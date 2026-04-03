@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div style="max-width: 400px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px;">
+    <h2>PwaniNet: New Student Enrollment</h2>
+    <p>Register Here.</p>
+    
+    <form method="POST">
+        {% csrf_token %}
+        
+        {{ form.as_p }}
+        
+        <div style="margin-top: 20px;">
+            <button type="submit" style="padding: 10px 20px; cursor: pointer;">Complete Registration</button>
+        </div>
+    </form>
+    
+    <hr>
+    <p>Already have an account? <a href="{% url 'login' %}">Login Instead</a></p>
+</div>
+{% endblock %}

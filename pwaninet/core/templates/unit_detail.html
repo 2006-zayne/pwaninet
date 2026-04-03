@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Posts for {{ unit.code }}: {{ unit.name }}</h2>
+<a href="{% url 'home' %}">Back to Main Feed</a>
+
+  {% for post in posts %}
+        <div style="border: 1px solid black; padding: 10px; margin-bottom: 10px; border-radius: 25px;">
+            <p><strong>{{ post.author.first_name }} {{ post.author.second_name }}</strong> posted in {{ post.unit.name }}</p>
+            <p>{{ post.content }}</p>
+            <small>{{ post.date }}</small>
+        </div>
+    {% empty %}
+        <p>Hello {{ user.username }} write something.</p> 
+    {% endfor %}
+
+{% endblock %}
+
+
+{% for post in posts %}
+    <div style="border: 1px dashed gray; padding: 10px; margin-top: 10px;">
+        <p>{{ post.content }}</p>
+        <small>Posted by {{ post.author.username }} on {{ post.date }}</small>
+    </div>
+{% endfor %}

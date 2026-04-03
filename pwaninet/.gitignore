@@ -1,0 +1,16 @@
+# Python artifacts
+__pycache__/
+*.pyc
+ramsey-env/
+venv/
+.vscode/
+
+# Database and Secrets (DO NOT REMOVE)
+db.sqlite3
+db.sqlite3-journal
+login_credentials.txt
+
+# Distribution
+*.egg-info/
+dist/
+build/
