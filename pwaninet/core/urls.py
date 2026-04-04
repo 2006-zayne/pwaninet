@@ -17,4 +17,7 @@ urlpatterns = [
     # the load year url for the year filter.
     path('load-years/', views.load_years, name='load_years'),
 
+    #The url to the profile view.
+    path('user/<str:username>', views.profile_view , name='profile'),
+
 ]

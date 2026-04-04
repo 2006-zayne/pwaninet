@@ -15,7 +15,7 @@
 <div style="float: left; width: 55%;">
     {% for post in posts %}
         <div style="border: 1px solid black; padding: 10px; margin-bottom: 10px; border-radius: 25px;">
-            <p><strong>{{ post.author.first_name }} {{ post.author.second_name }}</strong> posted in {{ post.unit.name }}</p>
+            <p><strong><a style="color: black;" href="{% url 'profile' username=post.author.username %}">{{ post.author.first_name }} {{ post.author.second_name }}</a></strong> posted in {{ post.unit.name }}</p>
             <p>{{ post.content }}</p>
             <small>{{ post.date }}</small>
         </div>

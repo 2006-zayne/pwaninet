@@ -10,7 +10,7 @@
         <a href="{% url 'create_post' %}">Create Post</a> | 
         {% if user.is_authenticated %}
             <span>
-               <em> Student:</em> <strong>{{ user.first_name }}  {{user.second_name}}</strong> | 
+               <em> Student:</em> <strong>{{ user.first_name }} {{ user.second_name }}</strong> | 
                 <em>Course:</em> <strong>{{ user.course.name }}</strong>
             </span>
         {% else %}

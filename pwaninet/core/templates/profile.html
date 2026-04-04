@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1> <strong>Name:</strong>{{ profile_user.first_name }} {{ profile_user.second_name }} {{ profile_user.last_name }}</h1>
+<p><strong>Username:</strong> @{{ profile_user.username }} </p>
+
+<ul>
+    <li><strong>Course:</strong> {{ profile_user.course }}</li>
+    <li><strong>Year:</strong> {{ profile_user.year }}</li>
+
+</ul>
+
+{% if request.user == profile_user %} {#THis one is a little bit tricky I'll work on it later it's the edit profile button where if you are viewing your profile you get the edit profile priviledge.#}
+    <p><a href="#">[The edit profile logic is needed that's for later mandem.]</a></p>
+
+{% endif %}
+
+<hr>
+
+<h2>Posts by {{ profile_user.username }}</h2> {#Begins the posts sections where we user will see the posts by that dude.#}
+
+{% for post in posts %}
+    <div class="raw-post"  style="border: 1px solid black; padding: 10px; margin-bottom: 10px; border-radius: 25px;"> {#will help you in stylyng...jeff.#}
+        <p>{{ post.content }}</p> {#will just show the posts as paragraph you can tamper with it jeff the stage is yours.#}
+        <small>Posted: {{ post.date }}</small>
+    </div>
+
+    <br>
+{% empty %}
+        <p>User has no post yet.</p>
+{% endfor %}
+
+{% endblock %}

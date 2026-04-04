@@ -2,8 +2,11 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from .models import Post, Unit, Course ,Year ,User
 from .forms import PwaniSignupForm ,PostForm
+from django.contrib.auth import get_user_model
 
 # Create your views here.
+
+User = get_user_model()
 
 def register_view(request):
     if request.method == 'POST':
@@ -91,3 +94,20 @@ def load_years(request):
     
     # Return the partial HTML for filtering the year
     return render(request, 'partials/year_options.html', {'years': years})
+
+@login_required
+def profile_view(request ,username):
+
+    # FiNDS  the user who posted or returns a 404 not found error.
+    target_user = get_object_or_404(User,username=username)
+
+    #We gather all the posts the user has ever posted.
+    user_posts = target_user.posts.all().order_by('-date')
+
+    #The briefcase with the data we want to see.
+    context ={
+        'profile_user': target_user,
+        'posts' : user_posts,
+    }
+
+    return render(request, 'profile.html' ,context)
