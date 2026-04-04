@@ -16,8 +16,11 @@
 {% endif %}
 
 <hr>
-
-<h2>Posts by {{ profile_user.username }}</h2> {#Begins the posts sections where we user will see the posts by that dude.#}
+{% if request.user == profile_user %}
+<h2>Your posts:</h2> {#Begins the posts sections where we user will see the posts by that dude.#}
+{% else %}
+<h2>Posts by {{ profile_user.username }}</h2>
+{% endif %}
 
 {% for post in posts %}
     <div class="raw-post"  style="border: 1px solid black; padding: 10px; margin-bottom: 10px; border-radius: 25px;"> {#will help you in stylyng...jeff.#}
