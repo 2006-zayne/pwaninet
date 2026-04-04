@@ -7,7 +7,7 @@ class PwaniSignupForm(UserCreationForm):
         model = User
         fields = UserCreationForm.Meta.fields + ('first_name', 'second_name', 'last_name', 'course', 'year')
         
-        # MISSION: Inject HTMX into the Signup dropdowns
+        #  WE use HTMX into the Signup dropdowns HTMX is a form of Java script which is directly injected into the HTML.
         widgets = {
             'course': forms.Select(attrs={
                 'hx-get': '/load-years/',      # The endpoint for filtering
@@ -22,7 +22,7 @@ class PwaniSignupForm(UserCreationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # TACTICAL CLEANUP: Start with an empty Year list
+        # To start with an empty Year list
         self.fields['year'].queryset = Year.objects.none()
 
         # Update queryset if course data is present (for validation and HTMX)

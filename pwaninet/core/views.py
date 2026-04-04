@@ -5,6 +5,7 @@ from .forms import PwaniSignupForm ,PostForm
 from django.contrib.auth import get_user_model
 
 # Create your views here.
+# This is simply to include the abstract user model ok fam?
 
 User = get_user_model()
 
@@ -27,7 +28,7 @@ def post_list_view(request):
     user = request.user
 
 
-    # MISSION: Only show units for the user's specific Course and Year
+    # Only show units for the user's specific Course and Year
     if user.course and user.year:
         units = Unit.objects.filter(course=user.course, year=user.year)
         posts = Post.objects.filter(course=user.course, unit__year=user.year).order_by('-date')
