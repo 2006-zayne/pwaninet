@@ -1,0 +1,7 @@
+{% block content %}
+<div style="text-align: center; margin-top: 50px;">
+    <h2>Logged out of {{ user.username }}.</h2>
+    <p>You have successfully logged out of your account.</p>
+    <a href="{% url 'login' %}">Login</a>
+</div>
+{% endblock %}

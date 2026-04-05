@@ -121,7 +121,7 @@ STATIC_URL = 'static/'
 LOGIN_REDIRECT_URL = 'home'
 
 # Where to go after logging out
-LOGOUT_REDIRECT_URL = 'login'
+LOGOUT_REDIRECT_URL = 'logout'
 
 AUTH_USER_MODEL = 'core.User'
 

@@ -8,6 +8,17 @@
     <nav>
         <a href="{% url 'home' %}">Feed</a> | 
         <a href="{% url 'create_post' %}">Create Post</a> | 
+        <a href="{% url 'notifications' %}">My Notifications</a>
+
+        {% if user.is_authenticated %}
+        <form action="{% url 'logout' %}" method="post" style="display:inline;">
+            {% csrf_token %}
+                <button type="submit" style="background:none; border:none; color:red; cursor:pointer;">
+                    Logout
+                </button>
+        </form>
+        {% endif %}
+
         {% if user.is_authenticated %}
             <span>
                <em> Student:</em> <strong>{{ user.first_name }} {{ user.second_name }}</strong> | 
@@ -18,6 +29,17 @@
         {% endif %}
     </nav>
     <hr>
+    {# Hey Jeff this is the messages interceptor I have placed it so that we dont place it in every page.You can style it as you wish.THe onclick attribute on the button will enable one to dismiss it we can change this once we learn Java script. #}
+    {% if messages %}
+    <div id="msg-container">
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}" style="padding: 10px; border: 1px solid whitesmoke;border-radius: 15px; background-color: green; margin-bottom: 10px; color: white;">
+                {{ message }}
+                <button onclick="this.parentElement.style.display='none'" style="float: right; cursor: pointer;">&times;</button>
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
     
     {% block content %}
     {% endblock %}

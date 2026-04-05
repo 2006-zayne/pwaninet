@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import Course, Year ,Post ,Unit ,User
+from .models import Course, Year ,Post ,Unit ,User ,Notifications
 
 #Add the course and year fields to the Admin panel.
 class TheUserAdmin(UserAdmin):
@@ -24,3 +24,4 @@ admin.site.register(Course)
 admin.site.register(Year)
 admin.site.register(Post)
 admin.site.register(Unit)
+admin.site.register(Notifications)

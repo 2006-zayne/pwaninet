@@ -9,7 +9,7 @@ class Year(models.Model):
         'Course', 
         on_delete=models.CASCADE, 
         related_name='years'
-    )# related_name='years' allows Course.years.all() to work
+    )# related_name='years' allows Course.years.all() to work ok fam?
 
     def __str__(self):
         return f"{self.course.name} - Year {self.level}"
@@ -17,7 +17,7 @@ class Year(models.Model):
     class Meta:
       
         ordering = ['level'] #  Ensures Year 1 comes before Year 2 in the dropdowns
-        unique_together = ['level', 'course']   # Prevents duplicate years for the same course (e.g., two "Year 1"s for CS)
+        unique_together = ['level', 'course']   # Prevents duplicate years for the same course 
        #pass
 
 class Course(models.Model):
@@ -68,3 +68,14 @@ class Post(models.Model):
     def __str__(self):
         return f"Post by {self.author} on {self.date.strftime('%Y-%m-%d')}"
 
+#Wagwan Jeff This is the notification model to store every student's notification it contains,the receiver,sender,and the is read field which determines if they have already read it.
+class Notifications(models.Model):
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE , related_name='notifications')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE ,related_name='sent_notifications' )
+    msg = models.CharField(max_length=255)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Notification for {self.recipient.username}"#Just for identify purposes for it not to bring crazy names when we nee to show it in the frontend hahahahahah!
+    
