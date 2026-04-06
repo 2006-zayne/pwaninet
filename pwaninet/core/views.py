@@ -132,6 +132,8 @@ def profile_view(request ,username):
         'posts' : user_posts,
     }
 
+    return render(request, 'profile.html' ,context )
+
 
 @login_required
 def notifications_list(request):
