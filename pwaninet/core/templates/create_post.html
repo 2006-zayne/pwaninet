@@ -1,19 +1,38 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-dark text-white">
+                    <h4 class="mb-0">New PwaniNet Post</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        {% for field in form %}
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.help_text %}
+                                    <div class="form-text">{{ field.help_text }}</div>
+                                {% endif %}
+                                {% for error in field.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
 
-<div class="content-section">
-    <form method="POST">
-        {% csrf_token %}
-        <fieldset class="form-group">
-            <legend class="border-bottom mb-4">New PwaniNet Post</legend>
-            {# WE are going to use the forms from forms.py #}
-            {{ form.as_p }} 
-        </fieldset>
-        <div class="form-group">
-            <button class="btn btn-outline-info" type="submit">Post</button>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" type="submit">Deploy Intel</button>
+                            <a href="{% url 'home' %}" class="btn btn-outline-secondary">Abort Mission</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
-    </form>
+    </div>
 </div>
-
 {% endblock %}

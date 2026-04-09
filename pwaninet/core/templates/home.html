@@ -1,26 +1,62 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h2>Main Feed</h2>
-
-<div style="float: left; width: 15%; border-right: 1px solid black ; margin-right: 20px;">
-    <h3>Units</h3>
-    <ul>
-        {% for unit in units %}
-            <li><a href="{% url 'unit_detail' unit.id %}">{{ unit.code }}</a></li>
-        {% endfor %}
-    </ul>
-</div>
-
-<div style="float: left; width: 55%;">
-    {% for post in posts %}
-        <div style="border: 1px solid black; padding: 10px; margin-bottom: 10px; border-radius: 25px;">
-            <p><strong><a style="color: black;" href="{% url 'profile' username=post.author.username %}">{{ post.author.first_name }} {{ post.author.second_name }}</a></strong> posted in {{ post.unit.name }}</p>
-            <p>{{ post.content }}</p>
-            <small>{{ post.date }}</small>
+<div class="row">
+    <div class="col-md-3 mb-4">
+        <div class="post-card-base p-3">
+            <h6 class="fw-bold mb-3">Academic Sectors</h6>
+            <div class="list-group list-group-flush small">
+                {% for unit in units %}
+                <a href="{% url 'unit_detail' unit.id %}" class="list-group-item list-group-item-action border-0 px-0">
+                    <span class="badge bg-light text-dark me-2">{{ unit.code }}</span> {{ unit.name }}
+                </a>
+                {% endfor %}
+            </div>
         </div>
-    {% empty %}
-        <p>Hello {{ user.username }} write something.</p> 
-    {% endfor %}
+    </div>
+
+    <div class="col-md-9">
+        {% for post in posts %}
+        <div class="post-card-base {{ post.gradient_class }}">
+            <div class="d-flex align-items-center mb-3">
+                <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover;">
+                <div class="ms-3">
+                    <h6 class="mb-0 fw-bold">
+                        <a href="{% url 'profile' username=post.author.username %}" class="text-inherit">
+                            {{ post.author.first_name }} {{ post.author.second_name }}
+                        </a>
+                    </h6>
+                    <small class="opacity-75">Posted in <strong>{{ post.unit.code }}</strong> • {{ post.date|timesince }} ago</small>
+                </div>
+            </div>
+
+            <p class="fs-5">{{ post.content }}</p>
+
+            {% if post.image %}
+                <img src="{{ post.image.url }}" class="img-fluid rounded-4 mb-3 shadow-sm border">
+            {% endif %}
+
+            {% if post.video %}
+                <div class="ratio ratio-16x9 mb-3 shadow-sm rounded-4 overflow-hidden bg-black">
+                    <video controls><source src="{{ post.video.url }}" type="video/mp4"></video>
+                </div>
+            {% endif %}
+
+            {% if post.docs %}
+                <div class="d-grid mt-2">
+                    <a href="{{ post.docs.url }}" class="btn btn-light btn-sm text-start border shadow-sm rounded-3">
+                        📂 View Attached Intel: {{ post.docs.name|truncatechars:25 }}
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="text-center py-5 post-card-base">
+            <h4 class="text-muted">The feed is silent, Comrade.</h4>
+            <p>Deploy the first piece of intelligence to your squad.</p>
+            <a href="{% url 'create_post' %}" class="btn btn-primary rounded-pill">Deploy Post</a>
+        </div>
+        {% endfor %}
+    </div>
 </div>
 {% endblock %}

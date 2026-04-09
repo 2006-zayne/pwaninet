@@ -125,3 +125,11 @@ LOGOUT_REDIRECT_URL = 'logout'
 
 AUTH_USER_MODEL = 'core.User'
 
+import os
+#The url for all the media while the site is still under development
+MEDIA_URL = '/media/'
+
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+
+

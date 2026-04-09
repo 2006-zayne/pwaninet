@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from .models import Post, Unit, Course ,Year ,User ,Notifications
-from .forms import PwaniSignupForm ,PostForm
+from .forms import PwaniSignupForm ,PostForm , ProfileUpdateForm
 from django.contrib.auth import get_user_model
 from django.contrib import messages
 
@@ -70,8 +70,8 @@ def create_post_view(request):
        
        # WE first define the user to avoid the user not defined error.
        user = request.user
-       
-       form = PostForm(request.POST ,user= request.user )
+       print(f"FILES RECEIVED: {request.FILES}")
+       form = PostForm(request.POST  , request.FILES , user= request.user)
 
        if form.is_valid():
            post =form.save(commit=False)
@@ -148,3 +148,24 @@ def notifications_list(request):
 
     return render(redirect , 'notifications.html' , {'notifications' : my_notifs})
 
+
+@login_required
+def update_profile_view(request): #This is the logic we have all been waiting for,the profile update view where a user can change profile pic,edit,bio and nickname is upcoming.
+
+    user_instance = request.user #WE set the user to be the one who is currently logged in.
+
+    
+    if request.method == 'POST':
+
+        form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Profile updated successfully.")
+            return redirect('profile' , username =request.user.username )
+    else:
+        
+        form = ProfileUpdateForm(instance=user_instance)
+        #JUst a line to test and scan for errors .
+        print(f"Form fields: {form.fields.keys()}")
+
+    return render(request, 'update_profile.html', {'form': form})

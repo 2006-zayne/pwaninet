@@ -26,5 +26,8 @@ urlpatterns = [
 
     #THe notifications path 
     path('notifications/' , views.notifications_list , name='notifications'),
+    
+    #THe link to update profile view
+    path('profile/edit/' ,views.update_profile_view , name='update_profile'),
 
 ]

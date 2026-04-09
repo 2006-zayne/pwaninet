@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="post-card-base">
+            <div class="text-center mb-4">
+                <h3 class="fw-bold">Profile Calibration</h3>
+                <p class="text-muted">Modify your digital identity</p>
+            </div>
+
+            <div class="text-center mb-4">
+                <img src="{{ user.profile_pic.url }}" class="rounded-circle border border-4 border-white shadow-sm" style="width: 120px; height: 120px; object-fit: cover;">
+                <p class="small text-muted mt-2">Current Active Signature</p>
+            </div>
+
+            <form method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                {% if form %}
+                    {% for field in form %}
+                        <div class="mb-3 text-start">
+                            <label class="form-label fw-bold small text-uppercase text-secondary">{{ field.label }}</label>
+                            {{ field }}
+                            {% for error in field.errors %}
+                                <div class="text-danger x-small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-danger">ERROR: Form interface not responding.</div>
+                {% endif %}
+
+                <div class="d-grid gap-2 mt-4">
+                    <button type="submit" class="btn btn-success btn-lg shadow-sm rounded-3">Save & Sync</button>
+                    <a href="{% url 'profile' username=user.username %}" class="btn btn-link text-decoration-none text-secondary">Cancel Calibration</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

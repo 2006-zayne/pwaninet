@@ -46,7 +46,7 @@ class PostForm(forms.ModelForm):
 
     class Meta:
         model = Post
-        fields = ['unit', 'content'] 
+        fields = ['unit', 'content' , 'image' , 'video' , 'docs' , 'gradient_class'] 
 
         widgets = {
             'content': forms.Textarea(attrs={
@@ -55,6 +55,7 @@ class PostForm(forms.ModelForm):
                 'placeholder': 'What is on your mind?',
                 'class': 'form-control'
             }),
+            'gradient_class': forms.Select(attrs={'class': 'form-select'}),
         }
 
     # Filter units based on the user's Course and Year
@@ -62,8 +63,21 @@ class PostForm(forms.ModelForm):
         user = kwargs.pop('user', None) # Extract the user from the view
         super().__init__(*args, **kwargs)
         if user:
-            # MISSION: Restrict units to the user's specific deployment sector
+            # Restrict units to the user's specific deployment sector
             self.fields['unit'].queryset = Unit.objects.filter(
                 course=user.course, 
                 year=user.year
             )
+
+class ProfileUpdateForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ['profile_pic' , 'bio']#The students will only be allowed to edit the profile pic bio and other fields if possible maybe nicknames but we will figure out that later.
+        widgets = {
+            'bio' : forms.Textarea(attrs={'class': 'form-control', 'rows':3,'placeholder':'Write about yourself...'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super(ProfileUpdateForm, self).__init__(*args, **kwargs)
+        # THis ensure the file input is visible
+        self.fields['profile_pic'].widget.attrs.update({'class': 'form-control-file'})

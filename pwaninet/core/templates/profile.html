@@ -1,36 +1,58 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h1> <strong>Name:</strong>{{ profile_user.first_name }} {{ profile_user.second_name }} {{ profile_user.last_name }}</h1>
-<p><strong>Username:</strong> @{{ profile_user.username }} </p>
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="post-card-base mb-4">
+            <div class="row align-items-center">
+                <div class="col-md-3 text-center mb-3 mb-md-0">
+                    <img src="{{ profile_user.profile_pic.url }}" 
+                         class="rounded-circle border border-4 border-white shadow" 
+                         style="width: 150px; height: 150px; object-fit: cover;">
+                </div>
+                <div class="col-md-7 text-center text-md-start">
+                    <h2 class="fw-bold mb-0">{{ profile_user.first_name }} {{ profile_user.second_name }}</h2>
+                    <p class="text-primary mb-2">@{{ profile_user.username }}</p>
+                    <p class="mb-3">{{ profile_user.bio|default:"No personal bio provided for this operative." }}</p>
+                    <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-md-start">
+                        <span class="badge bg-light text-dark border p-2">🎓 {{ profile_user.course }}</span>
+                        <span class="badge bg-light text-dark border p-2">📅 Year: {{ profile_user.year }}</span>
+                    </div>
+                </div>
+                <div class="col-md-2 text-md-end">
+                    {% if request.user == profile_user %}
+                        <a href="{% url 'update_profile' %}" class="btn btn-sm btn-outline-dark rounded-pill px-3">Edit Gear</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
 
-<ul>
-    <li><strong>Course:</strong> {{ profile_user.course }}</li>
-    <li><strong>Year:</strong> {{ profile_user.year }}</li>
+        <h5 class="fw-bold mb-3 px-2">Deployment History</h5>
 
-</ul>
-
-{% if request.user == profile_user %} {#THis one is a little bit tricky I'll work on it later it's the edit profile button where if you are viewing your profile you get the edit profile priviledge.#}
-    <p><a href="#">[The edit profile logic is needed that's for later mandem.]</a></p>
-
-{% endif %}
-
-<hr>
-{% if request.user == profile_user %}
-<h2>Your posts:</h2> {#Begins the posts sections where we user will see the posts by that dude.#}
-{% else %}
-<h2>Posts by {{ profile_user.username }}</h2>
-{% endif %}
-
-{% for post in posts %}
-    <div class="raw-post"  style="border: 1px solid black; padding: 10px; margin-bottom: 10px; border-radius: 25px;"> {#will help you in stylyng...jeff.#}
-        <p>{{ post.content }}</p> {#will just show the posts as paragraph you can tamper with it jeff the stage is yours.#}
-        <small>Posted: {{ post.date }}</small>
+        {% for post in posts %}
+        <div class="post-card-base {{ post.gradient_class }}">
+            <div class="d-flex align-items-center mb-3">
+                <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-white" style="width: 35px; height: 35px; object-fit: cover;">
+                <div class="ms-2">
+                    <small class="opacity-75">Posted in <strong>{{ post.unit.code }}</strong> on {{ post.date|date:"F d, Y" }}</small>
+                </div>
+            </div>
+            <p class="fs-5">{{ post.content }}</p>
+            {% if post.image %}<img src="{{ post.image.url }}" class="img-fluid rounded-4 mb-3 border shadow-sm">{% endif %}
+            {% if post.video %}
+                <div class="ratio ratio-16x9 mb-3 rounded-4 overflow-hidden bg-black shadow-sm">
+                    <video controls><source src="{{ post.video.url }}" type="video/mp4"></video>
+                </div>
+            {% endif %}
+            {% if post.docs %}
+                <a href="{{ post.docs.url }}" class="btn btn-sm btn-light border w-100 text-start">📄 Resource Download</a>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="text-center py-5 post-card-base">
+            <p class="text-muted">No posts found in this operative's history.</p>
+        </div>
+        {% endfor %}
     </div>
-
-    <br>
-{% empty %}
-        <p>User has no post yet.</p>
-{% endfor %}
-
+</div>
 {% endblock %}

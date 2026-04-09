@@ -1,22 +1,56 @@
-{% extends 'base.html' %}{# WE must include the base html because of the HTMX link or else the year drop down won't work properly #}
+{% extends 'base.html' %}
 
 {% block content %}
-<div style="max-width: 400px; margin: auto; padding: 20px; border: 1px solid whitesmoke; border-radius: 8px;">
-    <h2>PwaniNet student account Register</h2>
-    <p>Register Here.</p>
-    
-    <form method="POST">
-        {% csrf_token %}
+<div class="container">
+    <div class="row justify-content-center align-items-center" style="min-height: 85vh; padding-top: 20px; padding-bottom: 20px;">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-lg border-0" style="border-radius: 20px;">
+                <div class="card-header bg-dark text-white text-center py-4" style="border-radius: 20px 20px 0 0;">
+                    <h2 class="fw-bold mb-0">PwaniNet.</h2>
+                    <small class="text-info">Student Recruitment Portal</small>
+                </div>
+                <div class="card-body p-4 p-md-5">
+                    <div class="mb-4 text-center">
+                        <h4 class="fw-bold">Create Account</h4>
+                        <p class="text-muted small">Enter your academic credentials to join the squad.</p>
+                    </div>
 
-    {# WE are going to use the forms from forms.py #}
-        {{ form.as_p }}
-        
-        <div style="margin-top: 20px;">
-            <button type="submit" style="padding: 10px 20px; cursor: pointer;">Complete Registration</button>
+                    <form method="POST">
+                        {% csrf_token %}
+                        
+                        {% for field in form %}
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.help_text %}
+                                    <div class="form-text x-small text-muted">{{ field.help_text }}</div>
+                                {% endif %}
+                                {% for error in field.errors %}
+                                    <div class="text-danger small mt-1">⚠️ {{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button class="btn btn-primary btn-lg shadow-sm" type="submit" style="border-radius: 10px;">
+                                Complete Registration
+                            </button>
+                        </div>
+                    </form>
+
+                    <hr class="my-4">
+
+                    <div class="text-center">
+                        <p class="mb-0 text-muted small">Already have an account?</p>
+                        <a href="{% url 'login' %}" class="fw-bold text-dark text-decoration-none">Return to Base (Login)</a>
+                    </div>
+                </div>
+            </div>
+            
+            <p class="text-center mt-3 text-secondary small">
+                By joining, you agree to the Pwani University code of conduct.
+            </p>
         </div>
-    </form>
-    
-    <hr>
-    <p>Already have an account? <a href="{% url 'login' %}">Login Instead</a></p>
+    </div>
 </div>
 {% endblock %}

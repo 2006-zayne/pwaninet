@@ -1,47 +1,85 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PwaniNet.</title>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>{# This the HTMX link we talked about earlier in the forms so read on it. #}
+    
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        body { background-color: #ffffff; color: #212529; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* THE VANGUARD SHADOW BOX */
+        .post-card-base {
+            padding: 25px;
+            border-radius: 18px;
+            margin-bottom: 25px;
+            background-color: #ffffff;
+            border: 1px solid #f2f2f2;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        .post-card-base:hover { transform: translateY(-3px); box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1); }
+
+        /* CONDITIONAL TACTICAL GRADIENTS */
+        .grad-ocean { background: linear-gradient(135deg, #1e3c72, #2a5298) !important; color: white !important; border: none !important; }
+        .grad-forest { background: linear-gradient(135deg, #11998e, #38ef7d) !important; color: white !important; border: none !important; }
+        .grad-magma { background: linear-gradient(135deg, #eb3349, #f45c43) !important; color: white !important; border: none !important; }
+        .grad-midnight { background: linear-gradient(135deg, #6441a5, #2a0845) !important; color: white !important; border: none !important; }
+
+        .text-inherit { color: inherit !important; text-decoration: none; }
+        .navbar { border-bottom: 1px solid #f0f0f0; }
+        .video-container { border-radius: 12px; overflow: hidden; background: #000; }
+    </style>
 </head>
 <body>
-    <nav>
-        <a href="{% url 'home' %}">Feed</a> | 
-        <a href="{% url 'create_post' %}">Create Post</a> | 
-        <a href="{% url 'notifications' %}">My Notifications</a>
-
-        {% if user.is_authenticated %}
-        <form action="{% url 'logout' %}" method="post" style="display:inline;">
-            {% csrf_token %}
-                <button type="submit" style="background:none; border:none; color:red; cursor:pointer;">
-                    Logout
-                </button>
-        </form>
-        {% endif %}
-
-        {% if user.is_authenticated %}
-            <span>
-               <em> Student:</em> <strong>{{ user.first_name }} {{ user.second_name }}</strong> | 
-                <em>Course:</em> <strong>{{ user.course.name }}</strong>
-            </span>
-        {% else %}
-            <a href="{% url 'login' %}">Login</a>
-        {% endif %}
-    </nav>
-    <hr>
-    {# Hey Jeff this is the messages interceptor I have placed it so that we dont place it in every page.You can style it as you wish.THe onclick attribute on the button will enable one to dismiss it we can change this once we learn Java script. #}
-    {% if messages %}
-    <div id="msg-container">
-        {% for message in messages %}
-            <div class="alert alert-{{ message.tags }}" style="padding: 10px; border: 1px solid whitesmoke;border-radius: 15px; background-color: green; margin-bottom: 10px; color: white;">
-                {{ message }}
-                <button onclick="this.parentElement.style.display='none'" style="float: right; cursor: pointer;">&times;</button>
+    <nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold text-dark" href="{% url 'home' %}">PwaniNet.</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Feed</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'create_post' %}">Create Post</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'notifications' %}">Intelligence Feed</a></li>
+                </ul>
+                <div class="d-flex align-items-center">
+                    {% if user.is_authenticated %}
+                        <span class="me-3 small text-muted d-none d-md-inline">
+                             Comrade: <strong>{{ user.first_name }}</strong>
+                        </span>
+                        <a href="{% url 'profile' username=user.username %}" class="btn btn-sm btn-outline-dark rounded-pill px-3 me-2">Profile</a>
+                        <form action="{% url 'logout' %}" method="post" class="m-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-danger rounded-pill px-3">Logout</button>
+                        </form>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="btn btn-sm btn-primary rounded-pill px-3">Login</a>
+                    {% endif %}
+                </div>
             </div>
-        {% endfor %}
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% if messages %}
+            <div id="msg-container">
+                {% for message in messages %}
+                    <div class="alert alert-success alert-dismissible fade show shadow-sm rounded-4" role="alert">
+                        <strong>Update:</strong> {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        
+        {% block content %}{% endblock %}
     </div>
-    {% endif %}
-    
-    {% block content %}
-    {% endblock %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

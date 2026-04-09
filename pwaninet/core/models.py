@@ -1,6 +1,19 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+from PIL import Image
+from io import BytesIO
+from django.core.files.uploadedfile import InMemoryUploadedFile
+import sys
+from .validators import validate_image_size, validate_video_size, validate_document_size
+
+GRADIENT_CHOICES = [
+    ('none', 'Standard (No Gradient)'),
+    ('grad-ocean', 'Ocean Blue'),
+    ('grad-forest', 'Forest Green'),
+    ('grad-magma', 'Magma Red'),
+    ('grad-midnight', 'Midnight Purple'),
+]
 
 class Year(models.Model):
     level = models.PositiveIntegerField()
@@ -47,6 +60,9 @@ class User(AbstractUser):
     last_name = models.CharField(max_length=200 ,null=True,blank=True)
     year = models.ForeignKey(Year, on_delete=models.SET_NULL, null=True)
     course = models.ForeignKey(Course, on_delete=models.CASCADE,  null=True ,blank=True)
+    profile_pic = models.ImageField(default='profile_pic/default_pic1.jpg', upload_to='profile_pic')
+    bio = models.TextField(max_length=500 , blank=True)
+    #groups_in = models.ManyToManyField('Groups' , related_name='members')
     
     def __str__(self):
         return f"{self.first_name } { self.second_name}".strip() or self.username
@@ -63,10 +79,36 @@ class Post(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True)
     content = models.TextField()
+    image = models.ImageField(upload_to='posts/images' , blank=True , null= True)
+    video = models.FileField(upload_to='posts/videos' , blank= True , null= True )
+    docs = models.FileField(upload_to= 'posts/docs' , blank= True , null= True )
+    gradient_class = models.CharField(max_length=50 , choices=GRADIENT_CHOICES , default= 'none' , blank= True )
     date = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"Post by {self.author} on {self.date.strftime('%Y-%m-%d')}"
+    
+    def save(self, *args, **kwargs):
+        if self.image:
+            img = Image.open(self.image)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Downscale for HP ProBook storage efficiency
+            if img.height > 1080 or img.width > 1080:
+                img.thumbnail((1080, 1080))
+            
+            output = BytesIO()
+            img.save(output, format='JPEG', quality=75) # Crushing file size by ~60%
+            output.seek(0)
+            
+            file_name = self.image.name.split('.')[0]
+            self.image = InMemoryUploadedFile(
+                output, 'ImageField', f"{file_name}.jpg", 
+                'image/jpeg', sys.getsizeof(output), None
+            )
+
+        super(Post, self).save(*args, **kwargs)
 
 #Wagwan Jeff This is the notification model to store every student's notification it contains,the receiver,sender,and the is read field which determines if they have already read it.
 class Notifications(models.Model):
