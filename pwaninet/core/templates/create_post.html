@@ -1,38 +1,121 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-5">
+<div class="container py-5">
     <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow">
-                <div class="card-header bg-dark text-white">
-                    <h4 class="mb-0">New PwaniNet Post</h4>
+        <div class="col-12 col-md-8 col-lg-7">
+            
+            <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+                <div class="bg-dark p-4 d-flex align-items-center justify-content-between">
+                    <div>
+                        <h4 class="fw-bold text-white mb-0" style="letter-spacing: 1px;">NEW DEPLOYMENT</h4>
+                        <small class="text-primary fw-bold text-uppercase" style="font-size: 0.7rem;">Broadcasting to Pwaninet Network</small>
+                    </div>
+                    <i class="bi bi-shield-shaded text-primary fs-3"></i>
                 </div>
-                <div class="card-body">
-                    <form method="POST" enctype="multipart/form-data">
+
+                <div class="card-body p-4 p-md-5">
+                    <form method="POST" enctype="multipart/form-data" id="postForm">
                         {% csrf_token %}
                         
-                        {% for field in form %}
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">{{ field.label }}</label>
-                                {{ field }}
-                                {% if field.help_text %}
-                                    <div class="form-text">{{ field.help_text }}</div>
-                                {% endif %}
-                                {% for error in field.errors %}
-                                    <div class="text-danger small">{{ error }}</div>
-                                {% endfor %}
+                        <div class="mb-4">
+                            <label class="form-label small fw-black text-muted text-uppercase">Target Sector</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-0"><i class="bi bi-geo-alt-fill text-primary"></i></span>
+                                {{ form.unit }}
                             </div>
-                        {% endfor %}
+                            <div class="form-text x-small italic">Leave as "General" to broadcast to the entire university feed.</div>
+                        </div>
 
-                        <div class="d-grid gap-2">
-                            <button class="btn btn-primary" type="submit">Deploy Intel</button>
-                            <a href="{% url 'home' %}" class="btn btn-outline-secondary">Abort Mission</a>
+                        <div class="mb-4">
+                            <label class="form-label small fw-black text-muted text-uppercase">Intelligence Briefing</label>
+                            {{ form.content }}
+                        </div>
+
+                        <div class="p-3 bg-light rounded-4 mb-4">
+                            <h6 class="small fw-bold text-uppercase mb-3"><i class="bi bi-paperclip me-2"></i>Attached Assets</h6>
+                            <div class="row g-2">
+                                <div class="col-4">
+                                    <div class="media-upload-box text-center p-2 border rounded-3 bg-white">
+                                        <label for="{{ form.image.id_for_label }}" class="mb-0 cursor-pointer">
+                                            <i class="bi bi-image text-primary d-block fs-4"></i>
+                                            <span class="x-small fw-bold">IMAGE</span>
+                                        </label>
+                                        <div class="visually-hidden">{{ form.image }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="media-upload-box text-center p-2 border rounded-3 bg-white">
+                                        <label for="{{ form.video.id_for_label }}" class="mb-0 cursor-pointer">
+                                            <i class="bi bi-play-btn text-danger d-block fs-4"></i>
+                                            <span class="x-small fw-bold">VIDEO</span>
+                                        </label>
+                                        <div class="visually-hidden">{{ form.video }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="media-upload-box text-center p-2 border rounded-3 bg-white">
+                                        <label for="{{ form.docs.id_for_label }}" class="mb-0 cursor-pointer">
+                                            <i class="bi bi-file-earmark-pdf text-info d-block fs-4"></i>
+                                            <span class="x-small fw-bold">DOCS</span>
+                                        </label>
+                                        <div class="visually-hidden">{{ form.docs }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-5">
+                            <label class="form-label small fw-black text-muted text-uppercase">Deployment Visual Style</label>
+                            {{ form.gradient_class }}
+                        </div>
+
+                        <div class="d-grid gap-3">
+                            <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold shadow">
+                                <i class="bi bi-send-fill me-2"></i>DEPLOY INTEL
+                            </button>
+                            <a href="{% url 'home' %}" class="btn btn-link text-muted text-decoration-none fw-bold small">
+                                ABORT MISSION
+                            </a>
                         </div>
                     </form>
                 </div>
             </div>
+
         </div>
     </div>
 </div>
+
+<style>
+    .fw-black { font-weight: 900; }
+    .x-small { font-size: 0.7rem; }
+    .cursor-pointer { cursor: pointer; }
+    .italic { font-style: italic; }
+
+    /* Custom Form Styling */
+    #postForm textarea {
+        border: 2px solid #f1f3f5 !important;
+        border-radius: 15px !important;
+        background-color: #f8f9fa !important;
+        transition: all 0.3s ease;
+    }
+    #postForm textarea:focus {
+        background-color: #fff !important;
+        border-color: var(--bs-primary) !important;
+        box-shadow: 0 8px 20px rgba(13, 110, 253, 0.05) !important;
+    }
+    #postForm select {
+        border-radius: 10px !important;
+        border: 1px solid #dee2e6 !important;
+    }
+    .media-upload-box {
+        transition: all 0.2s ease;
+        border: 1px dashed #dee2e6 !important;
+    }
+    .media-upload-box:hover {
+        background-color: #e9ecef !important;
+        border-color: var(--bs-primary) !important;
+        transform: translateY(-2px);
+    }
+</style>
 {% endblock %}

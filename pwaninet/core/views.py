@@ -81,15 +81,26 @@ def post_list_view(request):
         Q(course=user.course, unit__year=user.year)
     ).distinct().order_by('-date')
 
-    posts = list(feed_query[:40])
+    # Optimization: select_related/prefetch_related to speed up loading
+    posts_qs = feed_query.select_related('author', 'unit').prefetch_related('likes')
+    
+    posts = list(posts_qs[:40])
     if len(posts) > 10:
         posts = random.sample(posts, k=min(len(posts), 15))
         posts.sort(key=lambda x: x.date, reverse=True)
+
+    # NEW: Identify which intel the operative has already liked
+    # This checks your 'Like' model for all posts in the current feed
+    liked_post_ids = Like.objects.filter(
+        user=user, 
+        post__in=posts
+    ).values_list('post_id', flat=True)
 
     return render(request, 'home.html', {
         'posts': posts,
         'suggested_groups': suggested_groups,
         'suggestions': suggestions,
+        'liked_post_ids': liked_post_ids, # Pass this to the template
         'title': 'PwaniNet Command Feed',
     })
 
@@ -104,14 +115,23 @@ def notifications_list(request):
 @login_required
 def groups_dashboard(request):
     user = request.user
-    official_groups = user.joined_groups.filter(is_official=True)
-    social_groups = user.joined_groups.filter(is_official=False)
+    
+    # Use 'members' to find groups the user is in
+    user_groups = Groups.objects.filter(members=user)
+
+    # Use 'exclude' to find groups the user is NOT in
+    # REMOVED course/year filters because they don't exist in your model yet
+    all_groups = Groups.objects.all().exclude(members=user)
+
+    # Suggested groups based on following
     following_ids = user.following.values_list('id', flat=True)
-    suggested_groups = Groups.objects.filter(members__id__in=following_ids).exclude(members=user).distinct()[:5]
+    suggested_groups = Groups.objects.filter(
+        members__id__in=following_ids
+    ).exclude(members=user).distinct()[:5]
 
     return render(request, 'groups_dashboard.html', {
-        'official_groups': official_groups,
-        'social_groups': social_groups,
+        'user_groups': user_groups,
+        'all_groups': all_groups,
         'suggested_groups': suggested_groups,
     })
 

@@ -1,97 +1,157 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-4 pb-5">
-    <div class="d-flex justify-content-between align-items-center mb-5">
-        <div>
-            <h2 class="fw-bold mb-0 text-primary">Community Hub</h2>
-            <p class="text-muted">Command center for your academic and social squads.</p>
+<div class="container-fluid py-4 px-md-5">
+    
+    <div class="row align-items-end mb-5 g-3">
+        <div class="col-12 col-md-7">
+            <h1 class="fw-black mb-1" style="letter-spacing: -1px;">SQUAD HUB</h1>
+            <p class="text-muted text-uppercase small fw-bold mb-0">
+                <i class="bi bi-broadcast text-primary me-2"></i>Active Network: Pwani University Sector
+            </p>
         </div>
-        <a href="{% url 'create_group' %}" class="btn btn-primary rounded-pill shadow-sm px-4">
-            <i class="bi bi-plus-lg me-2"></i>Create Squad
-        </a>
+        <div class="col-12 col-md-5 text-md-end">
+            <a href="{% url 'create_group' %}" class="btn btn-primary rounded-pill px-4 py-2 fw-bold shadow-sm">
+                <i class="bi bi-plus-lg me-1"></i> INITIALIZE NEW UNIT
+            </a>
+        </div>
     </div>
 
-    <div class="row">
-        <div class="col-12 mb-5">
-            <div class="d-flex align-items-center mb-4">
-                <div class="bg-primary rounded-circle p-2 me-3 shadow-sm">
-                    <i class="bi bi-mortarboard-fill text-white"></i>
-                </div>
-                <h4 class="fw-bold mb-0 text-uppercase tracking-wider small text-muted">Official Academic Sectors</h4>
-            </div>
-            
-            <div class="row g-4">
-                {% for group in official_groups %}
-                <div class="col-md-6 col-lg-4">
-                    <div class="card h-100 border-0 shadow-sm transition-up" style="border-left: 5px solid #0d6efd !important;">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center">
-                                {% if group.group_pic %}
-                                    <img src="{{ group.group_pic.url }}" class="rounded-3 shadow-sm" style="width: 60px; height: 60px; object-fit: cover;">
-                                {% else %}
-                                    <div class="rounded-3 bg-primary-subtle d-flex align-items-center justify-content-center shadow-sm" style="width: 60px; height: 60px;">
-                                        <i class="bi bi-bank2 text-primary fs-3"></i>
+    <div class="row g-4">
+        
+        <div class="col-12 col-xl-4">
+            <div class="sticky-top" style="top: 20px; z-index: 10;">
+                <div class="card border-0 shadow-sm bg-dark text-white rounded-4 overflow-hidden mb-4">
+                    <div class="card-body p-4">
+                        <h6 class="text-primary text-uppercase fw-bold mb-4 small" style="letter-spacing: 2px;">Your Fleet</h6>
+                        
+                        <div class="unit-list" style="max-height: 60vh; overflow-y: auto;">
+                            {% for group in user_groups %}
+                                <div class="d-flex align-items-center mb-3 p-2 rounded-3 hover-bg-light-dark transition-all position-relative">
+                                    <div class="flex-shrink-0">
+                                        {% if group.group_pic %}
+                                            <img src="{{ group.group_pic.url }}" class="rounded-circle border border-2 border-primary" style="width: 48px; height: 48px; object-fit: cover;">
+                                        {% else %}
+                                            <div class="rounded-circle bg-primary bg-opacity-25 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                                                <i class="bi bi-shield-lock text-primary"></i>
+                                            </div>
+                                        {% endif %}
                                     </div>
-                                {% endif %}
-                                <div class="ms-3">
-                                    <h5 class="mb-1 fw-bold">
-                                        <a href="{% url 'groups_detail' group.id %}" class="text-dark text-decoration-none">{{ group.name }}</a>
-                                    </h5>
-                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill small">Verified Sector</span>
+                                    <div class="ms-3 overflow-hidden">
+                                        <h6 class="mb-0 fw-bold text-truncate">{{ group.name }}</h6>
+                                        <small class="text-muted" style="font-size: 11px;">{{ group.members.count }} operatives</small>
+                                    </div>
+                                    <a href="{% url 'groups_detail' group.id %}" class="stretched-link"></a>
                                 </div>
-                            </div>
-                            <div class="mt-3 pt-3 border-top d-flex justify-content-between align-items-center">
-                                <small class="text-muted"><i class="bi bi-people me-1"></i>{{ group.members.count }} Comrades</small>
-                                <a href="{% url 'groups_detail' group.id %}" class="btn btn-sm btn-outline-primary rounded-pill px-3">Enter</a>
-                            </div>
+                            {% empty %}
+                                <div class="text-center py-4 opacity-50">
+                                    <i class="bi bi-geo-alt fs-2 d-block mb-2"></i>
+                                    <p class="small mb-0">No active deployments.</p>
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
+
+                <div class="p-4 border border-2 rounded-4 border-dashed text-muted bg-white shadow-sm">
+                    <h6 class="fw-bold small mb-2"><i class="bi bi-info-circle me-2 text-primary"></i>Command Note</h6>
+                    <p class="small mb-0" style="font-size: 12px;">Joining squads allows you to access private Intel Streams and coordinate with your unit members in real-time.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-8">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h5 class="fw-bold mb-0">Available Operations</h5>
+                <span class="badge bg-light text-dark rounded-pill border">{{ all_groups.count }} Units Detected</span>
+            </div>
+
+            <div class="row g-3">
+                {% for group in all_groups %}
+                    <div class="col-12 col-md-6">
+                        <div class="card border-0 shadow-sm h-100 tactical-card rounded-4 bg-white">
+                            <div class="card-body p-4 d-flex flex-column">
+                                <div class="d-flex justify-content-between mb-3">
+                                    <span class="badge {% if group.is_official %}bg-primary{% else %}bg-secondary{% endif %} rounded-pill small" style="font-size: 10px;">
+                                        {% if group.is_official %}OFFICIAL{% else %}COMMUNITY{% endif %}
+                                    </span>
+                                    <small class="text-muted"><i class="bi bi-people me-1"></i>{{ group.members.count }}</small>
+                                </div>
+                                <h5 class="fw-bold mb-2 h6 text-uppercase">{{ group.name }}</h5>
+                                <p class="text-muted small mb-4" style="font-size: 13px; line-height: 1.4;">
+                                    {{ group.description|truncatewords:20|default:"No briefing data available." }}
+                                </p>
+                                <div class="mt-auto">
+                                    <a href="{% url 'groups_detail' group.id %}" class="btn btn-outline-primary btn-sm w-100 rounded-pill fw-bold transition-all">
+                                        ANALYZE INTEL
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="col-12 text-center py-5">
+                        <i class="bi bi-radar text-muted display-1"></i>
+                        <p class="text-muted mt-3">All sectors currently dark.</p>
+                    </div>
                 {% endfor %}
             </div>
         </div>
 
-        <div class="col-12">
-            <div class="d-flex align-items-center mb-4">
-                <div class="bg-success rounded-circle p-2 me-3 shadow-sm">
-                    <i class="bi bi-chat-heart-fill text-white"></i>
-                </div>
-                <h4 class="fw-bold mb-0 text-uppercase tracking-wider small text-muted">Social Squads & Clubs</h4>
-            </div>
-            
-            <div class="row g-4">
-                {% for group in social_groups %}
-                <div class="col-md-6 col-lg-4">
-                    <div class="card h-100 border-0 shadow-sm transition-up">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center mb-3">
-                                {% if group.group_pic %}
-                                    <img src="{{ group.group_pic.url }}" class="rounded-circle border" style="width: 50px; height: 50px; object-fit: cover;">
-                                {% else %}
-                                    <div class="rounded-circle bg-success-subtle d-flex align-items-center justify-content-center border" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-people-fill text-success fs-4"></i>
-                                    </div>
-                                {% endif %}
-                                <div class="ms-3 flex-grow-1">
-                                    <h6 class="mb-0 fw-bold">
-                                        <a href="{% url 'groups_detail' group.id %}" class="text-dark text-dark text-decoration-none">{{ group.name }}</a>
-                                    </h6>
-                                    <small class="text-muted">{{ group.members.count }} members</small>
-                                </div>
-                            </div>
-                            <div class="d-flex gap-2">
-                                <a href="{% url 'groups_detail' group.id %}" class="btn btn-success btn-sm rounded-pill flex-grow-1">Visit</a>
-                                <button class="btn btn-light btn-sm rounded-pill" onclick="copyInviteLink('{{ group.id }}')">
-                                    <i class="bi bi-share"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
     </div>
 </div>
+
+<style>
+
+    /* Updated Tactical Card Animation */
+    .tactical-card {
+        border-bottom: 4px solid transparent !important; /* Base state: hidden border */
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Professional easing */
+    }
+
+    .tactical-card:hover {
+        transform: translateY(-8px); /* Lifts the card higher */
+        border-bottom-color: #0d6efd !important; /* Pwani primary blue color */
+        box-shadow: 0 1rem 3rem rgba(13, 110, 253, 0.15) !important; /* Subtle blue glow */
+    }
+
+    /* Optional: Make the button react to the hover as well */
+    .tactical-card:hover .btn-outline-primary {
+        background-color: #0d6efd;
+        color: white;
+    }
+
+    .fw-black { font-weight: 900; }
+    .border-dashed { border-style: dashed !important; border-color: #dee2e6 !important; }
+    .transition-all { transition: all 0.2s ease-in-out; }
+    
+    .tactical-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 1rem 3rem rgba(0,0,0,.08) !important;
+    }
+
+    .hover-bg-light-dark:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Logic to keep sidebar sticky on desktop only */
+    @media (min-width: 1200px) {
+        .sticky-top {
+            position: sticky;
+            top: 20px;
+        }
+    }
+
+    /* Hide scrollbar but keep functionality for the fleet list */
+    .unit-list::-webkit-scrollbar {
+        width: 4px;
+    }
+    .unit-list::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .unit-list::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.1);
+        border-radius: 10px;
+    }
+</style>
 {% endblock %}

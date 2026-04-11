@@ -1,35 +1,68 @@
-<div class="post-card shadow-sm mb-3">
+<div class="post-card shadow-sm mb-3 bg-white rounded-4 overflow-hidden border-0">
     <div class="d-flex align-items-center p-3">
-        <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border" style="width: 40px; height: 40px; object-fit: cover;">
+        <a href="{% url 'profile' post.author.username %}">
+            <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border" style="width: 40px; height: 40px; object-fit: cover;">
+        </a>
         <div class="ms-2">
             <h6 class="mb-0 fw-bold small">
                 <a href="{% url 'profile' post.author.username %}" class="text-dark text-decoration-none">
                     {{ post.author.get_full_name|default:post.author.username }}
                 </a>
             </h6>
-            <small class="text-muted" style="font-size: 12px;">
-                <span class="badge bg-light text-primary border">{{ post.unit.code|default:"Global" }}</span> • {{ post.date|timesince }} ago
+            <small class="text-muted" style="font-size: 11px;">
+                <span class="badge bg-light text-primary border-0">{{ post.unit.code|default:"GLOBAL" }}</span> • {{ post.date|timesince }} ago
             </small>
         </div>
     </div>
 
     <div class="px-3 pb-3">
-        <p class="mb-0">{{ post.content }}</p>
+        <p class="mb-0 text-dark" style="font-size: 15px; line-height: 1.5;">{{ post.content }}</p>
     </div>
 
-    {% if post.image %}
-        <img src="{{ post.image.url }}" class="img-fluid w-100 border-top border-bottom" style="max-height: 500px; object-fit: cover;">
+    {% if post.get_intel_file %}
+    <div class="post-media border-top border-bottom bg-light">
+        {% with f_url=post.get_intel_file.url|lower %}
+            
+            {% if ".jpg" in f_url or ".png" in f_url or ".jpeg" in f_url or ".webp" in f_url %}
+                <img src="{{ post.get_intel_file.url }}" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;">
+            
+            {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
+                <div class="ratio ratio-16x9 bg-black">
+                    <video controls preload="metadata" class="w-100 h-100">
+                        <source src="{{ post.get_intel_file.url }}" type="video/mp4">
+                    </video>
+                </div>
+
+            {% elif ".pdf" in f_url %}
+                <div class="p-4 d-flex align-items-center justify-content-between bg-white">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-danger bg-opacity-10 p-3 rounded-3 me-3">
+                            <i class="bi bi-file-earmark-pdf-fill text-danger fs-3"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0 fw-bold">Academic Intel</h6>
+                            <small class="text-muted">PDF DOCUMENT</small>
+                        </div>
+                    </div>
+                    <a href="{{ post.get_intel_file.url }}" target="_blank" class="btn btn-outline-dark btn-sm rounded-pill px-3 fw-bold">
+                        VIEW PDF
+                    </a>
+                </div>
+
+            {% endif %}
+        {% endwith %}
+    </div>
     {% endif %}
 
     <div class="d-flex align-items-center gap-4 px-3 py-2 border-top">
         <div id="like-section-{{ post.id }}">
-            {% include 'partials/like_button.html' %}
+            {% include 'partials/like_button.html' with post=post %}
         </div>
         <span class="small text-muted fw-bold" style="cursor:pointer;" 
               data-bs-toggle="modal" data-bs-target="#likersModal" 
               hx-get="{% url 'post_likers_list' post.id %}" 
               hx-target="#modal-content-target">
-            <i class="bi bi-eye"></i> View Intel
+            <i class="bi bi-eye-fill me-1"></i> VIEW INTEL
         </span>
     </div>
 </div>

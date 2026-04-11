@@ -40,6 +40,7 @@ class PostForm(forms.ModelForm):
     # Unit field definition as a dropdown
     unit = forms.ModelChoiceField(
         queryset=Unit.objects.all(),
+        required=False,
         empty_label="Select Unit.",
         widget=forms.Select(attrs={'class': 'form-control'}) # Standard Issue Styling
     )

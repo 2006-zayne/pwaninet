@@ -90,6 +90,28 @@ class Post(models.Model):
     def __str__(self):
         return f"Post by {self.author} on {self.date.strftime('%Y-%m-%d')}"
     
+
+    @property
+    def get_intel_file(self):
+        """Returns the active media file regardless of type."""
+        if self.image:
+            return self.image
+        if self.video:
+            return self.video
+        if self.docs:
+            return self.docs
+        return None
+    
+    def is_liked_by(self, user):
+        if user.is_authenticated:
+            # We check your 'Like' model specifically
+            return self.likes_received.filter(user=user).exists()
+        return False
+
+    @property
+    def like_count(self):
+        return self.likes_received.count()
+    
     def save(self, *args, **kwargs):
         if self.image:
             img = Image.open(self.image)
@@ -129,12 +151,19 @@ class Groups(models.Model):
     creator = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_groups')
     members = models.ManyToManyField(User, related_name='joined_groups', blank=True)
     description = models.TextField(max_length=500, blank=True)
-    group_pic = models.ImageField(default='group_profile_pic/default_group.jpg', upload_to='group_profile_pic')
-    is_official = models.BooleanField(default=False) #Only allows us thee admins to creeate officil groups
+    group_pic = models.ImageField(upload_to='group_profile_pic' , null=True , blank=True)
+    is_official = models.BooleanField(default=False) #Only allows us the admins to create official groups
 
 
     def __str__(self):
         return self.name
+    
+    @property
+    def get_photo_url(self):
+        if self.group_pic and hasattr(self.group_pic, 'url'):
+            return self.group_pic.url
+        # Tactical Fallback: Points to your STATIC folder, not MEDIA
+        return f"{settings.STATIC_URL}images/default_group.jpg"
 
 
 class Like(models.Model):
