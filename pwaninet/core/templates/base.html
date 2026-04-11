@@ -2,82 +2,171 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PwaniNet.</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PwaniNet | Command Center</title>
     
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     
     <style>
-        body { background-color: #ffffff; color: #212529; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        
-        /* THE VANGUARD SHADOW BOX */
-        .post-card-base {
-            padding: 25px;
-            border-radius: 18px;
-            margin-bottom: 25px;
-            background-color: #ffffff;
-            border: 1px solid #f2f2f2;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-            transition: all 0.3s ease;
+        :root { 
+            --cmd-black: #0f172a; 
+            --cmd-slate: #1e293b;
+            --cmd-blue: #3b82f6; 
+            --fb-gray: #f8fafc;
+            --border-color: #e2e8f0; 
         }
-        .post-card-base:hover { transform: translateY(-3px); box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1); }
+        
+        body { 
+            background-color: var(--fb-gray) !important; 
+            color: var(--cmd-black); 
+            font-family: 'Inter', -apple-system, sans-serif; 
+            padding-top: 70px; /* Space for Top Nav */
+            padding-bottom: 70px; 
+        }
 
-        /* CONDITIONAL TACTICAL GRADIENTS */
-        .grad-ocean { background: linear-gradient(135deg, #1e3c72, #2a5298) !important; color: white !important; border: none !important; }
-        .grad-forest { background: linear-gradient(135deg, #11998e, #38ef7d) !important; color: white !important; border: none !important; }
-        .grad-magma { background: linear-gradient(135deg, #eb3349, #f45c43) !important; color: white !important; border: none !important; }
-        .grad-midnight { background: linear-gradient(135deg, #6441a5, #2a0845) !important; color: white !important; border: none !important; }
+        /* COMMAND NAVBAR (TOP) */
+        .navbar-top { 
+            background: rgba(255, 255, 255, 0.95) !important; 
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color); 
+            height: 65px; 
+            z-index: 1050; 
+        }
 
-        .text-inherit { color: inherit !important; text-decoration: none; }
-        .navbar { border-bottom: 1px solid #f0f0f0; }
-        .video-container { border-radius: 12px; overflow: hidden; background: #000; }
+        .nav-brand-tactical {
+            font-weight: 800;
+            letter-spacing: -1px;
+            color: var(--cmd-black);
+            text-transform: uppercase;
+        }
+
+        /* TACTICAL NAVIGATION CHIPS */
+        .nav-chip {
+            color: #64748b;
+            padding: 8px 16px;
+            border-radius: 12px;
+            transition: all 0.2s ease;
+            font-size: 1.2rem;
+            text-decoration: none;
+        }
+        .nav-chip:hover {
+            background: #f1f5f9;
+            color: var(--cmd-blue);
+        }
+        .nav-chip.active {
+            background: #eff6ff;
+            color: var(--cmd-blue);
+        }
+
+        /* MOBILE BOTTOM NAV - REDESIGNED */
+        .mobile-bottom-nav { 
+            background: #fff; 
+            border-top: 1px solid var(--border-color); 
+            height: 65px; 
+            position: fixed; 
+            bottom: 0; 
+            width: 100%; 
+            z-index: 2000; 
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+
+        /* POST CARDS */
+        .post-card { 
+            background: #fff; 
+            border-radius: 16px; 
+            border: 1px solid var(--border-color); 
+            margin-bottom: 20px; 
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
+            transition: transform 0.2s ease;
+        }
+        
+        /* THE "WHAT'S ON YOUR MIND" TRIGGER BOX */
+        .mind-trigger {
+            background: #f1f5f9;
+            border-radius: 100px;
+            padding: 12px 20px;
+            color: #64748b;
+            cursor: pointer;
+            transition: background 0.2s;
+            border: none;
+            width: 100%;
+            text-align: left;
+        }
+        .mind-trigger:hover { background: #e2e8f0; }
+
+        @media (min-width: 768px) { .mobile-bottom-nav { display: none; } }
     </style>
 </head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top shadow-sm">
-        <div class="container">
-            <a class="navbar-brand fw-bold text-dark" href="{% url 'home' %}">PwaniNet.</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Feed</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'create_post' %}">Create Post</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'notifications' %}">Intelligence Feed</a></li>
-                </ul>
-                <div class="d-flex align-items-center">
-                    {% if user.is_authenticated %}
-                        <span class="me-3 small text-muted d-none d-md-inline">
-                             Comrade: <strong>{{ user.first_name }}</strong>
-                        </span>
-                        <a href="{% url 'profile' username=user.username %}" class="btn btn-sm btn-outline-dark rounded-pill px-3 me-2">Profile</a>
-                        <form action="{% url 'logout' %}" method="post" class="m-0">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-danger rounded-pill px-3">Logout</button>
-                        </form>
-                    {% else %}
-                        <a href="{% url 'login' %}" class="btn btn-sm btn-primary rounded-pill px-3">Login</a>
-                    {% endif %}
-                </div>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+    
+    <nav class="navbar navbar-top fixed-top">
+        <div class="container d-flex justify-content-between align-items-center">
+            <a class="navbar-brand nav-brand-tactical" href="{% url 'home' %}">PwaniNet<span class="text-primary">.</span></a>
+            
+            <div class="d-none d-md-flex gap-2">
+                <a href="{% url 'home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+                    <i class="bi bi-house-door-fill"></i>
+                </a>
+                <a href="{% url 'groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}">
+                    <i class="bi bi-shield-shaded"></i>
+                </a>
+                <a href="{% url 'notifications' %}" class="nav-chip">
+                    <i class="bi bi-bell-fill"></i>
+                </a>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+                {% if request.user.is_authenticated %}
+                    <a href="{% url 'profile' request.user.username %}" class="text-dark">
+                        <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 35px; height: 35px; object-fit: cover;">
+                    </a>
+                    
+
+                {% else %}
+                    <a href="{% url 'login' %}" class="btn btn-primary btn-sm rounded-pill px-3">Login</a>
+                {% endif %}
             </div>
         </div>
     </nav>
 
-    <div class="container mt-4">
-        {% if messages %}
-            <div id="msg-container">
-                {% for message in messages %}
-                    <div class="alert alert-success alert-dismissible fade show shadow-sm rounded-4" role="alert">
-                        <strong>Update:</strong> {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
+    <main class="container py-4">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-8">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show rounded-4 shadow-sm border-0 mb-4" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                {% block content %}{% endblock %}
             </div>
-        {% endif %}
-        
-        {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <div class="mobile-bottom-nav d-md-none border-top">
+    <a href="{% url 'home' %}" class="nav-chip"><i class="bi bi-house-door-fill"></i></a>
+    <a href="{% url 'groups_dashboard' %}" class="nav-chip"><i class="bi bi-people-fill"></i></a>
+    
+    {% if user.is_authenticated %}
+        <a href="{% url 'create_post' %}" class="nav-chip"><i class="bi bi-plus-circle-fill"></i></a>
+        <a href="{% url 'notifications' %}" class="nav-chip"><i class="bi bi-bell-fill"></i></a>
+        <a href="{% url 'profile' request.user.username %}" class="nav-chip"><i class="bi bi-person-circle"></i></a>
+    {% else %}
+        <a href="{% url 'login' %}" class="nav-chip"><i class="bi bi-box-arrow-in-right"></i></a>
+    {% endif %}
+    </div>
+
+    <div class="modal fade" id="likersModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg rounded-4" id="modal-content-target"></div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

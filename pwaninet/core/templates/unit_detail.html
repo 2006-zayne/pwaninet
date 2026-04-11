@@ -1,78 +1,108 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row mb-4 align-items-center">
+<div class="container py-3">
+    <div class="row mb-4 align-items-end px-2">
         <div class="col-md-8">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-decoration-none">Main Feed</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">{{ unit.code }}</li>
+            <nav aria-label="breadcrumb" class="mb-2">
+                <ol class="breadcrumb small text-uppercase fw-bold">
+                    <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-decoration-none text-muted">Command Feed</a></li>
+                    <li class="breadcrumb-item active text-primary" aria-current="page">{{ unit.code }}</li>
                 </ol>
             </nav>
-            <h2 class="fw-bold text-dark">
-                <span class="badge bg-primary me-2">{{ unit.code }}</span> {{ unit.name }}
+            <h2 class="fw-bold text-dark d-flex align-items-center gap-3 mb-1">
+                <span class="badge bg-dark px-3 py-2 border border-secondary shadow-sm">{{ unit.code }}</span> 
+                {{ unit.name }}
             </h2>
-            <p class="text-muted">Filtering all intelligence for this specific unit.</p>
+            <p class="text-muted small mb-0"><i class="bi bi-funnel-fill me-1"></i> Filtering all incoming intel for this specific unit.</p>
         </div>
-        <div class="col-md-4 text-md-end">
-            <a href="{% url 'create_post' %}" class="btn btn-dark shadow-sm">
-                ➕ New Unit Post
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+            <a href="{% url 'create_post' %}" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">
+                <i class="bi bi-plus-lg me-1"></i> New Unit Intel
             </a>
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-lg-9 mx-auto">
+    <div style="height: 1px; background: linear-gradient(to right, #3b82f6, transparent); margin-bottom: 2rem;"></div>
+
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10">
             {% for post in posts %}
-                <div class="card shadow-sm mb-4 {{ post.gradient_class }}" style="border-radius: 15px; border: none;">
-                    <div class="card-body p-4">
-                        <div class="d-flex align-items-center mb-3">
+                <div class="post-card border-0 shadow-sm mb-4 overflow-hidden">
+                    <div class="p-3 border-bottom bg-light d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-3">
                             <img src="{{ post.author.profile_pic.url }}" 
-                                 class="rounded-circle border border-white shadow-sm" 
-                                 style="width: 40px; height: 40px; object-fit: cover;">
-                            <div class="ms-3">
-                                <h6 class="mb-0">
-                                    <a href="{% url 'profile' username=post.author.username %}" class="text-inherit fw-bold text-decoration-none">
-                                        {{ post.author.first_name }} {{ post.author.second_name }}
+                                 class="rounded-circle border border-2 border-white shadow-sm" 
+                                 style="width: 45px; height: 45px; object-fit: cover;">
+                            <div>
+                                <h6 class="mb-0 fw-bold">
+                                    <a href="{% url 'profile' username=post.author.username %}" class="text-dark text-decoration-none">
+                                        {{ post.author.get_full_name|default:post.author.username }}
                                     </a>
                                 </h6>
-                                <small class="opacity-75">{{ post.date|timesince }} ago</small>
+                                <small class="text-muted" style="font-size: 0.75rem;">
+                                    <i class="bi bi-clock-history me-1"></i> {{ post.date|timesince }} ago
+                                </small>
                             </div>
                         </div>
+                        <span class="badge bg-white text-dark border px-2 py-1 small fw-normal">Field Report</span>
+                    </div>
 
-                        <p class="fs-5">{{ post.content }}</p>
+                    <div class="card-body p-4 {% if post.gradient_class %}{{ post.gradient_class }} text-white{% endif %}">
+                        <p class="{% if post.gradient_class %}fs-4 fw-bold mb-0{% else %}fs-5 text-dark{% endif %}">
+                            {{ post.content }}
+                        </p>
+                    </div>
 
-                        {% if post.image %}
-                            <img src="{{ post.image.url }}" class="img-fluid rounded-3 mb-3 shadow-sm">
-                        {% endif %}
+                    {% if post.image %}
+                        <img src="{{ post.image.url }}" class="img-fluid w-100 border-top border-bottom" style="max-height: 500px; object-fit: cover;">
+                    {% endif %}
 
-                        {% if post.video %}
-                            <div class="ratio ratio-16x9 mb-3">
-                                <video controls class="rounded-3 shadow-sm">
-                                    <source src="{{ post.video.url }}" type="video/mp4">
-                                </video>
-                            </div>
-                        {% endif %}
+                    {% if post.video %}
+                        <div class="ratio ratio-16x9 border-top border-bottom">
+                            <video controls class="w-100">
+                                <source src="{{ post.video.url }}" type="video/mp4">
+                            </video>
+                        </div>
+                    {% endif %}
 
-                        {% if post.docs %}
-                            <div class="d-grid mb-2">
-                                <a href="{{ post.docs.url }}" class="btn btn-light btn-sm text-start border shadow-sm">
-                                    📂 DOWNLOAD RESOURCES: {{ post.docs.name|truncatechars:30 }}
+                    {% if post.docs %}
+                        <div class="p-3 bg-dark">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="text-white-50 small fw-bold text-uppercase">
+                                    <i class="bi bi-file-earmark-zip me-2"></i> Attached Resources
+                                </div>
+                                <a href="{{ post.docs.url }}" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold">
+                                    <i class="bi bi-download me-1"></i> Download Intel
                                 </a>
                             </div>
-                        {% endif %}
+                            <div class="mt-2 py-2 px-3 bg-secondary bg-opacity-25 rounded border border-secondary border-opacity-25 text-white small text-truncate">
+                                {{ post.docs.name }}
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <div class="p-2 px-3 d-flex align-items-center gap-4">
+                         <div id="like-section-{{ post.id }}">{% include 'partials/like_button.html' %}</div>
+                         <button class="btn btn-sm text-muted border-0 fw-bold"><i class="bi bi-chat-left-dots me-1"></i> Comms</button>
                     </div>
                 </div>
             {% empty %}
-                <div class="text-center py-5 bg-white rounded-4 shadow-sm border border-dashed">
-                    <div class="mb-3" style="font-size: 3rem;">📝</div>
-                    <h4>No intel deployed for {{ unit.code }} yet.</h4>
-                    <p class="text-muted">Hello {{ user.username }}, be the first to share notes or questions!</p>
-                    <a href="{% url 'create_post' %}" class="btn btn-primary px-4">Create First Post</a>
+                <div class="text-center py-5 bg-white rounded-4 shadow-sm border-2 border-dashed">
+                    <div class="mb-3 text-muted display-4"><i class="bi bi-journal-x"></i></div>
+                    <h5 class="fw-bold">No Records Found</h5>
+                    <p class="text-muted small mx-auto" style="max-width: 350px;">
+                        Operative {{ request.user.username }}, this sector is currently silent. Be the first to deploy resources for {{ unit.code }}.
+                    </p>
+                    <a href="{% url 'create_post' %}" class="btn btn-primary rounded-pill px-4 mt-2 fw-bold">Initialize Deployment</a>
                 </div>
             {% endfor %}
         </div>
     </div>
 </div>
+
+<style>
+    .text-inherit { color: inherit; }
+    .breadcrumb-item + .breadcrumb-item::before { content: "»"; color: #94a3b8; }
+</style>
 {% endblock %}

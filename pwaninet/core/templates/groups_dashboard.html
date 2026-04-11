@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4 pb-5">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <div>
+            <h2 class="fw-bold mb-0 text-primary">Community Hub</h2>
+            <p class="text-muted">Command center for your academic and social squads.</p>
+        </div>
+        <a href="{% url 'create_group' %}" class="btn btn-primary rounded-pill shadow-sm px-4">
+            <i class="bi bi-plus-lg me-2"></i>Create Squad
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-12 mb-5">
+            <div class="d-flex align-items-center mb-4">
+                <div class="bg-primary rounded-circle p-2 me-3 shadow-sm">
+                    <i class="bi bi-mortarboard-fill text-white"></i>
+                </div>
+                <h4 class="fw-bold mb-0 text-uppercase tracking-wider small text-muted">Official Academic Sectors</h4>
+            </div>
+            
+            <div class="row g-4">
+                {% for group in official_groups %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100 border-0 shadow-sm transition-up" style="border-left: 5px solid #0d6efd !important;">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                {% if group.group_pic %}
+                                    <img src="{{ group.group_pic.url }}" class="rounded-3 shadow-sm" style="width: 60px; height: 60px; object-fit: cover;">
+                                {% else %}
+                                    <div class="rounded-3 bg-primary-subtle d-flex align-items-center justify-content-center shadow-sm" style="width: 60px; height: 60px;">
+                                        <i class="bi bi-bank2 text-primary fs-3"></i>
+                                    </div>
+                                {% endif %}
+                                <div class="ms-3">
+                                    <h5 class="mb-1 fw-bold">
+                                        <a href="{% url 'groups_detail' group.id %}" class="text-dark text-decoration-none">{{ group.name }}</a>
+                                    </h5>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill small">Verified Sector</span>
+                                </div>
+                            </div>
+                            <div class="mt-3 pt-3 border-top d-flex justify-content-between align-items-center">
+                                <small class="text-muted"><i class="bi bi-people me-1"></i>{{ group.members.count }} Comrades</small>
+                                <a href="{% url 'groups_detail' group.id %}" class="btn btn-sm btn-outline-primary rounded-pill px-3">Enter</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="d-flex align-items-center mb-4">
+                <div class="bg-success rounded-circle p-2 me-3 shadow-sm">
+                    <i class="bi bi-chat-heart-fill text-white"></i>
+                </div>
+                <h4 class="fw-bold mb-0 text-uppercase tracking-wider small text-muted">Social Squads & Clubs</h4>
+            </div>
+            
+            <div class="row g-4">
+                {% for group in social_groups %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100 border-0 shadow-sm transition-up">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-3">
+                                {% if group.group_pic %}
+                                    <img src="{{ group.group_pic.url }}" class="rounded-circle border" style="width: 50px; height: 50px; object-fit: cover;">
+                                {% else %}
+                                    <div class="rounded-circle bg-success-subtle d-flex align-items-center justify-content-center border" style="width: 50px; height: 50px;">
+                                        <i class="bi bi-people-fill text-success fs-4"></i>
+                                    </div>
+                                {% endif %}
+                                <div class="ms-3 flex-grow-1">
+                                    <h6 class="mb-0 fw-bold">
+                                        <a href="{% url 'groups_detail' group.id %}" class="text-dark text-dark text-decoration-none">{{ group.name }}</a>
+                                    </h6>
+                                    <small class="text-muted">{{ group.members.count }} members</small>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <a href="{% url 'groups_detail' group.id %}" class="btn btn-success btn-sm rounded-pill flex-grow-1">Visit</a>
+                                <button class="btn btn-light btn-sm rounded-pill" onclick="copyInviteLink('{{ group.id }}')">
+                                    <i class="bi bi-share"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,171 +1,262 @@
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import render, get_object_or_404, redirect 
 from django.contrib.auth.decorators import login_required
-from .models import Post, Unit, Course ,Year ,User ,Notifications
-from .forms import PwaniSignupForm ,PostForm , ProfileUpdateForm
+from .models import Post, Unit, Course ,Year ,User ,Notifications ,Groups ,Like
+from .forms import PwaniSignupForm ,PostForm , ProfileUpdateForm ,GroupForm
 from django.contrib.auth import get_user_model
 from django.contrib import messages
+from django.db.models import Q ,Count
+import random
+from django.http import JsonResponse
 
-# Create your views here.
-# This is simply to include the abstract user model ok fam?
 
 User = get_user_model()
+
+# --- REGISTRATION & PROFILE ---
 
 def register_view(request):
     if request.method == 'POST':
         form = PwaniSignupForm(request.POST)
-        if form.is_valid():#Validates the error in the form.
-
-            form.save()#creates the user in the DB.
-
-            messages.success(request, "Account succesfully registered.")
-
-            return redirect('login')# Redirects to the login page.
-           
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Account successfully registered.")
+            return redirect('login')
     else:
         form = PwaniSignupForm()
     return render(request, 'register.html', {'form': form})
 
 
-@login_required
-def post_list_view(request):
-    user = request.user
-
-
-    # Only show units for the user's specific Course and Year
-    if user.course and user.year:
-        units = Unit.objects.filter(course=user.course, year=user.year)
-        posts = Post.objects.filter(course=user.course, unit__year=user.year).order_by('-date')
-    else:
-        units = Unit.objects.none()
-        posts = Post.objects.none()
-        
-    context = {
-        'posts': posts,
-        'units': units,
-        'title': 'PwaniNet Command Feed'
-    }
-    return render(request, 'home.html', context)
-
-
-@login_required
-def unit_posts_view(request, unit_id):
-    # Find the specific unit or return a 404 Error
-    target_unit = get_object_or_404(Unit, id=unit_id)
-    
-    # Filter posts to ONLY show this unit
-    posts = Post.objects.filter(unit=target_unit).order_by('-date')
-
-    context = {
-        'unit': target_unit,
-        'posts': posts
-    }
-    return render(request, 'unit_detail.html', context)
-
-
-
-
-@login_required
-def create_post_view(request):
-   if request.method == 'POST':
-       
-       # WE first define the user to avoid the user not defined error.
-       user = request.user
-       print(f"FILES RECEIVED: {request.FILES}")
-       form = PostForm(request.POST  , request.FILES , user= request.user)
-
-       if form.is_valid():
-           post =form.save(commit=False)
-           post.author = request.user
-          #post.content = post.content
-
-           if post.unit:
-               post.course = post.unit.course
-
-           post.save()
-            #THis is the logic to find all the students in the same course and year so that the notification can be sent to them.WE also exclude ourselves we dont want to see that we sent a message we already know hahahaha.
-           classmates = User.objects.filter(
-               course = user.course,
-               year = user.year,
-           ).exclude(id= request.user.id)
-
-           #Now we create the messages record for every student.
-           for student in classmates:
-               Notifications.objects.create(
-                   recipient = student,
-                   sender = request.user,
-                   msg = "posted a new update.Wanna check out?"
-               )
-
-           messages.success(request, "Post uploaded successfully.")
-
-           return redirect('home')
-       
-   else:
-        form = PostForm(user = request.user)
-
-        return render(request, 'create_post.html' , {'form' : form})
-   
-
 
 def load_years(request):
     course_id = request.GET.get('course')
-    # To see if the ID is arriving
-    print(f"DEBUG: Loading years for Course ID: {course_id}")
-    
+    # Fetch only the years assigned to the selected course
     years = Year.objects.filter(course_id=course_id).order_by('level')
     
-    # Return the partial HTML for filtering the year
+    # We return a partial HTML snippet, not a full page
     return render(request, 'partials/year_options.html', {'years': years})
 
 @login_required
-def profile_view(request ,username):
-
-    # FiNDS  the user who posted or returns a 404 not found error.
-    target_user = get_object_or_404(User,username=username)
-
-    #We gather all the posts the user has ever posted.
-    user_posts = target_user.posts.all().order_by('-date')
-
-    #The briefcase with the data we want to see.
-    context ={
-        'profile_user': target_user,
-        'posts' : user_posts,
-    }
-
-    return render(request, 'profile.html' ,context )
-
-
-@login_required
-def notifications_list(request):
-    #Now we collect all the notifications for the user and arrange them from the newest to the oldest.
-    my_notifs = request.user.notifications.all().order_by('-timestamp')
-    #Once the user opens the page we mark the mesage as read.
-    #Temporarily set the ones with is_read field as false to unread notifs
-    unread_notifs = my_notifs.filter(is_read=False)
-
-    #Now change them to Read.
-    unread_notifs.update(is_read=True)
-
-    return render(redirect , 'notifications.html' , {'notifications' : my_notifs})
-
-
-@login_required
-def update_profile_view(request): #This is the logic we have all been waiting for,the profile update view where a user can change profile pic,edit,bio and nickname is upcoming.
-
-    user_instance = request.user #WE set the user to be the one who is currently logged in.
-
+def profile_view(request, username):
+    user_profile = get_object_or_404(User, username=username)
+    is_following = request.user.following.filter(id=user_profile.id).exists()
     
-    if request.method == 'POST':
+    # Calculate Impact (Total Likes received across all posts)
+    total_likes = Post.objects.filter(author=user_profile).aggregate(total=Count('likes'))['total'] or 0
+    
+    user_posts = user_profile.posts.all().order_by('-date')
 
+    context = {
+        'profile_user': user_profile,
+        'following_count': user_profile.following.count(),
+        'followers_count': user_profile.followers.count(),
+        'total_likes': total_likes, # Added this to the context
+        'posts': user_posts,
+        'is_following': is_following,
+    }
+    return render(request, 'profile.html', context)
+
+@login_required
+def update_profile_view(request):
+    if request.method == 'POST':
         form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, "Profile updated successfully.")
-            return redirect('profile' , username =request.user.username )
+            return redirect('profile' , username=request.user.username)
     else:
-        
-        form = ProfileUpdateForm(instance=user_instance)
-        #JUst a line to test and scan for errors .
-        print(f"Form fields: {form.fields.keys()}")
-
+        form = ProfileUpdateForm(instance=request.user)
     return render(request, 'update_profile.html', {'form': form})
+
+# --- FEED & NOTIFICATIONS ---
+
+@login_required
+def post_list_view(request):
+    user = request.user
+    suggestions = get_suggestions(request)
+    following_ids = user.following.values_list('id', flat=True)
+    suggested_groups = Groups.objects.filter(members__id__in=following_ids).exclude(members=user).distinct()[:5]
+
+    feed_query = Post.objects.filter(
+        Q(group__isnull=True) | 
+        Q(group__members=user) | 
+        Q(course=user.course, unit__year=user.year)
+    ).distinct().order_by('-date')
+
+    posts = list(feed_query[:40])
+    if len(posts) > 10:
+        posts = random.sample(posts, k=min(len(posts), 15))
+        posts.sort(key=lambda x: x.date, reverse=True)
+
+    return render(request, 'home.html', {
+        'posts': posts,
+        'suggested_groups': suggested_groups,
+        'suggestions': suggestions,
+        'title': 'PwaniNet Command Feed',
+    })
+
+@login_required
+def notifications_list(request):
+    my_notifs = request.user.notifications.all().order_by('-timestamp')
+    my_notifs.filter(is_read=False).update(is_read=True)
+    return render(request, 'notifications.html', {'notifications': my_notifs})
+
+# --- GROUP & UNIT LOGIC ---
+
+@login_required
+def groups_dashboard(request):
+    user = request.user
+    official_groups = user.joined_groups.filter(is_official=True)
+    social_groups = user.joined_groups.filter(is_official=False)
+    following_ids = user.following.values_list('id', flat=True)
+    suggested_groups = Groups.objects.filter(members__id__in=following_ids).exclude(members=user).distinct()[:5]
+
+    return render(request, 'groups_dashboard.html', {
+        'official_groups': official_groups,
+        'social_groups': social_groups,
+        'suggested_groups': suggested_groups,
+    })
+
+@login_required
+def groups_detail_view(request, group_id):
+    group = get_object_or_404(Groups, id=group_id)
+    group_posts = Post.objects.filter(group=group).order_by('-date')
+    is_member = group.members.filter(id=request.user.id).exists()
+
+    return render(request, 'groups_detail.html', {
+        'group': group,
+        'posts': group_posts,
+        'is_member': is_member,
+    })
+
+@login_required
+def create_group_view(request):
+    if request.method == 'POST':
+        form = GroupForm(request.POST, request.FILES)
+        if form.is_valid():
+            group = form.save(commit=False)
+            group.is_official = False 
+            group.save()
+            group.members.add(request.user)
+            return redirect('groups_dashboard')
+    else:
+        form = GroupForm()
+    return render(request, 'create_group.html', {'form': form})
+
+# --- POST CREATION & INTERACTION ---
+
+@login_required
+def create_post_view(request):
+    user = request.user
+    # Support for ?group=ID in URL
+    group_id = request.GET.get('group')
+    initial_data = {}
+    
+    if group_id:
+        group = get_object_or_404(Groups, id=group_id)
+        initial_data['group'] = group
+
+    if request.method == 'POST':
+        form = PostForm(request.POST, request.FILES, user=user)
+        if form.is_valid():
+            post = form.save(commit=False)
+            post.author = user
+            
+            # If the user selected a group in the form
+            if post.group and post.group.is_official:
+                post.course = user.course 
+            
+            if post.unit:
+                post.course = post.unit.course
+
+            post.save()
+        
+            # Notification Deployment
+            if post.group:
+                recipients = post.group.members.exclude(id=user.id)
+                msg_text = f"posted in the {post.group.name} squad."
+            else:
+                recipients = User.objects.filter(course=user.course, year=user.year).exclude(id=user.id)
+                msg_text = "posted a new update in the global feed."
+
+            notif_list = [Notifications(recipient=student, sender=user, msg=msg_text) for student in recipients]
+            Notifications.objects.bulk_create(notif_list)
+
+            messages.success(request, "Intelligence deployed successfully.")
+            return redirect('groups_detail', group_id=post.group.id) if post.group else redirect('home')
+    else:
+        form = PostForm(user=user, initial=initial_data)
+
+    return render(request, 'create_post.html', {'form': form})
+
+@login_required
+def toggle_like(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    like_qs = Like.objects.filter(user=request.user, post=post)
+
+    if like_qs.exists():
+        like_qs.delete()
+        is_liked = False
+    else:
+        Like.objects.create(user=request.user, post=post)
+        is_liked = True
+        if post.author != request.user:
+            Notifications.objects.create(
+                recipient=post.author,
+                sender=request.user,
+                msg=f"liked your intelligence update: '{post.content[:20]}...'"
+            )
+
+    return render(request, 'partials/like_button.html', {
+        'post': post, 'is_liked': is_liked, 'like_count': post.likes.count()
+    })
+
+# --- UTILITIES ---
+
+def get_suggestions(request):
+    user = request.user
+    already_following = user.following.values_list('id', flat=True)
+    my_groups = user.joined_groups.all() # Corrected to your joined_groups relation
+    return User.objects.filter(joined_groups__in=my_groups).exclude(
+        Q(id__in=already_following) | Q(id=user.id)
+    ).distinct()[:5]
+
+@login_required
+def toggle_follow(request, username):
+    target_user = get_object_or_404(User, username=username)
+    
+    if target_user == request.user:
+        return JsonResponse({"error": "Self-following is prohibited."}, status=400)
+
+    if target_user in request.user.following.all():
+        request.user.following.remove(target_user)
+        is_following = False
+    else:
+        request.user.following.add(target_user)
+        is_following = True
+
+    return JsonResponse({
+        "is_following": is_following,
+        "follower_count": target_user.followers.count()
+    })
+
+@login_required
+def unit_posts_view(request, unit_id):
+    target_unit = get_object_or_404(Unit, id=unit_id)
+    posts = Post.objects.filter(unit=target_unit).order_by('-date')
+    return render(request, 'unit_detail.html', {'unit': target_unit, 'posts': posts})
+
+@login_required
+def post_likers_list(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    likers = post.likes.all().select_related('user')
+    return render(request, 'partials/likers_modal_content.html', {'likers': likers})
+
+@login_required
+def toggle_group_membership(request, group_id):
+    group = get_object_or_404(Groups, id=group_id)
+    if group.members.filter(id=request.user.id).exists():
+        group.members.remove(request.user)
+        messages.info(request, f"You have left the {group.name} squad.")
+    else:
+        group.members.add(request.user)
+        messages.success(request, f"You have joined the {group.name} squad.")
+    return redirect('groups_detail', group_id=group.id)

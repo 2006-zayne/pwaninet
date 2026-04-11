@@ -1,0 +1,35 @@
+<div class="post-card shadow-sm mb-3">
+    <div class="d-flex align-items-center p-3">
+        <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border" style="width: 40px; height: 40px; object-fit: cover;">
+        <div class="ms-2">
+            <h6 class="mb-0 fw-bold small">
+                <a href="{% url 'profile' post.author.username %}" class="text-dark text-decoration-none">
+                    {{ post.author.get_full_name|default:post.author.username }}
+                </a>
+            </h6>
+            <small class="text-muted" style="font-size: 12px;">
+                <span class="badge bg-light text-primary border">{{ post.unit.code|default:"Global" }}</span> • {{ post.date|timesince }} ago
+            </small>
+        </div>
+    </div>
+
+    <div class="px-3 pb-3">
+        <p class="mb-0">{{ post.content }}</p>
+    </div>
+
+    {% if post.image %}
+        <img src="{{ post.image.url }}" class="img-fluid w-100 border-top border-bottom" style="max-height: 500px; object-fit: cover;">
+    {% endif %}
+
+    <div class="d-flex align-items-center gap-4 px-3 py-2 border-top">
+        <div id="like-section-{{ post.id }}">
+            {% include 'partials/like_button.html' %}
+        </div>
+        <span class="small text-muted fw-bold" style="cursor:pointer;" 
+              data-bs-toggle="modal" data-bs-target="#likersModal" 
+              hx-get="{% url 'post_likers_list' post.id %}" 
+              hx-target="#modal-content-target">
+            <i class="bi bi-eye"></i> View Intel
+        </span>
+    </div>
+</div>

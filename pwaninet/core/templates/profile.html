@@ -1,58 +1,129 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-10">
-        <div class="post-card-base mb-4">
-            <div class="row align-items-center">
-                <div class="col-md-3 text-center mb-3 mb-md-0">
-                    <img src="{{ profile_user.profile_pic.url }}" 
-                         class="rounded-circle border border-4 border-white shadow" 
-                         style="width: 150px; height: 150px; object-fit: cover;">
-                </div>
-                <div class="col-md-7 text-center text-md-start">
-                    <h2 class="fw-bold mb-0">{{ profile_user.first_name }} {{ profile_user.second_name }}</h2>
-                    <p class="text-primary mb-2">@{{ profile_user.username }}</p>
-                    <p class="mb-3">{{ profile_user.bio|default:"No personal bio provided for this operative." }}</p>
-                    <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-md-start">
-                        <span class="badge bg-light text-dark border p-2">🎓 {{ profile_user.course }}</span>
-                        <span class="badge bg-light text-dark border p-2">📅 Year: {{ profile_user.year }}</span>
+<div class="container-fluid py-3 px-2 px-md-4">
+    <div class="row g-4 justify-content-center">
+        
+        <div class="col-12 col-lg-4 col-xl-3">
+            <div class="post-card shadow-sm mb-4 border-0 overflow-hidden">
+                <div class="bg-dark position-relative" style="height: 100px;">
+                    <div class="position-absolute top-100 start-50 translate-middle">
+                        <img src="{{ profile_user.profile_pic.url }}" 
+                             class="rounded-circle border border-4 border-white shadow" 
+                             style="width: 120px; height: 120px; object-fit: cover; background: white;">
                     </div>
                 </div>
-                <div class="col-md-2 text-md-end">
-                    {% if request.user == profile_user %}
-                        <a href="{% url 'update_profile' %}" class="btn btn-sm btn-outline-dark rounded-pill px-3">Edit Gear</a>
+
+                <div class="text-center pt-5 pb-3 px-3 mt-4">
+                    <h4 class="fw-bold mb-0">{{ profile_user.get_full_name }}</h4>
+                    <p class="text-muted small">@{{ profile_user.username }}</p>
+                    
+                    <div class="bg-light rounded-3 p-2 mb-3">
+                        <p class="small mb-0 text-secondary">
+                            <i class="bi bi-shield-lock me-1"></i>
+                            {{ profile_user.bio|default:"Standard PwaniNet Operative." }}
+                        </p>
+                    </div>
+
+                    {% if request.user != profile_user %}
+                        <button id="follow-btn" 
+                                data-username="{{ profile_user.username }}"
+                                class="btn {% if is_following %}btn-outline-dark{% else %}btn-primary{% endif %} w-100 rounded-pill fw-bold mb-2">
+                            {% if is_following %} Unfollow {% else %} Follow {% endif %}
+                        </button>
+                    {% else %}
+                        <a href="{% url 'update_profile' %}" class="btn btn-outline-secondary w-100 rounded-pill fw-bold mb-2">
+                            <i class="bi bi-gear-wide-connected me-1"></i> Update Gear
+                        </a>
+                        <form action="{% url 'logout' %}" method="POST" class="px-3">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-danger w-100 rounded-pill btn-sm fw-bold">
+                                <i class="bi bi-box-arrow-right me-2"></i>Terminate Session
+                            </button>
+                        </form>
                     {% endif %}
                 </div>
+
+                <div class="row g-0 border-top text-center py-3">
+                    <div class="col-4 border-end">
+                        <h6 id="follower-count" class="fw-bold mb-0">{{ followers_count }}</h6>
+                        <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Followers</small>
+                    </div>
+                    <div class="col-4 border-end">
+                        <h6 class="fw-bold mb-0">{{ following_count }}</h6>
+                        <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Following</small>
+                    </div>
+                    <div class="col-4">
+                        <h6 class="fw-bold mb-0 text-primary">{{ total_likes|default:"0" }}</h6>
+                        <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Impact</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="post-card p-3 shadow-sm border-0">
+                <h6 class="small fw-bold text-uppercase text-muted mb-3"><i class="bi bi-info-circle me-1"></i> Unit Intel</h6>
+                <div class="mb-2 d-flex justify-content-between">
+                    <small class="text-muted">Assigned Course</small>
+                    <span class="fw-bold small">{{ profile_user.course|default:"N/A" }}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">Operational Year</small>
+                    <span class="fw-bold small">Year {{ profile_user.year|default:"N/A" }}</span>
+                </div>
             </div>
         </div>
 
-        <h5 class="fw-bold mb-3 px-2">Deployment History</h5>
-
-        {% for post in posts %}
-        <div class="post-card-base {{ post.gradient_class }}">
-            <div class="d-flex align-items-center mb-3">
-                <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-white" style="width: 35px; height: 35px; object-fit: cover;">
-                <div class="ms-2">
-                    <small class="opacity-75">Posted in <strong>{{ post.unit.code }}</strong> on {{ post.date|date:"F d, Y" }}</small>
-                </div>
+        <div class="col-12 col-lg-8 col-xl-6">
+            <div class="d-flex align-items-center justify-content-between mb-3 px-2">
+                <h6 class="fw-bold text-muted text-uppercase mb-0">Tactical History</h6>
+                <span class="badge bg-secondary rounded-pill">{{ posts.count }} Updates</span>
             </div>
-            <p class="fs-5">{{ post.content }}</p>
-            {% if post.image %}<img src="{{ post.image.url }}" class="img-fluid rounded-4 mb-3 border shadow-sm">{% endif %}
-            {% if post.video %}
-                <div class="ratio ratio-16x9 mb-3 rounded-4 overflow-hidden bg-black shadow-sm">
-                    <video controls><source src="{{ post.video.url }}" type="video/mp4"></video>
-                </div>
-            {% endif %}
-            {% if post.docs %}
-                <a href="{{ post.docs.url }}" class="btn btn-sm btn-light border w-100 text-start">📄 Resource Download</a>
-            {% endif %}
+            
+            <div class="intel-stream">
+                {% for post in posts %}
+                    {% include 'partials/post_card.html' %}
+                {% empty %}
+                    <div class="text-center py-5 bg-white rounded-4 shadow-sm border-0">
+                        <i class="bi bi-incognito text-muted display-4"></i>
+                        <p class="text-muted mt-3">No records found in this operative's history.</p>
+                    </div>
+                {% endfor %}
+            </div>
         </div>
-        {% empty %}
-        <div class="text-center py-5 post-card-base">
-            <p class="text-muted">No posts found in this operative's history.</p>
-        </div>
-        {% endfor %}
+
     </div>
 </div>
+
+<script>
+/* FOLLOW LOGIC SYNCHRONIZED */
+document.getElementById('follow-btn')?.addEventListener('click', function() {
+    const btn = this;
+    const username = btn.getAttribute('data-username');
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || "{{ csrf_token }}";
+
+    fetch(`/toggle-follow/${username}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) return;
+
+        if (data.is_following) {
+            btn.innerText = 'Unfollow';
+            btn.classList.replace('btn-primary', 'btn-outline-dark');
+        } else {
+            btn.innerText = 'Follow';
+            btn.classList.replace('btn-outline-dark', 'btn-primary');
+        }
+
+        const countElement = document.getElementById('follower-count');
+        if (countElement) countElement.innerText = data.follower_count;
+    })
+    .catch(error => console.error('Tactical Communication Failure:', error));
+});
+</script>
 {% endblock %}

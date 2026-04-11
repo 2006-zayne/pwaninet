@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="post-card-base shadow-lg border-0 p-4">
+                <div class="text-center mb-4">
+                    <div class="bg-primary rounded-circle d-inline-block p-3 mb-3 shadow">
+                        <i class="bi bi-people-fill text-white fs-3"></i>
+                    </div>
+                    <h2 class="fw-bold">Deploy New Squad</h2>
+                    <p class="text-muted">Create a social hub for your comrades.</p>
+                </div>
+
+                <form method="POST" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-uppercase">Squad Name</label>
+                        {{ form.name }}
+                        {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-uppercase">Mission Intelligence (Description)</label>
+                        {{ form.description }}
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-uppercase">Squad Insignia (Image)</label>
+                        {{ form.group_pic }}
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary rounded-pill py-2 fw-bold shadow-sm">
+                            Initialize Group
+                        </button>
+                        <a href="{% url 'groups_dashboard' %}" class="btn btn-light rounded-pill py-2">
+                            Abort Mission
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

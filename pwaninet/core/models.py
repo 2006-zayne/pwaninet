@@ -62,7 +62,8 @@ class User(AbstractUser):
     course = models.ForeignKey(Course, on_delete=models.CASCADE,  null=True ,blank=True)
     profile_pic = models.ImageField(default='profile_pic/default_pic1.jpg', upload_to='profile_pic')
     bio = models.TextField(max_length=500 , blank=True)
-    #groups_in = models.ManyToManyField('Groups' , related_name='members')
+    groups_in = models.ManyToManyField('Groups' , related_name='joined_groups')
+    following = models.ManyToManyField("self", symmetrical=False, related_name="followers", blank=True)
     
     def __str__(self):
         return f"{self.first_name } { self.second_name}".strip() or self.username
@@ -75,8 +76,9 @@ class User(AbstractUser):
    
 
 class Post(models.Model):
+    group = models.ForeignKey('Groups', on_delete=models.CASCADE, null=True, blank=True, related_name='posts')
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='posts')
-    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE ,null= True ,blank=True )
     unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True)
     content = models.TextField()
     image = models.ImageField(upload_to='posts/images' , blank=True , null= True)
@@ -120,4 +122,25 @@ class Notifications(models.Model):
 
     def __str__(self):
         return f"Notification for {self.recipient.username}"#Just for identify purposes for it not to bring crazy names when we nee to show it in the frontend hahahahahah!
-    
+
+
+class Groups(models.Model):
+    name = models.CharField(max_length=200, unique=True)
+    creator = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_groups')
+    members = models.ManyToManyField(User, related_name='joined_groups', blank=True)
+    description = models.TextField(max_length=500, blank=True)
+    group_pic = models.ImageField(default='group_profile_pic/default_group.jpg', upload_to='group_profile_pic')
+    is_official = models.BooleanField(default=False) #Only allows us thee admins to creeate officil groups
+
+
+    def __str__(self):
+        return self.name
+
+
+class Like(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='likes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'post') # Hard constraint: one like per post per operative   

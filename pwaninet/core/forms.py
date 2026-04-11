@@ -1,6 +1,6 @@
 from django import forms 
 from django.contrib.auth.forms import UserCreationForm
-from .models import User, Unit, Post, Year
+from .models import User, Unit, Post, Year ,Groups
 
 class PwaniSignupForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
@@ -81,3 +81,17 @@ class ProfileUpdateForm(forms.ModelForm):
         super(ProfileUpdateForm, self).__init__(*args, **kwargs)
         # THis ensure the file input is visible
         self.fields['profile_pic'].widget.attrs.update({'class': 'form-control-file'})
+
+
+class GroupForm(forms.ModelForm):
+    class Meta:
+        model = Groups
+        # We only want users to fill in these specific fields
+        fields = ['name', 'description', 'group_pic']
+        
+        # Adding Bootstrap classes so the form looks sharp on your ProBook
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control rounded-pill', 'placeholder': 'Squad Name'}),
+            'description': forms.Textarea(attrs={'class': 'form-control rounded-4', 'rows': 3, 'placeholder': 'What is this squad about?'}),
+            'group_pic': forms.FileInput(attrs={'class': 'form-control'}),
+        }

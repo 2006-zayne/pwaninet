@@ -1,41 +1,103 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="post-card-base">
-            <div class="text-center mb-4">
-                <h3 class="fw-bold">Profile Calibration</h3>
-                <p class="text-muted">Modify your digital identity</p>
+<div class="row justify-content-center py-4">
+    <div class="col-12 col-md-8 col-lg-6">
+        <div class="post-card border-0 shadow-lg overflow-hidden" style="border-radius: 20px;">
+            
+            <div class="bg-dark p-4 text-center text-white">
+                <h4 class="fw-bold mb-1 text-uppercase tracking-wider">Gear Calibration</h4>
+                <p class="small text-white-50 mb-0">Modifying Operative Digital Signature</p>
             </div>
 
-            <div class="text-center mb-4">
-                <img src="{{ user.profile_pic.url }}" class="rounded-circle border border-4 border-white shadow-sm" style="width: 120px; height: 120px; object-fit: cover;">
-                <p class="small text-muted mt-2">Current Active Signature</p>
-            </div>
-
-            <form method="POST" enctype="multipart/form-data">
-                {% csrf_token %}
-                {% if form %}
-                    {% for field in form %}
-                        <div class="mb-3 text-start">
-                            <label class="form-label fw-bold small text-uppercase text-secondary">{{ field.label }}</label>
-                            {{ field }}
-                            {% for error in field.errors %}
-                                <div class="text-danger x-small">{{ error }}</div>
-                            {% endfor %}
+            <div class="p-4 p-md-5 bg-white">
+                <div class="text-center mb-5">
+                    <div class="position-relative d-inline-block">
+                        <img src="{{ user.profile_pic.url }}" 
+                             class="rounded-circle border border-4 border-primary shadow-sm" 
+                             style="width: 130px; height: 130px; object-fit: cover;">
+                        <div class="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle p-2 shadow">
+                            <i class="bi bi-camera-fill"></i>
                         </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="alert alert-danger">ERROR: Form interface not responding.</div>
-                {% endif %}
-
-                <div class="d-grid gap-2 mt-4">
-                    <button type="submit" class="btn btn-success btn-lg shadow-sm rounded-3">Save & Sync</button>
-                    <a href="{% url 'profile' username=user.username %}" class="btn btn-link text-decoration-none text-secondary">Cancel Calibration</a>
+                    </div>
+                    <p class="small fw-bold text-uppercase text-muted mt-3 mb-0">Active Avatar</p>
                 </div>
-            </form>
+
+                <form method="POST" enctype="multipart/form-data" class="tactical-form">
+                    {% csrf_token %}
+                    
+                    {% if form %}
+                        {% for field in form %}
+                            <div class="mb-4">
+                                <label class="form-label fw-bold small text-uppercase text-muted mb-1">
+                                    <i class="bi bi-chevron-right text-primary small"></i> {{ field.label }}
+                                </label>
+                                
+                                {# Injecting Bootstrap classes into Django form widgets #}
+                                <div class="input-group">
+                                    {{ field }}
+                                </div>
+
+                                {% if field.help_text %}
+                                    <div class="form-text x-small text-muted">{{ field.help_text }}</div>
+                                {% endif %}
+                                
+                                {% for error in field.errors %}
+                                    <div class="text-danger fw-bold mt-1" style="font-size: 0.75rem;">
+                                        <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ error }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert alert-danger border-0 shadow-sm rounded-3">
+                            <i class="bi bi-shield-slash-fill me-2"></i> SYSTEM ERROR: Interface response timeout.
+                        </div>
+                    {% endif %}
+
+                    <div class="d-grid gap-3 mt-5">
+                        <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold shadow">
+                            Save & Sync Changes
+                        </button>
+                        <a href="{% url 'profile' username=user.username %}" class="btn btn-link text-decoration-none text-muted small fw-bold text-uppercase">
+                            Abort Calibration
+                        </a>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
+
+<style>
+    .tracking-wider { letter-spacing: 2px; }
+    .x-small { font-size: 0.7rem; }
+    
+    /* Tactical Input Styling */
+    .tactical-form input, 
+    .tactical-form textarea, 
+    .tactical-form select {
+        width: 100%;
+        padding: 12px 16px;
+        background-color: #f8fafc;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        transition: all 0.2s ease;
+        font-size: 0.95rem;
+    }
+
+    .tactical-form input:focus, 
+    .tactical-form textarea:focus {
+        background-color: #fff;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        outline: none;
+    }
+
+    /* Handling Django's file input specifically */
+    .tactical-form input[type="file"] {
+        padding: 8px;
+        font-size: 0.85rem;
+    }
+</style>
 {% endblock %}

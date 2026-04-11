@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4">
+    <a href="{% url 'groups_dashboard' %}" class="btn btn-link text-decoration-none text-muted mb-3 p-0">
+        <i class="bi bi-arrow-left me-1"></i> Back to Hub
+    </a>
+
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+            <div class="card border-0 shadow-sm mb-4 overflow-hidden">
+                <div class="bg-primary p-5 text-center position-relative">
+                    {% if group.group_pic %}
+                        <img src="{{ group.group_pic.url }}" class="rounded-circle border border-4 border-white shadow" style="width: 120px; height: 120px; object-fit: cover; margin-bottom: -90px; position: relative; z-index: 2;">
+                    {% else %}
+                        <div class="rounded-circle bg-white d-inline-flex align-items-center justify-content-center shadow" style="width: 120px; height: 120px; margin-bottom: -90px; position: relative; z-index: 2;">
+                            <i class="bi bi-people-fill text-primary fs-1"></i>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="card-body pt-5 mt-4 text-center">
+                    <h3 class="fw-bold mb-1">{{ group.name }}</h3>
+                    <p class="text-muted small mb-3">{{ group.description|default:"No briefing provided." }}</p>
+                    
+                    <div class="d-flex justify-content-center gap-3 mb-3">
+                        <span class="badge bg-light text-dark border"><i class="bi bi-people me-1"></i>{{ group.members.count }} Members</span>
+                    </div>
+
+                    {% if not is_member %}
+                        <a href="{% url 'toggle_membership' group.id %}" class="btn btn-primary rounded-pill px-4">Join Squad</a>
+                    {% else %}
+                        <div class="d-flex justify-content-center gap-2">
+                            <a href="{% url 'create_post' %}?group={{ group.id }}" class="btn btn-dark rounded-pill px-4">Deploy Intel</a>
+                            {% if not group.is_official %}
+                                <a href="{% url 'toggle_membership' group.id %}" class="btn btn-outline-danger btn-sm rounded-pill">Leave</a>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <h6 class="fw-bold text-muted text-uppercase mb-3">Squad Intel Feed</h6>
+            {% for post in posts %}
+                {% include 'partials/post_card.html' %}
+            {% empty %}
+                <div class="text-center py-5 bg-white rounded-3 shadow-sm border">
+                    <i class="bi bi-chat-left-dots text-muted fs-1"></i>
+                    <p class="text-muted mt-2">No intelligence has been deployed in this sector yet.</p>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

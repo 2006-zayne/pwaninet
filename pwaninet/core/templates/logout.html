@@ -1,34 +1,49 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container">
-    <div class="row justify-content-center align-items-center" style="min-height: 60vh;">
-        <div class="col-md-6 col-lg-4 text-center">
-            <div class="card shadow-lg border-0" style="border-radius: 20px;">
-                <div class="card-body p-5">
-                    <div class="mb-4">
-                        <span style="font-size: 4rem;">🔒</span>
+<div class="container-fluid">
+    <div class="row justify-content-center align-items-center bg-light" style="min-height: 85vh;">
+        <div class="col-12 col-md-6 col-lg-4 text-center">
+            
+            <div class="post-card border-0 shadow-lg overflow-hidden" style="border-radius: 20px;">
+                <div class="bg-dark p-4 border-bottom border-danger border-3">
+                    <div class="mb-2">
+                        <i class="bi bi-shield-slash text-danger display-4"></i>
                     </div>
-                    <h2 class="fw-bold mb-3">Logged Out</h2>
-                    <p class="text-muted mb-4">
-                        You have successfully disconnected from the PwaniNet sector. Your session is now secure.
-                    </p>
+                    <h3 class="fw-bold text-white mb-0 tracking-widest text-uppercase">Session Terminated</h3>
+                </div>
+
+                <div class="p-4 p-md-5 bg-white">
+                    <div class="mb-4">
+                        <p class="text-muted fw-bold text-uppercase small mb-2">Operational Status: Offline</p>
+                        <p class="text-secondary">
+                            You have successfully disconnected from the **PwaniNet Sector**. All encrypted channels are now closed.
+                        </p>
+                    </div>
                     
-                    <div class="d-grid gap-2">
-                        <a href="{% url 'login' %}" class="btn btn-primary btn-lg shadow-sm">
-                            Return to Base (Login)
+                    <div class="d-grid gap-3">
+                        <a href="{% url 'login' %}" class="btn btn-primary btn-lg rounded-pill fw-bold shadow-sm py-3">
+                            <i class="bi bi-box-arrow-in-right me-2"></i> Re-Authenticate (Login)
                         </a>
-                        <a href="{% url 'home' %}" class="btn btn-outline-secondary">
-                            View Public Feed
+                        <a href="{% url 'home' %}" class="btn btn-outline-secondary rounded-pill fw-bold small text-uppercase py-2">
+                            <i class="bi bi-eye me-2"></i> Observe Public Feed
                         </a>
                     </div>
                 </div>
             </div>
             
-            <p class="mt-4 text-secondary small">
-                © 2026 PwaniNet. | Secure Student Network
-            </p>
+            <div class="mt-4">
+                <p class="text-muted mb-0" style="font-size: 0.75rem; letter-spacing: 1px;">
+                    <i class="bi bi-cpu-fill me-1"></i> PWANINET CORE v1.0.26
+                </p>
+                <p class="text-secondary x-small">Secure End-to-End Encryption Confirmed.</p>
+            </div>
         </div>
     </div>
 </div>
+
+<style>
+    .tracking-widest { letter-spacing: 3px; }
+    .x-small { font-size: 0.65rem; }
+</style>
 {% endblock %}

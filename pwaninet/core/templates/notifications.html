@@ -1,49 +1,74 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container py-3">
     <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2 class="fw-bold">Intelligence Feed</h2>
-                <span class="badge bg-primary rounded-pill">{{ notifications.count }} Total</span>
+        <div class="col-12 col-lg-10">
+            
+            <div class="d-flex justify-content-between align-items-center mb-4 px-2">
+                <div>
+                    <h4 class="fw-bold mb-0 text-uppercase letter-spacing-1">Intelligence Log</h4>
+                    <p class="small text-muted mb-0">Field status and operative alerts</p>
+                </div>
+                {% if notifications %}
+                <span class="badge bg-dark rounded-pill px-3 py-2 border border-secondary">
+                    {{ notifications.count }} ACTIVE ALERTS
+                </span>
+                {% endif %}
             </div>
             
-            <div class="card shadow-sm border-0" style="border-radius: 15px; overflow: hidden;">
+            <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
                 <div class="list-group list-group-flush">
                     {% for n in notifications %}
-                        <div class="list-group-item list-group-item-action p-3 {% if not n.is_read %}bg-light border-start border-4 border-primary{% endif %}">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong class="text-dark">{{ n.sender.get_full_name }}</strong> 
-                                    <span class="text-secondary">{{ n.msg }}</span>
+                        <div class="list-group-item list-group-item-action border-bottom p-3 transition-all {% if not n.is_read %}border-start border-4 border-primary bg-aliceblue{% endif %}">
+                            <div class="d-flex align-items-start gap-3">
+                                <img src="{{ n.sender.profile_pic.url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover;">
+                                
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-1 fw-bold text-dark">
+                                            {{ n.sender.get_full_name|default:n.sender.username }}
+                                            {% if not n.is_read %}
+                                                <span class="ms-2 badge bg-danger text-uppercase" style="font-size: 0.6rem; vertical-align: middle;">New Intel</span>
+                                            {% endif %}
+                                        </h6>
+                                        <small class="text-muted d-flex align-items-center gap-1">
+                                            <i class="bi bi-clock-history"></i> {{ n.timestamp|timesince }}
+                                        </small>
+                                    </div>
+                                    <p class="mb-0 text-secondary" style="font-size: 0.95rem;">{{ n.msg }}</p>
                                 </div>
-                                {% if not n.is_read %}
-                                    <span class="badge rounded-pill bg-danger" style="font-size: 0.6rem;">NEW</span>
-                                {% endif %}
-                            </div>
-                            <div class="mt-1">
-                                <small class="text-muted">
-                                    <i class="bi bi-clock"></i> {{ n.timestamp|timesince }} ago
-                                </small>
                             </div>
                         </div>
                     {% empty %}
-                        <div class="text-center p-5">
-                            <div class="mb-3" style="font-size: 3rem;">📡</div>
-                            <p class="text-muted">No new intelligence in this sector. All quiet on the front lines.</p>
-                            <a href="{% url 'home' %}" class="btn btn-sm btn-outline-secondary">Return to Feed</a>
+                        <div class="text-center py-5 px-3">
+                            <div class="mb-3">
+                                <i class="bi bi-radar text-muted display-1"></i>
+                            </div>
+                            <h5 class="fw-bold text-muted">Silence on the Net</h5>
+                            <p class="text-muted small mx-auto" style="max-width: 300px;">No incoming signals detected in this sector. All operative channels are currently clear.</p>
+                            <a href="{% url 'home' %}" class="btn btn-primary rounded-pill px-4 mt-2">Return to Command</a>
                         </div>
                     {% endfor %}
                 </div>
             </div>
             
             {% if notifications %}
-                <div class="text-center mt-3">
-                    <button class="btn btn-sm btn-link text-decoration-none text-secondary">Mark all as read</button>
+                <div class="d-flex justify-content-center mt-4">
+                    <button class="btn btn-outline-secondary btn-sm rounded-pill px-4 fw-bold text-uppercase border-2" style="font-size: 0.75rem;">
+                        <i class="bi bi-check2-all me-1"></i> Clear Alert History
+                    </button>
                 </div>
             {% endif %}
+
         </div>
     </div>
 </div>
+
+<style>
+    .bg-aliceblue { background-color: #f0f7ff; }
+    .letter-spacing-1 { letter-spacing: 1px; }
+    .transition-all { transition: all 0.2s ease; }
+    .list-group-item:hover { background-color: #f8fafc; }
+</style>
 {% endblock %}
