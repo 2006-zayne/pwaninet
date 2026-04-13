@@ -1,12 +1,12 @@
 from django.shortcuts import render, get_object_or_404, redirect 
 from django.contrib.auth.decorators import login_required
-from .models import Post, Unit, Course ,Year ,User ,Notifications ,Groups ,Like
+from .models import Post, Unit, Course ,Year ,User ,Notifications ,Groups ,Like ,Follow
 from .forms import PwaniSignupForm ,PostForm , ProfileUpdateForm ,GroupForm
 from django.contrib.auth import get_user_model
 from django.contrib import messages
 from django.db.models import Q ,Count
 import random
-from django.http import JsonResponse
+from django.http import JsonResponse  ,HttpResponse
 
 
 User = get_user_model()
@@ -66,10 +66,11 @@ def update_profile_view(request):
         form = ProfileUpdateForm(instance=request.user)
     return render(request, 'update_profile.html', {'form': form})
 
-# --- FEED & NOTIFICATIONS ---
+
+    # pwaninet/core/views.py
 
 @login_required
-def post_list_view(request):
+def home_view(request):
     user = request.user
     suggestions = get_suggestions(request)
     following_ids = user.following.values_list('id', flat=True)
@@ -79,18 +80,19 @@ def post_list_view(request):
         Q(group__isnull=True) | 
         Q(group__members=user) | 
         Q(course=user.course, unit__year=user.year)
-    ).distinct().order_by('-date')
+    ).distinct().order_by('?') # Randomize at DB level
 
-    # Optimization: select_related/prefetch_related to speed up loading
     posts_qs = feed_query.select_related('author', 'unit').prefetch_related('likes')
     
+    # Take a slice and convert to list
     posts = list(posts_qs[:40])
+    
+    # Shuffle or sample if the pool is large enough
     if len(posts) > 10:
+        # random.sample provides a random subset WITHOUT re-sorting them by date
         posts = random.sample(posts, k=min(len(posts), 15))
-        posts.sort(key=lambda x: x.date, reverse=True)
 
-    # NEW: Identify which intel the operative has already liked
-    # This checks your 'Like' model for all posts in the current feed
+
     liked_post_ids = Like.objects.filter(
         user=user, 
         post__in=posts
@@ -100,15 +102,113 @@ def post_list_view(request):
         'posts': posts,
         'suggested_groups': suggested_groups,
         'suggestions': suggestions,
-        'liked_post_ids': liked_post_ids, # Pass this to the template
+        'liked_post_ids': liked_post_ids,
         'title': 'PwaniNet Command Feed',
     })
 
 @login_required
 def notifications_list(request):
+    """
+    Retrieves and displays all intelligence alerts for the current operative.
+    Orders by most recent timestamp.
+    """
+    # Fetch all notifications for the user
     my_notifs = request.user.notifications.all().order_by('-timestamp')
+
     my_notifs.filter(is_read=False).update(is_read=True)
-    return render(request, 'notifications.html', {'notifications': my_notifs})
+    
+    context = {
+        'notifications': my_notifs,
+    }
+    
+    return render(request, 'notifications.html', context)
+
+def unread_notification_count(request):
+    """Tactical update for the navbar badge via HTMX."""
+    if not request.user.is_authenticated:
+        return HttpResponse("")
+        
+    count = request.user.notifications.filter(is_read=False).count()
+    
+    # We return just the internal HTML of the link to update the badge
+    html = f'<i class="bi bi-bell-fill"></i>'
+    if count > 0:
+        html += f'''
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light" 
+                  style="font-size: 0.6rem; padding: 0.35em 0.5em;">
+                {count}
+            </span>'''
+    return HttpResponse(html)
+
+@login_required
+def mark_notification_as_read(request, notif_id):
+    """
+    Marks a single notification as read and removes it from the UI.
+    """
+    notification = get_object_or_404(Notifications, id=notif_id, recipient=request.user)
+    notification.is_read = True
+    notification.save()
+
+    # AMMO: Trigger the navbar to refresh the unread count
+    response = HttpResponse("") # Returning empty string removes the element if hx-swap is 'outerHTML'
+    response['HX-Trigger'] = 'notificationUpdate'
+    return response
+
+@login_required
+def mark_all_as_read(request):
+    # 1. Neutralize all unread intelligence alerts
+    Notifications.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+    
+    # 2. Retrieve updated list (FIXED: changed order_index to order_by)
+    notifications = Notifications.objects.filter(recipient=request.user).order_by('-timestamp')
+    
+    # 3. Deploy the partial to the UI
+    # IMPORTANT: Ensure templates/partials/notification_list_items.html exists!
+    response = render(request, 'partials/notification_list_items.html', {'notifications': notifications})
+    
+    # 4. SIGNAL: Trigger the navbar badge to refresh immediately
+    response['HX-Trigger'] = 'notificationUpdate'
+    return response
+
+@login_required
+def invite_to_group(request, group_id, user_id):
+    group = get_object_or_404(Groups, id=group_id)
+    target_user = get_object_or_404(User, id=user_id)
+    
+    # Check if target is already in the sector
+    if target_user not in group.members.all():
+        # Check if an invite is already pending to avoid spam
+        exists = Notifications.objects.filter(
+            recipient=target_user, 
+            group=group, 
+            notification_type='INVITE'
+        ).exists()
+        
+        if not exists:
+            Notifications.objects.create(
+                recipient=target_user,
+                sender=request.user,
+                group=group,
+                notification_type='INVITE',
+                msg=f"wants you to join the sector: {group.name}"
+            )
+    
+    return redirect('groups_detail', group_id=group.id)
+
+
+@login_required
+def respond_to_invite(request, notif_id, action):
+    notification = get_object_or_404(Notifications, id=notif_id, recipient=request.user)
+    
+    if action == 'accept' and notification.group:
+        notification.group.members.add(request.user)
+
+    else :
+        return redirect('notifications')
+    
+    # Task complete: terminate the notification
+    notification.delete()
+    return redirect('notifications')
 
 # --- GROUP & UNIT LOGIC ---
 
@@ -116,10 +216,10 @@ def notifications_list(request):
 def groups_dashboard(request):
     user = request.user
     
-    # Use 'members' to find groups the user is in
+    # We use the members=user to find the groups that the user part of remember the user is the one using the site.
     user_groups = Groups.objects.filter(members=user)
 
-    # Use 'exclude' to find groups the user is NOT in
+    # We use'exclude" to filter out the groups that I'm in.
     # REMOVED course/year filters because they don't exist in your model yet
     all_groups = Groups.objects.all().exclude(members=user)
 
@@ -127,7 +227,7 @@ def groups_dashboard(request):
     following_ids = user.following.values_list('id', flat=True)
     suggested_groups = Groups.objects.filter(
         members__id__in=following_ids
-    ).exclude(members=user).distinct()[:5]
+    ).exclude(members=user).distinct()[:10]#We won't suggest a group that I'm one of the users.
 
     return render(request, 'groups_dashboard.html', {
         'user_groups': user_groups,
@@ -140,11 +240,25 @@ def groups_detail_view(request, group_id):
     group = get_object_or_404(Groups, id=group_id)
     group_posts = Post.objects.filter(group=group).order_by('-date')
     is_member = group.members.filter(id=request.user.id).exists()
+    
+    # Track existing connections for the "Follow" button toggle
+    following_ids = request.user.following.values_list('id', flat=True)
+
+    # RECRUITMENT RADAR
+    query = request.GET.get('search_user')
+    search_results = None
+    if query:
+        search_results = User.objects.filter(
+            username__icontains=query
+        ).exclude(id__in=group.members.all())[:10]
 
     return render(request, 'groups_detail.html', {
         'group': group,
         'posts': group_posts,
         'is_member': is_member,
+        'search_results': search_results,
+        'query': query,
+        'following_ids': following_ids,
     })
 
 @login_required
@@ -166,28 +280,29 @@ def create_group_view(request):
 @login_required
 def create_post_view(request):
     user = request.user
-    # Support for ?group=ID in URL
-    group_id = request.GET.get('group')
-    initial_data = {}
+    group_id = request.GET.get('group')  or request.POST.get('group')# Capture the sector ID from the URL
     
-    if group_id:
-        group = get_object_or_404(Groups, id=group_id)
-        initial_data['group'] = group
-
     if request.method == 'POST':
         form = PostForm(request.POST, request.FILES, user=user)
         if form.is_valid():
             post = form.save(commit=False)
             post.author = user
-            
-            # If the user selected a group in the form
-            if post.group and post.group.is_official:
-                post.course = user.course 
+
+            # FORCE GROUP ATTACHMENT
+            # This ensures the relationship is built even if the field is hidden in the form
+            if group_id:
+                post.group = get_object_or_404(Groups, id=group_id)
+
+            # ENSURE DUAL VISIBILITY (Home Feed + Group)
+            # Stamping with course/year ensures it appears on the home feed
+            post.course = user.course
+            post.year = user.year 
             
             if post.unit:
                 post.course = post.unit.course
 
             post.save()
+            form.save_m2m() # Critical for saving likes/tags
         
             # Notification Deployment
             if post.group:
@@ -203,6 +318,11 @@ def create_post_view(request):
             messages.success(request, "Intelligence deployed successfully.")
             return redirect('groups_detail', group_id=post.group.id) if post.group else redirect('home')
     else:
+        # Pass the group into initial data so the form knows about it during GET
+        initial_data = {}
+        if group_id:
+            initial_data['group'] = get_object_or_404(Groups, id=group_id)
+        
         form = PostForm(user=user, initial=initial_data)
 
     return render(request, 'create_post.html', {'form': form})
@@ -241,16 +361,28 @@ def get_suggestions(request):
 
 @login_required
 def toggle_follow(request, username):
+    """
+    Tactical Toggle: Manages the follower-followed relationship 
+    and triggers automated notifications via signals.
+    """
     target_user = get_object_or_404(User, username=username)
     
     if target_user == request.user:
         return JsonResponse({"error": "Self-following is prohibited."}, status=400)
 
-    if target_user in request.user.following.all():
-        request.user.following.remove(target_user)
+    # Tactical Check: Query the dedicated Follow model
+    follow_qs = Follow.objects.filter(follower=request.user, followed=target_user)
+    
+    if follow_qs.exists():
+        # Objective: Termination of following relationship
+        follow_qs.delete()
+        request.user.following.remove(target_user) # Keep M2M in sync
         is_following = False
     else:
-        request.user.following.add(target_user)
+        # Objective: Establishment of new following relationship
+        # This create() call triggers the post_save signal in signals.py
+        Follow.objects.create(follower=request.user, followed=target_user)
+        request.user.following.add(target_user) # Keep M2M in sync
         is_following = True
 
     return JsonResponse({
@@ -265,9 +397,33 @@ def unit_posts_view(request, unit_id):
     return render(request, 'unit_detail.html', {'unit': target_unit, 'posts': posts})
 
 @login_required
-def post_likers_list(request, post_id):
+def post_detail_view(request, post_id):
+    """
+    Tactical View: Displays a single intelligence update in full detail.
+    """
     post = get_object_or_404(Post, id=post_id)
-    likers = post.likes.all().select_related('user')
+    
+    # Check if the current user has liked this specific post
+    is_liked = post.likes.filter(user=request.user).exists()
+    
+    return render(request, 'post_detail.html', {
+        'post': post,
+        'is_liked': is_liked,
+    })
+
+
+@login_required
+def post_likers_list(request, post_id):
+    """
+    Tactical Retrieval: Fetches the manifest of all operatives who liked the intel.
+    """
+    post = get_object_or_404(Post, id=post_id)
+    
+    # We grab the 'Like' objects and select the related 'user' to avoid crash
+    # Then we extract the users from those likes
+    likes = post.likes.select_related('user').all()
+    likers = [like.user for like in likes]
+    
     return render(request, 'partials/likers_modal_content.html', {'likers': likers})
 
 @login_required
@@ -279,4 +435,46 @@ def toggle_group_membership(request, group_id):
     else:
         group.members.add(request.user)
         messages.success(request, f"You have joined the {group.name} squad.")
+    return redirect('groups_detail', group_id=group.id)
+
+@login_required
+def edit_group(request, group_id):
+    group = get_object_or_404(Groups, id=group_id)
+    
+    # Security Check: Only the creator can modify sector intel
+    if request.user != group.creator:
+        return redirect('groups_detail', group_id=group.id)
+
+    if request.method == 'POST':
+        group.name = request.POST.get('name')
+        group.description = request.POST.get('description')
+        
+        # Check if a new photo was uploaded
+        if 'photo' in request.FILES:
+            group.group_profile_pic = request.FILES['photo']
+            
+        group.save()
+        return redirect('group_detail', group_id=group.id)
+    
+    return redirect('groups_detail', group_id=group.id)
+
+@login_required
+def invite_to_group(request, group_id, user_id):
+    group = get_object_or_404(Groups, id=group_id)
+    target_user = get_object_or_404(User, id=user_id)
+    
+    # Security check: Only members can invite others
+    if request.user in group.members.all():
+        if target_user not in group.members.all():
+            group.members.add(target_user)
+            # Optional: Add a success message here later
+        if target_user != request.user:
+            Notifications.objects.create(
+                recipient=target_user,
+                sender=request.user,
+                msg=f"{request.user.first_name} invited you to join a group :{ group.name }"
+            )
+
+
+    # Redirect back to the sector briefing
     return redirect('groups_detail', group_id=group.id)

@@ -41,13 +41,14 @@ class PostForm(forms.ModelForm):
     unit = forms.ModelChoiceField(
         queryset=Unit.objects.all(),
         required=False,
-        empty_label="Select Unit.",
+        empty_label="Global Feed.",
         widget=forms.Select(attrs={'class': 'form-control'}) # Standard Issue Styling
     )
+   # group = Groups.objects.all()
 
     class Meta:
         model = Post
-        fields = ['unit', 'content' , 'image' , 'video' , 'docs' , 'gradient_class'] 
+        fields = ['unit', 'group' , 'content' , 'image' , 'video' , 'docs' , 'gradient_class' ] 
 
         widgets = {
             'content': forms.Textarea(attrs={
@@ -57,6 +58,7 @@ class PostForm(forms.ModelForm):
                 'class': 'form-control'
             }),
             'gradient_class': forms.Select(attrs={'class': 'form-select'}),
+           # 'group' : forms.Select(attrs={'class' : 'form-select'}),
         }
 
     # Filter units based on the user's Course and Year

@@ -7,9 +7,10 @@
         <div class="col-12 col-lg-5 col-xl-4">
             <div class="sticky-top" style="top: 85px; z-index: 10;">
                 
-                <div class="post-card shadow-sm mb-4 border-0 overflow-hidden">
+                <div class="post-card shadow-sm mb-4 border-0 rounded-3 overflow-hidden">
                     <div class="bg-dark position-relative" style="height: 100px;">
                         <div class="position-absolute top-100 start-50 translate-middle">
+                            
                             <img src="{{ profile_user.profile_pic.url }}" 
                                  class="rounded-circle border border-4 border-white shadow" 
                                  style="width: 130px; height: 130px; object-fit: cover; background: white;">
@@ -23,7 +24,7 @@
                         <div class="bg-light rounded-3 p-2 mb-3">
                             <p class="small mb-0 text-secondary italic">
                                 <i class="bi bi-shield-lock me-1"></i>
-                                "{{ profile_user.bio|default:"Standard PwaniNet Operative." }}"
+                                "{{ profile_user.bio|default:"Pwani University Student." }}"
                             </p>
                         </div>
 
@@ -36,12 +37,12 @@
                         {% else %}
                             <div class="d-grid gap-2 px-2">
                                 <a href="{% url 'update_profile' %}" class="btn btn-outline-secondary rounded-pill fw-bold btn-sm">
-                                    <i class="bi bi-gear-wide-connected me-1"></i> Update Gear
+                                    <i class="bi bi-gear-wide-connected me-1"></i> UPDATE PROFILE
                                 </a>
                                 <form action="{% url 'logout' %}" method="POST" class="m-0">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-outline-danger w-100 rounded-pill btn-sm fw-bold">
-                                        <i class="bi bi-box-arrow-right me-2"></i>Terminate Session
+                                        <i class="bi bi-box-arrow-right me-2"></i>LOGOUT
                                     </button>
                                 </form>
                             </div>
@@ -65,13 +66,13 @@
                 </div>
 
                 <div class="post-card p-3 shadow-sm border-0">
-                    <h6 class="small fw-bold text-uppercase text-muted mb-3"><i class="bi bi-info-circle me-1"></i> Unit Intel</h6>
+                    <h6 class="small fw-bold text-uppercase text-muted mb-3"><i class="bi bi-info-circle me-1"></i>Academic Details</h6>
                     <div class="mb-2 d-flex justify-content-between">
-                        <small class="text-muted">Assigned Course</small>
+                        <small class="text-muted">Course</small>
                         <span class="fw-bold small">{{ profile_user.course|default:"N/A" }}</span>
                     </div>
                     <div class="d-flex justify-content-between">
-                        <small class="text-muted">Operational Year</small>
+                        <small class="text-muted">Year</small>
                         <span class="fw-bold small">Year {{ profile_user.year|default:"N/A" }}</span>
                     </div>
                 </div>
@@ -80,7 +81,7 @@
 
         <div class="col-12 col-lg-7 col-xl-6">
             <div class="d-flex align-items-center justify-content-between mb-3 px-2">
-                <h6 class="fw-bold text-muted text-uppercase mb-0">Tactical History</h6>
+                <h6 class="fw-bold text-muted text-uppercase mb-0">{{ profile_user.username}}'s posts:</h6>
                 <span class="badge bg-dark rounded-pill">{{ posts.count }} Updates</span>
             </div>
             
@@ -90,7 +91,7 @@
                 {% empty %}
                     <div class="text-center py-5 bg-white rounded-4 shadow-sm border-0">
                         <i class="bi bi-incognito text-muted display-4"></i>
-                        <p class="text-muted mt-3">No records found in this operative's history.</p>
+                        <p class="text-muted mt-3">{{ profile_user.username }} hasn't posted anything yet.</p>
                     </div>
                 {% endfor %}
             </div>

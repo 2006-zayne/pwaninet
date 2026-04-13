@@ -16,9 +16,9 @@
                 </div>
                 
                 <div class="d-flex justify-content-around mt-3">
-                    <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-image me-1 text-success"></i>PHOTO</a>
-                    <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-hash me-1 text-primary"></i>UNIT TAG</a>
-                    <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-shield-check me-1 text-danger"></i>OFFICIAL</a>
+                    <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-image me-1 text-success"></i></a>
+                    <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-hash me-1 text-primary"></i></a>
+                    <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-shield-check me-1 text-danger"></i></a>
                 </div>
             </div>
         </div>
@@ -30,7 +30,7 @@
             
             <div id="squad-container" class="post-card p-3 mb-4 border-0 shadow-sm bg-white rounded-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="fw-bold text-muted small text-uppercase mb-0">Active Squads</h6>
+                    <h6 class="fw-bold text-muted small text-uppercase mb-0">Groups to Explore:</h6>
                     <a href="{% url 'groups_dashboard' %}" class="text-primary small text-decoration-none fw-bold">View All</a>
                 </div>
                 
@@ -52,7 +52,7 @@
                     </div>
                 {% else %}
                     <div class="text-center py-2">
-                        <p class="small text-muted mb-0">No squads joined. Form up, Comrade!</p>
+                        <p class="small text-muted mb-0">No Groups Suggestions at the moment.</p>
                     </div>
                 {% endif %}
             </div>
@@ -63,8 +63,8 @@
                 {% empty %}
                     <div class="text-center py-5">
                         <i class="bi bi-broadcast text-muted fs-1"></i>
-                        <p class="text-muted mt-2">Silence on the net. Be the first to broadcast.</p>
-                        <a href="{% url 'create_post' %}" class="btn btn-primary rounded-pill px-4">Initialize Intel</a>
+                        <p class="text-muted mt-2">No posts yet,Be the first one to post.</p>
+                        <a href="{% url 'create_post' %}" class="btn btn-primary rounded-pill px-4">Create a post</a>
                     </div>
                 {% endfor %}
             </div>

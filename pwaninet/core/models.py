@@ -134,16 +134,33 @@ class Post(models.Model):
 
         super(Post, self).save(*args, **kwargs)
 
-#Wagwan Jeff This is the notification model to store every student's notification it contains,the receiver,sender,and the is read field which determines if they have already read it.
 class Notifications(models.Model):
-    recipient = models.ForeignKey(User, on_delete=models.CASCADE , related_name='notifications')
-    sender = models.ForeignKey(User, on_delete=models.CASCADE ,related_name='sent_notifications' )
+    INVITE = 'INVITE'
+    ALERTE = 'ALERT'
+    LIKE = 'LIKE'     # New Protocol
+    FOLLOW = 'FOLLOW' # New Protocol
+    
+    TYPE_CHOICES = [
+        (INVITE, 'Group Invite'), 
+        (ALERTE, 'General Alert'),
+        (LIKE, 'Post Like'),
+        (FOLLOW, 'New Follower')
+    ]
+
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_notifications')
+    group = models.ForeignKey('Groups', on_delete=models.CASCADE, null=True, blank=True)
+    post = models.ForeignKey('Post', on_delete=models.CASCADE, null=True, blank=True) # Link to the intel
+    notification_type = models.CharField(max_length=10, choices=TYPE_CHOICES, default=ALERTE)
     msg = models.CharField(max_length=255)
     timestamp = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)
 
+    class Meta:
+        ordering = ['-timestamp']
+
     def __str__(self):
-        return f"Notification for {self.recipient.username}"#Just for identify purposes for it not to bring crazy names when we nee to show it in the frontend hahahahahah!
+        return f"{self.notification_type} for {self.recipient.username}"
 
 
 class Groups(models.Model):
@@ -173,3 +190,15 @@ class Like(models.Model):
 
     class Meta:
         unique_together = ('user', 'post') # Hard constraint: one like per post per operative   
+
+
+class Follow(models.Model):
+    follower = models.ForeignKey(User, on_delete=models.CASCADE, related_name='following_relationships')
+    followed = models.ForeignKey(User, on_delete=models.CASCADE, related_name='follower_relationships')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('follower', 'followed') # Prevent duplicate tracking
+
+    def __str__(self):
+        return f"{self.follower.username} follows {self.followed.username}"

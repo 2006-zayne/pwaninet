@@ -1,10 +1,12 @@
 from django.urls import path
 from . import views
 from django.contrib.auth import views as auth_views
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     # The Feed (Home)
-    path('', views.post_list_view, name='home'),
+    path('', views.home_view, name='home'),
     
     # Registration
     path('register/', views.register_view, name='register'),
@@ -51,5 +53,20 @@ urlpatterns = [
 
     #Path to the follow view .
     path('toggle-follow/<str:username>/', views.toggle_follow, name='toggle_follow'),
+
+    path('group/<int:group_id>/edit/', views.edit_group, name='edit_group'),
+
+    path('group/<int:group_id>/invite/<int:user_id>/', views.invite_to_group, name='invite_to_group'),
+
+    path('invite/respond/<int:notif_id>/<str:action>/', views.respond_to_invite, name='respond_to_invite'),
+
+    path('notifications/unread-count/', views.unread_notification_count, name='unread_notification_count'),
+
+    path('notifications/mark-as-read/', views.mark_all_as_read, name='mark_all_as_read'), 
+
+    path('post/<int:post_id>/', views.post_detail_view, name='post_details'),
+
+    # core/urls.py
+    path('notifications/read/<int:notif_id>/', views.mark_notification_as_read, name='mark_notification_as_read'),
 
 ]

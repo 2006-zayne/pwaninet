@@ -5,14 +5,14 @@
     
     <div class="row align-items-end mb-5 g-3">
         <div class="col-12 col-md-7">
-            <h1 class="fw-black mb-1" style="letter-spacing: -1px;">SQUAD HUB</h1>
+            <h1 class="fw-black mb-1" style="letter-spacing: -1px;">GROUPS</h1>
             <p class="text-muted text-uppercase small fw-bold mb-0">
-                <i class="bi bi-broadcast text-primary me-2"></i>Active Network: Pwani University Sector
+                <i class="bi bi-broadcast text-primary me-2"></i>Active Groups 
             </p>
         </div>
         <div class="col-12 col-md-5 text-md-end">
             <a href="{% url 'create_group' %}" class="btn btn-primary rounded-pill px-4 py-2 fw-bold shadow-sm">
-                <i class="bi bi-plus-lg me-1"></i> INITIALIZE NEW UNIT
+                <i class="bi bi-plus-lg me-1"></i> CREATE NEW GROUP
             </a>
         </div>
     </div>
@@ -21,13 +21,13 @@
         
         <div class="col-12 col-xl-4">
             <div class="sticky-top" style="top: 20px; z-index: 10;">
-                <div class="card border-0 shadow-sm bg-dark text-white rounded-4 overflow-hidden mb-4">
+                <div class="card border-0 shadow-sm bg-dark text-white rounded-3 overflow-hidden mb-4">
                     <div class="card-body p-4">
-                        <h6 class="text-primary text-uppercase fw-bold mb-4 small" style="letter-spacing: 2px;">Your Fleet</h6>
+                        <h6 class="text-primary text-uppercase fw-bold mb-4 small" style="letter-spacing: 2px;">Your Groups</h6>
                         
                         <div class="unit-list" style="max-height: 60vh; overflow-y: auto;">
                             {% for group in user_groups %}
-                                <div class="d-flex align-items-center mb-3 p-2 rounded-3 hover-bg-light-dark transition-all position-relative">
+                                <div class="d-flex align-items-center mb-3 p-2 rounded-4 hover-bg-light-dark transition-all position-relative">
                                     <div class="flex-shrink-0">
                                         {% if group.group_pic %}
                                             <img src="{{ group.group_pic.url }}" class="rounded-circle border border-2 border-primary" style="width: 48px; height: 48px; object-fit: cover;">
@@ -39,7 +39,7 @@
                                     </div>
                                     <div class="ms-3 overflow-hidden">
                                         <h6 class="mb-0 fw-bold text-truncate">{{ group.name }}</h6>
-                                        <small class="text-muted" style="font-size: 11px;">{{ group.members.count }} operatives</small>
+                                        <small class="text-muted" style="font-size: 11px;">{{ group.members.count }} Members</small>
                                     </div>
                                     <a href="{% url 'groups_detail' group.id %}" class="stretched-link"></a>
                                 </div>
@@ -62,8 +62,8 @@
 
         <div class="col-12 col-xl-8">
             <div class="d-flex align-items-center justify-content-between mb-4">
-                <h5 class="fw-bold mb-0">Available Operations</h5>
-                <span class="badge bg-light text-dark rounded-pill border">{{ all_groups.count }} Units Detected</span>
+                <h5 class="fw-bold mb-0">Available Groups</h5>
+                <span class="badge bg-light text-dark rounded-pill border">{{ all_groups.count }} Groups Found</span>
             </div>
 
             <div class="row g-3">
@@ -83,7 +83,7 @@
                                 </p>
                                 <div class="mt-auto">
                                     <a href="{% url 'groups_detail' group.id %}" class="btn btn-outline-primary btn-sm w-100 rounded-pill fw-bold transition-all">
-                                        ANALYZE INTEL
+                                        View Group Details
                                     </a>
                                 </div>
                             </div>
