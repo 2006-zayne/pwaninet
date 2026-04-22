@@ -11,8 +11,8 @@
                     <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center shadow-lg mb-3" style="width: 70px; height: 70px; position: relative; z-index: 2;">
                         <i class="bi bi-shield-plus fs-2"></i>
                     </div>
-                    <h3 class="fw-bold mb-1" style="letter-spacing: 1px;">SQUAD INITIALIZATION</h3>
-                    <p class="small text-uppercase opacity-75 mb-0">Establishing New Tactical Hub</p>
+                    <h3 class="fw-bold mb-1" style="letter-spacing: 1px;">CREATE NEW GROUP</h3>
+                    <p class="small text-uppercase opacity-75 mb-0">You are establishing a new hub.</p>
                 </div>
 
                 <div class="card-body p-4 p-md-5">
@@ -21,7 +21,7 @@
                         
                         <div class="mb-4">
                             <label class="form-label fw-bold small text-uppercase text-primary">
-                                <i class="bi bi-tag-fill me-1"></i> Squad Designation
+                                <i class="bi bi-tag-fill me-1"></i> GROUP NAME
                             </label>
                             <div class="input-group">
                                 {{ form.name }}
@@ -33,7 +33,7 @@
 
                         <div class="mb-4">
                             <label class="form-label fw-bold small text-uppercase text-primary">
-                                <i class="bi bi-file-earmark-text-fill me-1"></i> Mission Intelligence
+                                <i class="bi bi-file-earmark-text-fill me-1"></i> GROUP DESCRIPTION.
                             </label>
                             {{ form.description }}
                             <div class="form-text x-small italic">Brief your comrades on the squad's primary objectives.</div>
@@ -41,7 +41,7 @@
 
                         <div class="mb-5">
                             <label class="form-label fw-bold small text-uppercase text-primary">
-                                <i class="bi bi-image-fill me-1"></i> Squad Insignia
+                                <i class="bi bi-image-fill me-1"></i> GROUP PROFILE PICTURE.
                             </label>
                             <div class="p-3 border rounded-3 bg-light">
                                 {{ form.group_pic }}
@@ -50,10 +50,10 @@
 
                         <div class="d-grid gap-3">
                             <button type="submit" class="btn btn-primary rounded-pill py-2 fw-bold shadow">
-                                <i class="bi bi-check-circle-fill me-2"></i>CONFIRM INITIALIZATION
+                                <i class="bi bi-check-circle-fill me-2"></i>CONFIRM CREATION.
                             </button>
                             <a href="{% url 'groups_dashboard' %}" class="btn btn-outline-secondary rounded-pill py-2 fw-bold border-0">
-                                <i class="bi bi-x-circle me-2"></i>ABORT MISSION
+                                <i class="bi bi-x-circle me-2"></i>CANCEL CREATION
                             </a>
                         </div>
                     </form>

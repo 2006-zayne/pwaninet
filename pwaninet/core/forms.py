@@ -94,7 +94,7 @@ class GroupForm(forms.ModelForm):
         
         # Adding Bootstrap classes so the form looks sharp on your ProBook
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control rounded-pill', 'placeholder': 'Squad Name'}),
+            'name': forms.TextInput(attrs={'class': 'form-control rounded-pill', 'placeholder': 'Group Name...'}),
             'description': forms.Textarea(attrs={'class': 'form-control rounded-4', 'rows': 3, 'placeholder': 'What is this squad about?'}),
             'group_pic': forms.FileInput(attrs={'class': 'form-control'}),
         }

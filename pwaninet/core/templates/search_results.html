@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="bg-white">
+        <div class="container py-3 px-3">
+            <!-- Search Form -->
+            <div class="post-card border-0 mb-3 shadow-none">
+                <form method="GET" action="{% url 'search_results' %}" id="searchForm" class="d-flex gap-2 align-items-center">
+                    <input type="text" id="searchInput" name="q" class="form-control rounded-pill" placeholder="Search for friends, groups..." value="{{ query }}">
+                </form>
+            </div>
+        </div>
+        <hr class="m-0 opacity-25" style="border-top: 1px solid #dee2e6;">
+    </div>
+
+    <div class="row justify-content-center g-0">
+        <div class="col-12 py-3 px-2 mb-5">
+            <div id="searchResults">
+                {% include 'partials/search_results_content.html' %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hover-border-primary:hover { border-color: var(--bs-primary) !important; background-color: #f8f9fa !important; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .post-card { background: white; border-radius: 1rem; }
+    .list-group-item { border-bottom: 1px solid #f0f0f0; }
+    .list-group-item:last-child { border-bottom: none; }
+    .list-group-item:hover { background-color: #f9f9f9; }
+</style>
+
+<script>
+    const searchInput = document.getElementById('searchInput');
+    const searchResults = document.getElementById('searchResults');
+    let debounceTimer;
+
+    // Debounced search function
+    function performSearch(query) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('q', query);
+        
+        fetch(url.toString(), {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.text())
+        .then(html => {
+            searchResults.innerHTML = html;
+            attachEventListeners();
+        })
+        .catch(error => console.error('Search error:', error));
+    }
+
+    // Event listener for input changes
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        const query = e.target.value.trim();
+        
+        // Debounce: wait 300ms after user stops typing
+        debounceTimer = setTimeout(() => {
+            performSearch(query);
+        }, 300);
+    });
+
+    // Attach event listeners to follow and group buttons
+    function attachEventListeners() {
+        // Follow button listeners
+        document.querySelectorAll('.follow-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const username = this.dataset.username;
+                toggleFollow(username, this);
+            });
+        });
+
+        // Group button listeners
+        document.querySelectorAll('.group-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const groupId = this.dataset.groupId;
+                const action = this.dataset.action;
+                toggleGroup(groupId, action, this);
+            });
+        });
+    }
+
+    // Toggle follow function
+    function toggleFollow(username, buttonElement) {
+        fetch(`{% url 'toggle_follow' 'USERNAME' %}`.replace('USERNAME', username))
+            .then(response => response.json())
+            .then(data => {
+                if (data.is_following) {
+                    buttonElement.classList.remove('btn-primary');
+                    buttonElement.classList.add('btn-outline-secondary');
+                    buttonElement.innerHTML = '<i class="bi bi-person-dash"></i> Following';
+                } else {
+                    buttonElement.classList.add('btn-primary');
+                    buttonElement.classList.remove('btn-outline-secondary');
+                    buttonElement.innerHTML = '<i class="bi bi-person-plus"></i> Follow';
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    // Toggle group membership function
+    function toggleGroup(groupId, action, buttonElement) {
+        fetch(`{% url 'toggle_membership' 999 %}`.replace('999', groupId))
+            .then(response => {
+                // Refresh results after toggling group
+                const currentQuery = searchInput.value.trim();
+                performSearch(currentQuery);
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    // Attach listeners on page load
+    document.addEventListener('DOMContentLoaded', attachEventListeners);
+</script>
+{% endblock %}

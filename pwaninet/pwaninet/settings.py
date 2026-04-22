@@ -30,7 +30,12 @@ ALLOWED_HOSTS = [
     'rosily-untempted-divina.ngrok-free.dev',
     '192.168.72.66',
     '192.168.112.221',
+    '192.168.145.221',
     '192.168.64.211',
+    '192.168.180.94',
+    '192.168.183.245',
+    '192.168.61.221',
+    '10.20.152.125',
     '0.0.0.0',
     '127.0.0.1', 
     'localhost',
@@ -88,6 +93,21 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
+
+# Cache (works locally and in production without paid products).
+# For multi-process deployments, switch to django.core.cache.backends.filebased.FileBasedCache
+# or Redis when available.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'pwaninet-local-cache',
+        'TIMEOUT': 300,
+        'OPTIONS': {
+            'MAX_ENTRIES': 2000,
+            'CULL_FREQUENCY': 3,
+        },
     }
 }
 

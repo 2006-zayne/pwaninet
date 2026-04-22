@@ -1,0 +1,22 @@
+{% for post in posts %}
+    {% include 'partials/post_card.html' %}
+{% empty %}
+    {% if page == 1 %}
+        <div class="text-center py-5">
+            <i class="bi bi-broadcast text-muted fs-1"></i>
+            <p class="text-muted mt-2">No posts yet,Be the first one to post.</p>
+            <a href="{% url 'create_post' %}" class="btn btn-primary rounded-pill px-4">Create a post</a>
+        </div>
+    {% endif %}
+{% endfor %}
+
+{% if has_next %}
+    <div
+        class="feed-loader py-2 text-center"
+        hx-get="{% url 'home_feed_page' %}?page={{ next_page }}"
+        hx-trigger="revealed"
+        hx-swap="outerHTML"
+    >
+        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+    </div>
+{% endif %}

@@ -5,15 +5,13 @@
     <div class="bg-white">
         <div class="container py-3 px-3">
             <div class="post-card border-0 mb-0 shadow-none">
-                <div class="d-flex align-items-center gap-3">
+                <form method="GET" action="{% url 'search_results' %}" class="d-flex align-items-center gap-3">
                     <a href="{% url 'profile' request.user.username %}" class="flex-shrink-0">
                         <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
                     </a>
                     
-                    <a href="{% url 'create_post' %}" class="mind-trigger text-decoration-none flex-grow-1 bg-light rounded-pill px-4 py-2 text-muted border border-light transition-all hover-border-primary">
-                        What's the intel, {{ request.user.first_name|default:request.user.username }}?
-                    </a>
-                </div>
+                    <input type="text" name="q" class="mind-trigger text-decoration-none flex-grow-1 bg-light rounded-pill px-4 py-2 text-muted border border-light transition-all hover-border-primary" placeholder="Search for friends, groups..." style="outline: none;">
+                </form>
                 
                 <div class="d-flex justify-content-around mt-3">
                     <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-image me-1 text-success"></i></a>
@@ -57,16 +55,8 @@
                 {% endif %}
             </div>
 
-            <div class="feed-sector">
-                {% for post in posts %}
-                    {% include 'partials/post_card.html' %}
-                {% empty %}
-                    <div class="text-center py-5">
-                        <i class="bi bi-broadcast text-muted fs-1"></i>
-                        <p class="text-muted mt-2">No posts yet,Be the first one to post.</p>
-                        <a href="{% url 'create_post' %}" class="btn btn-primary rounded-pill px-4">Create a post</a>
-                    </div>
-                {% endfor %}
+            <div id="feed-stream" class="feed-sector">
+                {% include 'partials/feed_posts_page.html' with posts=posts has_next=has_next next_page=next_page page=1 %}
             </div>
 
         </div>

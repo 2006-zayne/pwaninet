@@ -105,12 +105,12 @@ class Post(models.Model):
     def is_liked_by(self, user):
         if user.is_authenticated:
             # We check your 'Like' model specifically
-            return self.likes_received.filter(user=user).exists()
+            return self.likes.filter(user=user).exists()
         return False
 
     @property
     def like_count(self):
-        return self.likes_received.count()
+        return self.likes.count()
     
     def save(self, *args, **kwargs):
         if self.image:

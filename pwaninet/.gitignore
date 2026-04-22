@@ -5,6 +5,8 @@ ramsey-env/
 venv/
 .vscode/
 
+media/
+
 # Database and Secrets (DO NOT REMOVE)
 db.sqlite3
 db.sqlite3-journal

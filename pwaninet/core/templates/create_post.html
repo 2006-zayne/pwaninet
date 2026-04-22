@@ -8,8 +8,8 @@
             <div class="card border-0 shadow-lg rounded-1 overflow-hidden">
                 <div class="bg-dark p-4 d-flex align-items-center justify-content-between">
                     <div>
-                        <h4 class="fw-bold text-white mb-0" style="letter-spacing: 1px;">NEW DEPLOYMENT</h4>
-                        <small class="text-primary fw-bold text-uppercase" style="font-size: 0.7rem;">Broadcasting to Pwaninet Network</small>
+                        <h4 class="fw-bold text-white mb-0" style="letter-spacing: 1px;">NEW POST</h4>
+                        <small class="text-primary fw-bold text-uppercase" style="font-size: 0.7rem;">Pass the message to fellow comrades.</small>
                     </div>
                     <i class="bi bi-shield-shaded text-primary fs-3"></i>
                 </div>
@@ -19,21 +19,21 @@
                         {% csrf_token %}
                         
                         <div class="mb-4">
-                            <label class="form-label small fw-black text-muted text-uppercase">Target Sector</label>
+                            <label class="form-label small fw-black text-muted text-uppercase">Target Group</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-0"><i class="bi bi-geo-alt-fill text-primary"></i></span>
                                 {{ form.unit }}
                             </div>
-                            <div class="form-text x-small italic">Leave as "General" to broadcast to the entire university feed.</div>
+                            <div class="form-text x-small italic">Leave as "General" to post to the entire university feed.</div>
                         </div>
 
                         <div class="mb-4">
-                            <label class="form-label small fw-black text-muted text-uppercase">Intelligence Briefing</label>
+                            <label class="form-label small fw-black text-muted text-uppercase">CONVEY THE NEWS</label>
                             {{ form.content }}
                         </div>
 
                         <div class="p-3 bg-light rounded-4 mb-4">
-                            <h6 class="small fw-bold text-uppercase mb-3"><i class="bi bi-paperclip me-2"></i>Attached Assets</h6>
+                            <h6 class="small fw-bold text-uppercase mb-3"><i class="bi bi-paperclip me-2"></i>Attached media files</h6>
                             <div class="row g-2">
                                 <div class="col-4">
                                     <div class="media-upload-box text-center p-2 border rounded-3 bg-white">
@@ -66,16 +66,16 @@
                         </div>
 
                         <div class="mb-5">
-                            <label class="form-label small fw-black text-muted text-uppercase">Deployment Visual Style</label>
+                            <label class="form-label small fw-black text-muted text-uppercase">Choose the background gradient</label>
                             {{ form.gradient_class }}
                         </div>
 
                         <div class="d-grid gap-3">
                             <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold shadow">
-                                <i class="bi bi-send-fill me-2"></i>DEPLOY INTEL
+                                <i class="bi bi-send-fill me-2"></i>create post
                             </button>
                             <a href="{% url 'home' %}" class="btn btn-link text-muted text-decoration-none fw-bold small">
-                                ABORT MISSION
+                                CANCEL POST
                             </a>
                         </div>
                     </form>

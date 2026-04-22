@@ -4,9 +4,21 @@ from .models import Post, Unit, Course ,Year ,User ,Notifications ,Groups ,Like 
 from .forms import PwaniSignupForm ,PostForm , ProfileUpdateForm ,GroupForm
 from django.contrib.auth import get_user_model
 from django.contrib import messages
-from django.db.models import Q ,Count
-import random
 from django.http import JsonResponse  ,HttpResponse
+from django.urls import reverse
+from .services.feed_service import build_home_feed_context, invalidate_home_feed_context
+from .services.group_service import (
+    build_group_detail_context,
+    build_groups_dashboard_context,
+)
+from .services.notification_service import (
+    build_notifications_context,
+    build_unread_notification_html,
+    invalidate_unread_count_cache,
+    mark_single_notification_as_read,
+)
+from .services.profile_service import build_profile_context
+from .services.search_service import build_search_context
 
 
 User = get_user_model()
@@ -37,21 +49,7 @@ def load_years(request):
 @login_required
 def profile_view(request, username):
     user_profile = get_object_or_404(User, username=username)
-    is_following = request.user.following.filter(id=user_profile.id).exists()
-    
-    # Calculate Impact (Total Likes received across all posts)
-    total_likes = Post.objects.filter(author=user_profile).aggregate(total=Count('likes'))['total'] or 0
-    
-    user_posts = user_profile.posts.all().order_by('-date')
-
-    context = {
-        'profile_user': user_profile,
-        'following_count': user_profile.following.count(),
-        'followers_count': user_profile.followers.count(),
-        'total_likes': total_likes, # Added this to the context
-        'posts': user_posts,
-        'is_following': is_following,
-    }
+    context = build_profile_context(request.user, user_profile)
     return render(request, 'profile.html', context)
 
 @login_required
@@ -71,40 +69,20 @@ def update_profile_view(request):
 
 @login_required
 def home_view(request):
-    user = request.user
-    suggestions = get_suggestions(request)
-    following_ids = user.following.values_list('id', flat=True)
-    suggested_groups = Groups.objects.filter(members__id__in=following_ids).exclude(members=user).distinct()[:5]
-
-    feed_query = Post.objects.filter(
-        Q(group__isnull=True) | 
-        Q(group__members=user) | 
-        Q(course=user.course, unit__year=user.year)
-    ).distinct().order_by('?') # Randomize at DB level
-
-    posts_qs = feed_query.select_related('author', 'unit').prefetch_related('likes')
-    
-    # Take a slice and convert to list
-    posts = list(posts_qs[:40])
-    
-    # Shuffle or sample if the pool is large enough
-    if len(posts) > 10:
-        # random.sample provides a random subset WITHOUT re-sorting them by date
-        posts = random.sample(posts, k=min(len(posts), 15))
+    context = build_home_feed_context(request.user, page=1)
+    return render(request, 'home.html', context)
 
 
-    liked_post_ids = Like.objects.filter(
-        user=user, 
-        post__in=posts
-    ).values_list('post_id', flat=True)
+@login_required
+def home_feed_page(request):
+    page = request.GET.get("page", 1)
+    try:
+        page = int(page)
+    except (TypeError, ValueError):
+        page = 1
 
-    return render(request, 'home.html', {
-        'posts': posts,
-        'suggested_groups': suggested_groups,
-        'suggestions': suggestions,
-        'liked_post_ids': liked_post_ids,
-        'title': 'PwaniNet Command Feed',
-    })
+    context = build_home_feed_context(request.user, page=page)
+    return render(request, "partials/feed_posts_page.html", context)
 
 @login_required
 def notifications_list(request):
@@ -112,32 +90,15 @@ def notifications_list(request):
     Retrieves and displays all intelligence alerts for the current operative.
     Orders by most recent timestamp.
     """
-    # Fetch all notifications for the user
-    my_notifs = request.user.notifications.all().order_by('-timestamp')
-
-    my_notifs.filter(is_read=False).update(is_read=True)
-    
-    context = {
-        'notifications': my_notifs,
-    }
-    
+    context = build_notifications_context(request.user, mark_read=False)
     return render(request, 'notifications.html', context)
 
 def unread_notification_count(request):
     """Tactical update for the navbar badge via HTMX."""
     if not request.user.is_authenticated:
         return HttpResponse("")
-        
-    count = request.user.notifications.filter(is_read=False).count()
     
-    # We return just the internal HTML of the link to update the badge
-    html = f'<i class="bi bi-bell-fill"></i>'
-    if count > 0:
-        html += f'''
-            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light" 
-                  style="font-size: 0.6rem; padding: 0.35em 0.5em;">
-                {count}
-            </span>'''
+    html = build_unread_notification_html(request.user)
     return HttpResponse(html)
 
 @login_required
@@ -145,9 +106,12 @@ def mark_notification_as_read(request, notif_id):
     """
     Marks a single notification as read and removes it from the UI.
     """
-    notification = get_object_or_404(Notifications, id=notif_id, recipient=request.user)
-    notification.is_read = True
-    notification.save()
+    if request.method != "POST":
+        return HttpResponse("", status=405)
+
+    notification = mark_single_notification_as_read(request.user, notif_id)
+    if notification is None:
+        return HttpResponse("", status=404)
 
     # AMMO: Trigger the navbar to refresh the unread count
     response = HttpResponse("") # Returning empty string removes the element if hx-swap is 'outerHTML'
@@ -156,15 +120,11 @@ def mark_notification_as_read(request, notif_id):
 
 @login_required
 def mark_all_as_read(request):
-    # 1. Neutralize all unread intelligence alerts
-    Notifications.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
-    
-    # 2. Retrieve updated list (FIXED: changed order_index to order_by)
-    notifications = Notifications.objects.filter(recipient=request.user).order_by('-timestamp')
-    
-    # 3. Deploy the partial to the UI
-    # IMPORTANT: Ensure templates/partials/notification_list_items.html exists!
-    response = render(request, 'partials/notification_list_items.html', {'notifications': notifications})
+    if request.method != "POST":
+        return HttpResponse("", status=405)
+
+    context = build_notifications_context(request.user, mark_read=True)
+    response = render(request, 'partials/notification_list_items.html', context)
     
     # 4. SIGNAL: Trigger the navbar badge to refresh immediately
     response['HX-Trigger'] = 'notificationUpdate'
@@ -172,16 +132,24 @@ def mark_all_as_read(request):
 
 @login_required
 def invite_to_group(request, group_id, user_id):
+    if request.method != "POST":
+        return HttpResponse("", status=405)
+
     group = get_object_or_404(Groups, id=group_id)
     target_user = get_object_or_404(User, id=user_id)
     
     # Check if target is already in the sector
-    if target_user not in group.members.all():
+    if request.user not in group.members.all():
+        return HttpResponse("", status=403)
+
+    if target_user not in group.members.all() and target_user != request.user:
         # Check if an invite is already pending to avoid spam
         exists = Notifications.objects.filter(
             recipient=target_user, 
+            sender=request.user,
             group=group, 
-            notification_type='INVITE'
+            notification_type='INVITE',
+            is_read=False,
         ).exists()
         
         if not exists:
@@ -192,74 +160,63 @@ def invite_to_group(request, group_id, user_id):
                 notification_type='INVITE',
                 msg=f"wants you to join the sector: {group.name}"
             )
+            invalidate_unread_count_cache(target_user.id)
     
     return redirect('groups_detail', group_id=group.id)
 
 
 @login_required
 def respond_to_invite(request, notif_id, action):
+    if request.method != "POST":
+        return HttpResponse("", status=405)
+
     notification = get_object_or_404(Notifications, id=notif_id, recipient=request.user)
     
     if action == 'accept' and notification.group:
         notification.group.members.add(request.user)
-
-    else :
-        return redirect('notifications')
+        invalidate_home_feed_context(request.user.id)
+    elif action != "decline":
+        return HttpResponse("", status=400)
     
     # Task complete: terminate the notification
     notification.delete()
+    invalidate_unread_count_cache(request.user.id)
+    return redirect('notifications')
+
+
+@login_required
+def notification_redirect(request, notif_id):
+    notification = get_object_or_404(Notifications, id=notif_id, recipient=request.user)
+
+    if not notification.is_read:
+        notification.is_read = True
+        notification.save(update_fields=["is_read"])
+        invalidate_unread_count_cache(request.user.id)
+
+    if notification.notification_type == Notifications.INVITE and notification.group_id:
+        return redirect(f"{reverse('notifications')}#notification-{notification.id}")
+
+    if notification.post_id:
+        return redirect('post_details', post_id=notification.post_id)
+
+    if notification.notification_type == Notifications.FOLLOW:
+        return redirect('profile', username=notification.sender.username)
+
     return redirect('notifications')
 
 # --- GROUP & UNIT LOGIC ---
 
 @login_required
 def groups_dashboard(request):
-    user = request.user
-    
-    # We use the members=user to find the groups that the user part of remember the user is the one using the site.
-    user_groups = Groups.objects.filter(members=user)
-
-    # We use'exclude" to filter out the groups that I'm in.
-    # REMOVED course/year filters because they don't exist in your model yet
-    all_groups = Groups.objects.all().exclude(members=user)
-
-    # Suggested groups based on following
-    following_ids = user.following.values_list('id', flat=True)
-    suggested_groups = Groups.objects.filter(
-        members__id__in=following_ids
-    ).exclude(members=user).distinct()[:10]#We won't suggest a group that I'm one of the users.
-
-    return render(request, 'groups_dashboard.html', {
-        'user_groups': user_groups,
-        'all_groups': all_groups,
-        'suggested_groups': suggested_groups,
-    })
+    context = build_groups_dashboard_context(request.user)
+    return render(request, 'groups_dashboard.html', context)
 
 @login_required
 def groups_detail_view(request, group_id):
     group = get_object_or_404(Groups, id=group_id)
-    group_posts = Post.objects.filter(group=group).order_by('-date')
-    is_member = group.members.filter(id=request.user.id).exists()
-    
-    # Track existing connections for the "Follow" button toggle
-    following_ids = request.user.following.values_list('id', flat=True)
-
-    # RECRUITMENT RADAR
     query = request.GET.get('search_user')
-    search_results = None
-    if query:
-        search_results = User.objects.filter(
-            username__icontains=query
-        ).exclude(id__in=group.members.all())[:10]
-
-    return render(request, 'groups_detail.html', {
-        'group': group,
-        'posts': group_posts,
-        'is_member': is_member,
-        'search_results': search_results,
-        'query': query,
-        'following_ids': following_ids,
-    })
+    context = build_group_detail_context(request.user, group, query)
+    return render(request, 'groups_detail.html', context)
 
 @login_required
 def create_group_view(request):
@@ -303,6 +260,7 @@ def create_post_view(request):
 
             post.save()
             form.save_m2m() # Critical for saving likes/tags
+            invalidate_home_feed_context(user.id)
         
             # Notification Deployment
             if post.group:
@@ -338,26 +296,15 @@ def toggle_like(request, post_id):
     else:
         Like.objects.create(user=request.user, post=post)
         is_liked = True
-        if post.author != request.user:
-            Notifications.objects.create(
-                recipient=post.author,
-                sender=request.user,
-                msg=f"liked your intelligence update: '{post.content[:20]}...'"
-            )
+    invalidate_home_feed_context(request.user.id)
+    if post.author_id != request.user.id:
+        invalidate_home_feed_context(post.author_id)
 
     return render(request, 'partials/like_button.html', {
         'post': post, 'is_liked': is_liked, 'like_count': post.likes.count()
     })
 
 # --- UTILITIES ---
-
-def get_suggestions(request):
-    user = request.user
-    already_following = user.following.values_list('id', flat=True)
-    my_groups = user.joined_groups.all() # Corrected to your joined_groups relation
-    return User.objects.filter(joined_groups__in=my_groups).exclude(
-        Q(id__in=already_following) | Q(id=user.id)
-    ).distinct()[:5]
 
 @login_required
 def toggle_follow(request, username):
@@ -370,24 +317,28 @@ def toggle_follow(request, username):
     if target_user == request.user:
         return JsonResponse({"error": "Self-following is prohibited."}, status=400)
 
-    # Tactical Check: Query the dedicated Follow model
+    # Query the dedicated Follow model
     follow_qs = Follow.objects.filter(follower=request.user, followed=target_user)
     
     if follow_qs.exists():
-        # Objective: Termination of following relationship
+        # Termination of following relationship
         follow_qs.delete()
-        request.user.following.remove(target_user) # Keep M2M in sync
+        #follow_qs.delete()
+       # request.user.following.remove(target_user) # Keep M2M in sync
         is_following = False
     else:
-        # Objective: Establishment of new following relationship
+        # Establishment of new following relationship
         # This create() call triggers the post_save signal in signals.py
-        Follow.objects.create(follower=request.user, followed=target_user)
-        request.user.following.add(target_user) # Keep M2M in sync
+        Follow.objects.get_or_create(follower=request.user, followed=target_user)
+        #request.user.following.add(target_user) # Keep M2M in sync
         is_following = True
+    invalidate_home_feed_context(request.user.id)
+    invalidate_home_feed_context(target_user.id)
 
     return JsonResponse({
         "is_following": is_following,
-        "follower_count": target_user.followers.count()
+        "follower_count":Follow.objects.filter(followed=target_user).count(),
+        # target_user.followers.count()
     })
 
 @login_required
@@ -435,6 +386,7 @@ def toggle_group_membership(request, group_id):
     else:
         group.members.add(request.user)
         messages.success(request, f"You have joined the {group.name} squad.")
+    invalidate_home_feed_context(request.user.id)
     return redirect('groups_detail', group_id=group.id)
 
 @login_required
@@ -454,27 +406,16 @@ def edit_group(request, group_id):
             group.group_profile_pic = request.FILES['photo']
             
         group.save()
-        return redirect('group_detail', group_id=group.id)
+        return redirect('groups_detail', group_id=group.id)
     
     return redirect('groups_detail', group_id=group.id)
 
 @login_required
-def invite_to_group(request, group_id, user_id):
-    group = get_object_or_404(Groups, id=group_id)
-    target_user = get_object_or_404(User, id=user_id)
+def search_results(request):
+    context = build_search_context(request.user, request.GET.get('q', ''))
     
-    # Security check: Only members can invite others
-    if request.user in group.members.all():
-        if target_user not in group.members.all():
-            group.members.add(target_user)
-            # Optional: Add a success message here later
-        if target_user != request.user:
-            Notifications.objects.create(
-                recipient=target_user,
-                sender=request.user,
-                msg=f"{request.user.first_name} invited you to join a group :{ group.name }"
-            )
-
-
-    # Redirect back to the sector briefing
-    return redirect('groups_detail', group_id=group.id)
+    # Check if it's an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'partials/search_results_content.html', context)
+    
+    return render(request, 'search_results.html', context)

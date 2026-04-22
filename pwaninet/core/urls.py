@@ -7,6 +7,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     # The Feed (Home)
     path('', views.home_view, name='home'),
+    path('feed/page/', views.home_feed_page, name='home_feed_page'),
     
     # Registration
     path('register/', views.register_view, name='register'),
@@ -68,5 +69,8 @@ urlpatterns = [
 
     # core/urls.py
     path('notifications/read/<int:notif_id>/', views.mark_notification_as_read, name='mark_notification_as_read'),
+    path('notifications/open/<int:notif_id>/', views.notification_redirect, name='notification_redirect'),
 
+    # Search for users and groups
+    path('search/', views.search_results, name='search_results'),
 ]

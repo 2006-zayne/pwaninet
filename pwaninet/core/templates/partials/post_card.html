@@ -35,9 +35,15 @@
                     </a>
                 {% endif %}
             </h6>
-            <small class="text-muted d-flex align-items-center" style="font-size: 11px;">
-                <span class="badge bg-light text-primary border-0 me-1">{{ post.unit.code|default:"GLOBAL" }}</span> 
-                <i class="bi bi-dot"></i> {{ post.date|timesince }} ago
+            <small class="text-muted d-flex align-items-center gap-2" style="font-size: 11px;">
+                <span class="badge bg-light text-primary border-0">{{ post.unit.code|default:"GLOBAL" }}</span> 
+                <i class="bi bi-dot"></i> 
+                <span>{{ post.date|timesince }} ago</span>
+                {% if post.like_count %}
+                    <i class="bi bi-dot"></i>
+                    <i class="bi bi-heart-fill text-danger" style="font-size: 10px;"></i>
+                    <span>{{ post.like_count }}</span>
+                {% endif %}
             </small>
         </div>
     </div>

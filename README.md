@@ -40,10 +40,6 @@ SECRET_KEY = 'django-insecure-k_7b)v2uaqy2&mske+$ovmneqg82af2=2u_a0@208n9j8h@c2v
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    'rosily-untempted-divina.ngrok-free.dev',
-    '192.168.72.66',
-    '192.168.112.221',
-    '192.168.64.211',
     '0.0.0.0',
     '127.0.0.1', 
     'localhost',
@@ -160,6 +156,9 @@ import os
 MEDIA_URL = '/media/'
 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+Wagwan mandem I think we shoud meet and discuss on what to add to pwaninet like we have already talked of comment section and the messaging now what bout we add the records in the academic groups where people can actually upload pdf and others can find them there with ease without necessarilly failing to get them or delettion when a person joins late he/she will still find the content because it was already uploaded into thee database long time ago.Another thing still in the groups is the admin validation and the the badges on Officials for identty.
+
 
 
 

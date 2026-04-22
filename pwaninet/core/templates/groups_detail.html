@@ -91,7 +91,7 @@
                 </div>
                 
                 <h2 class="fw-black text-uppercase h4 mb-0" style="letter-spacing: -0.5px;">{{ group.name }}</h2>
-                <p class="text-muted small fw-bold mb-4">@sector_{{ group.id }}</p>
+                <p class="text-muted small fw-bold mb-4">Group number : {{ group.id }}</p>
 
                 <div class="d-flex justify-content-center gap-4 border-top border-bottom py-3 mb-4 hover-manifest" 
                      data-bs-toggle="modal" 
@@ -281,7 +281,10 @@
                                 <img src="{{ user.profile_pic.url }}" class="rounded-circle" style="width: 25px; height: 25px; object-fit: cover;">
                                 <span class="small fw-bold">@{{ user.username }}</span>
                             </div>
-                            <a href="{% url 'invite_to_group' group.id user.id %}" class="btn btn-join py-1 px-3" style="font-size: 0.6rem;">INVITE</a>
+                            <form action="{% url 'invite_to_group' group.id user.id %}" method="POST" class="m-0">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-join py-1 px-3" style="font-size: 0.6rem;">INVITE</button>
+                            </form>
                         </div>
                     {% empty %}
                         <p class="text-center text-muted text-tiny">NO OPERATIVES FOUND</p>
@@ -323,7 +326,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // We only trigger this if the 'query' variable exists in the context
     //{% if query %}
     const inviteEl = document.getElementById('inviteModal');
-    if (inviteEl) {
+    if (inviteEl && window.bootstrap) {
         const inviteModal = new bootstrap.Modal(inviteEl);
         inviteModal.show();
     }

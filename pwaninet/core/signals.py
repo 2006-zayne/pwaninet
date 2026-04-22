@@ -2,6 +2,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from .models import User, Groups ,Notifications , Like , Follow
+from .services.notification_service import invalidate_unread_count_cache
 
 @receiver(post_save, sender=User)
 def auto_join_course_group(sender, instance, created, **kwargs):
@@ -43,6 +44,7 @@ def notify_post_owner_on_like(sender, instance, created, **kwargs):
                 post=instance.post,
                 msg="liked your field intel."
             )
+            invalidate_unread_count_cache(instance.post.author_id)
 
 @receiver(post_save, sender=Follow)
 def notify_user_on_follow(sender, instance, created, **kwargs):
@@ -54,3 +56,4 @@ def notify_user_on_follow(sender, instance, created, **kwargs):
             notification_type='FOLLOW',
             msg="started following your tactical updates."
         )
+        invalidate_unread_count_cache(instance.followed_id)

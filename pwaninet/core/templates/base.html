@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PwaniNet | Command Center</title>
     
+    <script src="{% static 'js/htmx.min.js' %}"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
@@ -144,16 +145,32 @@
         {% endif %}
     </div>
 
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Protocol: Reset modal intel on close
+        function refreshNotificationBadge() {
+            const badgeContainer = document.getElementById('notification-badge-container');
+            if (badgeContainer && window.htmx) {
+                htmx.ajax('GET', "{% url 'unread_notification_count' %}", '#notification-badge-container');
+            }
+        }
+
+        document.body.addEventListener('notificationUpdate', refreshNotificationBadge);
+
+        // Protocol: Reset modal intel on close.
+        // Guarding this block prevents JS crashes when Bootstrap assets fail to load.
         const likersModal = document.getElementById('likersModal');
-        likersModal.addEventListener('hidden.bs.modal', function () {
-            document.getElementById('modal-content-target').innerHTML = `
-                <div class="p-5 text-center">
-                    <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
-                </div>`;
-        });
+        if (likersModal) {
+            likersModal.addEventListener('hidden.bs.modal', function () {
+                const modalTarget = document.getElementById('modal-content-target');
+                if (modalTarget) {
+                    modalTarget.innerHTML = `
+                        <div class="p-5 text-center">
+                            <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                        </div>`;
+                }
+            });
+        }
     </script>
 </body>
 </html>
