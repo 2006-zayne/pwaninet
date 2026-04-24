@@ -1,0 +1,962 @@
+[33mcommit 8de9f2106d5cafab9658317fd16708340af5f7d6[m
+Author: Zayne_earthman.dev <zayneearthman005@gmail.com>
+Date:   Fri Apr 3 16:37:35 2026 +0300
+
+    Initial Backend logic commit v1.0 by Ramsey
+
+[1mdiff --git a/pwaninet/.gitignore b/pwaninet/.gitignore[m
+[1mnew file mode 100644[m
+[1mindex 0000000..2257db3[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/.gitignore[m
+[36m@@ -0,0 +1,16 @@[m
+[32m+[m[32m# Python artifacts[m
+[32m+[m[32m__pycache__/[m
+[32m+[m[32m*.pyc[m
+[32m+[m[32mramsey-env/[m
+[32m+[m[32mvenv/[m
+[32m+[m[32m.vscode/[m
+[32m+[m
+[32m+[m[32m# Database and Secrets (DO NOT REMOVE)[m
+[32m+[m[32mdb.sqlite3[m
+[32m+[m[32mdb.sqlite3-journal[m
+[32m+[m[32mlogin_credentials.txt[m
+[32m+[m
+[32m+[m[32m# Distribution[m
+[32m+[m[32m*.egg-info/[m
+[32m+[m[32mdist/[m
+[32m+[m[32mbuild/[m
+\ No newline at end of file[m
+[1mdiff --git a/pwaninet/LICENSE b/pwaninet/LICENSE[m
+[1mnew file mode 100644[m
+[1mindex 0000000..51c84ca[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/LICENSE[m
+[36m@@ -0,0 +1,21 @@[m
+[32m+[m[32mMIT License[m
+[32m+[m
+[32m+[m[32mCopyright (c) 2026 Zayne_earthman.dev[m
+[32m+[m
+[32m+[m[32mPermission is hereby granted, free of charge, to any person obtaining a copy[m
+[32m+[m[32mof this software and associated documentation files (the "Software"), to deal[m
+[32m+[m[32min the Software without restriction, including without limitation the rights[m
+[32m+[m[32mto use, copy, modify, merge, publish, distribute, sublicense, and/or sell[m
+[32m+[m[32mcopies of the Software, and to permit persons to whom the Software is[m
+[32m+[m[32mfurnished to do so, subject to the following conditions:[m
+[32m+[m
+[32m+[m[32mThe above copyright notice and this permission notice shall be included in all[m
+[32m+[m[32mcopies or substantial portions of the Software.[m
+[32m+[m
+[32m+[m[32mTHE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR[m
+[32m+[m[32mIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,[m
+[32m+[m[32mFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE[m
+[32m+[m[32mAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER[m
+[32m+[m[32mLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,[m
+[32m+[m[32mOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE[m
+[32m+[m[32mSOFTWARE.[m
+[1mdiff --git a/pwaninet/README.md b/pwaninet/README.md[m
+[1mnew file mode 100644[m
+[1mindex 0000000..03a9334[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/README.md[m
+[36m@@ -0,0 +1,2 @@[m
+[32m+[m[32m# pwaninet[m
+[32m+[m[32mThe pwani university social network.[m
+[1mdiff --git a/pwaninet/myapp/__init__.py b/pwaninet/core/__init__.py[m
+[1msimilarity index 100%[m
+[1mrename from pwaninet/myapp/__init__.py[m
+[1mrename to pwaninet/core/__init__.py[m
+[1mdiff --git a/pwaninet/core/admin.py b/pwaninet/core/admin.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..f433e0a[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/admin.py[m
+[36m@@ -0,0 +1,26 @@[m
+[32m+[m[32mfrom django.contrib import admin[m
+[32m+[m[32mfrom django.contrib.auth.admin import UserAdmin[m
+[32m+[m[32mfrom .models import Course, Year ,Post ,Unit ,User[m
+[32m+[m
+[32m+[m[32m#Add the course and year fields to the Admin panel.[m
+[32m+[m[32mclass TheUserAdmin(UserAdmin):[m
+[32m+[m[32m    fieldsets = UserAdmin.fieldsets + ([m
+[32m+[m[32m        (None,{'fields':('course','year')}),[m
+[32m+[m
+[32m+[m[32m        )[m
+[32m+[m[41m    [m
+[32m+[m[32m    add_fieldsets = UserAdmin.add_fieldsets + ([m
+[32m+[m[32m        (None, {'fields':('course' ,'year')}),[m
+[32m+[m[32m    )[m
+[32m+[m
+[32m+[m[32m    list_display = ['first_name','second_name','last_name','username', 'email', 'is_staff'][m
+[32m+[m
+[32m+[m[32m    list_filter = ['course', 'year', 'is_staff'][m
+[32m+[m
+[32m+[m[32madmin.site.register(User,TheUserAdmin)[m
+[32m+[m
+[32m+[m[32m# This makes the models visible in the Admin Panel[m
+[32m+[m[32madmin.site.register(Course)[m
+[32m+[m[32madmin.site.register(Year)[m
+[32m+[m[32madmin.site.register(Post)[m
+[32m+[m[32madmin.site.register(Unit)[m
+\ No newline at end of file[m
+[1mdiff --git a/pwaninet/core/apps.py b/pwaninet/core/apps.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..fe2e904[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/apps.py[m
+[36m@@ -0,0 +1,8 @@[m
+[32m+[m[32mfrom django.apps import AppConfig[m
+[32m+[m
+[32m+[m
+[32m+[m[32m#class CoreConfig(AppConfig):[m
+[32m+[m[32m   # name = 'core'[m
+[32m+[m
+[32m+[m[32m   # def ready(self):[m
+[32m+[m[32m        #import core.signals[m
+[1mdiff --git a/pwaninet/core/forms.py b/pwaninet/core/forms.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..29bd392[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/forms.py[m
+[36m@@ -0,0 +1,69 @@[m
+[32m+[m[32mfrom django import forms[m[41m [m
+[32m+[m[32mfrom django.contrib.auth.forms import UserCreationForm[m
+[32m+[m[32mfrom .models import User, Unit, Post, Year[m
+[32m+[m
+[32m+[m[32mclass PwaniSignupForm(UserCreationForm):[m
+[32m+[m[32m    class Meta(UserCreationForm.Meta):[m
+[32m+[m[32m        model = User[m
+[32m+[m[32m        fields = UserCreationForm.Meta.fields + ('first_name', 'second_name', 'last_name', 'course', 'year')[m
+[32m+[m[41m        [m
+[32m+[m[32m        # MISSION: Inject HTMX into the Signup dropdowns[m
+[32m+[m[32m        widgets = {[m
+[32m+[m[32m            'course': forms.Select(attrs={[m
+[32m+[m[32m                'hx-get': '/load-years/',      # The endpoint for filtering[m
+[32m+[m[32m                'hx-target': '#id_year',       # Targets the 'year' field's HTML ID[m
+[32m+[m[32m                'class': 'form-control'[m
+[32m+[m[32m            }),[m
+[32m+[m[32m            'year': forms.Select(attrs={[m
+[32m+[m[32m                'class': 'form-control'[m
+[32m+[m[32m            }),[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m    def __init__(self, *args, **kwargs):[m
+[32m+[m[32m        super().__init__(*args, **kwargs)[m
+[32m+[m[41m        [m
+[32m+[m[32m        # TACTICAL CLEANUP: Start with an empty Year list[m
+[32m+[m[32m        self.fields['year'].queryset = Year.objects.none()[m
+[32m+[m
+[32m+[m[32m        # Update queryset if course data is present (for validation and HTMX)[m
+[32m+[m[32m        if 'course' in self.data:[m
+[32m+[m[32m            try:[m
+[32m+[m[32m                course_id = int(self.data.get('course'))[m
+[32m+[m[32m                self.fields['year'].queryset = Year.objects.filter(course_id=course_id).order_by('level')[m
+[32m+[m[32m            except (ValueError, TypeError):[m
+[32m+[m[32m                pass[m
+[32m+[m[32m        elif self.instance.pk and self.instance.course:[m
+[32m+[m[32m            self.fields['year'].queryset = self.instance.course.years.all()[m
+[32m+[m
+[32m+[m
+[32m+[m[32mclass PostForm(forms.ModelForm):[m
+[32m+[m[32m    # Unit field definition as a dropdown[m
+[32m+[m[32m    unit = forms.ModelChoiceField([m
+[32m+[m[32m        queryset=Unit.objects.all(),[m
+[32m+[m[32m        empty_label="Select Unit.",[m
+[32m+[m[32m        widget=forms.Select(attrs={'class': 'form-control'}) # Standard Issue Styling[m
+[32m+[m[32m    )[m
+[32m+[m
+[32m+[m[32m    class Meta:[m
+[32m+[m[32m        model = Post[m
+[32m+[m[32m        fields = ['unit', 'content'][m[41m [m
+[32m+[m
+[32m+[m[32m        widgets = {[m
+[32m+[m[32m            'content': forms.Textarea(attrs={[m
+[32m+[m[32m                'rows': 5,[m[41m [m
+[32m+[m[32m                'cols': 40,[m[41m [m
+[32m+[m[32m                'placeholder': 'What is on your mind?',[m
+[32m+[m[32m                'class': 'form-control'[m
+[32m+[m[32m            }),[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m    # Filter units based on the user's Course and Year[m
+[32m+[m[32m    def __init__(self, *args, **kwargs):[m
+[32m+[m[32m        user = kwargs.pop('user', None) # Extract the user from the view[m
+[32m+[m[32m        super().__init__(*args, **kwargs)[m
+[32m+[m[32m        if user:[m
+[32m+[m[32m            # MISSION: Restrict units to the user's specific deployment sector[m
+[32m+[m[32m            self.fields['unit'].queryset = Unit.objects.filter([m
+[32m+[m[32m                course=user.course,[m[41m [m
+[32m+[m[32m                year=user.year[m
+[32m+[m[32m            )[m
+\ No newline at end of file[m
+[1mdiff --git a/pwaninet/myapp/migrations/__init__.py b/pwaninet/core/management/__init__.py[m
+[1msimilarity index 100%[m
+[1mrename from pwaninet/myapp/migrations/__init__.py[m
+[1mrename to pwaninet/core/management/__init__.py[m
+[1mdiff --git a/pwaninet/core/management/commands/__init__.py b/pwaninet/core/management/commands/__init__.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..e69de29[m
+[1mdiff --git a/pwaninet/core/management/commands/populate_units.py b/pwaninet/core/management/commands/populate_units.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..bfc78f3[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/management/commands/populate_units.py[m
+[36m@@ -0,0 +1,29 @@[m
+[32m+[m[32mfrom django.core.management.base import BaseCommand[m
+[32m+[m[32mfrom core.models import Course, Unit[m
+[32m+[m
+[32m+[m[32mclass Command(BaseCommand):[m
+[32m+[m[32m    help = 'Populates the database with Pwani University units'[m
+[32m+[m
+[32m+[m[32m    def handle(self, *args, **kwargs):[m
+[32m+[m[32m        # Gets or create the course[m[41m [m
+[32m+[m[32m        cs_course, created = Course.objects.get_or_create(name="Computer Science")[m
+[32m+[m[41m        [m
+[32m+[m[32m        #Defining the units (code,name,year)[m
+[32m+[m[32m        units_to_add = [[m
+[32m+[m[32m            ("SMA 121", "Discrete Mathematics", 1),[m
+[32m+[m[32m            ("BIT 111", "Introduction to Programming", 1),[m
+[32m+[m[32m            ("PHY 111", "Electronics", 1),[m
+[32m+[m[32m            ("SMA 122", "Calculus I", 1),[m
+[32m+[m[32m            ("CSC 121", "Computer Organization", 1),[m
+[32m+[m[32m        ][m
+[32m+[m
+[32m+[m[32m        #feeds the units into the db[m
+[32m+[m[32m        for code, name, year in units_to_add:[m
+[32m+[m[32m            unit, created = Unit.objects.get_or_create([m
+[32m+[m[32m                code=code,[m
+[32m+[m[32m                defaults={'name': name, 'course': cs_course, 'year': year}[m
+[32m+[m[32m            )[m
+[32m+[m[32m            if created:[m
+[32m+[m[32m                self.stdout.write(self.style.SUCCESS(f"Deployed: {name}"))[m
+[32m+[m[32m            else:[m
+[32m+[m[32m                self.stdout.write(self.style.WARNING(f"Skipped (Exists): {name}"))[m
+\ No newline at end of file[m
+[1mdiff --git a/pwaninet/core/migrations/0001_initial.py b/pwaninet/core/migrations/0001_initial.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..909edd4[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/migrations/0001_initial.py[m
+[36m@@ -0,0 +1,92 @@[m
+[32m+[m[32m# Generated by Django 6.0.3 on 2026-04-02 08:57[m
+[32m+[m
+[32m+[m[32mimport django.contrib.auth.models[m
+[32m+[m[32mimport django.contrib.auth.validators[m
+[32m+[m[32mimport django.db.models.deletion[m
+[32m+[m[32mimport django.utils.timezone[m
+[32m+[m[32mfrom django.conf import settings[m
+[32m+[m[32mfrom django.db import migrations, models[m
+[32m+[m
+[32m+[m
+[32m+[m[32mclass Migration(migrations.Migration):[m
+[32m+[m
+[32m+[m[32m    initial = True[m
+[32m+[m
+[32m+[m[32m    dependencies = [[m
+[32m+[m[32m        ('auth', '0012_alter_user_first_name_max_length'),[m
+[32m+[m[32m    ][m
+[32m+[m
+[32m+[m[32m    operations = [[m
+[32m+[m[32m        migrations.CreateModel([m
+[32m+[m[32m            name='Course',[m
+[32m+[m[32m            fields=[[m
+[32m+[m[32m                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),[m
+[32m+[m[32m                ('name', models.CharField(max_length=30)),[m
+[32m+[m[32m            ],[m
+[32m+[m[32m        ),[m
+[32m+[m[32m        migrations.CreateModel([m
+[32m+[m[32m            name='User',[m
+[32m+[m[32m            fields=[[m
+[32m+[m[32m                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),[m
+[32m+[m[32m                ('password', models.CharField(max_length=128, verbose_name='password')),[m
+[32m+[m[32m                ('last_login', models.DateTimeField(blank=True, null=True, verbose_name='last login')),[m
+[32m+[m[32m                ('is_superuser', models.BooleanField(default=False, help_text='Designates that this user has all permissions without explicitly assigning them.', verbose_name='superuser status')),[m
+[32m+[m[32m                ('username', models.CharField(error_messages={'unique': 'A user with that username already exists.'}, help_text='Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.', max_length=150, unique=True, validators=[django.contrib.auth.validators.UnicodeUsernameValidator()], verbose_name='username')),[m
+[32m+[m[32m                ('last_name', models.CharField(blank=True, max_length=150, verbose_name='last name')),[m
+[32m+[m[32m                ('email', models.EmailField(blank=True, max_length=254, verbose_name='email address')),[m
+[32m+[m[32m                ('is_staff', models.BooleanField(default=False, help_text='Designates whether the user can log into this admin site.', verbose_name='staff status')),[m
+[32m+[m[32m                ('is_active', models.BooleanField(default=True, help_text='Designates whether this user should be treated as active. Unselect this instead of deleting accounts.', verbose_name='active')),[m
+[32m+[m[32m                ('date_joined', models.DateTimeField(default=django.utils.timezone.now, verbose_name='date joined')),[m
+[32m+[m[32m                ('first_name', models.CharField(blank=True, max_length=200, null=True)),[m
+[32m+[m[32m                ('second_name', models.CharField(blank=True, max_length=200, null=True)),[m
+[32m+[m[32m                ('groups', models.ManyToManyField(blank=True, help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.', related_name='user_set', related_query_name='user', to='auth.group', verbose_name='groups')),[m
+[32m+[m[32m                ('user_permissions', models.ManyToManyField(blank=True, help_text='Specific permissions for this user.', related_name='user_set', related_query_name='user', to='auth.permission', verbose_name='user permissions')),[m
+[32m+[m[32m                ('course', models.ForeignKey(blank=True, on_delete=django.db.models.deletion.CASCADE, to='core.course')),[m
+[32m+[m[32m            ],[m
+[32m+[m[32m            options={[m
+[32m+[m[32m                'verbose_name': 'user',[m
+[32m+[m[32m                'verbose_name_plural': 'users',[m
+[32m+[m[32m                'abstract': False,[m
+[32m+[m[32m            },[m
+[32m+[m[32m            managers=[[m
+[32m+[m[32m                ('objects', django.contrib.auth.models.UserManager()),[m
+[32m+[m[32m            ],[m
+[32m+[m[32m        ),[m
+[32m+[m[32m        migrations.CreateModel([m
+[32m+[m[32m            name='Unit',[m
+[32m+[m[32m            fields=[[m
+[32m+[m[32m                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),[m
+[32m+[m[32m                ('code', models.CharField(max_length=10, unique=True)),[m
+[32m+[m[32m                ('name', models.CharField(max_length=100)),[m
+[32m+[m[32m                ('course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='units', to='core.course')),[m
+[32m+[m[32m            ],[m
+[32m+[m[32m        ),[m
+[32m+[m[32m        migrations.CreateModel([m
+[32m+[m[32m            name='Post',[m
+[32m+[m[32m            fields=[[m
+[32m+[m[32m                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),[m
+[32m+[m[32m                ('content', models.TextField()),[m
+[32m+[m[32m                ('date', models.DateTimeField(auto_now_add=True)),[m
+[32m+[m[32m                ('author', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='posts', to=settings.AUTH_USER_MODEL)),[m
+[32m+[m[32m                ('course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='core.course')),[m
+[32m+[m[32m                ('unit', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='core.unit')),[m
+[32m+[m[32m            ],[m
+[32m+[m[32m        ),[m
+[32m+[m[32m        migrations.CreateModel([m
+[32m+[m[32m            name='Year',[m
+[32m+[m[32m            fields=[[m
+[32m+[m[32m                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),[m
+[32m+[m[32m                ('level', models.PositiveIntegerField()),[m
+[32m+[m[32m                ('course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='years', to='core.course')),[m
+[32m+[m[32m            ],[m
+[32m+[m[32m            options={[m
+[32m+[m[32m                'ordering': ['level'],[m
+[32m+[m[32m                'unique_together': {('level', 'course')},[m
+[32m+[m[32m            },[m
+[32m+[m[32m        ),[m
+[32m+[m[32m        migrations.AddField([m
+[32m+[m[32m            model_name='user',[m
+[32m+[m[32m            name='year',[m
+[32m+[m[32m            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='core.year'),[m
+[32m+[m[32m        ),[m
+[32m+[m[32m    ][m
+[1mdiff --git a/pwaninet/core/migrations/0002_alter_user_course.py b/pwaninet/core/migrations/0002_alter_user_course.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..6a54ea0[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/migrations/0002_alter_user_course.py[m
+[36m@@ -0,0 +1,19 @@[m
+[32m+[m[32m# Generated by Django 6.0.3 on 2026-04-02 09:02[m
+[32m+[m
+[32m+[m[32mimport django.db.models.deletion[m
+[32m+[m[32mfrom django.db import migrations, models[m
+[32m+[m
+[32m+[m
+[32m+[m[32mclass Migration(migrations.Migration):[m
+[32m+[m
+[32m+[m[32m    dependencies = [[m
+[32m+[m[32m        ('core', '0001_initial'),[m
+[32m+[m[32m    ][m
+[32m+[m
+[32m+[m[32m    operations = [[m
+[32m+[m[32m        migrations.AlterField([m
+[32m+[m[32m            model_name='user',[m
+[32m+[m[32m            name='course',[m
+[32m+[m[32m            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='core.course'),[m
+[32m+[m[32m        ),[m
+[32m+[m[32m    ][m
+[1mdiff --git a/pwaninet/core/migrations/0003_alter_user_last_name.py b/pwaninet/core/migrations/0003_alter_user_last_name.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..a6f57bf[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/migrations/0003_alter_user_last_name.py[m
+[36m@@ -0,0 +1,18 @@[m
+[32m+[m[32m# Generated by Django 6.0.3 on 2026-04-02 09:16[m
+[32m+[m
+[32m+[m[32mfrom django.db import migrations, models[m
+[32m+[m
+[32m+[m
+[32m+[m[32mclass Migration(migrations.Migration):[m
+[32m+[m
+[32m+[m[32m    dependencies = [[m
+[32m+[m[32m        ('core', '0002_alter_user_course'),[m
+[32m+[m[32m    ][m
+[32m+[m
+[32m+[m[32m    operations = [[m
+[32m+[m[32m        migrations.AlterField([m
+[32m+[m[32m            model_name='user',[m
+[32m+[m[32m            name='last_name',[m
+[32m+[m[32m            field=models.CharField(blank=True, max_length=200, null=True),[m
+[32m+[m[32m        ),[m
+[32m+[m[32m    ][m
+[1mdiff --git a/pwaninet/core/migrations/0004_remove_unit_course.py b/pwaninet/core/migrations/0004_remove_unit_course.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..3ed5cc7[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/migrations/0004_remove_unit_course.py[m
+[36m@@ -0,0 +1,17 @@[m
+[32m+[m[32m# Generated by Django 6.0.3 on 2026-04-02 21:12[m
+[32m+[m
+[32m+[m[32mfrom django.db import migrations[m
+[32m+[m
+[32m+[m
+[32m+[m[32mclass Migration(migrations.Migration):[m
+[32m+[m
+[32m+[m[32m    dependencies = [[m
+[32m+[m[32m        ('core', '0003_alter_user_last_name'),[m
+[32m+[m[32m    ][m
+[32m+[m
+[32m+[m[32m    operations = [[m
+[32m+[m[32m        migrations.RemoveField([m
+[32m+[m[32m            model_name='unit',[m
+[32m+[m[32m            name='course',[m
+[32m+[m[32m        ),[m
+[32m+[m[32m    ][m
+[1mdiff --git a/pwaninet/core/migrations/0005_unit_course.py b/pwaninet/core/migrations/0005_unit_course.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..a18030c[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/migrations/0005_unit_course.py[m
+[36m@@ -0,0 +1,20 @@[m
+[32m+[m[32m# Generated by Django 6.0.3 on 2026-04-02 21:13[m
+[32m+[m
+[32m+[m[32mimport django.db.models.deletion[m
+[32m+[m[32mfrom django.db import migrations, models[m
+[32m+[m
+[32m+[m
+[32m+[m[32mclass Migration(migrations.Migration):[m
+[32m+[m
+[32m+[m[32m    dependencies = [[m
+[32m+[m[32m        ('core', '0004_remove_unit_course'),[m
+[32m+[m[32m    ][m
+[32m+[m
+[32m+[m[32m    operations = [[m
+[32m+[m[32m        migrations.AddField([m
+[32m+[m[32m            model_name='unit',[m
+[32m+[m[32m            name='course',[m
+[32m+[m[32m            field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.CASCADE, related_name='units', to='core.course'),[m
+[32m+[m[32m            preserve_default=False,[m
+[32m+[m[32m        ),[m
+[32m+[m[32m    ][m
+[1mdiff --git a/pwaninet/core/migrations/0006_unit_year.py b/pwaninet/core/migrations/0006_unit_year.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..deeee93[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/migrations/0006_unit_year.py[m
+[36m@@ -0,0 +1,18 @@[m
+[32m+[m[32m# Generated by Django 6.0.3 on 2026-04-03 07:18[m
+[32m+[m
+[32m+[m[32mfrom django.db import migrations, models[m
+[32m+[m
+[32m+[m
+[32m+[m[32mclass Migration(migrations.Migration):[m
+[32m+[m
+[32m+[m[32m    dependencies = [[m
+[32m+[m[32m        ('core', '0005_unit_course'),[m
+[32m+[m[32m    ][m
+[32m+[m
+[32m+[m[32m    operations = [[m
+[32m+[m[32m        migrations.AddField([m
+[32m+[m[32m            model_name='unit',[m
+[32m+[m[32m            name='year',[m
+[32m+[m[32m            field=models.IntegerField(default=1),[m
+[32m+[m[32m        ),[m
+[32m+[m[32m    ][m
+[1mdiff --git a/pwaninet/core/migrations/0007_alter_unit_year.py b/pwaninet/core/migrations/0007_alter_unit_year.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..b3210e3[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/migrations/0007_alter_unit_year.py[m
+[36m@@ -0,0 +1,19 @@[m
+[32m+[m[32m# Generated by Django 6.0.3 on 2026-04-03 07:29[m
+[32m+[m
+[32m+[m[32mimport django.db.models.deletion[m
+[32m+[m[32mfrom django.db import migrations, models[m
+[32m+[m
+[32m+[m
+[32m+[m[32mclass Migration(migrations.Migration):[m
+[32m+[m
+[32m+[m[32m    dependencies = [[m
+[32m+[m[32m        ('core', '0006_unit_year'),[m
+[32m+[m[32m    ][m
+[32m+[m
+[32m+[m[32m    operations = [[m
+[32m+[m[32m        migrations.AlterField([m
+[32m+[m[32m            model_name='unit',[m
+[32m+[m[32m            name='year',[m
+[32m+[m[32m            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='units', to='core.year'),[m
+[32m+[m[32m        ),[m
+[32m+[m[32m    ][m
+[1mdiff --git a/pwaninet/core/migrations/__init__.py b/pwaninet/core/migrations/__init__.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..e69de29[m
+[1mdiff --git a/pwaninet/core/models.py b/pwaninet/core/models.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..44adc08[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/models.py[m
+[36m@@ -0,0 +1,70 @@[m
+[32m+[m[32mfrom django.db import models[m
+[32m+[m[32mfrom django.contrib.auth.models import AbstractUser[m
+[32m+[m[32mfrom django.conf import settings[m
+[32m+[m
+[32m+[m[32mclass Year(models.Model):[m
+[32m+[m[32m    level = models.PositiveIntegerField()[m
+[32m+[m[41m    [m
+[32m+[m[32m    course = models.ForeignKey([m
+[32m+[m[32m        'Course',[m[41m [m
+[32m+[m[32m        on_delete=models.CASCADE,[m[41m [m
+[32m+[m[32m        related_name='years'[m
+[32m+[m[32m    )# related_name='years' allows Course.years.all() to work[m
+[32m+[m
+[32m+[m[32m    def __str__(self):[m
+[32m+[m[32m        return f"{self.course.name} - Year {self.level}"[m
+[32m+[m
+[32m+[m[32m    class Meta:[m
+[32m+[m[41m      [m
+[32m+[m[32m        ordering = ['level'] #  Ensures Year 1 comes before Year 2 in the dropdowns[m
+[32m+[m[32m        unique_together = ['level', 'course']   # Prevents duplicate years for the same course (e.g., two "Year 1"s for CS)[m
+[32m+[m[32m       #pass[m
+[32m+[m
+[32m+[m[32mclass Course(models.Model):[m
+[32m+[m[32m    name = models.CharField(max_length=30)[m
+[32m+[m[32m    #unit = models.ForeignKey('Unit' , on_delete=models.CASCADE )[m
+[32m+[m[32m    #year = models.ForeignKey(Year , on_delete=models.CASCADE )[m
+[32m+[m
+[32m+[m[32m    def __str__(self):[m
+[32m+[m[32m        return self.name[m
+[32m+[m[41m    [m
+[32m+[m
+[32m+[m[32mclass Unit(models.Model):[m
+[32m+[m[32m    code = models.CharField(max_length=10, unique=True)[m
+[32m+[m[32m    name = models.CharField(max_length=100)[m
+[32m+[m[32m    course = models.ForeignKey(Course, on_delete=models.CASCADE ,related_name='units')[m
+[32m+[m[32m    year = models.ForeignKey(Year, on_delete = models.CASCADE ,null=True , blank=True , related_name= 'units')[m
+[32m+[m
+[32m+[m[32m    def __str__(self):[m
+[32m+[m[32m        return self.name[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m[32mclass User(AbstractUser):[m
+[32m+[m[32m    first_name = models.CharField(max_length=200 ,null=True,blank=True)[m
+[32m+[m[32m    second_name = models.CharField(max_length=200 ,null=True,blank=True)[m
+[32m+[m[32m    last_name = models.CharField(max_length=200 ,null=True,blank=True)[m
+[32m+[m[32m    year = models.ForeignKey(Year, on_delete=models.SET_NULL, null=True)[m
+[32m+[m[32m    course = models.ForeignKey(Course, on_delete=models.CASCADE,  null=True ,blank=True)[m
+[32m+[m[41m    [m
+[32m+[m[32m    def __str__(self):[m
+[32m+[m[32m        return f"{self.first_name } { self.second_name}".strip() or self.username[m
+[32m+[m[41m    [m
+[32m+[m[32m    @property[m
+[32m+[m[32m    def is_profile_complete(self):[m
+[32m+[m[32m        return bool(self.course and self.year)[m
+[32m+[m
+[32m+[m
+[32m+[m[41m   [m
+[32m+[m
+[32m+[m[32mclass Post(models.Model):[m
+[32m+[m[32m    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='posts')[m
+[32m+[m[32m    course = models.ForeignKey(Course, on_delete=models.CASCADE)[m
+[32m+[m[32m    unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True)[m
+[32m+[m[32m    content = models.TextField()[m
+[32m+[m[32m    date = models.DateTimeField(auto_now_add=True)[m
+[32m+[m
+[32m+[m[32m    def __str__(self):[m
+[32m+[m[32m        return f"Post by {self.author} on {self.date.strftime('%Y-%m-%d')}"[m
+[32m+[m
+[1mdiff --git a/pwaninet/core/templates/base.html b/pwaninet/core/templates/base.html[m
+[1mnew file mode 100644[m
+[1mindex 0000000..ffaf42b[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/templates/base.html[m
+[36m@@ -0,0 +1,25 @@[m
+[32m+[m[32m<!DOCTYPE html>[m
+[32m+[m[32m<html>[m
+[32m+[m[32m<head>[m
+[32m+[m[32m    <title>PwaniNet.</title>[m
+[32m+[m[32m    <script src="https://unpkg.com/htmx.org@1.9.10"></script>[m
+[32m+[m[32m</head>[m
+[32m+[m[32m<body>[m
+[32m+[m[32m    <nav>[m
+[32m+[m[32m        <a href="{% url 'home' %}">Feed</a> |[m[41m [m
+[32m+[m[32m        <a href="{% url 'create_post' %}">Create Post</a> |[m[41m [m
+[32m+[m[32m        {% if user.is_authenticated %}[m
+[32m+[m[32m            <span>[m
+[32m+[m[32m               <em> Student:</em> <strong>{{ user.first_name }}  {{user.second_name}}</strong> |[m[41m [m
+[32m+[m[32m                <em>Course:</em> <strong>{{ user.course.name }}</strong>[m
+[32m+[m[32m            </span>[m
+[32m+[m[32m        {% else %}[m
+[32m+[m[32m            <a href="{% url 'login' %}">Login</a>[m
+[32m+[m[32m        {% endif %}[m
+[32m+[m[32m    </nav>[m
+[32m+[m[32m    <hr>[m
+[32m+[m[41m    [m
+[32m+[m[32m    {% block content %}[m
+[32m+[m[32m    {% endblock %}[m
+[32m+[m[32m</body>[m
+[32m+[m[32m</html>[m
+\ No newline at end of file[m
+[1mdiff --git a/pwaninet/core/templates/create_post.html b/pwaninet/core/templates/create_post.html[m
+[1mnew file mode 100644[m
+[1mindex 0000000..6475b01[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/templates/create_post.html[m
+[36m@@ -0,0 +1,18 @@[m
+[32m+[m[32m{% extends 'base.html' %}[m
+[32m+[m
+[32m+[m[32m{% block content %}[m
+[32m+[m
+[32m+[m[32m<div class="content-section">[m
+[32m+[m[32m    <form method="POST">[m
+[32m+[m[32m        {% csrf_token %}[m
+[32m+[m[32m        <fieldset class="form-group">[m
+[32m+[m[32m            <legend class="border-bottom mb-4">New PwaniNet Post</legend>[m
+[32m+[m[32m            {{ form.as_p }}[m[41m [m
+[32m+[m[32m        </fieldset>[m
+[32m+[m[32m        <div class="form-group">[m
+[32m+[m[32m            <button class="btn btn-outline-info" type="submit">Post</button>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m    </form>[m
+[32m+[m[32m</div>[m
+[32m+[m
+[32m+[m[32m{% endblock %}[m
+\ No newline at end of file[m
+[1mdiff --git a/pwaninet/core/templates/home.html b/pwaninet/core/templates/home.html[m
+[1mnew file mode 100644[m
+[1mindex 0000000..922d1df[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/templates/home.html[m
+[36m@@ -0,0 +1,26 @@[m
+[32m+[m[32m{% extends 'base.html' %}[m
+[32m+[m
+[32m+[m[32m{% block content %}[m
+[32m+[m[32m<h2>Main Feed</h2>[m
+[32m+[m
+[32m+[m[32m<div style="float: left; width: 15%; border-right: 1px solid black ; margin-right: 20px;">[m
+[32m+[m[32m    <h3>Units</h3>[m
+[32m+[m[32m    <ul>[m
+[32m+[m[32m        {% for unit in units %}[m
+[32m+[m[32m            <li><a href="{% url 'unit_detail' unit.id %}">{{ unit.code }}</a></li>[m
+[32m+[m[32m        {% endfor %}[m
+[32m+[m[32m    </ul>[m
+[32m+[m[32m</div>[m
+[32m+[m
+[32m+[m[32m<div style="float: left; width: 55%;">[m
+[32m+[m[32m    {% for post in posts %}[m
+[32m+[m[32m        <div style="border: 1px solid black; padding: 10px; margin-bottom: 10px; border-radius: 25px;">[m
+[32m+[m[32m            <p><strong>{{ post.author.first_name }} {{ post.author.second_name }}</strong> posted in {{ post.unit.name }}</p>[m
+[32m+[m[32m            <p>{{ post.content }}</p>[m
+[32m+[m[32m            <small>{{ post.date }}</small>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m    {% empty %}[m
+[32m+[m[32m        <p>Hello {{ user.username }} write something.</p>[m[41m [m
+[32m+[m[32m    {% endfor %}[m
+[32m+[m[32m</div>[m
+[32m+[m[32m{% endblock %}[m
+[1mdiff --git a/pwaninet/core/templates/partials/year_options.html b/pwaninet/core/templates/partials/year_options.html[m
+[1mnew file mode 100644[m
+[1mindex 0000000..25ac014[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/templates/partials/year_options.html[m
+[36m@@ -0,0 +1,4 @@[m
+[32m+[m[32m<option value="">---------</option>[m
+[32m+[m[32m{% for year in years %}[m
+[32m+[m[32m    <option value="{{ year.id }}">Year {{ year.level }}</option>[m
+[32m+[m[32m{% endfor %}[m
+\ No newline at end of file[m
+[1mdiff --git a/pwaninet/core/templates/register.html b/pwaninet/core/templates/register.html[m
+[1mnew file mode 100644[m
+[1mindex 0000000..b047826[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/templates/register.html[m
+[36m@@ -0,0 +1,21 @@[m
+[32m+[m[32m{% extends 'base.html' %}[m
+[32m+[m
+[32m+[m[32m{% block content %}[m
+[32m+[m[32m<div style="max-width: 400px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px;">[m
+[32m+[m[32m    <h2>PwaniNet: New Student Enrollment</h2>[m
+[32m+[m[32m    <p>Register Here.</p>[m
+[32m+[m[41m    [m
+[32m+[m[32m    <form method="POST">[m
+[32m+[m[32m        {% csrf_token %}[m
+[32m+[m[41m        [m
+[32m+[m[32m        {{ form.as_p }}[m
+[32m+[m[41m        [m
+[32m+[m[32m        <div style="margin-top: 20px;">[m
+[32m+[m[32m            <button type="submit" style="padding: 10px 20px; cursor: pointer;">Complete Registration</button>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m    </form>[m
+[32m+[m[41m    [m
+[32m+[m[32m    <hr>[m
+[32m+[m[32m    <p>Already have an account? <a href="{% url 'login' %}">Login Instead</a></p>[m
+[32m+[m[32m</div>[m
+[32m+[m[32m{% endblock %}[m
+\ No newline at end of file[m
+[1mdiff --git a/pwaninet/core/templates/registration/login.html b/pwaninet/core/templates/registration/login.html[m
+[1mnew file mode 100644[m
+[1mindex 0000000..f85c8cc[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/templates/registration/login.html[m
+[36m@@ -0,0 +1,12 @@[m
+[32m+[m[32m{% extends 'base.html' %}[m
+[32m+[m
+[32m+[m[32m{% block content %}[m
+[32m+[m[32m<h2>PwaniNet: Welcome Back Comrade!</h2>[m
+[32m+[m[32m<form method="post">[m
+[32m+[m[32m    {% csrf_token %}[m
+[32m+[m[32m    {{ form.as_p }}[m
+[32m+[m[32m    <button type="submit">Login</button>[m
+[32m+[m[32m</form>[m
+[32m+[m
+[32m+[m[32m<p>New to the squad? <a href="{% url 'register' %}">Sign up here</a></p>[m
+[32m+[m[32m{% endblock %}[m
+[1mdiff --git a/pwaninet/core/templates/unit_detail.html b/pwaninet/core/templates/unit_detail.html[m
+[1mnew file mode 100644[m
+[1mindex 0000000..90c6cc9[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/templates/unit_detail.html[m
+[36m@@ -0,0 +1,25 @@[m
+[32m+[m[32m{% extends 'base.html' %}[m
+[32m+[m
+[32m+[m[32m{% block content %}[m
+[32m+[m[32m<h2>Posts for {{ unit.code }}: {{ unit.name }}</h2>[m
+[32m+[m[32m<a href="{% url 'home' %}">Back to Main Feed</a>[m
+[32m+[m
+[32m+[m[32m  {% for post in posts %}[m
+[32m+[m[32m        <div style="border: 1px solid black; padding: 10px; margin-bottom: 10px; border-radius: 25px;">[m
+[32m+[m[32m            <p><strong>{{ post.author.first_name }} {{ post.author.second_name }}</strong> posted in {{ post.unit.name }}</p>[m
+[32m+[m[32m            <p>{{ post.content }}</p>[m
+[32m+[m[32m            <small>{{ post.date }}</small>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m    {% empty %}[m
+[32m+[m[32m        <p>Hello {{ user.username }} write something.</p>[m[41m [m
+[32m+[m[32m    {% endfor %}[m
+[32m+[m
+[32m+[m[32m{% endblock %}[m
+[32m+[m
+[32m+[m
+[32m+[m[32m{% for post in posts %}[m
+[32m+[m[32m    <div style="border: 1px dashed gray; padding: 10px; margin-top: 10px;">[m
+[32m+[m[32m        <p>{{ post.content }}</p>[m
+[32m+[m[32m        <small>Posted by {{ post.author.username }} on {{ post.date }}</small>[m
+[32m+[m[32m    </div>[m
+[32m+[m[32m{% endfor %}[m
+\ No newline at end of file[m
+[1mdiff --git a/pwaninet/myapp/tests.py b/pwaninet/core/tests.py[m
+[1msimilarity index 100%[m
+[1mrename from pwaninet/myapp/tests.py[m
+[1mrename to pwaninet/core/tests.py[m
+[1mdiff --git a/pwaninet/core/urls.py b/pwaninet/core/urls.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..ae55b5e[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/urls.py[m
+[36m@@ -0,0 +1,20 @@[m
+[32m+[m[32mfrom django.urls import path[m
+[32m+[m[32mfrom . import views[m
+[32m+[m
+[32m+[m[32murlpatterns = [[m
+[32m+[m[32m    # The Feed (Home)[m
+[32m+[m[32m    path('', views.post_list_view, name='home'),[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Registration[m
+[32m+[m[32m    path('register/', views.register_view, name='register'),[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Unit Specific Posts (e.g., /unit/1/)[m
+[32m+[m[32m    path('unit/<int:unit_id>/', views.unit_posts_view, name='unit_detail'),[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Create Post view[m
+[32m+[m[32m    path('post/new/', views.create_post_view, name='create_post'),[m
+[32m+[m
+[32m+[m[32m    # the load year url for the year filter.[m
+[32m+[m[32m    path('load-years/', views.load_years, name='load_years'),[m
+[32m+[m
+[32m+[m[32m][m
+\ No newline at end of file[m
+[1mdiff --git a/pwaninet/core/views.py b/pwaninet/core/views.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..0b4f528[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/core/views.py[m
+[36m@@ -0,0 +1,93 @@[m
+[32m+[m[32mfrom django.shortcuts import render, get_object_or_404, redirect[m
+[32m+[m[32mfrom django.contrib.auth.decorators import login_required[m
+[32m+[m[32mfrom .models import Post, Unit, Course ,Year ,User[m
+[32m+[m[32mfrom .forms import PwaniSignupForm ,PostForm[m
+[32m+[m
+[32m+[m[32m# Create your views here.[m
+[32m+[m
+[32m+[m[32mdef register_view(request):[m
+[32m+[m[32m    if request.method == 'POST':[m
+[32m+[m[32m        form = PwaniSignupForm(request.POST)[m
+[32m+[m[32m        if form.is_valid():#Validates the error in the form.[m
+[32m+[m
+[32m+[m[32m            form.save()#creates the user in the DB.[m
+[32m+[m
+[32m+[m[32m            return redirect('login')# Redirects to the login page.[m
+[32m+[m[41m           [m
+[32m+[m[32m    else:[m
+[32m+[m[32m        form = PwaniSignupForm()[m
+[32m+[m[32m    return render(request, 'register.html', {'form': form})[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@login_required[m
+[32m+[m[32mdef post_list_view(request):[m
+[32m+[m[32m    user = request.user[m
+[32m+[m
+[32m+[m
+[32m+[m[32m    # MISSION: Only show units for the user's specific Course and Year[m
+[32m+[m[32m    if user.course and user.year:[m
+[32m+[m[32m        units = Unit.objects.filter(course=user.course, year=user.year)[m
+[32m+[m[32m        posts = Post.objects.filter(course=user.course, unit__year=user.year).order_by('-date')[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        units = Unit.objects.none()[m
+[32m+[m[32m        posts = Post.objects.none()[m
+[32m+[m[41m        [m
+[32m+[m[32m    context = {[m
+[32m+[m[32m        'posts': posts,[m
+[32m+[m[32m        'units': units,[m
+[32m+[m[32m        'title': 'PwaniNet Command Feed'[m
+[32m+[m[32m    }[m
+[32m+[m[32m    return render(request, 'home.html', context)[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@login_required[m
+[32m+[m[32mdef unit_posts_view(request, unit_id):[m
+[32m+[m[32m    # Find the specific unit or return a 404 Error[m
+[32m+[m[32m    target_unit = get_object_or_404(Unit, id=unit_id)[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Filter posts to ONLY show this unit[m
+[32m+[m[32m    posts = Post.objects.filter(unit=target_unit).order_by('-date')[m
+[32m+[m
+[32m+[m[32m    context = {[m
+[32m+[m[32m        'unit': target_unit,[m
+[32m+[m[32m        'posts': posts[m
+[32m+[m[32m    }[m
+[32m+[m[32m    return render(request, 'unit_detail.html', context)[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@login_required[m
+[32m+[m[32mdef create_post_view(request):[m
+[32m+[m[32m   if request.method == 'POST':[m
+[32m+[m[41m       [m
+[32m+[m[32m       form = PostForm(request.POST ,user= request.user )[m
+[32m+[m
+[32m+[m[32m       if form.is_valid():[m
+[32m+[m[32m           post =form.save(commit=False)[m
+[32m+[m[32m           post.author = request.user[m
+[32m+[m[32m          #post.content = post.content[m
+[32m+[m
+[32m+[m[32m           if post.unit:[m
+[32m+[m[32m               post.course = post.unit.course[m
+[32m+[m
+[32m+[m[32m           post.save()[m
+[32m+[m
+[32m+[m[32m           return redirect('home')[m
+[32m+[m[41m       [m
+[32m+[m[32m   else:[m
+[32m+[m[32m        form = PostForm(user = request.user)[m
+[32m+[m
+[32m+[m[32m        return render(request, 'create_post.html' , {'form' : form})[m
+[32m+[m[41m   [m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef load_years(request):[m
+[32m+[m[32m    course_id = request.GET.get('course')[m
+[32m+[m[32m    # To see if the ID is arriving[m
+[32m+[m[32m    print(f"DEBUG: Loading years for Course ID: {course_id}")[m
+[32m+[m[41m    [m
+[32m+[m[32m    years = Year.objects.filter(course_id=course_id).order_by('level')[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Return the partial HTML for filtering the year[m
+[32m+[m[32m    return render(request, 'partials/year_options.html', {'years': years})[m
+\ No newline at end of file[m
+[1mdiff --git a/pwaninet/myapp/admin.py b/pwaninet/myapp/admin.py[m
+[1mdeleted file mode 100644[m
+[1mindex 8c38f3f..0000000[m
+[1m--- a/pwaninet/myapp/admin.py[m
+[1m+++ /dev/null[m
+[36m@@ -1,3 +0,0 @@[m
+[31m-from django.contrib import admin[m
+[31m-[m
+[31m-# Register your models here.[m
+[1mdiff --git a/pwaninet/myapp/apps.py b/pwaninet/myapp/apps.py[m
+[1mdeleted file mode 100644[m
+[1mindex 74d6d13..0000000[m
+[1m--- a/pwaninet/myapp/apps.py[m
+[1m+++ /dev/null[m
+[36m@@ -1,5 +0,0 @@[m
+[31m-from django.apps import AppConfig[m
+[31m-[m
+[31m-[m
+[31m-class MyappConfig(AppConfig):[m
+[31m-    name = 'myapp'[m
+[1mdiff --git a/pwaninet/myapp/models.py b/pwaninet/myapp/models.py[m
+[1mdeleted file mode 100644[m
+[1mindex 71a8362..0000000[m
+[1m--- a/pwaninet/myapp/models.py[m
+[1m+++ /dev/null[m
+[36m@@ -1,3 +0,0 @@[m
+[31m-from django.db import models[m
+[31m-[m
+[31m-# Create your models here.[m
+[1mdiff --git a/pwaninet/myapp/views.py b/pwaninet/myapp/views.py[m
+[1mdeleted file mode 100644[m
+[1mindex 91ea44a..0000000[m
+[1m--- a/pwaninet/myapp/views.py[m
+[1m+++ /dev/null[m
+[36m@@ -1,3 +0,0 @@[m
+[31m-from django.shortcuts import render[m
+[31m-[m
+[31m-# Create your views here.[m
+[1mdiff --git a/pwaninet/pwaninet/__pycache__/settings.cpython-312.pyc b/pwaninet/pwaninet/__pycache__/settings.cpython-312.pyc[m
+[1mindex 84157f8..c1a2412 100644[m
+Binary files a/pwaninet/pwaninet/__pycache__/settings.cpython-312.pyc and b/pwaninet/pwaninet/__pycache__/settings.cpython-312.pyc differ
+[1mdiff --git a/pwaninet/pwaninet/__pycache__/urls.cpython-312.pyc b/pwaninet/pwaninet/__pycache__/urls.cpython-312.pyc[m
+[1mindex 38bfd5c..018d85d 100644[m
+Binary files a/pwaninet/pwaninet/__pycache__/urls.cpython-312.pyc and b/pwaninet/pwaninet/__pycache__/urls.cpython-312.pyc differ
+[1mdiff --git a/pwaninet/pwaninet/settings.py b/pwaninet/pwaninet/settings.py[m
+[1mindex c486c27..9b3fa8e 100644[m
+[1m--- a/pwaninet/pwaninet/settings.py[m
+[1m+++ b/pwaninet/pwaninet/settings.py[m
+[36m@@ -37,6 +37,7 @@[m [mINSTALLED_APPS = [[m
+     'django.contrib.sessions',[m
+     'django.contrib.messages',[m
+     'django.contrib.staticfiles',[m
+[32m+[m[32m    'core',[m
+ ][m
+ [m
+ MIDDLEWARE = [[m
+[36m@@ -115,3 +116,12 @@[m [mUSE_TZ = True[m
+ # https://docs.djangoproject.com/en/6.0/howto/static-files/[m
+ [m
+ STATIC_URL = 'static/'[m
+[32m+[m
+[32m+[m[32m# Where to go after a successful login[m
+[32m+[m[32mLOGIN_REDIRECT_URL = 'home'[m
+[32m+[m
+[32m+[m[32m# Where to go after logging out[m
+[32m+[m[32mLOGOUT_REDIRECT_URL = 'login'[m
+[32m+[m
+[32m+[m[32mAUTH_USER_MODEL = 'core.User'[m
+[41m+[m
+[1mdiff --git a/pwaninet/pwaninet/urls.py b/pwaninet/pwaninet/urls.py[m
+[1mindex b45fd03..a654257 100644[m
+[1m--- a/pwaninet/pwaninet/urls.py[m
+[1m+++ b/pwaninet/pwaninet/urls.py[m
+[36m@@ -15,8 +15,11 @@[m [mIncluding another URLconf[m
+     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))[m
+ """[m
+ from django.contrib import admin[m
+[31m-from django.urls import path[m
+[32m+[m[32mfrom django.urls import path,include[m
+ [m
+ urlpatterns = [[m
+     path('admin/', admin.site.urls),[m
+[32m+[m[32m    # This maps 'accounts/login/' and 'accounts/logout/' automatically[m
+[32m+[m[32m    path('accounts/', include('django.contrib.auth.urls')),[m
+[32m+[m[32m    path('', include('core.urls')),[m
+ ][m
+[1mdiff --git a/pwaninet/requirements.txt b/pwaninet/requirements.txt[m
+[1mnew file mode 100644[m
+[1mindex 0000000..a7c6414[m
+[1m--- /dev/null[m
+[1m+++ b/pwaninet/requirements.txt[m
+[36m@@ -0,0 +1,3 @@[m
+[32m+[m[32masgiref==3.11.1[m
+[32m+[m[32mDjango==6.0.3[m
+[32m+[m[32msqlparse==0.5.5[m
