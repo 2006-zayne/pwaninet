@@ -1,88 +1,69 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-12 col-md-8 col-lg-7">
-            
-            <div class="card border-0 shadow-lg rounded-1 overflow-hidden">
-                <div class="bg-dark p-4 d-flex align-items-center justify-content-between">
-                    <div>
-                        <h4 class="fw-bold text-white mb-0" style="letter-spacing: 1px;">NEW POST</h4>
-                        <small class="text-primary fw-bold text-uppercase" style="font-size: 0.7rem;">Pass the message to fellow comrades.</small>
+<div class="container-fluid p-0">
+    <div class="bg-white">
+        <div class="container py-4 px-3">
+            <form method="POST" enctype="multipart/form-data" id="postForm">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Target Group</label>
+                    {{ form.unit }}
+                    <small class="form-text text-muted">Leave as "General" to post to the entire university feed.</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Message</label>
+                    {{ form.content }}
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Media</label>
+                    <div class="d-flex gap-2">
+                        <div class="media-upload-box text-center p-2 border rounded-2 bg-light flex-fill">
+                            <label for="id_images" class="mb-0 cursor-pointer d-block">
+                                <i class="bi bi-images text-primary d-block fs-5"></i>
+                                <span class="x-small fw-bold">Images (Max 15)</span>
+                            </label>
+                            <input type="file" id="id_images" name="images" accept="image/*" multiple class="visually-hidden">
+                        </div>
+                        <div class="media-upload-box text-center p-2 border rounded-2 bg-light flex-fill">
+                            <label for="{{ form.video.id_for_label }}" class="mb-0 cursor-pointer d-block">
+                                <i class="bi bi-play-btn text-danger d-block fs-5"></i>
+                                <span class="x-small fw-bold">Video</span>
+                            </label>
+                            <div class="visually-hidden">{{ form.video }}</div>
+                        </div>
+                        <div class="media-upload-box text-center p-2 border rounded-2 bg-light flex-fill">
+                            <label for="{{ form.docs.id_for_label }}" class="mb-0 cursor-pointer d-block">
+                                <i class="bi bi-file-earmark-pdf text-info d-block fs-5"></i>
+                                <span class="x-small fw-bold">Docs</span>
+                            </label>
+                            <div class="visually-hidden">{{ form.docs }}</div>
+                        </div>
                     </div>
-                    <i class="bi bi-shield-shaded text-primary fs-3"></i>
                 </div>
 
-                <div class="card-body p-4 p-md-5">
-                    <form method="POST" enctype="multipart/form-data" id="postForm">
-                        {% csrf_token %}
-                        
-                        <div class="mb-4">
-                            <label class="form-label small fw-black text-muted text-uppercase">Target Group</label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light border-0"><i class="bi bi-geo-alt-fill text-primary"></i></span>
-                                {{ form.unit }}
-                            </div>
-                            <div class="form-text x-small italic">Leave as "General" to post to the entire university feed.</div>
-                        </div>
-
-                        <div class="mb-4">
-                            <label class="form-label small fw-black text-muted text-uppercase">CONVEY THE NEWS</label>
-                            {{ form.content }}
-                        </div>
-
-                        <div class="p-3 bg-light rounded-4 mb-4">
-                            <h6 class="small fw-bold text-uppercase mb-3"><i class="bi bi-paperclip me-2"></i>Attached media files</h6>
-                            <div class="row g-2">
-                                <div class="col-4">
-                                    <div class="media-upload-box text-center p-2 border rounded-3 bg-white">
-                                        <label for="{{ form.image.id_for_label }}" class="mb-0 cursor-pointer">
-                                            <i class="bi bi-image text-primary d-block fs-4"></i>
-                                            <span class="x-small fw-bold">IMAGE</span>
-                                        </label>
-                                        <div class="visually-hidden">{{ form.image }}</div>
-                                    </div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="media-upload-box text-center p-2 border rounded-3 bg-white">
-                                        <label for="{{ form.video.id_for_label }}" class="mb-0 cursor-pointer">
-                                            <i class="bi bi-play-btn text-danger d-block fs-4"></i>
-                                            <span class="x-small fw-bold">VIDEO</span>
-                                        </label>
-                                        <div class="visually-hidden">{{ form.video }}</div>
-                                    </div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="media-upload-box text-center p-2 border rounded-3 bg-white">
-                                        <label for="{{ form.docs.id_for_label }}" class="mb-0 cursor-pointer">
-                                            <i class="bi bi-file-earmark-pdf text-info d-block fs-4"></i>
-                                            <span class="x-small fw-bold">DOCS</span>
-                                        </label>
-                                        <div class="visually-hidden">{{ form.docs }}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mb-5">
-                            <label class="form-label small fw-black text-muted text-uppercase">Choose the background gradient</label>
-                            {{ form.gradient_class }}
-                        </div>
-
-                        <div class="d-grid gap-3">
-                            <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold shadow">
-                                <i class="bi bi-send-fill me-2"></i>create post
-                            </button>
-                            <a href="{% url 'home' %}" class="btn btn-link text-muted text-decoration-none fw-bold small">
-                                CANCEL POST
-                            </a>
-                        </div>
-                    </form>
+                <div class="mb-4">
+                    <label class="form-label small fw-bold text-muted text-uppercase">Gradient</label>
+                    {{ form.gradient_class }}
+                    <div class="mt-2 p-3 rounded-2 border preview-box bg-light" id="previewBox">
+                        <p class="text-center text-muted small mb-0">Preview</p>
+                    </div>
                 </div>
-            </div>
 
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-grow-1 fw-bold">
+                        <i class="bi bi-send-fill me-2"></i>Post
+                    </button>
+                    <a href="{% url 'home' %}" class="btn btn-link text-muted text-decoration-none fw-bold">
+                        Cancel
+                    </a>
+                </div>
+            </form>
         </div>
+        <hr class="m-0 opacity-25" style="border-top: 1px solid #dee2e6;">
     </div>
 </div>
 
@@ -94,28 +75,82 @@
 
     /* Custom Form Styling */
     #postForm textarea {
-        border: 2px solid #f1f3f5 !important;
-        border-radius: 15px !important;
+        border: 1px solid #dee2e6 !important;
+        border-radius: 8px !important;
         background-color: #f8f9fa !important;
         transition: all 0.3s ease;
+        padding: 10px 12px;
     }
     #postForm textarea:focus {
         background-color: #fff !important;
         border-color: var(--bs-primary) !important;
-        box-shadow: 0 8px 20px rgba(13, 110, 253, 0.05) !important;
+        box-shadow: none !important;
     }
     #postForm select {
-        border-radius: 10px !important;
+        border-radius: 8px !important;
         border: 1px solid #dee2e6 !important;
+        background-color: #f8f9fa !important;
     }
+
     .media-upload-box {
         transition: all 0.2s ease;
-        border: 1px dashed #dee2e6 !important;
+        cursor: pointer;
+        border: 1px solid #dee2e6 !important;
     }
     .media-upload-box:hover {
         background-color: #e9ecef !important;
         border-color: var(--bs-primary) !important;
-        transform: translateY(-2px);
+    }
+
+    /* Gradient Classes */
+    .grad-ocean {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white;
+    }
+    .grad-forest {
+        background: linear-gradient(135deg, #134e5e 0%, #71b280 100%) !important;
+        color: white;
+    }
+    .grad-magma {
+        background: linear-gradient(135deg, #f12711 0%, #f5af19 100%) !important;
+        color: white;
+    }
+    .grad-midnight {
+        background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%) !important;
+        color: white;
+    }
+
+    .preview-box {
+        min-height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
     }
 </style>
+
+<script>
+    document.getElementById('gradientPreview').addEventListener('change', function() {
+        const previewBox = document.getElementById('previewBox');
+        const selectedValue = this.value;
+
+        // Remove all gradient classes
+        previewBox.classList.remove('grad-ocean', 'grad-forest', 'grad-magma', 'grad-midnight');
+        previewBox.classList.remove('bg-light');
+
+        // Add the selected gradient class
+        if (selectedValue && selectedValue !== 'none') {
+            previewBox.classList.add(selectedValue);
+            previewBox.innerHTML = '<p class="text-center mb-0" style="font-weight: bold;">✨ Preview ✨</p>';
+        } else {
+            previewBox.classList.add('bg-light');
+            previewBox.innerHTML = '<p class="text-center text-muted small mb-0">Standard (No Gradient)</p>';
+        }
+    });
+
+    // Trigger preview on page load
+    window.addEventListener('load', function() {
+        document.getElementById('gradientPreview').dispatchEvent(new Event('change'));
+    });
+</script>
 {% endblock %}

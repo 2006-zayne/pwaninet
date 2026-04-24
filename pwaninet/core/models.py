@@ -62,7 +62,6 @@ class User(AbstractUser):
     course = models.ForeignKey(Course, on_delete=models.CASCADE,  null=True ,blank=True)
     profile_pic = models.ImageField(default='profile_pic/default_pic1.jpg', upload_to='profile_pic')
     bio = models.TextField(max_length=500 , blank=True)
-    groups_in = models.ManyToManyField('Groups' , related_name='joined_groups')
     following = models.ManyToManyField("self", symmetrical=False, related_name="followers", blank=True)
     
     def __str__(self):
@@ -87,9 +86,11 @@ class Post(models.Model):
     gradient_class = models.CharField(max_length=50 , choices=GRADIENT_CHOICES , default= 'none' , blank= True )
     date = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['-date']
+
     def __str__(self):
         return f"Post by {self.author} on {self.date.strftime('%Y-%m-%d')}"
-    
 
     @property
     def get_intel_file(self):
@@ -101,7 +102,12 @@ class Post(models.Model):
         if self.docs:
             return self.docs
         return None
-    
+
+    @property
+    def get_all_images(self):
+        """Returns all images related to this post."""
+        return self.post_images.all()
+
     def is_liked_by(self, user):
         if user.is_authenticated:
             # We check your 'Like' model specifically
@@ -111,28 +117,67 @@ class Post(models.Model):
     @property
     def like_count(self):
         return self.likes.count()
-    
+
+    @property
+    def comment_count(self):
+        return self.comments.count()
+
     def save(self, *args, **kwargs):
         if self.image:
             img = Image.open(self.image)
             if img.mode != 'RGB':
                 img = img.convert('RGB')
-            
+
             # Downscale for HP ProBook storage efficiency
             if img.height > 1080 or img.width > 1080:
                 img.thumbnail((1080, 1080))
-            
+
             output = BytesIO()
             img.save(output, format='JPEG', quality=75) # Crushing file size by ~60%
             output.seek(0)
-            
+
             file_name = self.image.name.split('.')[0]
             self.image = InMemoryUploadedFile(
-                output, 'ImageField', f"{file_name}.jpg", 
+                output, 'ImageField', f"{file_name}.jpg",
                 'image/jpeg', sys.getsizeof(output), None
             )
 
         super(Post, self).save(*args, **kwargs)
+
+
+class PostImage(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='post_images')
+    image = models.ImageField(upload_to='posts/images')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+
+    def save(self, *args, **kwargs):
+        if self.image:
+            img = Image.open(self.image)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+
+            # Downscale for storage efficiency
+            if img.height > 1080 or img.width > 1080:
+                img.thumbnail((1080, 1080))
+
+            output = BytesIO()
+            img.save(output, format='JPEG', quality=75)
+            output.seek(0)
+
+            file_name = self.image.name.split('.')[0]
+            self.image = InMemoryUploadedFile(
+                output, 'ImageField', f"{file_name}.jpg",
+                'image/jpeg', sys.getsizeof(output), None
+            )
+
+        super(PostImage, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Image for Post {self.post.id}"
 
 class Notifications(models.Model):
     INVITE = 'INVITE'
@@ -202,3 +247,27 @@ class Follow(models.Model):
 
     def __str__(self):
         return f"{self.follower.username} follows {self.followed.username}"
+
+
+class Comment(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments')
+    content = models.TextField(max_length=1000)
+    likes = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='liked_comments', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['created_at']
+    
+    @property
+    def like_count(self):
+        return self.likes.count()
+    
+    def is_liked_by(self, user):
+        """Check if a comment is liked by a specific user."""
+        if user.is_authenticated:
+            return self.likes.filter(user=user).exists()
+        return False
+
+    def __str__(self):
+        return f"Comment by {self.author.username} on {self.post.id}"

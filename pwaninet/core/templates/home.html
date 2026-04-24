@@ -1,71 +1,363 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container-fluid p-0">
-    <div class="bg-white">
-        <div class="container py-3 px-3">
-            <div class="post-card border-0 mb-0 shadow-none">
-                <form method="GET" action="{% url 'search_results' %}" class="d-flex align-items-center gap-3">
-                    <a href="{% url 'profile' request.user.username %}" class="flex-shrink-0">
-                        <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
-                    </a>
-                    
-                    <input type="text" name="q" class="mind-trigger text-decoration-none flex-grow-1 bg-light rounded-pill px-4 py-2 text-muted border border-light transition-all hover-border-primary" placeholder="Search for friends, groups..." style="outline: none;">
-                </form>
-                
-                <div class="d-flex justify-content-around mt-3">
-                    <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-image me-1 text-success"></i></a>
-                    <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-hash me-1 text-primary"></i></a>
-                    <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-shield-check me-1 text-danger"></i></a>
+<div class="d-lg-none">
+    <div class="container-fluid p-0">
+        <div class="bg-white">
+            <div class="container py-3 px-3">
+                <div class="post-card border-0 mb-0 shadow-none">
+                    <form method="GET" action="{% url 'search_results' %}" class="d-flex align-items-center gap-3">
+                        <a href="{% url 'profile' request.user.username %}" class="flex-shrink-0">
+                            <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+                        </a>
+
+                        <input type="text" name="q" class="mind-trigger text-decoration-none flex-grow-1 bg-light rounded-pill px-4 py-2 text-muted border border-light transition-all hover-border-primary" placeholder="Search for friends, groups..." style="outline: none;">
+                    </form>
+
+                    <div class="d-flex justify-content-around mt-3">
+                        <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-image me-1 text-success"></i></a>
+                        <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-hash me-1 text-primary"></i></a>
+                        <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-shield-check me-1 text-danger"></i></a>
+                    </div>
+                </div>
+            </div>
+            <hr class="m-0 opacity-25" style="border-top: 1px solid #dee2e6;">
+        </div>
+
+        <div class="row g-0 justify-content-center">
+            <div class="col-12 col-lg-8 py-3 px-2 mb-5">
+                <div id="feed-stream" class="feed-sector">
+                    {% include 'partials/feed_posts_page.html' with posts=posts has_next=has_next next_page=next_page page=1 %}
                 </div>
             </div>
         </div>
-        <hr class="m-0 opacity-25" style="border-top: 1px solid #dee2e6;">
     </div>
+</div>
 
-    <div class="row justify-content-center g-0">
-        <div class="col-12 py-3 px-2 mb-5">
-            
-            <div id="squad-container" class="post-card p-3 mb-4 border-0 shadow-sm bg-white rounded-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="fw-bold text-muted small text-uppercase mb-0">Groups to Explore:</h6>
-                    <a href="{% url 'groups_dashboard' %}" class="text-primary small text-decoration-none fw-bold">View All</a>
-                </div>
-                
-                {% if suggested_groups %}
-                    <div class="d-flex gap-3 overflow-auto pb-2 no-scrollbar" style="scrollbar-width: none;">
-                        {% for group in suggested_groups %}
-                        <a href="{% url 'groups_detail' group.id %}" class="text-center text-decoration-none text-dark" style="min-width: 75px;">
-                            <div class="position-relative d-inline-block">
-                                <img src="{{ group.get_photo_url }}" class="rounded-circle border border-2 border-primary p-1" style="width: 60px; height: 60px; object-fit: cover;">
-                                {% if group.is_official %}
-                                    <span class="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 18px; height: 18px; font-size: 10px;">
-                                        <i class="bi bi-check-lg"></i>
-                                    </span>
-                                {% endif %}
+<div class="d-none d-lg-block home-desktop-shell">
+    <div class="home-desktop-grid">
+        <aside class="desktop-left-rail">
+            <div class="desktop-left-stack">
+                <div class="post-card border-0 shadow-sm bg-white rounded-4 p-4">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 54px; height: 54px; object-fit: cover;">
+                        <div>
+                            <div class="fw-bold">{{ request.user.get_full_name|default:request.user.username }}</div>
+                            <div class="small text-muted">@{{ request.user.username }}</div>
+                        </div>
+                    </div>
+                    <a href="{% url 'notifications' %}" class="text-decoration-none">
+                        <div class="bg-light rounded-4 p-3 d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="small text-uppercase text-muted fw-bold">Alerts</div>
+                                <div class="fw-bold text-dark">Notifications Center</div>
                             </div>
-                            <p class="small mt-1 mb-0 text-truncate" style="max-width: 75px;">{{ group.name }}</p>
+                            <span class="badge bg-dark rounded-pill px-3 py-2">{{ unread_notifications_count }}</span>
+                        </div>
+                    </a>
+                </div>
+
+                {% if suggested_groups %}
+                <div class="post-card border-0 shadow-sm bg-white rounded-4 p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold text-muted small text-uppercase mb-0">Group Suggestions</h6>
+                        <a href="{% url 'groups_dashboard' %}" class="small text-decoration-none fw-bold">See All</a>
+                    </div>
+                    <div class="d-flex flex-column gap-3">
+                        {% for group in suggested_groups|slice:":4" %}
+                        <a href="{% url 'groups_detail' group.id %}" class="text-decoration-none text-dark">
+                            <div class="d-flex align-items-center gap-3 p-2 rounded-3 recommendation-row">
+                                <img src="{{ group.get_photo_url }}" class="rounded-circle border border-2 border-primary" style="width: 46px; height: 46px; object-fit: cover;">
+                                <div class="min-w-0">
+                                    <div class="fw-bold small text-truncate">
+                                        {{ group.name }}
+                                        {% if group.is_official %}
+                                        <i class="bi bi-check-circle-fill text-primary ms-1"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div class="x-small text-muted">{{ group.members.count }} members</div>
+                                </div>
+                            </div>
                         </a>
                         {% endfor %}
                     </div>
-                {% else %}
-                    <div class="text-center py-2">
-                        <p class="small text-muted mb-0">No Groups Suggestions at the moment.</p>
+                </div>
+                {% endif %}
+
+                {% if suggested_friends %}
+                <div class="post-card border-0 shadow-sm bg-white rounded-4 p-4">
+                    <h6 class="fw-bold text-muted small text-uppercase mb-3">People To Follow</h6>
+                    <div class="d-flex flex-column gap-3">
+                        {% for friend in suggested_friends|slice:":4" %}
+                        <div class="d-flex align-items-center justify-content-between gap-3 p-2 rounded-3 recommendation-row">
+                            <a href="{% url 'profile' friend.username %}" class="d-flex align-items-center gap-3 text-decoration-none text-dark flex-grow-1 min-w-0">
+                                <img src="{{ friend.profile_pic.url }}" class="rounded-circle border" style="width: 42px; height: 42px; object-fit: cover;">
+                                <div class="min-w-0">
+                                    <div class="fw-bold small text-truncate">{{ friend.first_name }} {{ friend.last_name }}</div>
+                                    <div class="x-small text-muted text-truncate">@{{ friend.username }}</div>
+                                </div>
+                            </a>
+                            <button
+                                class="btn btn-sm btn-outline-primary rounded-pill follow-btn flex-shrink-0"
+                                data-user-id="{{ friend.id }}"
+                                onclick="followUser({{ friend.id }}, this)"
+                            >
+                                Follow
+                            </button>
+                        </div>
+                        {% endfor %}
                     </div>
+                </div>
                 {% endif %}
             </div>
+        </aside>
 
-            <div id="feed-stream" class="feed-sector">
-                {% include 'partials/feed_posts_page.html' with posts=posts has_next=has_next next_page=next_page page=1 %}
+        <section class="desktop-center-rail">
+            <div class="desktop-center-shell">
+                <div class="desktop-search-card post-card border-0 shadow-sm bg-white rounded-4 p-3">
+                    <form method="GET" action="{% url 'search_results' %}" class="d-flex align-items-center gap-3">
+                        <a href="{% url 'profile' request.user.username %}" class="flex-shrink-0">
+                            <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover;">
+                        </a>
+                        <input type="text" name="q" class="mind-trigger text-decoration-none flex-grow-1 bg-light rounded-pill px-4 py-2 text-muted border border-light transition-all hover-border-primary" placeholder="Search for friends, groups..." style="outline: none;">
+                        <a href="{% url 'create_post' %}" class="btn btn-primary rounded-pill px-4 fw-bold flex-shrink-0">
+                            <i class="bi bi-plus-lg me-1"></i> Post
+                        </a>
+                    </form>
+                </div>
+
+                <div class="desktop-feed-shell" id="feed-stream">
+                    {% include 'partials/feed_posts_page.html' with posts=posts has_next=has_next next_page=next_page page=1 %}
+                </div>
             </div>
+        </section>
 
-        </div>
+        <aside class="desktop-right-rail">
+            <div class="desktop-comments-shell">
+                <div class="bg-white border rounded-4 h-100 d-flex flex-column overflow-hidden">
+                    <div class="border-bottom p-3">
+                        <h6 class="fw-bold mb-0 small text-uppercase text-muted">Comments</h6>
+                    </div>
+
+                    <div class="flex-grow-1 p-3" id="comments-container">
+                        <div class="text-center py-5">
+                            <i class="bi bi-chat-left text-muted fs-4"></i>
+                            <p class="text-muted small mt-2 mb-0">Select a post to view comments</p>
+                        </div>
+                    </div>
+
+                    <div id="comment-form-container" class="border-top p-3 bg-white d-none">
+                        <form method="post" id="quick-comment-form">
+                            {% csrf_token %}
+                            <div class="d-flex gap-2 align-items-center">
+                                <div class="flex-grow-1 position-relative">
+                                    <input type="text" class="mind-trigger text-decoration-none w-100 rounded-pill ps-4 pe-5 py-2 text-muted border border-light transition-all hover-border-primary small" name="content" placeholder="Add a comment..." required style="outline: none; background-color: #e9ecef;">
+                                    <button class="btn btn-link text-dark p-0 border-0 shadow-none position-absolute top-50 end-0 translate-middle-y me-3 d-flex align-items-center justify-content-center text-decoration-none" type="submit" aria-label="Send comment">
+                                        <i class="bi bi-send-fill fs-6"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </aside>
     </div>
 </div>
 
 <style>
     .hover-border-primary:hover { border-color: var(--bs-primary) !important; background-color: #f8f9fa !important; }
-    .no-scrollbar::-webkit-scrollbar { display: none; }
     .post-card { background: white; border-radius: 1rem; }
+    .x-small { font-size: 0.75rem; }
+    .min-w-0 { min-width: 0; }
+
+    .recommendation-row {
+        transition: background-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .recommendation-row:hover {
+        background-color: #f8fafc;
+        transform: translateX(2px);
+    }
+
+    .desktop-feed-shell::-webkit-scrollbar,
+    #comments-container::-webkit-scrollbar {
+        width: 7px;
+    }
+
+    .desktop-feed-shell::-webkit-scrollbar-track,
+    #comments-container::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .desktop-feed-shell::-webkit-scrollbar-thumb,
+    #comments-container::-webkit-scrollbar-thumb {
+        background: rgba(13, 110, 253, 0.2);
+        border-radius: 10px;
+    }
+
+    .post-card.active-post {
+        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.15);
+        border-left: 4px solid var(--bs-primary);
+    }
+
+    @media (min-width: 992px) {
+        .friend-suggestions-card {
+            display: none !important;
+        }
+
+        .home-desktop-shell {
+            padding: 12px 20px 0;
+        }
+
+        .home-desktop-grid {
+            display: grid;
+            grid-template-columns: minmax(260px, 320px) minmax(480px, 1fr) minmax(320px, 420px);
+            gap: 18px;
+            align-items: start;
+        }
+
+        .desktop-left-stack {
+            position: sticky;
+            top: 87px;
+        }
+
+        .desktop-center-shell,
+        .desktop-right-rail {
+            height: calc(100vh - 87px);
+        }
+
+        .desktop-center-shell {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            min-height: 0;
+        }
+
+        .desktop-search-card {
+            flex-shrink: 0;
+        }
+
+        .desktop-feed-shell {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding-right: 0.35rem;
+        }
+
+        .desktop-comments-shell {
+            height: 100%;
+        }
+
+        #comments-container {
+            min-height: 0;
+            overflow-y: auto;
+        }
+    }
 </style>
+
+<script>
+    function loadPostComments(postId) {
+        const container = document.getElementById('comments-container');
+        const formContainer = document.getElementById('comment-form-container');
+        if (!container || !formContainer) return;
+
+        container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div></div>';
+
+        fetch(`/post/${postId}/comments-panel/`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.text())
+        .then(html => {
+            container.innerHTML = html;
+            if (window.htmx) {
+                htmx.process(container);
+            }
+
+            const form = document.getElementById('quick-comment-form');
+            if (form) {
+                form.action = `/post/${postId}/comment/`;
+            }
+            formContainer.classList.remove('d-none');
+
+            document.querySelectorAll('.post-card').forEach(card => {
+                card.classList.remove('active-post');
+            });
+
+            const activePost = document.querySelector(`[data-post-id="${postId}"]`);
+            if (activePost) {
+                activePost.classList.add('active-post');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading comments:', error);
+            container.innerHTML = '<p class="text-danger small text-center py-4">Error loading comments</p>';
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.innerWidth >= 992) {
+            const firstPost = document.querySelector('[data-post-id]');
+            if (firstPost) {
+                loadPostComments(firstPost.getAttribute('data-post-id'));
+            }
+        }
+    });
+
+    function followUser(userId, buttonElement) {
+        if (buttonElement.disabled) return;
+
+        buttonElement.disabled = true;
+        const originalText = buttonElement.innerHTML;
+        buttonElement.innerHTML = '...';
+
+        fetch(`/follow/${userId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({})
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                buttonElement.classList.remove('btn-outline-primary');
+                buttonElement.classList.add('btn-success');
+                buttonElement.textContent = 'Following';
+                buttonElement.disabled = true;
+            } else {
+                buttonElement.innerHTML = originalText;
+                buttonElement.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            buttonElement.innerHTML = originalText;
+            buttonElement.disabled = false;
+        });
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
 {% endblock %}

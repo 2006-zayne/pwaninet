@@ -1,11 +1,17 @@
 from django.shortcuts import render, get_object_or_404, redirect 
 from django.contrib.auth.decorators import login_required
-from .models import Post, Unit, Course ,Year ,User ,Notifications ,Groups ,Like ,Follow
+from .models import Post, Unit, Year ,User ,Notifications ,Groups ,Follow ,Comment
 from .forms import PwaniSignupForm ,PostForm , ProfileUpdateForm ,GroupForm
 from django.contrib.auth import get_user_model
 from django.contrib import messages
 from django.http import JsonResponse  ,HttpResponse
 from django.urls import reverse
+from core.queries.profile_queries import get_followers_count
+from core.services.comment_service import (
+    build_comments_context,
+    handle_add_comment_request,
+    toggle_comment_like_for_user,
+)
 from .services.feed_service import build_home_feed_context, invalidate_home_feed_context
 from .services.group_service import (
     build_group_detail_context,
@@ -18,6 +24,11 @@ from .services.notification_service import (
     mark_single_notification_as_read,
 )
 from .services.profile_service import build_profile_context
+from core.services.post_service import (
+    create_post_for_user,
+    prepare_post_form_initial,
+    toggle_post_like_for_user,
+)
 from .services.search_service import build_search_context
 
 
@@ -242,67 +253,19 @@ def create_post_view(request):
     if request.method == 'POST':
         form = PostForm(request.POST, request.FILES, user=user)
         if form.is_valid():
-            post = form.save(commit=False)
-            post.author = user
-
-            # FORCE GROUP ATTACHMENT
-            # This ensures the relationship is built even if the field is hidden in the form
-            if group_id:
-                post.group = get_object_or_404(Groups, id=group_id)
-
-            # ENSURE DUAL VISIBILITY (Home Feed + Group)
-            # Stamping with course/year ensures it appears on the home feed
-            post.course = user.course
-            post.year = user.year 
-            
-            if post.unit:
-                post.course = post.unit.course
-
-            post.save()
-            form.save_m2m() # Critical for saving likes/tags
-            invalidate_home_feed_context(user.id)
-        
-            # Notification Deployment
-            if post.group:
-                recipients = post.group.members.exclude(id=user.id)
-                msg_text = f"posted in the {post.group.name} squad."
-            else:
-                recipients = User.objects.filter(course=user.course, year=user.year).exclude(id=user.id)
-                msg_text = "posted a new update in the global feed."
-
-            notif_list = [Notifications(recipient=student, sender=user, msg=msg_text) for student in recipients]
-            Notifications.objects.bulk_create(notif_list)
-
+            post = create_post_for_user(form, user, group_id=group_id)
             messages.success(request, "Intelligence deployed successfully.")
             return redirect('groups_detail', group_id=post.group.id) if post.group else redirect('home')
     else:
-        # Pass the group into initial data so the form knows about it during GET
-        initial_data = {}
-        if group_id:
-            initial_data['group'] = get_object_or_404(Groups, id=group_id)
-        
-        form = PostForm(user=user, initial=initial_data)
+        form = PostForm(user=user, initial=prepare_post_form_initial(group_id))
 
     return render(request, 'create_post.html', {'form': form})
 
 @login_required
 def toggle_like(request, post_id):
     post = get_object_or_404(Post, id=post_id)
-    like_qs = Like.objects.filter(user=request.user, post=post)
-
-    if like_qs.exists():
-        like_qs.delete()
-        is_liked = False
-    else:
-        Like.objects.create(user=request.user, post=post)
-        is_liked = True
-    invalidate_home_feed_context(request.user.id)
-    if post.author_id != request.user.id:
-        invalidate_home_feed_context(post.author_id)
-
-    return render(request, 'partials/like_button.html', {
-        'post': post, 'is_liked': is_liked, 'like_count': post.likes.count()
-    })
+    context = toggle_post_like_for_user(post, request.user)
+    return render(request, 'partials/like_button.html', context)
 
 # --- UTILITIES ---
 
@@ -337,9 +300,21 @@ def toggle_follow(request, username):
 
     return JsonResponse({
         "is_following": is_following,
-        "follower_count":Follow.objects.filter(followed=target_user).count(),
-        # target_user.followers.count()
+        "follower_count": get_followers_count(target_user),
     })
+
+@login_required
+def add_comment(request, post_id):
+    """
+    Handle adding a new comment to a post.
+    """
+    if request.method != 'POST':
+        return HttpResponse("", status=405)
+    
+    post = get_object_or_404(Post, id=post_id)
+    handle_add_comment_request(request, post)
+    return redirect('post_details', post_id=post_id)
+
 
 @login_required
 def unit_posts_view(request, unit_id):
@@ -353,6 +328,8 @@ def post_detail_view(request, post_id):
     Tactical View: Displays a single intelligence update in full detail.
     """
     post = get_object_or_404(Post, id=post_id)
+    show_all_comments = request.GET.get("all_comments") == "1"
+    comments_context = build_comments_context(post, request.user, show_all_comments=show_all_comments)
     
     # Check if the current user has liked this specific post
     is_liked = post.likes.filter(user=request.user).exists()
@@ -360,7 +337,26 @@ def post_detail_view(request, post_id):
     return render(request, 'post_detail.html', {
         'post': post,
         'is_liked': is_liked,
+        **comments_context,
     })
+
+
+@login_required
+def post_comments_panel(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    show_all_comments = request.GET.get("all_comments") == "1"
+    context = build_comments_context(post, request.user, show_all_comments=show_all_comments)
+    return render(request, 'partials/post_comments_section.html', context)
+
+
+@login_required
+def toggle_comment_like(request, comment_id):
+    if request.method != "POST":
+        return HttpResponse("", status=405)
+
+    comment = get_object_or_404(Comment.objects.select_related('post'), id=comment_id)
+    context = toggle_comment_like_for_user(comment, request.user)
+    return render(request, 'partials/comment_like_button.html', context)
 
 
 @login_required
@@ -417,5 +413,64 @@ def search_results(request):
     # Check if it's an AJAX request
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return render(request, 'partials/search_results_content.html', context)
+    return render(request, 'search_results.html', context)
+
+
+@login_required
+def follow_user(request, user_id):
+    """
+    Handle following/unfollowing a user via AJAX.
+    Returns JSON response with success status.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Invalid request method'}, status=405)
+    
+    try:
+        target_user = get_object_or_404(User, id=user_id)
+        
+        # Prevent following yourself
+        if target_user.id == request.user.id:
+            return JsonResponse({'success': False, 'message': 'You cannot follow yourself'}, status=400)
+        
+        # Check if already following
+        follow_qs = Follow.objects.filter(follower=request.user, followed=target_user)
+        
+        if follow_qs.exists():
+            # Already following, so unfollow
+            follow_qs.delete()
+            message = 'Unfollowed successfully'
+            is_following = False
+        else:
+            # Not following, so follow
+            Follow.objects.create(follower=request.user, followed=target_user)
+            
+            # Create notification for the followed user
+            Notifications.objects.create(
+                recipient=target_user,
+                sender=request.user,
+                notification_type=Notifications.FOLLOW,
+                msg=f"started following you"
+            )
+            invalidate_unread_count_cache(target_user.id)
+            
+            message = 'Followed successfully'
+            is_following = True
+        
+        # Invalidate feed cache for the follower
+        invalidate_home_feed_context(request.user.id)
+        
+        # Invalidate friend suggestions cache so followed user is removed from suggestions
+        from core.services.friend_suggestion_service import invalidate_friend_suggestions_cache
+        invalidate_friend_suggestions_cache(request.user.id)
+        
+        return JsonResponse({
+            'success': True,
+            'message': message,
+            'is_following': is_following,
+            'user_id': user_id
+        })
+    
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
     
     return render(request, 'search_results.html', context)

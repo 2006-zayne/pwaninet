@@ -1,12 +1,12 @@
-from django import forms 
+from django import forms
 from django.contrib.auth.forms import UserCreationForm
-from .models import User, Unit, Post, Year ,Groups
+from .models import User, Unit, Post, Year ,Groups, PostImage
 
 class PwaniSignupForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
         model = User
         fields = UserCreationForm.Meta.fields + ('first_name', 'second_name', 'last_name', 'course', 'year')
-        
+
         #  WE use HTMX into the Signup dropdowns HTMX is a form of Java script which is directly injected into the HTML.
         widgets = {
             'course': forms.Select(attrs={
@@ -21,7 +21,7 @@ class PwaniSignupForm(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
         # To start with an empty Year list
         self.fields['year'].queryset = Year.objects.none()
 
@@ -44,20 +44,33 @@ class PostForm(forms.ModelForm):
         empty_label="Global Feed.",
         widget=forms.Select(attrs={'class': 'form-control'}) # Standard Issue Styling
     )
+
+    # Multiple image upload field
+    images = forms.FileField(
+        required=False,
+        widget=forms.FileInput(attrs={
+            'accept': 'image/*',
+            'class': 'form-control'
+        }),
+        help_text='Upload up to 15 images'
+    )
    # group = Groups.objects.all()
 
     class Meta:
         model = Post
-        fields = ['unit', 'group' , 'content' , 'image' , 'video' , 'docs' , 'gradient_class' ] 
+        fields = ['unit', 'group' , 'content' , 'image' , 'video' , 'docs' , 'gradient_class' ]
 
         widgets = {
             'content': forms.Textarea(attrs={
-                'rows': 5, 
-                'cols': 40, 
+                'rows': 5,
+                'cols': 40,
                 'placeholder': 'What is on your mind?',
                 'class': 'form-control'
             }),
-            'gradient_class': forms.Select(attrs={'class': 'form-select'}),
+            'gradient_class': forms.Select(attrs={
+                'class': 'form-select',
+                'id': 'gradientPreview'
+            }),
            # 'group' : forms.Select(attrs={'class' : 'form-select'}),
         }
 
@@ -68,8 +81,25 @@ class PostForm(forms.ModelForm):
         if user:
             # Restrict units to the user's specific deployment sector
             self.fields['unit'].queryset = Unit.objects.filter(
-                course=user.course, 
+                course=user.course,
                 year=user.year
+            )
+
+    def save(self, commit=True):
+        post = super().save(commit=commit)
+
+        if commit:
+            self.save_images(post)
+
+        return post
+
+    def save_images(self, post):
+        images = self.files.getlist('images')
+        for index, image_file in enumerate(images[:15]):
+            PostImage.objects.create(
+                post=post,
+                image=image_file,
+                order=index
             )
 
 class ProfileUpdateForm(forms.ModelForm):
@@ -91,7 +121,7 @@ class GroupForm(forms.ModelForm):
         model = Groups
         # We only want users to fill in these specific fields
         fields = ['name', 'description', 'group_pic']
-        
+
         # Adding Bootstrap classes so the form looks sharp on your ProBook
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control rounded-pill', 'placeholder': 'Group Name...'}),

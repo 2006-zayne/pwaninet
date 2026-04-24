@@ -8,6 +8,7 @@ from core.queries.feed_queries import (
     get_user_group_ids,
     get_user_suggestions_from_groups,
 )
+from core.services.friend_suggestion_service import get_friend_suggestions_for_user
 
 FEED_PAGE_SIZE = 10
 
@@ -38,7 +39,10 @@ def build_home_feed_context(user, page=1):
         "next_page": page + 1,
         "page": page,
         "title": "PwaniNet Command Feed",
+        # Add suggested friends to ALL pages
+        "suggested_friends": get_friend_suggestions_for_user(user, limit=10),
     }
+    
     if page == 1:
         context["suggested_groups"] = get_suggested_groups(user, following_ids, limit=5)
         context["suggestions"] = get_user_suggestions_from_groups(user, limit=5)

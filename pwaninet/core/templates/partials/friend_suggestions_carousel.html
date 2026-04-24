@@ -1,0 +1,120 @@
+{% if suggested_friends %}
+<div class="friend-suggestions-card p-3 mb-4 border-0 shadow-sm bg-white rounded-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="fw-bold text-muted small text-uppercase mb-0">
+            <i class="bi bi-people me-2 text-primary"></i>Suggested Friends
+        </h6>
+    </div>
+    
+    <div class="friend-carousel-wrapper">
+        <div class="friend-carousel d-flex gap-3 overflow-auto pb-2" style="scrollbar-width: thin;">
+            {% for friend in suggested_friends %}
+            <div class="friend-card flex-shrink-0" data-friend-id="{{ friend.id }}">
+                <div class="card border-0 shadow-sm h-100" style="width: 160px; min-width: 160px;">
+                    <!-- Profile Section -->
+                    <a href="{% url 'profile' friend.username %}" class="text-decoration-none text-dark">
+                        <div class="position-relative overflow-hidden" style="height: 160px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            <img 
+                                src="{{ friend.profile_pic.url }}" 
+                                class="w-100 h-100 object-fit-cover"
+                                alt="{{ friend.first_name }}"
+                                style="object-fit: cover;"
+                            >
+                            <!-- Verification Badge if applicable -->
+                            {% if friend.is_profile_complete %}
+                            <span class="position-absolute top-0 end-0 m-2 badge bg-success rounded-circle p-2" title="Profile Complete">
+                                <i class="bi bi-check-lg" style="font-size: 0.7rem;"></i>
+                            </span>
+                            {% endif %}
+                        </div>
+                    </a>
+                    
+                    <!-- Name Section -->
+                    <div class="card-body p-2 text-center">
+                        <a href="{% url 'profile' friend.username %}" class="text-decoration-none text-dark">
+                            <h6 class="card-title fw-bold small mb-1 text-truncate">
+                                {{ friend.first_name }} {{ friend.last_name }}
+                            </h6>
+                        </a>
+                        
+                        <!-- Course/Year Info -->
+                        <div class="small text-muted mb-2">
+                            {% if friend.course %}
+                                <div class="text-truncate">{{ friend.course.name }}</div>
+                            {% endif %}
+                            {% if friend.year %}
+                                <div class="text-truncate">Year {{ friend.year.level }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Follow Button -->
+                    <div class="card-footer bg-white border-0 p-2">
+                        <button 
+                            class="btn btn-sm btn-primary w-100 follow-btn"
+                            data-user-id="{{ friend.id }}"
+                            onclick="followUser({{ friend.id }}, this)"
+                            style="font-size: 0.75rem; padding: 0.4rem 0.5rem;"
+                        >
+                            <i class="bi bi-person-plus me-1"></i>Follow
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .friend-carousel-wrapper {
+        position: relative;
+    }
+    
+    .friend-carousel {
+        /* Horizontal scroll without affecting vertical feed */
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-behavior: smooth;
+        /* Hide scrollbar for cleaner look */
+        -ms-overflow-style: none;
+        scrollbar-width: thin;
+        scrollbar-color: #ccc #f1f1f1;
+    }
+    
+    .friend-carousel::-webkit-scrollbar {
+        height: 6px;
+    }
+    
+    .friend-carousel::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 3px;
+    }
+    
+    .friend-carousel::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 3px;
+    }
+    
+    .friend-carousel::-webkit-scrollbar-thumb:hover {
+        background: #999;
+    }
+    
+    .friend-card {
+        transition: transform 0.2s ease, opacity 0.3s ease;
+    }
+    
+    .friend-card:hover {
+        transform: translateY(-4px);
+    }
+    
+    .friend-card .card {
+        cursor: pointer;
+        transition: box-shadow 0.2s ease;
+    }
+    
+    .friend-card .card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+</style>
+{% endif %}

@@ -1,5 +1,10 @@
 {% for post in posts %}
     {% include 'partials/post_card.html' %}
+    
+    {# Inject friend suggestions after 3rd post on first page #}
+    {% if forloop.counter == 3 and page == 1 and suggested_friends %}
+        {% include 'partials/friend_suggestions_carousel.html' with suggested_friends=suggested_friends %}
+    {% endif %}
 {% empty %}
     {% if page == 1 %}
         <div class="text-center py-5">

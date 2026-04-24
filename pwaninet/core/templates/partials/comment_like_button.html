@@ -1,0 +1,9 @@
+<button
+    class="btn btn-sm border-0 d-inline-flex align-items-center px-0 {% if comment.id in liked_comment_ids %}text-danger{% else %}text-muted{% endif %}"
+    hx-post="{% url 'toggle_comment_like' comment.id %}"
+    hx-target="this"
+    hx-swap="outerHTML"
+>
+    <i class="bi {% if comment.id in liked_comment_ids %}bi-heart-fill{% else %}bi-heart{% endif %}"></i>
+    <span class="ms-1 fw-bold small">{{ comment.likes_count|default:comment.like_count }}</span>
+</button>

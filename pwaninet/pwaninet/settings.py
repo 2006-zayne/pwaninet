@@ -31,6 +31,8 @@ ALLOWED_HOSTS = [
     '192.168.72.66',
     '192.168.112.221',
     '192.168.145.221',
+    '192.168.99.221',
+    '192.168.72.88',
     '192.168.64.211',
     '192.168.180.94',
     '192.168.183.245',
@@ -148,7 +150,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
-STATIC_ROOT = BASE_DIR /'staticfiles'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
@@ -167,6 +169,3 @@ import os
 MEDIA_URL = '/media/'
 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
-
-

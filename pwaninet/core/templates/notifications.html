@@ -5,16 +5,23 @@
     <div class="row justify-content-center">
         <div class="col-12 col-lg-10">
             
-            <div class="d-flex justify-content-between align-items-center mb-4 px-2">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 px-2 gap-3">
                 <div>
                     <h4 class="fw-bold mb-0 text-uppercase letter-spacing-1"> notifications</h4>
                     <p class="small text-muted mb-0">You will get notified about the stuffs you are interested in or have taken part in.</p>
                 </div>
-                <div id="alert-counter">
+                <div class="d-flex align-items-center gap-2 flex-wrap justify-content-start justify-content-md-end">
                     {% if notifications %}
-                    <span class="badge bg-dark rounded-pill px-3 py-2 border border-secondary">
+                    <span class="badge bg-dark rounded-pill px-3 py-2 border border-secondary" style="white-space: nowrap;">
                         {{ unread_notifications_count }} ACTIVE NOTIFS
                     </span>
+                    <button class="btn btn-danger btn-sm rounded-pill px-3 fw-bold text-uppercase border-0" 
+                            style="font-size: 0.75rem; white-space: nowrap;"
+                            hx-post="{% url 'mark_all_as_read' %}"
+                            hx-target="#notification-list"
+                            hx-swap="innerHTML">
+                        <i class="bi bi-trash me-1"></i> Clear
+                    </button>
                     {% endif %}
                 </div>
             </div>
@@ -24,18 +31,6 @@
                     {% include 'partials/notification_list_items.html' %}
                 </div>
             </div>
-            
-            {% if notifications %}
-                <div class="d-flex justify-content-center mt-4">
-                    <button class="btn btn-outline-secondary btn-sm rounded-pill px-4 fw-bold text-uppercase border-2" 
-                            style="font-size: 0.75rem;"
-                            hx-post="{% url 'mark_all_as_read' %}"
-                            hx-target="#notification-list"
-                            hx-swap="innerHTML">
-                        <i class="bi bi-check2-all me-1"></i> Clear Notification History
-                    </button>
-                </div>
-            {% endif %}
 
         </div>
     </div>

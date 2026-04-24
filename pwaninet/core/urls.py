@@ -45,6 +45,8 @@ urlpatterns = [
 
     # THis will help us see thosee who liked our posts
     path('post/<int:post_id>/likers/', views.post_likers_list, name='post_likers_list'),
+    path('post/<int:post_id>/comments-panel/', views.post_comments_panel, name='post_comments_panel'),
+    path('comment/<int:comment_id>/like/', views.toggle_comment_like, name='toggle_comment_like'),
 
     # Add this to resolve the 'toggle_like' Reverse error
     path('like/<int:post_id>/', views.toggle_like, name='toggle_like'),
@@ -66,6 +68,9 @@ urlpatterns = [
     path('notifications/mark-as-read/', views.mark_all_as_read, name='mark_all_as_read'), 
 
     path('post/<int:post_id>/', views.post_detail_view, name='post_details'),
+    
+    # Add comment to post
+    path('post/<int:post_id>/comment/', views.add_comment, name='add_comment'),
 
     # core/urls.py
     path('notifications/read/<int:notif_id>/', views.mark_notification_as_read, name='mark_notification_as_read'),
@@ -73,4 +78,7 @@ urlpatterns = [
 
     # Search for users and groups
     path('search/', views.search_results, name='search_results'),
+    
+    # Follow user by ID (for friend suggestions carousel)
+    path('follow/<int:user_id>/', views.follow_user, name='follow_user'),
 ]

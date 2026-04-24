@@ -1,79 +1,281 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-4">
-
-    <div class="mt-3">
-        <a href="{% url 'home' %}" class="btn btn-link text-decoration-none">
-            <i class="bi bi-arrow-left"></i> Back
-        </a>
-    </div>
-
-
-    <div class="post-card shadow-sm mb-3 bg-white rounded-3 overflow-hidden border-0 ">
-    <div class="d-flex align-items-center p-3">
-        <a href="{% url 'profile' post.author.username %}">
-            <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border" style="width: 40px; height: 40px; object-fit: cover;">
-        </a>
-        <div class="ms-2">
-            <h6 class="mb-0 fw-bold small">
-                <a href="{% url 'profile' post.author.username %}" class="text-dark text-decoration-none">
-                    {{ post.author.get_full_name|default:post.author.username }}
-                </a>
-            </h6>
-            <small class="text-muted" style="font-size: 11px;">
-                <span class="badge bg-light text-primary border-0">{{ post.unit.code|default:"GLOBAL" }}</span> • {{ post.date|timesince }} ago
-            </small>
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <!-- Back Button -->
+        <div class="col-12 col-lg-8 mb-3">
+            <a href="{% url 'home' %}" class="btn btn-link text-decoration-none text-muted">
+                <i class="bi bi-arrow-left me-1"></i>Back
+            </a>
         </div>
-    </div>
 
-    <div class="px-3 pb-3">
-        <p class="mb-0 text-dark" style="font-size: 15px; line-height: 1.5;">{{ post.content }}</p>
-    </div>
-
-    {% if post.get_intel_file %}
-    <div class="post-media border-top border-bottom bg-light">
-        {% with f_url=post.get_intel_file.url|lower %}
-            {% if ".jpg" in f_url or ".png" in f_url or ".jpeg" in f_url or ".webp" in f_url %}
-                <img src="{{ post.get_intel_file.url }}" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;">
-            {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
-                <div class="ratio ratio-16x9 bg-black">
-                    <video controls preload="metadata" class="w-100 h-100">
-                        <source src="{{ post.get_intel_file.url }}" type="video/mp4">
-                    </video>
-                </div>
-            {% elif ".pdf" in f_url %}
-                <div class="p-4 d-flex align-items-center justify-content-between bg-white">
-                    <div class="d-flex align-items-center">
-                        <div class="bg-danger bg-opacity-10 p-3 rounded-3 me-3">
-                            <i class="bi bi-file-earmark-pdf-fill text-danger fs-3"></i>
-                        </div>
-                        <div>
-                            <h6 class="mb-0 fw-bold small">Academic Intel</h6>
-                            <small class="text-muted">PDF DOCUMENT</small>
-                        </div>
+        <!-- Post Container (Center) -->
+        <div class="col-12 col-lg-8">
+            <div class="post-card bg-white rounded-2 border mb-4">
+                <!-- Post Header -->
+                <div class="d-flex align-items-center p-3">
+                    <a href="{% url 'profile' post.author.username %}">
+                        <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border" style="width: 40px; height: 40px; object-fit: cover;">
+                    </a>
+                    <div class="ms-2">
+                        <h6 class="mb-0 fw-bold small">
+                            <a href="{% url 'profile' post.author.username %}" class="text-dark text-decoration-none">
+                                {{ post.author.get_full_name|default:post.author.username }}
+                            </a>
+                        </h6>
+                        <small class="text-muted" style="font-size: 11px;">
+                            <span class="badge bg-light text-primary border-0">{{ post.unit.code|default:"GLOBAL" }}</span> • {{ post.date|timesince }} ago
+                        </small>
                     </div>
-                    <a href="{{ post.get_intel_file.url }}" target="_blank" class="btn btn-outline-dark btn-sm rounded-pill px-3 fw-bold">VIEW PDF</a>
                 </div>
-            {% endif %}
-        {% endwith %}
-    </div>
-    {% endif %}
 
-    <div class="d-flex align-items-center gap-4 px-3 py-2 border-top">
-        <div id="like-section-{{ post.id }}">
-            {% include 'partials/like_button.html' with post=post %}
+                <!-- Post Content -->
+                {% if post.gradient_class and post.gradient_class != 'none' %}
+                <div class="{{ post.gradient_class }}" style="width: 100%; margin: 0; padding: 0; min-height: 300px; display: flex; align-items: center; justify-content: center;">
+                    <p class="mb-0" style="color: white; text-align: center; padding: 2rem; font-weight: bold; font-size: 18px; line-height: 1.5;">{{ post.content }}</p>
+                </div>
+                {% elif post.content and post.get_all_images or post.content and post.image or post.content and post.get_intel_file %}
+                <div class="px-3 pt-2 pb-3">
+                    <p class="mb-0 text-dark" style="font-size: 14px; line-height: 1.5;">{{ post.content }}</p>
+                </div>
+                {% elif post.content %}
+                <div class="px-3 pt-2 pb-3">
+                    <p class="mb-0 text-dark" style="font-size: 15px; line-height: 1.6;">{{ post.content }}</p>
+                </div>
+                {% endif %}
+
+                <!-- Post Media -->
+                {% if post.get_all_images %}
+                <div class="post-media-carousel" style="position: relative; background-color: #000; overflow: hidden;">
+                    {% if post.get_all_images.count > 1 %}
+                    <!-- Navigation Buttons -->
+                    <button class="carousel-btn carousel-btn-prev" onclick="prevImage()">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <button class="carousel-btn carousel-btn-next" onclick="nextImage()">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                    {% endif %}
+
+                    <!-- Images Container -->
+                    <div class="carousel-container" id="imageCarousel" style="display: flex; height: 500px;">
+                        {% for img in post.get_all_images %}
+                        <div class="carousel-item" style="flex: 0 0 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                            <img src="{{ img.image.url }}" class="fullscreenable-image" data-fullscreen-src="{{ img.image.url }}" data-fullscreen-alt="Post image" style="width: 100%; height: 100%; object-fit: contain;">
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Image Counter -->
+                    <div style="position: absolute; bottom: 15px; left: 15px; background: rgba(0,0,0,0.6); color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">
+                        <span id="imageCounter">1</span> / {{ post.get_all_images.count }}
+                    </div>
+                </div>
+                {% elif post.get_intel_file %}
+                <div class="post-media border-top border-bottom bg-light">
+                    {% with f_url=post.get_intel_file.url|lower %}
+                        {% if ".jpg" in f_url or ".png" in f_url or ".jpeg" in f_url or ".webp" in f_url %}
+                            <img src="{{ post.get_intel_file.url }}" class="img-fluid w-100 fullscreenable-image" data-fullscreen-src="{{ post.get_intel_file.url }}" data-fullscreen-alt="Post image" style="max-height: 550px; object-fit: cover;">
+                        {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
+                            <div class="ratio ratio-16x9 bg-black">
+                                <video controls preload="metadata" class="w-100 h-100">
+                                    <source src="{{ post.get_intel_file.url }}" type="video/mp4">
+                                </video>
+                            </div>
+                        {% elif ".pdf" in f_url %}
+                            <div class="p-4 d-flex align-items-center justify-content-between bg-white">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-danger bg-opacity-10 p-3 rounded-2 me-3">
+                                        <i class="bi bi-file-earmark-pdf-fill text-danger fs-3"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0 fw-bold small">Academic Intel</h6>
+                                        <small class="text-muted">PDF DOCUMENT</small>
+                                    </div>
+                                </div>
+                                <a href="{{ post.get_intel_file.url }}" target="_blank" class="btn btn-outline-dark btn-sm rounded-pill px-3 fw-bold">VIEW PDF</a>
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+                </div>
+                {% endif %}
+
+                <!-- Post Actions -->
+                <div class="d-flex align-items-center gap-3 px-3 py-2 border-top">
+                    <div id="like-section-{{ post.id }}">
+                        {% include 'partials/like_button.html' with post=post %}
+                    </div>
+
+                    <span class="small text-muted fw-bold" style="cursor:pointer;"
+                          data-bs-toggle="modal" data-bs-target="#likersModal"
+                          hx-get="{% url 'post_likers_list' post.id %}"
+                          hx-target="#modal-content-target">
+                        <i class="bi bi-eye-fill me-1"></i>SEE WHO LIKED
+                    </span>
+                </div>
+
+                <!-- Comment Input Form -->
+                {% if user.is_authenticated %}
+                <div class="px-3 py-3 bg-white border-top">
+                    <form method="post" action="{% url 'add_comment' post.id %}" class="comment-form">
+                        {% csrf_token %}
+                        <div class="d-flex gap-2 align-items-center">
+                            <img src="{{ request.user.profile_pic.url }}" class="rounded-circle flex-shrink-0" style="width: 32px; height: 32px; object-fit: cover;">
+                            <div class="flex-grow-1 position-relative">
+                                <input type="text" name="content" class="mind-trigger text-decoration-none w-100 rounded-pill ps-4 pe-5 py-2 text-muted border border-light transition-all hover-border-primary small" placeholder="Write a comment..." required style="outline: none; background-color: #e9ecef;">
+                                <button type="submit" class="btn btn-link text-dark p-0 border-0 shadow-none position-absolute top-50 end-0 translate-middle-y me-3 d-flex align-items-center justify-content-center text-decoration-none" aria-label="Send comment">
+                                    <i class="bi bi-send-fill fs-6"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Comments Section -->
+            <div class="bg-white rounded-2 border p-4">
+                <h5 class="mb-4">Comments ({{ post.comments.count }})</h5>
+
+                <!-- Comments List -->
+                {% include 'partials/post_comments_section.html' %}
+            </div>
         </div>
-        
-        <span class="small text-muted fw-bold" style="cursor:pointer;" 
-              data-bs-toggle="modal" data-bs-target="#likersModal" 
-              hx-get="{% url 'post_likers_list' post.id %}" 
-              hx-target="#modal-content-target">
-            <i class="bi bi-eye-fill me-1"></i>SEE WHO LIKED?
-        </span>
     </div>
-    </div>
-
-
 </div>
+
+<style>
+    .post-card {
+        box-shadow: none;
+        transition: all 0.2s ease;
+    }
+    .post-card:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Image Carousel Styling */
+    .carousel-btn {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        background: rgba(255, 255, 255, 0.3);
+        border: none;
+        color: white;
+        font-size: 24px;
+        padding: 10px 15px;
+        cursor: pointer;
+        z-index: 10;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+    }
+    .carousel-btn:hover {
+        background: rgba(255, 255, 255, 0.6);
+    }
+    .carousel-btn-prev {
+        left: 10px;
+    }
+    .carousel-btn-next {
+        right: 10px;
+    }
+    .carousel-container {
+        scroll-behavior: smooth;
+        transition: transform 0.3s ease;
+        will-change: transform;
+    }
+</style>
+
+<script>
+    let currentImageIndex = 0;
+    const carousel = document.getElementById('imageCarousel');
+    const carouselViewport = carousel ? carousel.parentElement : null;
+    const totalImages = document.querySelectorAll('.carousel-item').length;
+
+    function showImage(index) {
+        if (!carousel || !carouselViewport || totalImages === 0) return;
+
+        if (index >= totalImages) {
+            currentImageIndex = 0;
+        } else if (index < 0) {
+            currentImageIndex = totalImages - 1;
+        } else {
+            currentImageIndex = index;
+        }
+
+        const offset = currentImageIndex * carouselViewport.clientWidth;
+        carousel.style.transform = `translateX(-${offset}px)`;
+
+        const imageCounter = document.getElementById('imageCounter');
+        if (imageCounter) {
+            imageCounter.textContent = currentImageIndex + 1;
+        }
+    }
+
+    function nextImage() {
+        showImage(currentImageIndex + 1);
+    }
+
+    function prevImage() {
+        showImage(currentImageIndex - 1);
+    }
+
+    // Touch/Swipe Support
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    if (carousel) {
+        carousel.style.transform = 'translateX(0)';
+        window.addEventListener('resize', () => showImage(currentImageIndex));
+
+        carousel.addEventListener('touchstart', function(e) {
+            touchStartX = e.changedTouches[0].screenX;
+        }, false);
+
+        carousel.addEventListener('touchend', function(e) {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        }, false);
+
+        // Mouse swipe support
+        let mouseDown = false;
+        let mouseDownX = 0;
+
+        carousel.addEventListener('mousedown', (e) => {
+            mouseDown = true;
+            mouseDownX = e.clientX;
+        });
+
+        carousel.addEventListener('mousemove', (e) => {
+            if (!mouseDown) return;
+        });
+
+        carousel.addEventListener('mouseup', (e) => {
+            if (!mouseDown) return;
+            mouseDown = false;
+            const diff = mouseDownX - e.clientX;
+            if (Math.abs(diff) > 50) {
+                if (diff > 0) {
+                    nextImage();
+                } else {
+                    prevImage();
+                }
+            }
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') nextImage();
+            if (e.key === 'ArrowLeft') prevImage();
+        });
+    }
+
+    function handleSwipe() {
+        if (touchEndX < touchStartX - 50) {
+            nextImage();
+        } else if (touchEndX > touchStartX + 50) {
+            prevImage();
+        }
+    }
+
+</script>
 {% endblock %}

@@ -1,0 +1,51 @@
+<div class="comments-list" id="comments-list">
+    {% if visible_comments %}
+        {% for comment in visible_comments %}
+            <div class="d-flex gap-2 mb-3 p-2 bg-light rounded-2">
+                <a href="{% url 'profile' comment.author.username %}" class="flex-shrink-0">
+                    <img src="{{ comment.author.profile_pic.url }}" class="rounded-circle border" style="width: 35px; height: 35px; object-fit: cover;">
+                </a>
+                <div class="flex-grow-1">
+                    <h6 class="mb-0 fw-bold small">
+                        <a href="{% url 'profile' comment.author.username %}" class="text-dark text-decoration-none">
+                            {{ comment.author.get_full_name|default:comment.author.username }}
+                        </a>
+                    </h6>
+                    <small class="text-muted d-block mb-1">{{ comment.created_at|timesince }} ago</small>
+                    <p class="mb-0 text-dark" style="font-size: 14px;">{{ comment.content }}</p>
+                    <div class="mt-2">
+                        {% include 'partials/comment_like_button.html' with comment=comment liked_comment_ids=liked_comment_ids %}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+
+        {% if has_more_comments and not show_all_comments %}
+        <div class="text-center mt-4">
+            <button
+                type="button"
+                class="btn btn-outline-primary btn-sm"
+                hx-get="{% url 'post_comments_panel' post.id %}?all_comments=1"
+                hx-target="#comments-list"
+                hx-swap="outerHTML"
+            >
+                View More Comments
+            </button>
+        </div>
+        {% elif show_all_comments and has_more_comments %}
+        <div class="text-center mt-4">
+            <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                hx-get="{% url 'post_comments_panel' post.id %}"
+                hx-target="#comments-list"
+                hx-swap="outerHTML"
+            >
+                Show Fewer Comments
+            </button>
+        </div>
+        {% endif %}
+    {% else %}
+        <p class="text-muted text-center py-3 small">No comments yet. Be the first to comment!</p>
+    {% endif %}
+</div>
