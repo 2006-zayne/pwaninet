@@ -1,0 +1,70 @@
+{% comment %}
+Renders a single Django form field with Bootstrap 5 styling and validation feedback.
+Requires a 'field' object from a Django form.
+Optional: 'input_class' for additional classes on the input element.
+{% endcomment %}
+
+<div class="mb-4">
+    <label class="form-label fw-bold small text-uppercase text-muted mb-1" for="{{ field.id_for_label }}">
+        <i class="bi bi-chevron-right text-primary small"></i> {{ field.label }}
+    </label>
+
+    {% if field.field.widget.input_type == 'checkbox' %}
+        <div class="form-check">
+            <input type="checkbox" name="{{ field.name }}" id="{{ field.id_for_label }}"
+                   class="form-check-input {% if field.errors %}is-invalid{% endif %}"
+                   {% if field.value %}checked{% endif %}
+                   {% if field.field.required %}required{% endif %}
+                   {% for attr, value in field.field.widget.attrs.items %}{{ attr }}="{{ value }}"{% endfor %}>
+            <label class="form-check-label" for="{{ field.id_for_label }}">
+                {{ field.label }}
+            </label>
+        </div>
+    {% elif field.field.widget.input_type == 'radio' %}
+        {% for radio in field %}
+            <div class="form-check">
+                {{ radio.tag }}
+                <label class="form-check-label" for="{{ radio.id_for_label }}">
+                    {{ radio.choice_label }}
+                </label>
+            </div>
+        {% endfor %}
+    {% elif field.field.widget.input_type == 'select' %}
+        <select name="{{ field.name }}" id="{{ field.id_for_label }}"
+                class="form-select {% if field.errors %}is-invalid{% endif %} {% if input_class %}{{ input_class }}{% endif %}"
+                {% if field.field.required %}required{% endif %}
+                {% for attr, value in field.field.widget.attrs.items %}{{ attr }}="{{ value }}"{% endfor %}>
+            {% for choice_value, choice_label in field.field.choices %}
+                <option value="{{ choice_value }}" {% if field.value == choice_value %}selected{% endif %}>{{ choice_label }}</option>
+            {% endfor %}
+        </select>
+    {% elif field.field.widget.input_type == 'textarea' %}
+        <textarea name="{{ field.name }}" id="{{ field.id_for_label }}"
+                  class="form-control {% if field.errors %}is-invalid{% endif %} {% if input_class %}{{ input_class }}{% endif %}"
+                  placeholder="{{ field.label }}"
+                  {% if field.field.required %}required{% endif %}
+                  {% for attr, value in field.field.widget.attrs.items %}{{ attr }}="{{ value }}"{% endfor %}>{{ field.value|default_if_none:'' }}</textarea>
+    {% elif field.field.widget.input_type == 'file' %}
+        <input type="file" name="{{ field.name }}" id="{{ field.id_for_label }}"
+               class="form-control {% if field.errors %}is-invalid{% endif %} {% if input_class %}{{ input_class }}{% endif %}"
+               {% if field.field.required %}required{% endif %}
+               {% for attr, value in field.field.widget.attrs.items %}{{ attr }}="{{ value }}"{% endfor %}>
+    {% else %}
+        <input type="{{ field.field.widget.input_type }}" name="{{ field.name }}" id="{{ field.id_for_label }}"
+               class="form-control {% if field.errors %}is-invalid{% endif %} {% if input_class %}{{ input_class }}{% endif %}"
+               placeholder="{{ field.label }}"
+               value="{{ field.value|default_if_none:'' }}"
+               {% if field.field.required %}required{% endif %}
+               {% for attr, value in field.field.widget.attrs.items %}{{ attr }}="{{ value }}"{% endfor %}>
+    {% endif %}
+
+    {% if field.help_text %}
+        <div class="form-text x-small text-muted">{{ field.help_text }}</div>
+    {% endif %}
+
+    {% for error in field.errors %}
+        <div class="invalid-feedback d-block">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ error }}
+        </div>
+    {% endfor %}
+</div>

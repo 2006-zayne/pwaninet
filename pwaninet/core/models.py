@@ -13,6 +13,8 @@ GRADIENT_CHOICES = [
     ('grad-forest', 'Forest Green'),
     ('grad-magma', 'Magma Red'),
     ('grad-midnight', 'Midnight Purple'),
+    ('grad-desert', 'Desert Storm'),
+    ('grad-stealth', 'Night Ops (Stealth)'),
 ]
 
 class Year(models.Model):

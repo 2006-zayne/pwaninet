@@ -3,7 +3,7 @@
 {% block content %}
 <div class="row justify-content-center py-4">
     <div class="col-12 col-md-8 col-lg-6">
-        <div class="post-card border-0 shadow-lg overflow-hidden" style="border-radius: 20px;">
+        <div class="post-card border-0 overflow-hidden">
             
             <div class="bg-dark p-4 text-center text-white">
                 <h4 class="fw-bold mb-1 text-uppercase tracking-wider">Edit Profile</h4>
@@ -68,36 +68,4 @@
         </div>
     </div>
 </div>
-
-<style>
-    .tracking-wider { letter-spacing: 2px; }
-    .x-small { font-size: 0.7rem; }
-    
-    /* Tactical Input Styling */
-    .tactical-form input, 
-    .tactical-form textarea, 
-    .tactical-form select {
-        width: 100%;
-        padding: 12px 16px;
-        background-color: #f8fafc;
-        border: 2px solid #e2e8f0;
-        border-radius: 12px;
-        transition: all 0.2s ease;
-        font-size: 0.95rem;
-    }
-
-    .tactical-form input:focus, 
-    .tactical-form textarea:focus {
-        background-color: #fff;
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
-        outline: none;
-    }
-
-    /* Handling Django's file input specifically */
-    .tactical-form input[type="file"] {
-        padding: 8px;
-        font-size: 0.85rem;
-    }
-</style>
 {% endblock %}

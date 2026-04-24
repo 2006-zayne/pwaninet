@@ -1,0 +1,147 @@
+/* ================================
+   TYPOGRAPHY HELPERS
+================================ */
+.tracking-widest {
+    letter-spacing: 4px;
+}
+
+.fw-black {
+    font-weight: 900;
+}
+
+.x-small {
+    font-size: 0.7rem;
+}
+
+.italic {
+    font-style: italic;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+/* ================================
+   BASE FORM SYSTEM
+================================ */
+.tactical-form-input,
+.tactical-form textarea,
+.tactical-form select,
+#postForm textarea,
+#postForm select {
+    width: 100%;
+    padding: 14px 18px;
+    background-color: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    font-size: 1rem;
+    transition: all 0.25s ease;
+    outline: none;
+}
+
+/* ================================
+   FOCUS STATE (UNIFIED)
+================================ */
+.tactical-form-input:focus,
+.tactical-form textarea:focus,
+.tactical-form select:focus,
+#postForm textarea:focus,
+#postForm select:focus {
+    border-color: #3b82f6;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+}
+
+/* ================================
+   HOVER EFFECTS
+================================ */
+.transition-all:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.05);
+    box-shadow: 0 10px 20px rgba(59, 130, 246, 0.15);
+}
+
+/* ================================
+   MEDIA UPLOAD BOX
+================================ */
+.media-upload-box {
+    border: 1px dashed #dee2e6;
+    transition: all 0.2s ease;
+}
+
+.media-upload-box:hover {
+    background-color: #e9ecef;
+    border-color: #3b82f6;
+    transform: translateY(-2px);
+}
+
+/* ================================
+   POST CARD SYSTEM
+================================ */
+.post-card {
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
+}
+
+/* ================================
+   SUGGESTIONS UI
+================================ */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.suggestion-card {
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.suggestion-card:hover {
+    border-color: #3b82f6;
+    background-color: #f8fafc;
+    transform: translateY(-3px);
+}
+
+.avatar-ring {
+    padding: 3px;
+    border: 2px solid #3b82f6;
+}
+
+/* ================================
+   GRADIENT SYSTEM (POSTS)
+================================ */
+.grad-ocean {
+    background: linear-gradient(135deg, #0f172a 0%, #3b82f6 100%);
+}
+
+.grad-forest {
+    background: linear-gradient(135deg, #064e3b 0%, #10b981 100%);
+}
+
+.grad-magma {
+    background: linear-gradient(135deg, #450a0a 0%, #ef4444 100%);
+}
+
+.grad-midnight {
+    background: linear-gradient(135deg, #1e1b4b 0%, #8b5cf6 100%);
+}
+
+.grad-desert {
+    background: linear-gradient(135deg, #78350f 0%, #f59e0b 100%);
+}
+
+.grad-stealth {
+    background: linear-gradient(135deg, #020617 0%, #475569 100%);
+}
+
+/* ================================
+   INTELLIGENCE BACKGROUND BOX
+================================ */
+.gradient-intel-bg {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem;
+}

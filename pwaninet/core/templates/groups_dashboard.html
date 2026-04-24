@@ -11,7 +11,7 @@
             </p>
         </div>
         <div class="col-12 col-md-5 text-md-end">
-            <a href="{% url 'create_group' %}" class="btn btn-primary rounded-pill px-4 py-2 fw-bold shadow-sm">
+            <a href="{% url 'create_group' %}" class="btn btn-dark rounded-pill px-4 py-2 fw-bold shadow-sm">
                 <i class="bi bi-plus-lg me-1"></i> CREATE NEW GROUP
             </a>
         </div>
@@ -82,7 +82,7 @@
                                     {{ group.description|truncatewords:20|default:"No briefing data available." }}
                                 </p>
                                 <div class="mt-auto">
-                                    <a href="{% url 'groups_detail' group.id %}" class="btn btn-outline-primary btn-sm w-100 rounded-pill fw-bold transition-all">
+                                    <a href="{% url 'groups_detail' group.id %}" class="btn btn-outline-dark btn-sm w-100 rounded-pill fw-bold transition-all">
                                         View Group Details
                                     </a>
                                 </div>

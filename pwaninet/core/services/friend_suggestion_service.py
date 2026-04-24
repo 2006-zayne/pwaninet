@@ -17,6 +17,7 @@ from django.core.cache import cache
 from core.queries.feed_queries import get_friend_suggestions
 
 def get_friend_suggestions_for_user(user, limit, use_cache = (5, True)):
+def get_friend_suggestions_for_user(user, limit=5, use_cache=True):
     '''
     Get friend suggestions for a user with caching.
     

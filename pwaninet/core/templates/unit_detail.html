@@ -48,8 +48,8 @@
                         <span class="badge bg-white text-dark border px-2 py-1 small fw-normal">Field Report</span>
                     </div>
 
-                    <div class="card-body p-4 {% if post.gradient_class %}{{ post.gradient_class }} text-white{% endif %}">
-                        <p class="{% if post.gradient_class %}fs-4 fw-bold mb-0{% else %}fs-5 text-dark{% endif %}">
+                    <div class="{% if post.gradient_class != 'none' %}{{ post.gradient_class }} gradient-intel-bg text-white text-center{% else %}card-body p-4{% endif %}">
+                        <p class="mb-0 {% if post.gradient_class != 'none' %}fs-3 fw-bold{% else %}fs-5 text-dark{% endif %}">
                             {{ post.content }}
                         </p>
                     </div>

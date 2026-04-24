@@ -3,9 +3,9 @@
 {% block content %}
 <div class="container-fluid">
     <div class="row justify-content-center align-items-center bg-light" style="min-height: 85vh;">
-        <div class="col-12 col-md-6 col-lg-4 text-center">
+        <div class="col-12 col-md-6 col-lg-4 text-center rounded-3">
             
-            <div class="post-card border-0 shadow-lg overflow-hidden" style="border-radius: 5px;">
+            <div class="post-card border-0 rounded-3 overflow-hidden">
                 <div class="bg-dark p-4 border-bottom border-danger border-3">
                     <div class="mb-2">
                         <i class="bi bi-shield-slash text-danger display-4"></i>
@@ -22,7 +22,7 @@
                     </div>
                     
                     <div class="d-grid gap-3">
-                        <a href="{% url 'login' %}" class="btn btn-primary btn-lg rounded-pill fw-bold shadow-sm py-3">
+                        <a href="{% url 'login' %}" class="btn btn-dark btn-lg rounded-pill fw-bold shadow-sm py-3">
                             <i class="bi bi-box-arrow-in-right me-2"></i> Re-Authenticate (Login)
                         </a>
                         <a href="{% url 'home' %}" class="btn btn-outline-secondary rounded-pill fw-bold small text-uppercase py-2">
