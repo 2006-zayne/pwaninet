@@ -1,0 +1,381 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    /* 1. TACTICAL GRID ARCHITECTURE */
+    .sector-layout {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 2.5rem;
+        max-width: 1300px;
+        margin: 2rem auto;
+        padding: 0 1.5rem;
+    }
+
+    /* 2. CORE COMPONENTS */
+    .tactical-card {
+        background: #ffffff;
+        border-radius: 1rem;
+        border: 1px solid rgba(0,0,0,0.06);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+
+    .card-inner { padding: 1.5rem; }
+    .fw-black { font-weight: 900; }
+    .text-tiny { font-size: 0.65rem; letter-spacing: 1.2px; font-weight: 800; }
+
+    /* 3. BUTTON SYSTEM */
+    .btn-tactical {
+        border-radius: 50px;
+        font-weight: 800;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        padding: 0.7rem;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        width: 100%;
+        margin-bottom: 0.8rem;
+        display: block;
+        text-align: center;
+        text-decoration: none;
+        border: none;
+    }
+
+    .btn-join { background: #10b981; color: white; }
+    .btn-join:hover { background: #059669; color: white; transform: translateY(-2px); }
+    
+    .btn-modify { background: #6366f1; color: white; }
+    .btn-modify:hover { background: #4f46e5; color: white; transform: translateY(-2px); }
+
+    .btn-terminate { 
+        background: #fff; 
+        color: #ef4444; 
+        border: 1px solid #fee2e2; 
+        cursor: pointer;
+    }
+    .btn-terminate:hover { background: #fef2f2; border-color: #f87171; }
+
+    /* 4. MODAL & SCROLLING */
+    .manifest-scroll {
+        max-height: 400px;
+        overflow-y: auto;
+        padding-right: 8px;
+    }
+    .manifest-scroll::-webkit-scrollbar { width: 4px; }
+    .manifest-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+    
+    .hover-manifest:hover { 
+        background: #f9fafb; 
+        cursor: pointer; 
+        border-radius: 1rem; 
+        transition: background 0.2s;
+    }
+
+    .sticky-sidebar { position: sticky; top: 100px; }
+
+    @media (max-width: 992px) {
+        .sector-layout { grid-template-columns: 1fr; }
+        .sticky-sidebar { position: static; }
+    }
+</style>
+
+<div class="sector-layout">
+    <aside class="sticky-sidebar">
+        <div class="tactical-card text-center">
+            <div class="card-inner">
+                <div class="position-relative d-inline-block mb-3">
+                    <img src="{{ group.get_photo_url }}" 
+                         class="rounded-circle border border-4 border-dark shadow-sm" 
+                         style="width: 120px; height: 120px; object-fit: cover;">
+                </div>
+                
+                <h2 class="fw-black text-uppercase h4 mb-0" style="letter-spacing: -0.5px;">{{ group.name }}</h2>
+                <p class="text-muted small fw-bold mb-4">@sector_{{ group.id }}</p>
+
+                <div class="d-flex justify-content-center gap-4 border-top border-bottom py-3 mb-4 hover-manifest" 
+                     data-bs-toggle="modal" 
+                     data-bs-target="#personnelModal">
+                    <div>
+                        <div class="fw-black h5 mb-0 text-primary">{{ group.members.count }}</div>
+                        <div class="text-tiny text-muted text-uppercase">Operatives</div>
+                    </div>
+                    <div>
+                        <div class="fw-black h5 mb-0">{{ posts.count }}</div>
+                        <div class="text-tiny text-muted text-uppercase">Updates</div>
+                    </div>
+                </div>
+
+                {% if request.user in group.members.all %}
+                    {% if request.user == group.creator %}
+                        <button class="btn-tactical btn-modify mb-2" data-bs-toggle="modal" data-bs-target="#editGroupModal">Edit Group Details</button>
+                    {% endif %}
+                    <button class="btn-tactical btn-join mb-2" data-bs-toggle="modal" data-bs-target="#inviteModal">Invite Friends</button>
+                    <a href="{% url 'toggle_membership' group.id %}" class="btn-tactical btn-terminate">Exit Group</a>
+                {% else %}
+                    <a href="{% url 'toggle_membership' group.id %}" class="btn-tactical btn-join">Join Group</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="tactical-card">
+            <div class="card-inner">
+                <h6 class="text-muted fw-black text-tiny text-uppercase mb-3">
+                    <i class="bi bi-shield-lock-fill me-2"></i>Unit Briefing
+                </h6>
+                <div class="small mb-2">
+                    <span class="text-muted fw-bold">Assigned:</span> 
+                    <span class="fw-black text-dark text-uppercase ms-1">{{ group.name }}</span>
+                </div>
+                <div class="small mb-2">
+                    <span class="text-muted fw-bold">Status:</span> 
+                    <span class="fw-black text-success ms-1">ACTIVE</span>
+                </div>
+                <p class="text-secondary small mt-3 mb-0 lh-sm">
+                    {{ group.description|default:"No briefing data available for this sector." }}
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    <main>
+        <div class="d-flex justify-content-between align-items-center mb-4 px-2">
+            <h5 class="fw-black text-uppercase mb-0" style="letter-spacing: 1px;">Group Posts</h5>
+            <span class="badge bg-dark rounded-pill py-2 px-3 text-tiny">{{ posts.count }} UPDATES</span>
+        </div>
+
+        {% if request.user in group.members.all %}
+        <div class="tactical-card mb-4" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#createPostModal">
+            <div class="card-inner d-flex align-items-center gap-3 py-3">
+                <img src="{{ request.user.profile_pic.url }}" class="rounded-circle" style="width: 45px; height: 45px; object-fit: cover;">
+                <div class="flex-grow-1 bg-light rounded-pill px-4 py-2 text-muted small fw-bold">
+                    Hello {{ request.user.username }}, write something to the group...
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="history-stream">
+            {% for post in posts %}
+                {% include 'partials/post_card.html' with post=post %}
+            {% empty %}
+                <div class="tactical-card p-5 text-center">
+                    <div class="py-5">
+                        <i class="bi bi-broadcast text-muted display-4"></i>
+                        <p class="fw-black text-muted text-uppercase mt-3">The group is currently silent.</p>
+                        <p class="text-muted x-small">Hey {{ request.user.username }}, be the first one to post.</p>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </main>
+</div>
+
+<div class="modal fade" id="editGroupModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content tactical-card border-0">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="fw-black text-tiny text-uppercase mb-0">Modify Sector Intelligence</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{% url 'edit_group' group.id %}" method="POST" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="text-tiny fw-black text-uppercase mb-1">Group Name</label>
+                        <input type="text" name="name" class="form-control rounded-pill px-3" value="{{ group.name }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-tiny fw-black text-uppercase mb-1">Briefing Description</label>
+                        <textarea name="description" class="form-control rounded-4" rows="3">{{ group.description }}</textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="text-tiny fw-black text-uppercase mb-1">Profile Photo</label>
+                        <input type="file" name="photo" class="form-control form-control-sm">
+                    </div>
+                    <button type="submit" class="btn btn-dark w-100 rounded-pill fw-black">UPDATE GROUP</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="personnelModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content tactical-card border-0">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="fw-black text-tiny text-uppercase mb-0">Group Members</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div class="manifest-scroll">
+                    {% for member in group.members.all %}
+                        {% if member != request.user %}
+                        <div class="d-flex align-items-center justify-content-between mb-3 p-2 hover-manifest">
+                            <div class="d-flex align-items-center gap-2">
+                                <img src="{{ member.profile_pic.url|default:'/static/images/default_user.jpg' }}" 
+                                     class="rounded-circle border border-primary-subtle" 
+                                     style="width: 35px; height: 35px; object-fit: cover;">
+                                <div>
+                                    <div class="fw-black small text-dark mb-0">@{{ member.username }}</div>
+                                    <div class="text-muted" style="font-size: 0.55rem;">ACTIVE MEMBER</div>
+                                </div>
+                            </div>
+                            
+                            <button class="btn rounded-pill fw-bold btn-follow-manifest {% if member.id in following_ids %}btn-secondary{% else %}btn-outline-primary{% endif %}" 
+                                    data-username="{{ member.username }}"
+                                    style="font-size: 0.6rem; padding: 4px 12px; min-width: 85px;">
+                                {% if member.id in following_ids %}FOLLOWED{% else %}FOLLOW{% endif %}
+                            </button>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="createPostModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content tactical-card border-0">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="fw-black text-tiny text-uppercase mb-0">POST</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{% url 'create_post' %}?group={{ group.id }}" method="POST" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="group" value="{{ group.id }}">
+                    
+                    <div class="mb-3">
+                        <label class="text-tiny fw-black text-uppercase mb-1">Briefing Visual Style</label>
+                        <select name="gradient_class" class="form-select form-select-sm rounded-pill px-3">
+                            <option value="none">Standard (No Gradient)</option>
+                            <option value="grad-ocean">Ocean Blue</option>
+                            <option value="grad-forest">Forest Green</option>
+                            <option value="grad-magma">Magma Red</option>
+                            <option value="grad-midnight">Midnight Purple</option>
+                            <option value="grad-desert">Desert Storm</option>
+                            <option value="grad-stealth">Night Ops</option>
+                        </select>
+                    </div>
+
+                    <textarea name="content" class="form-control border-0 bg-light rounded-4 mb-3" rows="4" placeholder="Write something to the {{ group.name }} members..." required></textarea>
+                    
+                    <!-- MODAL PREVIEW -->
+                    <div id="modalPreviewSection" class="mb-3 d-none">
+                        <div class="post-card border-0 overflow-hidden shadow-sm" style="border-radius: 1rem;">
+                            <div id="modalPreviewBg" class="gradient-intel-bg text-center">
+                                <p id="modalPreviewText" class="mb-0 text-white fw-bold fs-5" style="line-height: 1.4;"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex gap-2">
+                            <input type="file" name="image" id="postImg" hidden accept="image/*">
+                            <label for="postImg" class="btn btn-light btn-sm rounded-pill px-3 fw-bold">
+                                <i class="bi bi-image me-1"></i> IMAGE
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-dark rounded-pill px-4 fw-black">
+                            <i class="bi bi-send-fill me-1"></i> POST
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="inviteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content tactical-card border-0">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="fw-black text-tiny text-uppercase mb-0">Invite Friends</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <form action="" method="GET" class="mb-3">
+                    <input type="text" name="search_user" class="form-control form-control-sm rounded-pill" placeholder="Search username..." value="{{ query|default:'' }}">
+                </form>
+                <div class="manifest-scroll">
+                    {% for user in search_results %}
+                        <div class="d-flex align-items-center justify-content-between mb-2 p-2 hover-manifest">
+                            <div class="d-flex align-items-center gap-2">
+                                <img src="{{ user.profile_pic.url }}" class="rounded-circle" style="width: 25px; height: 25px; object-fit: cover;">
+                                <span class="small fw-bold">@{{ user.username }}</span>
+                            </div>
+                            <a href="{% url 'invite_to_group' group.id user.id %}" class="btn btn-join py-1 px-3" style="font-size: 0.6rem;">INVITE</a>
+                        </div>
+                    {% empty %}
+                        <p class="text-center text-muted text-tiny">NO OPERATIVES FOUND</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. Follow Logic
+    const followButtons = document.querySelectorAll('.btn-follow-manifest');
+    followButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const username = this.getAttribute('data-username');
+            fetch(`/toggle-follow/${username}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.is_following) {
+                    this.innerText = 'FOLLOWED';
+                    this.classList.replace('btn-outline-primary', 'btn-secondary');
+                } else {
+                    this.innerText = 'FOLLOW';
+                    this.classList.replace('btn-secondary', 'btn-outline-primary');
+                }
+            });
+        });
+    });
+
+    // 2. Modal Preview Logic
+    const modalContent = document.querySelector('#createPostModal textarea[name="content"]');
+    const modalStyle = document.querySelector('#createPostModal select[name="gradient_class"]');
+    const modalPrevSection = document.getElementById('modalPreviewSection');
+    const modalPrevBg = document.getElementById('modalPreviewBg');
+    const modalPrevText = document.getElementById('modalPreviewText');
+
+    function updateModalPreview() {
+        const text = modalContent.value;
+        const grad = modalStyle.value;
+        if (grad !== 'none' && text.trim() !== '') {
+            modalPrevSection.classList.remove('d-none');
+            modalPrevText.textContent = text;
+            modalPrevBg.className = 'gradient-intel-bg text-center ' + grad;
+        } else {
+            modalPrevSection.classList.add('d-none');
+        }
+    }
+    modalContent.addEventListener('input', updateModalPreview);
+    modalStyle.addEventListener('change', updateModalPreview);
+
+    // 2. Auto-open Invite Modal logic
+    // We only trigger this if the 'query' variable exists in the context
+    //{% if query %}
+    const inviteEl = document.getElementById('inviteModal');
+    if (inviteEl) {
+        const inviteModal = new bootstrap.Modal(inviteEl);
+        inviteModal.show();
+    }
+   //{% endif %}
+});
+</script>
+
+{% endblock %}

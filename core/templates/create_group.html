@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6">
+            
+            <div class="post-card shadow-lg border-0 overflow-hidden">
+                <div class="bg-dark p-4 text-center text-white position-relative">
+                    <div class="position-absolute top-0 start-0 w-100 h-100 opacity-25" style="background-image: radial-gradient(circle, #ffffff 1px, transparent 1px); background-size: 20px 20px;"></div>
+                    <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center shadow-lg mb-3" style="width: 70px; height: 70px; position: relative; z-index: 2;">
+                        <i class="bi bi-shield-plus fs-2"></i>
+                    </div>
+                    <h3 class="fw-bold mb-1" style="letter-spacing: 1px;">SQUAD INITIALIZATION</h3>
+                    <p class="small text-uppercase opacity-75 mb-0">Establishing New Tactical Hub</p>
+                </div>
+
+                <div class="card-body p-4 p-md-5">
+                    <form method="POST" enctype="multipart/form-data" class="tactical-form">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-uppercase text-primary">
+                                <i class="bi bi-tag-fill me-1"></i> Squad Designation
+                            </label>
+                            <div class="input-group">
+                                {{ form.name }}
+                            </div>
+                            {% if form.name.errors %}
+                                <div class="text-danger x-small mt-1">{{ form.name.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-uppercase text-primary">
+                                <i class="bi bi-file-earmark-text-fill me-1"></i> Mission Intelligence
+                            </label>
+                            {{ form.description }}
+                            <div class="form-text x-small italic">Brief your comrades on the squad's primary objectives.</div>
+                        </div>
+
+                        <div class="mb-5">
+                            <label class="form-label fw-bold small text-uppercase text-primary">
+                                <i class="bi bi-image-fill me-1"></i> Squad Insignia
+                            </label>
+                            <div class="p-3 border rounded-3 bg-light">
+                                {{ form.group_pic }}
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-3">
+                            <button type="submit" class="btn btn-primary rounded-pill py-2 fw-bold shadow">
+                                <i class="bi bi-check-circle-fill me-2"></i>CONFIRM INITIALIZATION
+                            </button>
+                            <a href="{% url 'groups_dashboard' %}" class="btn btn-outline-secondary rounded-pill py-2 fw-bold border-0">
+                                <i class="bi bi-x-circle me-2"></i>ABORT MISSION
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

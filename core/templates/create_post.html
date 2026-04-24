@@ -1,0 +1,494 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    .compose-wrap {
+        max-width: 620px;
+        margin: 0 auto;
+        padding: 1.5rem 1rem;
+    }
+
+    .compose-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.25rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid #f1f3f5;
+    }
+
+    .compose-header-title {
+        font-size: 0.7rem;
+        font-weight: 900;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: #94a3b8;
+    }
+
+    .compose-body {
+        display: flex;
+        gap: 0.875rem;
+        align-items: flex-start;
+    }
+
+    .compose-avatar {
+        flex-shrink: 0;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #e2e8f0;
+    }
+
+    .compose-right {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .compose-author {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 0.5rem;
+    }
+
+    .compose-textarea {
+        width: 100%;
+        border: none !important;
+        outline: none !important;
+        resize: none;
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #0f172a;
+        background: transparent !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        line-height: 1.6;
+        min-height: 100px;
+    }
+
+    .compose-textarea::placeholder {
+        color: #cbd5e1;
+        font-weight: 400;
+    }
+
+    /* Preview gradient box */
+    .compose-preview {
+        margin-top: 0.75rem;
+        border-radius: 16px;
+        overflow: hidden;
+        display: none;
+    }
+
+    .compose-preview.active {
+        display: block;
+    }
+
+    .gradient-intel-bg {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2.5rem;
+    }
+
+    .grad-ocean    { background: linear-gradient(135deg, #0f172a 0%, #3b82f6 100%) !important; }
+    .grad-forest   { background: linear-gradient(135deg, #064e3b 0%, #10b981 100%) !important; }
+    .grad-magma    { background: linear-gradient(135deg, #450a0a 0%, #ef4444 100%) !important; }
+    .grad-midnight { background: linear-gradient(135deg, #1e1b4b 0%, #8b5cf6 100%) !important; }
+    .grad-desert   { background: linear-gradient(135deg, #78350f 0%, #f59e0b 100%) !important; }
+    .grad-stealth  { background: linear-gradient(135deg, #020617 0%, #475569 100%) !important; }
+
+    /* Toolbar strip */
+    .compose-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 1rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid #f1f3f5;
+    }
+
+    .toolbar-left {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .toolbar-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: none;
+        background: transparent;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1.05rem;
+        transition: background 0.15s, color 0.15s;
+        position: relative;
+    }
+
+    .toolbar-btn:hover {
+        background: #f1f5f9;
+        color: #3b82f6;
+    }
+
+    .toolbar-btn.active {
+        background: #eff6ff;
+        color: #3b82f6;
+    }
+
+    /* Expandable panels */
+    .compose-panel {
+        display: none;
+        margin-top: 0.75rem;
+        padding: 0.875rem 1rem;
+        background: #f8fafc;
+        border-radius: 14px;
+        border: 1.5px solid #e2e8f0;
+    }
+
+    .compose-panel.open {
+        display: block;
+    }
+
+    .panel-label {
+        font-size: 0.65rem;
+        font-weight: 900;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: #94a3b8;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Sector select */
+    .sector-select {
+        width: 100%;
+        border: 1.5px solid #e2e8f0 !important;
+        border-radius: 10px !important;
+        background: white !important;
+        font-size: 0.875rem;
+        padding: 0.5rem 0.75rem !important;
+        color: #0f172a;
+    }
+
+    .sector-select:focus {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 4px rgba(59,130,246,0.1) !important;
+        outline: none;
+    }
+
+    /* Style swatches */
+    .style-grid {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .style-swatch {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        border: 2px solid transparent;
+        cursor: pointer;
+        transition: transform 0.15s, border-color 0.15s;
+        position: relative;
+    }
+
+    .style-swatch:hover { transform: scale(1.1); }
+
+    .style-swatch.selected {
+        border-color: #0f172a;
+        transform: scale(1.1);
+    }
+
+    .style-swatch.swatch-none {
+        background: #f1f5f9;
+        border-color: #e2e8f0 !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.6rem;
+        font-weight: 700;
+        color: #94a3b8;
+        letter-spacing: 0.5px;
+    }
+
+    .style-swatch.swatch-none.selected {
+        border-color: #0f172a !important;
+        color: #0f172a;
+    }
+
+    /* Media rows */
+    .media-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0;
+    }
+
+    .media-row + .media-row {
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .media-row label {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #475569;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        width: 80px;
+        flex-shrink: 0;
+        cursor: pointer;
+        margin: 0;
+    }
+
+    .media-row input[type="file"] {
+        flex: 1;
+        font-size: 0.78rem;
+        color: #64748b;
+    }
+
+    /* Deploy button */
+    .btn-deploy {
+        background: #0f172a;
+        color: white;
+        border: none;
+        border-radius: 999px;
+        padding: 0.55rem 1.5rem;
+        font-size: 0.8rem;
+        font-weight: 900;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: background 0.15s, transform 0.1s;
+    }
+
+    .btn-deploy:hover {
+        background: #1e3a5f;
+        transform: translateY(-1px);
+    }
+
+    .btn-deploy:disabled {
+        background: #cbd5e1;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    /* Char counter */
+    #charCount {
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #cbd5e1;
+        transition: color 0.2s;
+    }
+
+    #charCount.warn { color: #f59e0b; }
+    #charCount.danger { color: #ef4444; }
+
+    /* Divider line */
+    .compose-divider {
+        width: 1px;
+        background: #e2e8f0;
+        align-self: stretch;
+        flex-shrink: 0;
+        margin: 0;
+    }
+
+    /* Hidden gradient input */
+    #id_gradient_class { display: none; }
+</style>
+
+<div class="compose-wrap">
+
+    <div class="compose-header">
+        <span class="compose-header-title">New Deployment</span>
+        <a href="{% url 'home' %}" class="text-muted text-decoration-none" style="font-size: 0.75rem; font-weight: 700; letter-spacing: 1px;">ABORT</a>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" id="postForm">
+        {% csrf_token %}
+
+        {{ form.gradient_class }}
+
+        <div class="compose-body">
+            <img src="{{ request.user.profile_pic.url }}" class="compose-avatar" alt="You">
+            <div class="compose-divider"></div>
+            <div class="compose-right">
+
+                <div class="compose-author">
+                    {{ request.user.get_full_name|default:request.user.username }}
+                </div>
+
+                <textarea
+                    name="content"
+                    id="id_content"
+                    class="compose-textarea form-control"
+                    placeholder="What intel are you deploying today?"
+                    required
+                    maxlength="1000"
+                    rows="4">{{ form.content.value|default:'' }}</textarea>
+
+                <!-- Live gradient preview -->
+                <div class="compose-preview" id="previewBox">
+                    <div id="previewTarget" class="gradient-intel-bg rounded-3">
+                        <p id="previewContent" class="mb-0 text-white fw-bold fs-3" style="line-height:1.5;"></p>
+                    </div>
+                </div>
+
+                <!-- Sector panel -->
+                <div class="compose-panel" id="sectorPanel">
+                    <div class="panel-label">Target Sector</div>
+                    <select name="unit" class="sector-select form-select" id="id_unit">
+                        {% for value, label in form.unit.field.choices %}
+                            <option value="{{ value }}" {% if form.unit.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="mt-1" style="font-size:0.68rem; color:#94a3b8; font-style:italic;">Leave as "General" to broadcast to the full university feed.</div>
+                </div>
+
+                <!-- Style panel -->
+                <div class="compose-panel" id="stylePanel">
+                    <div class="panel-label">Deployment Visual Style</div>
+                    <div class="style-grid">
+                        <div class="style-swatch swatch-none selected" data-value="none" title="Standard">NONE</div>
+                        <div class="style-swatch grad-ocean" data-value="grad-ocean" title="Ocean Blue"></div>
+                        <div class="style-swatch grad-forest" data-value="grad-forest" title="Forest Green"></div>
+                        <div class="style-swatch grad-magma" data-value="grad-magma" title="Magma Red"></div>
+                        <div class="style-swatch grad-midnight" data-value="grad-midnight" title="Midnight Purple"></div>
+                        <div class="style-swatch grad-desert" data-value="grad-desert" title="Desert Storm"></div>
+                        <div class="style-swatch grad-stealth" data-value="grad-stealth" title="Stealth"></div>
+                    </div>
+                </div>
+
+                <!-- Media panel -->
+                <div class="compose-panel" id="mediaPanel">
+                    <div class="panel-label">Attach Assets</div>
+                    <div class="media-row">
+                        <label for="{{ form.image.id_for_label }}">
+                            <i class="bi bi-image text-primary"></i> Image
+                        </label>
+                        {{ form.image }}
+                    </div>
+                    <div class="media-row">
+                        <label for="{{ form.video.id_for_label }}">
+                            <i class="bi bi-play-btn text-danger"></i> Video
+                        </label>
+                        {{ form.video }}
+                    </div>
+                    <div class="media-row">
+                        <label for="{{ form.docs.id_for_label }}">
+                            <i class="bi bi-file-earmark-pdf text-info"></i> PDF
+                        </label>
+                        {{ form.docs }}
+                    </div>
+                </div>
+
+                <!-- Toolbar -->
+                <div class="compose-toolbar">
+                    <div class="toolbar-left">
+                        <button type="button" class="toolbar-btn" id="toggleSector" title="Target Sector">
+                            <i class="bi bi-geo-alt-fill"></i>
+                        </button>
+                        <button type="button" class="toolbar-btn" id="toggleStyle" title="Visual Style">
+                            <i class="bi bi-palette-fill"></i>
+                        </button>
+                        <button type="button" class="toolbar-btn" id="toggleMedia" title="Attach File">
+                            <i class="bi bi-paperclip"></i>
+                        </button>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-3">
+                        <span id="charCount">0 / 1000</span>
+                        <button type="submit" class="btn-deploy" id="deployBtn" disabled>
+                            <i class="bi bi-send-fill me-1"></i>Deploy
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const textarea    = document.getElementById('id_content');
+    const gradInput   = document.getElementById('id_gradient_class');
+    const previewBox  = document.getElementById('previewBox');
+    const previewTgt  = document.getElementById('previewTarget');
+    const previewTxt  = document.getElementById('previewContent');
+    const deployBtn   = document.getElementById('deployBtn');
+    const charCount   = document.getElementById('charCount');
+
+    const panels = {
+        sector: document.getElementById('sectorPanel'),
+        style:  document.getElementById('stylePanel'),
+        media:  document.getElementById('mediaPanel'),
+    };
+
+    const btns = {
+        sector: document.getElementById('toggleSector'),
+        style:  document.getElementById('toggleStyle'),
+        media:  document.getElementById('toggleMedia'),
+    };
+
+    function togglePanel(name) {
+        Object.keys(panels).forEach(k => {
+            const isTarget = k === name;
+            const alreadyOpen = panels[k].classList.contains('open');
+            panels[k].classList.toggle('open', isTarget && !alreadyOpen);
+            btns[k].classList.toggle('active', isTarget && !alreadyOpen);
+        });
+    }
+
+    btns.sector.addEventListener('click', () => togglePanel('sector'));
+    btns.style.addEventListener('click',  () => togglePanel('style'));
+    btns.media.addEventListener('click',  () => togglePanel('media'));
+
+    // Style swatches
+    let selectedStyle = 'none';
+    document.querySelectorAll('.style-swatch').forEach(swatch => {
+        swatch.addEventListener('click', function () {
+            document.querySelectorAll('.style-swatch').forEach(s => s.classList.remove('selected'));
+            this.classList.add('selected');
+            selectedStyle = this.dataset.value;
+            gradInput.value = selectedStyle;
+            updatePreview();
+        });
+    });
+
+    // Textarea
+    textarea.addEventListener('input', updatePreview);
+
+    function updatePreview() {
+        const text = textarea.value;
+        const len  = text.length;
+        charCount.textContent = len + ' / 1000';
+        charCount.className   = len > 900 ? 'danger' : len > 750 ? 'warn' : '';
+        deployBtn.disabled    = text.trim() === '';
+
+        if (selectedStyle !== 'none' && text.trim() !== '') {
+            previewTgt.className = 'gradient-intel-bg rounded-3 ' + selectedStyle;
+            previewTxt.textContent = text;
+            previewBox.classList.add('active');
+        } else {
+            previewBox.classList.remove('active');
+        }
+    }
+
+    // Auto-grow textarea
+    textarea.addEventListener('input', function () {
+        this.style.height = 'auto';
+        this.style.height = this.scrollHeight + 'px';
+    });
+});
+</script>
+{% endblock %}

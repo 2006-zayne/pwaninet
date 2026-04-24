@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="bg-white">
+        <div class="container py-3 px-3">
+            <form method="GET" action="{% url 'search' %}" class="d-flex align-items-center gap-2">
+                <a href="{% url 'profile' request.user.username %}" class="flex-shrink-0">
+                    <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover;">
+                </a>
+                <div class="input-group flex-grow-1">
+                    <span class="input-group-text bg-light border-0 rounded-start-pill ps-3">
+                        <i class="bi bi-search text-muted"></i>
+                    </span>
+                    <input type="text" name="q" class="form-control bg-light border-0 rounded-end-pill pe-4"
+                           placeholder="Search friends & groups..."
+                           style="font-size: 14px;"
+                           value="{{ request.GET.q }}">
+                </div>
+            </form>
+        </div>
+        <hr class="m-0 opacity-25" style="border-top: 1px solid #dee2e6;">
+    </div>
+
+    <div class="row justify-content-center g-0">
+        <div class="col-12 py-3 px-2 mb-5">
+            
+            <!-- Groups Suggestions -->
+            <div id="squad-container" class="post-card p-3 mb-3 border-0 shadow-sm bg-white rounded-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold text-muted small text-uppercase mb-0"><i class="bi bi-shield-shaded me-2 text-primary"></i>Groups to Explore:</h6>
+                    <a href="{% url 'groups_dashboard' %}" class="text-primary small text-decoration-none fw-bold">View All</a>
+                </div>
+                
+                {% if suggested_groups %}
+                    <div class="d-flex gap-3 overflow-auto pb-2 no-scrollbar" style="scrollbar-width: none;">
+                        {% for group in suggested_groups %}
+                        <a href="{% url 'groups_detail' group.id %}" class="text-center text-decoration-none text-dark p-2 rounded-3 suggestion-card" style="min-width: 90px;">
+                            <div class="position-relative d-inline-block">
+                                <img src="{{ group.get_photo_url }}" class="rounded-circle avatar-ring" style="width: 60px; height: 60px; object-fit: cover;">
+                                {% if group.is_official %}
+                                    <span class="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 18px; height: 18px; font-size: 10px;">
+                                        <i class="bi bi-check-lg"></i>
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <p class="small mt-1 mb-0 text-truncate" style="max-width: 75px;">{{ group.name }}</p>
+                        </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-2">
+                        <p class="small text-muted mb-0">No Groups Suggestions at the moment.</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Friend Suggestions -->
+            <div id="friend-suggestions-container" class="post-card p-3 mb-4 border-0 shadow-sm bg-white rounded-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold text-muted small text-uppercase mb-0"><i class="bi bi-person-plus-fill me-2 text-primary"></i>Operatives to Recruit:</h6>
+                </div>
+                
+                <div class="d-flex gap-3 overflow-auto pb-2 no-scrollbar" style="scrollbar-width: none;">
+                    {% for recruit in suggested_friends %}
+                        <div class="text-center p-2 rounded-3 suggestion-card" style="min-width: 100px;">
+                            <a href="{% url 'profile' recruit.username %}" class="text-decoration-none text-dark">
+                                <img src="{{ recruit.profile_pic.url }}" class="rounded-circle border border-2 shadow-sm mb-2" style="width: 55px; height: 55px; object-fit: cover;">
+                                <p class="small fw-bold mb-0 text-truncate" style="max-width: 90px;">{{ recruit.username }}</p>
+                                <small class="text-muted x-small d-block mb-2">{{ recruit.course.name|truncatechars:10|default:"Student" }}</small>
+                            </a>
+                            <button class="btn btn-primary btn-sm rounded-pill w-100 fw-bold" style="font-size: 0.65rem;"
+                                    hx-post="{% url 'toggle_follow' recruit.username %}"
+                                    hx-swap="none">
+                                RECRUIT
+                            </button>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="feed-sector">
+                {% for post in posts %}
+                    {% include 'partials/post_card.html' %}
+                {% empty %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-broadcast text-muted fs-1"></i>
+                        <p class="text-muted mt-2">No posts yet,Be the first one to post.</p>
+                        <a href="{% url 'create_post' %}" class="btn btn-primary rounded-pill px-4">Create a post</a>
+                    </div>
+                {% endfor %}
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .hover-border-primary:hover { border-color: var(--bs-primary) !important; background-color: #f8f9fa !important; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+</style>
+{% endblock %}

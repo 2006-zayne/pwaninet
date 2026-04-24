@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-3">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10">
+            
+            <div class="d-flex justify-content-between align-items-center mb-4 px-2">
+                <div>
+                    <h4 class="fw-bold mb-0 text-uppercase letter-spacing-1">Intelligence Log</h4>
+                    <p class="small text-muted mb-0">Field status and operative alerts</p>
+                </div>
+                <div id="alert-counter">
+                    {% if notifications %}
+                    <span class="badge bg-dark rounded-pill px-3 py-2 border border-secondary">
+                        {{ unread_notifications_count }} ACTIVE ALERTS
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+                <div class="list-group list-group-flush" id="notification-list">
+                    {% for n in notifications %}
+                        <div class="list-group-item list-group-item-action border-bottom p-3 transition-all {% if not n.is_read %}border-start border-4 border-primary bg-aliceblue{% endif %}">
+                            <div class="d-flex align-items-start gap-3">
+                                <img src="{{ n.sender.profile_pic.url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover;">
+                                
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-1 fw-bold text-dark">
+                                            {{ n.sender.username }}
+                                            {% if n.notification_type == 'INVITE' %}
+                                                <span class="ms-1 badge bg-primary text-uppercase" style="font-size: 0.55rem;">Invited</span>
+                                            {% elif n.notification_type == 'FOLLOW' %}
+                                                <span class="ms-1 badge bg-info text-uppercase" style="font-size: 0.55rem;">Followed</span>
+                                            {% elif n.notification_type == 'LIKE' %}
+                                                <span class="ms-1 badge bg-danger text-uppercase" style="font-size: 0.55rem;">Liked</span>
+                                            {% endif %}
+                                        </h6>
+                                        <small class="text-muted"><i class="bi bi-clock-history"></i> {{ n.timestamp|timesince }}</small>
+                                    </div>
+                                    
+                                    <p class="mb-0 text-secondary" style="font-size: 0.95rem;">
+                                        {{ n.msg }}
+                                        {% if n.post %}
+                                            <a href="{% url 'post_details' n.post.id %}" class="text-primary text-decoration-none fw-bold">"{{ n.post.content|truncatechars:30 }}"</a>
+                                        {% endif %}
+                                    </p>
+
+                                    {% if n.notification_type == 'INVITE' %}
+                                    <div class="d-flex gap-2 mt-2">
+                                        <a href="{% url 'respond_to_invite' n.id 'accept' %}" class="btn btn-success btn-sm rounded-pill px-3 fw-bold" style="font-size: 0.7rem;">ACCEPT</a>
+                                        <a href="{% url 'respond_to_invite' n.id 'decline' %}" class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-bold" style="font-size: 0.7rem;">DECLINE</a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="ms-auto text-muted opacity-50">
+                                    {% if n.notification_type == 'LIKE' %}<i class="bi bi-heart-fill text-danger"></i>
+                                    {% elif n.notification_type == 'FOLLOW' %}<i class="bi bi-person-plus-fill text-info"></i>
+                                    {% elif n.notification_type == 'INVITE' %}<i class="bi bi-shield-lock-fill text-primary"></i>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="p-5 text-center text-muted" id="empty-state">
+                            <i class="bi bi-radar fs-1 mb-3"></i>
+                            <p class="fw-bold text-uppercase">Sector Clear</p>
+                            <p class="small">No active alerts at this time.</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            {% if notifications %}
+                <div class="d-flex justify-content-center mt-4">
+                    <button class="btn btn-outline-secondary btn-sm rounded-pill px-4 fw-bold text-uppercase border-2" 
+                            style="font-size: 0.75rem;"
+                            hx-post="{% url 'mark_all_as_read' %}"
+                            hx-target="#notification-list"
+                            hx-swap="innerHTML">
+                        <i class="bi bi-check2-all me-1"></i> Clear Alert History
+                    </button>
+                </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .bg-aliceblue { background-color: #f0f7ff; }
+    .letter-spacing-1 { letter-spacing: 1px; }
+    .transition-all { transition: all 0.2s ease; }
+    .list-group-item:hover { background-color: #f8fafc; }
+</style>
+{% endblock %}
