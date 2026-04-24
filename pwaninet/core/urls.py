@@ -68,5 +68,7 @@ urlpatterns = [
 
     # core/urls.py
     path('notifications/read/<int:notif_id>/', views.mark_notification_as_read, name='mark_notification_as_read'),
-
+    path('post/<int:post_id>/comment/', views.add_comment, name='add_comment'),
+    path('comment/<int:comment_id>/like/', views.toggle_comment_like, name='toggle_comment_like'),
+    path('search/', views.search_view, name='search'),
 ]

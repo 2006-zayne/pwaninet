@@ -22,7 +22,7 @@ def invalidate_unread_count_cache(user_id):
     cache.delete(_unread_count_cache_key(user_id))
 
 
-def build_notifications_context(user, mark_read = (False,)):
+def build_notifications_context(user, mark_read = False):
     if mark_read:
         mark_user_notifications_as_read(user)
         cache.set(_unread_count_cache_key(user.id), 0, timeout = 30)

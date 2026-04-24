@@ -4,23 +4,20 @@
 <div class="container-fluid p-0">
     <div class="bg-white">
         <div class="container py-3 px-3">
-            <div class="post-card border-0 mb-0 shadow-none">
-                <div class="d-flex align-items-center gap-3">
-                    <a href="{% url 'profile' request.user.username %}" class="flex-shrink-0">
-                        <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
-                    </a>
-                    
-                    <a href="{% url 'create_post' %}" class="mind-trigger text-decoration-none flex-grow-1 bg-light rounded-pill px-4 py-2 text-muted border border-light transition-all hover-border-primary">
-                        What's the intel, {{ request.user.first_name|default:request.user.username }}?
-                    </a>
+            <form method="GET" action="{% url 'search' %}" class="d-flex align-items-center gap-2">
+                <a href="{% url 'profile' request.user.username %}" class="flex-shrink-0">
+                    <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover;">
+                </a>
+                <div class="input-group flex-grow-1">
+                    <span class="input-group-text bg-light border-0 rounded-start-pill ps-3">
+                        <i class="bi bi-search text-muted"></i>
+                    </span>
+                    <input type="text" name="q" class="form-control bg-light border-0 rounded-end-pill pe-4"
+                           placeholder="Search friends & groups..."
+                           style="font-size: 14px;"
+                           value="{{ request.GET.q }}">
                 </div>
-                
-                <div class="d-flex justify-content-around mt-3">
-                    <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-image me-1 text-success"></i></a>
-                    <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-hash me-1 text-primary"></i></a>
-                    <a href="{% url 'create_post' %}" class="btn btn-sm text-muted border-0 fw-bold small"><i class="bi bi-shield-check me-1 text-danger"></i></a>
-                </div>
-            </div>
+            </form>
         </div>
         <hr class="m-0 opacity-25" style="border-top: 1px solid #dee2e6;">
     </div>

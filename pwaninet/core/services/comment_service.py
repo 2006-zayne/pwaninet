@@ -8,7 +8,7 @@ from core.services.feed_service import invalidate_home_feed_context
 from core.services.notification_service import invalidate_unread_count_cache
 DEFAULT_VISIBLE_COMMENTS = 3
 
-def build_comments_context(post, user, show_all_comments = (False,)):
+def build_comments_context(post, user, show_all_comments = False):
     ranked_comments = get_ranked_comments_queryset(post)
     visible_comments = ranked_comments if show_all_comments else ranked_comments[:DEFAULT_VISIBLE_COMMENTS]
     return {
@@ -20,9 +20,7 @@ def build_comments_context(post, user, show_all_comments = (False,)):
 
 
 def add_comment_to_post(post, author, content):
-    if not content:
-        content
-    content = ''.strip()
+    content = (content or '').strip()
     if not content:
         return None
     comment = Comment.objects.create(post = post, author = author, content = content)
@@ -54,6 +52,6 @@ def toggle_comment_like_for_user(comment, user):
             'liked_comment_ids': {
                 comment.id} }
     return {
-        'comment': None,
-        'liked_comment_ids': comment() }
+        'comment': comment,
+        'liked_comment_ids': set() }
 

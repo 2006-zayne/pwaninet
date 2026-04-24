@@ -15,7 +15,7 @@ def get_following_ids(user):
     return Follow.objects.filter(follower = user).values_list('followed_id', flat = True)
 
 
-def get_suggested_groups_from_following(user, limit = (10,)):
+def get_suggested_groups_from_following(user, limit = 10):
     following_ids = get_following_ids(user)
     return Groups.objects.filter(members__id__in = following_ids).exclude(members = user).distinct()[:limit]
 
@@ -32,7 +32,7 @@ def get_group_member_exclusion_ids(group):
     return group.members.values_list('id', flat = True)
 
 
-def search_invite_candidates(query, group, limit = (10,)):
+def search_invite_candidates(query, group, limit = 10):
     if not query:
         return None
     return User.objects.filter(username__icontains = query).exclude(id__in = get_group_member_exclusion_ids(group))[:limit]

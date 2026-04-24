@@ -105,12 +105,12 @@ class Post(models.Model):
     def is_liked_by(self, user):
         if user.is_authenticated:
             # We check your 'Like' model specifically
-            return self.likes_received.filter(user=user).exists()
+            return self.likes.filter(user=user).exists()
         return False
 
     @property
     def like_count(self):
-        return self.likes_received.count()
+        return self.likes.count()
     
     def save(self, *args, **kwargs):
         if self.image:
@@ -202,3 +202,29 @@ class Follow(models.Model):
 
     def __str__(self):
         return f"{self.follower.username} follows {self.followed.username}"
+
+class Comment(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='comments')
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Comment by {self.author} on {self.post}"
+
+    def is_liked_by(self, user):
+        if user.is_authenticated:
+            return self.likes.filter(user=user).exists()
+        return False
+
+
+class CommentLike(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='likes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'comment')

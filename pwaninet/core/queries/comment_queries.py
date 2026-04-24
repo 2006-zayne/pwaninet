@@ -14,5 +14,5 @@ def get_ranked_comments_queryset(post):
 def get_liked_comment_ids_for_user(user, post):
     if not user.is_authenticated:
         return set()
-    return None(CommentLike.objects.filter(user = user, comment__post = post).values_list('comment_id', flat = True))
+    return set(CommentLike.objects.filter(user = user, comment__post = post).values_list('comment_id', flat = True))
 
