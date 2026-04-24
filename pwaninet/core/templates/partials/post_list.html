@@ -1,0 +1,45 @@
+{% for post in posts %}
+    {% if forloop.last and has_next %}
+        <div hx-get="{% url 'home' %}?page={{ page|add:1 }}" 
+             hx-trigger="revealed" 
+             hx-swap="afterend" 
+             hx-indicator="#feed-spinner">
+            {% include 'partials/post_card.html' %}
+        </div>
+    {% else %}
+        {% include 'partials/post_card.html' %}
+    {% endif %}
+
+    {% if forloop.counter == suggestion_index and suggested_friends %}
+        <!-- In-Feed Friend Suggestions -->
+        <div class="post-card p-3 mb-3 border-0 shadow-sm bg-white rounded-4">
+            <h6 class="fw-bold text-muted small text-uppercase mb-3"><i class="bi bi-person-plus-fill me-2 text-primary"></i>Comrades to follow:</h6>
+            <div class="d-flex gap-3 overflow-auto pb-2 no-scrollbar" style="scrollbar-width: none;">
+                {% for recruit in suggested_friends %}
+                    <div class="text-center p-2 rounded-3 suggestion-card" style="min-width: 100px;">
+                        <a href="{% url 'profile' recruit.username %}" class="text-decoration-none text-dark">
+                            <img src="{{ recruit.profile_pic.url }}" class="rounded-circle border border-2 shadow-sm mb-2" style="width: 55px; height: 55px; object-fit: cover;">
+                            <p class="small fw-bold mb-0 text-truncate">{{ recruit.username }}</p>
+                        </a>
+                        <div id="follow-recruit-{{ recruit.id }}">
+                            {% if recruit.id in following_ids %}
+                                {% include 'partials/follow_button_recruit.html' with is_following=True %}
+                            {% else %}
+                                {% include 'partials/follow_button_recruit.html' with is_following=False %}
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+{% empty %}
+    {% if page == 1 %}
+        <div class="text-center py-5">
+            <i class="bi bi-broadcast text-muted fs-1"></i>
+            <p class="text-muted mt-2">No posts yet. Be the first one to post.</p>
+            <a href="{% url 'create_post' %}" class="btn btn-primary rounded-pill px-4">Create a post</a>
+        </div>
+    {% endif %}
+{% endfor %}

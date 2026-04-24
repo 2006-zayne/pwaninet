@@ -27,10 +27,8 @@ SECRET_KEY = 'django-insecure-k_7b)v2uaqy2&mske+$ovmneqg82af2=2u_a0@208n9j8h@c2v
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    'rosily-untempted-divina.ngrok-free.dev',
-    '192.168.72.66',
-    '192.168.112.221',
-    '192.168.64.211',
+    '192.168.26.221',
+    '10.20.152.125',
     '0.0.0.0',
     '127.0.0.1', 
     'localhost',

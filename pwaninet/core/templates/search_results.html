@@ -5,12 +5,12 @@
     <div class="bg-white rounded-3 shadow-sm p-3 mb-4">
         <form method="GET" action="{% url 'search' %}" class="d-flex align-items-center gap-2">
             <div class="input-group">
-                <span class="input-group-text bg-light border-0 rounded-start-pill ps-3">
+                <span class="input-group-text border-0 rounded-start-pill ps-3" style="background-color: #e9ecef;">
                     <i class="bi bi-search text-muted"></i>
                 </span>
-                <input type="text" name="q" class="form-control bg-light border-0 rounded-end-pill"
+                <input type="text" name="q" class="form-control border-0 rounded-end-pill"
                        placeholder="Search friends & groups..."
-                       value="{{ query }}" autofocus>
+                       value="{{ query }}" autofocus style="background-color: #e9ecef;">
             </div>
         </form>
     </div>

@@ -1,19 +1,27 @@
 {% extends 'base.html' %}
 
+{% block mobile_bottom_nav %}{% endblock %} {# Hide mobile bottom nav for this page #}
+
 {% block content %}
-<div class="container mt-4">
-    <div class="mt-3">
-        <a href="{% url 'home' %}" class="btn btn-link text-decoration-none">
-            <i class="bi bi-arrow-left"></i> Back
-        </a>
+
+ <div class="container mt-3">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+            <a href="{% url 'home' %}" class="btn btn-sm btn-outline-secondary rounded-pill fw-bold text-uppercase mb-3 px-3">
+                <i class="bi bi-arrow-left me-1"></i> Return to Feed
+            </a>
+        </div>
     </div>
 
-    <div class="post-card mb-3 overflow-hidden border-0">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+
+    <div class="post-card shadow-sm mb-3 bg-white rounded-3 overflow-hidden border-0">
         <div class="d-flex align-items-center p-3">
             <a href="{% url 'profile' post.author.username %}">
-                <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border" style="width: 40px; height: 40px; object-fit: cover;">
+                <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 48px; height: 48px; object-fit: cover;">
             </a>
-            <div class="ms-2">
+            <div class="ms-3">
                 <h6 class="mb-0 fw-bold small">
                     <a href="{% url 'profile' post.author.username %}" class="text-dark text-decoration-none">
                         {{ post.author.get_full_name|default:post.author.username }}
@@ -21,12 +29,16 @@
                 </h6>
                 <small class="text-muted" style="font-size: 11px;">
                     <span class="badge bg-light text-primary border-0">{{ post.unit.code|default:"GLOBAL" }}</span> • {{ post.date|timesince }} ago
+                    {% if post.group %}
+                        <span class="text-muted fw-normal mx-1">posted in</span>
+                        <a href="{% url 'groups_detail' post.group.id %}" class="text-primary text-decoration-none">{{ post.group.name }}</a>
+                    {% endif %}
                 </small>
             </div>
         </div>
 
         <div class="{% if post.gradient_class != 'none' %}{{ post.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %}">
-            <p class="mb-0 {% if post.gradient_class != 'none' %}text-white fw-bold fs-2{% else %}text-dark{% endif %}" 
+            <p class="mb-0 {% if post.gradient_class != 'none' %}text-white fw-bold fs-3{% else %}text-dark{% endif %}" 
                style="{% if post.gradient_class == 'none' %}font-size: 15px;{% endif %} line-height: 1.5;">
                 {{ post.content }}
             </p>
@@ -36,7 +48,7 @@
         <div class="post-media border-top border-bottom bg-light">
             {% with f_url=post.get_intel_file.url|lower %}
                 {% if ".jpg" in f_url or ".png" in f_url or ".jpeg" in f_url or ".webp" in f_url %}
-                    <img src="{{ post.get_intel_file.url }}" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;">
+                    <img src="{{ post.get_intel_file.url }}" class="img-fluid w-100" style="object-fit: cover;">
                 {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
                     <div class="ratio ratio-16x9 bg-black">
                         <video controls preload="metadata" class="w-100 h-100">
@@ -50,11 +62,11 @@
                                 <i class="bi bi-file-earmark-pdf-fill text-danger fs-3"></i>
                             </div>
                             <div>
-                                <h6 class="mb-0 fw-bold small">Academic Intel</h6>
+                                <h6 class="mb-0 fw-bold small">Academic Files</h6>
                                 <small class="text-muted">PDF DOCUMENT</small>
                             </div>
                         </div>
-                        <a href="{{ post.get_intel_file.url }}" target="_blank" class="btn btn-outline-dark btn-sm rounded-pill px-3 fw-bold">VIEW PDF</a>
+                        <a href="{{ post.get_intel_file.url }}" target="_blank" class="btn btn-dark btn-sm rounded-pill px-3 fw-bold">VIEW PDF</a>
                     </div>
                 {% endif %}
             {% endwith %}
@@ -69,13 +81,13 @@
                   data-bs-toggle="modal" data-bs-target="#likersModal"
                   hx-get="{% url 'post_likers_list' post.id %}"
                   hx-target="#modal-content-target">
-                <i class="bi bi-eye-fill me-1"></i>SEE WHO LIKED?
+                <i class="bi bi-eye-fill me-1"></i>Likes
             </span>
             <span class="small text-muted fw-bold">
                 <i class="bi bi-chat-dots me-1"></i>{{ post.comments.count }} Comments
             </span>
         </div>
-    </div>
+    </div> 
 
     <!-- Comment Form -->
     <div class="bg-white rounded-3 shadow-sm p-3 mb-3">
@@ -84,15 +96,16 @@
             <div class="d-flex gap-2 align-items-start">
                 <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border flex-shrink-0" style="width: 36px; height: 36px; object-fit: cover;">
                 <div class="flex-grow-1">
-                    <textarea name="content" rows="2" class="form-control border-0 bg-light rounded-3"
-                              placeholder="Drop your intel here..." style="resize: none; font-size: 14px;"></textarea>
+                    <textarea name="content" rows="2" class="form-control border-0 rounded-3"
+                              placeholder="Add comment..." style="resize: none; font-size: 14px; background-color: #e9ecef;"></textarea>
                 </div>
                 <button type="submit" class="btn btn-dark btn-sm rounded-pill px-3 fw-bold align-self-end">
                     <i class="bi bi-send-fill"></i>
                 </button>
             </div>
         </form>
-    </div>
+    </div> 
+
 
     <!-- Comments Section -->
     <div class="bg-white rounded-3 shadow-sm overflow-hidden mb-4" id="comments-section">
@@ -103,7 +116,7 @@
         </div>
 
         {% for comment in visible_comments %}
-        <div class="d-flex gap-2 p-3 border-bottom" id="comment-{{ comment.id }}">
+        <div class="d-flex gap-2 p-3 {% if not forloop.last %}border-bottom{% endif %}" id="comment-{{ comment.id }}">
             <a href="{% url 'profile' comment.author.username %}">
                 <img src="{{ comment.author.profile_pic.url }}" class="rounded-circle border flex-shrink-0" style="width: 34px; height: 34px; object-fit: cover;">
             </a>

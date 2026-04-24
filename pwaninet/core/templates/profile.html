@@ -29,11 +29,9 @@
                         </div>
 
                         {% if request.user != profile_user %}
-                            <button id="follow-btn" 
-                                    data-username="{{ profile_user.username }}"
-                                    class="btn {% if is_following %}btn-outline-dark{% else %}btn-primary{% endif %} w-100 rounded-pill fw-bold mb-2">
-                                {% if is_following %} Unfollow {% else %} Follow {% endif %}
-                            </button>
+                            <div id="follow-btn-container">
+                                {% include 'partials/follow_button_profile.html' %}
+                            </div>
                         {% else %}
                             <div class="d-grid gap-2 px-2">
                                 <a href="{% url 'update_profile' %}" class="btn btn-outline-secondary rounded-pill fw-bold btn-sm">
@@ -99,38 +97,4 @@
 
     </div>
 </div>
-
-<script>
-/* ASYNC FOLLOW PROTOCOL */
-document.getElementById('follow-btn')?.addEventListener('click', function() {
-    const btn = this;
-    const username = btn.getAttribute('data-username');
-    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || "{{ csrf_token }}";
-
-    fetch(`/toggle-follow/${username}/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': csrftoken,
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) return;
-
-        if (data.is_following) {
-            btn.innerText = 'Unfollow';
-            btn.classList.replace('btn-primary', 'btn-outline-dark');
-        } else {
-            btn.innerText = 'Follow';
-            btn.classList.replace('btn-outline-dark', 'btn-primary');
-        }
-
-        const countElement = document.getElementById('follower-count');
-        if (countElement) countElement.innerText = data.follower_count;
-    })
-    .catch(error => console.error('Tactical Communication Failure:', error));
-});
-</script>
-
 {% endblock %}

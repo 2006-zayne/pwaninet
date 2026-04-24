@@ -26,7 +26,7 @@ def register_view(request):
             return redirect('login')
     else:
         form = PwaniSignupForm()
-    return render(request, 'registration/register.html', {'form': form})
+    return render(request, 'register.html', {'form': form})
 
 
 def load_years(request):
@@ -37,8 +37,21 @@ def load_years(request):
 
 @login_required
 def home_view(request):
-    page = request.GET.get('page', 1)
+    try:
+        page = int(request.GET.get('page', 1))
+    except (ValueError, TypeError):
+        page = 1
+
     context = build_home_feed_context(request.user, page=page)
+    
+    # If HTMX requests the home feed (e.g. when clearing search), return the inner content
+    if request.headers.get('HX-Request') and not request.GET.get('q'):
+        return render(request, 'partials/home_content.html', context)
+
+    # For HTMX infinite scroll: render only the posts partial
+    if request.headers.get('HX-Request'):
+        return render(request, 'partials/post_list.html', context)
+
     context['unread_notifications_count'] = get_cached_unread_count(request.user)
     return render(request, 'home.html', context)
 
@@ -105,7 +118,7 @@ def create_post_view(request):
     if request.method == 'POST':
         form = PostForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
-            create_post_for_user(form, request.user, group_id=group_id)
+            create_post_for_user(form, request.user, request.FILES, group_id=group_id)
             messages.success(request, 'Post created successfully.')
             return redirect('home')
     else:
@@ -156,10 +169,14 @@ def toggle_like(request, post_id):
 @login_required
 def toggle_follow(request, username):
     target = get_object_or_404(User, username=username)
+    
+    is_ajax = request.headers.get('HX-Request') or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
     if target == request.user:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'error': 'Cannot follow yourself'})
+        if is_ajax:
+            return JsonResponse({'error': 'Cannot follow yourself'}, status=400)
         return redirect('profile', username=username)
+
     follow_qs = Follow.objects.filter(follower=request.user, followed=target)
     if follow_qs.exists():
         follow_qs.delete()
@@ -173,9 +190,25 @@ def toggle_follow(request, username):
         )
         invalidate_unread_count_cache(target.id)
         is_following = True
+
     follower_count = target.follower_relationships.count()
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+
+    if request.headers.get('HX-Request'):
+        # Return HTML partial based on which button triggered the request
+        template = 'partials/follow_button_profile.html'
+        if request.headers.get('HX-Target', '').startswith('follow-recruit-'):
+            template = 'partials/follow_button_recruit.html'
+            
+        return render(request, template, {
+            'profile_user': target,
+            'recruit': target,
+            'is_following': is_following,
+            'follower_count': follower_count
+        })
+
+    if is_ajax:
         return JsonResponse({'is_following': is_following, 'follower_count': follower_count})
+
     return redirect('profile', username=username)
 
 
@@ -306,4 +339,8 @@ def search_view(request):
     query = request.GET.get('q', '')
     context = build_search_context(request.user, query)
     context['unread_notifications_count'] = get_cached_unread_count(request.user)
+    
+    if request.headers.get('HX-Request'):
+        return render(request, 'partials/search_results_inner.html', context)
+
     return render(request, 'search_results.html', context)

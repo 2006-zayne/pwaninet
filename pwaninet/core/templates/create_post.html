@@ -19,11 +19,11 @@
     }
 
     .compose-header-title {
-        font-size: 0.7rem;
+        font-size: 0.8rem;
         font-weight: 900;
         letter-spacing: 3px;
         text-transform: uppercase;
-        color: #94a3b8;
+        color: #121212;
     }
 
     .compose-body {
@@ -69,7 +69,7 @@
     }
 
     .compose-textarea::placeholder {
-        color: #cbd5e1;
+        color: #94a1b0;
         font-weight: 400;
     }
 
@@ -308,8 +308,8 @@
 <div class="compose-wrap">
 
     <div class="compose-header">
-        <span class="compose-header-title">New Deployment</span>
-        <a href="{% url 'home' %}" class="text-muted text-decoration-none" style="font-size: 0.75rem; font-weight: 700; letter-spacing: 1px;">ABORT</a>
+        <span class="compose-header-title">Create new post</span>
+        <a href="{% url 'home' %}" class="text-muted text-decoration-none" style="font-size: 0.8rem; font-weight: 700; letter-spacing: 1px;">Discard Post</a>
     </div>
 
     <form method="POST" enctype="multipart/form-data" id="postForm">
@@ -330,7 +330,7 @@
                     name="content"
                     id="id_content"
                     class="compose-textarea form-control"
-                    placeholder="What intel are you deploying today?"
+                    placeholder="What's on your mind ?"
                     required
                     maxlength="1000"
                     rows="4">{{ form.content.value|default:'' }}</textarea>
@@ -344,7 +344,7 @@
 
                 <!-- Sector panel -->
                 <div class="compose-panel" id="sectorPanel">
-                    <div class="panel-label">Target Sector</div>
+                    <div class="panel-label">Target Group</div>
                     <select name="unit" class="sector-select form-select" id="id_unit">
                         {% for value, label in form.unit.field.choices %}
                             <option value="{{ value }}" {% if form.unit.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
@@ -355,7 +355,7 @@
 
                 <!-- Style panel -->
                 <div class="compose-panel" id="stylePanel">
-                    <div class="panel-label">Deployment Visual Style</div>
+                    <div class="panel-label">Select gradient background.</div>
                     <div class="style-grid">
                         <div class="style-swatch swatch-none selected" data-value="none" title="Standard">NONE</div>
                         <div class="style-swatch grad-ocean" data-value="grad-ocean" title="Ocean Blue"></div>
@@ -369,7 +369,7 @@
 
                 <!-- Media panel -->
                 <div class="compose-panel" id="mediaPanel">
-                    <div class="panel-label">Attach Assets</div>
+                    <div class="panel-label">Attach Files</div>
                     <div class="media-row">
                         <label for="{{ form.image.id_for_label }}">
                             <i class="bi bi-image text-primary"></i> Image
@@ -407,7 +407,7 @@
                     <div class="d-flex align-items-center gap-3">
                         <span id="charCount">0 / 1000</span>
                         <button type="submit" class="btn-deploy" id="deployBtn" disabled>
-                            <i class="bi bi-send-fill me-1"></i>Deploy
+                            <i class="bi bi-send-fill me-1"></i>Post
                         </button>
                     </div>
                 </div>
