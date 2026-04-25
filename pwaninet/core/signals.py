@@ -1,7 +1,10 @@
 # signals.py
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import User, Groups ,Notifications , Like , Follow
+from users.models import User, Follow
+from posts.models import Like
+from groups.models import Groups
+from notifications.models import Notifications
 
 @receiver(post_save, sender=User)
 def auto_join_course_group(sender, instance, created, **kwargs):

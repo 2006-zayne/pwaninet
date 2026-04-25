@@ -1,18 +1,14 @@
 <div class="d-flex gap-2 p-3 border-bottom" id="comment-{{ comment.id }}">
-    <a href="{% url 'profile' comment.author.username %}">
+    <a href="{% url 'users:profile' comment.author.username %}">
         <img src="{{ comment.author.profile_pic.url }}" class="rounded-circle border flex-shrink-0" style="width: 34px; height: 34px; object-fit: cover;">
     </a>
-    <div class="flex-grow-1">
-        <div class="bg-light rounded-3 px-3 py-2">
-            <a href="{% url 'profile' comment.author.username %}" class="fw-bold small text-dark text-decoration-none">
-                {{ comment.author.get_full_name|default:comment.author.username }}
-            </a>
-            <p class="mb-0 small" style="font-size: 14px; line-height: 1.5;">{{ comment.content }}</p>
-        </div>
-        <div class="d-flex align-items-center gap-3 mt-1 ms-2">
-            <small class="text-muted" style="font-size: 11px;">{{ comment.created_at|timesince }} ago</small>
+    <div>
+        <a href="{% url 'users:profile' comment.author.username %}" class="fw-bold small text-dark text-decoration-none">
+            {{ comment.author.get_full_name|default:comment.author.username }}
+        </a>
+        <p class="mb-0 small" style="font-size: 14px; line-height: 1.5;">{{ comment.content }}</p>
             <button class="btn btn-sm border-0 p-0 {% if comment.id in liked_comment_ids %}text-danger{% else %}text-muted{% endif %}"
-                    hx-post="{% url 'toggle_comment_like' comment.id %}"
+                    hx-post="{% url 'posts:toggle_comment_like' comment.id %}"
                     hx-target="#comment-{{ comment.id }}"
                     hx-swap="outerHTML"
                     style="font-size: 12px;">

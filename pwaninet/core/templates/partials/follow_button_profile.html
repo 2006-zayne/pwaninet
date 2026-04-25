@@ -1,4 +1,4 @@
-<button hx-post="{% url 'toggle_follow' profile_user.username %}"
+<button hx-post="{% url 'users:toggle_follow' profile_user.username %}"
         hx-target="#follow-btn-container"
         hx-swap="innerHTML"
         class="btn {% if is_following %}btn-outline-dark{% else %}btn-primary{% endif %} w-100 rounded-pill fw-bold mb-2">

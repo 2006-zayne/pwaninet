@@ -59,7 +59,7 @@
                         <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold shadow">
                             Save & Sync Changes
                         </button>
-                        <a href="{% url 'profile' username=user.username %}" class="btn btn-link text-decoration-none text-muted small fw-bold text-uppercase">
+                        <a href="{% url 'users:profile' username=user.username %}" class="btn btn-link text-decoration-none text-muted small fw-bold text-uppercase">
                             Abort Update
                         </a>
                     </div>

@@ -4,10 +4,10 @@
 
 {% block content %}
 
- <div class="container mt-3">
+<div class="container mt-3" style="padding-bottom: 80px;">
     <div class="row justify-content-center">
         <div class="col-12 col-lg-8">
-            <a href="{% url 'home' %}" class="btn btn-sm btn-outline-secondary rounded-pill fw-bold text-uppercase mb-3 px-3">
+            <a href="{% url 'posts:home' %}" class="btn btn-sm btn-outline-secondary rounded-pill fw-bold text-uppercase mb-3 px-3">
                 <i class="bi bi-arrow-left me-1"></i> Return to Feed
             </a>
         </div>
@@ -18,27 +18,25 @@
 
     <div class="post-card shadow-sm mb-3 bg-white rounded-3 overflow-hidden border-0">
         <div class="d-flex align-items-center p-3">
-            <a href="{% url 'profile' post.author.username %}">
+            <a href="{% url 'users:profile' post.author.username %}">
                 <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 48px; height: 48px; object-fit: cover;">
             </a>
             <div class="ms-3">
-                <h6 class="mb-0 fw-bold small">
-                    <a href="{% url 'profile' post.author.username %}" class="text-dark text-decoration-none">
-                        {{ post.author.get_full_name|default:post.author.username }}
-                    </a>
-                </h6>
+                <a href="{% url 'users:profile' post.author.username %}" class="text-dark text-decoration-none">
+                    {{ post.author.get_full_name|default:post.author.username }}
+                </a>
                 <small class="text-muted" style="font-size: 11px;">
                     <span class="badge bg-light text-primary border-0">{{ post.unit.code|default:"GLOBAL" }}</span> • {{ post.date|timesince }} ago
                     {% if post.group %}
                         <span class="text-muted fw-normal mx-1">posted in</span>
-                        <a href="{% url 'groups_detail' post.group.id %}" class="text-primary text-decoration-none">{{ post.group.name }}</a>
+                        <a href="{% url 'groups:groups_detail' post.group.id %}" class="text-primary text-decoration-none">{{ post.group.name }}</a>
                     {% endif %}
                 </small>
             </div>
         </div>
 
         <div class="{% if post.gradient_class != 'none' %}{{ post.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %}">
-            <p class="mb-0 {% if post.gradient_class != 'none' %}text-white fw-bold fs-3{% else %}text-dark{% endif %}" 
+            <p class="mb-0 {% if post.gradient_class != 'none' %}text-white fw-bold fs-3{% else %}text-dark{% endif %}"
                style="{% if post.gradient_class == 'none' %}font-size: 15px;{% endif %} line-height: 1.5;">
                 {{ post.content }}
             </p>
@@ -79,7 +77,7 @@
             </div>
             <span class="small text-muted fw-bold" style="cursor:pointer;"
                   data-bs-toggle="modal" data-bs-target="#likersModal"
-                  hx-get="{% url 'post_likers_list' post.id %}"
+                  hx-get="{% url 'posts:post_likers_list' post.id %}"
                   hx-target="#modal-content-target">
                 <i class="bi bi-eye-fill me-1"></i>Likes
             </span>
@@ -87,63 +85,38 @@
                 <i class="bi bi-chat-dots me-1"></i>{{ post.comments.count }} Comments
             </span>
         </div>
-    </div> 
-
-    <!-- Comment Form -->
-    <div class="bg-white rounded-3 shadow-sm p-3 mb-3">
-        <form method="POST" action="{% url 'add_comment' post.id %}">
-            {% csrf_token %}
-            <div class="d-flex gap-2 align-items-start">
-                <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border flex-shrink-0" style="width: 36px; height: 36px; object-fit: cover;">
-                <div class="flex-grow-1">
-                    <textarea name="content" rows="2" class="form-control border-0 rounded-3"
-                              placeholder="Add comment..." style="resize: none; font-size: 14px; background-color: #e9ecef;"></textarea>
-                </div>
-                <button type="submit" class="btn btn-dark btn-sm rounded-pill px-3 fw-bold align-self-end">
-                    <i class="bi bi-send-fill"></i>
-                </button>
-            </div>
-        </form>
-    </div> 
+    </div>
 
 
     <!-- Comments Section -->
-    <div class="bg-white rounded-3 shadow-sm overflow-hidden mb-4" id="comments-section">
-        <div class="px-3 pt-3 pb-1 border-bottom">
-            <h6 class="fw-bold text-uppercase small text-muted mb-0">
-                <i class="bi bi-chat-square-text me-1"></i>Field Reports ({{ post.comments.count }})
-            </h6>
-        </div>
-
+    <div class="bg-white rounded-3 shadow-sm overflow-hidden mb-3" id="comments-section">
         {% for comment in visible_comments %}
         <div class="d-flex gap-2 p-3 {% if not forloop.last %}border-bottom{% endif %}" id="comment-{{ comment.id }}">
-            <a href="{% url 'profile' comment.author.username %}">
+            <a href="{% url 'users:profile' comment.author.username %}">
                 <img src="{{ comment.author.profile_pic.url }}" class="rounded-circle border flex-shrink-0" style="width: 34px; height: 34px; object-fit: cover;">
             </a>
             <div class="flex-grow-1">
-                <div class="bg-light rounded-3 px-3 py-2">
-                    <a href="{% url 'profile' comment.author.username %}" class="fw-bold small text-dark text-decoration-none">
+                <div class="d-flex align-items-center gap-2">
+                    <a href="{% url 'users:profile' comment.author.username %}" class="fw-bold small text-dark text-decoration-none">
                         {{ comment.author.get_full_name|default:comment.author.username }}
                     </a>
-                    <p class="mb-0 small" style="font-size: 14px; line-height: 1.5;">{{ comment.content }}</p>
-                </div>
-                <div class="d-flex align-items-center gap-3 mt-1 ms-2">
                     <small class="text-muted" style="font-size: 11px;">{{ comment.created_at|timesince }} ago</small>
-                    <button class="btn btn-sm border-0 p-0 {% if comment.id in liked_comment_ids %}text-danger{% else %}text-muted{% endif %}"
-                            hx-post="{% url 'toggle_comment_like' comment.id %}"
-                            hx-target="#comment-{{ comment.id }}"
-                            hx-swap="outerHTML"
-                            style="font-size: 12px;">
-                        <i class="bi {% if comment.id in liked_comment_ids %}bi-heart-fill{% else %}bi-heart{% endif %}"></i>
-                        <span class="ms-1">{{ comment.likes.count }}</span>
-                    </button>
                 </div>
+                <p class="mb-1 small" style="font-size: 14px; line-height: 1.5;">{{ comment.content }}</p>
+                <button class="btn btn-sm border-0 p-0 {% if comment.id in liked_comment_ids %}text-danger{% else %}text-muted{% endif %}"
+                        hx-post="{% url 'posts:toggle_comment_like' comment.id %}"
+                        hx-target="#comment-{{ comment.id }}"
+                        hx-swap="outerHTML"
+                        style="font-size: 12px;">
+                    <i class="bi {% if comment.id in liked_comment_ids %}bi-heart-fill{% else %}bi-heart{% endif %}"></i>
+                    <span class="ms-1">{{ comment.likes.count }}</span>
+                </button>
             </div>
         </div>
         {% empty %}
         <div class="text-center py-4 text-muted">
             <i class="bi bi-chat-dots fs-3"></i>
-            <p class="small mt-2 mb-0">No field reports yet. Be the first.</p>
+            <p class="small mt-2 mb-0">No comments yet. Be the first.</p>
         </div>
         {% endfor %}
 
@@ -156,4 +129,31 @@
         {% endif %}
     </div>
 </div>
+</div>
+</div>
+
+<!-- Sticky Comment Input at Bottom -->
+<div class="fixed-bottom bg-white border-top shadow" style="z-index: 1000;">
+    <div class="container py-3">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-8">
+                <form method="POST" action="{% url 'posts:add_comment' post.id %}" class="d-flex align-items-center gap-2">
+                    {% csrf_token %}
+                    <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border flex-shrink-0" style="width: 36px; height: 36px; object-fit: cover;">
+                    <div class="flex-grow-1 position-relative">
+                        <input type="text" name="content"
+                               class="form-control border-0 rounded-pill"
+                               placeholder="Add comment..."
+                               style="font-size: 14px; background-color: #e9ecef; padding-right: 40px;">
+                        <button type="submit" class="btn border-0 rounded-circle position-absolute"
+                                style="width: 32px; height: 32px; right: 4px; top: 50%; transform: translateY(-50%); padding: 0; display: flex; align-items: center; justify-content: center; background: transparent;">
+                            <i class="bi bi-send-fill" style="font-size: 13px; color: #0f172a;"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

@@ -455,11 +455,11 @@
           <button class="btn-base btn-primary-brand" data-bs-toggle="modal" data-bs-target="#inviteModal">
             <i class="bi bi-person-plus-fill me-1"></i> Invite Friends
           </button>
-          <a href="{% url 'toggle_membership' group.id %}" class="btn-base btn-ghost-danger">
+          <a href="{% url 'groups:toggle_membership' group.id %}" class="btn-base btn-ghost-danger">
             <i class="bi bi-box-arrow-left me-1"></i> Leave Group
           </a>
         {% else %}
-          <a href="{% url 'toggle_membership' group.id %}" class="btn-base btn-primary-brand">
+          <a href="{% url 'groups:toggle_membership' group.id %}" class="btn-base btn-primary-brand">
             <i class="bi bi-plus-circle-fill me-1"></i> Join Group
           </a>
         {% endif %}
@@ -539,7 +539,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <form action="{% url 'edit_group' group.id %}" method="POST" enctype="multipart/form-data">
+        <form action="{% url 'groups:edit_group' group.id %}" method="POST" enctype="multipart/form-data">
           {% csrf_token %}
           <div class="mb-3">
             <label class="field-label">Group Name</label>
@@ -609,7 +609,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <form action="{% url 'create_post' %}?group={{ group.id }}" method="POST" enctype="multipart/form-data">
+        <form action="{% url 'posts:create_post' %}?group={{ group.id }}" method="POST" enctype="multipart/form-data">
           {% csrf_token %}
           <input type="hidden" name="group" value="{{ group.id }}">
 
@@ -679,7 +679,7 @@
                 <img src="{{ user.profile_pic.url }}" class="member-avatar" alt="">
                 <div class="member-name">@{{ user.username }}</div>
               </div>
-              <a href="{% url 'invite_to_group' group.id user.id %}"
+              <a href="{% url 'groups:invite_to_group' group.id user.id %}"
                  class="btn-follow" style="text-decoration:none;">Invite</a>
             </div>
           {% empty %}

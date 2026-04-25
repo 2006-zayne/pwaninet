@@ -92,8 +92,8 @@
   }
   .search-input {
     width: 100%;
-    background: var(--search-bg);
-    border: 1.5px solid transparent;
+    background: #e9ecef;
+    border: 0;
     border-radius: var(--radius-pill);
     padding: 10px 42px 10px 40px;
     font-size: 14px;
@@ -102,14 +102,12 @@
     outline: none;
     transition:
       background var(--transition-smooth),
-      border-color var(--transition-smooth),
       box-shadow var(--transition-smooth);
     line-height: 1.4;
   }
   .search-input::placeholder { color: var(--text-muted); font-weight: 400; }
   .search-input:focus {
-    background: var(--search-bg-focus);
-    border-color: var(--brand-warm);
+    background: #fff;
     box-shadow: 0 0 0 3px rgba(255,107,53,0.12);
   }
   .search-input:focus ~ .search-icon,
@@ -197,7 +195,7 @@
     <div class="search-inner">
 
       <!-- Avatar 
-      <a href="{% url 'profile' request.user.username %}" class="avatar-link">
+      <a href="{% url 'users:profile' request.user.username %}" class="avatar-link">
         <img src="{{ request.user.profile_pic.url }}"
              class="avatar-img"
              alt="{{ request.user.username }}'s profile">
@@ -205,9 +203,9 @@
 
       <!-- Search Form -->
       <form method="GET"
-            action="{% url 'search' %}"
+            action="{% url 'posts:search' %}"
             class="search-form"
-            hx-get="{% url 'search' %}"
+            hx-get="{% url 'posts:search' %}"
             hx-target="#main-content-area"
             hx-trigger="submit"
             autocomplete="off">
@@ -217,7 +215,7 @@
                class="search-input"
                placeholder="Search friends &amp; groups…"
                value="{{ request.GET.q }}"
-               hx-get="{% url 'search' %}"
+               hx-get="{% url 'posts:search' %}"
                hx-target="#main-content-area"
                hx-trigger="keyup changed delay:500ms, search"
                hx-indicator="#search-indicator"

@@ -6,7 +6,7 @@
         <div class="col-md-8">
             <nav aria-label="breadcrumb" class="mb-2">
                 <ol class="breadcrumb small text-uppercase fw-bold">
-                    <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-decoration-none text-muted">Command Feed</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'posts:home' %}" class="text-decoration-none text-muted">Command Feed</a></li>
                     <li class="breadcrumb-item active text-primary" aria-current="page">{{ unit.code }}</li>
                 </ol>
             </nav>
@@ -17,7 +17,7 @@
             <p class="text-muted small mb-0"><i class="bi bi-funnel-fill me-1"></i> Filtering all incoming intel for this specific unit.</p>
         </div>
         <div class="col-md-4 text-md-end mt-3 mt-md-0">
-            <a href="{% url 'create_post' %}" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">
+            <a href="{% url 'posts:create_post' %}" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">
                 <i class="bi bi-plus-lg me-1"></i> New Unit Intel
             </a>
         </div>
@@ -36,7 +36,7 @@
                                  style="width: 45px; height: 45px; object-fit: cover;">
                             <div>
                                 <h6 class="mb-0 fw-bold">
-                                    <a href="{% url 'profile' username=post.author.username %}" class="text-dark text-decoration-none">
+                                    <a href="{% url 'users:profile' username=post.author.username %}" class="text-dark text-decoration-none">
                                         {{ post.author.get_full_name|default:post.author.username }}
                                     </a>
                                 </h6>
@@ -94,7 +94,7 @@
                     <p class="text-muted small mx-auto" style="max-width: 350px;">
                         Operative {{ request.user.username }}, this sector is currently silent. Be the first to deploy resources for {{ unit.code }}.
                     </p>
-                    <a href="{% url 'create_post' %}" class="btn btn-primary rounded-pill px-4 mt-2 fw-bold">Initialize Deployment</a>
+                    <a href="{% url 'posts:create_post' %}" class="btn btn-primary rounded-pill px-4 mt-2 fw-bold">Initialize Deployment</a>
                 </div>
             {% endfor %}
         </div>

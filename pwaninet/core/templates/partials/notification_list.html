@@ -1,0 +1,62 @@
+{% for n in notifications %}
+  <div class="notif-item {% if not n.is_read %}unread{% endif %}">
+    <img src="{{ n.sender.profile_pic.url }}" class="notif-avatar" alt="{{ n.sender.username }}">
+    
+    <div class="notif-content">
+      <div class="notif-header">
+        <div>
+          <h3 class="notif-user">
+            {{ n.sender.username }}
+            {% if n.notification_type == 'INVITE' %}
+              <span class="notif-badge badge-invite"><i class="bi bi-envelope-fill"></i> Invite</span>
+            {% elif n.notification_type == 'FOLLOW' %}
+              <span class="notif-badge badge-follow"><i class="bi bi-person-plus-fill"></i> Follow</span>
+            {% elif n.notification_type == 'LIKE' %}
+              <span class="notif-badge badge-like"><i class="bi bi-heart-fill"></i> Like</span>
+            {% else %}
+              <span class="notif-badge badge-alert"><i class="bi bi-bell-fill"></i> Alert</span>
+            {% endif %}
+          </h3>
+        </div>
+        <span class="notif-time">
+          <i class="bi bi-clock-history"></i> {{ n.timestamp|timesince }}
+        </span>
+      </div>
+      
+      <p class="notif-message">
+        {{ n.msg }}
+        {% if n.post %}
+          <a href="{% url 'posts:post_details' n.post.id %}">View post</a>
+        {% endif %}
+        {% if n.group %}
+          <a href="{% url 'groups:groups_detail' n.group.id %}">View group</a>
+        {% endif %}
+      </p>
+
+      {% if n.notification_type == 'INVITE' %}
+        <div class="notif-actions">
+          <a href="{% url 'groups:respond_to_invite' n.id 'accept' %}" class="btn-action btn-accept">
+            <i class="bi bi-check-lg"></i> Accept
+          </a>
+          <a href="{% url 'groups:respond_to_invite' n.id 'decline' %}" class="btn-action btn-decline">
+            <i class="bi bi-x-lg"></i> Decline
+          </a>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="notif-icon {% if n.notification_type == 'LIKE' %}icon-like{% elif n.notification_type == 'FOLLOW' %}icon-follow{% elif n.notification_type == 'INVITE' %}icon-invite{% else %}icon-alert{% endif %}">
+      {% if n.notification_type == 'LIKE' %}<i class="bi bi-heart-fill"></i>
+      {% elif n.notification_type == 'FOLLOW' %}<i class="bi bi-person-plus-fill"></i>
+      {% elif n.notification_type == 'INVITE' %}<i class="bi bi-envelope-fill"></i>
+      {% else %}<i class="bi bi-bell-fill"></i>
+      {% endif %}
+    </div>
+  </div>
+{% empty %}
+  <div class="empty-state">
+    <div class="empty-icon"><i class="bi bi-bell-slash"></i></div>
+    <div class="empty-title">No notifications</div>
+    <p class="empty-sub">You're all caught up!</p>
+  </div>
+{% endfor %}

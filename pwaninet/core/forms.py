@@ -1,6 +1,9 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
-from .models import User, Unit, Post, Year, Groups
+from users.models import User
+from posts.models import Post
+from courses.models import Unit, Year
+from groups.models import Groups
 
 
 class PwaniSignupForm(UserCreationForm):
@@ -13,7 +16,7 @@ class PwaniSignupForm(UserCreationForm):
         # which is directly injected into the HTML.
         widgets = {
             'course': forms.Select(attrs={
-                'hx-get': '/load-years/',      # The endpoint for filtering
+                'hx-get': '/courses/load-years/',      # The endpoint for filtering
                 'hx-target': '#id_year',       # Targets the 'year' field's HTML ID
                 'class': 'form-control'
             }),

@@ -10,7 +10,7 @@
         {% for operative in likers %}
         <div class="list-group-item border-0 px-0 d-flex align-items-center justify-content-between bg-transparent mb-2">
             <div class="d-flex align-items-center gap-3">
-                <a href="{% url 'profile' operative.username %}">
+                <a href="{% url 'users:profile' operative.username %}">
                     <img src="{{ operative.profile_pic.url }}" 
                          class="rounded-circle border border-2 border-light shadow-sm" 
                          style="width: 42px; height: 42px; object-fit: cover;">
@@ -22,7 +22,7 @@
                     <small class="text-muted" style="font-size: 0.75rem;">@{{ operative.username }}</small>
                 </div>
             </div>
-            <a href="{% url 'profile' operative.username %}" 
+            <a href="{% url 'users:profile' operative.username %}" 
                class="btn btn-outline-primary btn-sm rounded-pill px-3 py-1 fw-bold" 
                style="font-size: 0.65rem; border-width: 2px;">
                 VIEW PROFILE

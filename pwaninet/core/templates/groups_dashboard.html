@@ -435,7 +435,7 @@
       </div>
       <h1 class="page-title">Groups</h1>
     </div>
-    <a href="{% url 'create_group' %}" class="btn-create">
+    <a href="{% url 'groups:create_group' %}" class="btn-create">
       <i class="bi bi-plus-lg"></i> New Group
     </a>
   </div>
@@ -454,7 +454,7 @@
           </div>
           <div class="my-groups-scroll">
             {% for group in user_groups %}
-              <a href="{% url 'groups_detail' group.id %}" class="my-group-row">
+              <a href="{% url 'groups:groups_detail' group.id %}" class="my-group-row">
                 {% if group.group_pic %}
                   <img src="{{ group.group_pic.url }}" class="my-group-avatar" alt="{{ group.name }}">
                 {% else %}
@@ -500,7 +500,7 @@
 
       <div class="groups-grid">
         {% for group in all_groups %}
-          <a href="{% url 'groups_detail' group.id %}" class="group-card">
+          <a href="{% url 'groups:groups_detail' group.id %}" class="group-card">
             <div class="group-card-bar"></div>
             <div class="group-card-body">
               <div class="group-card-top">
@@ -534,7 +534,7 @@
             <div class="empty-icon"><i class="bi bi-people"></i></div>
             <div class="empty-title">No groups yet</div>
             <p class="empty-sub">Be the first to create a community.</p>
-            <a href="{% url 'create_group' %}" class="btn-create" style="display:inline-flex;">
+            <a href="{% url 'groups:create_group' %}" class="btn-create" style="display:inline-flex;">
               <i class="bi bi-plus-lg"></i> Create a Group
             </a>
           </div>

@@ -17,7 +17,7 @@
                         {% if not n.is_read %}
                             <button class="btn btn-sm btn-outline-success border-0 rounded-circle p-1"
                                     title="Mark as read"
-                                    hx-post="{% url 'mark_notification_as_read' n.id %}"
+                                    hx-post="{% url 'notifications:mark_notification_as_read' n.id %}"
                                     hx-target="#notification-{{ n.id }}"
                                     hx-swap="outerHTML">
                                 <i class="bi bi-check-lg"></i>
@@ -29,8 +29,8 @@
                 <p class="mb-0 text-secondary" style="font-size: 0.95rem;">
                     {{ n.msg }}
                     {% if n.post %}
-                        <a href="{% url 'post_details' n.post.id %}" class="text-primary text-decoration-none fw-bold">"{{ n.post.content|truncatechars:30 }}"</a>
-                        <a href="{% url 'groups_detail' group.id %}" class="text-primary text-decoration-none fw-bold">"{{ group.name }}"</a>
+                        <a href="{% url 'posts:post_details' n.post.id %}" class="text-primary text-decoration-none fw-bold">"{{ n.post.content|truncatechars:30 }}"</a>
+                        <a href="{% url 'groups:groups_detail' group.id %}" class="text-primary text-decoration-none fw-bold">"{{ group.name }}"</a>
                     {% endif %}
                 </p>
                 </div>

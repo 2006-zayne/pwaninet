@@ -34,10 +34,10 @@
                             </div>
                         {% else %}
                             <div class="d-grid gap-2 px-2">
-                                <a href="{% url 'update_profile' %}" class="btn btn-outline-secondary rounded-pill fw-bold btn-sm">
+                                <a href="{% url 'users:update_profile' %}" class="btn btn-outline-secondary rounded-pill fw-bold btn-sm">
                                     <i class="bi bi-gear-wide-connected me-1"></i> UPDATE PROFILE
                                 </a>
-                                <form action="{% url 'logout' %}" method="POST" class="m-0">
+                                <form action="{% url 'core:logout' %}" method="POST" class="m-0">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-outline-danger w-100 rounded-pill btn-sm fw-bold">
                                         <i class="bi bi-box-arrow-right me-2"></i>LOGOUT

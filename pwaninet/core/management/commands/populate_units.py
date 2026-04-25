@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from core.models import Course, Unit
+from courses.models import Course, Unit
 
 class Command(BaseCommand):
     help = 'Populates the database with Pwani University units'
