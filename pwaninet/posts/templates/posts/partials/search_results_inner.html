@@ -10,11 +10,11 @@
                     <small class="text-muted">@{{ user.username }}</small>
                 </div>
             </a>
-            <div id="follow-recruit-{{ user.id }}">
+            <div id="follow-search-{{ user.id }}">
                 {% if user.id in following_ids %}
-                    {% include 'partials/follow_button_recruit.html' with recruit=user is_following=True %}
+                    {% include 'users/partials/follow_button_search.html' with recruit=user is_following=True %}
                 {% else %}
-                    {% include 'partials/follow_button_recruit.html' with recruit=user is_following=False %}
+                    {% include 'users/partials/follow_button_search.html' with recruit=user is_following=False %}
                 {% endif %}
             </div>
         </div>

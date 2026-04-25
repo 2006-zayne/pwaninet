@@ -2,7 +2,10 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.shortcuts import get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.db.models import Q, Count
 
 from .models import Group, Membership, MembershipRole, MembershipStatus
 from .serializers import (
@@ -13,6 +16,11 @@ from .permissions import (
     CanManageGroup, CanManageMembership, CanJoinOfficialGroup,
     IsApprovedMember, IsGroupAdmin
 )
+from posts.models import Post, Like
+from users.models import User
+from notifications.models import Notifications
+from groups.forms import GroupForm
+from notifications.services.notification_service import create_notification, invalidate_unread_count_cache, get_cached_unread_count
 
 
 class GroupViewSet(viewsets.ModelViewSet):
@@ -261,3 +269,155 @@ class GroupViewSet(viewsets.ModelViewSet):
             {'detail': 'You have left the group.'},
             status=status.HTTP_200_OK
         )
+
+
+# ============================================================================
+# DJANGO WEB VIEWS
+# ============================================================================
+
+@login_required
+def groups_dashboard(request):
+    user_groups = Group.objects.filter(memberships__user=request.user, memberships__status=MembershipStatus.APPROVED)
+    pending_groups = Group.objects.filter(memberships__user=request.user, memberships__status=MembershipStatus.PENDING)
+    all_groups = Group.objects.all().annotate(member_count=Count('memberships', filter=Q(memberships__status=MembershipStatus.APPROVED))).order_by('-member_count')
+    user_group_ids = set(user_groups.values_list('id', flat=True))
+    pending_group_ids = set(pending_groups.values_list('id', flat=True))
+    return render(request, 'groups/groups_dashboard.html', {
+        'user_groups': user_groups,
+        'all_groups': all_groups,
+        'user_group_ids': user_group_ids,
+        'pending_group_ids': pending_group_ids,
+        'unread_notifications_count': get_cached_unread_count(request.user),
+    })
+
+
+@login_required
+def groups_detail_view(request, group_id):
+    from groups.services.group_service import build_group_detail_context
+    group = get_object_or_404(Group.objects.annotate(member_count=Count('memberships', filter=Q(memberships__status=MembershipStatus.APPROVED))), id=group_id)
+    query = request.GET.get('search_user', '')
+    context = build_group_detail_context(request.user, group, query)
+    liked_post_ids = set(Like.objects.filter(user=request.user, post__in=context['posts']).values_list('post_id', flat=True))
+    context['liked_post_ids'] = liked_post_ids
+    context['unread_notifications_count'] = get_cached_unread_count(request.user)
+    return render(request, 'groups/groups_detail.html', context)
+
+
+@login_required
+def create_group_view(request):
+    if request.method == 'POST':
+        form = GroupForm(request.POST, request.FILES)
+        if form.is_valid():
+            group = form.save(commit=False)
+            group.created_by = request.user
+            group.save()
+            Membership.objects.create(group=group, user=request.user, role=MembershipRole.ADMIN, status=MembershipStatus.APPROVED)
+            messages.success(request, f'Squad "{group.name}" created successfully.')
+            return redirect('groups:groups_detail', group_id=group.id)
+    else:
+        form = GroupForm()
+    return render(request, 'groups/create_group.html', {'form': form})
+
+
+@login_required
+def toggle_group_membership(request, group_id):
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check official group restrictions
+    if group.is_official and group.course and group.year:
+        if request.user.course != group.course or request.user.year != group.year:
+            messages.error(request, 'You can only join official groups that match your course and year.')
+            return redirect('groups:groups_detail', group_id=group_id)
+    
+    # Check if already has membership
+    existing_membership = Membership.objects.filter(group=group, user=request.user).first()
+    
+    if existing_membership:
+        existing_membership.delete()
+        messages.success(request, f'You left {group.name}.')
+    else:
+        # For official groups, membership needs approval (pending status)
+        # For community groups, auto-approve
+        status = MembershipStatus.PENDING if group.is_official else MembershipStatus.APPROVED
+        membership = Membership.objects.create(group=group, user=request.user, status=status)
+        if status == MembershipStatus.APPROVED:
+            messages.success(request, f'You joined {group.name}!')
+            # Send welcome notification
+            create_notification(
+                recipient=request.user,
+                sender=request.user,
+                notification_type=Notifications.GROUP_APPROVED,
+                msg=f'Welcome to {group.name}! You can now contribute to the group.',
+                group=group
+            )
+            invalidate_unread_count_cache(request.user.id)
+        else:
+            messages.info(request, f'Your request to join {group.name} is pending approval.')
+            # Send request confirmation notification - use group creator as sender
+            sender_user = group.created_by if group.created_by else request.user
+            create_notification(
+                recipient=request.user,
+                sender=sender_user,
+                notification_type=Notifications.GROUP_REQUEST,
+                msg=f'Your request to join {group.name} has been sent. You will be notified when it is accepted.',
+                group=group
+            )
+            invalidate_unread_count_cache(request.user.id)
+    
+    return redirect('groups:groups_detail', group_id=group_id)
+
+
+@login_required
+def edit_group(request, group_id):
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check if user is admin (creator or has admin membership)
+    is_admin = (group.created_by == request.user) or Membership.objects.filter(
+        group=group, 
+        user=request.user, 
+        role=MembershipRole.ADMIN, 
+        status=MembershipStatus.APPROVED
+    ).exists()
+    
+    if not is_admin:
+        messages.error(request, 'Only admins can edit this group.')
+        return redirect('groups:groups_detail', group_id=group_id)
+    
+    if request.method == 'POST':
+        form = GroupForm(request.POST, request.FILES, instance=group)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Squad updated.')
+            return redirect('groups:groups_detail', group_id=group_id)
+    else:
+        form = GroupForm(instance=group)
+    return render(request, 'groups/create_group.html', {'form': form, 'group': group})
+
+
+@login_required
+def invite_to_group(request, group_id, user_id):
+    group = get_object_or_404(Group, id=group_id)
+    target = get_object_or_404(User, id=user_id)
+    if not Membership.objects.filter(group=group, user=target).exists():
+        create_notification(
+            recipient=target,
+            sender=request.user,
+            notification_type=Notifications.INVITE,
+            msg=f'invited you to join {group.name}.',
+            group=group
+        )
+        messages.success(request, f'Invite sent to {target.username}.')
+    return redirect('groups:groups_detail', group_id=group_id)
+
+
+@login_required
+def respond_to_invite(request, notif_id, action):
+    notif = get_object_or_404(Notifications, id=notif_id, recipient=request.user)
+    if notif.group:
+        if action == 'accept':
+            Membership.objects.create(group=notif.group, user=request.user, status=MembershipStatus.APPROVED)
+            messages.success(request, f'You joined {notif.group.name}!')
+        else:
+            messages.info(request, 'Invite declined.')
+    notif.delete()
+    return redirect('notifications:notifications')

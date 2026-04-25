@@ -1,0 +1,15 @@
+{% if is_following %}
+    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold"
+            hx-post="{% url 'users:toggle_follow' recruit.username %}?source=search"
+            hx-target="#follow-search-{{ recruit.id }}"
+            hx-swap="outerHTML">
+        Following
+    </button>
+{% else %}
+    <button class="btn btn-sm btn-primary rounded-pill px-3 fw-bold"
+            hx-post="{% url 'users:toggle_follow' recruit.username %}?source=search"
+            hx-target="#follow-search-{{ recruit.id }}"
+            hx-swap="outerHTML">
+        Follow
+    </button>
+{% endif %}

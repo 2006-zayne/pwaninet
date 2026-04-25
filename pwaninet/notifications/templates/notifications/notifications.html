@@ -1,10 +1,6 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-
 <style>
   /* ── Design Tokens (matches groups style) ── */
   :root {
@@ -36,7 +32,7 @@
     --ease:           cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  *, *::before, *::after { font-family: 'Nunito', sans-serif; box-sizing: border-box; }
+  *, *::before, *::after { font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif; box-sizing: border-box; }
   body { background: var(--page-bg); }
 
   /* ── Page wrapper ── */
@@ -313,7 +309,7 @@
   <!-- ── Notifications Card ── -->
   <div class="card" id="notification-list">
     <div class="card-body" style="padding: 0;">
-      {% include 'partials/notification_list.html' %}
+      {% include 'notifications/partials/notification_list.html' %}
     </div>
   </div>
   

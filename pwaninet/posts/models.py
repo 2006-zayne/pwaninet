@@ -27,7 +27,7 @@ class Post(models.Model):
     video = models.FileField(upload_to='posts/videos', blank=True, null=True)
     docs = models.FileField(upload_to='posts/docs', blank=True, null=True)
     gradient_class = models.CharField(max_length=50, choices=GRADIENT_CHOICES, default='none', blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):

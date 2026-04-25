@@ -1,10 +1,6 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-
 <style>
   /* ── Design Tokens ── */
   :root {
@@ -32,7 +28,7 @@
     --ease:           cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  *, *::before, *::after { font-family: 'Nunito', sans-serif; box-sizing: border-box; }
+  *, *::before, *::after { font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif; box-sizing: border-box; }
   body { background: var(--page-bg); }
 
   /* ── Layout ── */
@@ -349,7 +345,7 @@
     border: none !important;
     border-radius: var(--radius-lg) !important;
     box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
     background: var(--card-bg) !important;
   }
   .modal-header {
@@ -377,7 +373,7 @@
     color: var(--text-primary);
     outline: none; background: var(--card-bg);
     transition: border-color 0.18s, box-shadow 0.18s;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
   }
   .form-field:focus {
     border-color: var(--brand);
@@ -397,7 +393,7 @@
     border: none; border-radius: var(--radius-pill);
     font-size: 0.8rem; font-weight: 800;
     cursor: pointer; transition: all 0.18s var(--ease);
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
   }
   .btn-modal-submit:hover {
     background: var(--brand);
@@ -549,7 +545,7 @@
     <!-- Posts -->
     <div class="posts-feed">
       {% for post in posts %}
-        {% include 'partials/post_card.html' with post=post %}
+        {% include 'posts/partials/post_card.html' with post=post %}
       {% empty %}
         <div class="card">
           <div class="empty-state">

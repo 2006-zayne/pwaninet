@@ -28,10 +28,13 @@
                         <small class="text-muted">@{{ user.username }} · {{ user.course|default:"" }}</small>
                     </div>
                 </a>
-                <a href="{% url 'users:toggle_follow' user.username %}"
-                   class="btn btn-sm rounded-pill px-3 fw-bold {% if user.id in following_ids %}btn-outline-secondary{% else %}btn-primary{% endif %}">
-                    {% if user.id in following_ids %}Following{% else %}Follow{% endif %}
-                </a>
+                <div id="follow-search-{{ user.id }}">
+                    {% if user.id in following_ids %}
+                        {% include 'users/partials/follow_button_search.html' with recruit=user is_following=True %}
+                    {% else %}
+                        {% include 'users/partials/follow_button_search.html' with recruit=user is_following=False %}
+                    {% endif %}
+                </div>
             </div>
             {% empty %}
             <div class="text-center py-4 text-muted">

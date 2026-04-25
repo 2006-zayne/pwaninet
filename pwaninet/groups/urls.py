@@ -3,7 +3,7 @@ Web URLs for groups app.
 Contains only Django web view routes - no API routes.
 """
 from django.urls import path
-from core import views
+from . import views
 
 urlpatterns = [
     path('dashboard/', views.groups_dashboard, name='groups_dashboard'),

@@ -30,7 +30,7 @@
 
                         {% if request.user != profile_user %}
                             <div id="follow-btn-container">
-                                {% include 'partials/follow_button_profile.html' %}
+                                {% include 'users/partials/follow_button_profile.html' %}
                             </div>
                         {% else %}
                             <div class="d-grid gap-2 px-2">
@@ -85,7 +85,7 @@
             
             <div class="intel-stream">
                 {% for post in posts %}
-                    {% include 'partials/post_card.html' %}
+                    {% include 'posts/partials/post_card.html' %}
                 {% empty %}
                     <div class="text-center py-5 bg-white rounded-4 shadow-sm border-0">
                         <i class="bi bi-incognito text-muted display-4"></i>

@@ -1,0 +1,64 @@
+from django import forms
+from posts.models import Post
+from courses.models import Unit
+
+
+class PostForm(forms.ModelForm):
+    # Unit field definition as a dropdown
+    unit = forms.ModelChoiceField(
+        queryset=Unit.objects.all(),
+        required=False,
+        empty_label="Global Feed.",
+        # Standard Issue Styling
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+   # group = Group.objects.all()
+    # save image and video and docs as optional fields
+    image = forms.ImageField(
+        required=False,
+        widget=forms.ClearableFileInput(
+            attrs={
+                'class': 'form-control-file'}))
+    video = forms.FileField(
+        required=False,
+        widget=forms.ClearableFileInput(
+            attrs={
+                'class': 'form-control-file'}))
+    docs = forms.FileField(
+        required=False,
+        widget=forms.ClearableFileInput(
+            attrs={
+                'class': 'form-control-file'}))
+
+    class Meta:
+        model = Post
+        fields = [
+            'unit',
+            'group',
+            'content',
+            'image',
+            'video',
+            'docs',
+            'gradient_class']
+
+        widgets = {
+            'content': forms.Textarea(attrs={
+                'rows': 5,
+                'cols': 40,
+                'placeholder': 'What is on your mind?',
+                'class': 'form-control'
+            }),
+            'gradient_class': forms.Select(attrs={'class': 'form-select'}),
+            # 'group' : forms.Select(attrs={'class' : 'form-select'}),
+        }
+
+    # Filter units based on the user's Course and Year
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)  # Extract the user from the view
+        super().__init__(*args, **kwargs)
+        if user:
+            # Restrict units to the user's specific deployment sector
+            self.fields['unit'].queryset = Unit.objects.filter(
+                course=user.course,
+                year=user.year
+            )

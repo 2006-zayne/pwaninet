@@ -29,7 +29,7 @@
             </h6>
             <small class="text-muted d-flex align-items-center" style="font-size: 11px;">
                 <span class="badge bg-light text-primary border-0 me-1">{{ post.unit.code|default:"GLOBAL" }}</span>
-                <i class="bi bi-dot"></i> {{ post.date|timesince }} ago
+                <i class="bi bi-dot"></i> {{ post.created_at|timesince }} ago
             </small>
         </div>
     </div>
@@ -74,7 +74,7 @@
 
     <div class="d-flex align-items-center gap-4 px-3 py-2 border-top">
         <div id="like-section-{{ post.id }}">
-            {% include "partials/like_button.html" with post=post %}
+            {% include "posts/partials/like_button.html" with post=post %}
         </div>
         <a href="{% url 'posts:post_details' post.id %}" class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none">
             <i class="bi bi-chat-dots fs-5"></i>
