@@ -1,7 +1,10 @@
 # signals.py
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import User, Groups ,Notifications , Like , Follow
+from users.models import User, Follow
+from posts.models import Like
+from groups.models import Group, Membership, MembershipRole, MembershipStatus
+from notifications.models import Notifications
 
 @receiver(post_save, sender=User)
 def auto_join_course_group(sender, instance, created, **kwargs):
@@ -18,16 +21,26 @@ def auto_join_course_group(sender, instance, created, **kwargs):
         
         # Logic: Search for the group. If it doesn't exist, create it.
         # 'get_or_create' returns a tuple: (object, created_bool)
-        group, created_group = Groups.objects.get_or_create(
+        group, created_group = Group.objects.get_or_create(
             name=target_group_name,
             defaults={
                 'description': f"Official academic hub for {target_group_name} operatives.",
-                'is_official': True # Mark as system-generated, not user-made
+                'is_official': True,
+                'course': instance.course,
+                'year': instance.year
             }
         )
         
-        # Deploy the user into the group roster
-        group.members.add(instance)
+        # Create membership instead of using direct M2M
+        # Use PENDING status for official groups to require admin approval
+        Membership.objects.get_or_create(
+            user=instance,
+            group=group,
+            defaults={
+                'role': MembershipRole.MEMBER,
+                'status': MembershipStatus.PENDING
+            }
+        )
 
 
 @receiver(post_save, sender=Like)

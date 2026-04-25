@@ -1,0 +1,249 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+  /* ── Design Tokens (matches groups_dashboard.html & groups_detail.html) ── */
+  :root {
+    --brand:          #1a1410;
+    --brand-light:    #f0eee9;
+    --brand-mid:      #dedad3;
+    --brand-glow:     rgba(26,20,16,0.10);
+    --page-bg:        #f5f2ef;
+    --card-bg:        #ffffff;
+    --border:         #ede8e3;
+    --border-hover:   #d6cfc8;
+    --text-primary:   #1a1410;
+    --text-secondary: #7a736c;
+    --text-muted:     #a89f98;
+    --radius-sm:      8px;
+    --radius-md:      14px;
+    --radius-lg:      20px;
+    --radius-pill:    999px;
+    --shadow-card:    0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
+    --shadow-hover:   0 4px 12px rgba(0,0,0,0.08), 0 16px 40px rgba(0,0,0,0.06);
+    --ease:           cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  *, *::before, *::after { font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif; box-sizing: border-box; }
+  body { background: var(--page-bg); }
+
+  /* ── Page wrapper ── */
+  .page-wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 5rem;
+  }
+
+  /* ── Page Header ── */
+  .page-header {
+    margin-bottom: 2rem;
+  }
+  .page-eyebrow {
+    font-size: 0.62rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .page-title {
+    font-size: 1.75rem;
+    font-weight: 900;
+    color: var(--text-primary);
+    letter-spacing: -1.2px;
+    line-height: 1.1;
+    margin: 0;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+  }
+  .card-body { padding: 1.75rem; }
+
+  /* ── Form Controls ── */
+  .field-label {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    display: block;
+    margin-bottom: 8px;
+  }
+  .form-field {
+    width: 100%;
+    padding: 0.75rem 1.1rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-pill);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    outline: none;
+    background: var(--card-bg);
+    transition: border-color 0.18s, box-shadow 0.18s;
+    font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+  }
+  .form-field:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-glow);
+  }
+  textarea.form-field {
+    border-radius: var(--radius-md);
+    resize: none;
+    line-height: 1.6;
+  }
+  .form-field::placeholder {
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  /* File input styling */
+  .file-upload-wrap {
+    padding: 1.25rem;
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius-md);
+    background: var(--brand-light);
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.18s var(--ease);
+  }
+  .file-upload-wrap:hover {
+    border-color: var(--border-hover);
+    background: var(--brand-mid);
+  }
+  .file-upload-icon {
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .file-upload-text {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  /* ── Buttons ── */
+  .btn-base {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.85rem;
+    font-weight: 800;
+    text-align: center;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.18s var(--ease);
+    letter-spacing: 0.02em;
+    width: 100%;
+  }
+
+  .btn-primary-brand {
+    background: var(--brand);
+    color: #fff;
+  }
+  .btn-primary-brand:hover {
+    background: #3a3330;
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px var(--brand-glow);
+  }
+
+  .btn-secondary-brand {
+    background: var(--brand-light);
+    color: var(--brand);
+    border: 1.5px solid var(--brand-mid);
+  }
+  .btn-secondary-brand:hover {
+    background: var(--brand-mid);
+    color: #1a1410;
+    transform: translateY(-2px);
+  }
+
+  /* ── Error messages ── */
+  .field-error {
+    font-size: 0.72rem;
+    color: var(--danger);
+    font-weight: 600;
+    margin-top: 6px;
+  }
+
+  /* ── Page load animation ── */
+  .page-wrap > * {
+    animation: page-rise 0.4s var(--ease) both;
+  }
+  @keyframes page-rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+
+<div class="page-wrap">
+
+  <!-- ── Page Header ── -->
+  <div class="page-header">
+    <div class="page-eyebrow">
+      <i class="bi bi-plus-circle-fill"></i> New Group
+    </div>
+    <h1 class="page-title">Create a Group</h1>
+  </div>
+
+  <!-- ── Form Card ── -->
+  <div class="card">
+    <div class="card-body">
+      <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div class="mb-4">
+          <label class="field-label">Group Name</label>
+          <input type="text" name="name" class="form-field" placeholder="Enter group name…" required>
+          {% if form.name.errors %}
+            <div class="field-error">{{ form.name.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="mb-4">
+          <label class="field-label">Description</label>
+          <textarea name="description" class="form-field" rows="4" placeholder="What's this group about?"></textarea>
+        </div>
+
+        <div class="mb-5">
+          <label class="field-label">Group Photo</label>
+          <div class="file-upload-wrap">
+            <input type="file" name="group_pic" id="groupPic" accept="image/*" style="display: none;">
+            <label for="groupPic" style="cursor: pointer; display: block;">
+              <div class="file-upload-icon">
+                <i class="bi bi-image"></i>
+              </div>
+              <div class="file-upload-text">Click to upload group photo</div>
+            </label>
+          </div>
+        </div>
+
+        <div class="d-grid gap-3">
+          <button type="submit" class="btn-base btn-primary-brand">
+            <i class="bi bi-check-circle-fill"></i> Create Group
+          </button>
+          <a href="{% url 'groups:groups_dashboard' %}" class="btn-base btn-secondary-brand">
+            <i class="bi bi-x-circle"></i> Cancel
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,8 @@
+<button class="btn {% if is_liked or post.id in liked_post_ids %}text-danger{% else %}text-muted{% endif %} btn-sm border-0 d-flex align-items-center"
+        hx-post="{% url 'posts:toggle_like' post.id %}"
+        hx-target="this"
+        hx-swap="outerHTML">
+    
+    <i class="bi {% if is_liked or post.id in liked_post_ids %}bi-heart-fill{% else %}bi-heart{% endif %} fs-5"></i>
+    <span class="ms-2 fw-bold">{{ like_count|default:post.like_count }}</span>
+</button>

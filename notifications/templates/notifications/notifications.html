@@ -1,0 +1,342 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+  /* ── Design Tokens (matches groups style) ── */
+  :root {
+    --brand:          #1a1410;
+    --brand-light:    #f0eee9;
+    --brand-mid:      #dedad3;
+    --brand-glow:     rgba(26,20,16,0.10);
+    --page-bg:        #f5f2ef;
+    --card-bg:        #ffffff;
+    --border:         #ede8e3;
+    --border-hover:   #d6cfc8;
+    --text-primary:   #1a1410;
+    --text-secondary: #7a736c;
+    --text-muted:     #a89f98;
+    --success:        #16a34a;
+    --success-light:  #f0fdf4;
+    --danger:         #dc2626;
+    --danger-light:   #fff1f1;
+    --primary:        #2563eb;
+    --primary-light:  #eff6ff;
+    --info:           #0891b2;
+    --info-light:     #ecfeff;
+    --radius-sm:      8px;
+    --radius-md:      14px;
+    --radius-lg:      20px;
+    --radius-pill:    999px;
+    --shadow-card:    0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
+    --shadow-hover:   0 4px 12px rgba(0,0,0,0.08), 0 16px 40px rgba(0,0,0,0.06);
+    --ease:           cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  *, *::before, *::after { font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif; box-sizing: border-box; }
+  body { background: var(--page-bg); }
+
+  /* ── Page wrapper ── */
+  .page-wrap {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 5rem;
+  }
+
+  /* ── Page Header ── */
+  .page-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+    flex-wrap: wrap;
+  }
+  .page-eyebrow {
+    font-size: 0.62rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .eyebrow-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    display: inline-block;
+  }
+  .page-title {
+    font-size: 2rem;
+    font-weight: 900;
+    color: var(--text-primary);
+    letter-spacing: -1.5px;
+    line-height: 1;
+    margin: 0;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+  }
+  .card-body { padding: 1.5rem; }
+
+  /* ── Notification Item ── */
+  .notif-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.18s var(--ease);
+    position: relative;
+  }
+  .notif-item:last-child { border-bottom: none; }
+  .notif-item:hover { background: var(--brand-light); }
+  .notif-item.unread {
+    background: var(--primary-light);
+    border-left: 4px solid var(--primary);
+  }
+  .notif-item.unread:hover { background: #e0e7ff; }
+
+  .notif-avatar {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 2px solid var(--border);
+  }
+
+  .notif-content { flex: 1; min-width: 0; }
+  .notif-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.4rem;
+    gap: 0.75rem;
+  }
+  .notif-user {
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  .notif-time {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .notif-message {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0 0 0.5rem;
+  }
+  .notif-message a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 700;
+  }
+  .notif-message a:hover { text-decoration: underline; }
+
+  /* Notification type badges */
+  .notif-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.58rem;
+    font-weight: 800;
+    border-radius: var(--radius-pill);
+    padding: 3px 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-left: 8px;
+  }
+  .badge-invite {
+    background: var(--primary);
+    color: #fff;
+  }
+  .badge-follow {
+    background: var(--info);
+    color: #fff;
+  }
+  .badge-like {
+    background: var(--danger);
+    color: #fff;
+  }
+  .badge-alert {
+    background: var(--brand);
+    color: #fff;
+  }
+
+  /* Action buttons for invites */
+  .notif-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+  .btn-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0.4rem 1rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.18s var(--ease);
+    border: none;
+  }
+  .btn-accept {
+    background: var(--success);
+    color: #fff;
+  }
+  .btn-accept:hover {
+    background: #15803d;
+    transform: translateY(-1px);
+  }
+  .btn-decline {
+    background: transparent;
+    color: var(--danger);
+    border: 1.5px solid #fecaca;
+  }
+  .btn-decline:hover {
+    background: var(--danger-light);
+    border-color: #f87171;
+  }
+
+  /* Notification icon */
+  .notif-icon {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+    opacity: 0.6;
+  }
+  .icon-like { color: var(--danger); }
+  .icon-follow { color: var(--info); }
+  .icon-invite { color: var(--primary); }
+  .icon-alert { color: var(--brand); }
+
+  /* ── Empty State ── */
+  .empty-state {
+    padding: 4rem 2rem;
+    text-align: center;
+  }
+  .empty-icon {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    background: var(--brand-light);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; color: var(--brand);
+    margin: 0 auto 1.25rem;
+  }
+  .empty-title {
+    font-size: 1rem; font-weight: 800;
+    color: var(--text-primary); margin-bottom: 6px;
+  }
+  .empty-sub {
+    font-size: 0.82rem; color: var(--text-muted);
+  }
+
+  /* ── Clear All Button ── */
+  .btn-clear {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.65rem 1.4rem;
+    background: var(--brand-light);
+    color: var(--brand);
+    border: 1.5px solid var(--brand-mid);
+    border-radius: var(--radius-pill);
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.18s var(--ease);
+    letter-spacing: 0.02em;
+  }
+  .btn-clear:hover {
+    background: var(--brand-mid);
+    color: #1a1410;
+    transform: translateY(-1px);
+  }
+
+  /* Page load animation */
+  .page-header, .card {
+    animation: page-rise 0.35s var(--ease) both;
+  }
+  .card { animation-delay: 0.06s; }
+  @keyframes page-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+
+<div class="page-wrap">
+
+  <!-- ── Page Header ── -->
+  <div class="page-header">
+    <div>
+      <div class="page-eyebrow">
+        <span class="eyebrow-dot"></span>
+        Activity Feed
+      </div>
+      <h1 class="page-title">Notifications</h1>
+    </div>
+    {% if notifications %}
+      <span id="unread-count-badge" style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); background: var(--border); padding: 6px 14px; border-radius: var(--radius-pill); text-transform: uppercase; letter-spacing: 0.06em;">
+        {{ unread_notifications_count }} unread
+      </span>
+    {% endif %}
+  </div>
+
+  <!-- ── Notifications Card ── -->
+  <div class="card" id="notification-list">
+    <div class="card-body" style="padding: 0;">
+      {% include 'notifications/partials/notification_list.html' %}
+    </div>
+  </div>
+  
+  {% if notifications %}
+    <div style="text-align: center; margin-top: 1.5rem;">
+      <button class="btn-clear"
+              hx-post="{% url 'notifications:mark_all_as_read' %}"
+              hx-target="#notification-list .card-body"
+              hx-swap="innerHTML">
+        <i class="bi bi-check2-all"></i> Mark all as read
+      </button>
+    </div>
+  {% endif %}
+
+</div>
+
+<script>
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+  if (evt.detail.triggerSpec?.trigger === 'updateUnreadCount') {
+    fetch('/unread-notification-count/')
+      .then(r => r.text())
+      .then(html => {
+        const badge = document.getElementById('unread-count-badge');
+        if (badge) badge.outerHTML = html;
+      });
+  }
+});
+</script>
+
+{% endblock %}

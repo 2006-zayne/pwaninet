@@ -1,0 +1,604 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+  /* ── Design Tokens (matches other pages) ── */
+  :root {
+    --brand:          #1a1410;
+    --brand-light:    #f0eee9;
+    --brand-mid:      #dedad3;
+    --brand-glow:     rgba(26,20,16,0.10);
+    --page-bg:        #f5f2ef;
+    --card-bg:        #ffffff;
+    --border:         #ede8e3;
+    --border-hover:   #d6cfc8;
+    --text-primary:   #1a1410;
+    --text-secondary: #7a736c;
+    --text-muted:     #a89f98;
+    --radius-sm:      8px;
+    --radius-md:      14px;
+    --radius-lg:      20px;
+    --radius-pill:    999px;
+    --shadow-card:    0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
+    --shadow-hover:   0 4px 12px rgba(0,0,0,0.08), 0 16px 40px rgba(0,0,0,0.06);
+    --ease:           cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  *, *::before, *::after { font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif; box-sizing: border-box; }
+  body { background: var(--page-bg); }
+
+  /* ── Page wrapper ── */
+  .page-wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 5rem;
+  }
+
+  /* ── Page Header ── */
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+  }
+  .page-eyebrow {
+    font-size: 0.62rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .page-title {
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: var(--text-primary);
+    letter-spacing: -1px;
+    line-height: 1.1;
+    margin: 0;
+  }
+  .btn-cancel {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.18s var(--ease);
+  }
+  .btn-cancel:hover { color: var(--text-primary); }
+
+  /* ── Card ── */
+  .card {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+  }
+  .card-body { padding: 1.5rem; }
+
+  /* ── Compose Body ── */
+  .compose-body {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .compose-avatar {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border);
+  }
+
+  .compose-right {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .compose-author {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+  }
+
+  .compose-textarea {
+    width: 100%;
+    border: none !important;
+    outline: none !important;
+    resize: none;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    line-height: 1.6;
+    min-height: 100px;
+    font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+  }
+
+  .compose-textarea::placeholder {
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  /* ── Preview gradient box ── */
+  .compose-preview {
+    margin-top: 0.75rem;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    display: none;
+    width: 100%;
+  }
+
+  .compose-preview.active {
+    display: block;
+  }
+
+  .gradient-intel-bg {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+
+  .gradient-intel-bg p {
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    line-height: 1.5;
+    text-align: center;
+    margin: 0;
+    word-wrap: break-word;
+    max-width: 90%;
+  }
+
+  .grad-ocean    { background: linear-gradient(135deg, #0f172a 0%, #3b82f6 100%) !important; }
+  .grad-forest   { background: linear-gradient(135deg, #064e3b 0%, #10b981 100%) !important; }
+  .grad-magma    { background: linear-gradient(135deg, #450a0a 0%, #ef4444 100%) !important; }
+  .grad-midnight { background: linear-gradient(135deg, #1e1b4b 0%, #8b5cf6 100%) !important; }
+  .grad-desert   { background: linear-gradient(135deg, #78350f 0%, #f59e0b 100%) !important; }
+  .grad-stealth  { background: linear-gradient(135deg, #020617 0%, #475569 100%) !important; }
+
+  /* ── Toolbar strip ── */
+  .compose-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .toolbar-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.05rem;
+    transition: background 0.15s var(--ease), color 0.15s var(--ease);
+    position: relative;
+  }
+
+  .toolbar-btn:hover {
+    background: var(--brand-light);
+    color: var(--brand);
+  }
+
+  .toolbar-btn.active {
+    background: var(--brand-light);
+    color: var(--brand);
+  }
+
+  /* ── Expandable panels ── */
+  .compose-panel {
+    display: none;
+    margin-top: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: var(--brand-light);
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border);
+  }
+
+  .compose-panel.open {
+    display: block;
+  }
+
+  .panel-label {
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+  }
+
+  /* ── Sector select ── */
+  .sector-select {
+    width: 100%;
+    border: 1.5px solid var(--border) !important;
+    border-radius: var(--radius-pill) !important;
+    background: var(--card-bg) !important;
+    font-size: 0.85rem;
+    padding: 0.6rem 1rem !important;
+    color: var(--text-primary);
+    font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+    font-weight: 500;
+  }
+
+  .sector-select:focus {
+    border-color: var(--brand) !important;
+    box-shadow: 0 0 0 3px var(--brand-glow) !important;
+    outline: none;
+  }
+
+  .sector-hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 0.5rem;
+  }
+
+  /* ── Style swatches ── */
+  .style-grid {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .style-swatch {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-sm);
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s var(--ease), border-color 0.15s var(--ease);
+    position: relative;
+  }
+
+  .style-swatch:hover { transform: scale(1.1); }
+
+  .style-swatch.selected {
+    border-color: var(--brand);
+    transform: scale(1.1);
+  }
+
+  .style-swatch.swatch-none {
+    background: var(--brand-light);
+    border-color: var(--border) !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+  }
+
+  .style-swatch.swatch-none.selected {
+    border-color: var(--brand) !important;
+    color: var(--brand);
+  }
+
+  /* ── Media rows ── */
+  .media-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0;
+  }
+
+  .media-row + .media-row {
+    border-top: 1px solid var(--border);
+  }
+
+  .media-row label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 90px;
+    flex-shrink: 0;
+    cursor: pointer;
+    margin: 0;
+    transition: color 0.18s var(--ease);
+  }
+
+  .media-row label:hover {
+    color: var(--brand);
+  }
+
+  .media-row label i {
+    font-size: 1rem;
+    color: var(--text-muted);
+    transition: color 0.18s var(--ease);
+  }
+
+  .media-row label:hover i {
+    color: var(--brand);
+  }
+
+  .media-row input[type="file"] {
+    flex: 1;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+    font-weight: 500;
+  }
+
+  /* ── Deploy button ── */
+  .btn-deploy {
+    background: var(--brand);
+    color: white;
+    border: none;
+    border-radius: var(--radius-pill);
+    padding: 0.6rem 1.5rem;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: all 0.18s var(--ease);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-deploy:hover {
+    background: #3a3330;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px var(--brand-glow);
+  }
+
+  .btn-deploy:disabled {
+    background: var(--border);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* ── Char counter ── */
+  #charCount {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    transition: color 0.2s;
+  }
+
+  #charCount.warn { color: #f59e0b; }
+  #charCount.danger { color: #ef4444; }
+
+  /* ── Hidden gradient input ── */
+  #id_gradient_class { display: none; }
+
+  /* ── Page load animation ── */
+  .page-wrap > * {
+    animation: page-rise 0.4s var(--ease) both;
+  }
+  @keyframes page-rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+
+<div class="page-wrap">
+
+  <!-- ── Page Header ── -->
+  <div class="page-header">
+    <div>
+      <div class="page-eyebrow">
+        <i class="bi bi-plus-circle-fill"></i> New Post
+      </div>
+      <h1 class="page-title">Create a Post</h1>
+    </div>
+    <a href="{% url 'posts:home' %}" class="btn-cancel">Discard</a>
+  </div>
+
+  <!-- ── Compose Card ── -->
+  <div class="card">
+    <div class="card-body">
+      <form method="POST" enctype="multipart/form-data" id="postForm">
+        {% csrf_token %}
+
+        {{ form.gradient_class }}
+
+        <div class="compose-body">
+          <img src="{{ request.user.profile_pic.url }}" class="compose-avatar" alt="You">
+          <div class="compose-right">
+
+            <div class="compose-author">
+              {{ request.user.get_full_name|default:request.user.username }}
+            </div>
+
+            <textarea
+              name="content"
+              id="id_content"
+              class="compose-textarea form-control"
+              placeholder="What's on your mind?"
+              required
+              maxlength="1000"
+              rows="4">{{ form.content.value|default:'' }}</textarea>
+
+            <!-- Sector panel -->
+            <div class="compose-panel" id="sectorPanel">
+              <div class="panel-label">Target Group</div>
+              <select name="unit" class="sector-select form-select" id="id_unit">
+                {% for value, label in form.unit.field.choices %}
+                  <option value="{{ value }}" {% if form.unit.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <div class="sector-hint">Leave as "General" to broadcast to the full feed.</div>
+            </div>
+
+            <!-- Style panel -->
+            <div class="compose-panel" id="stylePanel">
+              <div class="panel-label">Background Style</div>
+              <div class="style-grid">
+                <div class="style-swatch swatch-none selected" data-value="none" title="Standard">NONE</div>
+                <div class="style-swatch grad-ocean" data-value="grad-ocean" title="Ocean Blue"></div>
+                <div class="style-swatch grad-forest" data-value="grad-forest" title="Forest Green"></div>
+                <div class="style-swatch grad-magma" data-value="grad-magma" title="Magma Red"></div>
+                <div class="style-swatch grad-midnight" data-value="grad-midnight" title="Midnight Purple"></div>
+                <div class="style-swatch grad-desert" data-value="grad-desert" title="Desert Storm"></div>
+                <div class="style-swatch grad-stealth" data-value="grad-stealth" title="Stealth"></div>
+              </div>
+            </div>
+
+            <!-- Media panel -->
+            <div class="compose-panel" id="mediaPanel">
+              <div class="panel-label">Attach Files</div>
+              <div class="media-row">
+                <label for="{{ form.image.id_for_label }}">
+                  <i class="bi bi-image"></i> Image
+                </label>
+                {{ form.image }}
+              </div>
+              <div class="media-row">
+                <label for="{{ form.video.id_for_label }}">
+                  <i class="bi bi-play-btn"></i> Video
+                </label>
+                {{ form.video }}
+              </div>
+              <div class="media-row">
+                <label for="{{ form.docs.id_for_label }}">
+                  <i class="bi bi-file-earmark-pdf"></i> PDF
+                </label>
+                {{ form.docs }}
+              </div>
+            </div>
+
+            <!-- Toolbar -->
+            <div class="compose-toolbar">
+              <div class="toolbar-left">
+                <button type="button" class="toolbar-btn" id="toggleSector" title="Target Group">
+                  <i class="bi bi-geo-alt-fill"></i>
+                </button>
+                <button type="button" class="toolbar-btn" id="toggleStyle" title="Background Style">
+                  <i class="bi bi-palette-fill"></i>
+                </button>
+                <button type="button" class="toolbar-btn" id="toggleMedia" title="Attach File">
+                  <i class="bi bi-paperclip"></i>
+                </button>
+              </div>
+
+              <div class="d-flex align-items-center gap-3">
+                <span id="charCount">0 / 1000</span>
+                <button type="submit" class="btn-deploy" id="deployBtn" disabled>
+                  <i class="bi bi-send-fill"></i> Post
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Live gradient preview (full width) -->
+        <div class="compose-preview" id="previewBox">
+          <div id="previewTarget" class="gradient-intel-bg rounded-3">
+            <p id="previewContent"></p>
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const textarea    = document.getElementById('id_content');
+    const gradInput   = document.getElementById('id_gradient_class');
+    const previewBox  = document.getElementById('previewBox');
+    const previewTgt  = document.getElementById('previewTarget');
+    const previewTxt  = document.getElementById('previewContent');
+    const deployBtn   = document.getElementById('deployBtn');
+    const charCount   = document.getElementById('charCount');
+
+    const panels = {
+        sector: document.getElementById('sectorPanel'),
+        style:  document.getElementById('stylePanel'),
+        media:  document.getElementById('mediaPanel'),
+    };
+
+    const btns = {
+        sector: document.getElementById('toggleSector'),
+        style:  document.getElementById('toggleStyle'),
+        media:  document.getElementById('toggleMedia'),
+    };
+
+    function togglePanel(name) {
+        Object.keys(panels).forEach(k => {
+            const isTarget = k === name;
+            const alreadyOpen = panels[k].classList.contains('open');
+            panels[k].classList.toggle('open', isTarget && !alreadyOpen);
+            btns[k].classList.toggle('active', isTarget && !alreadyOpen);
+        });
+    }
+
+    btns.sector.addEventListener('click', () => togglePanel('sector'));
+    btns.style.addEventListener('click',  () => togglePanel('style'));
+    btns.media.addEventListener('click',  () => togglePanel('media'));
+
+    // Style swatches
+    let selectedStyle = 'none';
+    document.querySelectorAll('.style-swatch').forEach(swatch => {
+        swatch.addEventListener('click', function () {
+            document.querySelectorAll('.style-swatch').forEach(s => s.classList.remove('selected'));
+            this.classList.add('selected');
+            selectedStyle = this.dataset.value;
+            gradInput.value = selectedStyle;
+            updatePreview();
+        });
+    });
+
+    // Textarea
+    textarea.addEventListener('input', updatePreview);
+
+    function updatePreview() {
+        const text = textarea.value;
+        const len  = text.length;
+        charCount.textContent = len + ' / 1000';
+        charCount.className   = len > 900 ? 'danger' : len > 750 ? 'warn' : '';
+        deployBtn.disabled    = text.trim() === '';
+
+        if (selectedStyle !== 'none' && text.trim() !== '') {
+            previewTgt.className = 'gradient-intel-bg rounded-3 ' + selectedStyle;
+            previewTxt.textContent = text;
+            previewBox.classList.add('active');
+        } else {
+            previewBox.classList.remove('active');
+        }
+    }
+
+    // Auto-grow textarea
+    textarea.addEventListener('input', function () {
+        this.style.height = 'auto';
+        this.style.height = this.scrollHeight + 'px';
+    });
+});
+</script>
+{% endblock %}

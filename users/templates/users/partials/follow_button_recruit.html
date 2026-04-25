@@ -1,0 +1,7 @@
+<button class="btn btn-primary btn-sm rounded-pill w-100 fw-bold" 
+        style="font-size: 0.65rem;"
+        hx-post="{% url 'users:toggle_follow' recruit.username %}?source=recruit"
+        hx-target="closest .suggestion-card"
+        hx-swap="delete">
+    Follow
+</button>

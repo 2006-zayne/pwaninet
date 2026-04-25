@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-3">
+    <div class="bg-white rounded-3 shadow-sm p-3 mb-4">
+        <form method="GET" action="{% url 'posts:search' %}" class="d-flex align-items-center gap-2">
+            <div class="input-group">
+                <span class="input-group-text border-0 rounded-start-pill ps-3" style="background-color: #e9ecef;">
+                    <i class="bi bi-search text-muted"></i>
+                </span>
+                <input type="text" name="q" class="form-control border-0 rounded-end-pill"
+                       placeholder="Search friends & groups..."
+                       value="{{ query }}" autofocus style="background-color: #e9ecef;">
+            </div>
+        </form>
+    </div>
+
+    {% if query %}
+        <!-- Users Results -->
+        <h6 class="fw-bold text-uppercase text-muted small mb-3"><i class="bi bi-people me-1"></i>People</h6>
+        <div class="bg-white rounded-3 shadow-sm mb-4 overflow-hidden">
+            {% for user in users %}
+            <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
+                <a href="{% url 'users:profile' user.username %}" class="d-flex align-items-center gap-3 text-decoration-none text-dark">
+                    <img src="{{ user.profile_pic.url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover;">
+                    <div>
+                        <div class="fw-bold small">{{ user.get_full_name|default:user.username }}</div>
+                        <small class="text-muted">@{{ user.username }} · {{ user.course|default:"" }}</small>
+                    </div>
+                </a>
+                <div id="follow-search-{{ user.id }}">
+                    {% if user.id in following_ids %}
+                        {% include 'users/partials/follow_button_search.html' with recruit=user is_following=True %}
+                    {% else %}
+                        {% include 'users/partials/follow_button_search.html' with recruit=user is_following=False %}
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center py-4 text-muted">
+                <i class="bi bi-person-x fs-3"></i>
+                <p class="small mt-2 mb-0">No people found for "{{ query }}"</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Groups Results -->
+        <h6 class="fw-bold text-uppercase text-muted small mb-3"><i class="bi bi-shield me-1"></i>Groups</h6>
+        <div class="bg-white rounded-3 shadow-sm mb-4 overflow-hidden">
+            {% for group in groups %}
+            <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
+                <a href="{% url 'groups:groups_detail' group.id %}" class="d-flex align-items-center gap-3 text-decoration-none text-dark">
+                    <img src="{{ group.get_photo_url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover;">
+                    <div>
+                        <div class="fw-bold small">{{ group.name }}</div>
+                        <small class="text-muted">{{ group.members.count }} members</small>
+                    </div>
+                </a>
+                <a href="{% url 'groups:groups_detail' group.id %}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">View</a>
+            </div>
+            {% empty %}
+            <div class="text-center py-4 text-muted">
+                <i class="bi bi-shield-x fs-3"></i>
+                <p class="small mt-2 mb-0">No groups found for "{{ query }}"</p>
+            </div>
+            {% endfor %}
+        </div>
+
+    {% else %}
+    <div class="text-center py-5 text-muted">
+        <i class="bi bi-search fs-1"></i>
+        <p class="mt-3">Search for friends or groups above</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

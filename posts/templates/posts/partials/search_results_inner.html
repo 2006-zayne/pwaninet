@@ -1,0 +1,43 @@
+{% if query %}
+    <h6 class="fw-bold text-uppercase text-muted small mb-3 px-2">People</h6>
+    <div class="bg-white rounded-4 shadow-sm mb-4 overflow-hidden">
+        {% for user in users %}
+        <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
+            <a href="{% url 'users:profile' user.username %}" class="d-flex align-items-center gap-3 text-decoration-none text-dark">
+                <img src="{{ user.profile_pic.url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover;">
+                <div>
+                    <div class="fw-bold small">{{ user.get_full_name|default:user.username }}</div>
+                    <small class="text-muted">@{{ user.username }}</small>
+                </div>
+            </a>
+            <div id="follow-search-{{ user.id }}">
+                {% if user.id in following_ids %}
+                    {% include 'users/partials/follow_button_search.html' with recruit=user is_following=True %}
+                {% else %}
+                    {% include 'users/partials/follow_button_search.html' with recruit=user is_following=False %}
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+            <p class="p-4 text-center text-muted small">No people found.</p>
+        {% endfor %}
+    </div>
+
+    <h6 class="fw-bold text-uppercase text-muted small mb-3 px-2">Groups</h6>
+    <div class="bg-white rounded-4 shadow-sm mb-4 overflow-hidden">
+        {% for group in groups %}
+        <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
+            <a href="{% url 'groups:groups_detail' group.id %}" class="d-flex align-items-center gap-3 text-decoration-none text-dark">
+                <img src="{{ group.get_photo_url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover;">
+                <div class="fw-bold small">{{ group.name }}</div>
+            </a>
+            <a href="{% url 'groups:groups_detail' group.id %}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">View</a>
+        </div>
+        {% empty %}
+            <p class="p-4 text-center text-muted small">No groups found.</p>
+        {% endfor %}
+    </div>
+{% else %}
+    <!-- Automatically restore home feed if q is empty -->
+    <div hx-get="{% url 'posts:home' %}" hx-trigger="load" hx-target="#main-content-area"></div>
+{% endif %}

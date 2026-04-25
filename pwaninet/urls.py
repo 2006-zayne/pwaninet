@@ -23,7 +23,14 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # This maps 'accounts/login/' and 'accounts/logout/' automatically
     path('accounts/', include('django.contrib.auth.urls')),
-    path('', include('core.urls')),
+    # Domain app URLs
+    path('', include(('posts.urls', 'posts'), namespace='posts')),
+    path('users/', include(('users.urls', 'users'), namespace='users')),
+    path('groups/', include(('groups.urls', 'groups'), namespace='groups')),
+    path('notifications/', include(('notifications.urls', 'notifications'), namespace='notifications')),
+    path('courses/', include('courses.urls')),
+    # Core URLs (register, logout)
+    path('core/', include(('core.urls', 'core'), namespace='core')),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
