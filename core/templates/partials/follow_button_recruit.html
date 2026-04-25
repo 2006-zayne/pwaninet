@@ -1,0 +1,7 @@
+<button class="btn {% if is_following %}btn-dark{% else %}btn-primary{% endif %} btn-sm rounded-pill w-100 fw-bold" 
+        style="font-size: 0.65rem;"
+        hx-post="{% url 'toggle_follow' recruit.username %}"
+        hx-target="#follow-recruit-{{ recruit.id }}"
+        hx-swap="innerHTML">
+    {% if is_following %} Following {% else %} Follow {% endif %}
+</button>

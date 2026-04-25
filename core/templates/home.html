@@ -1,102 +1,257 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container-fluid p-0">
-    <div class="bg-white">
-        <div class="container py-3 px-3">
-            <form method="GET" action="{% url 'search' %}" class="d-flex align-items-center gap-2">
-                <a href="{% url 'profile' request.user.username %}" class="flex-shrink-0">
-                    <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover;">
-                </a>
-                <div class="input-group flex-grow-1">
-                    <span class="input-group-text bg-light border-0 rounded-start-pill ps-3">
-                        <i class="bi bi-search text-muted"></i>
-                    </span>
-                    <input type="text" name="q" class="form-control bg-light border-0 rounded-end-pill pe-4"
-                           placeholder="Search friends & groups..."
-                           style="font-size: 14px;"
-                           value="{{ request.GET.q }}">
-                </div>
-            </form>
-        </div>
-        <hr class="m-0 opacity-25" style="border-top: 1px solid #dee2e6;">
-    </div>
-
-    <div class="row justify-content-center g-0">
-        <div class="col-12 py-3 px-2 mb-5">
-            
-            <!-- Groups Suggestions -->
-            <div id="squad-container" class="post-card p-3 mb-3 border-0 shadow-sm bg-white rounded-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="fw-bold text-muted small text-uppercase mb-0"><i class="bi bi-shield-shaded me-2 text-primary"></i>Groups to Explore:</h6>
-                    <a href="{% url 'groups_dashboard' %}" class="text-primary small text-decoration-none fw-bold">View All</a>
-                </div>
-                
-                {% if suggested_groups %}
-                    <div class="d-flex gap-3 overflow-auto pb-2 no-scrollbar" style="scrollbar-width: none;">
-                        {% for group in suggested_groups %}
-                        <a href="{% url 'groups_detail' group.id %}" class="text-center text-decoration-none text-dark p-2 rounded-3 suggestion-card" style="min-width: 90px;">
-                            <div class="position-relative d-inline-block">
-                                <img src="{{ group.get_photo_url }}" class="rounded-circle avatar-ring" style="width: 60px; height: 60px; object-fit: cover;">
-                                {% if group.is_official %}
-                                    <span class="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 18px; height: 18px; font-size: 10px;">
-                                        <i class="bi bi-check-lg"></i>
-                                    </span>
-                                {% endif %}
-                            </div>
-                            <p class="small mt-1 mb-0 text-truncate" style="max-width: 75px;">{{ group.name }}</p>
-                        </a>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="text-center py-2">
-                        <p class="small text-muted mb-0">No Groups Suggestions at the moment.</p>
-                    </div>
-                {% endif %}
-            </div>
-
-            <!-- Friend Suggestions -->
-            <div id="friend-suggestions-container" class="post-card p-3 mb-4 border-0 shadow-sm bg-white rounded-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="fw-bold text-muted small text-uppercase mb-0"><i class="bi bi-person-plus-fill me-2 text-primary"></i>Operatives to Recruit:</h6>
-                </div>
-                
-                <div class="d-flex gap-3 overflow-auto pb-2 no-scrollbar" style="scrollbar-width: none;">
-                    {% for recruit in suggested_friends %}
-                        <div class="text-center p-2 rounded-3 suggestion-card" style="min-width: 100px;">
-                            <a href="{% url 'profile' recruit.username %}" class="text-decoration-none text-dark">
-                                <img src="{{ recruit.profile_pic.url }}" class="rounded-circle border border-2 shadow-sm mb-2" style="width: 55px; height: 55px; object-fit: cover;">
-                                <p class="small fw-bold mb-0 text-truncate" style="max-width: 90px;">{{ recruit.username }}</p>
-                                <small class="text-muted x-small d-block mb-2">{{ recruit.course.name|truncatechars:10|default:"Student" }}</small>
-                            </a>
-                            <button class="btn btn-primary btn-sm rounded-pill w-100 fw-bold" style="font-size: 0.65rem;"
-                                    hx-post="{% url 'toggle_follow' recruit.username %}"
-                                    hx-swap="none">
-                                RECRUIT
-                            </button>
-                        </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <div class="feed-sector">
-                {% for post in posts %}
-                    {% include 'partials/post_card.html' %}
-                {% empty %}
-                    <div class="text-center py-5">
-                        <i class="bi bi-broadcast text-muted fs-1"></i>
-                        <p class="text-muted mt-2">No posts yet,Be the first one to post.</p>
-                        <a href="{% url 'create_post' %}" class="btn btn-primary rounded-pill px-4">Create a post</a>
-                    </div>
-                {% endfor %}
-            </div>
-
-        </div>
-    </div>
-</div>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
-    .hover-border-primary:hover { border-color: var(--bs-primary) !important; background-color: #f8f9fa !important; }
-    .no-scrollbar::-webkit-scrollbar { display: none; }
+  :root {
+    --brand-warm: #FF6B35;
+    --brand-warm-light: #fff4f0;
+    --brand-warm-mid: #ffe5da;
+    --search-bg: #f3f0ec;
+    --search-bg-focus: #fff;
+    --header-blur-bg: rgba(255, 255, 255, 0.88);
+    --text-main: #1a1613;
+    --text-muted: #7a736c;
+    --border-soft: #e8e2dc;
+    --avatar-ring: #FF6B35;
+    --radius-pill: 999px;
+    --radius-lg: 16px;
+    --transition-smooth: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  * { font-family: 'Nunito', sans-serif; }
+
+  body { background-color: #f5f2ef; }
+
+  /* ── Sticky Search Header ── */
+  .search-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--header-blur-bg);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border-soft);
+    padding: 12px 16px 10px;
+  }
+
+  .search-inner {
+    max-width: 640px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* ── Avatar ── */
+  .avatar-link {
+    flex-shrink: 0;
+    display: block;
+    position: relative;
+    transition: transform var(--transition-smooth);
+  }
+  .avatar-link:hover { transform: scale(1.06); }
+  .avatar-link::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    border: 2px solid var(--avatar-ring);
+    opacity: 0;
+    transition: opacity var(--transition-smooth);
+  }
+  .avatar-link:hover::after { opacity: 1; }
+  .avatar-img {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  }
+
+  /* ── Search Form ── */
+  .search-form {
+    flex: 1;
+    position: relative;
+  }
+  .search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 15px;
+    pointer-events: none;
+    transition: color var(--transition-smooth);
+    z-index: 2;
+  }
+  .search-input {
+    width: 100%;
+    background: var(--search-bg);
+    border: 1.5px solid transparent;
+    border-radius: var(--radius-pill);
+    padding: 10px 42px 10px 40px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-main);
+    outline: none;
+    transition:
+      background var(--transition-smooth),
+      border-color var(--transition-smooth),
+      box-shadow var(--transition-smooth);
+    line-height: 1.4;
+  }
+  .search-input::placeholder { color: var(--text-muted); font-weight: 400; }
+  .search-input:focus {
+    background: var(--search-bg-focus);
+    border-color: var(--brand-warm);
+    box-shadow: 0 0 0 3px rgba(255,107,53,0.12);
+  }
+  .search-input:focus ~ .search-icon,
+  .search-form:focus-within .search-icon { color: var(--brand-warm); }
+
+  /* clear button shows when input has value */
+  .search-clear {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--text-muted);
+    border: none;
+    color: #fff;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    font-size: 11px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    z-index: 2;
+    transition: background var(--transition-smooth);
+  }
+  .search-clear:hover { background: var(--text-main); }
+  .search-input:not(:placeholder-shown) ~ .search-clear { display: flex; }
+
+  /* ── Loading Indicator ── */
+  #search-indicator {
+    display: none;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0 2px;
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  #search-indicator.htmx-request { display: flex; }
+  .search-dots {
+    display: flex;
+    gap: 4px;
+  }
+  .search-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--brand-warm);
+    animation: bounce-dot 0.9s infinite ease-in-out;
+  }
+  .search-dots span:nth-child(2) { animation-delay: 0.15s; }
+  .search-dots span:nth-child(3) { animation-delay: 0.30s; }
+  @keyframes bounce-dot {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+    40% { transform: translateY(-5px); opacity: 1; }
+  }
+
+  /* ── Main Content Area ── */
+  .content-wrapper {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 20px 16px 80px;
+  }
+
+  #main-content-area {
+    animation: fade-in 0.3s ease;
+  }
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* htmx swap animation */
+  #main-content-area.htmx-swapping { opacity: 0; transition: opacity 0.15s ease; }
+  #main-content-area.htmx-settling { animation: fade-in 0.3s ease; }
 </style>
+
+<div class="container-fluid p-0">
+
+  <!-- Sticky Search Header -->
+  <header class="search-header">
+    <div class="search-inner">
+
+      <!-- Avatar 
+      <a href="{% url 'profile' request.user.username %}" class="avatar-link">
+        <img src="{{ request.user.profile_pic.url }}"
+             class="avatar-img"
+             alt="{{ request.user.username }}'s profile">
+      </a>-->
+
+      <!-- Search Form -->
+      <form method="GET"
+            action="{% url 'search' %}"
+            class="search-form"
+            hx-get="{% url 'search' %}"
+            hx-target="#main-content-area"
+            hx-trigger="submit"
+            autocomplete="off">
+        <i class="bi bi-search search-icon"></i>
+        <input type="text"
+               name="q"
+               class="search-input"
+               placeholder="Search friends &amp; groups…"
+               value="{{ request.GET.q }}"
+               hx-get="{% url 'search' %}"
+               hx-target="#main-content-area"
+               hx-trigger="keyup changed delay:500ms, search"
+               hx-indicator="#search-indicator"
+               aria-label="Search friends and groups">
+        <button type="button"
+                class="search-clear"
+                onclick="this.previousElementSibling.value=''; this.previousElementSibling.dispatchEvent(new Event('search'));"
+                aria-label="Clear search">
+          <i class="bi bi-x"></i>
+        </button>
+      </form>
+
+    </div>
+
+    <!-- Loading indicator (inside header, below search) -->
+    <div class="content-wrapper" style="padding-top:0; padding-bottom:0;">
+      <div id="search-indicator" class="htmx-indicator">
+        <div class="search-dots">
+          <span></span><span></span><span></span>
+        </div>
+        Searching…
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="content-wrapper">
+      <div id="main-content-area"
+           hx-swap-oob="true">
+        {% include 'partials/home_content.html' %}
+      </div>
+    </div>
+  </main>
+
+</div>
 {% endblock %}

@@ -1,0 +1,9 @@
+<button hx-post="{% url 'toggle_follow' profile_user.username %}"
+        hx-target="#follow-btn-container"
+        hx-swap="innerHTML"
+        class="btn {% if is_following %}btn-outline-dark{% else %}btn-primary{% endif %} w-100 rounded-pill fw-bold mb-2">
+    {% if is_following %} Unfollow {% else %} Follow {% endif %}
+</button>
+
+<!-- Update the follower count elsewhere on the page instantly -->
+<h6 id="follower-count" class="fw-bold mb-0" hx-swap-oob="true">{{ follower_count }}</h6>
