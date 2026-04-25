@@ -304,7 +304,7 @@
       <h1 class="page-title">Notifications</h1>
     </div>
     {% if notifications %}
-      <span style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); background: var(--border); padding: 6px 14px; border-radius: var(--radius-pill); text-transform: uppercase; letter-spacing: 0.06em;">
+      <span id="unread-count-badge" style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); background: var(--border); padding: 6px 14px; border-radius: var(--radius-pill); text-transform: uppercase; letter-spacing: 0.06em;">
         {{ unread_notifications_count }} unread
       </span>
     {% endif %}
@@ -329,5 +329,18 @@
   {% endif %}
 
 </div>
+
+<script>
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+  if (evt.detail.triggerSpec?.trigger === 'updateUnreadCount') {
+    fetch('/unread-notification-count/')
+      .then(r => r.text())
+      .then(html => {
+        const badge = document.getElementById('unread-count-badge');
+        if (badge) badge.outerHTML = html;
+      });
+  }
+});
+</script>
 
 {% endblock %}

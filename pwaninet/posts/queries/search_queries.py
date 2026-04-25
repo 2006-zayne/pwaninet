@@ -1,6 +1,6 @@
 from django.db.models import Q
 from users.models import Follow, User
-from groups.models import Groups
+from groups.models import Group
 
 def search_users(query, current_user, limit=20):
     if not query:
@@ -15,8 +15,8 @@ def search_users(query, current_user, limit=20):
 
 def search_groups(query, limit=20):
     if not query:
-        return Groups.objects.none()
-    return Groups.objects.filter(
+        return Group.objects.none()
+    return Group.objects.filter(
         Q(name__icontains=query) |
         Q(description__icontains=query)
     )[:limit]
@@ -27,4 +27,4 @@ def get_following_ids(user):
 
 
 def get_user_groups(user):
-    return user.group_memberships.all()
+    return Group.objects.filter(memberships__user=user)

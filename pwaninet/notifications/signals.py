@@ -2,7 +2,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from posts.models import Like, Comment, CommentLike
 from users.models import Follow
-from groups.models import Groups
+from groups.models import Group
 from notifications.services.notification_service import create_notification
 from notifications.models import Notifications
 

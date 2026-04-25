@@ -3,7 +3,7 @@
 # Models are now located in:
 # - users.models: User, Follow
 # - posts.models: Post, Like, Comment, CommentLike
-# - groups.models: Groups
+# - groups.models: Group, Membership
 # - notifications.models: Notifications
 # - courses.models: Course, Year, Unit
 

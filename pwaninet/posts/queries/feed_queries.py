@@ -2,7 +2,7 @@ from datetime import timedelta
 from django.db.models import Case, Count, IntegerField, Q, Value, When
 from django.utils import timezone
 from users.models import Follow, User
-from groups.models import Groups
+from groups.models import Group, Membership, MembershipStatus
 from posts.models import Like, Post
 
 def get_following_ids(user):
@@ -10,7 +10,7 @@ def get_following_ids(user):
 
 
 def get_user_group_ids(user):
-    return list(user.group_memberships.values_list('id', flat = True))
+    return list(Membership.objects.filter(user=user, status=MembershipStatus.APPROVED).values_list('group_id', flat=True))
 
 
 def get_prioritized_feed_queryset(user, following_ids, user_group_ids):
@@ -27,12 +27,12 @@ def get_prioritized_feed_queryset(user, following_ids, user_group_ids):
             output_field=IntegerField()
         ), 
         recency_score=Case(
-            When(date__gte=timezone.now() - timedelta(days=7), then=Value(20)), 
-            When(date__gte=timezone.now() - timedelta(days=30), then=Value(10)), 
+            When(created_at__gte=timezone.now() - timedelta(days=7), then=Value(20)), 
+            When(created_at__gte=timezone.now() - timedelta(days=30), then=Value(10)), 
             default=Value(0), 
             output_field=IntegerField()
         )
-    ).distinct().order_by('-priority_tier', '-engagement_count', '-recency_score', '-date', '-id')
+    ).distinct().order_by('-priority_tier', '-engagement_count', '-recency_score', '-created_at', '-id')
 
 
 def get_prioritized_feed_posts(user, following_ids, user_group_ids, limit = 15):
@@ -44,10 +44,10 @@ def get_liked_post_ids_for_user(user, post_ids):
 
 
 def get_suggested_groups(user, following_ids, limit = 5):
-    return Groups.objects.filter(members__id__in = following_ids).exclude(members = user).annotate(member_count = Count('members')).order_by('-member_count').distinct()[:limit]
+    return Group.objects.filter(memberships__user_id__in=following_ids, memberships__status=MembershipStatus.APPROVED).exclude(memberships__user=user).annotate(member_count=Count('memberships')).order_by('-member_count').distinct()[:limit]
 
 
 def get_user_suggestions_from_groups(user, limit = 5):
     already_following = Follow.objects.filter(follower = user).values_list('followed_id', flat = True)
-    my_groups = user.group_memberships.all()
-    return User.objects.filter(group_memberships__in = my_groups).exclude(Q(id__in = already_following) | Q(id = user.id)).distinct()[:limit]
+    my_groups = Membership.objects.filter(user=user, status=MembershipStatus.APPROVED)
+    return User.objects.filter(group_memberships__group__in=my_groups.values('group_id')).exclude(Q(id__in=already_following) | Q(id=user.id)).distinct()[:limit]

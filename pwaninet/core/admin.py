@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin
 from users.models import User
 from posts.models import Post
 from courses.models import Course, Year, Unit
-from groups.models import Groups
+from groups.models import Group
 from notifications.models import Notifications
 
 # Add the course and year fields to the Admin panel.
@@ -27,4 +27,4 @@ admin.site.register(Year)
 admin.site.register(Post)
 admin.site.register(Unit)
 admin.site.register(Notifications)
-admin.site.register(Groups)
+admin.site.register(Group)

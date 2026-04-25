@@ -1,6 +1,6 @@
 import random
 from django.core.cache import cache
-from core.queries.feed_queries import (
+from posts.queries.feed_queries import (
     get_following_ids, get_liked_post_ids_for_user,
     get_prioritized_feed_queryset, get_suggested_groups,
     get_user_group_ids, get_user_suggestions_from_groups

@@ -1,7 +1,7 @@
 # Source Generated with Decompyle++
 # File: group_service.cpython-312.pyc (Python 3.12)
 
-from core.queries.group_queries import get_all_non_member_groups, get_following_ids, get_group_posts, get_suggested_groups_from_following, get_user_groups, is_group_member, search_invite_candidates
+from groups.queries.group_queries import get_all_non_member_groups, get_following_ids, get_group_posts, get_suggested_groups_from_following, get_user_groups, is_group_member, search_invite_candidates
 
 def build_groups_dashboard_context(user):
     return {

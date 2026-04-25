@@ -3,7 +3,7 @@ from django.contrib.auth.forms import UserCreationForm
 from users.models import User
 from posts.models import Post
 from courses.models import Unit, Year
-from groups.models import Groups
+from groups.models import Group
 
 
 class PwaniSignupForm(UserCreationForm):
@@ -52,7 +52,7 @@ class PostForm(forms.ModelForm):
         # Standard Issue Styling
         widget=forms.Select(attrs={'class': 'form-control'})
     )
-   # group = Groups.objects.all()
+   # group = Group.objects.all()
     # save image and video and docs as optional fields
     image = forms.ImageField(
         required=False,
@@ -128,7 +128,7 @@ class ProfileUpdateForm(forms.ModelForm):
 
 class GroupForm(forms.ModelForm):
     class Meta:
-        model = Groups
+        model = Group
         # We only want users to fill in these specific fields
         fields = ['name', 'description', 'group_pic']
 

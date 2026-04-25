@@ -510,7 +510,7 @@
                   <span class="badge-community">Community</span>
                 {% endif %}
                 <span class="member-count">
-                  <i class="bi bi-people"></i> {{ group.members.count }}
+                  <i class="bi bi-people"></i> {{ group.member_count }}
                 </span>
               </div>
               <h3 class="group-card-name">{{ group.name }}</h3>
@@ -521,9 +521,13 @@
                 <span class="btn-view">
                   View group <i class="bi bi-arrow-right"></i>
                 </span>
-                {% if request.user in group.members.all %}
+                {% if group.id in user_group_ids %}
                   <span style="font-size:0.65rem; font-weight:700; color:var(--success); display:flex; align-items:center; gap:4px;">
                     <i class="bi bi-check-circle-fill"></i> Joined
+                  </span>
+                {% elif group.id in pending_group_ids %}
+                  <span style="font-size:0.65rem; font-weight:700; color:var(--text-muted); display:flex; align-items:center; gap:4px;">
+                    <i class="bi bi-clock-fill"></i> Pending
                   </span>
                 {% endif %}
               </div>

@@ -1,8 +1,8 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
-from users.models import User, Follow
+from users.models import User, Follow, GlobalRole
 from posts.models import Post, Like, Comment, CommentLike, GRADIENT_CHOICES
-from groups.models import Groups
+from groups.models import Group, MembershipRole, MembershipStatus, Membership
 from courses.models import Course, Unit, Year
 from faker import Faker
 import random
@@ -11,7 +11,7 @@ fake = Faker()
 
 
 class Command(BaseCommand):
-    help = "Sync group memberships between Groups.members and User.groups_in"
+    help = "Seed social data for the application"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -37,15 +37,17 @@ class Command(BaseCommand):
             self.create_posts()
             self.create_comments()
             self.create_likes()
+            self.create_comment_likes()
             self.create_follows()
 
             self.stdout.write(self.style.SUCCESS("🔥 Seeding complete"))
 
     def sync_group_memberships(self):
-        for group in Groups.objects.all():
-            for member in group.members.all():
-                member.groups_in.add(group)
-        self.stdout.write("🔗 Synced group memberships")
+        for group in Group.objects.all():
+            for membership in group.memberships.filter(status='APPROVED'):
+                # Membership model now handles the relationship
+                pass
+        self.stdout.write("🔗 Group memberships synced")
 
     # ---------------- COURSES ----------------
     def create_courses(self):
@@ -119,7 +121,8 @@ class Command(BaseCommand):
                 last_name=fake.last_name(),
                 bio=fake.text(max_nb_chars=120),
                 course=course,
-                year=year
+                year=year,
+                global_role=random.choice(list(GlobalRole.choices))[0]
             )
             self.users.append(user)
 
@@ -130,19 +133,33 @@ class Command(BaseCommand):
         self.groups = []
 
         for i in range(8):
-            group = Groups.objects.create(
+            selected_course = random.choice(self.courses)
+            group = Group.objects.create(
                 name=fake.word().capitalize() + " Society",
-                creator=random.choice(self.users),
+                created_by=random.choice(self.users),
                 description=fake.text(max_nb_chars=150),
-                is_official=random.choice([True, False])
+                is_official=random.choice([True, False]),
+                course=selected_course,
+                year=random.choice([y for y in self.years if y.course == selected_course])
             )
 
             members = random.sample(self.users, k=random.randint(5, 20))
-            group.members.set(members)
-
-            # sync both M2M relationships
-            for u in members:
-                u.groups_in.add(group)
+            # Create memberships instead of using direct M2M
+            for idx, u in enumerate(members):
+                # Assign roles: first member as admin, some as moderators, rest as members
+                if idx == 0:
+                    role = MembershipRole.ADMIN
+                elif idx < len(members) // 4:
+                    role = MembershipRole.MODERATOR
+                else:
+                    role = MembershipRole.MEMBER
+                
+                Membership.objects.create(
+                    user=u,
+                    group=group,
+                    role=role,
+                    status=MembershipStatus.APPROVED
+                )
 
             self.groups.append(group)
 
@@ -162,7 +179,10 @@ class Command(BaseCommand):
                     course=user.course,
                     unit=random.choice(units) if units else None,
                     content=fake.paragraph(nb_sentences=5),
-                    gradient_class=random.choice([c[0] for c in GRADIENT_CHOICES])
+                    gradient_class=random.choice([c[0] for c in GRADIENT_CHOICES]),
+                    image=None,  # Will be populated with actual media if needed
+                    video=None,
+                    docs=None
                 )
                 self.posts.append(post)
 
@@ -191,6 +211,15 @@ class Command(BaseCommand):
                 Like.objects.get_or_create(user=user, post=post)
 
         self.stdout.write("❤️ Likes created")
+
+    # ---------------- COMMENT LIKES ----------------
+    def create_comment_likes(self):
+        for comment in self.comments:
+            likers = random.sample(self.users, k=random.randint(0, len(self.users)//4))
+            for user in likers:
+                CommentLike.objects.get_or_create(user=user, comment=comment)
+
+        self.stdout.write("💝 Comment likes created")
 
     # ---------------- FOLLOWS ----------------
     def create_follows(self):

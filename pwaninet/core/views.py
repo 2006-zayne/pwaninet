@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from courses.models import Course, Year, Unit
 from posts.models import Post, Like, Comment, CommentLike
-from groups.models import Groups
+from groups.models import Group, Membership, MembershipRole, MembershipStatus
 from notifications.models import Notifications
 from users.models import User, Follow
 from core.forms import PwaniSignupForm, PostForm, ProfileUpdateForm, GroupForm
@@ -60,7 +60,7 @@ def home_view(request):
 @login_required
 def profile_view(request, username):
     profile_user = get_object_or_404(User, username=username)
-    posts = Post.objects.filter(author=profile_user).order_by('-date')
+    posts = Post.objects.filter(author=profile_user).order_by('-created_at')
     is_following = Follow.objects.filter(follower=request.user, followed=profile_user).exists()
     followers_count = profile_user.follower_relationships.count()
     following_count = profile_user.following_relationships.count()
@@ -104,7 +104,12 @@ def unread_notification_count(request):
 @login_required
 def mark_notification_as_read(request, notif_id):
     mark_single_notification_as_read(request.user, notif_id)
-    return JsonResponse({'status': 'ok'})
+    from notifications.services.notification_service import build_notifications_context
+    context = build_notifications_context(request.user, mark_read=False)
+    context['unread_notifications_count'] = get_cached_unread_count(request.user)
+    response = render(request, 'partials/notification_list.html', context)
+    response['HX-Trigger'] = 'updateUnreadCount'
+    return response
 
 
 @login_required
@@ -248,11 +253,16 @@ def unit_posts_view(request, unit_id):
 
 @login_required
 def groups_dashboard(request):
-    user_groups = request.user.group_memberships.all()
-    all_groups = Groups.objects.all().annotate(member_count=Count('members')).order_by('-member_count')
+    user_groups = Group.objects.filter(memberships__user=request.user, memberships__status=MembershipStatus.APPROVED)
+    pending_groups = Group.objects.filter(memberships__user=request.user, memberships__status=MembershipStatus.PENDING)
+    all_groups = Group.objects.all().annotate(member_count=Count('memberships', filter=Q(memberships__status=MembershipStatus.APPROVED))).order_by('-member_count')
+    user_group_ids = set(user_groups.values_list('id', flat=True))
+    pending_group_ids = set(pending_groups.values_list('id', flat=True))
     return render(request, 'groups_dashboard.html', {
         'user_groups': user_groups,
         'all_groups': all_groups,
+        'user_group_ids': user_group_ids,
+        'pending_group_ids': pending_group_ids,
         'unread_notifications_count': get_cached_unread_count(request.user),
     })
 
@@ -260,7 +270,8 @@ def groups_dashboard(request):
 @login_required
 def groups_detail_view(request, group_id):
     from groups.services.group_service import build_group_detail_context
-    group = get_object_or_404(Groups, id=group_id)
+    from django.db.models import Count, Q
+    group = get_object_or_404(Group.objects.annotate(member_count=Count('memberships', filter=Q(memberships__status=MembershipStatus.APPROVED))), id=group_id)
     query = request.GET.get('search_user', '')
     context = build_group_detail_context(request.user, group, query)
     liked_post_ids = set(Like.objects.filter(user=request.user, post__in=context['posts']).values_list('post_id', flat=True))
@@ -275,9 +286,9 @@ def create_group_view(request):
         form = GroupForm(request.POST, request.FILES)
         if form.is_valid():
             group = form.save(commit=False)
-            group.creator = request.user
+            group.created_by = request.user
             group.save()
-            group.members.add(request.user)
+            Membership.objects.create(group=group, user=request.user, role=MembershipRole.ADMIN, status=MembershipStatus.APPROVED)
             messages.success(request, f'Squad "{group.name}" created successfully.')
             return redirect('groups:groups_detail', group_id=group.id)
     else:
@@ -287,17 +298,68 @@ def create_group_view(request):
 
 @login_required
 def toggle_group_membership(request, group_id):
-    group = get_object_or_404(Groups, id=group_id)
-    if group.members.filter(id=request.user.id).exists():
-        group.members.remove(request.user)
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check official group restrictions
+    if group.is_official and group.course and group.year:
+        if request.user.course != group.course or request.user.year != group.year:
+            messages.error(request, 'You can only join official groups that match your course and year.')
+            return redirect('groups:groups_detail', group_id=group_id)
+    
+    # Check if already has membership
+    existing_membership = Membership.objects.filter(group=group, user=request.user).first()
+    
+    if existing_membership:
+        existing_membership.delete()
+        messages.success(request, f'You left {group.name}.')
     else:
-        group.members.add(request.user)
+        # For official groups, membership needs approval (pending status)
+        # For community groups, auto-approve
+        status = MembershipStatus.PENDING if group.is_official else MembershipStatus.APPROVED
+        membership = Membership.objects.create(group=group, user=request.user, status=status)
+        if status == MembershipStatus.APPROVED:
+            messages.success(request, f'You joined {group.name}!')
+            # Send welcome notification
+            create_notification(
+                recipient=request.user,
+                sender=request.user,
+                notification_type=Notifications.GROUP_APPROVED,
+                msg=f'Welcome to {group.name}! You can now contribute to the group.',
+                group=group
+            )
+            invalidate_unread_count_cache(request.user.id)
+        else:
+            messages.info(request, f'Your request to join {group.name} is pending approval.')
+            # Send request confirmation notification - use group creator as sender
+            sender_user = group.created_by if group.created_by else request.user
+            create_notification(
+                recipient=request.user,
+                sender=sender_user,
+                notification_type=Notifications.GROUP_REQUEST,
+                msg=f'Your request to join {group.name} has been sent. You will be notified when it is accepted.',
+                group=group
+            )
+            invalidate_unread_count_cache(request.user.id)
+    
     return redirect('groups:groups_detail', group_id=group_id)
 
 
 @login_required
 def edit_group(request, group_id):
-    group = get_object_or_404(Groups, id=group_id, creator=request.user)
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check if user is admin (creator or has admin membership)
+    is_admin = (group.created_by == request.user) or Membership.objects.filter(
+        group=group, 
+        user=request.user, 
+        role=MembershipRole.ADMIN, 
+        status=MembershipStatus.APPROVED
+    ).exists()
+    
+    if not is_admin:
+        messages.error(request, 'Only admins can edit this group.')
+        return redirect('groups:groups_detail', group_id=group_id)
+    
     if request.method == 'POST':
         form = GroupForm(request.POST, request.FILES, instance=group)
         if form.is_valid():
@@ -311,9 +373,9 @@ def edit_group(request, group_id):
 
 @login_required
 def invite_to_group(request, group_id, user_id):
-    group = get_object_or_404(Groups, id=group_id)
+    group = get_object_or_404(Group, id=group_id)
     target = get_object_or_404(User, id=user_id)
-    if not group.members.filter(id=target.id).exists():
+    if not Membership.objects.filter(group=group, user=target).exists():
         create_notification(
             recipient=target,
             sender=request.user,
@@ -330,7 +392,7 @@ def respond_to_invite(request, notif_id, action):
     notif = get_object_or_404(Notifications, id=notif_id, recipient=request.user)
     if notif.group:
         if action == 'accept':
-            notif.group.members.add(request.user)
+            Membership.objects.create(group=notif.group, user=request.user, status=MembershipStatus.APPROVED)
             messages.success(request, f'You joined {notif.group.name}!')
         else:
             messages.info(request, 'Invite declined.')

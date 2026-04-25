@@ -8,11 +8,20 @@ def build_groups_dashboard_context(user):
 
 
 def build_group_detail_context(user, group, query):
+    from groups.models import Membership, MembershipRole, MembershipStatus
+    memberships = group.memberships.filter(status=MembershipStatus.APPROVED).select_related('user')
+    user_membership = group.memberships.filter(user=user).first()
+    is_admin = user_membership and user_membership.role == MembershipRole.ADMIN and user_membership.status == MembershipStatus.APPROVED
+    is_pending = user_membership and user_membership.status == MembershipStatus.PENDING
+    following_ids = list(get_following_ids(user))
     return {
         'group': group,
         'posts': get_group_posts(group),
         'is_member': is_group_member(group, user),
+        'is_admin': is_admin,
+        'is_pending': is_pending,
+        'memberships': memberships,
         'search_results': search_invite_candidates(query, group, limit = 10),
         'query': query,
-        'following_ids': get_following_ids(user) }
+        'following_ids': following_ids }
 

@@ -1,5 +1,5 @@
 from django.shortcuts import get_object_or_404
-from groups.models import Groups
+from groups.models import Group, Membership, MembershipStatus
 from posts.models import Like, Post
 from users.models import User
 from notifications.models import Notifications
@@ -14,7 +14,7 @@ def create_post_for_user(form, user, files, group_id=None):
 
     # Group handling
     if group_id:
-        post.group = get_object_or_404(Groups, id=group_id)
+        post.group = get_object_or_404(Group, id=group_id)
 
     # Unit override
     if post.unit:
@@ -27,7 +27,10 @@ def create_post_for_user(form, user, files, group_id=None):
 
     # Notifications
     if post.group:
-        recipients = post.group.members.exclude(id=user.id)
+        recipients = User.objects.filter(
+            group_memberships__group=post.group,
+            group_memberships__status=MembershipStatus.APPROVED
+        ).exclude(id=user.id)
         msg_text = f"posted in the {post.group.name} squad."
     else:
         recipients = User.objects.filter(

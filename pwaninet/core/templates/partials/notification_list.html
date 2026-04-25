@@ -13,6 +13,10 @@
               <span class="notif-badge badge-follow"><i class="bi bi-person-plus-fill"></i> Follow</span>
             {% elif n.notification_type == 'LIKE' %}
               <span class="notif-badge badge-like"><i class="bi bi-heart-fill"></i> Like</span>
+            {% elif n.notification_type == 'GROUP_REQUEST' %}
+              <span class="notif-badge badge-alert"><i class="bi bi-clock-fill"></i> Request</span>
+            {% elif n.notification_type == 'GROUP_APPROVED' %}
+              <span class="notif-badge badge-invite"><i class="bi bi-check-circle-fill"></i> Approved</span>
             {% else %}
               <span class="notif-badge badge-alert"><i class="bi bi-bell-fill"></i> Alert</span>
             {% endif %}
@@ -45,11 +49,30 @@
       {% endif %}
     </div>
 
-    <div class="notif-icon {% if n.notification_type == 'LIKE' %}icon-like{% elif n.notification_type == 'FOLLOW' %}icon-follow{% elif n.notification_type == 'INVITE' %}icon-invite{% else %}icon-alert{% endif %}">
-      {% if n.notification_type == 'LIKE' %}<i class="bi bi-heart-fill"></i>
-      {% elif n.notification_type == 'FOLLOW' %}<i class="bi bi-person-plus-fill"></i>
-      {% elif n.notification_type == 'INVITE' %}<i class="bi bi-envelope-fill"></i>
-      {% else %}<i class="bi bi-bell-fill"></i>
+    <div class="notif-icon {% if n.notification_type == 'LIKE' %}icon-like{% elif n.notification_type == 'FOLLOW' %}icon-follow{% elif n.notification_type == 'INVITE' %}icon-invite{% elif n.notification_type == 'GROUP_REQUEST' %}icon-alert{% elif n.notification_type == 'GROUP_APPROVED' %}icon-invite{% else %}icon-alert{% endif %}">
+      {% if not n.is_read %}
+        <button class="btn-read"
+                hx-post="{% url 'notifications:mark_notification_as_read' n.id %}"
+                hx-target="#notification-list .card-body"
+                hx-swap="innerHTML"
+                style="background: none; border: none; cursor: pointer; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 16px; opacity: 0.6;"
+                title="Mark as read">
+          {% if n.notification_type == 'LIKE' %}<i class="bi bi-heart-fill"></i>
+          {% elif n.notification_type == 'FOLLOW' %}<i class="bi bi-person-plus-fill"></i>
+          {% elif n.notification_type == 'INVITE' %}<i class="bi bi-envelope-fill"></i>
+          {% elif n.notification_type == 'GROUP_REQUEST' %}<i class="bi bi-clock-fill"></i>
+          {% elif n.notification_type == 'GROUP_APPROVED' %}<i class="bi bi-check-circle-fill"></i>
+          {% else %}<i class="bi bi-bell-fill"></i>
+          {% endif %}
+        </button>
+      {% else %}
+        {% if n.notification_type == 'LIKE' %}<i class="bi bi-heart-fill"></i>
+        {% elif n.notification_type == 'FOLLOW' %}<i class="bi bi-person-plus-fill"></i>
+        {% elif n.notification_type == 'INVITE' %}<i class="bi bi-envelope-fill"></i>
+        {% elif n.notification_type == 'GROUP_REQUEST' %}<i class="bi bi-clock-fill"></i>
+        {% elif n.notification_type == 'GROUP_APPROVED' %}<i class="bi bi-check-circle-fill"></i>
+        {% else %}<i class="bi bi-bell-fill"></i>
+        {% endif %}
       {% endif %}
     </div>
   </div>

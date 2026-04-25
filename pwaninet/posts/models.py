@@ -18,7 +18,7 @@ GRADIENT_CHOICES = [
 
 
 class Post(models.Model):
-    group = models.ForeignKey('groups.Groups', on_delete=models.CASCADE, null=True, blank=True, related_name='posts')
+    group = models.ForeignKey('groups.Group', on_delete=models.CASCADE, null=True, blank=True, related_name='posts')
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='posts')
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE, null=True, blank=True)
     unit = models.ForeignKey('courses.Unit', on_delete=models.SET_NULL, null=True, blank=True)
@@ -27,10 +27,11 @@ class Post(models.Model):
     video = models.FileField(upload_to='posts/videos', blank=True, null=True)
     docs = models.FileField(upload_to='posts/docs', blank=True, null=True)
     gradient_class = models.CharField(max_length=50, choices=GRADIENT_CHOICES, default='none', blank=True)
-    date = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Post by {self.author} on {self.date.strftime('%Y-%m-%d')}"
+        return f"Post by {self.author} on {self.created_at.strftime('%Y-%m-%d')}"
     
     @property
     def get_intel_file(self):
@@ -107,3 +108,17 @@ class CommentLike(models.Model):
 
     class Meta:
         unique_together = ('user', 'comment')
+
+
+class Report(models.Model):
+    reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reports')
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='reports')
+    reason = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('reporter', 'post')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Report by {self.reporter.username} on post {self.post.id}"

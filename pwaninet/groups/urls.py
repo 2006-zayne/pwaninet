@@ -1,3 +1,7 @@
+"""
+Web URLs for groups app.
+Contains only Django web view routes - no API routes.
+"""
 from django.urls import path
 from core import views
 
