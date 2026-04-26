@@ -1,10 +1,12 @@
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 from groups.models import Group, Membership, MembershipStatus
 from posts.models import Like, Post, PostImage
 from users.models import User
 from notifications.models import Notifications
-from posts.services.feed_service import invalidate_home_feed_context
+from users.services.feed_service import invalidate_home_feed_context
 
+@transaction.atomic
 def create_post_for_user(form, user, files, group_id=None):
     post = form.save(commit=False)
 
@@ -63,6 +65,7 @@ def create_post_for_user(form, user, files, group_id=None):
     return post
    
 
+@transaction.atomic
 
 
 def toggle_post_like_for_user(post, user):

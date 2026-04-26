@@ -121,9 +121,3 @@ def build_home_feed_context(user, cursor=None, limit=10):
         'has_more': feed_data['has_more'],
     }
     return context
-
-
-def invalidate_home_feed_context(user_id):
-    # Cursor-based pagination doesn't require page-based cache invalidation
-    # This function is kept for backwards compatibility
-    pass

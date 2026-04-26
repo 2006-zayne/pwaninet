@@ -14,6 +14,7 @@
 
                         <form method="POST">
                             {% csrf_token %}
+                            <input type="hidden" name="device_id" id="device_id_field">
                             
                             {% for field in form %}
                                 <div class="mb-3">
@@ -50,4 +51,22 @@
         </div>
     </div>
 </div>
+
+<script>
+(function() {
+    const DEVICE_ID_KEY = 'pwaninet_device_id';
+    let deviceId = localStorage.getItem(DEVICE_ID_KEY);
+    
+    if (!deviceId) {
+        // Generate device ID if not exists
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        deviceId = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+        localStorage.setItem(DEVICE_ID_KEY, deviceId);
+    }
+    
+    // Set the hidden field value
+    document.getElementById('device_id_field').value = deviceId;
+})();
+</script>
 {% endblock %}

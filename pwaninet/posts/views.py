@@ -6,11 +6,14 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
-from .models import Post, Comment, Report, Like
+from .models import Post, Comment, Report, Like, Repost, HiddenPost, AuthorPreference, SharedPost
 from .serializers import (
     PostSerializer, PostCreateSerializer, PostUpdateSerializer,
     CommentSerializer, CommentCreateSerializer, ReportCreateSerializer,
-    ReportSerializer
+    ReportSerializer, RepostSerializer, RepostCreateSerializer,
+    HiddenPostSerializer, HiddenPostCreateSerializer,
+    AuthorPreferenceSerializer, AuthorPreferenceCreateSerializer,
+    SharedPostSerializer, SharedPostCreateSerializer
 )
 from .permissions import CanDeletePost, CanEditPost, IsPostAuthorOrReadOnly
 from groups.permissions import IsApprovedMember
@@ -20,6 +23,10 @@ from posts.forms import PostForm
 from posts.services.comment_service import build_comments_context, handle_add_comment_request, toggle_comment_like_for_user
 from posts.services.feed_service import build_home_feed_context
 from posts.services.post_service import toggle_post_like_for_user, create_post_for_user
+from posts.services.repost_service import create_repost, delete_repost, get_post_reposts
+from posts.services.hide_service import hide_post, unhide_post, is_post_hidden
+from posts.services.author_preference_service import set_author_preference, get_author_preference, get_all_preferences
+from posts.services.share_service import share_post, get_shared_posts, mark_share_as_viewed
 from notifications.services.notification_service import get_cached_unread_count
 
 
@@ -125,6 +132,118 @@ class PostViewSet(viewsets.ModelViewSet):
         serializer = CommentSerializer(comments, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'], url_path='repost')
+    def repost(self, request, pk=None):
+        """
+        POST /posts/{id}/repost/
+        Repost a post.
+        """
+        post = self.get_object()
+        serializer = RepostCreateSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(original_post=post)
+        
+        return Response(
+            RepostSerializer(serializer.instance, context={'request': request}).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=['delete'], url_path='repost')
+    def delete_repost(self, request, pk=None):
+        """
+        DELETE /posts/{id}/repost/
+        Delete a repost.
+        """
+        post = self.get_object()
+        group_id = request.data.get('group_id')
+        group = None
+        if group_id:
+            from groups.models import Group
+            group = Group.objects.get(id=group_id)
+        
+        deleted = delete_repost(request.user, post, group)
+        if deleted:
+            return Response(
+                {'detail': 'Repost deleted.'},
+                status=status.HTTP_200_OK
+            )
+        else:
+            return Response(
+                {'detail': 'Repost not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=['get'], url_path='reposts')
+    def reposts(self, request, pk=None):
+        """
+        GET /posts/{id}/reposts/
+        List all reposts of a post.
+        """
+        post = self.get_object()
+        reposts = get_post_reposts(post)
+        serializer = RepostSerializer(reposts, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='hide')
+    def hide(self, request, pk=None):
+        """
+        POST /posts/{id}/hide/
+        Hide a post from feed.
+        """
+        post = self.get_object()
+        try:
+            hidden_post = hide_post(request.user, post)
+            return Response(
+                {'detail': 'Post hidden successfully.'},
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            return Response(
+                {'detail': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=True, methods=['delete'], url_path='hide')
+    def unhide(self, request, pk=None):
+        """
+        DELETE /posts/{id}/hide/
+        Unhide a post.
+        """
+        post = self.get_object()
+        unhidden = unhide_post(request.user, post)
+        if unhidden:
+            return Response(
+                {'detail': 'Post unhidden.'},
+                status=status.HTTP_200_OK
+            )
+        else:
+            return Response(
+                {'detail': 'Post was not hidden.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=['post'], url_path='share')
+    def share(self, request, pk=None):
+        """
+        POST /posts/{id}/share/
+        Share a post to another user's profile.
+        """
+        post = self.get_object()
+        serializer = SharedPostCreateSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(original_post=post)
+        
+        return Response(
+            SharedPostSerializer(serializer.instance, context={'request': request}).data,
+            status=status.HTTP_201_CREATED
+        )
+
 
 class CommentViewSet(viewsets.ModelViewSet):
     """
@@ -165,6 +284,59 @@ class ReportViewSet(viewsets.ReadOnlyModelViewSet):
         
         # Filter reports for posts in those groups
         return self.queryset.filter(post__group_id__in=admin_groups)
+
+
+class AuthorPreferenceViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing author preferences.
+    """
+    permission_classes = [IsAuthenticated]
+    queryset = AuthorPreference.objects.select_related('user', 'author').all()
+    serializer_class = AuthorPreferenceSerializer
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return AuthorPreferenceCreateSerializer
+        return AuthorPreferenceSerializer
+
+    def get_queryset(self):
+        # Only show current user's preferences
+        return self.queryset.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class SharedPostViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for viewing shared posts.
+    """
+    permission_classes = [IsAuthenticated]
+    queryset = SharedPost.objects.select_related('original_post', 'sharer', 'shared_to').all()
+    serializer_class = SharedPostSerializer
+
+    def get_queryset(self):
+        # Only show posts shared to current user
+        return self.queryset.filter(shared_to=self.request.user)
+
+    @action(detail=True, methods=['post'], url_path='view')
+    def mark_viewed(self, request, pk=None):
+        """
+        POST /shared-posts/{id}/view/
+        Mark a shared post as viewed.
+        """
+        shared_post = self.get_object()
+        marked = mark_share_as_viewed(shared_post.id)
+        if marked:
+            return Response(
+                {'detail': 'Shared post marked as viewed.'},
+                status=status.HTTP_200_OK
+            )
+        else:
+            return Response(
+                {'detail': 'Shared post not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
 # ============================================================================
@@ -320,7 +492,8 @@ def view_image_fullscreen(request, post_id, image_index):
     liked_users = [like.user for like in post_likes]
 
     # Get users that the current user follows
-    following_ids = set(request.user.following.all().values_list('id', flat=True))
+    from users.models import Follow
+    following_ids = set(Follow.objects.filter(follower=request.user).values_list('followed_id', flat=True))
 
     # Separate likes into followed users and others
     followed_likers = [user for user in liked_users if user.id in following_ids]
@@ -341,3 +514,23 @@ def view_image_fullscreen(request, post_id, image_index):
     }
 
     return render(request, 'posts/image_fullscreen.html', context)
+
+
+@login_required
+def share_post_view(request, post_id):
+    """Django view to handle post sharing with username lookup"""
+    if request.method == 'POST':
+        post = get_object_or_404(Post, id=post_id)
+        username = request.POST.get('shared_to_username')
+        message = request.POST.get('message', '')
+        
+        try:
+            shared_to_user = User.objects.get(username=username)
+            shared_post = share_post(request.user, post, shared_to_user, message)
+            messages.success(request, f'Post shared to {username} successfully.')
+        except User.DoesNotExist:
+            messages.error(request, 'User not found.')
+        except Exception as e:
+            messages.error(request, str(e))
+    
+    return redirect('posts:post_details', post_id=post_id)

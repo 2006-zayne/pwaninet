@@ -42,6 +42,116 @@
     padding: 2rem 1.5rem 5rem;
   }
 
+  /* ── Mobile Responsiveness ── */
+  @media (max-width: 768px) {
+    .page-wrap {
+      padding: 1.5rem 1rem 4rem;
+    }
+    
+    .page-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+    
+    .page-title {
+      font-size: 1.5rem;
+    }
+    
+    .filter-bar {
+      gap: 0.4rem;
+    }
+    
+    .btn-filter {
+      padding: 0.4rem 0.75rem;
+      font-size: 0.7rem;
+    }
+    
+    .notif-item {
+      padding: 1rem;
+      gap: 0.75rem;
+    }
+    
+    .notif-avatar {
+      width: 40px;
+      height: 40px;
+    }
+    
+    .notif-user {
+      font-size: 0.85rem;
+    }
+    
+    .notif-message {
+      font-size: 0.8rem;
+    }
+    
+    .notif-actions {
+      flex-wrap: wrap;
+    }
+    
+    .btn-action {
+      padding: 0.35rem 0.8rem;
+      font-size: 0.65rem;
+    }
+    
+    .pagination {
+      gap: 0.3rem;
+    }
+    
+    .page-link {
+      min-width: 36px;
+      height: 36px;
+      padding: 0 0.6rem;
+      font-size: 0.75rem;
+    }
+    
+    .btn-clear {
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .page-title {
+      font-size: 1.25rem;
+    }
+    
+    .filter-bar {
+      gap: 0.3rem;
+    }
+    
+    .btn-filter {
+      padding: 0.35rem 0.6rem;
+      font-size: 0.65rem;
+    }
+    
+    .notif-item {
+      flex-direction: column;
+      padding: 0.875rem;
+    }
+    
+    .notif-avatar {
+      width: 36px;
+      height: 36px;
+    }
+    
+    .notif-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    
+    .btn-delete {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+    }
+    
+    .notif-item {
+      position: relative;
+    }
+  }
+
   /* ── Page Header ── */
   .page-header {
     display: flex;
@@ -277,6 +387,111 @@
     transform: translateY(-1px);
   }
 
+  /* ── Filter Buttons ── */
+  .filter-bar {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+  }
+  .btn-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.5rem 1rem;
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.18s var(--ease);
+    letter-spacing: 0.02em;
+  }
+  .btn-filter:hover {
+    border-color: var(--brand);
+    color: var(--brand);
+    transform: translateY(-1px);
+  }
+  .btn-filter.active {
+    background: var(--brand);
+    color: #fff;
+    border-color: var(--brand);
+  }
+  .filter-count {
+    background: rgba(255,255,255,0.2);
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 0.65rem;
+  }
+  .btn-filter.active .filter-count {
+    background: rgba(255,255,255,0.3);
+  }
+
+  /* ── Pagination ── */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 2rem;
+  }
+  .page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+    padding: 0 0.75rem;
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.18s var(--ease);
+  }
+  .page-link:hover {
+    border-color: var(--brand);
+    color: var(--brand);
+    transform: translateY(-1px);
+  }
+  .page-link.active {
+    background: var(--brand);
+    color: #fff;
+    border-color: var(--brand);
+  }
+  .page-link.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  /* ── Delete Button ── */
+  .btn-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.18s var(--ease);
+  }
+  .btn-delete:hover {
+    background: var(--danger-light);
+    color: var(--danger);
+    border-color: #f87171;
+  }
+
   /* Page load animation */
   .page-header, .card {
     animation: page-rise 0.35s var(--ease) both;
@@ -306,20 +521,118 @@
     {% endif %}
   </div>
 
+  <!-- ── Filter Bar ── -->
+  <div class="filter-bar">
+    <a href="{% url 'notifications:notifications' %}" 
+       class="btn-filter {% if not filter_type and not filter_read %}active{% endif %}">
+      <i class="bi bi-inbox"></i> All
+    </a>
+    <a href="{% url 'notifications:notifications' %}?read=false" 
+       class="btn-filter {% if filter_read == False %}active{% endif %}">
+      <i class="bi bi-envelope"></i> Unread
+    </a>
+    <a href="{% url 'notifications:notifications' %}?read=true" 
+       class="btn-filter {% if filter_read == True %}active{% endif %}">
+      <i class="bi bi-check2"></i> Read
+    </a>
+    <div style="width: 1px; background: var(--border); margin: 0 0.5rem;"></div>
+    <a href="{% url 'notifications:notifications' %}?type=INVITE" 
+       class="btn-filter {% if filter_type == 'INVITE' %}active{% endif %}">
+      <i class="bi bi-envelope-fill"></i> Invites
+    </a>
+    <a href="{% url 'notifications:notifications' %}?type=LIKE" 
+       class="btn-filter {% if filter_type == 'LIKE' %}active{% endif %}">
+      <i class="bi bi-heart-fill"></i> Likes
+    </a>
+    <a href="{% url 'notifications:notifications' %}?type=FOLLOW" 
+       class="btn-filter {% if filter_type == 'FOLLOW' %}active{% endif %}">
+      <i class="bi bi-person-plus-fill"></i> Follows
+    </a>
+    <a href="{% url 'notifications:notifications' %}?type=GROUP_REQUEST" 
+       class="btn-filter {% if filter_type == 'GROUP_REQUEST' %}active{% endif %}">
+      <i class="bi bi-clock-fill"></i> Requests
+    </a>
+    <a href="{% url 'notifications:notifications' %}?type=GROUP_APPROVED" 
+       class="btn-filter {% if filter_type == 'GROUP_APPROVED' %}active{% endif %}">
+      <i class="bi bi-check-circle-fill"></i> Approved
+    </a>
+    <div style="width: 1px; background: var(--border); margin: 0 0.5rem;"></div>
+    <a href="?grouped={% if current_grouped == 'true' %}false{% else %}true{% endif %}{% if current_filter_type %}&type={{ current_filter_type }}{% endif %}{% if current_filter_read %}&read={{ current_filter_read }}{% endif %}" 
+       class="btn-filter {% if current_grouped == 'true' %}active{% endif %}">
+      <i class="bi bi-layers"></i> Grouped
+    </a>
+  </div>
+
   <!-- ── Notifications Card ── -->
   <div class="card" id="notification-list">
     <div class="card-body" style="padding: 0;">
-      {% include 'notifications/partials/notification_list.html' %}
+      {% if grouped %}
+        {% include 'notifications/partials/notification_list_grouped.html' %}
+      {% else %}
+        {% include 'notifications/partials/notification_list.html' %}
+      {% endif %}
     </div>
   </div>
+
+  <!-- ── Pagination ── -->
+  {% if has_pagination and notifications.has_other_pages %}
+    <div class="pagination">
+      {% if notifications.has_previous %}
+        <a href="?page=1{% if current_filter_type %}&type={{ current_filter_type }}{% endif %}{% if current_filter_read %}&read={{ current_filter_read }}{% endif %}" class="page-link">
+          <i class="bi bi-chevron-double-left"></i>
+        </a>
+        <a href="?page={{ notifications.previous_page_number }}{% if current_filter_type %}&type={{ current_filter_type }}{% endif %}{% if current_filter_read %}&read={{ current_filter_read }}{% endif %}" class="page-link">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+      {% else %}
+        <span class="page-link disabled"><i class="bi bi-chevron-double-left"></i></span>
+        <span class="page-link disabled"><i class="bi bi-chevron-left"></i></span>
+      {% endif %}
+
+      {% for num in notifications.paginator.page_range %}
+        {% if notifications.number == num %}
+          <span class="page-link active">{{ num }}</span>
+        {% elif num > notifications.number|add:'-3' and num < notifications.number|add:'3' %}
+          <a href="?page={{ num }}{% if current_filter_type %}&type={{ current_filter_type }}{% endif %}{% if current_filter_read %}&read={{ current_filter_read }}{% endif %}" class="page-link">{{ num }}</a>
+        {% endif %}
+      {% endfor %}
+
+      {% if notifications.has_next %}
+        <a href="?page={{ notifications.next_page_number }}{% if current_filter_type %}&type={{ current_filter_type }}{% endif %}{% if current_filter_read %}&read={{ current_filter_read }}{% endif %}" class="page-link">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+        <a href="?page={{ notifications.paginator.num_pages }}{% if current_filter_type %}&type={{ current_filter_type }}{% endif %}{% if current_filter_read %}&read={{ current_filter_read }}{% endif %}" class="page-link">
+          <i class="bi bi-chevron-double-right"></i>
+        </a>
+      {% else %}
+        <span class="page-link disabled"><i class="bi bi-chevron-right"></i></span>
+        <span class="page-link disabled"><i class="bi bi-chevron-double-right"></i></span>
+      {% endif %}
+    </div>
+  {% endif %}
   
   {% if notifications %}
-    <div style="text-align: center; margin-top: 1.5rem;">
+    <div style="text-align: center; margin-top: 1.5rem; display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
       <button class="btn-clear"
               hx-post="{% url 'notifications:mark_all_as_read' %}"
               hx-target="#notification-list .card-body"
               hx-swap="innerHTML">
         <i class="bi bi-check2-all"></i> Mark all as read
+      </button>
+      <button class="btn-clear"
+              hx-post="{% url 'notifications:delete_read_notifications' %}"
+              hx-target="#notification-list .card-body"
+              hx-swap="innerHTML"
+              style="background: var(--danger-light); color: var(--danger); border-color: #fecaca;">
+        <i class="bi bi-trash"></i> Delete read
+      </button>
+      <button class="btn-clear"
+              hx-post="{% url 'notifications:delete_all_notifications' %}"
+              hx-confirm="Are you sure you want to delete all notifications?"
+              hx-target="#notification-list .card-body"
+              hx-swap="innerHTML"
+              style="background: var(--danger); color: #fff; border-color: var(--danger);">
+        <i class="bi bi-trash3"></i> Delete all
       </button>
     </div>
   {% endif %}
@@ -334,6 +647,24 @@ document.body.addEventListener('htmx:afterSwap', function(evt) {
       .then(html => {
         const badge = document.getElementById('unread-count-badge');
         if (badge) badge.outerHTML = html;
+      });
+    
+    // Update group unread badges via API
+    fetch('/groups/api/unread-counts/')
+      .then(r => r.json())
+      .then(counts => {
+        document.querySelectorAll('.unread-badge').forEach(badge => {
+          const groupId = badge.getAttribute('data-group-id');
+          if (groupId && counts[groupId] !== undefined) {
+            const count = counts[groupId];
+            if (count > 0) {
+              badge.textContent = count;
+              badge.style.display = 'inline-flex';
+            } else {
+              badge.style.display = 'none';
+            }
+          }
+        });
       });
   }
 });

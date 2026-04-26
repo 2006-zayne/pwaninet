@@ -63,3 +63,32 @@ class ProfileUpdateForm(forms.ModelForm):
             {'class': 'form-control-file'})
         self.fields['cover_photo'].widget.attrs.update(
             {'class': 'form-control-file'})
+
+
+class NotificationPreferencesForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = [
+            'notify_on_like',
+            'notify_on_follow',
+            'notify_on_invite',
+            'notify_on_group_request',
+            'notify_on_group_approved',
+            'email_notifications'
+        ]
+        widgets = {
+            'notify_on_like': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notify_on_follow': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notify_on_invite': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notify_on_group_request': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notify_on_group_approved': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'email_notifications': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+        labels = {
+            'notify_on_like': 'Like notifications',
+            'notify_on_follow': 'Follow notifications',
+            'notify_on_invite': 'Group invite notifications',
+            'notify_on_group_request': 'Group join request notifications',
+            'notify_on_group_approved': 'Group approval notifications',
+            'email_notifications': 'Email notifications'
+        }

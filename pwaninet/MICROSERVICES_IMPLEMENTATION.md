@@ -436,12 +436,15 @@ pwaninet-microservices/
 ```python
 # In monolith
 def create_post(user_id, content):
+    from users.models import Follow
     user = User.objects.get(id=user_id)
     post = Post.objects.create(author=user, content=content)
-    
+
     # Direct function call
-    send_notification(user.followers.all(), post)
-    
+    follower_ids = Follow.objects.filter(followed=user).values_list('follower_id', flat=True)
+    followers = User.objects.filter(id__in=follower_ids)
+    send_notification(followers, post)
+
     return post
 ```
 

@@ -10,7 +10,6 @@ venv/
 # Database and Secrets (DO NOT REMOVE)
 db.sqlite3
 db.sqlite3-journal
-login_credentials.txt
 
 # Distribution
 *.egg-info/

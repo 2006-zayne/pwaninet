@@ -195,9 +195,9 @@
   <!-- ── Page Header ── -->
   <div class="page-header">
     <div class="page-eyebrow">
-      <i class="bi bi-plus-circle-fill"></i> New Group
+      <i class="bi bi-plus-circle-fill"></i> {% if group %}Edit Group{% else %}New Group{% endif %}
     </div>
-    <h1 class="page-title">Create a Group</h1>
+    <h1 class="page-title">{% if group %}Edit Group{% else %}Create a Group{% endif %}</h1>
   </div>
 
   <!-- ── Form Card ── -->
@@ -208,7 +208,7 @@
 
         <div class="mb-4">
           <label class="field-label">Group Name</label>
-          <input type="text" name="name" class="form-field" placeholder="Enter group name…" required>
+          <input type="text" name="name" class="form-field" placeholder="Enter group name…" value="{% if group %}{{ group.name }}{% endif %}" required>
           {% if form.name.errors %}
             <div class="field-error">{{ form.name.errors }}</div>
           {% endif %}
@@ -216,7 +216,16 @@
 
         <div class="mb-4">
           <label class="field-label">Description</label>
-          <textarea name="description" class="form-field" rows="4" placeholder="What's this group about?"></textarea>
+          <textarea name="description" class="form-field" rows="4" placeholder="What's this group about?">{% if group %}{{ group.description }}{% endif %}</textarea>
+        </div>
+
+        <div class="mb-4">
+          <label class="field-label">Join Policy</label>
+          <select name="join_policy" class="form-field">
+            <option value="open" {% if group and group.join_policy == 'open' %}selected{% endif %}>Open - Anyone can join</option>
+            <option value="approval" {% if group and group.join_policy == 'approval' %}selected{% endif %}>Requires Approval - Admin must approve requests</option>
+            <option value="invite" {% if group and group.join_policy == 'invite' %}selected{% endif %}>Invite Only - Only invited users can join</option>
+          </select>
         </div>
 
         <div class="mb-4">
@@ -247,9 +256,9 @@
 
         <div class="d-grid gap-3">
           <button type="submit" class="btn-base btn-primary-brand">
-            <i class="bi bi-check-circle-fill"></i> Create Group
+            <i class="bi bi-check-circle-fill"></i> {% if group %}Save Changes{% else %}Create Group{% endif %}
           </button>
-          <a href="{% url 'groups:groups_dashboard' %}" class="btn-base btn-secondary-brand">
+          <a href="{% if group %}{% url 'groups:groups_detail' group.id %}{% else %}{% url 'groups:groups_dashboard' %}{% endif %}" class="btn-base btn-secondary-brand">
             <i class="bi bi-x-circle"></i> Cancel
           </a>
         </div>

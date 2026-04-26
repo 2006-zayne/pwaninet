@@ -1,0 +1,97 @@
+<!-- Account Switcher Modal -->
+<div class="modal fade" id="accountSwitcherModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Switch Account</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="account-list-container">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <form action="{% url 'core:logout' %}" method="POST" class="m-0">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-plus-circle me-2"></i>Add New Account
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('accountSwitcherModal');
+    const container = document.getElementById('account-list-container');
+    const DEVICE_ID_KEY = 'pwaninet_device_id';
+    
+    modal.addEventListener('show.bs.modal', function() {
+        // Get device ID from localStorage (same as device_manager.js)
+        let deviceId = localStorage.getItem(DEVICE_ID_KEY);
+        
+        // If device_manager.js hasn't run yet, create it
+        if (!deviceId) {
+            const array = new Uint8Array(32);
+            crypto.getRandomValues(array);
+            deviceId = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+            localStorage.setItem(DEVICE_ID_KEY, deviceId);
+        }
+        
+        // Load accounts when modal opens
+        fetch('{% url "users:device_accounts" %}', {
+            headers: {
+                'X-Device-ID': deviceId
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.accounts && data.accounts.length > 0) {
+                    container.innerHTML = data.accounts.map(account => `
+                        <div class="account-item d-flex align-items-center p-3 mb-2 rounded-3 ${account.is_current ? 'bg-primary bg-opacity-10 border border-primary' : 'bg-light'}">
+                            <img src="${account.profile_pic || '/static/images/default_pic1.jpg'}" 
+                                 class="rounded-circle me-3" 
+                                 style="width: 48px; height: 48px; object-fit: cover;">
+                            <div class="flex-grow-1">
+                                <div class="fw-bold">${account.full_name || account.username}</div>
+                                <div class="text-muted small">@${account.username}</div>
+                            </div>
+                            ${account.is_current 
+                                ? '<span class="badge bg-primary">Current</span>'
+                                : `<a href="/users/accounts/switch/${account.id}/?device_id=${deviceId}" 
+                                      class="btn btn-sm btn-primary rounded-pill px-3">Switch</a>`
+                            }
+                            ${!account.is_current 
+                                ? `<a href="/users/accounts/remove/${account.id}/?device_id=${deviceId}" 
+                                      class="btn btn-sm btn-link text-muted ms-2" title="Remove from device">
+                                      <i class="bi bi-x-circle"></i></a>`
+                                : ''
+                            }
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = `
+                        <div class="text-center py-4">
+                            <i class="bi bi-person-circle display-4 text-muted mb-3"></i>
+                            <p class="text-muted">No other accounts on this device</p>
+                            <p class="text-muted small">Log out and log in with another account to add it here</p>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                container.innerHTML = `
+                    <div class="text-center py-4 text-danger">
+                        <i class="bi bi-exclamation-circle display-4 mb-3"></i>
+                        <p>Failed to load accounts</p>
+                    </div>
+                `;
+            });
+    });
+});
+</script>

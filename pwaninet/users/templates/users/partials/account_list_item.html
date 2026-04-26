@@ -1,0 +1,23 @@
+{% load static %}
+<div class="account-item d-flex align-items-center p-3 mb-2 rounded-3 {% if account.is_current %}bg-primary bg-opacity-10 border border-primary{% else %}bg-light{% endif %}">
+    <img src="{{ account.profile_pic|default:'/static/images/default_pic1.jpg' }}" 
+         class="rounded-circle me-3" 
+         style="width: 48px; height: 48px; object-fit: cover;"
+         alt="{{ account.username }}">
+    <div class="flex-grow-1">
+        <div class="fw-bold">{{ account.full_name|default:account.username }}</div>
+        <div class="text-muted small">@{{ account.username }}</div>
+    </div>
+    {% if account.is_current %}
+        <span class="badge bg-primary">Current</span>
+    {% else %}
+        <a href="{% url 'users:switch_account' account.id %}" 
+           class="btn btn-sm btn-primary rounded-pill px-3">Switch</a>
+        <a href="{% url 'users:remove_account_from_device' account.id %}" 
+           class="btn btn-sm btn-link text-muted ms-2" 
+           title="Remove from device"
+           onclick="return confirm('Remove this account from this device?')">
+            <i class="bi bi-x-circle"></i>
+        </a>
+    {% endif %}
+</div>

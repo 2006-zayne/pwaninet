@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Group, Membership, MembershipRole, MembershipStatus
+from .models import Group, Membership, MembershipRole, MembershipStatus, JoinPolicy
 from users.models import User
 from courses.models import Course, Year
 
@@ -32,7 +32,7 @@ class GroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
         fields = [
-            'id', 'name', 'description', 'group_pic', 'is_official',
+            'id', 'name', 'description', 'group_pic', 'is_official', 'join_policy',
             'course', 'year', 'created_at', 'created_by', 'member_count'
         ]
         read_only_fields = ['created_by', 'created_at']
@@ -46,7 +46,7 @@ class GroupCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
         fields = [
-            'name', 'description', 'group_pic', 'is_official',
+            'name', 'description', 'group_pic', 'is_official', 'join_policy',
             'course', 'year'
         ]
 
@@ -106,11 +106,26 @@ class MembershipCreateSerializer(serializers.Serializer):
         user = self.context['request'].user
         group_id = self.context['group_id']
         
+        try:
+            group = Group.objects.get(pk=group_id)
+        except Group.DoesNotExist:
+            raise serializers.ValidationError("Group not found.")
+        
+        # Determine status based on join policy
+        if group.join_policy == JoinPolicy.OPEN:
+            status = MembershipStatus.APPROVED
+        elif group.join_policy == JoinPolicy.APPROVAL:
+            status = MembershipStatus.PENDING
+        elif group.join_policy == JoinPolicy.INVITE_ONLY:
+            raise serializers.ValidationError("This group is invite-only.")
+        else:
+            status = MembershipStatus.PENDING
+        
         membership = Membership.objects.create(
             user=user,
             group_id=group_id,
             role=MembershipRole.MEMBER,
-            status=MembershipStatus.PENDING
+            status=status
         )
         return membership
 

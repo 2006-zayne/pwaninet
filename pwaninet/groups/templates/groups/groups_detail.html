@@ -552,10 +552,14 @@
           </a>
         {% elif is_pending %}
           <button class="btn-base btn-secondary-brand" disabled style="opacity: 0.7; cursor: not-allowed;">
-            <i class="bi bi-clock-fill me-1"></i> Pending Verification
+            <i class="bi bi-clock-fill me-1"></i> Request Sent ⏳
           </button>
           <a href="{% url 'groups:toggle_membership' group.id %}" class="btn-base btn-ghost-danger">
             <i class="bi bi-x-circle-fill me-1"></i> Cancel Request
+          </a>
+        {% elif is_rejected %}
+          <a href="{% url 'groups:toggle_membership' group.id %}" class="btn-base btn-primary-brand">
+            <i class="bi bi-arrow-clockwise me-1"></i> Request Again
           </a>
         {% else %}
           <a href="{% url 'groups:toggle_membership' group.id %}" class="btn-base btn-primary-brand">
@@ -649,8 +653,16 @@
             <textarea name="description" class="form-field" rows="3">{{ group.description }}</textarea>
           </div>
           <div class="mb-3">
+            <label class="field-label">Join Policy</label>
+            <select name="join_policy" class="form-field">
+              <option value="open" {% if group.join_policy == 'open' %}selected{% endif %}>Open - Anyone can join</option>
+              <option value="approval" {% if group.join_policy == 'approval' %}selected{% endif %}>Requires Approval - Admin must approve requests</option>
+              <option value="invite" {% if group.join_policy == 'invite' %}selected{% endif %}>Invite Only - Only invited users can join</option>
+            </select>
+          </div>
+          <div class="mb-3">
             <label class="field-label">Group Photo</label>
-            <input type="file" name="photo" class="form-control form-control-sm" style="font-family:'Nunito',sans-serif; font-size:0.82rem;">
+            <input type="file" name="group_pic" class="form-control form-control-sm" style="font-family:'Nunito',sans-serif; font-size:0.82rem;">
           </div>
           <div class="mb-4">
             <label class="field-label">Cover Photo</label>

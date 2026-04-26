@@ -2,6 +2,12 @@ from django.db import models
 from django.conf import settings
 
 
+class JoinPolicy(models.TextChoices):
+    OPEN = "open", "Open"
+    APPROVAL = "approval", "Requires Approval"
+    INVITE_ONLY = "invite", "Invite Only"
+
+
 class Group(models.Model):
     name = models.CharField(max_length=200, unique=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='created_groups')
@@ -9,6 +15,11 @@ class Group(models.Model):
     group_pic = models.ImageField(upload_to='group_profile_pic', null=True, blank=True)
     cover_photo = models.ImageField(upload_to='group_covers/', blank=True, null=True)
     is_official = models.BooleanField(default=False)
+    join_policy = models.CharField(
+        max_length=20,
+        choices=JoinPolicy.choices,
+        default=JoinPolicy.OPEN
+    )
     course = models.ForeignKey('courses.Course', on_delete=models.SET_NULL, null=True, blank=True)
     year = models.ForeignKey('courses.Year', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -40,11 +51,11 @@ class MembershipStatus(models.TextChoices):
 
 
 class Membership(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='group_memberships')
-    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='memberships')
-    role = models.CharField(max_length=20, choices=MembershipRole.choices, default=MembershipRole.MEMBER)
-    status = models.CharField(max_length=20, choices=MembershipStatus.choices, default=MembershipStatus.PENDING)
-    joined_at = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='group_memberships', db_index=True)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='memberships', db_index=True)
+    role = models.CharField(max_length=20, choices=MembershipRole.choices, default=MembershipRole.MEMBER, db_index=True)
+    status = models.CharField(max_length=20, choices=MembershipStatus.choices, default=MembershipStatus.PENDING, db_index=True)
+    joined_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
         unique_together = ('user', 'group')

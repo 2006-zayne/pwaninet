@@ -23,7 +23,14 @@ class User(AbstractUser):
     profile_pic = models.ImageField(default='profile_pic/default_pic1.jpg', upload_to='profile_pic')
     cover_photo = models.ImageField(upload_to='covers/', blank=True, null=True)
     bio = models.TextField(max_length=500, blank=True)
-    following = models.ManyToManyField("self", symmetrical=False, related_name="followers", blank=True)
+
+    # Notification preferences
+    notify_on_like = models.BooleanField(default=True)
+    notify_on_follow = models.BooleanField(default=True)
+    notify_on_invite = models.BooleanField(default=True)
+    notify_on_group_request = models.BooleanField(default=True)
+    notify_on_group_approved = models.BooleanField(default=True)
+    email_notifications = models.BooleanField(default=False)
     
     def __str__(self):
         return f"{self.first_name} {self.second_name}".strip() or self.username
@@ -34,12 +41,27 @@ class User(AbstractUser):
 
 
 class Follow(models.Model):
-    follower = models.ForeignKey(User, on_delete=models.CASCADE, related_name='following_relationships')
-    followed = models.ForeignKey(User, on_delete=models.CASCADE, related_name='follower_relationships')
-    created_at = models.DateTimeField(auto_now_add=True)
+    follower = models.ForeignKey(User, on_delete=models.CASCADE, related_name='following_relationships', db_index=True)
+    followed = models.ForeignKey(User, on_delete=models.CASCADE, related_name='follower_relationships', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
         unique_together = ('follower', 'followed')
 
     def __str__(self):
         return f"{self.follower.username} follows {self.followed.username}"
+
+
+class DeviceAccount(models.Model):
+    """Tracks accounts that have been used on a specific device"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='device_accounts')
+    device_id = models.CharField(max_length=255, db_index=True)
+    last_used = models.DateTimeField(auto_now=True)
+    session_key = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        unique_together = ('user', 'device_id')
+        ordering = ['-last_used']
+
+    def __str__(self):
+        return f"{self.user.username} on device {self.device_id}"

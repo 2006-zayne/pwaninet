@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load group_extras %}
 
 {% block content %}
 <style>
@@ -197,6 +198,34 @@
     flex-shrink: 0;
   }
   .my-group-row:hover .my-group-arrow { opacity: 1; }
+
+  /* ── Unread Badge ── */
+  .unread-badge {
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 800;
+    border-radius: var(--radius-pill);
+    padding: 2px 8px;
+    min-width: 20px;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    animation: badge-pulse 2s infinite;
+  }
+  .unread-badge:hover {
+    background: #b91c1c;
+    text-decoration: none;
+  }
+  @keyframes badge-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+  .unread-badge-container {
+    position: relative;
+    display: inline-flex;
+  }
 
   /* Sidebar: tip card */
   .tip-card {
@@ -458,7 +487,19 @@
                   </div>
                 {% endif %}
                 <div style="min-width:0; flex:1;">
-                  <div class="my-group-name">{{ group.name }}</div>
+                  <div class="my-group-name">
+                    {{ group.name }}
+                    <!-- DEBUG: group.id={{ group.id }}, count={{ group_unread_counts|get_item:group.id }} -->
+                    {% if group_unread_counts|get_item:group.id > 0 %}
+                      <a href="{% url 'notifications:notifications' %}?type=GROUP_REQUEST&read=false" 
+                         class="unread-badge"
+                         data-group-id="{{ group.id }}"
+                         style="margin-left: 8px; text-decoration: none;"
+                         title="{{ group_unread_counts|get_item:group.id }} unread notifications">
+                        {{ group_unread_counts|get_item:group.id }}
+                      </a>
+                    {% endif %}
+                  </div>
                   <div class="my-group-meta">{{ group.members.count }} member{{ group.members.count|pluralize }}</div>
                 </div>
                 <i class="bi bi-chevron-right my-group-arrow"></i>
@@ -518,11 +559,11 @@
                 </span>
                 {% if group.id in user_group_ids %}
                   <span style="font-size:0.65rem; font-weight:700; color:var(--success); display:flex; align-items:center; gap:4px;">
-                    <i class="bi bi-check-circle-fill"></i> Joined
+                    <i class="bi bi-check-circle-fill"></i> Joined ✅
                   </span>
                 {% elif group.id in pending_group_ids %}
                   <span style="font-size:0.65rem; font-weight:700; color:var(--text-muted); display:flex; align-items:center; gap:4px;">
-                    <i class="bi bi-clock-fill"></i> Pending
+                    <i class="bi bi-clock-fill"></i> Request Sent ⏳
                   </span>
                 {% endif %}
               </div>

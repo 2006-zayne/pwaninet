@@ -13,4 +13,7 @@ urlpatterns = [
     path('<int:group_id>/edit/', views.edit_group, name='edit_group'),
     path('<int:group_id>/invite/<int:user_id>/', views.invite_to_group, name='invite_to_group'),
     path('invite/respond/<int:notif_id>/<str:action>/', views.respond_to_invite, name='respond_to_invite'),
+    path('<int:group_id>/approve/<int:user_id>/', views.approve_from_notification, name='approve_from_notification'),
+    path('<int:group_id>/reject/<int:user_id>/', views.reject_from_notification, name='reject_from_notification'),
+    path('api/unread-counts/', views.group_unread_counts_api, name='group_unread_counts_api'),
 ]

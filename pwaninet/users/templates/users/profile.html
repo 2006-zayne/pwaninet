@@ -111,6 +111,9 @@
                                 <a href="{% url 'users:update_profile' %}" class="btn btn-outline-secondary rounded-pill fw-bold btn-sm">
                                     <i class="bi bi-gear-wide-connected me-1"></i> UPDATE PROFILE
                                 </a>
+                                <button type="button" class="btn btn-outline-primary w-100 rounded-pill btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#accountSwitcherModal">
+                                    <i class="bi bi-arrow-repeat me-2"></i>SWITCH ACCOUNT
+                                </button>
                                 <form action="{% url 'core:logout' %}" method="POST" class="m-0">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-outline-danger w-100 rounded-pill btn-sm fw-bold">
@@ -127,11 +130,11 @@
                             <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Followers</small>
                         </div>
                         <div class="col-4 border-end">
-                            <h6 class="fw-bold mb-0">{{ following_count }}</h6>
+                            <h6 id="following-count" class="fw-bold mb-0">{{ following_count }}</h6>
                             <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Following</small>
                         </div>
                         <div class="col-4">
-                            <h6 class="fw-bold mb-0 text-primary">{{ total_likes|default:"0" }}</h6>
+                            <h6 id="total-likes-count" class="fw-bold mb-0 text-primary">{{ total_likes|default:"0" }}</h6>
                             <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Likes</small>
                         </div>
                     </div>
@@ -171,4 +174,9 @@
 
     </div>
 </div>
+{% endblock %}
+
+{% block modals %}
+    {{ block.super }}
+    {% include 'users/partials/account_switcher_modal.html' %}
 {% endblock %}
