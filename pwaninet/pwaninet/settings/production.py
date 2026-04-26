@@ -5,7 +5,11 @@ from .base import *
 
 DEBUG = False
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS = [
+    host.split(':')[0].strip()
+    for host in os.environ.get('ALLOWED_HOSTS', '').split(',')
+    if host.strip()
+]
 
 # PostgreSQL database configuration
 DATABASES = {

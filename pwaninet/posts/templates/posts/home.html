@@ -3,16 +3,16 @@
 {% block content %}
 <style>
   :root {
-    --brand-warm: #FF6B35;
-    --brand-warm-light: #fff4f0;
-    --brand-warm-mid: #ffe5da;
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --primary-light: #dbeafe;
     --search-bg: #f3f0ec;
     --search-bg-focus: #fff;
     --header-blur-bg: rgba(255, 255, 255, 0.88);
-    --text-main: #1a1613;
-    --text-muted: #7a736c;
-    --border-soft: #e8e2dc;
-    --avatar-ring: #FF6B35;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --border-soft: #e2e8f0;
+    --avatar-ring: #2563eb;
     --radius-pill: 999px;
     --radius-lg: 16px;
     --transition-smooth: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
@@ -20,7 +20,7 @@
 
   * { font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif; }
 
-  body { background-color: #f5f2ef; }
+  body { background-color: #f8fafc; }
 
   /* ── Sticky Search Header ── */
   .search-header {
@@ -104,10 +104,10 @@
   .search-input::placeholder { color: var(--text-muted); font-weight: 400; }
   .search-input:focus {
     background: #fff;
-    box-shadow: 0 0 0 3px rgba(255,107,53,0.12);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
   }
   .search-input:focus ~ .search-icon,
-  .search-form:focus-within .search-icon { color: var(--brand-warm); }
+  .search-form:focus-within .search-icon { color: var(--primary); }
 
   /* clear button shows when input has value */
   .search-clear {
@@ -154,7 +154,7 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--brand-warm);
+    background: var(--primary);
     animation: bounce-dot 0.9s infinite ease-in-out;
   }
   .search-dots span:nth-child(2) { animation-delay: 0.15s; }
@@ -182,6 +182,78 @@
   /* htmx swap animation */
   #main-content-area.htmx-swapping { opacity: 0; transition: opacity 0.15s ease; }
   #main-content-area.htmx-settling { animation: fade-in 0.3s ease; }
+
+  /* ── Groups to Explore Section ── */
+  .groups-explore-section {
+    margin-bottom: 24px;
+  }
+
+  .groups-explore-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .groups-explore-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .groups-explore-link {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--primary);
+    text-decoration: none;
+  }
+
+  .groups-explore-link:hover {
+    text-decoration: underline;
+  }
+
+  .groups-explore-list {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+  }
+
+  .groups-explore-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .group-explore-item {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 70px;
+  }
+
+  .group-explore-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+
+  .group-explore-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-main);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
 </style>
 
 <div class="container-fluid p-0">
@@ -190,12 +262,12 @@
   <header class="search-header">
     <div class="search-inner">
 
-      <!-- Avatar 
+      <!-- Avatar -->
       <a href="{% url 'users:profile' request.user.username %}" class="avatar-link">
         <img src="{{ request.user.profile_pic.url }}"
              class="avatar-img"
              alt="{{ request.user.username }}'s profile">
-      </a>-->
+      </a>
 
       <!-- Search Form -->
       <form method="GET"

@@ -1,22 +1,96 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
+<style>
+.profile-card {
+    position: relative;
+}
+
+.cover-container {
+    width: 100%;
+    height: 160px;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    border-radius: 12px 12px 0 0;
+    position: relative;
+}
+
+.cover-upload-icon {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.cover-container:hover .cover-upload-icon {
+    opacity: 1;
+}
+
+.avatar-wrapper {
+    position: absolute;
+    bottom: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+}
+
+.avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 4px solid white;
+    object-fit: cover;
+    position: relative;
+}
+
+.profile-pic-upload-icon {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: var(--brand, #2563eb);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    border: 2px solid white;
+    font-size: 12px;
+}
+</style>
 <div class="container-fluid py-3 px-2 px-md-4">
     <div class="row g-4 justify-content-center">
         
         <div class="col-12 col-lg-5 col-xl-4">
             <div class="sticky-top" style="top: 85px; z-index: 10;">
                 
-                <div class="post-card shadow-sm mb-4 border-0 rounded-3 overflow-hidden">
-                    <div class="bg-dark position-relative" style="height: 100px;">
-                        <div class="position-absolute top-100 start-50 translate-middle">
-                            
-                            <img src="{{ profile_user.profile_pic.url }}" 
-                                 class="rounded-circle border border-4 border-white shadow" 
-                                 style="width: 130px; height: 130px; object-fit: cover; background: white;">
+                <div class="post-card shadow-sm mb-4 border-0 rounded-3 overflow-visible profile-card">
+                    <div class="cover-container"
+                         style="background-image: url('{% if profile_user.cover_photo %}{{ profile_user.cover_photo.url }}{% else %}{% static 'images/default-cover.jpg' %}{% endif %}')">
+                        {% if request.user == profile_user %}
+                        <a href="{% url 'users:update_profile' %}" class="cover-upload-icon"><i class="bi bi-camera-fill"></i></a>
+                        {% endif %}
+                        <div class="avatar-wrapper">
+                            <img src="{{ profile_user.profile_pic.url }}" class="avatar shadow">
+                            {% if request.user == profile_user %}
+                            <a href="{% url 'users:update_profile' %}" class="profile-pic-upload-icon"><i class="bi bi-camera-fill"></i></a>
+                            {% endif %}
                         </div>
                     </div>
-
                     <div class="text-center pt-5 pb-3 px-3 mt-4">
                         <h4 class="fw-bold mb-0">{{ profile_user.get_full_name }}</h4>
                         <p class="text-muted small">@{{ profile_user.username }}</p>
@@ -80,7 +154,7 @@
         <div class="col-12 col-lg-7 col-xl-6">
             <div class="d-flex align-items-center justify-content-between mb-3 px-2">
                 <h6 class="fw-bold text-muted text-uppercase mb-0">{{ profile_user.username}}'s posts:</h6>
-                <span class="badge bg-dark rounded-pill">{{ posts.count }} Updates</span>
+                <span class="badge bg-primary rounded-pill">{{ posts.count }} Updates</span>
             </div>
             
             <div class="intel-stream">

@@ -21,6 +21,7 @@ class User(AbstractUser):
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE, null=True, blank=True)
     global_role = models.CharField(max_length=20, choices=GlobalRole.choices, default=GlobalRole.NORMAL)
     profile_pic = models.ImageField(default='profile_pic/default_pic1.jpg', upload_to='profile_pic')
+    cover_photo = models.ImageField(upload_to='covers/', blank=True, null=True)
     bio = models.TextField(max_length=500, blank=True)
     following = models.ManyToManyField("self", symmetrical=False, related_name="followers", blank=True)
     

@@ -1,0 +1,241 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+  .fullscreen-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    overflow: hidden;
+  }
+
+  .fullscreen-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    touch-action: pan-y;
+  }
+
+  .close-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    transition: background 0.2s;
+    text-decoration: none;
+  }
+
+  .close-btn:hover {
+    background: #fff;
+  }
+
+  .nav-btn {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    transition: background 0.2s;
+    text-decoration: none;
+  }
+
+  .nav-btn:hover {
+    background: #fff;
+  }
+
+  .nav-btn.prev {
+    left: 20px;
+  }
+
+  .nav-btn.next {
+    right: 20px;
+  }
+
+  .image-counter {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 14px;
+    z-index: 10000;
+  }
+
+  .likes-display {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 25px;
+    font-size: 13px;
+    z-index: 10000;
+    max-width: 90%;
+    text-align: center;
+  }
+
+  .likes-display a {
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .likes-display a:hover {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 768px) {
+    .close-btn {
+      top: 15px;
+      right: 15px;
+      width: 45px;
+      height: 45px;
+      font-size: 20px;
+    }
+
+    .nav-btn {
+      width: 45px;
+      height: 45px;
+      font-size: 20px;
+    }
+
+    .nav-btn.prev {
+      left: 15px;
+    }
+
+    .nav-btn.next {
+      right: 15px;
+    }
+
+    .image-counter {
+      bottom: 70px;
+      font-size: 12px;
+      padding: 8px 16px;
+    }
+
+    .likes-display {
+      bottom: 15px;
+      font-size: 12px;
+      padding: 10px 16px;
+    }
+  }
+</style>
+
+<div class="fullscreen-container" id="fullscreenContainer">
+  <a href="{% url 'posts:post_details' post.id %}" class="close-btn">
+    <i class="bi bi-x-lg"></i>
+  </a>
+
+  {% if has_prev %}
+  <a href="{% url 'posts:view_image_fullscreen' post.id prev_index %}" class="nav-btn prev" id="prevBtn">
+    <i class="bi bi-chevron-left"></i>
+  </a>
+  {% endif %}
+
+  <img src="{{ post_image.image.url }}" class="fullscreen-image" alt="Image {{ current_index|add:1 }}" id="fullscreenImage">
+
+  {% if has_next %}
+  <a href="{% url 'posts:view_image_fullscreen' post.id next_index %}" class="nav-btn next" id="nextBtn">
+    <i class="bi bi-chevron-right"></i>
+  </a>
+  {% endif %}
+
+  <div class="image-counter">
+    {{ current_index|add:1 }} / {{ all_images|length }}
+  </div>
+
+  {% if total_likes > 0 %}
+  <div class="likes-display">
+    {% if followed_likers %}
+      Liked by
+      {% for liker in followed_likers %}
+        <a href="{% url 'users:profile' liker.username %}">{{ liker.get_full_name|default:liker.username }}</a>{% if not forloop.last %}, {% endif %}
+      {% endfor %}
+      {% if other_likers_count > 0 %}
+        and {{ other_likers_count }} other{{ other_likers_count|pluralize }}
+      {% endif %}
+    {% else %}
+      Liked by {{ total_likes }} user{{ total_likes|pluralize }}
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const container = document.getElementById('fullscreenContainer');
+  const image = document.getElementById('fullscreenImage');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+
+  let touchStartX = 0;
+  let touchEndX = 0;
+  const minSwipeDistance = 50;
+
+  container.addEventListener('touchstart', function(e) {
+    touchStartX = e.changedTouches[0].screenX;
+  }, false);
+
+  container.addEventListener('touchend', function(e) {
+    touchEndX = e.changedTouches[0].screenX;
+    handleSwipe();
+  }, false);
+
+  function handleSwipe() {
+    const swipeDistance = touchEndX - touchStartX;
+
+    if (Math.abs(swipeDistance) > minSwipeDistance) {
+      if (swipeDistance > 0 && prevBtn) {
+        // Swipe right - go to previous
+        window.location.href = prevBtn.href;
+      } else if (swipeDistance < 0 && nextBtn) {
+        // Swipe left - go to next
+        window.location.href = nextBtn.href;
+      }
+    }
+  }
+
+  // Keyboard navigation
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowLeft' && prevBtn) {
+      window.location.href = prevBtn.href;
+    } else if (e.key === 'ArrowRight' && nextBtn) {
+      window.location.href = nextBtn.href;
+    } else if (e.key === 'Escape') {
+      window.location.href = "{% url 'posts:post_details' post.id %}";
+    }
+  });
+});
+</script>
+{% endblock %}

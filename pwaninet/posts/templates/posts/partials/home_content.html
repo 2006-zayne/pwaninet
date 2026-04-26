@@ -1,3 +1,23 @@
+<!-- Groups to Explore Section -->
+{% if explore_groups %}
+<div class="groups-explore-section">
+    <div class="groups-explore-header">
+        <span class="groups-explore-title">GROUPS TO EXPLORE</span>
+        <a href="{% url 'groups:groups_dashboard' %}" class="groups-explore-link">View All</a>
+    </div>
+    <div class="groups-explore-list">
+        {% for group in explore_groups %}
+        <div class="group-explore-item">
+            <a href="{% url 'groups:groups_detail' group.id %}">
+                <img src="{{ group.get_photo_url }}" alt="{{ group.name }}" class="group-explore-avatar">
+            </a>
+            <span class="group-explore-name">{{ group.name|truncatewords:2 }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <div class="feed-sector">
     {% include 'posts/partials/post_list.html' %}
 </div>

@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404
 from groups.models import Group, Membership, MembershipStatus
-from posts.models import Like, Post
+from posts.models import Like, Post, PostImage
 from users.models import User
 from notifications.models import Notifications
 from posts.services.feed_service import invalidate_home_feed_context
@@ -21,6 +21,16 @@ def create_post_for_user(form, user, files, group_id=None):
         post.course = post.unit.course
 
     post.save()
+
+    # Handle multiple image uploads
+    if files and 'images' in files:
+        images = files.getlist('images')
+        for idx, image_file in enumerate(images[:15]):  # Max 15 images
+            PostImage.objects.create(
+                post=post,
+                image=image_file,
+                order=idx
+            )
 
     # Invalidate feeds
     invalidate_home_feed_context(user.id)

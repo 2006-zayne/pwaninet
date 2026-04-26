@@ -13,7 +13,15 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-change-this-in-produc
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,10.20.152.125').split(',')
+ALLOWED_HOSTS = [
+    host.split(':')[0].strip()
+    for host in os.environ.get(
+        'ALLOWED_HOSTS',
+        'localhost,127.0.0.1,10.20.152.125,192.168.56.221'
+    ).split(',')
+    if host.strip()
+]
 
 # Application definition
 INSTALLED_APPS = [
@@ -131,9 +139,6 @@ CACHES = {
     'default': {
         'BACKEND': 'pwaninet.cache_backends.FallbackRedisCache',
         'LOCATION': os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/1'),
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django.core.cache.backends.redis.RedisCache',
-        },
         'TIMEOUT': 300,
         'KEY_PREFIX': 'pwaninet',
     },
@@ -159,6 +164,13 @@ REST_FRAMEWORK = {
 # CORS settings
 CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
 CORS_ALLOW_CREDENTIALS = True
+
+# CSRF settings
+CSRF_TRUSTED_ORIGINS = [
+    f"http://{host.split(':')[0].strip()}"
+    for host in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    if host.strip()
+]
 
 # Celery configuration
 CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://127.0.0.1:6379/0')

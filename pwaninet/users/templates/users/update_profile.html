@@ -4,17 +4,17 @@
 <style>
   /* ── Design Tokens (matches create_group.html & groups_detail.html) ── */
   :root {
-    --brand:          #1a1410;
-    --brand-light:    #f0eee9;
-    --brand-mid:      #dedad3;
-    --brand-glow:     rgba(26,20,16,0.10);
-    --page-bg:        #f5f2ef;
+    --brand:          #2563eb;
+    --brand-light:    #dbeafe;
+    --brand-mid:      #bfdbfe;
+    --brand-glow:     rgba(37, 99, 235, 0.10);
+    --page-bg:        #f8fafc;
     --card-bg:        #ffffff;
-    --border:         #ede8e3;
-    --border-hover:   #d6cfc8;
-    --text-primary:   #1a1410;
-    --text-secondary: #7a736c;
-    --text-muted:     #a89f98;
+    --border:         #e2e8f0;
+    --border-hover:   #cbd5e1;
+    --text-primary:   #0f172a;
+    --text-secondary: #64748b;
+    --text-muted:     #94a3b8;
     --radius-sm:      8px;
     --radius-md:      14px;
     --radius-lg:      20px;
@@ -221,7 +221,7 @@
     color: #fff;
   }
   .btn-primary-brand:hover {
-    background: #3a3330;
+    background: #1d4ed8;
     color: #fff;
     transform: translateY(-2px);
     box-shadow: 0 6px 20px var(--brand-glow);
@@ -234,7 +234,7 @@
   }
   .btn-secondary-brand:hover {
     background: var(--brand-mid);
-    color: #1a1410;
+    color: #0f172a;
     transform: translateY(-2px);
   }
 
@@ -302,6 +302,16 @@
                       <i class="bi bi-image"></i>
                     </div>
                     <div class="file-upload-text">Click to upload new photo</div>
+                  </label>
+                </div>
+              {% elif field.name == 'cover_photo' %}
+                <div class="file-upload-wrap">
+                  <input type="file" name="{{ field.name }}" id="{{ field.auto_id }}" accept="image/*" style="display: none;">
+                  <label for="{{ field.auto_id }}" style="cursor: pointer; display: block;">
+                    <div class="file-upload-icon">
+                      <i class="bi bi-image"></i>
+                    </div>
+                    <div class="file-upload-text">Click to upload cover photo</div>
                   </label>
                 </div>
               {% else %}

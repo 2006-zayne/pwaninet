@@ -6,7 +6,7 @@ class GroupForm(forms.ModelForm):
     class Meta:
         model = Group
         # We only want users to fill in these specific fields
-        fields = ['name', 'description', 'group_pic']
+        fields = ['name', 'description', 'group_pic', 'cover_photo']
 
         # Adding Bootstrap classes so the form looks sharp on your ProBook
         widgets = {
@@ -20,6 +20,9 @@ class GroupForm(forms.ModelForm):
                     'rows': 3,
                     'placeholder': 'What is this squad about?'}),
             'group_pic': forms.FileInput(
+                attrs={
+                    'class': 'form-control'}),
+            'cover_photo': forms.FileInput(
                 attrs={
                     'class': 'form-control'}),
         }

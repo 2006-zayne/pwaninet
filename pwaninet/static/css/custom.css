@@ -47,9 +47,9 @@
 .tactical-form select:focus,
 #postForm textarea:focus,
 #postForm select:focus {
-    border-color: #3b82f6;
+    border-color: #2563eb;
     background-color: #ffffff;
-    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
 }
 
 /* ================================
@@ -58,7 +58,7 @@
 .transition-all:hover {
     transform: translateY(-2px);
     filter: brightness(1.05);
-    box-shadow: 0 10px 20px rgba(59, 130, 246, 0.15);
+    box-shadow: 0 10px 20px rgba(37, 99, 235, 0.15);
 }
 
 /* ================================
@@ -71,7 +71,7 @@
 
 .media-upload-box:hover {
     background-color: #e9ecef;
-    border-color: #3b82f6;
+    border-color: #2563eb;
     transform: translateY(-2px);
 }
 
@@ -81,7 +81,7 @@
 .post-card {
     background: #ffffff;
     border-radius: 1rem;
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 /* ================================
@@ -97,21 +97,21 @@
 }
 
 .suggestion-card:hover {
-    border-color: #3b82f6;
+    border-color: #2563eb;
     background-color: #f8fafc;
     transform: translateY(-3px);
 }
 
 .avatar-ring {
     padding: 3px;
-    border: 2px solid #3b82f6;
+    border: 2px solid #2563eb;
 }
 
 /* ================================
    GRADIENT SYSTEM (POSTS)
 ================================ */
 .grad-ocean {
-    background: linear-gradient(135deg, #0f172a 0%, #3b82f6 100%);
+    background: linear-gradient(135deg, #0f172a 0%, #2563eb 100%);
 }
 
 .grad-forest {

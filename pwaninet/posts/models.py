@@ -23,20 +23,22 @@ class Post(models.Model):
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE, null=True, blank=True)
     unit = models.ForeignKey('courses.Unit', on_delete=models.SET_NULL, null=True, blank=True)
     content = models.TextField()
-    image = models.ImageField(upload_to='posts/images', blank=True, null=True)
     video = models.FileField(upload_to='posts/videos', blank=True, null=True)
     docs = models.FileField(upload_to='posts/docs', blank=True, null=True)
     gradient_class = models.CharField(max_length=50, choices=GRADIENT_CHOICES, default='none', blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        ordering = ['-created_at']
+
     def __str__(self):
         return f"Post by {self.author} on {self.created_at.strftime('%Y-%m-%d')}"
     
     @property
     def get_intel_file(self):
-        if self.image:
-            return self.image
+        if self.images.exists():
+            return self.images.first().image
         if self.video:
             return self.video
         if self.docs:
@@ -53,25 +55,38 @@ class Post(models.Model):
         return self.likes.count()
     
     def save(self, *args, **kwargs):
+        super(Post, self).save(*args, **kwargs)
+
+
+class PostImage(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='posts/images')
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order']
+
+    def save(self, *args, **kwargs):
         if self.image:
             img = Image.open(self.image)
             if img.mode != 'RGB':
                 img = img.convert('RGB')
-            
+
             if img.height > 1080 or img.width > 1080:
                 img.thumbnail((1080, 1080))
-            
+
             output = BytesIO()
             img.save(output, format='JPEG', quality=75)
             output.seek(0)
-            
+
             file_name = self.image.name.split('.')[0]
             self.image = InMemoryUploadedFile(
-                output, 'ImageField', f"{file_name}.jpg", 
+                output, 'ImageField', f"{file_name}.jpg",
                 'image/jpeg', sys.getsizeof(output), None
             )
 
-        super(Post, self).save(*args, **kwargs)
+        super(PostImage, self).save(*args, **kwargs)
 
 
 class Like(models.Model):

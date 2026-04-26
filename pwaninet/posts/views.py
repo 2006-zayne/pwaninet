@@ -176,6 +176,15 @@ def home_view(request):
     cursor = request.GET.get('cursor')
     context = build_home_feed_context(request.user, cursor=cursor)
     
+    # Add explore groups - groups user is not a member of
+    from groups.models import Group, Membership, MembershipStatus
+    user_group_ids = set(Group.objects.filter(
+        memberships__user=request.user,
+        memberships__status=MembershipStatus.APPROVED
+    ).values_list('id', flat=True))
+    explore_groups = Group.objects.exclude(id__in=user_group_ids).order_by('-created_at')[:8]
+    context['explore_groups'] = explore_groups
+    
     # If HTMX requests the home feed (e.g. when clearing search), return the inner content
     if request.headers.get('HX-Request') and not request.GET.get('q'):
         return render(request, 'posts/partials/home_content.html', context)
@@ -271,12 +280,12 @@ def unit_posts_view(request, unit_id):
 def search_view(request):
     from posts.queries.search_queries import search_users, search_groups, get_user_groups, get_following_ids
     query = request.GET.get('q', '')
-    
+
     users = search_users(query, request.user)
     groups = search_groups(query)
     user_groups = get_user_groups(request.user)
     following_ids = list(get_following_ids(request.user))
-    
+
     context = {
         'query': query,
         'users': users,
@@ -285,8 +294,50 @@ def search_view(request):
         'following_ids': following_ids,
         'unread_notifications_count': get_cached_unread_count(request.user),
     }
-    
+
     if request.headers.get('HX-Request'):
         return render(request, 'posts/partials/search_results_inner.html', context)
 
     return render(request, 'posts/search_results.html', context)
+
+
+@login_required
+def view_image_fullscreen(request, post_id, image_index):
+    post = get_object_or_404(Post, id=post_id)
+    all_images = list(post.images.all())
+    
+    # Handle both index and ID (for backward compatibility with existing links)
+    if image_index < len(all_images):
+        current_index = image_index
+        post_image = all_images[current_index]
+    else:
+        # If image_index is actually an ID (from old links), find by ID
+        post_image = get_object_or_404(post.images, id=image_index)
+        current_index = all_images.index(post_image)
+
+    # Get likes for the post
+    post_likes = post.likes.select_related('user').all()
+    liked_users = [like.user for like in post_likes]
+
+    # Get users that the current user follows
+    following_ids = set(request.user.following.all().values_list('id', flat=True))
+
+    # Separate likes into followed users and others
+    followed_likers = [user for user in liked_users if user.id in following_ids]
+    other_likers = [user for user in liked_users if user.id not in following_ids]
+
+    context = {
+        'post': post,
+        'post_image': post_image,
+        'all_images': all_images,
+        'current_index': current_index,
+        'has_prev': current_index > 0,
+        'has_next': current_index < len(all_images) - 1,
+        'prev_index': current_index - 1 if current_index > 0 else None,
+        'next_index': current_index + 1 if current_index < len(all_images) - 1 else None,
+        'followed_likers': followed_likers,
+        'other_likers_count': len(other_likers),
+        'total_likes': len(liked_users),
+    }
+
+    return render(request, 'posts/image_fullscreen.html', context)

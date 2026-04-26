@@ -5,17 +5,17 @@
 <style>
   /* ── Design Tokens (matches other pages) ── */
   :root {
-    --brand:          #1a1410;
-    --brand-light:    #f0eee9;
-    --brand-mid:      #dedad3;
-    --brand-glow:     rgba(26,20,16,0.10);
-    --page-bg:        #f5f2ef;
+    --brand:          #2563eb;
+    --brand-light:    #dbeafe;
+    --brand-mid:      #bfdbfe;
+    --brand-glow:     rgba(37, 99, 235, 0.10);
+    --page-bg:        #f8fafc;
     --card-bg:        #ffffff;
-    --border:         #ede8e3;
-    --border-hover:   #d6cfc8;
-    --text-primary:   #1a1410;
-    --text-secondary: #7a736c;
-    --text-muted:     #a89f98;
+    --border:         #e2e8f0;
+    --border-hover:   #cbd5e1;
+    --text-primary:   #0f172a;
+    --text-secondary: #64748b;
+    --text-muted:     #94a3b8;
     --radius-sm:      8px;
     --radius-md:      14px;
     --radius-lg:      20px;
@@ -163,7 +163,7 @@
     max-width: 90%;
   }
 
-  .grad-ocean    { background: linear-gradient(135deg, #0f172a 0%, #3b82f6 100%) !important; }
+  .grad-ocean    { background: linear-gradient(135deg, #0f172a 0%, #2563eb 100%) !important; }
   .grad-forest   { background: linear-gradient(135deg, #064e3b 0%, #10b981 100%) !important; }
   .grad-magma    { background: linear-gradient(135deg, #450a0a 0%, #ef4444 100%) !important; }
   .grad-midnight { background: linear-gradient(135deg, #1e1b4b 0%, #8b5cf6 100%) !important; }
@@ -368,7 +368,7 @@
   }
 
   .btn-deploy:hover {
-    background: #3a3330;
+    background: #1d4ed8;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px var(--brand-glow);
   }
@@ -471,10 +471,10 @@
             <div class="compose-panel" id="mediaPanel">
               <div class="panel-label">Attach Files</div>
               <div class="media-row">
-                <label for="{{ form.image.id_for_label }}">
-                  <i class="bi bi-image"></i> Image
+                <label for="{{ form.images.id_for_label }}">
+                  <i class="bi bi-images"></i> Images (Max 15)
                 </label>
-                {{ form.image }}
+                <input type="file" name="images" id="{{ form.images.id_for_label }}" class="form-control-file" multiple accept="image/*">
               </div>
               <div class="media-row">
                 <label for="{{ form.video.id_for_label }}">

@@ -11,4 +11,5 @@ urlpatterns = [
     path('post/<int:post_id>/likers/', views.post_likers_list, name='post_likers_list'),
     path('unit/<int:unit_id>/', views.unit_posts_view, name='unit_detail'),
     path('search/', views.search_view, name='search'),
+    path('post/<int:post_id>/image/<int:image_index>/', views.view_image_fullscreen, name='view_image_fullscreen'),
 ]

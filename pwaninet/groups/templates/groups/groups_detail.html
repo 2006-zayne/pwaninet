@@ -1,20 +1,21 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 <style>
   /* ── Design Tokens ── */
   :root {
-    --brand:          #1a1410;
-    --brand-light:    #f0eee9;
-    --brand-mid:      #dedad3;
-    --brand-glow:     rgba(26,20,16,0.10);
-    --page-bg:        #f5f2ef;
+    --brand:          #2563eb;
+    --brand-light:    #dbeafe;
+    --brand-mid:      #bfdbfe;
+    --brand-glow:     rgba(37, 99, 235, 0.10);
+    --page-bg:        #f8fafc;
     --card-bg:        #ffffff;
-    --border:         #ede8e3;
-    --border-hover:   #d6cfc8;
-    --text-primary:   #1a1410;
-    --text-secondary: #7a736c;
-    --text-muted:     #a89f98;
+    --border:         #e2e8f0;
+    --border-hover:   #cbd5e1;
+    --text-primary:   #0f172a;
+    --text-secondary: #64748b;
+    --text-muted:     #94a3b8;
     --success:        #16a34a;
     --success-light:  #f0fdf4;
     --danger:         #dc2626;
@@ -34,24 +35,26 @@
   /* ── Layout ── */
   .page-grid {
     display: grid;
-    grid-template-columns: 300px 1fr;
-    gap: 2rem;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
     max-width: 1200px;
-    margin: 2rem auto;
-    padding: 0 1.5rem 4rem;
+    margin: 0 auto;
+    padding: 0 1rem 4rem;
     align-items: start;
   }
-  @media (max-width: 960px) {
-    .page-grid { grid-template-columns: 1fr; }
-    .sticky-panel { position: static !important; }
+  @media (min-width: 992px) {
+    .page-grid { grid-template-columns: 380px 1fr; }
   }
   .sticky-panel { position: sticky; top: 88px; }
+  @media (max-width: 991px) {
+    .sticky-panel { position: static !important; }
+  }
 
   /* ── Card ── */
   .card {
     background: var(--card-bg);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
+    border-radius: 1rem;
+    border: none;
     box-shadow: var(--shadow-card);
     overflow: hidden;
     margin-bottom: 1.25rem;
@@ -59,24 +62,74 @@
   .card-body { padding: 1.5rem; }
 
   /* ── Group Hero (sidebar top card) ── */
-  .group-banner {
-    height: 80px;
-    background: linear-gradient(135deg, #3a3330 0%, #1a1410 60%, #0d0b09 100%);
+  .group-card {
     position: relative;
+  }
+  .group-banner {
+    height: 160px;
+    position: relative;
+    border-radius: 12px 12px 0 0;
   }
   .group-avatar-wrap {
     position: absolute;
-    bottom: -36px;
+    bottom: -40px;
     left: 50%;
     transform: translateX(-50%);
+    z-index: 10;
   }
   .group-avatar {
-    width: 76px; height: 76px;
+    width: 120px;
+    height: 120px;
     border-radius: 50%;
     object-fit: cover;
     border: 4px solid var(--card-bg);
     box-shadow: 0 4px 14px rgba(0,0,0,0.15);
     display: block;
+    position: relative;
+  }
+  .cover-container {
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    border-radius: 12px 12px 0 0;
+    position: relative;
+  }
+  .cover-upload-icon {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .cover-container:hover .cover-upload-icon {
+    opacity: 1;
+  }
+  .group-pic-upload-icon {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: var(--brand);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    border: 2px solid var(--card-bg);
+    font-size: 12px;
   }
   .group-info { padding: 48px 1.5rem 1.5rem; text-align: center; }
   .group-name {
@@ -136,7 +189,7 @@
     color: #fff;
   }
   .btn-primary-brand:hover {
-    background: #e85a26;
+    background: #1d4ed8;
     color: #fff;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px var(--brand-glow);
@@ -149,7 +202,7 @@
   }
   .btn-secondary-brand:hover {
     background: var(--brand-mid);
-    color: #1a1410;
+    color: #0f172a;
     transform: translateY(-1px);
   }
 
@@ -445,16 +498,26 @@
   }
 </style>
 
-<div class="page-grid">
+<div class="container-fluid py-3 px-2 px-md-4">
+  <div class="page-grid">
 
   <!-- ══ SIDEBAR ══ -->
   <aside class="sticky-panel">
 
     <!-- Group Card -->
-    <div class="card">
+    <div class="card group-card" style="position: relative; overflow: visible;">
       <div class="group-banner">
+        <div class="cover-container"
+             style="background-image: url('{% if group.cover_photo %}{{ group.cover_photo.url }}{% else %}{% static 'images/default-cover.jpg' %}{% endif %}')">
+          {% if is_admin %}
+          <a href="#" class="cover-upload-icon" data-bs-toggle="modal" data-bs-target="#editGroupModal"><i class="bi bi-camera-fill"></i></a>
+          {% endif %}
+        </div>
         <div class="group-avatar-wrap">
           <img src="{{ group.get_photo_url }}" class="group-avatar" alt="{{ group.name }}">
+          {% if is_admin %}
+          <a href="#" class="group-pic-upload-icon" data-bs-toggle="modal" data-bs-target="#editGroupModal"><i class="bi bi-camera-fill"></i></a>
+          {% endif %}
         </div>
       </div>
       <div class="group-info">
@@ -585,9 +648,13 @@
             <label class="field-label">Description</label>
             <textarea name="description" class="form-field" rows="3">{{ group.description }}</textarea>
           </div>
-          <div class="mb-4">
+          <div class="mb-3">
             <label class="field-label">Group Photo</label>
             <input type="file" name="photo" class="form-control form-control-sm" style="font-family:'Nunito',sans-serif; font-size:0.82rem;">
+          </div>
+          <div class="mb-4">
+            <label class="field-label">Cover Photo</label>
+            <input type="file" name="cover_photo" class="form-control form-control-sm" style="font-family:'Nunito',sans-serif; font-size:0.82rem;">
           </div>
           <div class="d-flex justify-content-end">
             <button type="submit" class="btn-modal-submit">

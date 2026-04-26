@@ -47,7 +47,7 @@ class ProfileUpdateForm(forms.ModelForm):
         # The students will only be allowed to edit the profile pic bio and
         # other fields if possible maybe nicknames but we will figure out that
         # later.
-        fields = ['profile_pic', 'bio']
+        fields = ['profile_pic', 'cover_photo', 'bio']
         widgets = {
             'bio': forms.Textarea(
                 attrs={
@@ -60,4 +60,6 @@ class ProfileUpdateForm(forms.ModelForm):
         super(ProfileUpdateForm, self).__init__(*args, **kwargs)
         # THis ensure the file input is visible
         self.fields['profile_pic'].widget.attrs.update(
+            {'class': 'form-control-file'})
+        self.fields['cover_photo'].widget.attrs.update(
             {'class': 'form-control-file'})

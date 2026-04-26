@@ -7,6 +7,7 @@ class Group(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='created_groups')
     description = models.TextField(max_length=500, blank=True)
     group_pic = models.ImageField(upload_to='group_profile_pic', null=True, blank=True)
+    cover_photo = models.ImageField(upload_to='group_covers/', blank=True, null=True)
     is_official = models.BooleanField(default=False)
     course = models.ForeignKey('courses.Course', on_delete=models.SET_NULL, null=True, blank=True)
     year = models.ForeignKey('courses.Year', on_delete=models.SET_NULL, null=True, blank=True)
