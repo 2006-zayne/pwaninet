@@ -1,14 +1,5 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 from . import views
-
-# API Router
-router = DefaultRouter()
-router.register(r'api/posts', views.PostViewSet, basename='post')
-router.register(r'api/comments', views.CommentViewSet, basename='comment')
-router.register(r'api/reports', views.ReportViewSet, basename='report')
-router.register(r'api/author-preferences', views.AuthorPreferenceViewSet, basename='authorpreference')
-router.register(r'api/shared-posts', views.SharedPostViewSet, basename='sharedpost')
 
 urlpatterns = [
     path('', views.home_view, name='home'),
@@ -22,5 +13,24 @@ urlpatterns = [
     path('search/', views.search_view, name='search'),
     path('post/<int:post_id>/image/<int:image_index>/', views.view_image_fullscreen, name='view_image_fullscreen'),
     path('post/<int:post_id>/share/', views.share_post_view, name='share_post'),
-    path('', include(router.urls)),
+    path('shares/', views.shared_posts_view, name='shared_posts'),
+    path('share/search-users/', views.search_following_users, name='search_following_users'),
+    path('share/search-groups/', views.search_user_groups, name='search_user_groups'),
+    # API endpoints
+    path('api/posts/', views.PostViewSet.as_view({'get': 'list', 'post': 'create'}), name='post_list'),
+    path('api/posts/<int:pk>/', views.PostViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='post_detail_api'),
+    path('api/posts/<int:pk>/repost/', views.PostViewSet.as_view({'post': 'repost', 'delete': 'delete_repost'}), name='post_repost'),
+    path('api/posts/<int:pk>/share/', views.PostViewSet.as_view({'post': 'share'}), name='post_share_api'),
+    path('api/posts/<int:pk>/hide/', views.PostViewSet.as_view({'post': 'hide'}), name='post_hide'),
+    path('api/posts/<int:pk>/unhide/', views.PostViewSet.as_view({'post': 'unhide'}), name='post_unhide'),
+    path('api/posts/<int:pk>/reposts/', views.PostViewSet.as_view({'get': 'reposts'}), name='post_reposts'),
+    path('api/comments/', views.CommentViewSet.as_view({'get': 'list', 'post': 'create'}), name='comment_list'),
+    path('api/comments/<int:pk>/', views.CommentViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='comment_detail'),
+    path('api/comments/<int:pk>/like/', views.CommentViewSet.as_view({'post': 'like'}), name='comment_like'),
+    path('api/reports/', views.ReportViewSet.as_view({'get': 'list', 'post': 'create'}), name='report_list'),
+    path('api/reports/<int:pk>/', views.ReportViewSet.as_view({'get': 'retrieve', 'delete': 'destroy'}), name='report_detail'),
+    path('api/author-preferences/', views.AuthorPreferenceViewSet.as_view({'get': 'list', 'post': 'create'}), name='author_preference_list'),
+    path('api/author-preferences/<int:pk>/', views.AuthorPreferenceViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='author_preference_detail'),
+    path('api/shared-posts/', views.SharedPostViewSet.as_view({'get': 'list', 'post': 'create'}), name='shared_post_list'),
+    path('api/shared-posts/<int:pk>/', views.SharedPostViewSet.as_view({'get': 'retrieve', 'delete': 'destroy'}), name='shared_post_detail'),
 ]

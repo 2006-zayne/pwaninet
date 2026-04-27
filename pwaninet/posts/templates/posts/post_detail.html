@@ -252,26 +252,183 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Share to profile</h5>
+                <h5 class="modal-title">Share Post</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form method="POST" action="{% url 'posts:share_post' post.id %}">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label class="form-label">Share to</label>
-                        <input type="text" name="shared_to_username" class="form-control" placeholder="Username" required>
+                <ul class="nav nav-tabs mb-3" id="shareTabs-{{ post.id }}" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="user-tab-{{ post.id }}" data-bs-toggle="tab" data-bs-target="#user-share-{{ post.id }}" type="button" role="tab">Share to Users</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="group-tab-{{ post.id }}" data-bs-toggle="tab" data-bs-target="#group-share-{{ post.id }}" type="button" role="tab">Share to Groups</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="shareTabContent-{{ post.id }}">
+                    <!-- Share to Users Tab -->
+                    <div class="tab-pane fade show active" id="user-share-{{ post.id }}" role="tabpanel">
+                        <form id="share-user-form-{{ post.id }}" hx-post="{% url 'posts:share_post' post.id %}" hx-target="#share-result-{{ post.id }}" hx-swap="innerHTML">
+                            {% csrf_token %}
+                            <input type="hidden" name="share_type" value="user">
+                            <div class="mb-3">
+                                <input type="text" 
+                                       class="form-control" 
+                                       placeholder="Search users you follow..." 
+                                       name="user_search"
+                                       hx-get="{% url 'posts:search_following_users' %}"
+                                       hx-target="#user-results-{{ post.id }}"
+                                       hx-trigger="keyup changed delay:300ms"
+                                       hx-indicator="#user-search-indicator-{{ post.id }}">
+                                <span id="user-search-indicator-{{ post.id }}" class="htmx-indicator">
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                </span>
+                            </div>
+                            <div id="user-results-{{ post.id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
+                                <div class="p-3 text-center text-muted">
+                                    <small>Start typing to search users you follow</small>
+                                </div>
+                            </div>
+                            <div id="selected-users-{{ post.id }}" class="mb-3">
+                                <small class="text-muted">Selected users will appear here</small>
+                            </div>
+                            <input type="hidden" name="shared_to_usernames" id="shared-to-usernames-{{ post.id }}">
+                            <div class="mb-3">
+                                <label class="form-label">Add a message (optional)</label>
+                                <textarea name="message" class="form-control" rows="3" placeholder="Check this out!"></textarea>
+                            </div>
+                            <button type="submit" 
+                                    class="btn btn-primary w-100"
+                                    hx-on::after-request="if(document.getElementById('share-result-{{ post.id }}').querySelector('.alert-success')) { bootstrap.Modal.getInstance(document.getElementById('shareModal-{{ post.id }}')).hide(); document.getElementById('share-result-{{ post.id }}').innerHTML = ''; }">
+                                Share to Selected Users
+                            </button>
+                            <div id="share-result-{{ post.id }}"></div>
+                        </form>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Add a message (optional)</label>
-                        <textarea name="message" class="form-control" rows="3" placeholder="Check this out!"></textarea>
+                    <!-- Share to Groups Tab -->
+                    <div class="tab-pane fade" id="group-share-{{ post.id }}" role="tabpanel">
+                        <form id="share-group-form-{{ post.id }}" hx-post="{% url 'posts:share_post' post.id %}" hx-target="#share-result-group-{{ post.id }}" hx-swap="innerHTML">
+                            {% csrf_token %}
+                            <input type="hidden" name="share_type" value="group">
+                            <div class="mb-3">
+                                <input type="text" 
+                                       class="form-control" 
+                                       placeholder="Search your groups..." 
+                                       name="group_search"
+                                       hx-get="{% url 'posts:search_user_groups' %}"
+                                       hx-target="#group-results-{{ post.id }}"
+                                       hx-trigger="keyup changed delay:300ms"
+                                       hx-indicator="#group-search-indicator-{{ post.id }}">
+                                <span id="group-search-indicator-{{ post.id }}" class="htmx-indicator">
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                </span>
+                            </div>
+                            <div id="group-results-{{ post.id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
+                                <div class="p-3 text-center text-muted">
+                                    <small>Start typing to search your groups</small>
+                                </div>
+                            </div>
+                            <div id="selected-groups-{{ post.id }}" class="mb-3">
+                                <small class="text-muted">Selected groups will appear here</small>
+                            </div>
+                            <input type="hidden" name="shared_to_group_ids" id="shared-to-group-ids-{{ post.id }}">
+                            <div class="mb-3">
+                                <label class="form-label">Add a message (optional)</label>
+                                <textarea name="message" class="form-control" rows="3" placeholder="Check this out!"></textarea>
+                            </div>
+                            <button type="submit" 
+                                    class="btn btn-primary w-100"
+                                    hx-on::after-request="if(document.getElementById('share-result-group-{{ post.id }}').querySelector('.alert-success')) { bootstrap.Modal.getInstance(document.getElementById('shareModal-{{ post.id }}')).hide(); document.getElementById('share-result-group-{{ post.id }}').innerHTML = ''; }">
+                                Share to Selected Groups
+                            </button>
+                            <div id="share-result-group-{{ post.id }}"></div>
+                        </form>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">Share</button>
-                </form>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('shareModal-{{ post.id }}');
+    if (!modal) return;
+    
+    const selectedUsers = new Set();
+    const selectedGroups = new Set();
+    
+    // Handle user checkbox changes
+    modal.addEventListener('change', function(e) {
+        if (e.target.classList.contains('user-checkbox')) {
+            const username = e.target.value;
+            
+            if (e.target.checked) {
+                selectedUsers.add(username);
+            } else {
+                selectedUsers.delete(username);
+            }
+            updateSelectedUsers();
+        }
+        
+        if (e.target.classList.contains('group-checkbox')) {
+            const groupId = e.target.value;
+            
+            if (e.target.checked) {
+                selectedGroups.add(groupId);
+            } else {
+                selectedGroups.delete(groupId);
+            }
+            updateSelectedGroups();
+        }
+    });
+    
+    function updateSelectedUsers() {
+        const container = document.getElementById('selected-users-{{ post.id }}');
+        const input = document.getElementById('shared-to-usernames-{{ post.id }}');
+        
+        if (selectedUsers.size === 0) {
+            container.innerHTML = '<small class="text-muted">Selected users will appear here</small>';
+            input.value = '';
+        } else {
+            container.innerHTML = Array.from(selectedUsers).map(username => 
+                `<span class="badge bg-primary me-1 mb-1">${username} <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.5rem;" onclick="removeUser{{ post.id }}('${username}')">&times;</button></span>`
+            ).join('');
+            input.value = Array.from(selectedUsers).join(',');
+        }
+    }
+    
+    function updateSelectedGroups() {
+        const container = document.getElementById('selected-groups-{{ post.id }}');
+        const input = document.getElementById('shared-to-group-ids-{{ post.id }}');
+        
+        if (selectedGroups.size === 0) {
+            container.innerHTML = '<small class="text-muted">Selected groups will appear here</small>';
+            input.value = '';
+        } else {
+            container.innerHTML = Array.from(selectedGroups).map(groupId => {
+                const label = document.querySelector(`#group-${groupId}`);
+                const groupName = label ? label.querySelector('.fw-bold').textContent : groupId;
+                return `<span class="badge bg-success me-1 mb-1">${groupName} <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.5rem;" onclick="removeGroup{{ post.id }}('${groupId}')">&times;</button></span>`;
+            }).join('');
+            input.value = Array.from(selectedGroups).join(',');
+        }
+    }
+    
+    window['removeUser' + {{ post.id }}] = function(username) {
+        selectedUsers.delete(username);
+        const checkbox = document.querySelector(`.user-checkbox[value="${username}"]`);
+        if (checkbox) checkbox.checked = false;
+        updateSelectedUsers();
+    };
+    
+    window['removeGroup' + {{ post.id }}] = function(groupId) {
+        selectedGroups.delete(groupId);
+        const checkbox = document.querySelector(`.group-checkbox[value="${groupId}"]`);
+        if (checkbox) checkbox.checked = false;
+        updateSelectedGroups();
+    };
+});
+</script>
 
 </div>
 </div>

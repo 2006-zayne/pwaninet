@@ -26,6 +26,7 @@ class Post(models.Model):
     video = models.FileField(upload_to='posts/videos', blank=True, null=True)
     docs = models.FileField(upload_to='posts/docs', blank=True, null=True)
     gradient_class = models.CharField(max_length=50, choices=GRADIENT_CHOICES, default='none', blank=True)
+    repost_of = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='repost_children')
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -60,12 +61,12 @@ class Post(models.Model):
     @property
     def repost_count(self):
         if not hasattr(self, '_repost_count'):
-            self._repost_count = self.reposts.count()
+            self._repost_count = self.repost_children.count()
         return self._repost_count
 
     def is_reposted_by(self, user):
         if user.is_authenticated:
-            return self.reposts.filter(reposter=user).exists()
+            return self.repost_children.filter(author=user).exists()
         return False
     
     def save(self, *args, **kwargs):
@@ -142,7 +143,8 @@ class CommentLike(models.Model):
 class Report(models.Model):
     reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reports')
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='reports')
-    reason = models.TextField()
+    reason = models.CharField(max_length=50)
+    description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -203,14 +205,34 @@ class AuthorPreference(models.Model):
 class SharedPost(models.Model):
     original_post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='shares')
     sharer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='shared_posts')
-    shared_to = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='received_shares')
+    shared_to = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='received_shares', null=True, blank=True)
+    shared_to_group = models.ForeignKey('groups.Group', on_delete=models.CASCADE, related_name='received_shares', null=True, blank=True)
     message = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     is_viewed = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ('original_post', 'sharer', 'shared_to')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['original_post', 'sharer', 'shared_to'],
+                condition=models.Q(shared_to__isnull=False),
+                name='unique_user_share'
+            ),
+            models.UniqueConstraint(
+                fields=['original_post', 'sharer', 'shared_to_group'],
+                condition=models.Q(shared_to_group__isnull=False),
+                name='unique_group_share'
+            ),
+            models.CheckConstraint(
+                condition=models.Q(shared_to__isnull=False) | models.Q(shared_to_group__isnull=False),
+                name='share_to_user_or_group'
+            )
+        ]
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.sharer.username} shared post {self.original_post.id} to {self.shared_to.username}"
+        if self.shared_to:
+            return f"{self.sharer.username} shared post {self.original_post.id} to {self.shared_to.username}"
+        elif self.shared_to_group:
+            return f"{self.sharer.username} shared post {self.original_post.id} to group {self.shared_to_group.name}"
+        return f"{self.sharer.username} shared post {self.original_post.id}"

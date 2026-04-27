@@ -1,5 +1,5 @@
-# core/context_processors.py
-from notifications.services.notification_service import get_cached_unread_count
+# notifications/context_processors.py
+from .services.notification_service import get_cached_unread_count
 
 def notification_count(request):
     """Protocol: Provides a global count of unread intel reports."""

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load user_extras %}
 
 {% block content %}
 <style>
@@ -55,6 +56,24 @@
     position: relative;
 }
 
+.clickable-photo {
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.clickable-photo:hover {
+    opacity: 0.9;
+}
+
+.clickable-cover {
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.clickable-cover:hover {
+    opacity: 0.9;
+}
+
 .profile-pic-upload-icon {
     position: absolute;
     bottom: 0;
@@ -71,6 +90,23 @@
     border: 2px solid white;
     font-size: 12px;
 }
+
+.authority-badge {
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: white;
+    z-index: 11;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    white-space: nowrap;
+}
 </style>
 <div class="container-fluid py-3 px-2 px-md-4">
     <div class="row g-4 justify-content-center">
@@ -79,16 +115,31 @@
             <div class="sticky-top" style="top: 85px; z-index: 10;">
                 
                 <div class="post-card shadow-sm mb-4 border-0 rounded-3 overflow-visible profile-card">
-                    <div class="cover-container"
+                    <div class="cover-container {% if request.user == profile_user or is_following %}clickable-cover{% endif %}"
+                         {% if request.user == profile_user or is_following %}
+                         onclick="window.location.href='{% url 'users:view_profile_photo_fullscreen' profile_user.username 'cover' %}'"
+                         {% endif %}
                          style="background-image: url('{% if profile_user.cover_photo %}{{ profile_user.cover_photo.url }}{% else %}{% static 'images/default-cover.jpg' %}{% endif %}')">
                         {% if request.user == profile_user %}
-                        <a href="{% url 'users:update_profile' %}" class="cover-upload-icon"><i class="bi bi-camera-fill"></i></a>
+                        <a href="{% url 'users:update_profile' %}" class="cover-upload-icon" onclick="event.stopPropagation()"><i class="bi bi-camera-fill"></i></a>
                         {% endif %}
                         <div class="avatar-wrapper">
+                            {% if request.user == profile_user or is_following %}
+                            <img src="{{ profile_user.profile_pic.url }}" class="avatar shadow clickable-photo"
+                                 onclick="event.stopPropagation(); window.location.href='{% url 'users:view_profile_photo_fullscreen' profile_user.username 'profile' %}'">
+                            {% else %}
                             <img src="{{ profile_user.profile_pic.url }}" class="avatar shadow">
-                            {% if request.user == profile_user %}
-                            <a href="{% url 'users:update_profile' %}" class="profile-pic-upload-icon"><i class="bi bi-camera-fill"></i></a>
                             {% endif %}
+                            {% if request.user == profile_user %}
+                            <a href="{% url 'users:update_profile' %}" class="profile-pic-upload-icon" onclick="event.stopPropagation()"><i class="bi bi-camera-fill"></i></a>
+                            {% endif %}
+                            {% with badge=profile_user|get_global_role_badge %}
+                                {% if badge %}
+                                    <div class="authority-badge {{ badge.class }}">
+                                        {{ badge.label }}
+                                    </div>
+                                {% endif %}
+                            {% endwith %}
                         </div>
                     </div>
                     <div class="text-center pt-5 pb-3 px-3 mt-4">
@@ -114,7 +165,7 @@
                                 <button type="button" class="btn btn-outline-primary w-100 rounded-pill btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#accountSwitcherModal">
                                     <i class="bi bi-arrow-repeat me-2"></i>SWITCH ACCOUNT
                                 </button>
-                                <form action="{% url 'core:logout' %}" method="POST" class="m-0">
+                                <form action="{% url 'users:logout' %}" method="POST" class="m-0">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-outline-danger w-100 rounded-pill btn-sm fw-bold">
                                         <i class="bi bi-box-arrow-right me-2"></i>LOGOUT
@@ -155,20 +206,53 @@
         </div>
 
         <div class="col-12 col-lg-7 col-xl-6">
-            <div class="d-flex align-items-center justify-content-between mb-3 px-2">
-                <h6 class="fw-bold text-muted text-uppercase mb-0">{{ profile_user.username}}'s posts:</h6>
-                <span class="badge bg-primary rounded-pill">{{ posts.count }} Updates</span>
-            </div>
+            <ul class="nav nav-tabs mb-3 px-2" id="profileTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="posts-tab" data-bs-toggle="tab" data-bs-target="#posts-content" type="button" role="tab">
+                        Posts
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="shared-tab" data-bs-toggle="tab" data-bs-target="#shared-content" type="button" role="tab"
+                            hx-post="{% url 'users:mark_shared_viewed' profile_user.username %}"
+                            hx-target="#shared-tab"
+                            hx-swap="outerHTML">
+                        Shared with {{ profile_user.username }}
+                        {% if unseen_shared_count > 0 %}
+                        <span class="badge bg-success rounded-pill ms-1">{{ unseen_shared_count }}</span>
+                        {% endif %}
+                    </button>
+                </li>
+            </ul>
             
-            <div class="intel-stream">
-                {% for post in posts %}
-                    {% include 'posts/partials/post_card.html' %}
-                {% empty %}
-                    <div class="text-center py-5 bg-white rounded-4 shadow-sm border-0">
-                        <i class="bi bi-incognito text-muted display-4"></i>
-                        <p class="text-muted mt-3">{{ profile_user.username }} hasn't posted anything yet.</p>
+            <div class="tab-content" id="profileTabContent">
+                <!-- Posts Tab -->
+                <div class="tab-pane fade show active" id="posts-content" role="tabpanel">
+                    <div class="intel-stream">
+                        {% for post in posts %}
+                            {% include 'posts/partials/post_card.html' %}
+                        {% empty %}
+                            <div class="text-center py-5 bg-white rounded-4 shadow-sm border-0">
+                                <i class="bi bi-incognito text-muted display-4"></i>
+                                <p class="text-muted mt-3">{{ profile_user.username }} hasn't posted anything yet.</p>
+                            </div>
+                        {% endfor %}
                     </div>
-                {% endfor %}
+                </div>
+                
+                <!-- Shared Posts Tab -->
+                <div class="tab-pane fade" id="shared-content" role="tabpanel">
+                    <div class="intel-stream">
+                        {% for shared_post in shared_posts %}
+                            {% include 'posts/partials/shared_post_card.html' %}
+                        {% empty %}
+                            <div class="text-center py-5 bg-white rounded-4 shadow-sm border-0">
+                                <i class="bi bi-share text-muted display-4"></i>
+                                <p class="text-muted mt-3">No posts have been shared with {{ profile_user.username }} yet.</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
         </div>
 

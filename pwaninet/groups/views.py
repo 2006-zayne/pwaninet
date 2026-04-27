@@ -258,7 +258,7 @@ class GroupViewSet(viewsets.ModelViewSet):
         Leave a group.
         """
         group = self.get_object()
-        
+
         try:
             membership = Membership.objects.get(
                 user=request.user,
@@ -270,23 +270,113 @@ class GroupViewSet(viewsets.ModelViewSet):
                 {'detail': 'You are not an approved member of this group.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # Prevent leaving if you're the last admin
+
+        # Check if user is the last admin
         if membership.role == MembershipRole.ADMIN:
             admin_count = Membership.objects.filter(
                 group=group,
                 role=MembershipRole.ADMIN,
                 status=MembershipStatus.APPROVED
             ).count()
+
             if admin_count == 1:
-                return Response(
-                    {'detail': 'You cannot leave as the last admin. Assign another admin first.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        
+                # Find potential successors
+                moderators = Membership.objects.filter(
+                    group=group,
+                    role=MembershipRole.MODERATOR,
+                    status=MembershipStatus.APPROVED
+                ).select_related('user')[:3]
+
+                members = Membership.objects.filter(
+                    group=group,
+                    role=MembershipRole.MEMBER,
+                    status=MembershipStatus.APPROVED
+                ).select_related('user').order_by('-id')[:5]
+
+                successors = []
+                for mod in moderators:
+                    successors.append({
+                        'id': mod.user.id,
+                        'username': mod.user.username,
+                        'name': f"{mod.user.first_name or ''} {mod.user.last_name or ''}".strip(),
+                        'role': 'MODERATOR',
+                        'priority': 1
+                    })
+
+                for mem in members:
+                    successors.append({
+                        'id': mem.user.id,
+                        'username': mem.user.username,
+                        'name': f"{mem.user.first_name or ''} {mem.user.last_name or ''}".strip(),
+                        'role': 'MEMBER',
+                        'priority': 2
+                    })
+
+                return Response({
+                    'is_last_admin': True,
+                    'detail': 'You are the last admin. Please assign a successor before leaving.',
+                    'successors': successors
+                }, status=status.HTTP_403_FORBIDDEN)
+
         membership.delete()
         return Response(
             {'detail': 'You have left the group.'},
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'], url_path='assign-and-leave')
+    def assign_and_leave(self, request, pk=None):
+        """
+        POST /groups/{id}/assign-and-leave/
+        Assign a new admin and then leave the group.
+        Used when the last admin wants to leave.
+        """
+        group = self.get_object()
+
+        # Check if user is admin
+        try:
+            membership = Membership.objects.get(
+                user=request.user,
+                group=group,
+                role=MembershipRole.ADMIN,
+                status=MembershipStatus.APPROVED
+            )
+        except Membership.DoesNotExist:
+            return Response(
+                {'detail': 'Only admins can use this endpoint.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Get the successor user_id
+        successor_id = request.data.get('successor_id')
+        if not successor_id:
+            return Response(
+                {'detail': 'successor_id is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get the successor membership
+        try:
+            successor_membership = Membership.objects.get(
+                user_id=successor_id,
+                group=group,
+                status=MembershipStatus.APPROVED
+            )
+        except Membership.DoesNotExist:
+            return Response(
+                {'detail': 'Successor is not a member of this group.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Promote successor to admin
+        successor_membership.role = MembershipRole.ADMIN
+        successor_membership.save()
+
+        # Leave the group
+        membership.delete()
+
+        return Response(
+            {'detail': f'Admin role transferred to {successor_membership.user.username}. You have left the group.'},
             status=status.HTTP_200_OK
         )
 
@@ -560,3 +650,87 @@ def group_unread_counts_api(request):
     all_group_ids = list(user_groups.values_list('id', flat=True))
     group_unread_counts = get_group_unread_counts(request.user, all_group_ids)
     return JsonResponse(group_unread_counts)
+
+
+@login_required
+def search_users_view(request):
+    """
+    Search users by username or global role for role assignment.
+    Returns JSON results.
+    Supports role keywords: president, delegate, verified
+    """
+    from django.conf import settings
+    from users.models import GlobalRole
+
+    query = request.GET.get('q', '').strip().lower()
+    if len(query) < 2:
+        return JsonResponse([], safe=False)
+
+    # Check for role keywords
+    role_keywords = {
+        'president': GlobalRole.PRESIDENT,
+        'delegate': GlobalRole.DELEGATE,
+        'verified': GlobalRole.VERIFIED,
+    }
+
+    # If query matches a role keyword, search by role
+    if query in role_keywords:
+        users = User.objects.filter(
+            global_role=role_keywords[query]
+        ).values('id', 'username', 'first_name', 'last_name', 'profile_pic')[:20]
+    else:
+        # Otherwise search by username
+        users = User.objects.filter(
+            username__icontains=query
+        ).values('id', 'username', 'first_name', 'last_name', 'profile_pic')[:20]
+
+    # Convert profile_pic paths to full URLs
+    user_list = list(users)
+    for user in user_list:
+        if user['profile_pic']:
+            user['profile_pic'] = request.build_absolute_uri(settings.MEDIA_URL + str(user['profile_pic']))
+        else:
+            user['profile_pic'] = '/static/images/default_user.jpg'
+
+    return JsonResponse(user_list, safe=False)
+
+
+@login_required
+def view_group_photo_fullscreen(request, group_id, photo_type):
+    """
+    View group or cover photo in full screen mode.
+    Only accessible if the viewer is a member of the group or is an admin.
+    """
+    group = get_object_or_404(Group, id=group_id)
+
+    # Check if user is allowed to view the photo (must be an approved member)
+    is_member = Membership.objects.filter(
+        user=request.user,
+        group=group,
+        status=MembershipStatus.APPROVED
+    ).exists()
+
+    if not is_member:
+        messages.error(request, 'You need to be a member of this group to view photos in full screen.')
+        return redirect('groups:groups_detail', group_id=group_id)
+
+    # Determine which photo to show
+    if photo_type == 'group':
+        photo_url = group.get_photo_url
+        photo_title = f"{group.name}'s Group Photo"
+    elif photo_type == 'cover':
+        if not group.cover_photo:
+            messages.error(request, 'This group does not have a cover photo.')
+            return redirect('groups:groups_detail', group_id=group_id)
+        photo_url = group.cover_photo.url
+        photo_title = f"{group.name}'s Cover Photo"
+    else:
+        messages.error(request, 'Invalid photo type.')
+        return redirect('groups:groups_detail', group_id=group_id)
+    
+    return render(request, 'groups/group_photo_fullscreen.html', {
+        'group': group,
+        'photo_url': photo_url,
+        'photo_type': photo_type,
+        'photo_title': photo_title,
+    })

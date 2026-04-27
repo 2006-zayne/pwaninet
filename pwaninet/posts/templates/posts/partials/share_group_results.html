@@ -1,0 +1,18 @@
+{% if groups %}
+    {% for group in groups %}
+    <div class="d-flex align-items-center p-2 border-bottom group-item" data-group-id="{{ group.id }}">
+        <input type="checkbox" class="form-check-input me-3 group-checkbox" value="{{ group.id }}" id="group-{{ group.id }}">
+        <label for="group-{{ group.id }}" class="d-flex align-items-center flex-grow-1 cursor-pointer" style="cursor: pointer;">
+            <img src="{{ group.get_photo_url }}" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+            <div>
+                <div class="fw-bold small">{{ group.name }}</div>
+                <div class="text-muted small">{% if group.is_official %}<span class="badge bg-primary">Official</span>{% endif %} {{ group.memberships.count }} members</div>
+            </div>
+        </label>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="p-3 text-center text-muted">
+        <small>No groups found</small>
+    </div>
+{% endif %}

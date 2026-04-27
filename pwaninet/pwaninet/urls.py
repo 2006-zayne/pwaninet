@@ -29,8 +29,6 @@ urlpatterns = [
     path('groups/', include(('groups.urls', 'groups'), namespace='groups')),
     path('notifications/', include(('notifications.urls', 'notifications'), namespace='notifications')),
     path('courses/', include('courses.urls')),
-    # Core URLs (register, logout)
-    path('core/', include(('core.urls', 'core'), namespace='core')),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

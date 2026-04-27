@@ -131,6 +131,24 @@
     border: 2px solid var(--card-bg);
     font-size: 12px;
   }
+
+  .clickable-photo {
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .clickable-photo:hover {
+    opacity: 0.9;
+  }
+
+  .clickable-cover {
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .clickable-cover:hover {
+    opacity: 0.9;
+  }
   .group-info { padding: 48px 1.5rem 1.5rem; text-align: center; }
   .group-name {
     font-size: 1.1rem; font-weight: 800;
@@ -507,16 +525,24 @@
     <!-- Group Card -->
     <div class="card group-card" style="position: relative; overflow: visible;">
       <div class="group-banner">
-        <div class="cover-container"
+        <div class="cover-container {% if is_member %}clickable-cover{% endif %}"
+             {% if is_member %}
+             onclick="window.location.href='{% url 'groups:view_group_photo_fullscreen' group.id 'cover' %}'"
+             {% endif %}
              style="background-image: url('{% if group.cover_photo %}{{ group.cover_photo.url }}{% else %}{% static 'images/default-cover.jpg' %}{% endif %}')">
           {% if is_admin %}
-          <a href="#" class="cover-upload-icon" data-bs-toggle="modal" data-bs-target="#editGroupModal"><i class="bi bi-camera-fill"></i></a>
+          <a href="#" class="cover-upload-icon" data-bs-toggle="modal" data-bs-target="#editGroupModal" onclick="event.stopPropagation()"><i class="bi bi-camera-fill"></i></a>
           {% endif %}
         </div>
         <div class="group-avatar-wrap">
+          {% if is_member %}
+          <img src="{{ group.get_photo_url }}" class="group-avatar clickable-photo" alt="{{ group.name }}"
+               onclick="event.stopPropagation(); window.location.href='{% url 'groups:view_group_photo_fullscreen' group.id 'group' %}'">
+          {% else %}
           <img src="{{ group.get_photo_url }}" class="group-avatar" alt="{{ group.name }}">
+          {% endif %}
           {% if is_admin %}
-          <a href="#" class="group-pic-upload-icon" data-bs-toggle="modal" data-bs-target="#editGroupModal"><i class="bi bi-camera-fill"></i></a>
+          <a href="#" class="group-pic-upload-icon" data-bs-toggle="modal" data-bs-target="#editGroupModal" onclick="event.stopPropagation()"><i class="bi bi-camera-fill"></i></a>
           {% endif %}
         </div>
       </div>
@@ -547,9 +573,9 @@
           <button class="btn-base btn-primary-brand" data-bs-toggle="modal" data-bs-target="#inviteModal">
             <i class="bi bi-person-plus-fill me-1"></i> Invite Friends
           </button>
-          <a href="{% url 'groups:toggle_membership' group.id %}" class="btn-base btn-ghost-danger">
+          <button id="leaveGroupBtn" class="btn-base btn-ghost-danger" onclick="handleLeaveGroup()">
             <i class="bi bi-box-arrow-left me-1"></i> Leave Group
-          </a>
+          </button>
         {% elif is_pending %}
           <button class="btn-base btn-secondary-brand" disabled style="opacity: 0.7; cursor: not-allowed;">
             <i class="bi bi-clock-fill me-1"></i> Request Sent ⏳
@@ -690,36 +716,74 @@
       </div>
       <div class="modal-body">
         <div class="members-scroll">
+          <!-- Officials Section -->
           {% for membership in memberships %}
-            <div class="member-row">
-              <div class="member-meta">
-                <img src="{{ membership.user.profile_pic.url|default:'/static/images/default_user.jpg' }}"
-                     class="member-avatar" alt="">
-                <div>
-                  <div class="member-name">
-                    {{ membership.user.first_name }} {{ membership.user.second_name }} @{{ membership.user.username }}
-                  </div>
-                  <div class="member-sub">
-                    {% if membership.role == 'ADMIN' %}
-                      <span class="role-badge role-admin">Admin</span>
-                    {% elif membership.role == 'MODERATOR' %}
-                      <span class="role-badge role-moderator">Moderator</span>
-                    {% elif membership.role == 'DELEGATE' %}
-                      <span class="role-badge role-delegate">Delegate</span>
-                    {% else %}
-                      <span class="role-badge role-member">Member</span>
-                    {% endif %}
+            {% if membership.role == 'ADMIN' or membership.role == 'MODERATOR' or membership.role == 'DELEGATE' %}
+              {% if forloop.first %}
+                <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.09em; padding: 0.5rem 0.75rem 0.25rem;">
+                  <i class="bi bi-shield-fill me-1"></i> Officials
+                </div>
+              {% endif %}
+              <div class="member-row">
+                <div class="member-meta">
+                  <img src="{{ membership.user.profile_pic.url|default:'/static/images/default_user.jpg' }}"
+                       class="member-avatar" alt="">
+                  <div>
+                    <div class="member-name">
+                      {{ membership.user.first_name }} {{ membership.user.second_name }} @{{ membership.user.username }}
+                    </div>
+                    <div class="member-sub">
+                      {% if membership.role == 'ADMIN' %}
+                        <span class="role-badge role-admin">Admin</span>
+                      {% elif membership.role == 'MODERATOR' %}
+                        <span class="role-badge role-moderator">Moderator</span>
+                      {% elif membership.role == 'DELEGATE' %}
+                        <span class="role-badge role-delegate">Delegate</span>
+                      {% endif %}
+                    </div>
                   </div>
                 </div>
+                {% if membership.user != request.user %}
+                <button class="btn-follow btn-follow-manifest {% if membership.user.id in following_ids %}following{% endif %}"
+                        data-username="{{ membership.user.username }}"
+                        data-user-id="{{ membership.user.id }}">
+                  {% if membership.user.id in following_ids %}Following{% else %}Follow{% endif %}
+                </button>
+                {% endif %}
               </div>
-              {% if membership.user != request.user %}
-              <button class="btn-follow btn-follow-manifest {% if membership.user.id in following_ids %}following{% endif %}"
-                      data-username="{{ membership.user.username }}"
-                      data-user-id="{{ membership.user.id }}">
-                {% if membership.user.id in following_ids %}Following{% else %}Follow{% endif %}
-              </button>
+            {% endif %}
+          {% endfor %}
+
+          <!-- Members Section -->
+          {% for membership in memberships %}
+            {% if membership.role == 'MEMBER' %}
+              {% if forloop.first %}
+                <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.09em; padding: 0.75rem 0.75rem 0.25rem; margin-top: 0.5rem; border-top: 1px solid var(--border);">
+                  <i class="bi bi-people-fill me-1"></i> Members
+                </div>
               {% endif %}
-            </div>
+              <div class="member-row">
+                <div class="member-meta">
+                  <img src="{{ membership.user.profile_pic.url|default:'/static/images/default_user.jpg' }}"
+                       class="member-avatar" alt="">
+                  <div>
+                    <div class="member-name">
+                      {{ membership.user.first_name }} {{ membership.user.second_name }} @{{ membership.user.username }}
+                    </div>
+                    <div class="member-sub">
+                      <span class="role-badge role-member">Member</span>
+                    </div>
+                  </div>
+                </div>
+                {% if membership.user != request.user %}
+                <button class="btn-follow btn-follow-manifest {% if membership.user.id in following_ids %}following{% endif %}"
+                        data-username="{{ membership.user.username }}"
+                        data-user-id="{{ membership.user.id }}">
+                  {% if membership.user.id in following_ids %}Following{% else %}Follow{% endif %}
+                </button>
+                {% endif %}
+              </div>
+            {% endif %}
           {% endfor %}
         </div>
       </div>
@@ -822,6 +886,58 @@
 </div>
 
 
+<!-- ══ MODAL: Assign Roles ══ -->
+<div class="modal fade" id="assignRoleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Manage Roles</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="searchUserForm" class="mb-3">
+          <input type="text" id="userSearchInput" class="form-field" placeholder="Search users by username...">
+        </form>
+        <div id="searchResults" class="members-scroll">
+          <p style="text-align:center; font-size:0.78rem; color:var(--text-muted); padding:1rem 0; font-weight:600;">
+            Search for a user to assign a role
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL: Admin Succession ══ -->
+<div class="modal fade" id="adminSuccessionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Assign Successor</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          You are the last admin. Please assign a successor before leaving.
+        </p>
+        <div id="successorList" class="members-scroll" style="max-height: 250px;">
+          <p style="text-align:center; font-size:0.78rem; color:var(--text-muted); padding:1rem 0; font-weight:600;">
+            Loading successors...
+          </p>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top: 1px solid var(--border); padding: 1rem 1.4rem; display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="font-size: 0.8rem; padding: 0.5rem 1rem;">Cancel</button>
+        <button type="button" id="autoChooseBtn" class="btn btn-primary" style="font-size: 0.8rem; padding: 0.5rem 1rem; display: none;">
+          <i class="bi bi-magic me-1"></i> Let System Choose
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
@@ -887,9 +1003,67 @@ document.addEventListener('DOMContentLoaded', function () {
   if (inviteEl) new bootstrap.Modal(inviteEl).show();
   //{% endif %}
 
-  // ── 5. Update role via API ──
-  window.updateRole = function(userId, newRole) {
-    fetch(`/api/groups/{{ group.id }}/assign-role/`, {
+  // ── 5. Search users for role assignment ──
+  const userSearchInput = document.getElementById('userSearchInput');
+  const searchResults = document.getElementById('searchResults');
+  let searchTimeout;
+
+  if (userSearchInput) {
+    userSearchInput.addEventListener('input', function() {
+      clearTimeout(searchTimeout);
+      const query = this.value.trim();
+
+      if (query.length < 2) {
+        searchResults.innerHTML = '<p style="text-align:center; font-size:0.78rem; color:var(--text-muted); padding:1rem 0; font-weight:600;">Search for a user to assign a role</p>';
+        return;
+      }
+
+      searchTimeout = setTimeout(() => {
+        fetch(`/groups/search-users/?q=${encodeURIComponent(query)}`, {
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+        .then(r => r.json())
+        .then(users => {
+          if (users.length === 0) {
+            searchResults.innerHTML = '<p style="text-align:center; font-size:0.78rem; color:var(--text-muted); padding:1rem 0; font-weight:600;">No users found</p>';
+            return;
+          }
+
+          searchResults.innerHTML = users.map(user => `
+            <div class="member-row">
+              <div class="member-meta">
+                <img src="${user.profile_pic || '/static/images/default_user.jpg'}" class="member-avatar" alt="">
+                <div>
+                  <div class="member-name">@${user.username}</div>
+                  <div class="member-sub">${user.first_name || ''} ${user.last_name || ''}</div>
+                </div>
+              </div>
+              <select class="form-field" style="width: auto; padding: 0.4rem 0.8rem; font-size: 0.7rem;"
+                      onchange="assignRole(${user.id}, this.value)">
+                <option value="">Select Role</option>
+                <option value="MEMBER">Member</option>
+                <option value="DELEGATE">Delegate</option>
+                <option value="MODERATOR">Moderator</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </div>
+          `).join('');
+        })
+        .catch(err => {
+          console.error('Error searching users:', err);
+          searchResults.innerHTML = '<p style="text-align:center; font-size:0.78rem; color:var(--danger); padding:1rem 0; font-weight:600;">Error searching users</p>';
+        });
+      }, 300);
+    });
+  }
+
+  // ── 6. Assign role via API ──
+  window.assignRole = function(userId, newRole) {
+    if (!newRole) return;
+
+    fetch(`/groups/api/groups/{{ group.id }}/assign-role/`, {
       method: 'POST',
       headers: {
         'X-CSRFToken': '{{ csrf_token }}',
@@ -904,22 +1078,108 @@ document.addEventListener('DOMContentLoaded', function () {
     .then(data => {
       if (data.detail) {
         alert(data.detail);
-        // Reset select to previous value by reloading page
-        location.reload();
       } else {
-        // Success - show brief feedback
-        const btn = event.target;
-        const originalBg = btn.style.background;
-        btn.style.background = 'var(--success-light)';
-        setTimeout(() => {
-          btn.style.background = originalBg;
-        }, 500);
+        alert('Role assigned successfully!');
+        userSearchInput.value = '';
+        searchResults.innerHTML = '<p style="text-align:center; font-size:0.78rem; color:var(--text-muted); padding:1rem 0; font-weight:600;">Search for a user to assign a role</p>';
       }
     })
     .catch(err => {
-      console.error('Error updating role:', err);
-      alert('Failed to update role');
-      location.reload();
+      console.error('Error assigning role:', err);
+      alert('Failed to assign role');
+    });
+  };
+
+  // ── 7. Handle Leave Group with Admin Succession ──
+  window.handleLeaveGroup = function() {
+    fetch(`/groups/api/groups/{{ group.id }}/leave/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.is_last_admin) {
+        // Show succession modal with successors
+        showSuccessionModal(data.successors);
+      } else if (data.detail) {
+        alert(data.detail);
+      } else {
+        // Successfully left the group
+        window.location.href = '/groups/dashboard/';
+      }
+    })
+    .catch(err => {
+      console.error('Error leaving group:', err);
+      alert('Failed to leave group');
+    });
+  };
+
+  function showSuccessionModal(successors) {
+    const successorList = document.getElementById('successorList');
+    const autoChooseBtn = document.getElementById('autoChooseBtn');
+    const modal = new bootstrap.Modal(document.getElementById('adminSuccessionModal'));
+
+    if (successors.length === 0) {
+      successorList.innerHTML = '<p style="text-align:center; font-size:0.78rem; color:var(--text-muted); padding:1rem 0; font-weight:600;">No eligible successors found</p>';
+      autoChooseBtn.style.display = 'none';
+    } else {
+      successorList.innerHTML = successors.map(user => `
+        <div class="member-row" style="cursor: pointer;" onclick="assignAndLeave(${user.id}, '${user.username}')">
+          <div class="member-meta">
+            <div style="width: 38px; height: 38px; border-radius: 50%; background: var(--brand-light); display: flex; align-items: center; justify-content: center; color: var(--brand); font-weight: 700; font-size: 0.9rem;">
+              ${user.name.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <div class="member-name">${user.name}</div>
+              <div class="member-sub">@${user.username}</div>
+            </div>
+          </div>
+          <span class="role-badge ${user.role === 'MODERATOR' ? 'role-moderator' : 'role-member'}">${user.role}</span>
+        </div>
+      `).join('');
+      autoChooseBtn.style.display = 'block';
+      autoChooseBtn.onclick = () => autoChooseSuccessor(successors);
+    }
+
+    modal.show();
+  }
+
+  function autoChooseSuccessor(successors) {
+    // System chooses the best successor: first moderator, or first member if no moderators
+    const bestSuccessor = successors.find(s => s.role === 'MODERATOR') || successors[0];
+    if (bestSuccessor) {
+      assignAndLeave(bestSuccessor.id, bestSuccessor.username);
+    }
+  }
+
+  window.assignAndLeave = function(userId, username) {
+    if (!confirm(`Transfer admin role to ${username} and leave the group?`)) {
+      return;
+    }
+
+    fetch(`/groups/api/groups/{{ group.id }}/assign-and-leave/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        successor_id: userId
+      })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.detail) {
+        alert(data.detail);
+        window.location.href = '/groups/dashboard/';
+      }
+    })
+    .catch(err => {
+      console.error('Error assigning successor:', err);
+      alert('Failed to assign successor');
     });
   };
 });

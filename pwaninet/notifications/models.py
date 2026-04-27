@@ -10,6 +10,8 @@ class Notifications(models.Model):
     GROUP_REQUEST = 'GROUP_REQUEST'
     GROUP_APPROVED = 'GROUP_APPROVED'
     GROUP_REJECTED = 'GROUP_REJECTED'
+    POST_SHARED = 'POST_SHARED'
+    POST_SHARED_TO_GROUP = 'POST_SHARED_TO_GROUP'
     
     TYPE_CHOICES = [
         (INVITE, 'Group Invite'), 
@@ -18,7 +20,9 @@ class Notifications(models.Model):
         (FOLLOW, 'New Follower'),
         (GROUP_REQUEST, 'Group Join Request'),
         (GROUP_APPROVED, 'Group Join Approved'),
-        (GROUP_REJECTED, 'Group Join Rejected')
+        (GROUP_REJECTED, 'Group Join Rejected'),
+        (POST_SHARED, 'Post Shared to User'),
+        (POST_SHARED_TO_GROUP, 'Post Shared to Group')
     ]
 
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications', db_index=True)

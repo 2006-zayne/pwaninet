@@ -1,14 +1,5 @@
 {% for post in posts %}
-    {% if forloop.last and has_more %}
-        <div hx-get="{% url 'posts:home' %}?cursor={{ next_cursor }}" 
-             hx-trigger="revealed" 
-             hx-swap="afterend" 
-             hx-indicator="#feed-spinner">
-            {% include 'posts/partials/post_card.html' %}
-        </div>
-    {% else %}
-        {% include 'posts/partials/post_card.html' %}
-    {% endif %}
+    {% include 'posts/partials/post_card.html' %}
 
     {% if forloop.counter == suggestion_index and suggested_friends %}
         <!-- In-Feed Friend Suggestions -->
@@ -43,3 +34,12 @@
         </div>
     {% endif %}
 {% endfor %}
+
+{% if has_more %}
+<div hx-get="{% url 'posts:home' %}?cursor={{ next_cursor }}" 
+     hx-trigger="revealed" 
+     hx-swap="afterend" 
+     hx-indicator="#feed-spinner"
+     style="height: 1px;">
+</div>
+{% endif %}

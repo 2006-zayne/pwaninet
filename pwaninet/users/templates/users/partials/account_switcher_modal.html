@@ -14,7 +14,7 @@
                 </div>
             </div>
             <div class="modal-footer border-0">
-                <form action="{% url 'core:logout' %}" method="POST" class="m-0">
+                <form action="{% url 'users:logout' %}" method="POST" class="m-0">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-outline-secondary w-100">
                         <i class="bi bi-plus-circle me-2"></i>Add New Account

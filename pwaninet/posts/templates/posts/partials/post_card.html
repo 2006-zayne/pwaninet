@@ -1,25 +1,68 @@
 <div id="post-card-{{ post.id }}" class="post-card shadow-sm mb-3 bg-white rounded-3 overflow-hidden border-0">
+    {% if post.repost_of %}
+    <!-- Repost Header -->
+    <div class="d-flex align-items-center p-2 border-bottom bg-light">
+        <div class="position-relative me-3" style="width: 80px; height: 50px;">
+            <a href="{% url 'users:profile' post.author.username %}">
+                <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm position-absolute" style="width: 48px; height: 48px; object-fit: cover; left: 0; top: 0;">
+            </a>
+            <a href="{% url 'users:profile' post.repost_of.author.username %}">
+                <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm position-absolute" style="width: 48px; height: 48px; object-fit: cover; left: 32px; top: 0;">
+            </a>
+        </div>
+        <div class="d-flex align-items-center flex-grow-1">
+            <div>
+                <small class="fw-bold text-dark">{{ post.author.get_full_name|default:post.author.username }}</small>
+                <div class="d-flex align-items-center" style="font-size: 11px;">
+                    <i class="bi bi-repeat text-primary me-1"></i>
+                    <span class="text-muted">reposted</span>
+                    <i class="bi bi-dot mx-1"></i>
+                    <span class="text-muted">{{ post.created_at|timesince }} ago</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="d-flex align-items-center p-3">
         <div class="position-relative me-3" style="width: 50px; height: 50px;">
             {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
                 <a href="{% url 'groups:groups_detail' post.group.id %}">
                     <img src="{{ post.group.get_photo_url }}" class="rounded-circle border border-2 border-white shadow-sm" style="width: 48px; height: 48px; object-fit: cover;">
                 </a>
-                <a href="{% url 'users:profile' post.author.username %}">
-                    <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 24px; height: 24px; object-fit: cover; transform: translate(15%, 15%);">
-                </a>
+                {% if post.repost_of %}
+                    <a href="{% url 'users:profile' post.repost_of.author.username %}">
+                        <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 24px; height: 24px; object-fit: cover; transform: translate(15%, 15%);">
+                    </a>
+                {% else %}
+                    <a href="{% url 'users:profile' post.author.username %}">
+                        <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 24px; height: 24px; object-fit: cover; transform: translate(15%, 15%);">
+                    </a>
+                {% endif %}
             {% else %}
-                <a href="{% url 'users:profile' post.author.username %}">
-                    <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 48px; height: 48px; object-fit: cover;">
-                </a>
+                {% if post.repost_of %}
+                    <a href="{% url 'users:profile' post.repost_of.author.username %}">
+                        <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 48px; height: 48px; object-fit: cover;">
+                    </a>
+                {% else %}
+                    <a href="{% url 'users:profile' post.author.username %}">
+                        <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 48px; height: 48px; object-fit: cover;">
+                    </a>
+                {% endif %}
             {% endif %}
         </div>
 
         <div class="flex-grow-1">
             <h6 class="mb-0 fw-bold small">
-                <a href="{% url 'users:profile' post.author.username %}" class="text-dark text-decoration-none">
-                    {{ post.author.get_full_name|default:post.author.username }}
-                </a>
+                {% if post.repost_of %}
+                    <a href="{% url 'users:profile' post.repost_of.author.username %}" class="text-dark text-decoration-none">
+                        {{ post.repost_of.author.get_full_name|default:post.repost_of.author.username }}
+                    </a>
+                {% else %}
+                    <a href="{% url 'users:profile' post.author.username %}" class="text-dark text-decoration-none">
+                        {{ post.author.get_full_name|default:post.author.username }}
+                    </a>
+                {% endif %}
                 {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
                     {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
                         <span class="text-muted fw-normal mx-1">posted in</span>
@@ -29,7 +72,7 @@
             </h6>
             <small class="text-muted d-flex align-items-center" style="font-size: 11px;">
                 <span class="badge bg-light text-primary border-0 me-1">{{ post.unit.code|default:"GLOBAL" }}</span>
-                <i class="bi bi-dot"></i> {{ post.created_at|timesince }} ago
+                <i class="bi bi-dot"></i> {% if post.repost_of %}{{ post.repost_of.created_at|timesince }}{% else %}{{ post.created_at|timesince }}{% endif %} ago
             </small>
         </div>
 
@@ -67,6 +110,12 @@
                         <i class="bi bi-share"></i> Share to profile
                     </button>
                 </li>
+                <li>
+                    <button class="dropdown-item d-flex align-items-center gap-2"
+                            data-bs-toggle="modal" data-bs-target="#reportModal-{{ post.id }}">
+                        <i class="bi bi-flag"></i> Report post
+                    </button>
+                </li>
                 {% if post.author == request.user or request.user.global_role == 'PRESIDENT' or request.user.global_role == 'DELEGATE' %}
                 <li><hr class="dropdown-divider"></li>
                 <li>
@@ -83,10 +132,15 @@
         </div>
     </div>
 
-    <div class="{% if post.gradient_class != 'none' %}{{ post.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %}">
-        <p class="mb-0 {% if post.gradient_class != 'none' %}text-white fw-bold fs-3{% else %}text-dark{% endif %}" 
-           style="{% if post.gradient_class == 'none' %}font-size: 15px;{% endif %} line-height: 1.5;">
-            {{ post.content }}
+    <div class="{% if post.repost_of %}{% if post.repost_of.gradient_class != 'none' %}{{ post.repost_of.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %}{% else %}{% if post.gradient_class != 'none' %}{{ post.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %}{% endif %}">
+        <p class="mb-0 {% if post.repost_of %}{% if post.repost_of.gradient_class != 'none' %}text-white fw-bold fs-3{% else %}text-dark{% endif %}{% else %}{% if post.gradient_class != 'none' %}text-white fw-bold fs-3{% else %}text-dark{% endif %}{% endif %}"
+           style="{% if post.repost_of %}{% if post.repost_of.gradient_class == 'none' %}font-size: 15px;{% endif %}{% else %}{% if post.gradient_class == 'none' %}font-size: 15px;{% endif %}{% endif %} line-height: 1.5;">
+            {% if post.repost_of %}
+                {% if post.content %}<p class="mb-2 text-dark" style="font-size: 14px;">{{ post.content }}</p>{% endif %}
+                {{ post.repost_of.content }}
+            {% else %}
+                {{ post.content }}
+            {% endif %}
         </p>
     </div>
 
@@ -193,7 +247,7 @@
                 <form hx-post="/api/posts/{{ post.id }}/repost/"
                       hx-target="#post-card-{{ post.id }}"
                       hx-swap="outerHTML"
-                      data-bs-dismiss="modal">
+                      hx-on::after-request="bootstrap.Modal.getInstance(document.getElementById('repostModal-{{ post.id }}')).hide()">
                     {% csrf_token %}
                     <div class="mb-3">
                         <label class="form-label">Add a comment (optional)</label>
@@ -211,21 +265,235 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Share to profile</h5>
+                <h5 class="modal-title">Share Post</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form method="POST" action="{% url 'posts:share_post' post.id %}">
+                <ul class="nav nav-tabs mb-3" id="shareTabs-{{ post.id }}" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="user-tab-{{ post.id }}" data-bs-toggle="tab" data-bs-target="#user-share-{{ post.id }}" type="button" role="tab">Share to Users</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="group-tab-{{ post.id }}" data-bs-toggle="tab" data-bs-target="#group-share-{{ post.id }}" type="button" role="tab">Share to Groups</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="shareTabContent-{{ post.id }}">
+                    <!-- Share to Users Tab -->
+                    <div class="tab-pane fade show active" id="user-share-{{ post.id }}" role="tabpanel">
+                        <form id="share-user-form-{{ post.id }}" hx-post="{% url 'posts:share_post' post.id %}" hx-target="#share-result-{{ post.id }}" hx-swap="innerHTML">
+                            {% csrf_token %}
+                            <input type="hidden" name="share_type" value="user">
+                            <div class="mb-3">
+                                <input type="text" 
+                                       class="form-control" 
+                                       placeholder="Search users you follow..." 
+                                       name="user_search"
+                                       hx-get="{% url 'posts:search_following_users' %}"
+                                       hx-target="#user-results-{{ post.id }}"
+                                       hx-trigger="keyup changed delay:300ms"
+                                       hx-indicator="#user-search-indicator-{{ post.id }}">
+                                <span id="user-search-indicator-{{ post.id }}" class="htmx-indicator">
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                </span>
+                            </div>
+                            <div id="user-results-{{ post.id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
+                                <div class="p-3 text-center text-muted">
+                                    <small>Start typing to search users you follow</small>
+                                </div>
+                            </div>
+                            <div id="selected-users-{{ post.id }}" class="mb-3">
+                                <small class="text-muted">Selected users will appear here</small>
+                            </div>
+                            <input type="hidden" name="shared_to_usernames" id="shared-to-usernames-{{ post.id }}">
+                            <div class="mb-3">
+                                <label class="form-label">Add a message (optional)</label>
+                                <textarea name="message" class="form-control" rows="3" placeholder="Check this out!"></textarea>
+                            </div>
+                            <button type="submit" 
+                                    class="btn btn-primary w-100"
+                                    hx-on::after-request="if(this.closest('form').querySelector('.alert-success')) { const modal = bootstrap.Modal.getInstance(document.getElementById('shareModal-{{ post.id }}')); if(modal) modal.hide(); this.closest('form').querySelector('.alert-success').remove(); }">
+                                Share to Selected Users
+                            </button>
+                            <div id="share-result-{{ post.id }}"></div>
+                        </form>
+                    </div>
+                    <!-- Share to Groups Tab -->
+                    <div class="tab-pane fade" id="group-share-{{ post.id }}" role="tabpanel">
+                        <form id="share-group-form-{{ post.id }}" hx-post="{% url 'posts:share_post' post.id %}" hx-target="#share-result-group-{{ post.id }}" hx-swap="innerHTML" onsubmit="updateSelectedGroups{{ post.id }}()">
+                            {% csrf_token %}
+                            <input type="hidden" name="share_type" value="group">
+                            <div class="mb-3">
+                                <input type="text" 
+                                       class="form-control" 
+                                       placeholder="Search your groups..." 
+                                       name="group_search"
+                                       hx-get="{% url 'posts:search_user_groups' %}"
+                                       hx-target="#group-results-{{ post.id }}"
+                                       hx-trigger="keyup changed delay:300ms"
+                                       hx-indicator="#group-search-indicator-{{ post.id }}">
+                                <span id="group-search-indicator-{{ post.id }}" class="htmx-indicator">
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                </span>
+                            </div>
+                            <div id="group-results-{{ post.id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
+                                <div class="p-3 text-center text-muted">
+                                    <small>Start typing to search your groups</small>
+                                </div>
+                            </div>
+                            <div id="selected-groups-{{ post.id }}" class="mb-3">
+                                <small class="text-muted">Selected groups will appear here</small>
+                            </div>
+                            <input type="hidden" name="shared_to_group_ids" id="shared-to-group-ids-{{ post.id }}">
+                            <div class="mb-3">
+                                <label class="form-label">Add a message (optional)</label>
+                                <textarea name="message" class="form-control" rows="3" placeholder="Check this out!"></textarea>
+                            </div>
+                            <button type="submit" 
+                                    class="btn btn-primary w-100"
+                                    hx-on::after-request="if(this.closest('form').querySelector('.alert-success')) { const modal = bootstrap.Modal.getInstance(document.getElementById('shareModal-{{ post.id }}')); if(modal) modal.hide(); this.closest('form').querySelector('.alert-success').remove(); }">
+                                Share to Selected Groups
+                            </button>
+                            <div id="share-result-group-{{ post.id }}"></div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('shareModal-{{ post.id }}');
+    if (!modal) return;
+    
+    const selectedUsers = new Set();
+    const selectedGroups = new Set();
+    
+    // Handle user checkbox changes
+    modal.addEventListener('change', function(e) {
+        if (e.target.classList.contains('user-checkbox')) {
+            const username = e.target.value;
+
+            if (e.target.checked) {
+                selectedUsers.add(username);
+            } else {
+                selectedUsers.delete(username);
+            }
+            updateSelectedUsers();
+        }
+
+        if (e.target.classList.contains('group-checkbox')) {
+            const groupId = e.target.value;
+
+            if (e.target.checked) {
+                selectedGroups.add(groupId);
+            } else {
+                selectedGroups.delete(groupId);
+            }
+            updateSelectedGroups();
+        }
+    });
+
+    // Also handle click events for better reliability
+    modal.addEventListener('click', function(e) {
+        if (e.target.classList.contains('group-checkbox') || e.target.closest('.group-checkbox')) {
+            const checkbox = e.target.classList.contains('group-checkbox') ? e.target : e.target.closest('.group-checkbox');
+            setTimeout(() => {
+                const groupId = checkbox.value;
+                if (checkbox.checked) {
+                    selectedGroups.add(groupId);
+                } else {
+                    selectedGroups.delete(groupId);
+                }
+                updateSelectedGroups();
+            }, 10);
+        }
+    });
+    
+    function updateSelectedUsers() {
+        const container = document.getElementById('selected-users-{{ post.id }}');
+        const input = document.getElementById('shared-to-usernames-{{ post.id }}');
+        
+        if (selectedUsers.size === 0) {
+            container.innerHTML = '<small class="text-muted">Selected users will appear here</small>';
+            input.value = '';
+        } else {
+            container.innerHTML = Array.from(selectedUsers).map(username => 
+                `<span class="badge bg-primary me-1 mb-1">${username} <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.5rem;" onclick="removeUser{{ post.id }}('${username}')">&times;</button></span>`
+            ).join('');
+            input.value = Array.from(selectedUsers).join(',');
+        }
+    }
+    
+    function updateSelectedGroups() {
+        const container = document.getElementById('selected-groups-{{ post.id }}');
+        const input = document.getElementById('shared-to-group-ids-{{ post.id }}');
+
+        if (selectedGroups.size === 0) {
+            container.innerHTML = '<small class="text-muted">Selected groups will appear here</small>';
+            input.value = '';
+        } else {
+            container.innerHTML = Array.from(selectedGroups).map(groupId => {
+                const label = document.querySelector(`#group-${groupId}`);
+                const boldElement = label ? label.querySelector('.fw-bold') : null;
+                const groupName = boldElement ? boldElement.textContent : groupId;
+                return `<span class="badge bg-success me-1 mb-1">${groupName} <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.5rem;" onclick="removeGroup{{ post.id }}('${groupId}')">&times;</button></span>`;
+            }).join('');
+            input.value = Array.from(selectedGroups).join(',');
+        }
+    }
+
+    // Expose globally for onsubmit handler
+    window['updateSelectedGroups' + {{ post.id }}] = updateSelectedGroups;
+    
+    window['removeUser' + {{ post.id }}] = function(username) {
+        selectedUsers.delete(username);
+        const checkbox = document.querySelector(`.user-checkbox[value="${username}"]`);
+        if (checkbox) checkbox.checked = false;
+        updateSelectedUsers();
+    };
+    
+    window['removeGroup' + {{ post.id }}] = function(groupId) {
+        selectedGroups.delete(groupId);
+        const checkbox = document.querySelector(`.group-checkbox[value="${groupId}"]`);
+        if (checkbox) checkbox.checked = false;
+        updateSelectedGroups();
+    };
+});
+</script>
+
+<!-- Report Modal -->
+<div class="modal fade" id="reportModal-{{ post.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Report post</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form hx-post="/api/reports/"
+                      hx-target="#post-card-{{ post.id }}"
+                      hx-swap="outerHTML"
+                      hx-on::after-request="bootstrap.Modal.getInstance(document.getElementById('reportModal-{{ post.id }}')).hide()">
                     {% csrf_token %}
+                    <input type="hidden" name="post" value="{{ post.id }}">
                     <div class="mb-3">
-                        <label class="form-label">Share to</label>
-                        <input type="text" name="shared_to_username" class="form-control" placeholder="Username" required>
+                        <label class="form-label">Reason for reporting</label>
+                        <select name="reason" class="form-select" required>
+                            <option value="">Select a reason</option>
+                            <option value="spam">Spam</option>
+                            <option value="inappropriate">Inappropriate content</option>
+                            <option value="harassment">Harassment</option>
+                            <option value="false_information">False information</option>
+                            <option value="other">Other</option>
+                        </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Add a message (optional)</label>
-                        <textarea name="message" class="form-control" rows="3" placeholder="Check this out!"></textarea>
+                        <label class="form-label">Additional details (optional)</label>
+                        <textarea name="description" class="form-control" rows="3" placeholder="Please provide more details about why you're reporting this post..."></textarea>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">Share</button>
+                    <button type="submit" class="btn btn-danger w-100">Submit Report</button>
                 </form>
             </div>
         </div>

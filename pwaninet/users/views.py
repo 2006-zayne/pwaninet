@@ -37,6 +37,15 @@ def profile_view(request, username):
     ).first()
     posts = Post.objects.filter(author=profile_user).order_by('-created_at')
     is_following = Follow.objects.filter(follower=request.user, followed=profile_user).exists()
+    
+    # Get shared posts for this profile user
+    from posts.models import SharedPost
+    from posts.services.share_service import get_user_received_shares
+    shared_posts = get_user_received_shares(profile_user)
+    
+    # Count unseen shared posts for the badge
+    unseen_shared_count = shared_posts.filter(is_viewed=False).count()
+    
     return render(request, 'users/profile.html', {
         'profile_user': profile_user,
         'posts': posts,
@@ -44,7 +53,49 @@ def profile_view(request, username):
         'followers_count': profile_user.followers_count,
         'following_count': profile_user.following_count,
         'total_likes': profile_user.total_likes,
+        'shared_posts': shared_posts,
+        'unseen_shared_count': unseen_shared_count,
     })
+
+
+@login_required
+def mark_shared_viewed(request, username):
+    """Mark all shared posts for the user as viewed"""
+    from posts.models import SharedPost
+    from django.http import HttpResponse
+    from notifications.services.notification_service import invalidate_unread_count_cache
+    from posts.services.share_service import get_user_received_shares
+    from groups.models import Membership, MembershipStatus
+
+    profile_user = get_object_or_404(User, username=username)
+
+    # Only allow marking as viewed if viewing your own profile
+    if request.user != profile_user:
+        return HttpResponse('Unauthorized', status=403)
+
+    # Get all received shares (direct + group shares)
+    received_shares = get_user_received_shares(profile_user)
+
+    # Mark all unseen received shares as viewed
+    received_shares.filter(is_viewed=False).update(is_viewed=True)
+
+    # Invalidate the unread count cache
+    invalidate_unread_count_cache(profile_user.id)
+
+    # Recalculate the unseen count to confirm it's 0
+    shared_posts = get_user_received_shares(profile_user)
+    unseen_count = shared_posts.filter(is_viewed=False).count()
+
+    # Return updated tab HTML with updated count
+    badge_html = f'<span class="badge bg-success rounded-pill ms-1">{unseen_count}</span>' if unseen_count > 0 else ''
+    return HttpResponse(f'''
+        <button class="nav-link" id="shared-tab" data-bs-toggle="tab" data-bs-target="#shared-content" type="button" role="tab"
+                hx-post="/user/{username}/mark-shared-viewed/"
+                hx-target="#shared-tab"
+                hx-swap="outerHTML">
+            Shared with {username}{badge_html}
+        </button>
+    ''')
 
 
 @login_required
@@ -238,3 +289,42 @@ def remove_account_from_device_view(request, user_id):
         messages.error(request, 'Account not found on this device.')
     
     return redirect('posts:home')
+
+
+@login_required
+def view_profile_photo_fullscreen(request, username, photo_type):
+    """
+    View profile or cover photo in full screen mode.
+    Only accessible if the viewer is following the profile user or if it's their own profile.
+    """
+    profile_user = get_object_or_404(User, username=username)
+    
+    # Check if user is allowed to view the photo
+    is_own_profile = request.user == profile_user
+    is_following = Follow.objects.filter(follower=request.user, followed=profile_user).exists()
+    
+    if not is_own_profile and not is_following:
+        messages.error(request, 'You need to follow this user to view their photos in full screen.')
+        return redirect('users:profile', username=username)
+    
+    # Determine which photo to show
+    if photo_type == 'profile':
+        photo_url = profile_user.profile_pic.url
+        photo_title = f"{profile_user.get_full_name}'s Profile Photo"
+    elif photo_type == 'cover':
+        if not profile_user.cover_photo:
+            messages.error(request, 'This user does not have a cover photo.')
+            return redirect('users:profile', username=username)
+        photo_url = profile_user.cover_photo.url
+        photo_title = f"{profile_user.get_full_name}'s Cover Photo"
+    else:
+        messages.error(request, 'Invalid photo type.')
+        return redirect('users:profile', username=username)
+    
+    return render(request, 'users/profile_photo_fullscreen.html', {
+        'profile_user': profile_user,
+        'photo_url': photo_url,
+        'photo_type': photo_type,
+        'photo_title': photo_title,
+        'is_own_profile': is_own_profile,
+    })

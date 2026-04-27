@@ -26,7 +26,7 @@ def get_friend_suggestions_for_user(user, limit=5, use_cache=True):
         use_cache: Whether to use cache (default: True)
     
     Returns:
-        List of suggested User instances, randomized
+        List of suggested User instances, ranked by score
     '''
     limit = min(max(limit, 5), 10)
     cache_key = f'friend_suggestions:user:{user.id}:limit:{limit}'
@@ -35,8 +35,7 @@ def get_friend_suggestions_for_user(user, limit=5, use_cache=True):
         if cached is not None:
             return cached
     suggestions = list(get_user_suggestions_from_groups(user, limit))
-    random.shuffle(suggestions)
-    suggestions = suggestions[:limit]
+    # No longer randomizing - results are now ranked by suggestion_score
     if use_cache:
         cache.set(cache_key, suggestions, timeout=300)
     return suggestions

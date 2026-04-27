@@ -3,8 +3,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import render, get_object_or_404, redirect
+from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 
 from .models import Post, Comment, Report, Like, Repost, HiddenPost, AuthorPreference, SharedPost
 from .serializers import (
@@ -26,7 +28,7 @@ from posts.services.post_service import toggle_post_like_for_user, create_post_f
 from posts.services.repost_service import create_repost, delete_repost, get_post_reposts
 from posts.services.hide_service import hide_post, unhide_post, is_post_hidden
 from posts.services.author_preference_service import set_author_preference, get_author_preference, get_all_preferences
-from posts.services.share_service import share_post, get_shared_posts, mark_share_as_viewed
+from posts.services.share_service import share_post, get_shared_posts, mark_share_as_viewed, get_user_received_shares
 from notifications.services.notification_service import get_cached_unread_count
 
 
@@ -136,18 +138,31 @@ class PostViewSet(viewsets.ModelViewSet):
     def repost(self, request, pk=None):
         """
         POST /posts/{id}/repost/
-        Repost a post.
+        Repost a post by creating a new post that references the original.
         """
-        post = self.get_object()
-        serializer = RepostCreateSerializer(
-            data=request.data,
-            context={'request': request}
+        original_post = self.get_object()
+        content = request.data.get('content', '')
+
+        # Create a new post as a repost
+        repost = Post.objects.create(
+            author=request.user,
+            content=content,
+            group=original_post.group,
+            course=original_post.course,
+            unit=original_post.unit,
+            video=original_post.video,
+            docs=original_post.docs,
+            gradient_class=original_post.gradient_class,
+            repost_of=original_post
         )
-        serializer.is_valid(raise_exception=True)
-        serializer.save(original_post=post)
-        
+
+        # Copy images from original post
+        for image in original_post.images.all():
+            from posts.models import PostImage
+            PostImage.objects.create(post=repost, image=image.image)
+
         return Response(
-            RepostSerializer(serializer.instance, context={'request': request}).data,
+            PostSerializer(repost, context={'request': request}).data,
             status=status.HTTP_201_CREATED
         )
 
@@ -155,26 +170,28 @@ class PostViewSet(viewsets.ModelViewSet):
     def delete_repost(self, request, pk=None):
         """
         DELETE /posts/{id}/repost/
-        Delete a repost.
+        Delete a repost (delete the reposted post).
         """
         post = self.get_object()
-        group_id = request.data.get('group_id')
-        group = None
-        if group_id:
-            from groups.models import Group
-            group = Group.objects.get(id=group_id)
-        
-        deleted = delete_repost(request.user, post, group)
-        if deleted:
+
+        # Only allow deleting if this is a repost and the user is the reposter
+        if not post.repost_of:
             return Response(
-                {'detail': 'Repost deleted.'},
-                status=status.HTTP_200_OK
+                {'detail': 'This is not a repost.'},
+                status=status.HTTP_400_BAD_REQUEST
             )
-        else:
+
+        if post.author != request.user:
             return Response(
-                {'detail': 'Repost not found.'},
-                status=status.HTTP_404_NOT_FOUND
+                {'detail': 'You can only delete your own reposts.'},
+                status=status.HTTP_403_FORBIDDEN
             )
+
+        post.delete()
+        return Response(
+            {'detail': 'Repost deleted.'},
+            status=status.HTTP_200_OK
+        )
 
     @action(detail=True, methods=['get'], url_path='reposts')
     def reposts(self, request, pk=None):
@@ -229,20 +246,113 @@ class PostViewSet(viewsets.ModelViewSet):
     def share(self, request, pk=None):
         """
         POST /posts/{id}/share/
-        Share a post to another user's profile.
+        Share a post to multiple users or groups.
+        Accepts either direct IDs (shared_to, shared_to_group) or lookups (shared_to_usernames, shared_to_group_ids).
+        For bulk sharing, use comma-separated values in shared_to_usernames or shared_to_group_ids.
         """
         post = self.get_object()
-        serializer = SharedPostCreateSerializer(
-            data=request.data,
-            context={'request': request}
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save(original_post=post)
+        share_data = request.data.copy()
+        message = share_data.get('message', '')
         
-        return Response(
-            SharedPostSerializer(serializer.instance, context={'request': request}).data,
-            status=status.HTTP_201_CREATED
-        )
+        # Handle bulk user sharing
+        if 'shared_to_usernames' in share_data:
+            usernames_str = share_data['shared_to_usernames']
+            usernames = [u.strip() for u in str(usernames_str).split(',') if u.strip()]
+            
+            shared_posts = []
+            errors = []
+            
+            for username in usernames:
+                try:
+                    user = User.objects.get(username=username)
+                    shared_post = share_post(request.user, post, shared_to_user=user, message=message)
+                    shared_posts.append(shared_post)
+                except User.DoesNotExist:
+                    errors.append(f'User {username} not found')
+                except Exception as e:
+                    errors.append(f'Error sharing to {username}: {str(e)}')
+            
+            if shared_posts:
+                return Response({
+                    'detail': f'Shared to {len(shared_posts)} user(s) successfully.',
+                    'shared_posts': SharedPostSerializer(shared_posts, many=True, context={'request': request}).data,
+                    'errors': errors if errors else None
+                }, status=status.HTTP_201_CREATED)
+            else:
+                return Response(
+                    {'detail': 'No successful shares.', 'errors': errors},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Handle bulk group sharing
+        elif 'shared_to_group_ids' in share_data:
+            group_ids_str = share_data['shared_to_group_ids']
+            group_ids = [g.strip() for g in str(group_ids_str).split(',') if g.strip()]
+            
+            shared_posts = []
+            errors = []
+            
+            from groups.models import Group
+            for group_id in group_ids:
+                try:
+                    group = Group.objects.get(id=group_id)
+                    shared_post = share_post(request.user, post, shared_to_group=group, message=message)
+                    shared_posts.append(shared_post)
+                except Group.DoesNotExist:
+                    errors.append(f'Group {group_id} not found')
+                except Exception as e:
+                    errors.append(f'Error sharing to group {group_id}: {str(e)}')
+            
+            if shared_posts:
+                return Response({
+                    'detail': f'Shared to {len(shared_posts)} group(s) successfully.',
+                    'shared_posts': SharedPostSerializer(shared_posts, many=True, context={'request': request}).data,
+                    'errors': errors if errors else None
+                }, status=status.HTTP_201_CREATED)
+            else:
+                return Response(
+                    {'detail': 'No successful shares.', 'errors': errors},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Handle single user/group sharing (backward compatibility)
+        else:
+            # If username is provided, look up the user ID
+            if 'shared_to_username' in share_data and not share_data.get('shared_to'):
+                try:
+                    user = User.objects.get(username=share_data['shared_to_username'])
+                    share_data['shared_to'] = user.id
+                    del share_data['shared_to_username']
+                except User.DoesNotExist:
+                    return Response(
+                        {'detail': 'User not found.'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            
+            # If group_id is provided, look up the group
+            if 'shared_to_group_id' in share_data and not share_data.get('shared_to_group'):
+                from groups.models import Group
+                try:
+                    group = Group.objects.get(id=share_data['shared_to_group_id'])
+                    share_data['shared_to_group'] = group.id
+                    del share_data['shared_to_group_id']
+                except Group.DoesNotExist:
+                    return Response(
+                        {'detail': 'Group not found.'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            
+            serializer = SharedPostCreateSerializer(
+                data=share_data,
+                context={'request': request}
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save(original_post=post)
+            
+            return Response(
+                SharedPostSerializer(serializer.instance, context={'request': request}).data,
+                status=status.HTTP_201_CREATED
+            )
 
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -262,28 +372,59 @@ class CommentViewSet(viewsets.ModelViewSet):
         serializer.save(author=self.request.user)
 
 
-class ReportViewSet(viewsets.ReadOnlyModelViewSet):
+class ReportViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for viewing reports (admin only).
+    ViewSet for managing reports.
     """
     permission_classes = [IsAuthenticated]
     queryset = Report.objects.select_related('reporter', 'post').all()
-    serializer_class = ReportSerializer
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return ReportCreateSerializer
+        return ReportSerializer
 
     def get_queryset(self):
         # Only allow admins to see reports
         user = self.request.user
         from groups.models import Membership, MembershipRole, MembershipStatus
-        
-        # Get all groups where user is admin
+
+        # Get all groups where user is admin or moderator
         admin_groups = Membership.objects.filter(
             user=user,
-            role=MembershipRole.ADMIN,
+            role__in=[MembershipRole.ADMIN, MembershipRole.MODERATOR],
             status=MembershipStatus.APPROVED
         ).values_list('group_id', flat=True)
-        
+
         # Filter reports for posts in those groups
         return self.queryset.filter(post__group_id__in=admin_groups)
+
+    def perform_create(self, serializer):
+        # Save the report
+        report = serializer.save(reporter=self.request.user)
+
+        # Send notification to group admins/moderators
+        if report.post.group:
+            from groups.models import Membership, MembershipRole, MembershipStatus
+            from notifications.models import Notifications
+
+            # Get all admins and moderators of the group
+            officials = Membership.objects.filter(
+                group=report.post.group,
+                role__in=[MembershipRole.ADMIN, MembershipRole.MODERATOR],
+                status=MembershipStatus.APPROVED
+            ).exclude(user=report.reporter)
+
+            # Create notification for each official
+            for membership in officials:
+                Notifications.objects.create(
+                    recipient=membership.user,
+                    sender=report.reporter,
+                    post=report.post,
+                    group=report.post.group,
+                    notification_type=Notifications.REPORT,
+                    message=f"Reported: {report.reason}"
+                )
 
 
 class AuthorPreferenceViewSet(viewsets.ModelViewSet):
@@ -348,14 +489,16 @@ def home_view(request):
     cursor = request.GET.get('cursor')
     context = build_home_feed_context(request.user, cursor=cursor)
     
-    # Add explore groups - groups user is not a member of
-    from groups.models import Group, Membership, MembershipStatus
-    user_group_ids = set(Group.objects.filter(
-        memberships__user=request.user,
-        memberships__status=MembershipStatus.APPROVED
-    ).values_list('id', flat=True))
-    explore_groups = Group.objects.exclude(id__in=user_group_ids).order_by('-created_at')[:8]
-    context['explore_groups'] = explore_groups
+    # Only add explore_groups on initial page load (no cursor, not HTMX pagination)
+    is_initial_load = cursor is None and not request.headers.get('HX-Request')
+    if is_initial_load:
+        from groups.models import Group, Membership, MembershipStatus
+        user_group_ids = set(Group.objects.filter(
+            memberships__user=request.user,
+            memberships__status=MembershipStatus.APPROVED
+        ).values_list('id', flat=True))
+        explore_groups = Group.objects.exclude(id__in=user_group_ids).order_by('-created_at')[:8]
+        context['explore_groups'] = explore_groups
     
     # If HTMX requests the home feed (e.g. when clearing search), return the inner content
     if request.headers.get('HX-Request') and not request.GET.get('q'):
@@ -518,19 +661,148 @@ def view_image_fullscreen(request, post_id, image_index):
 
 @login_required
 def share_post_view(request, post_id):
-    """Django view to handle post sharing with username lookup"""
+    """Django view to handle post sharing to multiple users or groups"""
     if request.method == 'POST':
         post = get_object_or_404(Post, id=post_id)
-        username = request.POST.get('shared_to_username')
+        share_type = request.POST.get('share_type')  # 'user' or 'group'
         message = request.POST.get('message', '')
         
+        # Debug: Log the POST data
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Share request - share_type: {share_type}, POST data: {dict(request.POST)}")
+        
         try:
-            shared_to_user = User.objects.get(username=username)
-            shared_post = share_post(request.user, post, shared_to_user, message)
-            messages.success(request, f'Post shared to {username} successfully.')
-        except User.DoesNotExist:
-            messages.error(request, 'User not found.')
+            if share_type == 'user':
+                # Handle multiple users (comma-separated)
+                usernames_str = request.POST.get('shared_to_usernames', '')
+                logger.info(f"Usernames string: {usernames_str}")
+                usernames = [u.strip() for u in usernames_str.split(',') if u.strip()]
+                logger.info(f"Parsed usernames: {usernames}")
+                
+                shared_count = 0
+                for username in usernames:
+                    try:
+                        shared_to_user = User.objects.get(username=username)
+                        share_post(request.user, post, shared_to_user=shared_to_user, message=message)
+                        shared_count += 1
+                    except User.DoesNotExist:
+                        continue  # Skip invalid usernames
+                
+                if shared_count > 0:
+                    if request.headers.get('HX-Request'):
+                        return HttpResponse(
+                            f'<div class="alert alert-success">Post shared to {shared_count} user(s) successfully.</div>'
+                        )
+                    messages.success(request, f'Post shared to {shared_count} user(s) successfully.')
+                else:
+                    if request.headers.get('HX-Request'):
+                        return HttpResponse(
+                            '<div class="alert alert-danger">No valid users found.</div>'
+                        )
+                    messages.error(request, 'No valid users found.')
+                    
+            elif share_type == 'group':
+                # Handle multiple groups (comma-separated)
+                group_ids_str = request.POST.get('shared_to_group_ids', '')
+                group_ids = [int(g.strip()) for g in group_ids_str.split(',') if g.strip()]
+                
+                shared_count = 0
+                errors = []
+                from groups.models import Group
+                for group_id in group_ids:
+                    try:
+                        shared_to_group = Group.objects.get(id=group_id)
+                        share_post(request.user, post, shared_to_group=shared_to_group, message=message)
+                        shared_count += 1
+                    except (Group.DoesNotExist, ValueError) as e:
+                        errors.append(str(e))
+                        continue  # Skip invalid group IDs
+                    except ValidationError as e:
+                        errors.append(str(e))
+                        continue  # Skip groups that can't be shared to
+                
+                if shared_count > 0:
+                    if request.headers.get('HX-Request'):
+                        return HttpResponse(
+                            f'<div class="alert alert-success">Post shared to {shared_count} group(s) successfully.</div>'
+                        )
+                    messages.success(request, f'Post shared to {shared_count} group(s) successfully.')
+                else:
+                    error_msg = errors[0] if errors else 'No valid groups found.'
+                    if request.headers.get('HX-Request'):
+                        return HttpResponse(
+                            f'<div class="alert alert-danger">{error_msg}</div>'
+                        )
+                    messages.error(request, error_msg)
+            else:
+                if request.headers.get('HX-Request'):
+                    return HttpResponse(
+                        f'<div class="alert alert-danger">Invalid share type: {share_type}</div>'
+                    )
+                messages.error(request, 'Invalid share type.')
         except Exception as e:
+            import traceback
+            logger.error(f"Share error: {str(e)}\n{traceback.format_exc()}")
+            if request.headers.get('HX-Request'):
+                return HttpResponse(
+                    f'<div class="alert alert-danger">Error: {str(e)}</div>'
+                )
             messages.error(request, str(e))
     
-    return redirect('posts:post_details', post_id=post_id)
+    # Only redirect if not an HTMX request
+    if not request.headers.get('HX-Request'):
+        return redirect('posts:post_details', post_id=post_id)
+    return HttpResponse('')
+
+
+@login_required
+def shared_posts_view(request):
+    """View to show all posts shared to the user (direct shares and group shares)"""
+    shared_posts = get_user_received_shares(request.user)
+    
+    context = {
+        'shared_posts': shared_posts,
+        'unread_notifications_count': get_cached_unread_count(request.user),
+    }
+    
+    return render(request, 'posts/shared_posts.html', context)
+
+
+@login_required
+def search_following_users(request):
+    """HTMX search endpoint for users the current user is following"""
+    query = request.GET.get('user_search', '') or request.GET.get('q', '')
+    
+    from users.models import Follow
+    following_ids = Follow.objects.filter(follower=request.user).values_list('followed_id', flat=True)
+    
+    users = User.objects.filter(
+        id__in=following_ids
+    ).filter(
+        username__icontains=query
+    )[:10]
+    
+    return render(request, 'posts/partials/share_user_results.html', {'users': users})
+
+
+@login_required
+def search_user_groups(request):
+    """HTMX search endpoint for groups the current user is a member of"""
+    query = request.GET.get('group_search', '') or request.GET.get('q', '')
+    
+    from groups.models import Membership, MembershipStatus
+    group_ids = Membership.objects.filter(
+        user=request.user,
+        status=MembershipStatus.APPROVED
+    ).values_list('group_id', flat=True)
+    
+    from groups.models import Group
+    groups = Group.objects.filter(id__in=group_ids)
+    
+    if query:
+        groups = groups.filter(name__icontains=query)
+    
+    groups = groups[:10]
+    
+    return render(request, 'posts/partials/share_group_results.html', {'groups': groups})

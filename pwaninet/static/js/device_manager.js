@@ -34,23 +34,21 @@ function getOrCreateDeviceId() {
  */
 function initDeviceManager() {
     const deviceId = getOrCreateDeviceId();
-    
+
     // Configure HTMX to include device ID in all requests
     if (typeof htmx !== 'undefined') {
         htmx.defineExtension('device-id', {
             onEvent: function(name, evt) {
                 if (name === 'htmx:beforeRequest') {
-                    evt.detail.headers['X-Device-ID'] = deviceId;
+                    evt.detail.xhr.setRequestHeader('X-Device-ID', deviceId);
                 }
             }
         });
-        
-        // Add the extension to all htmx elements
-        document.body.addEventListener('htmx:beforeRequest', function(evt) {
-            evt.detail.headers['X-Device-ID'] = deviceId;
-        });
+
+        // Add the extension to the body so it applies to all HTMX requests
+        document.body.setAttribute('hx-ext', 'device-id');
     }
-    
+
     console.log('Device Manager initialized with ID:', deviceId.substring(0, 8) + '...');
 }
 

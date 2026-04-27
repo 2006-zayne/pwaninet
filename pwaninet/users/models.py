@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
 from PIL import Image
 from io import BytesIO
 from django.core.files.uploadedfile import InMemoryUploadedFile
@@ -31,7 +32,31 @@ class User(AbstractUser):
     notify_on_group_request = models.BooleanField(default=True)
     notify_on_group_approved = models.BooleanField(default=True)
     email_notifications = models.BooleanField(default=False)
-    
+
+    def clean(self):
+        super().clean()
+        # Ensure only one president exists (only check when role is being set to PRESIDENT)
+        if self.global_role == GlobalRole.PRESIDENT:
+            # Check if this is a new instance or role is being changed to PRESIDENT
+            if self.pk is None or User.objects.filter(pk=self.pk, global_role=GlobalRole.PRESIDENT).exists():
+                return  # Already president or new instance, skip check
+
+            existing_president = User.objects.filter(global_role=GlobalRole.PRESIDENT).exclude(pk=self.pk).first()
+            if existing_president:
+                raise ValidationError({
+                    'global_role': f'There can only be one president. {existing_president.username} is already the president.'
+                })
+
+    def save(self, *args, **kwargs):
+        # Only run full_clean if global_role is being changed
+        if self.pk is not None:
+            old_user = User.objects.filter(pk=self.pk).first()
+            if old_user and old_user.global_role != self.global_role:
+                self.full_clean()
+        else:
+            self.full_clean()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.first_name} {self.second_name}".strip() or self.username
     

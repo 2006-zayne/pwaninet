@@ -38,7 +38,6 @@ INSTALLED_APPS = [
     'posts',
     'groups',
     'notifications',
-    'core',  # Re-enabled - contains views and forms (to be migrated later)
 ]
 
 MIDDLEWARE = [
@@ -58,14 +57,14 @@ ROOT_URLCONF = 'pwaninet.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'core.context_processors.notification_count',
+                'notifications.context_processors.notification_count',
             ],
         },
     },
@@ -120,7 +119,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # Auth settings
 LOGIN_REDIRECT_URL = 'posts:home'
-LOGOUT_REDIRECT_URL = 'core:logout'
+LOGOUT_REDIRECT_URL = 'users:logout'
 AUTH_USER_MODEL = 'users.User'
 
 # Security settings

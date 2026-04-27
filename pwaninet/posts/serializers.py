@@ -25,14 +25,15 @@ class PostSerializer(serializers.ModelSerializer):
     is_liked = serializers.SerializerMethodField()
     repost_count = serializers.ReadOnlyField(source='repost_count')
     is_reposted = serializers.SerializerMethodField()
+    repost_of = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Post
         fields = [
             'id', 'author', 'group', 'course', 'unit', 'content',
-            'image', 'video', 'docs', 'gradient_class',
+            'video', 'docs', 'gradient_class',
             'created_at', 'updated_at', 'like_count', 'is_liked',
-            'repost_count', 'is_reposted'
+            'repost_count', 'is_reposted', 'repost_of'
         ]
         read_only_fields = ['author', 'created_at', 'updated_at']
 
@@ -100,7 +101,7 @@ class PostUpdateSerializer(serializers.ModelSerializer):
     """Serializer for updating posts"""
     class Meta:
         model = Post
-        fields = ['content', 'image', 'video', 'docs', 'gradient_class']
+        fields = ['content', 'video', 'docs', 'gradient_class']
 
 
 class CommentSerializer(serializers.ModelSerializer):
@@ -170,7 +171,7 @@ class ReportCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating reports"""
     class Meta:
         model = Report
-        fields = ['post', 'reason']
+        fields = ['post', 'reason', 'description']
 
     def validate_post(self, value):
         request = self.context['request']
@@ -317,18 +318,32 @@ class SharedPostSerializer(serializers.ModelSerializer):
     original_post = PostSerializer(read_only=True)
     sharer = UserMinimalSerializer(read_only=True)
     shared_to = UserMinimalSerializer(read_only=True)
+    shared_to_group = GroupSerializer(read_only=True)
 
     class Meta:
         model = SharedPost
-        fields = ['id', 'original_post', 'sharer', 'shared_to', 'message', 'created_at', 'is_viewed']
+        fields = ['id', 'original_post', 'sharer', 'shared_to', 'shared_to_group', 'message', 'created_at', 'is_viewed']
         read_only_fields = ['sharer', 'created_at', 'is_viewed']
 
 
 class SharedPostCreateSerializer(serializers.ModelSerializer):
-    """Serializer for sharing posts"""
+    """Serializer for sharing posts to users or groups"""
     class Meta:
         model = SharedPost
-        fields = ['original_post', 'shared_to', 'message']
+        fields = ['original_post', 'shared_to', 'shared_to_group', 'message']
+
+    def validate(self, attrs):
+        request = self.context['request']
+        shared_to = attrs.get('shared_to')
+        shared_to_group = attrs.get('shared_to_group')
+        
+        # Ensure either user or group is provided, but not both
+        if not shared_to and not shared_to_group:
+            raise serializers.ValidationError("You must share to either a user or a group.")
+        if shared_to and shared_to_group:
+            raise serializers.ValidationError("You can only share to either a user or a group, not both.")
+        
+        return attrs
 
     def validate_original_post(self, value):
         request = self.context['request']
@@ -351,18 +366,42 @@ class SharedPostCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("You cannot share posts to yourself.")
         return value
 
+    def validate_shared_to_group(self, value):
+        request = self.context['request']
+        from groups.models import Membership, MembershipStatus
+        try:
+            Membership.objects.get(
+                user=request.user,
+                group=value,
+                status=MembershipStatus.APPROVED
+            )
+        except Membership.DoesNotExist:
+            raise serializers.ValidationError("You can only share to groups you're a member of.")
+        return value
+
     def create(self, validated_data):
         request = self.context['request']
         original_post = validated_data['original_post']
-        shared_to = validated_data['shared_to']
+        shared_to = validated_data.get('shared_to')
+        shared_to_group = validated_data.get('shared_to_group')
         
-        # Check if already shared
-        if SharedPost.objects.filter(
-            original_post=original_post,
-            sharer=request.user,
-            shared_to=shared_to
-        ).exists():
-            raise serializers.ValidationError("You have already shared this post to this user.")
+        # Check if already shared to user
+        if shared_to:
+            if SharedPost.objects.filter(
+                original_post=original_post,
+                sharer=request.user,
+                shared_to=shared_to
+            ).exists():
+                raise serializers.ValidationError("You have already shared this post to this user.")
+        
+        # Check if already shared to group
+        if shared_to_group:
+            if SharedPost.objects.filter(
+                original_post=original_post,
+                sharer=request.user,
+                shared_to_group=shared_to_group
+            ).exists():
+                raise serializers.ValidationError("You have already shared this post to this group.")
         
         shared_post = SharedPost.objects.create(sharer=request.user, **validated_data)
         return shared_post
