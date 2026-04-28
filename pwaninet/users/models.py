@@ -14,6 +14,12 @@ class GlobalRole(models.TextChoices):
     NORMAL = 'NORMAL', 'Normal'
 
 
+class ThemePreference(models.TextChoices):
+    LIGHT = 'light', 'Light'
+    DARK = 'dark', 'Dark'
+    SYSTEM = 'system', 'System Default'
+
+
 class User(AbstractUser):
     first_name = models.CharField(max_length=200, null=True, blank=True)
     second_name = models.CharField(max_length=200, null=True, blank=True)
@@ -32,6 +38,17 @@ class User(AbstractUser):
     notify_on_group_request = models.BooleanField(default=True)
     notify_on_group_approved = models.BooleanField(default=True)
     email_notifications = models.BooleanField(default=False)
+
+    # Theme preference
+    theme_preference = models.CharField(
+        max_length=10,
+        choices=ThemePreference.choices,
+        default=ThemePreference.SYSTEM
+    )
+
+    # Online status tracking
+    is_online = models.BooleanField(default=False)
+    last_seen = models.DateTimeField(auto_now=True)
 
     def clean(self):
         super().clean()

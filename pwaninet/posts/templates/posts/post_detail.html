@@ -3,6 +3,91 @@
 {% block mobile_bottom_nav %}{% endblock %} {# Hide mobile bottom nav for this page #}
 
 {% block content %}
+<style>
+  [data-theme="dark"] .post-card {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] .bg-light {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .bg-white {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .text-dark {
+    color: var(--text-primary) !important;
+  }
+  [data-theme="dark"] .text-muted {
+    color: var(--text-secondary) !important;
+  }
+  [data-theme="dark"] .border-top,
+  [data-theme="dark"] .border-bottom {
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] .dropdown-menu {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .dropdown-item {
+    color: var(--text-primary);
+  }
+  [data-theme="dark"] .dropdown-item:hover {
+    background-color: var(--border);
+  }
+  [data-theme="dark"] .form-control {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+    color: var(--text-primary);
+  }
+  [data-theme="dark"] .modal-content {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .modal-header {
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .form-label {
+    color: var(--text-primary);
+  }
+  [data-theme="dark"] .nav-tabs .nav-link {
+    color: var(--text-secondary);
+  }
+  [data-theme="dark"] .nav-tabs .nav-link.active {
+    color: var(--primary);
+    background-color: var(--card-bg);
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .tab-content {
+    color: var(--text-primary);
+  }
+  [data-theme="dark"] .fixed-bottom {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .form-control {
+    background-color: #3a3b3c !important;
+    border-color: #3a3b3c !important;
+    color: #e4e6eb !important;
+  }
+  [data-theme="dark"] .form-control::placeholder {
+    color: #b0b3b8 !important;
+    opacity: 0.7;
+  }
+  @media (max-width: 767px) {
+    .post-card {
+      width: 100% !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
+  }
+  @media (max-width: 767px) {
+    .container {
+      max-width: 100% !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+  }
+</style>
 
 <div class="container mt-3" style="padding-bottom: 80px;">
     <div class="row justify-content-center">

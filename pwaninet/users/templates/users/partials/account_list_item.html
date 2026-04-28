@@ -4,9 +4,35 @@
          class="rounded-circle me-3" 
          style="width: 48px; height: 48px; object-fit: cover;"
          alt="{{ account.username }}">
-    <div class="flex-grow-1">
-        <div class="fw-bold">{{ account.full_name|default:account.username }}</div>
-        <div class="text-muted small">@{{ account.username }}</div>
+    <style>
+  [data-theme="dark"] .bg-white {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .bg-light {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .text-dark {
+    color: #ffffff !important;
+  }
+  [data-theme="dark"] .text-muted {
+    color: #d1d5db !important;
+  }
+  [data-theme="dark"] .card {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] a {
+    color: #818cf8 !important;
+  }
+  [data-theme="dark"] .border {
+    border-color: var(--border) !important;
+  }
+</style>
+    <div class="card mb-3 border-0 shadow-sm">
+        <div class="flex-grow-1">
+            <div class="fw-bold">{{ account.full_name|default:account.username }}</div>
+            <div class="text-muted small">@{{ account.username }}</div>
+        </div>
     </div>
     {% if account.is_current %}
         <span class="badge bg-primary">Current</span>

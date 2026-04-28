@@ -1,3 +1,77 @@
+<style>
+  [data-theme="dark"] .post-card {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] .bg-light {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .text-dark {
+    color: var(--text-primary) !important;
+  }
+  [data-theme="dark"] .text-muted {
+    color: var(--text-secondary) !important;
+  }
+  [data-theme="dark"] .border-top,
+  [data-theme="dark"] .border-bottom {
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] .dropdown-menu {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .dropdown-item {
+    color: var(--text-primary);
+  }
+  [data-theme="dark"] .dropdown-item:hover {
+    background-color: var(--border);
+  }
+  [data-theme="dark"] .form-control {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+    color: var(--text-primary);
+  }
+  [data-theme="dark"] .modal-content {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .modal-header {
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .form-label {
+    color: var(--text-primary);
+  }
+  [data-theme="dark"] .nav-tabs .nav-link {
+    color: var(--text-secondary);
+  }
+  [data-theme="dark"] .nav-tabs .nav-link.active {
+    color: var(--primary);
+    background-color: var(--card-bg);
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .tab-content {
+    color: var(--text-primary);
+  }
+  [data-theme="dark"] .bg-white {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .form-control {
+    background-color: #3a3b3c !important;
+    border-color: #3a3b3c !important;
+    color: #e4e6eb !important;
+  }
+  [data-theme="dark"] .form-control::placeholder {
+    color: #b0b3b8 !important;
+    opacity: 0.7;
+  }
+  @media (max-width: 767px) {
+    .post-card {
+      width: 100% !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
+  }
+</style>
 <div id="post-card-{{ post.id }}" class="post-card shadow-sm mb-3 bg-white rounded-3 overflow-hidden border-0">
     {% if post.repost_of %}
     <!-- Repost Header -->
@@ -144,6 +218,29 @@
         </p>
     </div>
 
+    {% if post.audio %}
+    <div class="post-media border-top border-bottom bg-light" data-media-type="audio" data-post-id="{{ post.id }}">
+        <div class="p-3 d-flex align-items-center gap-3">
+            <div class="bg-primary bg-opacity-10 p-3 rounded-3 flex-shrink-0">
+                <i class="bi bi-music-note-fill text-primary fs-3"></i>
+            </div>
+            <div class="flex-grow-1">
+                <h6 class="mb-0 fw-bold small">Music/Audio</h6>
+                <small class="text-muted">Attached audio</small>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-light rounded-circle mute-toggle" data-post-id="{{ post.id }}" title="Unmute">
+                    <i class="bi bi-volume-mute-fill"></i>
+                </button>
+                <audio id="audio-{{ post.id }}" class="w-100" style="max-width: 300px;" muted loop>
+                    <source src="{{ post.audio.url }}" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     {% if post.images.exists %}
     <a href="{% url 'posts:post_details' post.id %}">
         <div class="post-media border-top border-bottom bg-light">
@@ -168,10 +265,13 @@
                 {% if ".jpg" in f_url or ".png" in f_url or ".jpeg" in f_url or ".webp" in f_url %}
                     <img src="{{ post.get_intel_file.url }}" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;">
                 {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
-                    <div class="ratio ratio-16x9 bg-black">
-                        <video controls preload="metadata" class="w-100 h-100">
+                    <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post-id="{{ post.id }}">
+                        <video id="video-{{ post.id }}" preload="metadata" class="w-100 h-100" muted loop playsinline>
                             <source src="{{ post.get_intel_file.url }}" type="video/mp4">
                         </video>
+                        <button class="btn btn-sm btn-light rounded-circle position-absolute mute-toggle" data-post-id="{{ post.id }}" style="top: 10px; right: 10px; z-index: 10;" title="Unmute">
+                            <i class="bi bi-volume-mute-fill"></i>
+                        </button>
                     </div>
                 {% elif ".pdf" in f_url %}
                     <a href="{{ post.get_intel_file.url }}" target="_blank" class="text-decoration-none">
@@ -460,6 +560,29 @@ document.addEventListener('DOMContentLoaded', function() {
         if (checkbox) checkbox.checked = false;
         updateSelectedGroups();
     };
+});
+
+// Mute toggle for this post's media
+document.addEventListener('DOMContentLoaded', function() {
+    const muteToggle = document.querySelector(`.mute-toggle[data-post-id="{{ post.id }}"]`);
+    if (muteToggle) {
+        muteToggle.addEventListener('click', function() {
+            const postId = this.dataset.postId;
+            const video = document.getElementById(`video-${postId}`);
+            const audio = document.getElementById(`audio-${postId}`);
+            const icon = this.querySelector('i');
+            
+            if (video) {
+                video.muted = !video.muted;
+                icon.className = video.muted ? 'bi bi-volume-mute-fill' : 'bi bi-volume-up-fill';
+                this.title = video.muted ? 'Unmute' : 'Mute';
+            } else if (audio) {
+                audio.muted = !audio.muted;
+                icon.className = audio.muted ? 'bi bi-volume-mute-fill' : 'bi bi-volume-up-fill';
+                this.title = audio.muted ? 'Unmute' : 'Mute';
+            }
+        });
+    }
 });
 </script>
 

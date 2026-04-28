@@ -1,3 +1,20 @@
+<style>
+  [data-theme="dark"] .bg-white {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .text-dark {
+    color: #ffffff !important;
+  }
+  [data-theme="dark"] .text-muted {
+    color: #d1d5db !important;
+  }
+  [data-theme="dark"] a {
+    color: #818cf8 !important;
+  }
+  [data-theme="dark"] .border-bottom {
+    border-color: var(--border) !important;
+  }
+</style>
 <!-- Comments Section -->
 <div class="bg-white rounded-3 shadow-sm overflow-hidden mb-3" id="comments-section">
     {% for comment in visible_comments %}

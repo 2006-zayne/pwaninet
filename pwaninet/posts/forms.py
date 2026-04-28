@@ -24,6 +24,13 @@ class PostForm(forms.ModelForm):
         widget=forms.ClearableFileInput(
             attrs={
                 'class': 'form-control-file'}))
+    audio = forms.FileField(
+        required=False,
+        widget=forms.ClearableFileInput(
+            attrs={
+                'class': 'form-control-file',
+                'accept': 'audio/*'
+            }))
     images = forms.ImageField(
         required=False,
         widget=forms.ClearableFileInput(
@@ -39,6 +46,7 @@ class PostForm(forms.ModelForm):
             'content',
             'video',
             'docs',
+            'audio',
             'gradient_class']
 
         widgets = {

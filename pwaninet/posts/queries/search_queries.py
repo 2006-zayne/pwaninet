@@ -13,6 +13,7 @@ def search_users(query, current_user, limit=20):
         'president': GlobalRole.PRESIDENT,
         'delegate': GlobalRole.DELEGATE,
         'verified': GlobalRole.VERIFIED,
+        'founder': GlobalROle.Founder,
     }
 
     # If query matches a role keyword, search by role

@@ -1,6 +1,30 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<style>
+  [data-theme="dark"] .card {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .text-dark {
+    color: var(--text-primary) !important;
+  }
+  [data-theme="dark"] .text-muted {
+    color: var(--text-secondary) !important;
+  }
+  [data-theme="dark"] .form-control {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+    color: var(--text-primary);
+  }
+  [data-theme="dark"] .form-control::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
+  }
+  [data-theme="dark"] .form-label {
+    color: var(--text-primary);
+  }
+</style>
 <div class="container">
     <div class="row justify-content-center align-items-center" style="min-height: 75vh;">
         <div class="col-md-5">

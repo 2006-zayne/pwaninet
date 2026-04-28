@@ -1,5 +1,5 @@
 """
-ASGI config for temp_base project.
+ASGI config for pwaninet project.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 
@@ -8,9 +8,24 @@ https://docs.djangoproject.com/en/6.0/howto/deployment/asgi/
 """
 
 import os
-
 from django.core.asgi import get_asgi_application
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.auth import AuthMiddlewareStack
+import django
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pwaninet.settings')
 
-application = get_asgi_application()
+# Initialize Django
+django.setup()
+
+# Import routing configuration after Django setup
+from pwaninet.routing import websocket_urlpatterns
+
+application = ProtocolTypeRouter({
+    "http": get_asgi_application(),
+    "websocket": AuthMiddlewareStack(
+        URLRouter(
+            websocket_urlpatterns
+        )
+    ),
+})

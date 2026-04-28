@@ -1,3 +1,11 @@
+<style>
+  [data-theme="dark"] .text-dark {
+    color: #ffffff !important;
+  }
+  [data-theme="dark"] .text-muted {
+    color: #d1d5db !important;
+  }
+</style>
 <div class="d-flex gap-2 p-3 border-bottom" id="comment-{{ comment.id }}">
     <a href="{% url 'users:profile' comment.author.username %}">
         <img src="{{ comment.author.profile_pic.url }}" class="rounded-circle border flex-shrink-0" style="width: 34px; height: 34px; object-fit: cover;">

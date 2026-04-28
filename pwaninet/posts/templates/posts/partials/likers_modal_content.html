@@ -7,7 +7,35 @@
 
 <div class="modal-body pt-3">
     <div class="list-group list-group-flush">
-        {% for operative in likers %}
+        <style>
+  [data-theme="dark"] .bg-white {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .bg-light {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .text-dark {
+    color: #ffffff !important;
+  }
+  [data-theme="dark"] .text-muted {
+    color: #d1d5db !important;
+  }
+  [data-theme="dark"] .card {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] .modal-content {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] .modal-title {
+    color: #ffffff !important;
+  }
+  [data-theme="dark"] a {
+    color: #818cf8 !important;
+  }
+</style>
+{% for operative in likers %}
         <div class="list-group-item border-0 px-0 d-flex align-items-center justify-content-between bg-transparent mb-2">
             <div class="d-flex align-items-center gap-3">
                 <a href="{% url 'users:profile' operative.username %}">

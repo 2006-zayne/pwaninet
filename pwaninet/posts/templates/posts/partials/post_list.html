@@ -1,22 +1,44 @@
 {% for post in posts %}
     {% include 'posts/partials/post_card.html' %}
 
-    {% if forloop.counter == suggestion_index and suggested_friends %}
+    {% if forloop.counter == suggestion_index and suggested_users %}
         <!-- In-Feed Friend Suggestions -->
+        <style>
+  [data-theme="dark"] .bg-white {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .text-muted {
+    color: #d1d5db !important;
+  }
+  [data-theme="dark"] .text-dark {
+    color: #ffffff !important;
+  }
+  [data-theme="dark"] .suggestion-card {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] a {
+    color: #818cf8 !important;
+  }
+</style>
         <div class="post-card p-3 mb-3 border-0 shadow-sm bg-white rounded-4">
-            <h6 class="fw-bold text-muted small text-uppercase mb-3"><i class="bi bi-person-plus-fill me-2 text-primary"></i>Comrades to follow:</h6>
+            <h6 class="fw-bold text-muted small text-uppercase mb-3"><i class="bi bi-person-plus-fill me-2 text-primary"></i>Suggested Friends</h6>
             <div class="d-flex gap-3 overflow-auto pb-2 no-scrollbar" style="scrollbar-width: none;">
-                {% for recruit in suggested_friends %}
-                    <div class="text-center p-2 rounded-3 suggestion-card" style="min-width: 100px;">
-                        <a href="{% url 'users:profile' recruit.username %}" class="text-decoration-none text-dark">
-                            <img src="{{ recruit.profile_pic.url }}" class="rounded-circle border border-2 shadow-sm mb-2" style="width: 55px; height: 55px; object-fit: cover;">
-                            <p class="small fw-bold mb-0 text-truncate">{{ recruit.username }}</p>
+                {% for user in suggested_users %}
+                    <div class="text-center p-2 rounded-3 suggestion-card" style="min-width: 140px; background: #f8fafc; border: 1px solid #e2e8f0;">
+                        <a href="{% url 'users:profile' user.username %}" class="text-decoration-none text-dark">
+                            <img src="{{ user.profile_pic.url }}" class="rounded-circle border border-2 shadow-sm mb-2" style="width: 55px; height: 55px; object-fit: cover;">
+                            <p class="small fw-bold mb-0 text-truncate" style="color: #0f172a;">{{ user.username }}</p>
                         </a>
-                        <div id="follow-recruit-{{ recruit.id }}">
-                            {% if recruit.id in following_ids %}
-                                {% include 'users/partials/follow_button_recruit.html' with is_following=True %}
+                        <div class="mt-2">
+                            {% if user.id in following_ids %}
+                                <button class="btn btn-sm btn-primary start-conversation" data-user-id="{{ user.id }}" style="font-size: 0.75rem; padding: 4px 12px;">
+                                    <i class="bi bi-chat-dots"></i>
+                                </button>
                             {% else %}
-                                {% include 'users/partials/follow_button_recruit.html' with is_following=False %}
+                                <button class="btn btn-sm btn-outline-primary btn-follow" data-user-id="{{ user.id }}" style="font-size: 0.75rem; padding: 4px 12px;">
+                                    <i class="bi bi-person-plus"></i>
+                                </button>
                             {% endif %}
                         </div>
                     </div>
@@ -36,9 +58,9 @@
 {% endfor %}
 
 {% if has_more %}
-<div hx-get="{% url 'posts:home' %}?cursor={{ next_cursor }}" 
-     hx-trigger="revealed" 
-     hx-swap="afterend" 
+<div hx-get="{% url 'posts:home' %}?cursor={{ next_cursor }}"
+     hx-trigger="revealed"
+     hx-swap="afterend"
      hx-indicator="#feed-spinner"
      style="height: 1px;">
 </div>

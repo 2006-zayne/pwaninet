@@ -31,7 +31,7 @@ class PostSerializer(serializers.ModelSerializer):
         model = Post
         fields = [
             'id', 'author', 'group', 'course', 'unit', 'content',
-            'video', 'docs', 'gradient_class',
+            'video', 'docs', 'audio', 'gradient_class',
             'created_at', 'updated_at', 'like_count', 'is_liked',
             'repost_count', 'is_reposted', 'repost_of'
         ]
@@ -77,7 +77,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
         model = Post
         fields = [
             'group', 'course', 'unit', 'content',
-            'image', 'video', 'docs', 'gradient_class'
+            'image', 'video', 'docs', 'audio', 'gradient_class'
         ]
 
     def validate_group(self, value):
@@ -101,7 +101,7 @@ class PostUpdateSerializer(serializers.ModelSerializer):
     """Serializer for updating posts"""
     class Meta:
         model = Post
-        fields = ['content', 'video', 'docs', 'gradient_class']
+        fields = ['content', 'video', 'docs', 'audio', 'gradient_class']
 
 
 class CommentSerializer(serializers.ModelSerializer):

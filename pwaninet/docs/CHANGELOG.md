@@ -2,6 +2,80 @@
 
 All notable changes to the project will be documented in this file.
 
+## [v0.99] - 2026-04-28
+
+### Added - Complete Messaging System Overhaul (2026-04-28)
+
+#### Enhanced Conversation Detail UI
+- **New Header Components**: Added avatar, username, online status, search button, and menu to conversation header
+- **Date Separators**: Messages now grouped by date with "Today", "Yesterday", and specific date labels
+- **Styled Chat Bubbles**: Messages have sharp bottom corners pointing to sender side for better visual flow
+- **Empty Conversation State**: When no messages exist, displays:
+  - Large profile picture (clickable for full-screen view)
+  - Receiver's first and last name
+  - Handle (@username • pwaninet)
+  - "View Profile" button
+  - "you can now message each other" subtitle
+  - Quick message suggestions (Hey {username}!, Hello {username}!, What's up?)
+- **Header Avatar Click**: Clicking header avatar navigates to user's profile page
+- **Full-Screen Image Viewer**: Clicking profile pictures opens them in a full-screen modal
+
+#### Message Input Enhancements
+- **File Attachments**: Support for documents, videos, pictures, and audio files
+- **Voice Recording**: Record voice messages with MediaRecorder API
+  - Visual waveform animation during recording
+  - Preview with play/pause, send, and delete options
+- **Camera Integration**: Built-in camera view for capturing photos and videos
+  - Live camera feed display
+  - Photo capture and video recording
+  - Front/back camera switching
+  - Flash effect on capture
+- **Emoji Picker**: Modal with emojis, GIFs, and stickers
+  - Searchable GIFs via Giphy API
+  - Sticker support (placeholder for future implementation)
+- **Attachment Options Modal**: Choose between photos, videos, or documents
+
+#### Message Interactions
+- **Right-Click Context Menu** (Desktop): Reply, copy, delete, forward messages
+- **Long-Press Menu** (Mobile): Same options as desktop for touch devices
+- **Message Reactions**: Quick emoji reactions (👍, ❤️, 😂, 😮, 😢)
+- **Reply Functionality**: Reply to specific messages with quoted preview
+- **Read Receipts**: Blue checkmarks for delivered/read messages
+
+#### Search Functionality
+- **In-Conversation Search**: Search messages by word/phrase
+- **Real-time Results**: Shows matching messages with highlighted text
+- **Direct Navigation**: Click result to scroll to exact message
+- **Temporary Highlight**: Found message highlights in blue for 2 seconds
+
+#### Theme Support
+- **Light/Dark/System Themes**: Full theme switching with CSS variables
+- **No Flash on Load**: Theme set immediately in head to prevent white flash
+- **Persistent Preferences**: Theme saved to localStorage and server
+
+#### Technical Improvements
+- **WebSocket Real-time**: Real-time message delivery via WebSocket
+- **Message Queue**: Queues messages when offline, sends on reconnect
+- **Typing Indicators**: Shows when other user is typing
+- **Auto-Reconnect**: Automatic WebSocket reconnection with exponential backoff
+- **Offline Support**: Bootstrap JS now served locally for offline testing
+
+#### Model Changes
+- **Message Model**: Added `attachment` and `attachment_type` fields for file uploads
+- **Migration**: Database migration created for new message fields
+- **Serializers**: Updated to handle attachments in API responses
+
+#### Files Modified/Created:
+- `messaging/templates/messaging/conversation_detail.html` - Complete UI overhaul
+- `messaging/models.py` - Added attachment fields
+- `messaging/migrations/0003_message_attachment_message_attachment_type_and_more.py` - New migration
+- `messaging/serializers.py` - Updated for attachments
+- `static/js/messaging.js` - WebSocket and message handling
+- `static/js/bootstrap.bundle.min.js` - Downloaded from CDN for offline support
+- `templates/base.html` - Theme initialization fix, local Bootstrap JS
+
+---
+
 ## [Unreleased]
 
 ### Fixed - Group Management Bugs (2026-04-26)

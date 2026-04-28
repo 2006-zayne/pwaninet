@@ -1,10 +1,30 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<style>
+  [data-theme="dark"] .bg-light {
+    background-color: var(--page-bg) !important;
+  }
+  [data-theme="dark"] .bg-white {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .post-card {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .text-muted {
+    color: var(--text-secondary) !important;
+  }
+  [data-theme="dark"] .text-secondary {
+    color: var(--text-secondary) !important;
+  }
+  .tracking-widest { letter-spacing: 3px; }
+  .x-small { font-size: 0.65rem; }
+</style>
 <div class="container-fluid">
     <div class="row justify-content-center align-items-center bg-light" style="min-height: 85vh;">
         <div class="col-12 col-md-6 col-lg-4 text-center rounded-3">
-            
+
             <div class="post-card border-0 rounded-3 overflow-hidden">
                 <div class="bg-primary p-4 border-bottom border-danger border-3">
                     <div class="mb-2">
@@ -20,7 +40,7 @@
                             You have successfully disconnected from the **PwaniNet Sector**. All encrypted channels are now closed.
                         </p>
                     </div>
-                    
+
                     <div class="d-grid gap-3">
                         <a href="{% url 'login' %}" class="btn btn-primary btn-lg rounded-pill fw-bold shadow-sm py-3">
                             <i class="bi bi-box-arrow-in-right me-2"></i> Re-Authenticate (Login)
@@ -31,7 +51,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="mt-4">
                 <p class="text-muted mb-0" style="font-size: 0.75rem; letter-spacing: 1px;">
                     <i class="bi bi-cpu-fill me-1"></i> PWANINET CORE v1.0.26
@@ -41,9 +61,4 @@
         </div>
     </div>
 </div>
-
-<style>
-    .tracking-widest { letter-spacing: 3px; }
-    .x-small { font-size: 0.65rem; }
-</style>
 {% endblock %}

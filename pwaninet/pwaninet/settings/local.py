@@ -9,7 +9,7 @@ ALLOWED_HOSTS = [
     host.split(':')[0].strip()
     for host in os.environ.get(
         'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,0.0.0.0,10.20.152.125,192.168.56.221'
+        'localhost,127.0.0.1,0.0.0.0,10.20.152.125,192.168.213.221,192.168.93.221,192.168.72.88,192.168.85.117'
     ).split(',')
     if host.strip()
 ]

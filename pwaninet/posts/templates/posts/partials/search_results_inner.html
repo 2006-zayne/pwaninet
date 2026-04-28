@@ -38,6 +38,30 @@
         {% endfor %}
     </div>
 {% else %}
+    <style>
+      [data-theme="dark"] .bg-white {
+        background-color: var(--card-bg) !important;
+      }
+      [data-theme="dark"] .bg-light {
+        background-color: var(--card-bg) !important;
+      }
+      [data-theme="dark"] .text-dark {
+        color: #ffffff !important;
+      }
+      [data-theme="dark"] .text-muted {
+        color: #d1d5db !important;
+      }
+      [data-theme="dark"] .card {
+        background-color: var(--card-bg) !important;
+        border-color: var(--border) !important;
+      }
+      [data-theme="dark"] a {
+        color: #818cf8 !important;
+      }
+      [data-theme="dark"] a:hover {
+        color: #a5b4fc !important;
+      }
+    </style>
     <!-- Automatically restore home feed if q is empty -->
     <div hx-get="{% url 'posts:home' %}" hx-trigger="load" hx-target="#main-content-area"></div>
 {% endif %}

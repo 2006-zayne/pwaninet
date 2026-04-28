@@ -1,13 +1,37 @@
+# Core Django
 asgiref==3.11.1
 Django==5.2.13
 sqlparse==0.5.5
-psycopg2==2.9.9
 python-decouple==3.8
+
+# Database
+psycopg2-binary==2.9.9
 redis==5.0.1
-celery==5.3.4
+
+# API Framework
 djangorestframework==3.14.0
 django-cors-headers==4.3.1
+django-filter==23.5
+drf-spectacular==0.27.0
+djangorestframework-simplejwt==5.3.0
+
+# Real-time (WebSocket)
+channels==4.0.0
+channels-redis==4.2.0
+
+# Task Queue
+celery==5.3.4
+
+# Security
+django-axes==6.3.0
+
+# Static Files & Media
 whitenoise==6.6.0
 Pillow==10.4.0
+
+# Server
 gunicorn==21.2.0
+
+# Development & Testing
 Faker==25.2.0
+setuptools

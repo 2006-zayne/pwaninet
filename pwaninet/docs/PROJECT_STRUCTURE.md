@@ -177,6 +177,27 @@ pwaninet/
 │   │
 │   └── __pycache__/
 │
+├── messaging/                 # Messaging domain app
+│   ├── __init__.py
+│   ├── apps.py
+│   ├── models.py              # Conversation, Message, MessageReaction models
+│   ├── views.py              # Conversation and message views
+│   ├── serializers.py        # DRF serializers for messaging API
+│   ├── urls.py                # Messaging-related URLs
+│   │
+│   ├── migrations/            # Messaging app migrations
+│   │   ├── __init__.py
+│   │   ├── 0001_initial.py
+│   │   ├── 0002_initial.py
+│   │   ├── 0003_message_attachment_message_attachment_type_and_more.py
+│   │   └── __pycache__/
+│   │
+│   ├── templates/messaging/  # Messaging templates
+│   │   ├── conversation_list.html
+│   │   └── conversation_detail.html
+│   │
+│   └── __pycache__/
+│
 ├── pwaninet/                  # Project configuration
 │   ├── __init__.py            # Celery app initialization
 │   ├── asgi.py                # ASGI configuration
@@ -262,6 +283,28 @@ pwaninet/
 - **Services**: (to be added)
 - **Queries**: (to be added)
 - **URLs**: load_years
+
+#### messaging/
+- **Purpose**: Real-time messaging and conversations
+- **Models**: Conversation, ConversationMember, Message, MessageRead, MessageReaction
+- **Views**: conversation_list, conversation_detail, DRF ViewSets for API
+- **Serializers**: MessageSerializer, MessageCreateSerializer, ConversationSerializer
+- **URLs**: conversation_list, conversation_detail, API endpoints
+- **Templates**: conversation_list.html, conversation_detail.html
+- **Features**:
+  - Real-time messaging via WebSocket
+  - File attachments (documents, videos, pictures, audio)
+  - Voice recording with MediaRecorder API
+  - Camera integration for photo/video capture
+  - Emoji picker with GIFs and stickers
+  - Message search with highlighting
+  - Date separators (Today, Yesterday, specific dates)
+  - Reply, copy, delete, forward functionality
+  - Message reactions
+  - Read receipts
+  - Typing indicators
+  - Theme support (light/dark/system)
+  - Empty conversation state with quick message suggestions
 
 ### Legacy App (core/)
 

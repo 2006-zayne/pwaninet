@@ -5,5 +5,11 @@
     {% if is_following %} Unfollow {% else %} Follow {% endif %}
 </button>
 
+{% if is_following %}
+<button class="btn btn-primary w-100 rounded-pill fw-bold mb-2 start-conversation-profile" data-user-id="{{ profile_user.id }}">
+    <i class="bi bi-chat-dots me-1"></i> Message
+</button>
+{% endif %}
+
 <!-- Update the follower count elsewhere on the page instantly -->
 <h6 id="follower-count" class="fw-bold mb-0" hx-swap-oob="true">{{ follower_count }}</h6>

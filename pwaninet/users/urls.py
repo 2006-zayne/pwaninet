@@ -1,8 +1,17 @@
-from django.urls import path
+from django.urls import path, include
 from django.contrib.auth import views as auth_views
+from rest_framework.routers import DefaultRouter
 from . import views
 
+router = DefaultRouter()
+router.register(r'users', views.UserViewSet, basename='user')
+router.register(r'follows', views.FollowViewSet, basename='follow')
+router.register(r'device-accounts', views.DeviceAccountViewSet, basename='device-account')
+
 urlpatterns = [
+    # API routes
+    path('api/', include(router.urls)),
+    
     # Registration
     path('register/', views.register_view, name='register'),
     

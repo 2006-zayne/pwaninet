@@ -1,9 +1,35 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load user_extras %}
+{% csrf_token %}
 
 {% block content %}
 <style>
+  [data-theme="dark"] .bg-white {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .bg-light {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .text-dark {
+    color: #ffffff !important;
+  }
+  [data-theme="dark"] .text-muted {
+    color: #d1d5db !important;
+  }
+  [data-theme="dark"] .card {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] a {
+    color: #818cf8 !important;
+  }
+  [data-theme="dark"] a:hover {
+    color: #a5b4fc !important;
+  }
+  [data-theme="dark"] .border {
+    border-color: var(--border) !important;
+  }
 .profile-card {
     position: relative;
 }
@@ -258,6 +284,57 @@
 
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Helper function to get CSRF token
+  function getCSRFToken() {
+    const token = document.querySelector('[name="csrfmiddlewaretoken"]');
+    return token ? token.value : '';
+  }
+
+  // Start conversation functionality for profile page
+  document.querySelectorAll('.start-conversation-profile').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      const userId = this.dataset.userId;
+      if (!userId) return;
+
+      fetch('/messaging/v1/conversations/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify({
+          type: 'direct',
+          member_ids: [userId]
+        })
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data.id) {
+          window.location.href = `/messaging/conversation/${data.id}/`;
+        } else {
+          console.error('Invalid response:', data);
+          alert('Failed to create conversation. Please try again.');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to create conversation. Please try again.');
+      });
+    });
+  });
+});
+</script>
 {% endblock %}
 
 {% block modals %}

@@ -108,7 +108,8 @@ def build_home_feed_context(user, cursor=None, limit=10):
     
     # Friend suggestions appear in feed on all loads (initial and paginated)
     user_suggestions = get_user_suggestions_from_groups(user)
-    context['suggested_friends'] = user_suggestions
+    context['suggested_users'] = user_suggestions
+    context['following_ids'] = following_ids
     context['suggestion_index'] = random.randint(2, 6) if user_suggestions else None
     
     return context

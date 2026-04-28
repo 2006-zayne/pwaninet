@@ -1,6 +1,12 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, logout
+from rest_framework import viewsets, status, permissions
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from users.models import User, Follow, DeviceAccount
 from posts.models import Post, Like
 from users.forms import PwaniSignupForm, ProfileUpdateForm, NotificationPreferencesForm
@@ -10,6 +16,11 @@ from django.db import transaction
 from notifications.models import Notifications
 from notifications.services.notification_service import invalidate_unread_count_cache, create_notification
 from users.services.device_service import get_or_create_device_id, hash_device_id
+from .serializers import (
+    UserSerializer, UserPublicSerializer, FollowSerializer,
+    DeviceAccountSerializer, UserUpdateSerializer, NotificationPreferencesSerializer
+)
+from .filters import UserFilter, FollowFilter
 
 
 def register_view(request):
@@ -328,3 +339,171 @@ def view_profile_photo_fullscreen(request, username, photo_type):
         'photo_title': photo_title,
         'is_own_profile': is_own_profile,
     })
+
+
+# API ViewSets
+class UserViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for User model.
+    Provides list, create, retrieve, update, partial_update, delete actions.
+    """
+    queryset = User.objects.all()
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = UserFilter
+    search_fields = ['username', 'first_name', 'last_name', 'second_name']
+    ordering_fields = ['username', 'date_joined', 'last_login']
+    ordering = ['-date_joined']
+
+    def get_serializer_class(self):
+        if self.action in ['list', 'retrieve']:
+            return UserPublicSerializer
+        elif self.action in ['update', 'partial_update']:
+            return UserUpdateSerializer
+        return UserSerializer
+
+    def get_permissions(self):
+        if self.action == 'create':
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
+
+    @extend_schema(
+        summary="Get current user profile",
+        description="Returns the authenticated user's profile information",
+        responses={200: UserPublicSerializer}
+    )
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        """Get current user profile"""
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary="Follow or unfollow a user",
+        description="Toggle follow status for a user",
+        responses={200: {"status": "unfollowed"}, 201: {"status": "followed"}, 400: {"error": "message"}}
+    )
+    @action(detail=True, methods=['post'])
+    def follow(self, request, pk=None):
+        """Follow or unfollow a user"""
+        target_user = self.get_object()
+        if target_user == request.user:
+            return Response(
+                {'error': 'You cannot follow yourself'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        follow, created = Follow.objects.get_or_create(
+            follower=request.user,
+            followed=target_user
+        )
+
+        if not created:
+            # Unfollow
+            follow.delete()
+            return Response({'status': 'unfollowed'}, status=status.HTTP_200_OK)
+
+        return Response({'status': 'followed'}, status=status.HTTP_201_CREATED)
+
+    @extend_schema(
+        summary="Get user's followers",
+        description="Returns a paginated list of users following the specified user",
+        responses={200: UserPublicSerializer(many=True)}
+    )
+    @action(detail=True, methods=['get'])
+    def followers(self, request, pk=None):
+        """Get list of followers for a user"""
+        user = self.get_object()
+        followers = User.objects.filter(follower_relationships__followed=user)
+        page = self.paginate_queryset(followers)
+        if page is not None:
+            serializer = UserPublicSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = UserPublicSerializer(followers, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary="Get users followed by user",
+        description="Returns a paginated list of users that the specified user is following",
+        responses={200: UserPublicSerializer(many=True)}
+    )
+    @action(detail=True, methods=['get'])
+    def following(self, request, pk=None):
+        """Get list of users followed by a user"""
+        user = self.get_object()
+        following = User.objects.filter(follower_relationships__follower=user)
+        page = self.paginate_queryset(following)
+        if page is not None:
+            serializer = UserPublicSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = UserPublicSerializer(following, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary="Update notification preferences",
+        description="Update the authenticated user's notification preferences",
+        request=NotificationPreferencesSerializer,
+        responses={200: NotificationPreferencesSerializer, 400: {"error": "message"}}
+    )
+    @action(detail=False, methods=['put', 'patch'])
+    def update_preferences(self, request):
+        """Update notification preferences"""
+        serializer = NotificationPreferencesSerializer(request.user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @extend_schema(
+        summary="Update theme preference",
+        description="Update the authenticated user's theme preference (light, dark, or system)",
+        responses={200: {"theme_preference": "string"}, 400: {"error": "message"}}
+    )
+    @action(detail=False, methods=['patch'])
+    def update_theme(self, request):
+        """Update theme preference"""
+        theme = request.data.get('theme_preference')
+        if theme not in ['light', 'dark', 'system']:
+            return Response(
+                {'error': 'Invalid theme preference. Must be light, dark, or system.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        request.user.theme_preference = theme
+        request.user.save()
+        return Response({'theme_preference': theme})
+
+
+class FollowViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for Follow model.
+    """
+    queryset = Follow.objects.all()
+    serializer_class = FollowSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_class = FollowFilter
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
+
+    def get_permissions(self):
+        if self.action == 'create':
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated()]
+
+    def perform_create(self, serializer):
+        serializer.save(follower=self.request.user)
+
+
+class DeviceAccountViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for DeviceAccount model.
+    """
+    queryset = DeviceAccount.objects.all()
+    serializer_class = DeviceAccountSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    ordering_fields = ['last_used']
+    ordering = ['-last_used']
+
+    def get_queryset(self):
+        return DeviceAccount.objects.filter(user=self.request.user)

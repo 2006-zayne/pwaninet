@@ -5,6 +5,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PwaniNet | Command Center</title>
+    <script>
+        // Set theme immediately to prevent flash
+        (function() {
+            const userPreference = '{{ request.user.theme_preference|default:"system" }}';
+            const savedTheme = localStorage.getItem('theme');
+            const theme = userPreference !== 'system' ? userPreference : (savedTheme || 'system');
+            
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else if (theme === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+            } else {
+                // System preference
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+            }
+        })();
+    </script>
     
     <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
@@ -15,7 +33,7 @@
     <script src="{% static 'js/device_manager.js' %}"></script>
     
     <style>
-        :root {
+        :root, [data-theme="light"] {
             --primary: #2563eb;
             --primary-hover: #1d4ed8;
             --primary-light: #dbeafe;
@@ -23,8 +41,32 @@
             --background: #f8fafc;
             --card-bg: #ffffff;
             --border: #e2e8f0;
+            --nav-bg: rgba(255, 255, 255, 0.9);
+            --mobile-nav-bg: #fff;
         }
-        
+
+        /* Dark theme variables */
+        [data-theme="dark"] {
+            --primary: #6366f1;
+            --primary-hover: #818cf8;
+            --primary-light: #312e81;
+            --text-dark: #e4e6eb;
+            --background: #18191f;
+            --card-bg: #242526;
+            --border: #3a3b3c;
+            --nav-bg: rgba(24, 25, 31, 0.9);
+            --mobile-nav-bg: #242526;
+            --text-secondary: #e4e6eb;
+            --text-muted: #e4e6eb;
+        }
+
+        [data-theme="dark"] .text-muted {
+            color: #e4e6eb !important;
+        }
+        [data-theme="dark"] .text-secondary {
+            color: #e4e6eb !important;
+        }
+
         body {
             background-color: var(--background) !important;
             color: var(--text-dark);
@@ -53,14 +95,14 @@
         .brand-net { color: var(--primary); }
 
         .navbar-top {
-            background: rgba(255, 255, 255, 0.9) !important;
+            background: var(--nav-bg) !important;
             backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border);
             height: 65px;
         }
 
         .nav-chip {
-            color: #64748b;
+            color: var(--text-secondary);
             padding: 10px 18px;
             border-radius: 12px;
             transition: all 0.2s ease-in-out;
@@ -70,7 +112,7 @@
         .nav-chip.active { background: var(--primary-light); color: var(--primary); }
 
         .mobile-bottom-nav {
-            background: #fff;
+            background: var(--mobile-nav-bg);
             border: 1px solid var(--border);
             border-radius: 24px;
             height: 65px;
@@ -91,12 +133,76 @@
         }
 
         .mobile-bottom-nav .nav-chip {
-            color: #475569;
+            color: var(--text-secondary);
         }
 
         .mobile-bottom-nav .nav-chip.active {
             color: var(--primary);
             background: var(--primary-light);
+        }
+
+        /* Mobile bottom nav active indicator */
+        [data-theme="dark"] .mobile-bottom-nav .nav-chip.active {
+            color: #9ca3af !important;
+            background: var(--border) !important;
+        }
+        [data-theme="dark"] .mobile-bottom-nav .nav-chip.active:hover {
+            color: #d1d5db !important;
+        }
+
+        /* Modal Styles */
+        .modal-content {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+        }
+        .modal-header {
+            border-color: var(--border);
+        }
+        .modal-title {
+            color: var(--text-dark);
+        }
+        .btn-close {
+            color: var(--text-secondary);
+        }
+        .btn-close:hover {
+            color: var(--text-dark);
+        }
+        [data-theme="dark"] .btn-close {
+            color: #9ca3af !important;
+            opacity: 0.8;
+        }
+        [data-theme="dark"] .btn-close:hover {
+            color: #d1d5db !important;
+            opacity: 1;
+        }
+        .dropdown-menu {
+            background-color: var(--card-bg);
+            border-color: var(--border);
+        }
+        .dropdown-item {
+            color: var(--text-dark) !important;
+        }
+        .dropdown-item:hover {
+            background-color: var(--border);
+            color: var(--text-dark) !important;
+        }
+
+        /* Input placeholders for dark theme */
+        [data-theme="dark"] ::placeholder {
+            color: var(--text-secondary) !important;
+            opacity: 0.7;
+        }
+        [data-theme="dark"] ::-webkit-input-placeholder {
+            color: var(--text-secondary) !important;
+            opacity: 0.7;
+        }
+        [data-theme="dark"] ::-moz-placeholder {
+            color: var(--text-secondary) !important;
+            opacity: 0.7;
+        }
+        [data-theme="dark"] :-ms-input-placeholder {
+            color: var(--text-secondary) !important;
+            opacity: 0.7;
         }
 
         /* Primary Button */
@@ -112,17 +218,41 @@
             border-color: var(--primary-hover) !important;
         }
 
-        /* Secondary Button */
-        .btn-outline-secondary {
-            color: var(--text-dark) !important;
+        /* Button text colors for dark theme */
+        [data-theme="dark"] .btn {
+            color: var(--text-primary) !important;
+        }
+        [data-theme="dark"] .btn-primary {
+            color: #fff !important;
+        }
+        [data-theme="dark"] .btn-outline-secondary {
+            color: var(--text-secondary) !important;
             border-color: var(--border) !important;
-            background-color: #f1f5f9 !important;
-            transition: all 0.2s ease-in-out;
+        }
+        [data-theme="dark"] .btn-outline-secondary:hover {
+            background-color: #4e4f50 !important;
+            border-color: #4e4f50 !important;
+            color: #ffffff !important;
         }
 
-        .btn-outline-secondary:hover {
-            background-color: #e2e8f0 !important;
-            border-color: #cbd5e1 !important;
+        [data-theme="dark"] .btn-secondary {
+            background-color: #3a3b3c !important;
+            border-color: #3a3b3c !important;
+            color: #e4e6eb !important;
+        }
+        [data-theme="dark"] .btn-secondary:hover {
+            background-color: #4e4f50 !important;
+            color: #ffffff !important;
+        }
+
+        [data-theme="dark"] .form-control {
+            background-color: #3a3b3c !important;
+            border-color: #3a3b3c !important;
+            color: #e4e6eb !important;
+        }
+        [data-theme="dark"] .form-control:focus {
+            background-color: #4e4f50 !important;
+            border-color: #6366f1 !important;
         }
 
         /* Form Inputs */
@@ -139,6 +269,23 @@
         }
 
         @media (min-width: 768px) { .mobile-bottom-nav { display: none; } }
+
+        /* Mobile full width fix */
+        @media (max-width: 767px) {
+            .container, .container-fluid {
+                max-width: 100% !important;
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+            }
+            .col-12, .col-lg-8, .col-md-5 {
+                max-width: 100% !important;
+                flex: 0 0 100% !important;
+            }
+            .row {
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+        }
     </style>
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
@@ -157,6 +304,9 @@
                     <i class="bi bi-shield-shaded"></i>
                 </a>
                 {% if request.user.is_authenticated %}
+                <a href="{% url 'messaging:conversation_list' %}" class="nav-chip {% if request.resolver_match.url_name == 'conversation_list' %}active{% endif %}">
+                    <i class="bi bi-chat-dots-fill"></i>
+                </a>
                 <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}">
                     <i class="bi bi-plus-circle-fill"></i>
                 </a>
@@ -167,6 +317,29 @@
             </div>
 
             <div class="d-flex align-items-center gap-3">
+                <!-- Theme Toggle -->
+                <div class="dropdown">
+                    <button class="btn btn-link p-0" data-bs-toggle="dropdown" style="color: var(--text-dark);">
+                        <i class="bi bi-circle-half" style="font-size: 1.2rem;"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <button class="dropdown-item" onclick="setTheme('light')">
+                                <i class="bi bi-sun me-2"></i> Light
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item" onclick="setTheme('dark')">
+                                <i class="bi bi-moon me-2"></i> Dark
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item" onclick="setTheme('system')">
+                                <i class="bi bi-display me-2"></i> System
+                            </button>
+                        </li>
+                    </ul>
+                </div>
                 {% if request.user.is_authenticated %}
                     <a href="{% url 'users:profile' request.user.username %}">
                         <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 35px; height: 35px; object-fit: cover;">
@@ -203,6 +376,7 @@
             <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}"><i class="bi bi-house-door-fill"></i></a>
             <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}"><i class="bi bi-people-fill"></i></a>
             {% if user.is_authenticated %}
+                <a href="{% url 'messaging:conversation_list' %}" class="nav-chip {% if request.resolver_match.url_name == 'conversation_list' %}active{% endif %}"><i class="bi bi-chat-dots-fill"></i></a>
                 <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}"><i class="bi bi-plus-circle-fill"></i></a>
                 <a href="{% url 'notifications:notifications' %}"
                     class="nav-chip position-relative {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
@@ -224,8 +398,57 @@
         </div>
     {% endblock %}
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
     <script>
+        // Theme Management
+        function setTheme(theme) {
+            const html = document.documentElement;
+            const userPreference = '{{ request.user.theme_preference|default:"system" }}';
+
+            if (theme === 'system') {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+                localStorage.setItem('theme', 'system');
+            } else {
+                html.setAttribute('data-theme', theme);
+                localStorage.setItem('theme', theme);
+            }
+
+            // Save to server if user is authenticated
+            if ('{{ request.user.is_authenticated }}' === 'True') {
+                fetch('/api/users/update_theme/', {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ theme_preference: theme })
+                }).catch(error => console.error('Failed to save theme preference:', error));
+            }
+        }
+
+        // Initialize theme on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme');
+            const userPreference = '{{ request.user.theme_preference|default:"system" }}';
+
+            if (userPreference !== 'system') {
+                setTheme(userPreference);
+            } else if (savedTheme && savedTheme !== 'system') {
+                setTheme(savedTheme);
+            } else {
+                setTheme('system');
+            }
+
+            // Listen for system theme changes
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                const currentTheme = localStorage.getItem('theme');
+                if (currentTheme === 'system' || !currentTheme) {
+                    setTheme('system');
+                }
+            });
+        });
+
         // Protocol: Reset modal intel on close
         const likersModal = document.getElementById('likersModal');
         likersModal.addEventListener('hidden.bs.modal', function () {
@@ -235,5 +458,6 @@
                 </div>`;
         });
     </script>
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -1,7 +1,15 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from notifications import views
 
+router = DefaultRouter()
+router.register(r'notifications', views.NotificationViewSet, basename='notification')
+
 urlpatterns = [
+    # API routes
+    path('api/', include(router.urls)),
+    
+    # Web routes
     path('', views.notifications_list, name='notifications'),
     path('unread-count/', views.unread_notification_count, name='unread_notification_count'),
     path('mark-as-read/', views.mark_all_as_read, name='mark_all_as_read'),

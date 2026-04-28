@@ -2,6 +2,11 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.core.paginator import Paginator
+from rest_framework import viewsets, status, permissions
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
 from notifications.models import Notifications
 from notifications.services.notification_service import (
     build_notifications_context,
@@ -13,6 +18,8 @@ from notifications.services.notification_service import (
     delete_all_user_notifications,
     delete_user_read_notifications
 )
+from .serializers import NotificationSerializer, NotificationUpdateSerializer, NotificationBulkActionSerializer
+from .filters import NotificationFilter
 
 
 @login_required
@@ -121,3 +128,107 @@ def delete_read_notifications(request):
     if request.method == 'POST':
         delete_user_read_notifications(request.user)
     return HttpResponse('')
+
+
+# API ViewSets
+class NotificationViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for Notifications model.
+    """
+    queryset = Notifications.objects.all()
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_class = NotificationFilter
+    ordering_fields = ['timestamp']
+    ordering = ['-timestamp']
+
+    def get_serializer_class(self):
+        if self.action in ['update', 'partial_update']:
+            return NotificationUpdateSerializer
+        return NotificationSerializer
+
+    def get_queryset(self):
+        # Users can only see their own notifications
+        return Notifications.objects.filter(recipient=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(sender=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def unread_count(self, request):
+        """Get unread notification count for current user"""
+        count = self.get_queryset().filter(is_read=False).count()
+        return Response({'unread_count': count})
+
+    @action(detail=False, methods=['post'])
+    def mark_all_read(self, request):
+        """Mark all notifications as read for current user"""
+        count = self.get_queryset().filter(is_read=False).update(is_read=True)
+        invalidate_unread_count_cache(request.user.id)
+        return Response({'marked_read': count})
+
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        """Mark a specific notification as read"""
+        notification = self.get_object()
+        notification.is_read = True
+        notification.save()
+        invalidate_unread_count_cache(request.user.id)
+        return Response({'status': 'marked as read'})
+
+    @action(detail=True, methods=['post'])
+    def mark_unread(self, request, pk=None):
+        """Mark a specific notification as unread"""
+        notification = self.get_object()
+        notification.is_read = False
+        notification.save()
+        invalidate_unread_count_cache(request.user.id)
+        return Response({'status': 'marked as unread'})
+
+    @action(detail=False, methods=['post'])
+    def delete_all(self, request):
+        """Delete all notifications for current user"""
+        count = self.get_queryset().count()
+        self.get_queryset().delete()
+        invalidate_unread_count_cache(request.user.id)
+        return Response({'deleted': count})
+
+    @action(detail=False, methods=['post'])
+    def delete_read(self, request):
+        """Delete all read notifications for current user"""
+        queryset = self.get_queryset().filter(is_read=True)
+        count = queryset.count()
+        queryset.delete()
+        invalidate_unread_count_cache(request.user.id)
+        return Response({'deleted': count})
+
+    @action(detail=False, methods=['post'])
+    def bulk_action(self, request):
+        """Perform bulk actions on multiple notifications"""
+        serializer = NotificationBulkActionSerializer(data=request.data)
+        if serializer.is_valid():
+            notification_ids = serializer.validated_data['notification_ids']
+            action_type = serializer.validated_data['action']
+            
+            queryset = self.get_queryset().filter(id__in=notification_ids)
+            count = queryset.count()
+            
+            if action_type == 'mark_read':
+                queryset.update(is_read=True)
+                invalidate_unread_count_cache(request.user.id)
+                return Response({'marked_read': count})
+            elif action_type == 'mark_unread':
+                queryset.update(is_read=False)
+                invalidate_unread_count_cache(request.user.id)
+                return Response({'marked_unread': count})
+            elif action_type == 'delete':
+                queryset.delete()
+                invalidate_unread_count_cache(request.user.id)
+                return Response({'deleted': count})
+            else:
+                return Response(
+                    {'error': 'Invalid action'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

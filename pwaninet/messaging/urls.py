@@ -1,0 +1,24 @@
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import (
+    ConversationViewSet,
+    MessageViewSet,
+    MessageReactionViewSet,
+    conversation_list,
+    conversation_detail,
+    search_followed_users
+)
+
+router = DefaultRouter()
+router.register(r'conversations', ConversationViewSet, basename='conversation')
+router.register(r'messages', MessageViewSet, basename='message')
+router.register(r'reactions', MessageReactionViewSet, basename='reaction')
+
+app_name = 'messaging'
+
+urlpatterns = [
+    path('v1/', include(router.urls)),
+    path('', conversation_list, name='conversation_list'),
+    path('conversation/<int:conversation_id>/', conversation_detail, name='conversation_detail'),
+    path('search-followed-users/', search_followed_users, name='search_followed_users'),
+]
