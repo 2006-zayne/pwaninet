@@ -298,9 +298,6 @@
       <form method="GET"
             action="{% url 'posts:search' %}"
             class="search-form"
-            hx-get="{% url 'posts:search' %}"
-            hx-target="#main-content-area"
-            hx-trigger="submit"
             autocomplete="off">
         <i class="bi bi-search search-icon"></i>
         <input type="text"

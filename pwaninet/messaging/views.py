@@ -108,20 +108,47 @@ class ConversationViewSet(viewsets.ModelViewSet):
         """Mark all messages in conversation as read for current user."""
         conversation = self.get_object()
         member = conversation.members.filter(user=request.user).first()
-        
+
         if not member:
             return Response(
                 {'error': 'You are not a member of this conversation'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         last_message = conversation.messages.last()
         if last_message:
             member.last_read_message = last_message
             member.save()
-        
+
         return Response(
             {'status': 'marked as read'},
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'])
+    def set_public_key(self, request, pk=None):
+        """Set the public key for the current user in this conversation."""
+        conversation = self.get_object()
+        member = conversation.members.filter(user=request.user).first()
+
+        if not member:
+            return Response(
+                {'error': 'You are not a member of this conversation'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        public_key = request.data.get('public_key')
+        if not public_key:
+            return Response(
+                {'error': 'public_key is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        member.public_key = public_key
+        member.save()
+
+        return Response(
+            ConversationMemberSerializer(member).data,
             status=status.HTTP_200_OK
         )
 
@@ -269,7 +296,19 @@ def conversation_list(request):
     """Display list of user's conversations."""
     conversations = Conversation.objects.filter(
         members__user=request.user
-    ).prefetch_related('members__user', 'messages').distinct()
+    ).prefetch_related(
+        'members__user',
+        'messages__sender'
+    ).distinct()
+    
+    # Calculate read status for each conversation
+    conversation_data = []
+    for conversation in conversations:
+        read_status = conversation.get_last_message_read_status(request.user)
+        conversation_data.append({
+            'conversation': conversation,
+            'read_status': read_status
+        })
 
     from users.models import User, Follow
     from users.services.friend_suggestion_service import get_friend_suggestions_for_user
@@ -297,7 +336,7 @@ def conversation_list(request):
         messages = active_conversation_obj.messages.all().order_by('created_at')
 
     context = {
-        'conversations': conversations,
+        'conversation_data': conversation_data,
         'users': users,
         'suggested_users': suggested_users,
         'following_ids': following_ids,
@@ -360,8 +399,8 @@ def conversation_detail(request, conversation_id):
     context = {
         'conversation': conversation,
         'messages': messages,
-        'today': today,
-        'yesterday': yesterday,
+        'today': today.strftime('%Y-%m-%d'),
+        'yesterday': yesterday.strftime('%Y-%m-%d'),
     }
     
     return render(request, 'messaging/conversation_detail.html', context)

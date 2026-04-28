@@ -34,11 +34,11 @@ class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = [
-            'id', 'conversation', 'sender', 'content', 'attachment',
-            'attachment_type', 'reply_to', 'reactions', 'read_receipts',
+            'id', 'conversation', 'sender', 'content', 'encrypted_content', 'is_encrypted',
+            'attachment', 'attachment_type', 'reply_to', 'reactions', 'read_receipts',
             'reply_to_details', 'attachment_url', 'created_at', 'edited_at', 'is_deleted'
         ]
-        read_only_fields = ['id', 'created_at', 'edited_at']
+        read_only_fields = ['id', 'created_at', 'edited_at', 'is_encrypted']
 
     def get_reply_to_details(self, obj):
         """Get details of the message being replied to."""
@@ -57,7 +57,7 @@ class MessageCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating messages."""
     class Meta:
         model = Message
-        fields = ['conversation', 'content', 'reply_to', 'attachment', 'attachment_type']
+        fields = ['conversation', 'content', 'encrypted_content', 'is_encrypted', 'reply_to', 'attachment', 'attachment_type']
 
 
 class MessageUpdateSerializer(serializers.ModelSerializer):
@@ -74,7 +74,7 @@ class ConversationMemberSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConversationMember
-        fields = ['id', 'conversation', 'user', 'joined_at', 'last_read_message', 'is_muted']
+        fields = ['id', 'conversation', 'user', 'joined_at', 'last_read_message', 'is_muted', 'public_key']
         read_only_fields = ['id', 'joined_at']
 
 
@@ -83,6 +83,7 @@ class ConversationSerializer(serializers.ModelSerializer):
     members = ConversationMemberSerializer(many=True, read_only=True)
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
+    existing = serializers.SerializerMethodField()
     member_ids = serializers.ListField(
         child=serializers.IntegerField(),
         write_only=True,
@@ -92,10 +93,10 @@ class ConversationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Conversation
         fields = [
-            'id', 'type', 'name', 'members', 'member_ids',
-            'created_at', 'updated_at', 'last_message', 'unread_count'
+            'id', 'type', 'name', 'is_encrypted', 'members', 'member_ids',
+            'created_at', 'updated_at', 'last_message', 'unread_count', 'existing'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'is_encrypted']
 
     def get_last_message(self, obj):
         """Get the last message in the conversation."""
@@ -116,11 +117,45 @@ class ConversationSerializer(serializers.ModelSerializer):
             return obj.messages.count()
         return 0
 
+    def get_existing(self, obj):
+        """Check if this conversation already existed (for direct conversations)."""
+        return getattr(obj, '_existing', False)
+
     def create(self, validated_data):
-        """Create a new conversation."""
+        """
+        Create a new conversation or return existing one for direct messages.
+        For direct conversations between two users, only one conversation is allowed.
+        """
         member_ids = validated_data.pop('member_ids', [])
+        request = self.context.get('request')
+        current_user = request.user if request else None
+
+        # For direct conversations, check if one already exists between these users
+        if validated_data.get('type') == Conversation.DIRECT and current_user:
+            # Include current user in the check
+            all_member_ids = set(member_ids + [current_user.id])
+
+            # Only check for duplicates if there are exactly 2 members (1-on-1 conversation)
+            if len(all_member_ids) == 2:
+                other_user_id = list(all_member_ids - {current_user.id})[0]
+                from users.models import User
+                try:
+                    other_user = User.objects.get(id=other_user_id)
+                    existing = Conversation.get_direct_conversation_between(
+                        current_user, other_user
+                    )
+                    if existing:
+                        # Mark as existing and return it
+                        existing._existing = True
+                        return existing
+                except User.DoesNotExist:
+                    pass
+
+        # Create new conversation
         conversation = Conversation.objects.create(**validated_data)
-        
+        conversation._existing = False
+
+        # Add members
         if member_ids:
             from users.models import User
             members = User.objects.filter(id__in=member_ids)
@@ -129,7 +164,7 @@ class ConversationSerializer(serializers.ModelSerializer):
                     conversation=conversation,
                     user=member
                 )
-        
+
         return conversation
 
 

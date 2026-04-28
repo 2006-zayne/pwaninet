@@ -1,4 +1,6 @@
 from django.db.models import Count, Q
+from django.utils import timezone
+from datetime import timedelta
 from notifications.models import Notifications
 
 def get_notifications_for_user(user, notification_type=None, is_read=None):
@@ -11,6 +13,42 @@ def get_notifications_for_user(user, notification_type=None, is_read=None):
         queryset = queryset.filter(is_read=is_read)
     
     return queryset.order_by('-timestamp')
+
+
+def get_notifications_by_time_periods(user, notification_type=None, is_read=None):
+    """
+    Group notifications by time periods: Today, Earlier, Previous
+    """
+    queryset = user.notifications.all()
+    
+    if notification_type:
+        queryset = queryset.filter(notification_type=notification_type)
+    
+    if is_read is not None:
+        queryset = queryset.filter(is_read=is_read)
+    
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_start = today_start - timedelta(days=1)
+    week_ago_start = today_start - timedelta(days=7)
+    
+    notifications = queryset.order_by('-timestamp')
+    
+    grouped = {
+        'today': [],
+        'earlier': [],
+        'previous': []
+    }
+    
+    for notif in notifications:
+        if notif.timestamp >= today_start:
+            grouped['today'].append(notif)
+        elif notif.timestamp >= yesterday_start:
+            grouped['earlier'].append(notif)
+        elif notif.timestamp >= week_ago_start:
+            grouped['previous'].append(notif)
+    
+    return grouped
 
 
 def get_grouped_notifications(user, notification_type=None, is_read=None):

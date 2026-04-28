@@ -1,5 +1,6 @@
 from django import forms
 from posts.models import Post
+from posts.validators import validate_audio_size
 from courses.models import Unit
 
 
@@ -26,6 +27,7 @@ class PostForm(forms.ModelForm):
                 'class': 'form-control-file'}))
     audio = forms.FileField(
         required=False,
+        validators=[validate_audio_size],
         widget=forms.ClearableFileInput(
             attrs={
                 'class': 'form-control-file',
@@ -47,6 +49,7 @@ class PostForm(forms.ModelForm):
             'video',
             'docs',
             'audio',
+            'images',
             'gradient_class']
 
         widgets = {

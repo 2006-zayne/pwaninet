@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Start Redis if not running
+if ! redis-cli ping > /dev/null 2>&1; then
+    redis-server --daemonize yes
+fi
+
+cd /home/zayne/projects
+source venv/bin/activate
+cd pwaninet
+daphne -b 0.0.0.0 -p 8000 pwaninet.asgi:application

@@ -228,6 +228,22 @@
                             <source src="{{ post.get_intel_file.url }}" type="video/mp4">
                         </video>
                     </div>
+                {% elif ".mp3" in f_url or ".wav" in f_url or ".ogg" in f_url or ".m4a" in f_url %}
+                    <div class="p-3 d-flex align-items-center justify-content-between" style="background: transparent;">
+                        <div class="d-flex align-items-center flex-grow-1">
+                            <div class="me-3">
+                                <i class="bi bi-music-note-fill text-muted fs-3"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-0 fw-bold small text-muted">Audio File</h6>
+                                <small class="text-muted">MUSIC/AUDIO</small>
+                            </div>
+                        </div>
+                        <audio id="audio-{{ post.id }}" controls preload="metadata" class="w-100" style="max-width: 300px; background: transparent; background-color: transparent;" muted loop autoplay>
+                            <source src="{{ post.get_intel_file.url }}" type="audio/mpeg">
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
                 {% elif ".pdf" in f_url %}
                     <a href="{{ post.get_intel_file.url }}" target="_blank" class="text-decoration-none">
                         <div class="p-4 d-flex align-items-center justify-content-between bg-white">

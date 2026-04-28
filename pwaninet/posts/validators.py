@@ -17,3 +17,9 @@ def validate_document_size(value):
     limit_mb = 50
     if value.size > limit_mb * 1024 * 1024:
         raise ValidationError(f"Document too heavy! Maximum allowed is {limit_mb}MB.")
+
+def validate_audio_size(value):
+    # Maximum size is 20 MB
+    limit_mb = 20
+    if value.size > limit_mb * 1024 * 1024:
+        raise ValidationError(f"Audio file too large! Maximum allowed is {limit_mb}MB.")

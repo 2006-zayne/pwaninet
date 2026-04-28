@@ -126,6 +126,7 @@
             justify-content: space-around;
             align-items: center;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+            z-index: 9999;
         }
 
         .mobile-bottom-nav .nav-chip i {
@@ -189,20 +190,20 @@
 
         /* Input placeholders for dark theme */
         [data-theme="dark"] ::placeholder {
-            color: var(--text-secondary) !important;
-            opacity: 0.7;
+            color: #d1d5db !important;
+            opacity: 1 !important;
         }
         [data-theme="dark"] ::-webkit-input-placeholder {
-            color: var(--text-secondary) !important;
-            opacity: 0.7;
+            color: #d1d5db !important;
+            opacity: 1 !important;
         }
         [data-theme="dark"] ::-moz-placeholder {
-            color: var(--text-secondary) !important;
-            opacity: 0.7;
+            color: #d1d5db !important;
+            opacity: 1 !important;
         }
         [data-theme="dark"] :-ms-input-placeholder {
-            color: var(--text-secondary) !important;
-            opacity: 0.7;
+            color: #d1d5db !important;
+            opacity: 1 !important;
         }
 
         /* Primary Button */
@@ -386,8 +387,8 @@
                     id="notification-badge-container">
                         <i class="bi bi-bell-fill"></i>
                         {% if unread_notifications_count > 0 %}
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light" 
-                                style="font-size: 0.6rem; padding: 0.35em 0.5em;">
+                            <span class="position-absolute top-0 end-0 translate-middle badge rounded-pill bg-danger border border-light" 
+                                style="font-size: 0.6rem; padding: 0.35em 0.5em; min-width: 18px; text-align: center; margin-top: -2px; margin-right: -2px;">
                                 {{ unread_notifications_count }}
                                 <span class="visually-hidden">unread messages</span>
                             </span>
@@ -458,6 +459,22 @@
                 </div>`;
         });
     </script>
-    {% block extra_js %}{% endblock %}
+    {% block extra_js %}
+<script>
+// Auto-refresh functionality for user actions
+function refreshPage() {
+    window.location.reload();
+}
+
+// Listen for custom refresh trigger
+document.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.trigger === 'refreshPage') {
+        setTimeout(() => {
+            refreshPage();
+        }, 100);
+    }
+});
+</script>
+{% endblock %}
 </body>
 </html>

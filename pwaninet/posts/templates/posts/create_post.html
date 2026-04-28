@@ -48,7 +48,72 @@
   .page-wrap {
     max-width: 640px;
     margin: 0 auto;
-    padding: 2rem 1.5rem 5rem;
+  }
+
+  /* ── Image Preview ── */
+  .preview-images {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .preview-image {
+    position: relative;
+    width: 100%;
+    height: 80px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+  }
+  .preview-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .preview-image .remove-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── Description Input ── */
+  .description-overlay {
+    position: relative;
+    margin-top: 12px;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: var(--radius-md);
+  }
+  .description-input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    padding: 12px;
+    font-size: 0.9rem;
+    resize: vertical;
+    min-height: 60px;
+  }
+  .description-input::placeholder {
+    color: var(--text-muted);
+  }
+  .description-input:focus {
+    outline: none;
+    border-color: var(--brand);
+    background: rgba(0, 0, 0, 0.9);
   }
 
   /* ── Page Header ── */
@@ -498,7 +563,7 @@
                 </label>
                 {{ form.video }}
               </div>
-              <div class="media-row">
+              <div class="media-row" id="audioUploadRow" style="display: none;">
                 <label for="{{ form.audio.id_for_label }}">
                   <i class="bi bi-music-note"></i> Music/Audio
                 </label>
@@ -537,10 +602,39 @@
           </div>
         </div>
 
-        <!-- Live gradient preview (full width) -->
-        <div class="compose-preview" id="previewBox">
-          <div id="previewTarget" class="gradient-intel-bg rounded-3">
-            <p id="previewContent"></p>
+        <!-- Preview Box -->
+        <div class="preview-box" id="previewBox">
+          <div class="preview-header">Preview</div>
+          <div class="preview-content" id="previewTarget">
+            <div class="preview-text" id="previewContent"></div>
+            <!-- Image Preview -->
+            <div id="imagePreviewContainer" style="display: none;">
+              <div class="preview-images" id="previewImages"></div>
+            </div>
+            <!-- Description Input -->
+            <div id="descriptionContainer" style="display: none;">
+              <div class="description-overlay">
+                <textarea 
+                  id="descriptionInput" 
+                  placeholder="Add a description..." 
+                  class="description-input"
+                  rows="3"
+                ></textarea>
+              </div>
+            </div>
+            <!-- Audio Input -->
+            <div id="audioContainer" style="display: none;">
+              <div class="description-overlay">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                  <i class="bi bi-music-note-fill text-primary fs-4"></i>
+                  <div>
+                    <h6 class="mb-0 fw-bold small">Add Music/Audio</h6>
+                    <small class="text-muted">Attach audio to play with your images</small>
+                  </div>
+                </div>
+                {{ form.audio }}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -559,6 +653,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const previewTxt  = document.getElementById('previewContent');
     const deployBtn   = document.getElementById('deployBtn');
     const charCount   = document.getElementById('charCount');
+    
+    // New elements for enhanced functionality
+    const audioUploadRow = document.getElementById('audioUploadRow');
+    const imageInput = document.getElementById('{{ form.images.id_for_label }}');
+    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+    const previewImages = document.getElementById('previewImages');
+    const descriptionContainer = document.getElementById('descriptionContainer');
+    const descriptionInput = document.getElementById('descriptionInput');
+    const audioContainer = document.getElementById('audioContainer');
 
     const panels = {
         sector: document.getElementById('sectorPanel'),
@@ -615,6 +718,68 @@ document.addEventListener('DOMContentLoaded', function () {
             previewBox.classList.remove('active');
         }
     }
+
+    // Post type detection and media handling
+    function detectPostType() {
+        const content = textarea.value.trim();
+        const hasImages = imageInput.files && imageInput.files.length > 0;
+        
+        if (hasImages) {
+            // Show image preview, description, and audio option
+            imagePreviewContainer.style.display = 'block';
+            descriptionContainer.style.display = 'block';
+            audioContainer.style.display = 'block';
+            audioUploadRow.style.display = 'none';
+            handleImagePreview();
+        } else {
+            // Hide image preview, description, and audio option
+            imagePreviewContainer.style.display = 'none';
+            descriptionContainer.style.display = 'none';
+            audioContainer.style.display = 'none';
+            audioUploadRow.style.display = 'block';
+        }
+    }
+
+    // Image preview handling
+    function handleImagePreview() {
+        previewImages.innerHTML = '';
+        const files = Array.from(imageInput.files);
+        
+        files.forEach((file, index) => {
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const div = document.createElement('div');
+                    div.className = 'preview-image';
+                    div.innerHTML = `
+                        <img src="${e.target.result}" alt="Preview ${index + 1}">
+                        <button class="remove-btn" onclick="removeImagePreview(${index})">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    `;
+                    previewImages.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    // Remove image preview
+    function removeImagePreview(index) {
+        const dt = new DataTransfer();
+        const files = Array.from(imageInput.files);
+        files.splice(index, 1);
+        dt.items.add(files);
+        imageInput.files = dt.files;
+        handleImagePreview();
+    }
+
+    // Initialize post type detection
+    imageInput.addEventListener('change', detectPostType);
+    textarea.addEventListener('input', function() {
+        detectPostType();
+        updatePreview();
+    });
 
     // Auto-grow textarea
     textarea.addEventListener('input', function () {

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load messaging_extras %}
 {% block content %}
 <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
 <script>
@@ -30,7 +31,7 @@ document.addEventListener('click', function(e) {
     if (!userId) return;
 
     const csrfToken = getCSRFToken();
-    
+
     fetch('/messaging/v1/conversations/', {
       method: 'POST',
       headers: {
@@ -52,6 +53,10 @@ document.addEventListener('click', function(e) {
     })
     .then(data => {
       if (data.id) {
+        // Show notification if using existing conversation
+        if (data.existing) {
+          showNotification('Existing conversation found. Redirecting...', 'info');
+        }
         window.location.href = `/messaging/conversation/${data.id}/`;
       } else {
         alert('Failed to create conversation. No ID in response.');
@@ -63,6 +68,19 @@ document.addEventListener('click', function(e) {
     });
   }
 });
+
+// Helper function to show notifications
+function showNotification(message, type = 'info') {
+  const notification = document.createElement('div');
+  notification.className = `alert alert-${type === 'info' ? 'primary' : type} alert-dismissible fade show position-fixed`;
+  notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+  notification.innerHTML = `
+    ${message}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  `;
+  document.body.appendChild(notification);
+  setTimeout(() => notification.remove(), 3000);
+}
 
 // Follow button functionality - use event delegation
 document.addEventListener('click', function(e) {
@@ -148,6 +166,19 @@ document.addEventListener('click', function(e) {
     max-width: 1400px;
     margin: 0 auto;
     padding: 2rem 1.5rem 5rem;
+  }
+
+  /* ── Mobile Full Screen ── */
+  @media (max-width: 767px) {
+    .page-wrap {
+      max-width: 100% !important;
+      padding: 1rem 0 5rem;
+    }
+    .container, .container-fluid {
+      max-width: 100% !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
   }
 
   /* ── Page Header ── */
@@ -263,7 +294,7 @@ document.addEventListener('click', function(e) {
   /* ── Two-column layout ── */
   .messaging-layout {
     display: grid;
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 360px 1fr;
     gap: 2rem;
     align-items: start;
   }
@@ -273,7 +304,6 @@ document.addEventListener('click', function(e) {
   }
   @media (max-width: 768px) {
     .messaging-layout { gap: 1.5rem; }
-    .page-wrap { padding: 1.5rem 1rem 4rem; }
     .page-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
     .page-title { font-size: 1.5rem; }
   }
@@ -578,7 +608,7 @@ document.addEventListener('click', function(e) {
     overflow: hidden;
     margin-bottom: 1.25rem;
   }
-  .card-body { padding: 1.4rem; }
+  .card-body { padding: 0.5rem; }
 
   /* ── Sidebar: Recent Chats ── */
   .sidebar-label {
@@ -604,12 +634,13 @@ document.addEventListener('click', function(e) {
     display: flex;
     align-items: center;
     gap: 11px;
-    padding: 0.6rem 0.65rem;
+    padding: 0.6rem 0.65rem 0.6rem 0.25rem;
     border-radius: var(--radius-md);
     text-decoration: none;
     transition: background 0.15s var(--ease), transform 0.15s var(--ease);
     position: relative;
     margin-bottom: 2px;
+    width: 100%;
   }
   .chat-row:hover {
     background: var(--brand-light);
@@ -633,7 +664,7 @@ document.addEventListener('click', function(e) {
     border: 2px solid var(--border);
   }
   .chat-name {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: var(--text-primary);
     white-space: nowrap;
@@ -642,7 +673,7 @@ document.addEventListener('click', function(e) {
     max-width: 160px;
   }
   .chat-preview {
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     font-weight: 600;
     margin-top: 1px;
@@ -770,6 +801,46 @@ document.addEventListener('click', function(e) {
   .sidebar-empty i { font-size: 1.8rem; color: var(--text-muted); display: block; margin-bottom: 8px; }
   .sidebar-empty p { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; margin: 0; }
 
+  /* Read Receipt Styles for Conversation List */
+  .read-receipt-indicator[data-status="online"] .read-receipt-circle {
+    background: var(--brand);
+    border-color: var(--brand);
+  }
+  .read-receipt-indicator[data-status="online"] .read-receipt-icon {
+    color: white;
+  }
+  .read-receipt-indicator[data-status="sent"] .read-receipt-circle {
+    background: white;
+    border: 2px solid #ddd;
+  }
+  .read-receipt-indicator[data-status="sent"] .read-receipt-icon {
+    color: #888;
+  }
+  .read-receipt-indicator[data-status="read"] .read-receipt-circle {
+    background: transparent;
+    border: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Dark mode support */
+  [data-theme="dark"] .read-receipt-indicator[data-status="sent"] .read-receipt-circle {
+    background: #2a3942;
+    border-color: #3a4a54;
+  }
+  [data-theme="dark"] .read-receipt-indicator[data-status="sent"] .read-receipt-icon {
+    color: #8696a0;
+  }
+  [data-theme="dark"] .read-receipt-indicator[data-status="online"] .read-receipt-circle {
+    background: var(--brand);
+    border-color: var(--brand);
+  }
+  [data-theme="dark"] .read-receipt-indicator[data-status="online"] .read-receipt-icon {
+    color: white;
+  }
+  [data-theme="dark"] .read-receipt-indicator[data-status="read"] .read-receipt-circle {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+
   /* Page load animation */
   .page-header, .messaging-layout {
     animation: page-rise 0.35s var(--ease) both;
@@ -825,10 +896,11 @@ document.addEventListener('click', function(e) {
           <div class="card">
             <div class="card-body">
               <div class="sidebar-label">
-                <i class="bi bi-chat-dots-fill"></i> Recent Chats
+                <i class="bi bi-chat-dots-fill"></i> Your Recent Chats
               </div>
               <div class="chats-scroll">
-                {% for conversation in conversations %}
+                {% for item in conversation_data %}
+                  {% with conversation=item.conversation %}
                   <a href="{% url 'messaging:conversation_detail' conversation.id %}" class="chat-row">
                     {% if conversation.type == 'group' %}
                       <div class="chat-icon">
@@ -841,37 +913,58 @@ document.addEventListener('click', function(e) {
                         {% endif %}
                       {% endfor %}
                     {% endif %}
-                    <div style="min-width:0; flex:1;">
-                      <div class="chat-name">
-                        {% if conversation.type == 'group' and conversation.name %}
-                          {{ conversation.name }}
-                        {% else %}
-                          {% for member in conversation.members.all %}
-                            {% if member.user != request.user %}
-                              {{ member.user.username }}
+                    <div style="min-width:0; flex:1; display: flex; align-items: center;">
+                      <div style="flex: 1;">
+                        <div class="chat-name">
+                          {% if conversation.type == 'group' and conversation.name %}
+                            {{ conversation.name }}
+                          {% else %}
+                            {% for member in conversation.members.all %}
+                              {% if member.user != request.user %}
+                                {{ member.user.username }}
+                              {% endif %}
+                            {% endfor %}
+                          {% endif %}
+                          {% if conversation.unread_count > 0 %}
+                            <a href="{% url 'messaging:conversation_detail' conversation.id %}"
+                               class="unread-badge"
+                               style="margin-left: 8px; text-decoration: none;"
+                               title="{{ conversation.unread_count }} unread messages">
+                              {{ conversation.unread_count }}
+                            </a>
+                          {% endif %}
+                        </div>
+                        <div class="chat-preview">
+                          {% if conversation.last_message %}
+                            {% if conversation.last_message.sender == request.user %}
+                              <span style="{% if conversation.unread_count > 0 %}font-weight: 400; color: var(--text-secondary);{% else %}font-weight: 400; color: var(--text-secondary);{% endif %}">
+                                You: {{ conversation.last_message.content|truncatechars:60 }}
+                              </span>
+                            {% else %}
+                              <span style="{% if conversation.unread_count > 0 %}font-weight: 700; color: var(--text-primary);{% else %}font-weight: 400; color: var(--text-secondary);{% endif %}">
+                                {{ conversation.last_message.sender.username }}: {{ conversation.last_message.content|truncatechars:60 }}
+                              </span>
                             {% endif %}
-                          {% endfor %}
-                        {% endif %}
+                          {% else %}
+                            <span style="color: var(--text-secondary);">Start a conversation</span>
+                          {% endif %}
+                        </div>
                         {% if conversation.unread_count > 0 %}
-                          <a href="{% url 'messaging:conversation_detail' conversation.id %}"
-                             class="unread-badge"
-                             style="margin-left: 8px; text-decoration: none;"
-                             title="{{ conversation.unread_count }} unread messages">
+                          <span class="unread-indicator" style="background: var(--brand); color: white; font-size: 11px; font-weight: 800; padding: 2px 6px; border-radius: 10px; position: absolute; right: 12px; top: 50%; transform: translateY(-50%);">
                             {{ conversation.unread_count }}
-                          </a>
-                        {% endif %}
-                      </div>
-                      <div class="chat-preview">
-                        {% if conversation.last_message %}
-                          {% if conversation.last_message.sender == request.user %}You: {% else %}{{ conversation.last_message.sender.username }}: {% endif %}
-                          {{ conversation.last_message.content|truncatechars:30 }}
-                        {% else %}
-                          Start a conversation
-                        {% endif %}
+                          </span>
+                        {% elif conversation.last_message and conversation.last_message.sender == request.user %}
+                        <div class="read-receipt-indicator" data-status="sent" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%);">
+                          <div class="read-receipt-circle" style="width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <span class="read-receipt-icon" style="font-size: 10px; font-weight: bold;">&#10003;</span>
+                          </div>
+                        </div>
+                      {% endif %}
                       </div>
                     </div>
                     <i class="bi bi-chevron-right chat-arrow"></i>
                   </a>
+                  {% endwith %}
                 {% empty %}
                   <div class="sidebar-empty">
                     <i class="bi bi-chat"></i>
@@ -910,11 +1003,12 @@ document.addEventListener('click', function(e) {
         <main>
           <div class="section-header">
             <h2 class="section-title">All Conversations</h2>
-            <span class="count-pill">{{ conversations|length }} conversation{{ conversations|length|pluralize }}</span>
+            <span class="count-pill">{{ conversation_data|length }} conversation{{ conversation_data|length|pluralize }}</span>
           </div>
 
           <div class="conversations-grid">
-        {% for conversation in conversations %}
+        {% for item in conversation_data %}
+          {% with conversation=item.conversation %}
           <a href="{% url 'messaging:conversation_detail' conversation.id %}" class="conversation-card">
             <div class="conversation-card-bar"></div>
             <div class="conversation-card-body">
@@ -964,6 +1058,7 @@ document.addEventListener('click', function(e) {
               </div>
             </div>
           </a>
+          {% endwith %}
         {% empty %}
           <div class="empty-state">
             <div class="empty-icon"><i class="bi bi-chat-dots"></i></div>
@@ -1020,7 +1115,7 @@ document.addEventListener('click', function(e) {
     <small class="text-muted">@{{ user.username }}</small>
   </div>
   <button class="btn btn-sm btn-primary start-conversation" data-user-id="{{ user.id }}">
-    <i class="bi bi-chat-dots"></i> Message
+    <i class="bi bi-chat-dots"></i> Start chat
   </button>
 </div>
 {% empty %}

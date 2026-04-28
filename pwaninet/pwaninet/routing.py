@@ -13,6 +13,4 @@ websocket_urlpatterns = [
     re_path(r'ws/feed/$', consumers.FeedConsumer.as_asgi()),
     # Online status consumer
     re_path(r'ws/online/$', consumers.OnlineStatusConsumer.as_asgi()),
-    # Messaging consumer
-    re_path(r'ws/chat/(?P<conversation_id>\w+)/$', consumers.ChatConsumer.as_asgi()),
 ] + messaging_websocket_urlpatterns

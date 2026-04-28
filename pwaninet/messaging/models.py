@@ -18,6 +18,7 @@ class Conversation(models.Model):
         default=DIRECT
     )
     name = models.CharField(max_length=255, null=True, blank=True)
+    is_encrypted = models.BooleanField(default=True, help_text="End-to-end encryption enabled")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
 
@@ -28,6 +29,40 @@ class Conversation(models.Model):
         if self.type == self.GROUP and self.name:
             return self.name
         return f"Conversation ({self.id})"
+
+    @property
+    def last_message(self):
+        """Get the most recent message in this conversation."""
+        return self.messages.order_by('-created_at').first()
+
+    def get_last_message_read_status(self, user):
+        """Get the read status of the last message for a specific user."""
+        last_msg = self.last_message
+        if not last_msg or last_msg.sender != user:
+            return None
+        
+        # Check if any other member has read this message
+        other_members = self.members.exclude(user=user)
+        for member in other_members:
+            if MessageRead.objects.filter(message=last_msg, user=member.user).exists():
+                return 'read'
+        
+        # Check if message was delivered (exists in database)
+        # For now, we'll consider it delivered if it's been sent
+        return 'delivered' if last_msg else 'sent'
+
+    @classmethod
+    def get_direct_conversation_between(cls, user1, user2):
+        """
+        Find existing direct conversation between two users.
+        Returns the conversation if found, None otherwise.
+        """
+        return cls.objects.filter(
+            type=cls.DIRECT,
+            members__user=user1
+        ).filter(
+            members__user=user2
+        ).distinct().first()
 
 
 class ConversationMember(models.Model):
@@ -51,6 +86,8 @@ class ConversationMember(models.Model):
         related_name='read_by_members'
     )
     is_muted = models.BooleanField(default=False)
+    # E2E encryption: Store public key for each participant
+    public_key = models.TextField(blank=True, null=True, help_text="User's public key for this conversation")
 
     class Meta:
         unique_together = ('conversation', 'user')
@@ -64,7 +101,7 @@ class ConversationMember(models.Model):
 
 
 class Message(models.Model):
-    """Message model for conversations."""
+    """Message model for conversations with E2E encryption support."""
     conversation = models.ForeignKey(
         Conversation,
         on_delete=models.CASCADE,
@@ -77,7 +114,11 @@ class Message(models.Model):
         related_name='sent_messages',
         db_index=True
     )
+    # Plaintext content (for non-encrypted or server-side storage)
     content = models.TextField(blank=True, null=True)
+    # Encrypted content (for E2E encrypted messages)
+    encrypted_content = models.TextField(blank=True, null=True)
+    is_encrypted = models.BooleanField(default=False)
     attachment = models.FileField(
         upload_to='message_attachments/%Y/%m/%d/',
         null=True,
@@ -113,7 +154,9 @@ class Message(models.Model):
         ]
 
     def __str__(self):
-        preview = self.content[:50] + '...' if len(self.content) > 50 else self.content
+        if self.is_encrypted:
+            return f"Encrypted message from {self.sender.username}"
+        preview = self.content[:50] + '...' if self.content and len(self.content) > 50 else self.content
         return f"Message from {self.sender.username}: {preview}"
 
 

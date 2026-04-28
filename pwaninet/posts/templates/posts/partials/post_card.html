@@ -229,8 +229,8 @@
                 <small class="text-muted">Attached audio</small>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-sm btn-light rounded-circle mute-toggle" data-post-id="{{ post.id }}" title="Unmute">
-                    <i class="bi bi-volume-mute-fill"></i>
+                <button class="btn btn-light rounded-circle mute-toggle" data-post-id="{{ post.id }}" title="Unmute" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                    <i class="bi bi-volume-mute-fill" style="font-size: 14px;"></i>
                 </button>
                 <audio id="audio-{{ post.id }}" class="w-100" style="max-width: 300px;" muted loop>
                     <source src="{{ post.audio.url }}" type="audio/mpeg">
@@ -266,12 +266,28 @@
                     <img src="{{ post.get_intel_file.url }}" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;">
                 {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
                     <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post-id="{{ post.id }}">
-                        <video id="video-{{ post.id }}" preload="metadata" class="w-100 h-100" muted loop playsinline>
+                        <video id="video-{{ post.id }}" preload="metadata" class="w-100 h-100" muted loop playsinline controls>
                             <source src="{{ post.get_intel_file.url }}" type="video/mp4">
                         </video>
-                        <button class="btn btn-sm btn-light rounded-circle position-absolute mute-toggle" data-post-id="{{ post.id }}" style="top: 10px; right: 10px; z-index: 10;" title="Unmute">
-                            <i class="bi bi-volume-mute-fill"></i>
+                        <button class="btn btn-light rounded-circle position-absolute mute-toggle" data-post-id="{{ post.id }}" style="bottom: 10px; left: 10px; z-index: 10; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Unmute">
+                            <i class="bi bi-volume-mute-fill" style="font-size: 14px;"></i>
                         </button>
+                    </div>
+                {% elif ".mp3" in f_url or ".wav" in f_url or ".ogg" in f_url or ".m4a" in f_url %}
+                    <div class="p-3 d-flex align-items-center justify-content-between" style="background: transparent;" data-media-type="audio" data-post-id="{{ post.id }}">
+                        <div class="d-flex align-items-center flex-grow-1">
+                            <div class="me-2">
+                                <i class="bi bi-music-note-fill text-muted fs-4"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-0 fw-bold small text-muted">Audio File</h6>
+                                <small class="text-muted">MUSIC/AUDIO</small>
+                            </div>
+                        </div>
+                        <audio id="audio-{{ post.id }}" controls preload="metadata" class="w-100" style="max-width: 200px; background: transparent; background-color: transparent;" muted loop autoplay>
+                            <source src="{{ post.get_intel_file.url }}" type="audio/mpeg">
+                            Your browser does not support the audio element.
+                        </audio>
                     </div>
                 {% elif ".pdf" in f_url %}
                     <a href="{{ post.get_intel_file.url }}" target="_blank" class="text-decoration-none">
@@ -566,7 +582,9 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('DOMContentLoaded', function() {
     const muteToggle = document.querySelector(`.mute-toggle[data-post-id="{{ post.id }}"]`);
     if (muteToggle) {
-        muteToggle.addEventListener('click', function() {
+        muteToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             const postId = this.dataset.postId;
             const video = document.getElementById(`video-${postId}`);
             const audio = document.getElementById(`audio-${postId}`);
@@ -581,6 +599,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 icon.className = audio.muted ? 'bi bi-volume-mute-fill' : 'bi bi-volume-up-fill';
                 this.title = audio.muted ? 'Unmute' : 'Mute';
             }
+        });
+    }
+
+    // Prevent navigation when clicking on video container
+    const videoContainer = document.querySelector(`[data-media-type="video"][data-post-id="{{ post.id }}"]`);
+    if (videoContainer) {
+        videoContainer.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
         });
     }
 });

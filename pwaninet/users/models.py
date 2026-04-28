@@ -21,12 +21,12 @@ class ThemePreference(models.TextChoices):
 
 
 class User(AbstractUser):
-    first_name = models.CharField(max_length=200, null=True, blank=True)
-    second_name = models.CharField(max_length=200, null=True, blank=True)
-    last_name = models.CharField(max_length=200, null=True, blank=True)
+    first_name = models.CharField(max_length=200, null=True, blank=True, db_index=True)
+    second_name = models.CharField(max_length=200, null=True, blank=True, db_index=True)
+    last_name = models.CharField(max_length=200, null=True, blank=True, db_index=True)
     year = models.ForeignKey('courses.Year', on_delete=models.SET_NULL, null=True)
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE, null=True, blank=True)
-    global_role = models.CharField(max_length=20, choices=GlobalRole.choices, default=GlobalRole.NORMAL)
+    global_role = models.CharField(max_length=20, choices=GlobalRole.choices, default=GlobalRole.NORMAL, db_index=True)
     profile_pic = models.ImageField(default='profile_pic/default_pic1.jpg', upload_to='profile_pic')
     cover_photo = models.ImageField(upload_to='covers/', blank=True, null=True)
     bio = models.TextField(max_length=500, blank=True)
@@ -89,6 +89,10 @@ class Follow(models.Model):
 
     class Meta:
         unique_together = ('follower', 'followed')
+        indexes = [
+            models.Index(fields=['follower', 'followed']),
+            models.Index(fields=['followed', 'follower']),
+        ]
 
     def __str__(self):
         return f"{self.follower.username} follows {self.followed.username}"
@@ -96,14 +100,18 @@ class Follow(models.Model):
 
 class DeviceAccount(models.Model):
     """Tracks accounts that have been used on a specific device"""
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='device_accounts')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='device_accounts', db_index=True)
     device_id = models.CharField(max_length=255, db_index=True)
-    last_used = models.DateTimeField(auto_now=True)
+    last_used = models.DateTimeField(auto_now=True, db_index=True)
     session_key = models.CharField(max_length=255, null=True, blank=True)
 
     class Meta:
         unique_together = ('user', 'device_id')
         ordering = ['-last_used']
+        indexes = [
+            models.Index(fields=['user', 'device_id']),
+            models.Index(fields=['device_id', 'last_used']),
+        ]
 
     def __str__(self):
         return f"{self.user.username} on device {self.device_id}"

@@ -60,13 +60,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def handle_chat_message(self, data):
         """Handle incoming chat message."""
         content = data.get('content')
+        encrypted_content = data.get('encrypted_content')
+        is_encrypted = data.get('is_encrypted', False)
         reply_to_id = data.get('reply_to')
 
-        if not content:
+        # Must have either plain content or encrypted content
+        if not content and not encrypted_content:
             return
 
         # Create message in database
-        message = await self.create_message(content, reply_to_id)
+        message = await self.create_message(content, encrypted_content, is_encrypted, reply_to_id)
 
         # Broadcast to room group
         await self.channel_layer.group_send(
@@ -147,7 +150,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return False
 
     @database_sync_to_async
-    def create_message(self, content, reply_to_id):
+    def create_message(self, content, encrypted_content, is_encrypted, reply_to_id):
         """Create a new message in the database."""
         try:
             conversation = Conversation.objects.get(id=self.conversation_id)
@@ -155,12 +158,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if reply_to_id:
                 reply_to = Message.objects.filter(id=reply_to_id).first()
 
-            message = Message.objects.create(
-                conversation=conversation,
-                sender=self.user,
-                content=content,
-                reply_to=reply_to
-            )
+            # If conversation is encrypted by default, mark message as encrypted
+            if is_encrypted or (conversation.is_encrypted and encrypted_content):
+                message = Message.objects.create(
+                    conversation=conversation,
+                    sender=self.user,
+                    content=None,  # Don't store plaintext for encrypted messages
+                    encrypted_content=encrypted_content,
+                    is_encrypted=True,
+                    reply_to=reply_to
+                )
+            else:
+                message = Message.objects.create(
+                    conversation=conversation,
+                    sender=self.user,
+                    content=content,
+                    reply_to=reply_to
+                )
 
             # Update conversation timestamp
             conversation.save()

@@ -1,0 +1,32 @@
+{% comment %}Group notifications by time{% endcomment %}
+{% regroup notifications by n.timestamp|date:"Y-m-d" as date_groups %}
+
+{% for date_group in date_groups %}
+  {% with current_date=date_group.grouper %}
+    {% now "Y-m-d" as today %}
+    
+    {% if current_date == today %}
+      <div class="time-section">
+        <div class="time-section-header">
+          <h6 class="fw-bold text-uppercase text-muted small mb-2 px-2">Today</h6>
+        </div>
+        {% include 'notifications/partials/notification_list_items.html' with notifications=date_group.list %}
+      </div>
+    {% else %}
+      <div class="time-section">
+        <div class="time-section-header">
+          <h6 class="fw-bold text-uppercase text-muted small mb-2 px-2 mt-3">{{ current_date|date:"F j, Y" }}</h6>
+        </div>
+        {% include 'notifications/partials/notification_list_items.html' with notifications=date_group.list %}
+      </div>
+    {% endif %}
+    
+  {% endwith %}
+{% endfor %}
+
+{% if not notifications %}
+  <div class="text-center py-5">
+    <i class="bi bi-bell-slash fs-1 text-muted mb-3"></i>
+    <h5 class="text-muted">No notifications</h5>
+  </div>
+{% endif %}

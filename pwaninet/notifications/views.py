@@ -28,6 +28,7 @@ def notifications_list(request):
     is_read_param = request.GET.get('read')
     page = request.GET.get('page', 1)
     grouped_param = request.GET.get('grouped', 'false')
+    time_filter = request.GET.get('time', 'all')
     
     is_read = None
     if is_read_param == 'true':
@@ -37,27 +38,48 @@ def notifications_list(request):
     
     grouped = grouped_param == 'true'
     
-    context = build_notifications_context(
-        request.user, 
-        mark_read=True,
-        notification_type=notification_type,
-        is_read=is_read,
-        grouped=grouped
-    )
-    
-    # Paginate notifications (only if not grouped)
-    if not grouped:
-        paginator = Paginator(context['notifications'], 20)
-        notifications_page = paginator.get_page(page)
-        context['notifications'] = notifications_page
-        context['has_pagination'] = True
+    # Use time-based grouping if requested
+    if time_filter != 'all':
+        from notifications.queries.notification_queries import get_notifications_by_time_periods
+        time_grouped = get_notifications_by_time_periods(
+            request.user,
+            notification_type=notification_type,
+            is_read=is_read
+        )
+        context = {
+            'time_grouped': time_grouped,
+            'time_filter': time_filter,
+            'filter_type': notification_type,
+            'filter_read': is_read,
+            'current_filter_type': notification_type,
+            'current_filter_read': is_read_param,
+            'current_grouped': grouped_param,
+            'has_pagination': False,
+            'unread_notifications_count': get_cached_unread_count(request.user)
+        }
     else:
-        context['has_pagination'] = False
-    
-    context['unread_notifications_count'] = 0
-    context['current_filter_type'] = notification_type
-    context['current_filter_read'] = is_read_param
-    context['current_grouped'] = grouped_param
+        context = build_notifications_context(
+            request.user,
+            mark_read=False,
+            notification_type=notification_type,
+            is_read=is_read,
+            grouped=grouped
+        )
+        
+        # Paginate notifications (only if not grouped)
+        if not grouped:
+            paginator = Paginator(context['notifications'], 20)
+            notifications_page = paginator.get_page(page)
+            context['notifications'] = notifications_page
+            context['has_pagination'] = True
+        else:
+            context['has_pagination'] = False
+        
+        context['unread_notifications_count'] = get_cached_unread_count(request.user)
+        context['current_filter_type'] = notification_type
+        context['current_filter_read'] = is_read_param
+        context['current_grouped'] = grouped_param
+        context['time_filter'] = 'all'
     
     return render(request, 'notifications/notifications.html', context)
 
@@ -71,10 +93,19 @@ def unread_notification_count(request):
 @login_required
 def mark_notification_as_read(request, notif_id):
     mark_single_notification_as_read(request.user, notif_id)
-    from notifications.services.notification_service import build_notifications_context
-    context = build_notifications_context(request.user, mark_read=False)
+    
+    # Get the specific notification that was marked
+    notification = get_notification_for_user(request.user, notif_id)
+    if notification:
+        notification.is_read = True
+        notification.save()
+    
+    # Return updated notification item
+    context = {
+        'notifications': [notification] if notification else []
+    }
     context['unread_notifications_count'] = get_cached_unread_count(request.user)
-    response = render(request, 'notifications/partials/notification_list.html', context)
+    response = render(request, 'notifications/partials/notification_list_items.html', context)
     response['HX-Trigger'] = 'updateUnreadCount'
     return response
 
@@ -110,7 +141,7 @@ def delete_notification(request, notif_id):
         context['current_filter_type'] = notification_type
         context['current_filter_read'] = is_read_param
         
-        response = render(request, 'notifications/partials/notification_list.html', context)
+        response = render(request, 'notifications/partials/notification_list_items.html', context)
         response['HX-Trigger'] = 'updateUnreadCount'
         return response
     return HttpResponse('')

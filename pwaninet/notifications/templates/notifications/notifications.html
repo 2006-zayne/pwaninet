@@ -66,12 +66,21 @@
     padding: 2rem 1.5rem 5rem;
   }
 
+  /* ── Mobile Full Screen ── */
+  @media (max-width: 767px) {
+    .page-wrap {
+      max-width: 100% !important;
+      padding: 1rem 0 5rem;
+    }
+    .container, .container-fluid {
+      max-width: 100% !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+  }
+
   /* ── Mobile Responsiveness ── */
   @media (max-width: 768px) {
-    .page-wrap {
-      padding: 1.5rem 1rem 4rem;
-    }
-    
     .page-header {
       flex-direction: column;
       align-items: flex-start;
@@ -82,13 +91,9 @@
       font-size: 1.5rem;
     }
     
-    .filter-bar {
-      gap: 0.4rem;
-    }
-    
-    .btn-filter {
-      padding: 0.4rem 0.75rem;
-      font-size: 0.7rem;
+    .filter-dropdown {
+      max-width: 100%;
+      font-size: 0.8rem;
     }
     
     .notif-item {
@@ -140,13 +145,9 @@
       font-size: 1.25rem;
     }
     
-    .filter-bar {
-      gap: 0.3rem;
-    }
-    
-    .btn-filter {
-      padding: 0.35rem 0.6rem;
-      font-size: 0.65rem;
+    .filter-dropdown {
+      font-size: 0.75rem;
+      padding: 0.6rem 0.8rem;
     }
     
     .notif-item {
@@ -411,47 +412,55 @@
     transform: translateY(-1px);
   }
 
-  /* ── Filter Buttons ── */
-  .filter-bar {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+  /* ── Filter Dropdown ── */
+  .filter-dropdown-container {
     margin-bottom: 1.5rem;
   }
-  .btn-filter {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0.5rem 1rem;
+  .filter-dropdown {
+    width: 100%;
+    max-width: 320px;
+    padding: 0.75rem 1rem;
     background: var(--card-bg);
-    color: var(--text-secondary);
+    color: var(--text-primary);
     border: 1.5px solid var(--border);
-    border-radius: var(--radius-pill);
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-decoration: none;
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.18s var(--ease);
-    letter-spacing: 0.02em;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 20px;
+    padding-right: 2.5rem;
   }
-  .btn-filter:hover {
+  .filter-dropdown:hover {
     border-color: var(--brand);
-    color: var(--brand);
-    transform: translateY(-1px);
+    box-shadow: 0 0 0 3px var(--brand-glow);
   }
-  .btn-filter.active {
+  .filter-dropdown:focus {
+    outline: none;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-glow);
+  }
+  .filter-dropdown optgroup {
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.75rem;
+    padding-top: 0.5rem;
+    background: var(--card-bg);
+  }
+  .filter-dropdown option {
+    padding: 0.5rem 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .filter-dropdown option:checked {
     background: var(--brand);
     color: #fff;
-    border-color: var(--brand);
-  }
-  .filter-count {
-    background: rgba(255,255,255,0.2);
-    padding: 2px 6px;
-    border-radius: 10px;
-    font-size: 0.65rem;
-  }
-  .btn-filter.active .filter-count {
-    background: rgba(255,255,255,0.3);
   }
 
   /* ── Pagination ── */
@@ -516,6 +525,80 @@
     border-color: #f87171;
   }
 
+  /* ── Time Sections ── */
+  .time-section {
+    margin-bottom: 1rem;
+  }
+  .time-section-header {
+    position: sticky;
+    top: 0;
+    background: var(--card-bg);
+    z-index: 10;
+    padding: 0.75rem 1rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .time-section-header h6 {
+    margin: 0;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+  }
+
+  /* ── View More Button ── */
+  .btn-view-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.75rem 1.5rem;
+    background: var(--brand-light);
+    color: var(--brand);
+    border: 1.5px solid var(--brand-mid);
+    border-radius: var(--radius-pill);
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.18s var(--ease);
+    letter-spacing: 0.02em;
+  }
+  .btn-view-more:hover {
+    background: var(--brand-mid);
+    color: #0f172a;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+  }
+  .btn-view-more.expanded {
+    background: var(--brand);
+    color: #fff;
+    border-color: var(--brand);
+  }
+  .btn-view-more.expanded i {
+    transform: rotate(180deg);
+  }
+
+  /* ── Unread Notification Styling ── */
+  .unread-notification {
+    background: var(--primary-light) !important;
+    border-left: 4px solid var(--primary) !important;
+  }
+  [data-theme="dark"] .unread-notification {
+    background: #37474f !important;
+    border-left: 4px solid #0084ff !important;
+  }
+  .unread-notification:hover {
+    background: var(--brand-light) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+  }
+  [data-theme="dark"] .unread-notification:hover {
+    background: #4a5568 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 132, 255, 0.15);
+  }
+  .list-group-item:hover {
+    background: var(--brand-light);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+  }
+
   /* Page load animation */
   .page-header, .card {
     animation: page-rise 0.35s var(--ease) both;
@@ -545,56 +628,33 @@
     {% endif %}
   </div>
 
-  <!-- ── Filter Bar ── -->
-  <div class="filter-bar">
-    <a href="{% url 'notifications:notifications' %}" 
-       class="btn-filter {% if not filter_type and not filter_read %}active{% endif %}">
-      <i class="bi bi-inbox"></i> All
-    </a>
-    <a href="{% url 'notifications:notifications' %}?read=false" 
-       class="btn-filter {% if filter_read == False %}active{% endif %}">
-      <i class="bi bi-envelope"></i> Unread
-    </a>
-    <a href="{% url 'notifications:notifications' %}?read=true" 
-       class="btn-filter {% if filter_read == True %}active{% endif %}">
-      <i class="bi bi-check2"></i> Read
-    </a>
-    <div style="width: 1px; background: var(--border); margin: 0 0.5rem;"></div>
-    <a href="{% url 'notifications:notifications' %}?type=INVITE" 
-       class="btn-filter {% if filter_type == 'INVITE' %}active{% endif %}">
-      <i class="bi bi-envelope-fill"></i> Invites
-    </a>
-    <a href="{% url 'notifications:notifications' %}?type=LIKE" 
-       class="btn-filter {% if filter_type == 'LIKE' %}active{% endif %}">
-      <i class="bi bi-heart-fill"></i> Likes
-    </a>
-    <a href="{% url 'notifications:notifications' %}?type=FOLLOW" 
-       class="btn-filter {% if filter_type == 'FOLLOW' %}active{% endif %}">
-      <i class="bi bi-person-plus-fill"></i> Follows
-    </a>
-    <a href="{% url 'notifications:notifications' %}?type=GROUP_REQUEST" 
-       class="btn-filter {% if filter_type == 'GROUP_REQUEST' %}active{% endif %}">
-      <i class="bi bi-clock-fill"></i> Requests
-    </a>
-    <a href="{% url 'notifications:notifications' %}?type=GROUP_APPROVED" 
-       class="btn-filter {% if filter_type == 'GROUP_APPROVED' %}active{% endif %}">
-      <i class="bi bi-check-circle-fill"></i> Approved
-    </a>
-    <div style="width: 1px; background: var(--border); margin: 0 0.5rem;"></div>
-    <a href="?grouped={% if current_grouped == 'true' %}false{% else %}true{% endif %}{% if current_filter_type %}&type={{ current_filter_type }}{% endif %}{% if current_filter_read %}&read={{ current_filter_read }}{% endif %}" 
-       class="btn-filter {% if current_grouped == 'true' %}active{% endif %}">
-      <i class="bi bi-layers"></i> Grouped
-    </a>
+  <!-- ── Filter Dropdown ── -->
+  <div class="filter-dropdown-container">
+    <select id="filter-select" class="filter-dropdown" onchange="handleFilterChange()">
+      <option value="">All Notifications</option>
+      <optgroup label="Read Status">
+        <option value="read=false" {% if filter_read == False %}selected{% endif %}>Unread</option>
+        <option value="read=true" {% if filter_read == True %}selected{% endif %}>Read</option>
+      </optgroup>
+      <optgroup label="Type">
+        <option value="type=INVITE" {% if filter_type == 'INVITE' %}selected{% endif %}>Invites</option>
+        <option value="type=LIKE" {% if filter_type == 'LIKE' %}selected{% endif %}>Likes</option>
+        <option value="type=FOLLOW" {% if filter_type == 'FOLLOW' %}selected{% endif %}>Follows</option>
+        <option value="type=GROUP_REQUEST" {% if filter_type == 'GROUP_REQUEST' %}selected{% endif %}>Requests</option>
+        <option value="type=GROUP_APPROVED" {% if filter_type == 'GROUP_APPROVED' %}selected{% endif %}>Approved</option>
+      </optgroup>
+      <optgroup label="Time Period">
+        <option value="time=today" {% if time_filter == 'today' %}selected{% endif %}>Today</option>
+        <option value="time=earlier" {% if time_filter == 'earlier' %}selected{% endif %}>Earlier</option>
+        <option value="time=previous" {% if time_filter == 'previous' %}selected{% endif %}>Previous</option>
+      </optgroup>
+          </select>
   </div>
 
   <!-- ── Notifications Card ── -->
   <div class="card" id="notification-list">
     <div class="card-body" style="padding: 0;">
-      {% if grouped %}
-        {% include 'notifications/partials/notification_list_grouped.html' %}
-      {% else %}
-        {% include 'notifications/partials/notification_list.html' %}
-      {% endif %}
+      {% include 'notifications/partials/notification_list_time_grouped.html' %}
     </div>
   </div>
 
@@ -664,6 +724,47 @@
 </div>
 
 <script>
+function handleFilterChange() {
+  const select = document.getElementById('filter-select');
+  const value = select.value;
+  
+  if (value === '') {
+    // Go to base URL (all notifications)
+    window.location.href = '{% url "notifications:notifications" %}';
+  } else {
+    // Build URL with parameters
+    const url = new URL(window.location);
+    url.pathname = '{% url "notifications:notifications" %}';
+    
+    // Clear existing parameters
+    url.searchParams.delete('type');
+    url.searchParams.delete('read');
+    url.searchParams.delete('time');
+    url.searchParams.delete('grouped');
+    
+    // Add new parameter
+    const [key, val] = value.split('=');
+    url.searchParams.set(key, val);
+    
+    window.location.href = url.toString();
+  }
+}
+
+function toggleOlderNotifications() {
+  const olderSection = document.getElementById('older-section');
+  const viewMoreBtn = document.querySelector('.btn-view-more');
+  
+  if (olderSection.style.display === 'none') {
+    olderSection.style.display = 'block';
+    viewMoreBtn.innerHTML = '<i class="bi bi-chevron-up"></i> View less';
+    viewMoreBtn.classList.add('expanded');
+  } else {
+    olderSection.style.display = 'none';
+    viewMoreBtn.innerHTML = '<i class="bi bi-chevron-down"></i> View more';
+    viewMoreBtn.classList.remove('expanded');
+  }
+}
+
 document.body.addEventListener('htmx:afterSwap', function(evt) {
   if (evt.detail.triggerSpec?.trigger === 'updateUnreadCount') {
     fetch('/unread-notification-count/')
