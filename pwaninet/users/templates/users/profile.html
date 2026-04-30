@@ -3,6 +3,42 @@
 {% load user_extras %}
 {% csrf_token %}
 
+{% block extra_css %}
+<style>
+@media (max-width: 767px) {
+    .profile-mobile-fullscreen .container-fluid {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    
+    .profile-mobile-fullscreen .row {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    
+    .profile-mobile-fullscreen .col-12 {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    
+    .profile-mobile-fullscreen .post-card {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    
+    .profile-mobile-fullscreen .nav-tabs {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    
+    .profile-mobile-fullscreen .intel-stream {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <style>
   [data-theme="dark"] .bg-white {
@@ -133,8 +169,9 @@
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     white-space: nowrap;
 }
+
 </style>
-<div class="container-fluid py-3 px-2 px-md-4">
+<div class="container-fluid p-0 profile-mobile-fullscreen">
     <div class="row g-4 justify-content-center">
         
         <div class="col-12 col-lg-5 col-xl-4">
@@ -291,8 +328,39 @@
 document.addEventListener('DOMContentLoaded', function() {
   // Helper function to get CSRF token
   function getCSRFToken() {
-    const token = document.querySelector('[name="csrfmiddlewaretoken"]');
-    return token ? token.value : '';
+    // Try multiple ways to get CSRF token
+    const token = document.querySelector('[name="csrfmiddlewaretoken"]') ||
+                   document.querySelector('input[name="csrfmiddlewaretoken"]') ||
+                   document.querySelector('meta[name="csrf-token"]');
+    
+    if (token) {
+      return token.value || token.getAttribute('content') || '';
+    }
+    
+    // Try to get from cookie
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'csrftoken') {
+        return value;
+      }
+    }
+    
+    console.warn('CSRF token not found');
+    return '';
+  }
+
+  // Helper function to show notifications
+  function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type === 'info' ? 'primary' : type} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.innerHTML = `
+      ${message}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 3000);
   }
 
   // Start conversation functionality for profile page
@@ -302,25 +370,48 @@ document.addEventListener('DOMContentLoaded', function() {
       const userId = this.dataset.userId;
       if (!userId) return;
 
+      const csrfToken = getCSRFToken();
+      console.log('CSRF Token:', csrfToken);
+      console.log('User ID:', userId);
+      console.log('User authenticated:', {{ request.user.is_authenticated|yesno:"true,false" }});
+      
+      if (!csrfToken) {
+        console.error('No CSRF token found');
+        alert('Security token not found. Please refresh the page and try again.');
+        return;
+      }
+      
       fetch('/messaging/v1/conversations/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRFToken': getCSRFToken()
+          'X-CSRFToken': csrfToken,
+          'X-Requested-With': 'XMLHttpRequest'
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
           type: 'direct',
           member_ids: [userId]
         })
       })
       .then(response => {
+        console.log('Response status:', response.status);
+        console.log('Response headers:', response.headers);
+        
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          return response.text().then(text => {
+            console.error('Error response:', text);
+            throw new Error(`HTTP ${response.status}: ${text}`);
+          });
         }
         return response.json();
       })
       .then(data => {
         if (data.id) {
+          // Show notification if using existing conversation
+          if (data.existing) {
+            showNotification('Existing conversation found. Redirecting...', 'info');
+          }
           window.location.href = `/messaging/conversation/${data.id}/`;
         } else {
           console.error('Invalid response:', data);

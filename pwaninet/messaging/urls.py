@@ -6,7 +6,8 @@ from .views import (
     MessageReactionViewSet,
     conversation_list,
     conversation_detail,
-    search_followed_users
+    search_followed_users,
+    create_conversation
 )
 
 router = DefaultRouter()
@@ -21,4 +22,5 @@ urlpatterns = [
     path('', conversation_list, name='conversation_list'),
     path('conversation/<int:conversation_id>/', conversation_detail, name='conversation_detail'),
     path('search-followed-users/', search_followed_users, name='search_followed_users'),
+    path('create/', create_conversation, name='create_conversation'),
 ]

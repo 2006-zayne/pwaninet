@@ -19,7 +19,7 @@ ALLOWED_HOSTS = [
     host.split(':')[0].strip()
     for host in os.environ.get(
         'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,10.20.152.125,192.168.213.221,192.168.180.221,192.168.72.88,192.168.85.117,192.168.72.88'
+        'localhost,127.0.0.1,10.20.152.125,192.168.213.221,192.168.180.221,192.168.72.88,192.168.85.117,192.168.72.88,192.168.183.245'
     ).split(',')
     if host.strip()
 ]
@@ -229,4 +229,7 @@ CSRF_TRUSTED_ORIGINS = [
     f"http://{host.split(':')[0].strip()}"
     for host in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
     if host.strip()
+] + [
+    'http://127.0.0.1:46555',  # Browser preview port
+    'http://localhost:46555',  # Browser preview port localhost
 ]

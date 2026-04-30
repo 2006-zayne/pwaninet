@@ -72,7 +72,7 @@
     }
   }
 </style>
-<div id="post-card-{{ post.id }}" class="post-card shadow-sm mb-3 bg-white rounded-3 overflow-hidden border-0">
+<div id="post-card-{{ post.id }}" class="post-card shadow-sm mb-2 bg-white rounded-3 overflow-hidden border-0">
     {% if post.repost_of %}
     <!-- Repost Header -->
     <div class="d-flex align-items-center p-2 border-bottom bg-light">
@@ -266,10 +266,10 @@
                     <img src="{{ post.get_intel_file.url }}" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;">
                 {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
                     <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post-id="{{ post.id }}">
-                        <video id="video-{{ post.id }}" preload="metadata" class="w-100 h-100" muted loop playsinline controls>
+                        <video id="video-{{ post.id }}" preload="metadata" class="w-100 h-100" muted loop playsinline autoplay data-autoplay="true">
                             <source src="{{ post.get_intel_file.url }}" type="video/mp4">
                         </video>
-                        <button class="btn btn-light rounded-circle position-absolute mute-toggle" data-post-id="{{ post.id }}" style="bottom: 10px; left: 10px; z-index: 10; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Unmute">
+                        <button class="btn btn-light rounded-circle position-absolute mute-toggle" data-post-id="{{ post.id }}" style="top: 10px; left: 10px; z-index: 10; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Unmute">
                             <i class="bi bi-volume-mute-fill" style="font-size: 14px;"></i>
                         </button>
                     </div>
@@ -341,10 +341,10 @@
                 <input type="text" name="content"
                        class="form-control border-0 rounded-pill"
                        placeholder="Write a comment..."
-                       style="font-size: 13px; background-color: #e9ecef; padding-right: 40px;">
+                       style="font-size: 13px; background-color: #e9ecef; padding-right: 40px; height: 42px;">
                 <button type="submit" class="btn border-0 rounded-circle position-absolute"
                         style="width: 32px; height: 32px; right: 4px; top: 50%; transform: translateY(-50%); padding: 0; display: flex; align-items: center; justify-content: center; background: transparent;">
-                    <i class="bi bi-send-fill" style="font-size: 13px; color: #0f172a;"></i>
+                    <i class="bi bi-send-fill" style="font-size: 20px; color: #0f172a;"></i>
                 </button>
             </div>
         </form>

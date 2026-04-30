@@ -1,0 +1,38 @@
+{% load messaging_extras %}
+<div class="conversation-profile-header">
+  {% if conversation.type == 'group' %}
+    <div class="profile-header-avatar bg-primary d-flex align-items-center justify-content-center">
+      <i class="bi bi-people-fill text-white"></i>
+    </div>
+    <div class="profile-header-info">
+      <div class="profile-header-name">
+        {% if conversation.name %}{{ conversation.name }}{% else %}Group Chat{% endif %}
+      </div>
+      <div class="profile-header-handle">@pwaninet</div>
+      <div class="profile-header-status" id="profileHeaderStatus"></div>
+      <div class="profile-header-members">
+        {% with member_count=conversation.members.all|length %}
+          {{ member_count }} member{{ member_count|pluralize }}
+        {% endwith %}
+      </div>
+    </div>
+  {% else %}
+    {% for member in conversation.members.all %}
+      {% if member.user != request.user %}
+        {% if member.user.profile_pic %}
+          <img src="{{ member.user.profile_pic.url }}" class="profile-header-avatar {% if member.user|is_online %}online{% endif %}">
+        {% else %}
+          <div class="profile-header-avatar bg-secondary d-flex align-items-center justify-content-center {% if member.user|is_online %}online{% endif %}">
+            <i class="bi bi-person-fill text-white"></i>
+          </div>
+        {% endif %}
+        <div class="profile-header-info">
+          <div class="profile-header-name">{{ member.user.first_name }} {{ member.user.last_name }}</div>
+          <div class="profile-header-handle">@{{ member.user.username }} • pwaninet</div>
+          <div class="profile-header-status" id="profileHeaderStatus"></div>
+          <div class="profile-header-bio">{{ member.user.bio|default:"" }}</div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+</div>

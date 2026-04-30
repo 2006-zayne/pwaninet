@@ -3,8 +3,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.views.decorators.csrf import csrf_exempt
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from .models import Conversation, ConversationMember, Message, MessageRead, MessageReaction
@@ -404,4 +406,47 @@ def conversation_detail(request, conversation_id):
     }
     
     return render(request, 'messaging/conversation_detail.html', context)
+
+
+@csrf_exempt
+@login_required
+def create_conversation(request):
+    """Create a new conversation or redirect to existing one."""
+    if request.method == 'POST':
+        user_id = request.POST.get('user_id')
+        conversation_type = request.POST.get('type', 'direct')
+        
+        if not user_id:
+            messages.error(request, 'User ID is required.')
+            return redirect('messaging:conversation_list')
+        
+        try:
+            from users.models import User
+            other_user = User.objects.get(id=user_id)
+            
+            # Check if conversation already exists
+            existing = Conversation.get_direct_conversation_between(
+                request.user, other_user
+            )
+            
+            if existing:
+                messages.info(request, 'Existing conversation found.')
+                return redirect('messaging:conversation_detail', conversation_id=existing.id)
+            
+            # Create new conversation
+            conversation = Conversation.objects.create(type=conversation_type)
+            
+            # Add members
+            ConversationMember.objects.create(conversation=conversation, user=request.user)
+            ConversationMember.objects.create(conversation=conversation, user=other_user)
+            
+            messages.success(request, 'Conversation created successfully.')
+            return redirect('messaging:conversation_detail', conversation_id=conversation.id)
+            
+        except User.DoesNotExist:
+            messages.error(request, 'User not found.')
+        except Exception as e:
+            messages.error(request, f'Failed to create conversation: {str(e)}')
+    
+    return redirect('messaging:conversation_list')
 

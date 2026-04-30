@@ -87,7 +87,8 @@
       padding-right: 0 !important;
     }
   }
-</style>
+  
+  </style>
 
 <div class="container mt-3" style="padding-bottom: 80px;">
     <div class="row justify-content-center">
@@ -223,10 +224,13 @@
                 {% if ".jpg" in f_url or ".png" in f_url or ".jpeg" in f_url or ".webp" in f_url %}
                     <img src="{{ post.get_intel_file.url }}" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;">
                 {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
-                    <div class="ratio ratio-16x9 bg-black">
-                        <video controls preload="metadata" class="w-100 h-100">
+                    <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post-id="{{ post.id }}">
+                        <video id="video-{{ post.id }}" controls preload="metadata" class="w-100 h-100" muted loop playsinline autoplay data-autoplay="true">
                             <source src="{{ post.get_intel_file.url }}" type="video/mp4">
                         </video>
+                        <button class="btn btn-light rounded-circle position-absolute mute-toggle" data-post-id="{{ post.id }}" style="top: 10px; left: 10px; z-index: 10; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Unmute">
+                            <i class="bi bi-volume-mute-fill" style="font-size: 14px;"></i>
+                        </button>
                     </div>
                 {% elif ".mp3" in f_url or ".wav" in f_url or ".ogg" in f_url or ".m4a" in f_url %}
                     <div class="p-3 d-flex align-items-center justify-content-between" style="background: transparent;">
@@ -312,10 +316,10 @@
                         <input type="text" name="content"
                                class="form-control border-0 rounded-pill"
                                placeholder="Add comment..."
-                               style="font-size: 14px; background-color: #e9ecef; padding-right: 40px;">
+                               style="font-size: 13px; background-color: #e9ecef; padding-right: 40px; height: 42px;">
                         <button type="submit" class="btn border-0 rounded-circle position-absolute"
                                 style="width: 32px; height: 32px; right: 4px; top: 50%; transform: translateY(-50%); padding: 0; display: flex; align-items: center; justify-content: center; background: transparent;">
-                            <i class="bi bi-send-fill" style="font-size: 13px; color: #0f172a;"></i>
+                            <i class="bi bi-send-fill" style="font-size: 20px; color: #0f172a;"></i>
                         </button>
                     </div>
                 </form>
