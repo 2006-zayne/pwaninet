@@ -223,7 +223,7 @@ def switch_account_view(request, user_id):
     logout(request)
     
     # Login as target user
-    login(request, target_user)
+    login(request, target_user, backend='django.contrib.auth.backends.ModelBackend')
     
     # Update the device account record
     device_account.session_key = request.session.session_key

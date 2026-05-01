@@ -1,8 +1,8 @@
 import json
-import redis
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
+from pwaninet.redis_client import get_redis_client
 from .models import Conversation, ConversationMember, Message
 
 User = get_user_model()
@@ -208,14 +208,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             pass
 
     async def set_user_online(self, is_online):
-        """Set user online status in Redis."""
+        """Set user online status in Redis using connection pool."""
         try:
-            redis_client = redis.Redis(
-                host='127.0.0.1',
-                port=6379,
-                db=0,
-                decode_responses=True
-            )
+            redis_client = get_redis_client()
             key = f'user_online:{self.user.id}'
             
             if is_online:
@@ -285,14 +280,9 @@ class OnlineStatusConsumer(AsyncWebsocketConsumer):
         await self.set_user_online(False)
 
     async def set_user_online(self, is_online):
-        """Set user online status in Redis."""
+        """Set user online status in Redis using connection pool."""
         try:
-            redis_client = redis.Redis(
-                host='127.0.0.1',
-                port=6379,
-                db=0,
-                decode_responses=True
-            )
+            redis_client = get_redis_client()
             key = f'user_online:{self.user.id}'
             
             if is_online:
@@ -320,14 +310,9 @@ class OnlineStatusConsumer(AsyncWebsocketConsumer):
             pass
 
     async def get_online_users(self):
-        """Get list of online users from Redis."""
+        """Get list of online users from Redis using connection pool."""
         try:
-            redis_client = redis.Redis(
-                host='127.0.0.1',
-                port=6379,
-                db=0,
-                decode_responses=True
-            )
+            redis_client = get_redis_client()
             keys = redis_client.keys('user_online:*')
             user_ids = [int(key.split(':')[1]) for key in keys]
             return user_ids

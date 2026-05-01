@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Conversation, ConversationMember, Message, MessageRead, MessageReaction
+from .models import Conversation, ConversationMember, Message, MessageRead, MessageReaction, ConversationTheme
 from users.serializers import UserSerializer
 
 
@@ -166,6 +166,86 @@ class ConversationSerializer(serializers.ModelSerializer):
                 )
 
         return conversation
+
+
+class ConversationThemeSerializer(serializers.ModelSerializer):
+    """Serializer for conversation themes."""
+    light_image_url = serializers.SerializerMethodField()
+    dark_image_url = serializers.SerializerMethodField()
+    css_variables_light = serializers.SerializerMethodField()
+    css_variables_dark = serializers.SerializerMethodField()
+    overlay_light = serializers.SerializerMethodField()
+    overlay_dark = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConversationTheme
+        fields = [
+            'id', 'conversation', 'theme_type', 'light_color', 'dark_color',
+            'light_gradient_start', 'light_gradient_end', 'dark_gradient_start', 
+            'dark_gradient_end', 'gradient_angle', 'light_image_url', 'dark_image_url',
+            'image_fit', 'overlay_opacity', 'light_overlay_color', 'dark_overlay_color',
+            'css_variables_light', 'css_variables_dark', 'overlay_light', 'overlay_dark',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_light_image_url(self, obj):
+        if obj.light_image:
+            return obj.light_image.url
+        return None
+
+    def get_dark_image_url(self, obj):
+        if obj.dark_image:
+            return obj.dark_image.url
+        return None
+
+    def get_css_variables_light(self, obj):
+        return obj.get_css_variables('light')
+
+    def get_css_variables_dark(self, obj):
+        return obj.get_css_variables('dark')
+
+    def get_overlay_light(self, obj):
+        return obj.get_overlay_css('light')
+
+    def get_overlay_dark(self, obj):
+        return obj.get_overlay_css('dark')
+
+
+class ConversationThemeCreateUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for creating and updating conversation themes."""
+    
+    class Meta:
+        model = ConversationTheme
+        fields = [
+            'theme_type', 'light_color', 'dark_color',
+            'light_gradient_start', 'light_gradient_end', 'dark_gradient_start', 
+            'dark_gradient_end', 'gradient_angle', 'light_image', 'dark_image',
+            'image_fit', 'overlay_opacity', 'light_overlay_color', 'dark_overlay_color'
+        ]
+
+    def validate(self, data):
+        theme_type = data.get('theme_type')
+        
+        if theme_type == 'solid':
+            if not data.get('light_color') or not data.get('dark_color'):
+                raise serializers.ValidationError(
+                    "Solid color theme requires both light_color and dark_color"
+                )
+        elif theme_type == 'gradient':
+            required_fields = ['light_gradient_start', 'light_gradient_end', 
+                             'dark_gradient_start', 'dark_gradient_end']
+            if not all(data.get(field) for field in required_fields):
+                raise serializers.ValidationError(
+                    "Gradient theme requires all gradient color fields"
+                )
+        elif theme_type == 'image':
+            if not data.get('light_image') and not data.get('dark_image'):
+                raise serializers.ValidationError(
+                    "Image theme requires at least one image (light or dark mode)"
+                )
+        
+        return data
 
 
 class ConversationDetailSerializer(ConversationSerializer):

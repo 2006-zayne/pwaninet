@@ -6,23 +6,25 @@
     background-color: var(--card-bg);
     border-color: var(--border);
   }
-  [data-theme="dark"] .text-dark {
-    color: var(--text-primary) !important;
+  [data-theme="dark"] .text-dark,
+  [data-theme="dark"] h2 {
+    color: #e4e6eb !important;
   }
-  [data-theme="dark"] .text-muted {
-    color: var(--text-secondary) !important;
-  }
-  [data-theme="dark"] .form-control {
-    background-color: var(--card-bg);
-    border-color: var(--border);
-    color: var(--text-primary);
-  }
-  [data-theme="dark"] .form-control::placeholder {
-    color: #d1d5db !important;
-    opacity: 1 !important;
+  [data-theme="dark"] .text-muted,
+  [data-theme="dark"] p {
+    color: #9ca3af !important;
   }
   [data-theme="dark"] .form-label {
-    color: var(--text-primary);
+    color: #e4e6eb !important;
+  }
+  [data-theme="dark"] .card .form-control {
+    background-color: #3a3b3c !important;
+    border-color: #3a3b3c !important;
+    color: #e4e6eb !important;
+  }
+  [data-theme="dark"] .card .form-control:focus {
+    background-color: #4e4f50 !important;
+    border-color: #6366f1 !important;
   }
 </style>
 <div class="container">

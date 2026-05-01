@@ -4,6 +4,7 @@ from .views import (
     ConversationViewSet,
     MessageViewSet,
     MessageReactionViewSet,
+    ConversationThemeViewSet,
     conversation_list,
     conversation_detail,
     search_followed_users,
@@ -14,6 +15,7 @@ router = DefaultRouter()
 router.register(r'conversations', ConversationViewSet, basename='conversation')
 router.register(r'messages', MessageViewSet, basename='message')
 router.register(r'reactions', MessageReactionViewSet, basename='reaction')
+router.register(r'themes', ConversationThemeViewSet, basename='theme')
 
 app_name = 'messaging'
 

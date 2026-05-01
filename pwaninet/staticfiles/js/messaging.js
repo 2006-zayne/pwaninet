@@ -13,6 +13,10 @@ class MessagingManager {
         this.e2eEncryption = null;
         this.isEncrypted = false;
         this.recipientPublicKey = null;
+        
+        // STATE LAYER: Single source of truth
+        this.messages = [];
+        this.isRendering = false;
 
         this.init();
     }
@@ -36,8 +40,161 @@ class MessagingManager {
 
         this.setupEventListeners();
         this.connectWebSocket();
+        this.loadInitialMessages();
     }
 
+    // STATE LAYER METHODS
+    
+    async loadInitialMessages() {
+        try {
+            const response = await fetch(`/messaging/v1/conversations/${this.conversationId}/messages/`);
+            if (response.ok) {
+                const data = await response.json();
+                this.messages = data.results || [];
+                this.render();
+            }
+        } catch (error) {
+            console.error('Error loading initial messages:', error);
+        }
+    }
+    
+    addMessage(messageData) {
+        // Add message to state array
+        this.messages.push(messageData);
+        // Sort messages by created_at to maintain order
+        this.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        this.render();
+    }
+    
+    // VIEW MODEL LAYER: Pure function for derived data
+    buildView(messages) {
+        const viewItems = [];
+        let lastDate = null;
+        let lastSenderId = null;
+        
+        for (const message of messages) {
+            const messageDate = new Date(message.created_at).toDateString();
+            const isOwn = message.sender_id === this.currentUserId;
+            
+            // Add date separator if needed
+            if (messageDate !== lastDate) {
+                viewItems.push({
+                    type: 'date',
+                    label: this.formatDateLabel(message.created_at)
+                });
+                lastDate = messageDate;
+            }
+            
+            // Determine if this is a consecutive message
+            const isConsecutive = lastSenderId === message.sender_id;
+            lastSenderId = message.sender_id;
+            
+            // Add message to view
+            viewItems.push({
+                type: 'message',
+                ...message,
+                isOwn,
+                isConsecutive,
+                isLastSent: isOwn && message === messages.filter(m => m.sender_id === this.currentUserId).pop()
+            });
+        }
+        
+        return viewItems;
+    }
+    
+    formatDateLabel(dateString) {
+        const date = new Date(dateString);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        if (date.toDateString() === today.toDateString()) {
+            return 'Today';
+        } else if (date.toDateString() === yesterday.toDateString()) {
+            return 'Yesterday';
+        } else {
+            return date.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            }).replace(/\//g, '/');
+        }
+    }
+    
+    // RENDER LAYER: Pure DOM rendering without logic
+    render() {
+        if (this.isRendering) return;
+        this.isRendering = true;
+        
+        try {
+            const container = document.getElementById('messagesContainer');
+            if (!container) return;
+            
+            // Clear container safely
+            container.innerHTML = '';
+            
+            // Build view from state
+            const viewItems = this.buildView(this.messages);
+            
+            // Render each item
+            viewItems.forEach(item => {
+                if (item.type === 'date') {
+                    const dateElement = document.createElement('div');
+                    dateElement.className = 'date-separator';
+                    dateElement.innerHTML = `<span>${item.label}</span>`;
+                    container.appendChild(dateElement);
+                } else if (item.type === 'message') {
+                    const messageElement = this.createMessageElement(item);
+                    container.appendChild(messageElement);
+                }
+            });
+            
+            // Scroll to bottom
+            container.scrollTop = container.scrollHeight;
+            
+        } finally {
+            this.isRendering = false;
+        }
+    }
+    
+    createMessageElement(message) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} ${message.isConsecutive ? 'consecutive-message' : 'first-in-group'} ${message.isLastSent ? 'last-sent' : ''}`;
+        messageDiv.setAttribute('data-message-id', message.id);
+        messageDiv.setAttribute('data-sender-id', message.sender_id);
+        messageDiv.setAttribute('data-read-status', message.read_status || 'sent');
+        
+        const readStatus = message.read_status || 'sent';
+        
+        messageDiv.innerHTML = `
+            <p class="message-content">${message.content || ''}</p>
+            <div class="message-time">
+                ${new Date(message.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+            </div>
+            ${message.isOwn ? `
+            <div class="read-receipt-indicator" data-status="${readStatus}">
+                <div class="read-receipt-circle">
+                    ${readStatus === 'read' && message.read_avatar ? 
+                        `<img src="${message.read_avatar}" class="read-receipt-avatar" />` :
+                        `<span class="read-receipt-icon">${this.getReadReceiptIcon(readStatus)}</span>`
+                    }
+                </div>
+            </div>
+            ` : ''}
+        `;
+        
+        return messageDiv;
+    }
+    
+    getReadReceiptIcon(status) {
+        switch (status) {
+            case 'sent': return '&#10003;';
+            case 'delivered': return '&#10003;&#10003;';
+            case 'online': return '&#10003;';
+            default: return '&#10003;';
+        }
+    }
+    
     async initEncryption() {
         try {
             this.e2eEncryption = new E2EEncryption();
@@ -103,6 +260,13 @@ class MessagingManager {
                     this.sendMessage();
                 }
                 this.handleTyping();
+            });
+            
+            // Auto-expand textarea as user types
+            messageInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                const newHeight = Math.min(this.scrollHeight, 120);
+                this.style.height = newHeight + 'px';
             });
         }
         
@@ -200,7 +364,9 @@ class MessagingManager {
                         data.data.content = '[Encrypted message - unable to decrypt]';
                     }
                 }
-                this.displayMessage(data.data);
+                
+                // STATE-DRIVEN: Add to state and render
+                this.addMessage(data.data);
                 this.updateConversationPreview(data.data);
                 break;
             case 'typing':
@@ -259,27 +425,11 @@ class MessagingManager {
         }
     }
     
-    displayMessage(message) {
-        const container = document.getElementById('messagesContainer');
-        if (!container) return;
-
-        const isOwn = message.sender.id === this.currentUserId;
-        const messageHtml = `
-            <div class="message-bubble ${isOwn ? 'sent' : 'received'}" data-message-id="${message.id}" data-sender-id="${message.sender.id}">
-                <p class="message-content">${message.content || ''}</p>
-                <div class="message-time">
-                    ${new Date(message.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    ${isOwn ? '<span class="message-read-receipt">✓✓</span>' : ''}
-                </div>
-            </div>
-        `;
-
-        container.insertAdjacentHTML('beforeend', messageHtml);
-        container.scrollTop = container.scrollHeight;
-
-        // Re-attach event listeners for new reaction buttons
-        this.attachReactionListeners();
-    }
+    // REMOVED: displayMessage() - replaced by state-driven render()
+    
+    // REMOVED: getMessageDate() - now handled in buildView()
+    
+    // REMOVED: formatDateLabel() - moved to view model layer
     
     attachReactionListeners() {
         document.querySelectorAll('.add-reaction').forEach(btn => {
@@ -448,6 +598,75 @@ class MessagingManager {
             replyDiv.remove();
         }
     }
+    
+    handleReadReceipt(data) {
+        const { message_id, status, user_avatar } = data;
+        
+        // Update message in state
+        const messageIndex = this.messages.findIndex(m => m.id == message_id);
+        if (messageIndex !== -1) {
+            this.messages[messageIndex].read_status = status;
+            this.messages[messageIndex].read_avatar = user_avatar;
+            this.render(); // Re-render to show updated read receipt
+        }
+        
+        // Update conversation list read receipt
+        this.updateConversationListReadReceipt(status, user_avatar);
+    }
+    
+    // REMOVED: updateReadReceiptStatus() - now handled in state-driven render()
+    // REMOVED: updateReadReceiptIndicator() - now handled in createMessageElement()
+    
+    updateConversationListReadReceipt(status, userAvatar = null) {
+        // Find the current conversation's read receipt in the conversation list
+        const currentConversationLink = document.querySelector(`a[href*="/conversation/${this.conversationId}/"]`);
+        if (!currentConversationLink) return;
+        
+        const indicator = currentConversationLink.querySelector('.read-receipt-indicator');
+        if (!indicator) return;
+        
+        // Update indicator based on status
+        indicator.dataset.status = status;
+        
+        const circle = indicator.querySelector('.read-receipt-circle');
+        const icon = indicator.querySelector('.read-receipt-icon');
+        
+        switch (status) {
+            case 'sent':
+                circle.style.background = 'white';
+                circle.style.borderColor = '#ddd';
+                icon.style.color = '#888';
+                icon.textContent = '✓';
+                break;
+            case 'delivered':
+                circle.style.background = 'white';
+                circle.style.borderColor = '#ddd';
+                icon.style.color = '#888';
+                icon.textContent = '✓✓';
+                break;
+            case 'online':
+                circle.style.background = 'var(--brand)';
+                circle.style.borderColor = 'var(--brand)';
+                icon.style.color = 'white';
+                icon.textContent = '✓';
+                break;
+            case 'read':
+                // Show avatar instead of checkmark
+                icon.style.display = 'none';
+                if (userAvatar) {
+                    let avatar = circle.querySelector('.read-receipt-avatar');
+                    if (!avatar) {
+                        avatar = document.createElement('img');
+                        avatar.className = 'read-receipt-avatar';
+                        circle.appendChild(avatar);
+                    }
+                    avatar.src = userAvatar;
+                }
+                break;
+        }
+    }
+    
+    // REMOVED: checkRecipientOnlineStatus() - now handled through state-driven read receipts
 }
 
 // Initialize on DOM ready

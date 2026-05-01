@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.core.validators import RegexValidator, MinValueValidator, MaxValueValidator
 
 
 class Conversation(models.Model):
@@ -202,6 +203,211 @@ class MessageReaction(models.Model):
 
     class Meta:
         unique_together = ('message', 'user', 'emoji')
+        indexes = [
+            models.Index(fields=['message', 'emoji']),
+            models.Index(fields=['user', 'created_at']),
+        ]
 
     def __str__(self):
         return f"{self.user.username} reacted {self.emoji} to message {self.message.id}"
+
+
+class ConversationTheme(models.Model):
+    """Per-user per-conversation theme settings."""
+    
+    THEME_TYPES = [
+        ('solid', 'Solid Color'),
+        ('gradient', 'CSS Gradient'),
+        ('image', 'Image Wallpaper'),
+    ]
+    
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='conversation_themes'
+    )
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name='themes'
+    )
+    theme_type = models.CharField(
+        max_length=10,
+        choices=THEME_TYPES,
+        default='solid'
+    )
+    
+    # Solid color theme
+    light_color = models.CharField(
+        max_length=7,
+        validators=[RegexValidator(r'^#[0-9A-Fa-f]{6}$', 'Enter a valid hex color')],
+        blank=True,
+        null=True,
+        help_text="Hex color for light mode"
+    )
+    dark_color = models.CharField(
+        max_length=7,
+        validators=[RegexValidator(r'^#[0-9A-Fa-f]{6}$', 'Enter a valid hex color')],
+        blank=True,
+        null=True,
+        help_text="Hex color for dark mode"
+    )
+    
+    # Gradient theme
+    light_gradient_start = models.CharField(
+        max_length=7,
+        validators=[RegexValidator(r'^#[0-9A-Fa-f]{6}$', 'Enter a valid hex color')],
+        blank=True,
+        null=True,
+        help_text="Start color for light mode gradient"
+    )
+    light_gradient_end = models.CharField(
+        max_length=7,
+        validators=[RegexValidator(r'^#[0-9A-Fa-f]{6}$', 'Enter a valid hex color')],
+        blank=True,
+        null=True,
+        help_text="End color for light mode gradient"
+    )
+    dark_gradient_start = models.CharField(
+        max_length=7,
+        validators=[RegexValidator(r'^#[0-9A-Fa-f]{6}$', 'Enter a valid hex color')],
+        blank=True,
+        null=True,
+        help_text="Start color for dark mode gradient"
+    )
+    dark_gradient_end = models.CharField(
+        max_length=7,
+        validators=[RegexValidator(r'^#[0-9A-Fa-f]{6}$', 'Enter a valid hex color')],
+        blank=True,
+        null=True,
+        help_text="End color for dark mode gradient"
+    )
+    gradient_angle = models.IntegerField(
+        default=45,
+        help_text="Gradient angle in degrees"
+    )
+    
+    # Image theme
+    light_image = models.ImageField(
+        upload_to='chat_themes/light/%Y/%m/',
+        blank=True,
+        null=True,
+        help_text="Image for light mode",
+        validators=[
+            RegexValidator(
+                r'.*\.(jpg|jpeg|png|gif|webp)$',
+                'Only image files (JPG, PNG, GIF, WebP) are allowed'
+            )
+        ]
+    )
+    dark_image = models.ImageField(
+        upload_to='chat_themes/dark/%Y/%m/',
+        blank=True,
+        null=True,
+        help_text="Image for dark mode",
+        validators=[
+            RegexValidator(
+                r'.*\.(jpg|jpeg|png|gif|webp)$',
+                'Only image files (JPG, PNG, GIF, WebP) are allowed'
+            )
+        ]
+    )
+    
+    # Image optimization fields
+    light_image_hash = models.CharField(
+        max_length=32,
+        blank=True,
+        null=True,
+        help_text="Hash for image deduplication"
+    )
+    dark_image_hash = models.CharField(
+        max_length=32,
+        blank=True,
+        null=True,
+        help_text="Hash for image deduplication"
+    )
+    light_image_size = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        help_text="Optimized image size in bytes"
+    )
+    dark_image_size = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        help_text="Optimized image size in bytes"
+    )
+    image_fit = models.CharField(
+        max_length=10,
+        choices=[
+            ('cover', 'Cover'),
+            ('contain', 'Contain'),
+            ('repeat', 'Repeat'),
+        ],
+        default='cover',
+        help_text="How to fit the image"
+    )
+    
+    # Overlay settings for readability
+    overlay_opacity = models.FloatField(
+        default=0.3,
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
+        help_text="Overlay opacity (0.0-1.0)"
+    )
+    light_overlay_color = models.CharField(
+        max_length=7,
+        default='#ffffff',
+        validators=[RegexValidator(r'^#[0-9A-Fa-f]{6}$', 'Enter a valid hex color')],
+        help_text="Overlay color for light mode"
+    )
+    dark_overlay_color = models.CharField(
+        max_length=7,
+        default='#000000',
+        validators=[RegexValidator(r'^#[0-9A-Fa-f]{6}$', 'Enter a valid hex color')],
+        help_text="Overlay color for dark mode"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ('user', 'conversation')
+        indexes = [
+            models.Index(fields=['user', 'conversation']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.username}'s theme for conversation {self.conversation.id}"
+    
+    def get_css_variables(self, theme_mode='light'):
+        """Generate CSS variables for this theme."""
+        if self.theme_type == 'solid':
+            color = self.light_color if theme_mode == 'light' else self.dark_color
+            return {
+                '--chat-bg': color or '#f8fafc',
+                '--chat-bg-type': 'solid',
+            }
+        elif self.theme_type == 'gradient':
+            start = self.light_gradient_start if theme_mode == 'light' else self.dark_gradient_start
+            end = self.light_gradient_end if theme_mode == 'light' else self.dark_gradient_end
+            return {
+                '--chat-bg': f'linear-gradient({self.gradient_angle}deg, {start}, {end})',
+                '--chat-bg-type': 'gradient',
+            }
+        elif self.theme_type == 'image':
+            image = self.light_image.url if theme_mode == 'light' and self.light_image else \
+                   (self.dark_image.url if theme_mode == 'dark' and self.dark_image else None)
+            return {
+                '--chat-bg': f'url({image})' if image else 'none',
+                '--chat-bg-type': 'image',
+                '--chat-bg-fit': self.image_fit,
+            }
+        
+        return {'--chat-bg': '#f8fafc', '--chat-bg-type': 'solid'}
+    
+    def get_overlay_css(self, theme_mode='light'):
+        """Generate overlay CSS variables."""
+        overlay_color = self.light_overlay_color if theme_mode == 'light' else self.dark_overlay_color
+        return {
+            '--chat-overlay-color': overlay_color,
+            '--chat-overlay-opacity': str(self.overlay_opacity),
+        }

@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager
 from django.core.exceptions import ValidationError
 from PIL import Image
 from io import BytesIO
@@ -20,14 +20,19 @@ class ThemePreference(models.TextChoices):
     SYSTEM = 'system', 'System Default'
 
 
+class CustomUserManager(UserManager):
+    pass
+
+
 class User(AbstractUser):
+    objects = CustomUserManager()
     first_name = models.CharField(max_length=200, null=True, blank=True, db_index=True)
     second_name = models.CharField(max_length=200, null=True, blank=True, db_index=True)
     last_name = models.CharField(max_length=200, null=True, blank=True, db_index=True)
-    year = models.ForeignKey('courses.Year', on_delete=models.SET_NULL, null=True)
+    year = models.ForeignKey('courses.Year', on_delete=models.SET_NULL, null=True, blank=True)
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE, null=True, blank=True)
     global_role = models.CharField(max_length=20, choices=GlobalRole.choices, default=GlobalRole.NORMAL, db_index=True)
-    profile_pic = models.ImageField(default='profile_pic/default_pic1.jpg', upload_to='profile_pic')
+    profile_pic = models.ImageField(default='profile_pic/default_pic1.jpg', upload_to='profile_pic', null=True, blank=True)
     cover_photo = models.ImageField(upload_to='covers/', blank=True, null=True)
     bio = models.TextField(max_length=500, blank=True)
 

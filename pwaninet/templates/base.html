@@ -39,6 +39,8 @@
             --primary-hover: #1d4ed8;
             --primary-light: #dbeafe;
             --text-dark: #0f172a;
+            --text-secondary: #64748b;
+            --text-muted: #64748b;
             --background: #f8fafc;
             --card-bg: #ffffff;
             --border: #e2e8f0;
@@ -163,7 +165,7 @@
             align-items: center;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
             z-index: 9999;
-            padding: 0 8px;
+            padding: 0 16px;
         }
 
         .mobile-bottom-nav .nav-chip i {
@@ -340,7 +342,7 @@
             <a class="nav-brand-tactical" href="{% url 'posts:home' %}">
                 PWANI<span class="brand-net">NET</span>
             </a>
-            
+
             <div class="d-none d-md-flex gap-2">
                 <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
                     <i class="bi bi-house-door-fill"></i>

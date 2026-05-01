@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messaging Architecture Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .success { color: green; }
+        .error { color: red; }
+        .messages-container { 
+            max-height: 400px; 
+            overflow-y: auto; 
+            border: 1px solid #ccc; 
+            padding: 10px; 
+            background: #f9f9f9;
+        }
+        .date-separator { text-align: center; margin: 10px 0; }
+        .date-separator span { 
+            background: #e0e0e0; 
+            padding: 4px 12px; 
+            border-radius: 12px; 
+            font-size: 12px; 
+        }
+        .message-bubble { 
+            max-width: 70%; 
+            padding: 8px 12px; 
+            margin: 4px 0; 
+            border-radius: 18px; 
+            position: relative; 
+        }
+        .sent { 
+            background: #cfd8dc; 
+            margin-left: auto; 
+            text-align: right; 
+        }
+        .received { 
+            background: white; 
+            border: 1px solid #ddd; 
+        }
+        .consecutive-message { 
+            border-top: 1px solid rgba(0,0,0,0.05); 
+        }
+        .message-time { 
+            font-size: 11px; 
+            opacity: 0.7; 
+            margin-top: 4px; 
+        }
+    </style>
+</head>
+<body>
+    <h1>⚡ Messaging Architecture Test</h1>
+    
+    <div class="test-section">
+        <h2>State-Driven Architecture Verification</h2>
+        <div id="test-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Live Messages Container</h2>
+        <div id="messagesContainer" class="messages-container"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test Controls</h2>
+        <button onclick="testArchitecture()">Run Architecture Test</button>
+        <button onclick="addTestMessage()">Add Test Message</button>
+        <button onclick="addTestMessages()">Add Multiple Messages</button>
+        <button onclick="clearMessages()">Clear Messages</button>
+    </div>
+
+    <script>
+        // Simplified MessagingManager for testing
+        class TestMessagingManager {
+            constructor() {
+                this.messages = [];
+                this.isRendering = false;
+                this.currentUserId = 'user1';
+                this.messageIdCounter = 1;
+            }
+            
+            // STATE LAYER
+            addMessage(messageData) {
+                this.messages.push(messageData);
+                this.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                this.render();
+            }
+            
+            // VIEW MODEL LAYER
+            buildView(messages) {
+                const viewItems = [];
+                let lastDate = null;
+                let lastSenderId = null;
+                
+                for (const message of messages) {
+                    const messageDate = new Date(message.created_at).toDateString();
+                    const isOwn = message.sender_id === this.currentUserId;
+                    
+                    // Add date separator if needed
+                    if (messageDate !== lastDate) {
+                        viewItems.push({
+                            type: 'date',
+                            label: this.formatDateLabel(message.created_at)
+                        });
+                        lastDate = messageDate;
+                    }
+                    
+                    // Determine if this is a consecutive message
+                    const isConsecutive = lastSenderId === message.sender_id;
+                    lastSenderId = message.sender_id;
+                    
+                    // Add message to view
+                    viewItems.push({
+                        type: 'message',
+                        ...message,
+                        isOwn,
+                        isConsecutive,
+                        isLastSent: isOwn && message === messages.filter(m => m.sender_id === this.currentUserId).pop()
+                    });
+                }
+                
+                return viewItems;
+            }
+            
+            formatDateLabel(dateString) {
+                const date = new Date(dateString);
+                const today = new Date();
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                
+                if (date.toDateString() === today.toDateString()) {
+                    return 'Today';
+                } else if (date.toDateString() === yesterday.toDateString()) {
+                    return 'Yesterday';
+                } else {
+                    return date.toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    }).replace(/\//g, '/');
+                }
+            }
+            
+            // RENDER LAYER
+            render() {
+                if (this.isRendering) return;
+                this.isRendering = true;
+                
+                try {
+                    const container = document.getElementById('messagesContainer');
+                    if (!container) return;
+                    
+                    container.innerHTML = '';
+                    const viewItems = this.buildView(this.messages);
+                    
+                    viewItems.forEach(item => {
+                        if (item.type === 'date') {
+                            const dateElement = document.createElement('div');
+                            dateElement.className = 'date-separator';
+                            dateElement.innerHTML = `<span>${item.label}</span>`;
+                            container.appendChild(dateElement);
+                        } else if (item.type === 'message') {
+                            const messageElement = this.createMessageElement(item);
+                            container.appendChild(messageElement);
+                        }
+                    });
+                    
+                    container.scrollTop = container.scrollHeight;
+                    
+                } finally {
+                    this.isRendering = false;
+                }
+            }
+            
+            createMessageElement(message) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} ${message.isConsecutive ? 'consecutive-message' : 'first-in-group'} ${message.isLastSent ? 'last-sent' : ''}`;
+                messageDiv.setAttribute('data-message-id', message.id);
+                messageDiv.setAttribute('data-sender-id', message.sender_id);
+                
+                messageDiv.innerHTML = `
+                    <p class="message-content">${message.content || ''}</p>
+                    <div class="message-time">
+                        ${new Date(message.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </div>
+                `;
+                
+                return messageDiv;
+            }
+        }
+        
+        const testManager = new TestMessagingManager();
+        
+        function testArchitecture() {
+            const results = document.getElementById('test-results');
+            let output = '<h3>Architecture Test Results:</h3>';
+            
+            // Test 1: State Layer
+            try {
+                testManager.messages = [];
+                testManager.addMessage({
+                    id: testManager.messageIdCounter++,
+                    sender_id: 'user1',
+                    content: 'Test message 1',
+                    created_at: new Date().toISOString()
+                });
+                
+                if (testManager.messages.length === 1) {
+                    output += '<div class="success">✅ State Layer: Messages array works correctly</div>';
+                } else {
+                    output += '<div class="error">❌ State Layer: Messages array failed</div>';
+                }
+            } catch (error) {
+                output += `<div class="error">❌ State Layer: ${error.message}</div>`;
+            }
+            
+            // Test 2: View Model Layer
+            try {
+                const viewItems = testManager.buildView(testManager.messages);
+                if (viewItems.length > 0 && viewItems[0].type === 'message') {
+                    output += '<div class="success">✅ View Model Layer: buildView() works correctly</div>';
+                } else {
+                    output += '<div class="error">❌ View Model Layer: buildView() failed</div>';
+                }
+            } catch (error) {
+                output += `<div class="error">❌ View Model Layer: ${error.message}</div>`;
+            }
+            
+            // Test 3: Render Layer
+            try {
+                const container = document.getElementById('messagesContainer');
+                const beforeCount = container.children.length;
+                testManager.render();
+                const afterCount = container.children.length;
+                
+                if (afterCount > beforeCount) {
+                    output += '<div class="success">✅ Render Layer: render() works correctly</div>';
+                } else {
+                    output += '<div class="error">❌ Render Layer: render() failed</div>';
+                }
+            } catch (error) {
+                output += `<div class="error">❌ Render Layer: ${error.message}</div>`;
+            }
+            
+            // Test 4: Date Separators
+            try {
+                testManager.messages = [];
+                const today = new Date();
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                
+                testManager.addMessage({
+                    id: testManager.messageIdCounter++,
+                    sender_id: 'user2',
+                    content: 'Yesterday message',
+                    created_at: yesterday.toISOString()
+                });
+                
+                testManager.addMessage({
+                    id: testManager.messageIdCounter++,
+                    sender_id: 'user1',
+                    content: 'Today message',
+                    created_at: today.toISOString()
+                });
+                
+                const container = document.getElementById('messagesContainer');
+                const dateSeparators = container.querySelectorAll('.date-separator');
+                
+                if (dateSeparators.length >= 1) {
+                    output += '<div class="success">✅ Date Separators: Working correctly</div>';
+                } else {
+                    output += '<div class="error">❌ Date Separators: Not working</div>';
+                }
+            } catch (error) {
+                output += `<div class="error">❌ Date Separators: ${error.message}</div>`;
+            }
+            
+            // Test 5: Message Alignment
+            try {
+                const sentMessages = document.querySelectorAll('.message-bubble.sent');
+                const receivedMessages = document.querySelectorAll('.message-bubble.received');
+                
+                if (sentMessages.length > 0 && receivedMessages.length > 0) {
+                    output += '<div class="success">✅ Message Alignment: Both sent and received messages render correctly</div>';
+                } else {
+                    output += '<div class="error">❌ Message Alignment: Missing sent or received messages</div>';
+                }
+            } catch (error) {
+                output += `<div class="error">❌ Message Alignment: ${error.message}</div>`;
+            }
+            
+            results.innerHTML = output;
+        }
+        
+        function addTestMessage() {
+            testManager.addMessage({
+                id: testManager.messageIdCounter++,
+                sender_id: Math.random() > 0.5 ? 'user1' : 'user2',
+                content: `Test message ${testManager.messageIdCounter - 1}`,
+                created_at: new Date().toISOString()
+            });
+        }
+        
+        function addTestMessages() {
+            const messages = [
+                { sender_id: 'user2', content: 'Hello there!', delay: 0 },
+                { sender_id: 'user1', content: 'Hi! How are you?', delay: 100 },
+                { sender_id: 'user2', content: 'I\\'m doing great, thanks!', delay: 200 },
+                { sender_id: 'user2', content: 'How about you?', delay: 300 },
+                { sender_id: 'user1', content: 'I\\'m good too!', delay: 400 },
+                { sender_id: 'user1', content: 'Want to grab coffee?', delay: 500 }
+            ];
+            
+            messages.forEach(msg => {
+                setTimeout(() => {
+                    testManager.addMessage({
+                        id: testManager.messageIdCounter++,
+                        sender_id: msg.sender_id,
+                        content: msg.content,
+                        created_at: new Date().toISOString()
+                    });
+                }, msg.delay);
+            });
+        }
+        
+        function clearMessages() {
+            testManager.messages = [];
+            testManager.render();
+        }
+        
+        // Run test on page load
+        window.addEventListener('load', () => {
+            testArchitecture();
+        });
+    </script>
+</body>
+</html>

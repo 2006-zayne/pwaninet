@@ -13,6 +13,10 @@ class MessagingManager {
         this.e2eEncryption = null;
         this.isEncrypted = false;
         this.recipientPublicKey = null;
+        
+        // STATE LAYER: Single source of truth
+        this.messages = [];
+        this.isRendering = false;
 
         this.init();
     }
@@ -36,8 +40,184 @@ class MessagingManager {
 
         this.setupEventListeners();
         this.connectWebSocket();
+        this.loadInitialMessages();
     }
 
+    // STATE LAYER METHODS
+    
+    async loadInitialMessages() {
+        try {
+            const response = await fetch(`/messaging/v1/conversations/${this.conversationId}/messages/`);
+            if (response.ok) {
+                const data = await response.json();
+                this.messages = data.results || [];
+                this.render();
+            }
+        } catch (error) {
+            console.error('Error loading initial messages:', error);
+        }
+    }
+    
+    addMessage(messageData) {
+        try {
+            console.log('addMessage called with:', messageData);
+            
+            // Normalize message data structure to match state expectations
+            const normalizedMessage = {
+                ...messageData,
+                sender_id: messageData.sender_id || messageData.sender?.id,
+                created_at: messageData.created_at || messageData.timestamp
+            };
+            
+            console.log('Normalized message:', normalizedMessage);
+            
+            // Validate required fields
+            if (!normalizedMessage.id || !normalizedMessage.content || !normalizedMessage.sender_id) {
+                console.error('Invalid message data:', normalizedMessage);
+                return;
+            }
+            
+            // Add message to state array
+            this.messages.push(normalizedMessage);
+            // Sort messages by created_at to maintain order
+            this.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            this.render();
+            
+            console.log('Message added successfully. Total messages:', this.messages.length);
+        } catch (error) {
+            console.error('Error in addMessage:', error, messageData);
+        }
+    }
+    
+    // VIEW MODEL LAYER: Pure function for derived data
+    buildView(messages) {
+        const viewItems = [];
+        let lastDate = null;
+        let lastSenderId = null;
+        
+        for (const message of messages) {
+            const messageDate = new Date(message.created_at).toDateString();
+            const isOwn = message.sender_id === this.currentUserId;
+            
+            // Add date separator if needed
+            if (messageDate !== lastDate) {
+                viewItems.push({
+                    type: 'date',
+                    label: this.formatDateLabel(message.created_at)
+                });
+                lastDate = messageDate;
+            }
+            
+            // Determine if this is a consecutive message
+            const isConsecutive = lastSenderId === message.sender_id;
+            lastSenderId = message.sender_id;
+            
+            // Add message to view
+            viewItems.push({
+                type: 'message',
+                ...message,
+                isOwn,
+                isConsecutive,
+                isLastSent: isOwn && message === messages.filter(m => m.sender_id === this.currentUserId).pop()
+            });
+        }
+        
+        return viewItems;
+    }
+    
+    formatDateLabel(dateString) {
+        const date = new Date(dateString);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        if (date.toDateString() === today.toDateString()) {
+            return 'Today';
+        } else if (date.toDateString() === yesterday.toDateString()) {
+            return 'Yesterday';
+        } else {
+            return date.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            }).replace(/\//g, '/');
+        }
+    }
+    
+    // RENDER LAYER: Pure DOM rendering without logic
+    render() {
+        if (this.isRendering) return;
+        this.isRendering = true;
+        
+        try {
+            const container = document.getElementById('messagesContainer');
+            if (!container) return;
+            
+            // Clear container safely
+            container.innerHTML = '';
+            
+            // Build view from state
+            const viewItems = this.buildView(this.messages);
+            
+            // Render each item
+            viewItems.forEach(item => {
+                if (item.type === 'date') {
+                    const dateElement = document.createElement('div');
+                    dateElement.className = 'date-separator';
+                    dateElement.innerHTML = `<span>${item.label}</span>`;
+                    container.appendChild(dateElement);
+                } else if (item.type === 'message') {
+                    const messageElement = this.createMessageElement(item);
+                    container.appendChild(messageElement);
+                }
+            });
+            
+            // Scroll to bottom
+            container.scrollTop = container.scrollHeight;
+            
+        } finally {
+            this.isRendering = false;
+        }
+    }
+    
+    createMessageElement(message) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} ${message.isConsecutive ? 'consecutive-message' : 'first-in-group'} ${message.isLastSent ? 'last-sent' : ''}`;
+        messageDiv.setAttribute('data-message-id', message.id);
+        messageDiv.setAttribute('data-sender-id', message.sender_id);
+        messageDiv.setAttribute('data-read-status', message.read_status || 'sent');
+        
+        const readStatus = message.read_status || 'sent';
+        
+        messageDiv.innerHTML = `
+            <p class="message-content">${message.content || ''}</p>
+            <div class="message-time">
+                ${new Date(message.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+            </div>
+            ${message.isOwn ? `
+            <div class="read-receipt-indicator" data-status="${readStatus}">
+                <div class="read-receipt-circle">
+                    ${readStatus === 'read' && message.read_avatar ? 
+                        `<img src="${message.read_avatar}" class="read-receipt-avatar" />` :
+                        `<span class="read-receipt-icon">${this.getReadReceiptIcon(readStatus)}</span>`
+                    }
+                </div>
+            </div>
+            ` : ''}
+        `;
+        
+        return messageDiv;
+    }
+    
+    getReadReceiptIcon(status) {
+        switch (status) {
+            case 'sent': return '&#10003;';
+            case 'delivered': return '&#10003;&#10003;';
+            case 'online': return '&#10003;';
+            default: return '&#10003;';
+        }
+    }
+    
     async initEncryption() {
         try {
             this.e2eEncryption = new E2EEncryption();
@@ -161,27 +341,35 @@ class MessagingManager {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws/chat/${this.conversationId}/`;
             
+            console.log('Connecting WebSocket to:', wsUrl);
+            
             this.socket = new WebSocket(wsUrl);
             
             this.socket.onopen = () => {
-                console.log('WebSocket connected');
+                console.log('WebSocket connected successfully');
                 this.reconnectAttempts = 0;
                 this.processMessageQueue();
             };
             
             this.socket.onmessage = (e) => {
-                const data = JSON.parse(e.data);
-                this.handleMessage(data);
+                try {
+                    const data = JSON.parse(e.data);
+                    this.handleMessage(data);
+                } catch (error) {
+                    console.error('Failed to parse WebSocket message:', error, e.data);
+                }
             };
             
-            this.socket.onclose = () => {
-                console.log('WebSocket disconnected');
+            this.socket.onclose = (event) => {
+                console.log('WebSocket disconnected:', event.code, event.reason);
                 this.attemptReconnect();
             };
             
             this.socket.onerror = (error) => {
                 console.error('WebSocket error:', error);
             };
+        } else {
+            console.warn('No conversation ID available for WebSocket connection');
         }
     }
     
@@ -196,26 +384,39 @@ class MessagingManager {
     }
     
     async handleMessage(data) {
-        switch (data.type) {
-            case 'message':
-                // Decrypt message if encrypted
-                if (data.data.is_encrypted && this.e2eEncryption) {
-                    try {
-                        data.data.content = await this.e2eEncryption.decryptMessage(data.data.encrypted_content);
-                    } catch (error) {
-                        console.error('Failed to decrypt message:', error);
-                        data.data.content = '[Encrypted message - unable to decrypt]';
+        console.log('WebSocket message received:', data);
+        
+        try {
+            switch (data.type) {
+                case 'message':
+                    console.log('Processing message:', data.data);
+                    
+                    // Decrypt message if encrypted
+                    if (data.data.is_encrypted && this.e2eEncryption) {
+                        try {
+                            data.data.content = await this.e2eEncryption.decryptMessage(data.data.encrypted_content);
+                        } catch (error) {
+                            console.error('Failed to decrypt message:', error);
+                            data.data.content = '[Encrypted message - unable to decrypt]';
+                        }
                     }
-                }
-                this.displayMessage(data.data);
-                this.updateConversationPreview(data.data);
-                break;
-            case 'typing':
-                this.handleTypingIndicator(data);
-                break;
-            case 'read_receipt':
-                this.handleReadReceipt(data);
-                break;
+                    
+                    // STATE-DRIVEN: Add to state and render
+                    console.log('Adding message to state:', data.data);
+                    this.addMessage(data.data);
+                    this.updateConversationPreview(data.data);
+                    break;
+                case 'typing':
+                    this.handleTypingIndicator(data);
+                    break;
+                case 'read_receipt':
+                    this.handleReadReceipt(data);
+                    break;
+                default:
+                    console.warn('Unknown message type:', data.type);
+            }
+        } catch (error) {
+            console.error('Error handling WebSocket message:', error, data);
         }
     }
     
@@ -266,88 +467,11 @@ class MessagingManager {
         }
     }
     
-    displayMessage(message) {
-        const container = document.getElementById('messagesContainer');
-        if (!container) return;
-
-        const isOwn = message.sender.id === this.currentUserId;
-        const messageDate = new Date(message.created_at).toDateString();
-        
-        // Check if this is a consecutive message from the same sender
-        const lastMessage = container.querySelector('.message-bubble:last-child');
-        const isConsecutive = lastMessage && 
-                            lastMessage.dataset.senderId === message.sender.id &&
-                            lastMessage.classList.contains(isOwn ? 'sent' : 'received');
-        
-        // Check if we need to add a date separator
-        const lastDateSeparator = container.querySelector('.date-separator:last-child');
-        const needsDateSeparator = !lastDateSeparator || 
-                                   (lastMessage && this.getMessageDate(lastMessage) !== messageDate);
-        
-        // Remove last-sent class from previous last message
-        const prevLastMessage = container.querySelector('.message-bubble.last-sent');
-        if (prevLastMessage) {
-            prevLastMessage.classList.remove('last-sent');
-            const oldIndicator = prevLastMessage.querySelector('.read-receipt-indicator');
-            if (oldIndicator) oldIndicator.remove();
-        }
-        
-        // Add date separator if needed
-        if (needsDateSeparator) {
-            const dateLabel = this.formatDateLabel(message.created_at);
-            const dateHtml = `<div class="date-separator"><span>${dateLabel}</span></div>`;
-            container.insertAdjacentHTML('beforeend', dateHtml);
-        }
-        
-        const messageHtml = `
-            <div class="message-bubble ${isOwn ? 'sent' : 'received'} ${isConsecutive ? 'consecutive-message' : 'first-in-group'} ${isOwn ? 'last-sent' : ''}" 
-                 data-message-id="${message.id}" 
-                 data-sender-id="${message.sender.id}"
-                 data-read-status="sent">
-                <p class="message-content">${message.content || ''}</p>
-                <div class="message-time">
-                    ${new Date(message.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                </div>
-                ${isOwn ? `
-                <div class="read-receipt-indicator" data-status="sent">
-                    <div class="read-receipt-circle">
-                        <span class="read-receipt-icon">&#10003;</span>
-                    </div>
-                </div>
-                ` : ''}
-            </div>
-        `;
-
-        container.insertAdjacentHTML('beforeend', messageHtml);
-        container.scrollTop = container.scrollHeight;
-
-        // Re-attach event listeners for new reaction buttons
-        this.attachReactionListeners();
-    }
+    // REMOVED: displayMessage() - replaced by state-driven render()
     
-    getMessageDate(messageElement) {
-        // Try to get date from data attribute or infer from context
-        return messageElement.dataset.messageDate || new Date().toDateString();
-    }
+    // REMOVED: getMessageDate() - now handled in buildView()
     
-    formatDateLabel(dateString) {
-        const date = new Date(dateString);
-        const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        
-        if (date.toDateString() === today.toDateString()) {
-            return 'Today';
-        } else if (date.toDateString() === yesterday.toDateString()) {
-            return 'Yesterday';
-        } else {
-            return date.toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-            }).replace(/\//g, '/');
-        }
-    }
+    // REMOVED: formatDateLabel() - moved to view model layer
     
     attachReactionListeners() {
         document.querySelectorAll('.add-reaction').forEach(btn => {
@@ -492,11 +616,12 @@ class MessagingManager {
     }
     
     updateConversationPreview(message) {
-        const conversationItem = document.querySelector(`[data-conversation-id="${message.conversation}"]`);
+        const conversationItem = document.querySelector(`[data-conversation-id="${message.conversation || message.conversation_id}"]`);
         if (conversationItem) {
             const preview = conversationItem.querySelector('.text-truncate.small');
             if (preview) {
-                preview.textContent = `${message.sender.username}: ${message.content.substring(0, 30)}`;
+                const senderName = message.sender?.username || message.sender_name || 'Unknown';
+                preview.textContent = `${senderName}: ${message.content.substring(0, 30)}`;
             }
         }
     }
@@ -519,24 +644,31 @@ class MessagingManager {
     
     handleReadReceipt(data) {
         const { message_id, status, user_avatar } = data;
-        this.updateReadReceiptStatus(message_id, status, user_avatar);
-    }
-    
-    updateReadReceiptStatus(messageId, status, userAvatar = null) {
-        // Update message bubble read receipt
-        const messageBubble = document.querySelector(`.message-bubble[data-message-id="${messageId}"]`);
-        if (messageBubble) {
-            const indicator = messageBubble.querySelector('.read-receipt-indicator');
-            if (indicator) {
-                this.updateReadReceiptIndicator(indicator, status, userAvatar);
-            }
+        
+        // Update message in state
+        const messageIndex = this.messages.findIndex(m => m.id == message_id);
+        if (messageIndex !== -1) {
+            this.messages[messageIndex].read_status = status;
+            this.messages[messageIndex].read_avatar = user_avatar;
+            this.render(); // Re-render to show updated read receipt
         }
         
-        // Update conversation list read receipt for last message
-        this.updateConversationListReadReceipt(status, userAvatar);
+        // Update conversation list read receipt
+        this.updateConversationListReadReceipt(status, user_avatar);
     }
     
-    updateReadReceiptIndicator(indicator, status, userAvatar = null) {
+    // REMOVED: updateReadReceiptStatus() - now handled in state-driven render()
+    // REMOVED: updateReadReceiptIndicator() - now handled in createMessageElement()
+    
+    updateConversationListReadReceipt(status, userAvatar = null) {
+        // Find the current conversation's read receipt in the conversation list
+        const currentConversationLink = document.querySelector(`a[href*="/conversation/${this.conversationId}/"]`);
+        if (!currentConversationLink) return;
+        
+        const indicator = currentConversationLink.querySelector('.read-receipt-indicator');
+        if (!indicator) return;
+        
+        // Update indicator based on status
         indicator.dataset.status = status;
         
         const circle = indicator.querySelector('.read-receipt-circle');
@@ -577,28 +709,7 @@ class MessagingManager {
         }
     }
     
-    updateConversationListReadReceipt(status, userAvatar = null) {
-        // Find the current conversation's read receipt in the conversation list
-        const currentConversationLink = document.querySelector(`a[href*="/conversation/${this.conversationId}/"]`);
-        if (!currentConversationLink) return;
-        
-        const indicator = currentConversationLink.querySelector('.read-receipt-indicator');
-        if (!indicator) return;
-        
-        this.updateReadReceiptIndicator(indicator, status, userAvatar);
-    }
-    
-    // Helper method to check if recipient is online and update indicator
-    checkRecipientOnlineStatus(isOnline) {
-        const lastSentMessage = document.querySelector('.message-bubble.last-sent.sent');
-        if (!lastSentMessage) return;
-        
-        const currentStatus = lastSentMessage.dataset.readStatus;
-        // Only update if currently 'sent' (not yet read)
-        if (currentStatus === 'sent' && isOnline) {
-            this.updateReadReceiptStatus(lastSentMessage.dataset.messageId, 'online');
-        }
-    }
+    // REMOVED: checkRecipientOnlineStatus() - now handled through state-driven read receipts
 }
 
 // Initialize on DOM ready

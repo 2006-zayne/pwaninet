@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+  [data-theme="dark"] .card {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .text-dark,
+  [data-theme="dark"] h2 {
+    color: #e4e6eb !important;
+  }
+  [data-theme="dark"] .text-muted,
+  [data-theme="dark"] p {
+    color: #9ca3af !important;
+  }
+</style>
+<div class="container">
+    <div class="row justify-content-center align-items-center" style="min-height: 75vh;">
+        <div class="col-md-5">
+            <div class="card shadow-lg border-0" style="border-radius: 20px; overflow: hidden;">
+                <div class="row g-0">
+                    <div class="card-body p-5">
+                        <div class="text-center mb-4">
+                            <h2 class="fw-bold text-dark">Account Locked</h2>
+                            <p class="text-muted">Too many failed login attempts. Your account has been temporarily locked for security.</p>
+                        </div>
+
+                        <div class="alert alert-warning text-center">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            {% if cooloff %}
+                                Please try again in {{ cooloff }}.
+                            {% else %}
+                                Please try again later.
+                            {% endif %}
+                        </div>
+
+                        <div class="text-center mt-4">
+                            <a href="{% url 'posts:home' %}" class="btn btn-secondary">Back to Home</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

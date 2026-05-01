@@ -19,7 +19,7 @@ ALLOWED_HOSTS = [
     host.split(':')[0].strip()
     for host in os.environ.get(
         'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,10.20.152.125,192.168.213.221,192.168.180.221,192.168.72.88,192.168.85.117,192.168.72.88,192.168.183.245'
+        'localhost,127.0.0.1,10.20.152.125,192.168.213.221,192.168.180.221,192.168.72.88,192.168.85.117,192.168.72.88,192.168.183.245,172.18.0.1'
     ).split(',')
     if host.strip()
 ]
@@ -75,7 +75,7 @@ TEMPLATES = [
                 'notifications.context_processors.notification_count',
             ],
         },
-    },
+    }
 ]
 
 WSGI_APPLICATION = 'pwaninet.wsgi.application'
@@ -85,11 +85,12 @@ ASGI_APPLICATION = 'pwaninet.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'pwaninet'),
+        'NAME': os.environ.get('DB_NAME', 'pwaninet_db'),
         'USER': os.environ.get('DB_USER', 'postgres'),
         'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
-        'HOST': os.environ.get('DB_HOST', 'db'),
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
         'PORT': os.environ.get('DB_PORT', '5432'),
+        'CONN_MAX_AGE': 60,
     }
 }
 
@@ -130,6 +131,11 @@ MEDIA_ROOT = BASE_DIR / 'media'
 LOGIN_REDIRECT_URL = 'posts:home'
 LOGOUT_REDIRECT_URL = 'users:logout'
 AUTH_USER_MODEL = 'users.User'
+
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
 
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True
@@ -173,6 +179,18 @@ REST_FRAMEWORK = {
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',
+        'user': '1000/hour',
+        'message_send': '60/minute',
+        'message_reaction': '30/minute',
+        'conversation_create': '10/minute',
+        'ws_message': '100/minute',
+    },
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
     'DEFAULT_VERSION': 'v1',

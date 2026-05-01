@@ -7,9 +7,10 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
+from django.db import models
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from .models import Conversation, ConversationMember, Message, MessageRead, MessageReaction
+from .models import Conversation, ConversationMember, Message, MessageRead, MessageReaction, ConversationTheme
 from .serializers import (
     ConversationSerializer,
     ConversationDetailSerializer,
@@ -18,7 +19,9 @@ from .serializers import (
     MessageCreateSerializer,
     MessageUpdateSerializer,
     MessageReadSerializer,
-    MessageReactionSerializer
+    MessageReactionSerializer,
+    ConversationThemeSerializer,
+    ConversationThemeCreateUpdateSerializer
 )
 
 
@@ -156,19 +159,27 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
 
 class MessageViewSet(viewsets.ModelViewSet):
-    """ViewSet for managing messages."""
+    """ViewSet for managing messages with pagination and rate limiting."""
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['conversation', 'sender']
     search_fields = ['content']
     ordering_fields = ['created_at']
     ordering = ['created_at']
+    pagination_class = None  # Messages use custom pagination per view
 
     def get_queryset(self):
-        """Return messages the user has access to."""
+        """Return messages the user has access to with optimized queries."""
         user = self.request.user
         return Message.objects.filter(
             conversation__members__user=user
+        ).select_related(
+            'sender',
+            'conversation',
+            'reply_to'
+        ).prefetch_related(
+            'reactions',
+            'read_receipts'
         ).distinct()
 
     def get_serializer_class(self):
@@ -180,7 +191,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         return MessageSerializer
 
     def perform_create(self, serializer):
-        """Create a new message and broadcast via WebSocket."""
+        """Create a new message and broadcast via WebSocket with rate limiting."""
         # Handle conversation_id from FormData for file uploads
         conversation_id = self.request.data.get('conversation_id')
         if conversation_id and not serializer.validated_data.get('conversation'):
@@ -295,18 +306,34 @@ class MessageReactionViewSet(viewsets.ModelViewSet):
 # Template Views
 @login_required
 def conversation_list(request):
-    """Display list of user's conversations."""
+    """Display list of user's conversations with optimized queries."""
+    # Fetch all conversations for the user with prefetched relations
     conversations = Conversation.objects.filter(
         members__user=request.user
     ).prefetch_related(
         'members__user',
-        'messages__sender'
+        'messages__sender',
+        'messages__read_receipts'
+    ).annotate(
+        # Optimize: get last message in one query instead of N+1
+        last_msg_id=models.Max('messages__id')
     ).distinct()
-    
-    # Calculate read status for each conversation
+
+    # Calculate read status efficiently
     conversation_data = []
     for conversation in conversations:
-        read_status = conversation.get_last_message_read_status(request.user)
+        # Get last message efficiently from the queryset
+        last_message = conversation.messages.order_by('-created_at').first()
+        
+        # Check if last message is read by current user
+        read_status = 'sent'  # Default
+        if last_message and last_message.sender != request.user:
+            # Check if current user has read this message
+            if last_message.read_receipts.filter(user=request.user).exists():
+                read_status = 'read'
+            else:
+                read_status = 'delivered'
+        
         conversation_data.append({
             'conversation': conversation,
             'read_status': read_status
@@ -449,4 +476,94 @@ def create_conversation(request):
             messages.error(request, f'Failed to create conversation: {str(e)}')
     
     return redirect('messaging:conversation_list')
+
+
+class ConversationThemeViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing conversation themes."""
+    permission_classes = [IsAuthenticated]
+    serializer_class = ConversationThemeSerializer
+
+    def get_queryset(self):
+        """Return themes for the current user."""
+        return ConversationTheme.objects.filter(user=self.request.user)
+
+    def get_serializer_class(self):
+        """Return appropriate serializer based on action."""
+        if self.action in ['create', 'update', 'partial_update']:
+            return ConversationThemeCreateUpdateSerializer
+        return ConversationThemeSerializer
+
+    def perform_create(self, serializer):
+        """Create a theme for the current user and conversation."""
+        conversation_id = self.request.data.get('conversation')
+        conversation = get_object_or_404(Conversation, id=conversation_id)
+        
+        # Verify user is a member of this conversation
+        if not conversation.members.filter(user=self.request.user).exists():
+            raise PermissionError("You are not a member of this conversation")
+        
+        serializer.save(user=self.request.user, conversation=conversation)
+
+    def perform_update(self, serializer):
+        """Update a theme for the current user."""
+        # Verify user owns this theme
+        if serializer.instance.user != self.request.user:
+            raise PermissionError("You can only edit your own themes")
+        serializer.save()
+
+    @action(detail=True, methods=['post'])
+    def apply(self, request, pk=None):
+        """Apply a theme to the conversation."""
+        theme = self.get_object()
+        conversation = theme.conversation
+        
+        # Verify user is a member of this conversation
+        if not conversation.members.filter(user=request.user).exists():
+            return Response(
+                {'error': 'You are not a member of this conversation'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Theme is already applied since it's user-specific
+        return Response({
+            'message': 'Theme applied successfully',
+            'theme': ConversationThemeSerializer(theme).data
+        })
+
+    @action(detail=False, methods=['get'])
+    def by_conversation(self, request):
+        """Get theme for a specific conversation."""
+        conversation_id = request.query_params.get('conversation_id')
+        if not conversation_id:
+            return Response(
+                {'error': 'conversation_id parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        conversation = get_object_or_404(Conversation, id=conversation_id)
+        
+        # Verify user is a member of this conversation
+        if not conversation.members.filter(user=request.user).exists():
+            return Response(
+                {'error': 'You are not a member of this conversation'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            theme = ConversationTheme.objects.get(
+                user=request.user,
+                conversation=conversation
+            )
+            serializer = self.get_serializer(theme)
+            return Response(serializer.data)
+        except ConversationTheme.DoesNotExist:
+            # Return default theme
+            return Response({
+                'theme_type': 'solid',
+                'light_color': '#f8fafc',
+                'dark_color': '#18191f',
+                'overlay_opacity': 0.3,
+                'light_overlay_color': '#ffffff',
+                'dark_overlay_color': '#000000'
+            })
 

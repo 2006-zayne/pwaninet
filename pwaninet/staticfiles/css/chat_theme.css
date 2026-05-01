@@ -1,0 +1,193 @@
+/* Chat Theme Styles */
+/* Additional styles for theme selector and chat theming */
+
+.theme-btn {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-btn:hover {
+  background: var(--border);
+  color: var(--text-primary);
+}
+
+.theme-btn i {
+  font-size: 18px;
+}
+
+/* Chat area theme styles */
+.messages-area {
+  transition: background 0.3s ease;
+}
+
+/* Message bubble adjustments for themed backgrounds */
+.messages-area .message {
+  backdrop-filter: blur(0);
+  transition: backdrop-filter 0.3s ease;
+}
+
+.messages-area::before ~ .message {
+  backdrop-filter: blur(1px);
+}
+
+/* Ensure message text remains readable */
+.messages-area .message-content {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .messages-area .message-content {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Theme preview in modal */
+.theme-preview {
+  width: 100%;
+  height: 120px;
+  border-radius: 8px;
+  margin: 16px 0;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.theme-preview::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--chat-overlay-color);
+  opacity: var(--chat-overlay-opacity);
+  z-index: 1;
+}
+
+.theme-preview-content {
+  position: relative;
+  z-index: 2;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.theme-preview-message {
+  background: var(--chat-bg-sent);
+  color: var(--chat-text-sent);
+  padding: 8px 12px;
+  border-radius: 12px;
+  max-width: 70%;
+  font-size: 0.85rem;
+}
+
+.theme-preview-message.received {
+  background: var(--chat-bg-received);
+  color: var(--chat-text-received);
+  align-self: flex-start;
+}
+
+.theme-preview-message.sent {
+  align-self: flex-end;
+}
+
+/* Loading states */
+.theme-loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.theme-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid var(--primary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Theme selector animations */
+.theme-selector-modal {
+  animation: fadeIn 0.3s ease;
+}
+
+.theme-selector-content {
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .theme-selector-content {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+  }
+  
+  .theme-btn {
+    padding: 6px;
+  }
+  
+  .theme-btn i {
+    font-size: 16px;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .messages-area .message-content {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  }
+  
+  [data-theme="dark"] .messages-area .message-content {
+    text-shadow: 0 1px 3px rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .messages-area,
+  .message,
+  .theme-selector-modal,
+  .theme-selector-content {
+    transition: none;
+    animation: none;
+  }
+  
+  .theme-loading::after {
+    animation: none;
+  }
+}

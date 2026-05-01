@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Static JS Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        pre { background: #f0f0f0; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Static JavaScript Test</h1>
+    
+    <div class="test-section">
+        <h2>JavaScript Loading Test</h2>
+        <div id="jsTestResults"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Console Output</h2>
+        <pre id="consoleOutput"></pre>
+    </div>
+    
+    <div class="test-section">
+        <h2>Manual Test</h2>
+        <button onclick="testMessagingJS()">Test messaging.js</button>
+        <button onclick="testEncryptionJS()">Test encryption.js</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+
+    <script>
+        // Capture console output
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        const consoleOutput = document.getElementById('consoleOutput');
+        
+        function addToConsole(type, ...args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            
+            consoleOutput.textContent += `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            
+            // Also call original console method
+            if (type === 'error') originalError(...args);
+            else if (type === 'warn') originalWarn(...args);
+            else originalLog(...args);
+        }
+        
+        console.log = (...args) => addToConsole('log', ...args);
+        console.error = (...args) => addToConsole('error', ...args);
+        console.warn = (...args) => addToConsole('warn', ...args);
+        
+        function updateTestResults(testName, status, message) {
+            const resultsDiv = document.getElementById('jsTestResults');
+            const testDiv = document.createElement('div');
+            testDiv.className = status;
+            testDiv.innerHTML = `<strong>${testName}:</strong> ${message}`;
+            resultsDiv.appendChild(testDiv);
+        }
+        
+        function clearResults() {
+            document.getElementById('jsTestResults').innerHTML = '';
+            document.getElementById('consoleOutput').textContent = '';
+        }
+        
+        // Test if messaging.js loads correctly
+        function testMessagingJS() {
+            console.log('Testing messaging.js...');
+            
+            // Check if MessagingManager class exists
+            if (typeof MessagingManager !== 'undefined') {
+                updateTestResults('MessagingManager Class', 'success', 'MessagingManager class is defined');
+                
+                // Try to create an instance
+                try {
+                    const testManager = new MessagingManager();
+                    updateTestResults('MessagingManager Instance', 'success', 'Can create MessagingManager instance');
+                    
+                    // Test key methods
+                    if (typeof testManager.addMessage === 'function') {
+                        updateTestResults('addMessage Method', 'success', 'addMessage method exists');
+                    } else {
+                        updateTestResults('addMessage Method', 'error', 'addMessage method missing');
+                    }
+                    
+                    if (typeof testManager.buildView === 'function') {
+                        updateTestResults('buildView Method', 'success', 'buildView method exists');
+                    } else {
+                        updateTestResults('buildView Method', 'error', 'buildView method missing');
+                    }
+                    
+                    if (typeof testManager.render === 'function') {
+                        updateTestResults('render Method', 'success', 'render method exists');
+                    } else {
+                        updateTestResults('render Method', 'error', 'render method missing');
+                    }
+                    
+                    // Test state-driven functionality
+                    testManager.messages = [];
+                    console.log('Testing addMessage with test data...');
+                    testManager.addMessage({
+                        id: 1,
+                        sender_id: 'user1',
+                        content: 'Test message',
+                        created_at: new Date().toISOString()
+                    });
+                    
+                    if (testManager.messages.length === 1) {
+                        updateTestResults('State Management', 'success', 'Messages array updated correctly');
+                    } else {
+                        updateTestResults('State Management', 'error', 'Messages array not updated');
+                    }
+                    
+                } catch (error) {
+                    updateTestResults('MessagingManager Instance', 'error', `Error creating instance: ${error.message}`);
+                }
+            } else {
+                updateTestResults('MessagingManager Class', 'error', 'MessagingManager class not found - JS file not loaded');
+            }
+        }
+        
+        function testEncryptionJS() {
+            console.log('Testing encryption.js...');
+            
+            if (typeof E2EEncryption !== 'undefined') {
+                updateTestResults('E2EEncryption Class', 'success', 'E2EEncryption class is defined');
+                
+                try {
+                    const testEncryption = new E2EEncryption();
+                    updateTestResults('E2EEncryption Instance', 'success', 'Can create E2EEncryption instance');
+                } catch (error) {
+                    updateTestResults('E2EEncryption Instance', 'error', `Error creating instance: ${error.message}`);
+                }
+            } else {
+                updateTestResults('E2EEncryption Class', 'error', 'E2EEncryption class not found - JS file not loaded');
+            }
+        }
+        
+        // Test on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM Content Loaded - Testing JavaScript file loading...');
+            
+            // Test if scripts loaded
+            const scripts = document.querySelectorAll('script[src]');
+            let loadedScripts = 0;
+            let totalScripts = scripts.length;
+            
+            scripts.forEach(script => {
+                if (script.readyState === 'complete' || script.readyState === 'loaded') {
+                    loadedScripts++;
+                }
+            });
+            
+            updateTestResults('Script Loading', 'success', `Loaded ${loadedScripts}/${totalScripts} scripts`);
+            
+            // Test if global variables are available
+            setTimeout(() => {
+                if (typeof window.MessagingManager !== 'undefined') {
+                    updateTestResults('Global Access', 'success', 'MessagingManager available globally');
+                } else {
+                    updateTestResults('Global Access', 'error', 'MessagingManager not available globally');
+                }
+                
+                if (typeof window.E2EEncryption !== 'undefined') {
+                    updateTestResults('Global Access', 'success', 'E2EEncryption available globally');
+                } else {
+                    updateTestResults('Global Access', 'warning', 'E2EEncryption not available globally');
+                }
+            }, 1000);
+        });
+    </script>
+    
+    <!-- Try to load the JavaScript files directly -->
+    <script src="static/js/messaging.js"></script>
+    <script src="static/js/encryption.js"></script>
+</body>
+</html>
