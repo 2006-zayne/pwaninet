@@ -432,7 +432,7 @@ def conversation_detail(request, conversation_id):
         'yesterday': yesterday.strftime('%Y-%m-%d'),
     }
 
-    return render(request, 'messaging/conversation_detail.html', context)
+    return render(request, 'messaging/conversation_detail_refactored.html', context)
 
 
 @csrf_exempt
