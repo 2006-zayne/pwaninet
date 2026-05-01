@@ -16,8 +16,21 @@ export const EVENTS = {
   MESSAGE_QUEUED: 'message:queued',
   MESSAGE_NEW: 'message:new',
   MESSAGE_READ_RECEIPT: 'message:read_receipt',
+  MESSAGE_FAILED: 'message:failed',
   MESSAGES_LOADED: 'messages:loaded',
   MESSAGES_UPDATED: 'messages:updated',
+
+  // Optimistic update events
+  MESSAGE_OPTIMISTIC_ADD: 'message:optimistic_add',
+  MESSAGE_CONFIRMED: 'message:confirmed',
+  REACTION_OPTIMISTIC_ADD: 'reaction:optimistic_add',
+  REACTION_CONFIRMED: 'reaction:confirmed',
+  UI_MESSAGE_PENDING: 'ui:message_pending',
+  UI_MESSAGE_CONFIRMED: 'ui:message_confirmed',
+  UI_MESSAGE_FAILED: 'ui:message_failed',
+  UI_REACTION_PENDING: 'ui:reaction_pending',
+  UI_REACTION_CONFIRMED: 'ui:reaction_confirmed',
+  UI_REACTION_TIMEOUT: 'ui:reaction_timeout',
 
   // Typing events
   TYPING_START: 'typing:start',
