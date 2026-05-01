@@ -1,21 +1,31 @@
 import json
+import asyncio
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 from pwaninet.redis_client import get_redis_client
 from .models import Conversation, ConversationMember, Message
+from .ws_middleware import WebSocketRateLimiter, WebSocketConnectionTracker
 
 User = get_user_model()
 
+# Heartbeat interval in seconds
+HEARTBEAT_INTERVAL = 30
+MESSAGE_TIMEOUT = 5  # seconds to wait for message processing
+WS_MESSAGE_RATE = 100  # messages per minute
+
 
 class ChatConsumer(AsyncWebsocketConsumer):
-    """WebSocket consumer for real-time chat in conversations."""
+    """WebSocket consumer for real-time chat in conversations with heartbeat."""
 
     async def connect(self):
-        """Handle WebSocket connection."""
+        """Handle WebSocket connection with heartbeat task and rate limiting."""
         self.conversation_id = self.scope['url_route']['kwargs']['conversation_id']
         self.room_group_name = f'chat_{self.conversation_id}'
         self.user = self.scope['user']
+        self.heartbeat_task = None
+        self.message_timeout_handle = None
+        self.connection_id = self.channel_name  # Unique per connection
 
         if not self.user.is_authenticated:
             await self.close()
@@ -27,6 +37,24 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
+        # Register connection for tracking
+        tracked = WebSocketConnectionTracker.register_connection(
+            self.user.id,
+            self.connection_id,
+            metadata={
+                'conversation_id': self.conversation_id,
+                'ip': self.scope.get('client', ['unknown'])[0],
+            }
+        )
+
+        if not tracked:
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': 'Too many active connections'
+            }))
+            await self.close()
+            return
+
         # Join room group
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
@@ -34,28 +62,80 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Set user online in Redis
         await self.set_user_online(True)
 
+        # Start heartbeat task to detect stale connections
+        self.heartbeat_task = asyncio.create_task(self.heartbeat_loop())
+
     async def disconnect(self, close_code):
-        """Handle WebSocket disconnection."""
+        """Handle WebSocket disconnection and cleanup."""
+        # Unregister connection
+        WebSocketConnectionTracker.unregister_connection(self.user.id, self.connection_id)
+
+        # Cancel heartbeat task
+        if self.heartbeat_task:
+            self.heartbeat_task.cancel()
+            try:
+                await self.heartbeat_task
+            except asyncio.CancelledError:
+                pass
+
         # Leave room group
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
         # Set user offline in Redis
         await self.set_user_online(False)
 
+    async def heartbeat_loop(self):
+        """Send periodic heartbeat messages to keep connection alive."""
+        try:
+            while True:
+                await asyncio.sleep(HEARTBEAT_INTERVAL)
+                try:
+                    await self.send(text_data=json.dumps({
+                        'type': 'ping',
+                        'timestamp': asyncio.get_event_loop().time()
+                    }))
+                except Exception:
+                    # Connection might be closed, let disconnect handle cleanup
+                    break
+        except asyncio.CancelledError:
+            pass
+
     async def receive(self, text_data):
-        """Handle incoming WebSocket messages."""
+        """Handle incoming WebSocket messages with timeout and rate limiting."""
+        # Check rate limit
+        if WebSocketRateLimiter.is_rate_limited(self.user.id, self.connection_id, WS_MESSAGE_RATE):
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': 'Rate limit exceeded'
+            }))
+            return
+
         try:
             data = json.loads(text_data)
             message_type = data.get('type')
 
+            # Skip heartbeat responses
+            if message_type == 'pong':
+                return
+
             if message_type == 'chat_message':
-                await self.handle_chat_message(data)
+                await asyncio.wait_for(self.handle_chat_message(data), timeout=MESSAGE_TIMEOUT)
             elif message_type == 'typing_indicator':
-                await self.handle_typing_indicator(data)
+                await asyncio.wait_for(self.handle_typing_indicator(data), timeout=MESSAGE_TIMEOUT)
             elif message_type == 'read_receipt':
-                await self.handle_read_receipt(data)
+                await asyncio.wait_for(self.handle_read_receipt(data), timeout=MESSAGE_TIMEOUT)
+        except asyncio.TimeoutError:
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': 'Message processing timeout'
+            }))
         except json.JSONDecodeError:
             pass
+        except Exception as e:
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': str(e)
+            }))
 
     async def handle_chat_message(self, data):
         """Handle incoming chat message."""
