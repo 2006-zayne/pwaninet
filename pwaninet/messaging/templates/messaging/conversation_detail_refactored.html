@@ -1778,23 +1778,6 @@ document.body.dataset.conversationId = '{{ conversation.id }}';
 document.body.dataset.isEncrypted = '{{ conversation.is_encrypted|yesno:"true,false" }}';
 </script>
 <script src="{% static 'js/encryption.js' %}"></script>
-<script type="module" src="{% static 'js/chat/shared/constants.js' %}"></script>
-<script type="module" src="{% static 'js/chat/shared/utils.js' %}"></script>
-<script type="module" src="{% static 'js/chat/core/event-bus.js' %}"></script>
-<script type="module" src="{% static 'js/chat/core/store.js' %}"></script>
-<script type="module" src="{% static 'js/chat/core/websocket.js' %}"></script>
-<script type="module" src="{% static 'js/chat/core/message-service.js' %}"></script>
-<script type="module" src="{% static 'js/chat/core/optimistic-updates.js' %}"></script>
-<script type="module" src="{% static 'js/chat/core/sync-engine.js' %}"></script>
-<script type="module" src="{% static 'js/chat/core/app-controller.js' %}"></script>
-<script type="module" src="{% static 'js/chat/ui/ui-controller.js' %}"></script>
-<script type="module" src="{% static 'js/chat/ui/renderer.js' %}"></script>
-<script type="module" src="{% static 'js/chat/ui/input.js' %}"></script>
-<script type="module" src="{% static 'js/chat/ui/header.js' %}"></script>
-<script type="module" src="{% static 'js/chat/ui/theme/theme.service.js' %}"></script>
-<script type="module" src="{% static 'js/chat/features/emoji/emoji.service.js' %}"></script>
-<script type="module" src="{% static 'js/chat/features/camera/camera.service.js' %}"></script>
-<script type="module" src="{% static 'js/chat/features/voice/voice.service.js' %}"></script>
-<script type="module" src="{% static 'js/chat/features/attachments/attachment.service.js' %}"></script>
+<!-- Bootstrap loads all chat modules -->
 <script type="module" src="{% static 'js/chat/bootstrap.js' %}"></script>
 {% endblock %}
