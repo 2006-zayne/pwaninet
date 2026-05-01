@@ -80,7 +80,9 @@
   z-index: 1;
 }
 
-.messages-area .message {
+.messages-area .message,
+.messages-area .message-bubble,
+.messages-area .message-wrapper {
   position: relative;
   z-index: 2;
 }
@@ -263,6 +265,40 @@
 .message-bubble.received .message-time {
   color: var(--chat-text-received) !important;
   opacity: 0.6;
+}
+
+/* Message wrapper - avatar + bubble layout */
+.message-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  width: 100%;
+  position: relative;
+  z-index: 2;
+}
+
+.sent-wrapper {
+  justify-content: flex-end;
+}
+
+.received-wrapper {
+  justify-content: flex-start;
+  padding-left: 8px;
+}
+
+.message-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  align-self: flex-end;
+  margin-bottom: 2px;
+}
+
+/* Hide avatar on consecutive but keep space so bubbles stay aligned */
+.message-avatar[style*="visibility: hidden"] {
+  pointer-events: none;
 }
 
 .message-read-receipt {
@@ -881,7 +917,9 @@ body {
 </style>
 <link rel="stylesheet" href="{% static 'css/chat_theme.css' %}">
 
-<div class="chat-container d-flex flex-column" style="height: 100vh;">
+<div class="chat-container d-flex flex-column" style="height: 100vh;"
+     data-conversation-id="{{ conversation.id }}"
+     data-is-encrypted="false">
   <div class="chat-header" data-conversation-id="{{ conversation.id }}">
     <a href="{% url 'messaging:conversation_list' %}" class="text-decoration-none" style="color: var(--text-primary);">
       <i class="bi bi-arrow-left" style="font-size: 20px;"></i>
@@ -1746,6 +1784,7 @@ document.body.dataset.isEncrypted = '{{ conversation.is_encrypted|yesno:"true,fa
 <script type="module" src="{% static 'js/chat/core/store.js' %}"></script>
 <script type="module" src="{% static 'js/chat/core/websocket.js' %}"></script>
 <script type="module" src="{% static 'js/chat/core/message-service.js' %}"></script>
+<script type="module" src="{% static 'js/chat/core/optimistic-updates.js' %}"></script>
 <script type="module" src="{% static 'js/chat/core/sync-engine.js' %}"></script>
 <script type="module" src="{% static 'js/chat/core/app-controller.js' %}"></script>
 <script type="module" src="{% static 'js/chat/ui/ui-controller.js' %}"></script>

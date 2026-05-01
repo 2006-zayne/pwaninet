@@ -23,8 +23,8 @@ class MessagingManager {
 
     async init() {
         console.log('MessagingManager init() called');
-        this.currentUserId = document.body.dataset.userId;
-        this.conversationId = document.body.dataset.conversationId;
+        this.currentUserId = Number(document.body.dataset.userId);
+        this.conversationId = Number(document.body.dataset.conversationId);
         this.isEncrypted = document.body.dataset.isEncrypted === 'true';
 
         console.log('MessagingManager init values:', {
@@ -61,69 +61,109 @@ class MessagingManager {
     addMessage(messageData) {
         try {
             console.log('addMessage called with:', messageData);
-            
+
+            // Check if this is a confirmation of an optimistic message
+            if (messageData.sender_id === parseInt(this.currentUserId) && !messageData.is_optimistic) {
+                // Find and remove the optimistic message
+                const optimisticIndex = this.messages.findIndex(m =>
+                    m.is_optimistic &&
+                    m.content === messageData.content &&
+                    (new Date(messageData.created_at) - new Date(m.created_at)) < 10000
+                );
+
+                if (optimisticIndex !== -1) {
+                    console.log('Replacing optimistic message with server confirmed message');
+                    this.messages[optimisticIndex] = messageData;
+                    this.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                    this.render();
+                    return;
+                }
+            }
+
             // Normalize message data structure to match state expectations
             const normalizedMessage = {
                 ...messageData,
                 sender_id: messageData.sender_id || messageData.sender?.id,
                 created_at: messageData.created_at || messageData.timestamp
             };
-            
+
             console.log('Normalized message:', normalizedMessage);
-            
+
             // Validate required fields
             if (!normalizedMessage.id || !normalizedMessage.content || !normalizedMessage.sender_id) {
                 console.error('Invalid message data:', normalizedMessage);
                 return;
             }
-            
+
             // Add message to state array
             this.messages.push(normalizedMessage);
             // Sort messages by created_at to maintain order
             this.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
             this.render();
-            
+
             console.log('Message added successfully. Total messages:', this.messages.length);
         } catch (error) {
             console.error('Error in addMessage:', error, messageData);
         }
     }
-    
+
     // VIEW MODEL LAYER: Pure function for derived data
-    buildView(messages) {
-        const viewItems = [];
-        let lastDate = null;
-        let lastSenderId = null;
-        
-        for (const message of messages) {
-            const messageDate = new Date(message.created_at).toDateString();
-            const isOwn = message.sender_id === this.currentUserId;
-            
-            // Add date separator if needed
-            if (messageDate !== lastDate) {
-                viewItems.push({
-                    type: 'date',
-                    label: this.formatDateLabel(message.created_at)
-                });
-                lastDate = messageDate;
-            }
-            
-            // Determine if this is a consecutive message
-            const isConsecutive = lastSenderId === message.sender_id;
-            lastSenderId = message.sender_id;
-            
-            // Add message to view
+buildView(messages) {
+    const viewItems = [];
+    let lastDate = null;
+    let lastSenderId = null;
+    let lastOwnMessageIndex = -1;
+
+    const currentUserId = Number(this.currentUserId);
+
+    for (const message of messages) {
+        const messageDate = new Date(message.created_at).toDateString();
+
+        const senderId = Number(message.sender?.id ?? message.sender_id);
+        const isOwn = senderId === currentUserId;
+
+        // Date separator
+        if (messageDate !== lastDate) {
             viewItems.push({
-                type: 'message',
-                ...message,
-                isOwn,
-                isConsecutive,
-                isLastSent: isOwn && message === messages.filter(m => m.sender_id === this.currentUserId).pop()
+                type: 'date',
+                label: this.formatDateLabel(message.created_at)
             });
+            lastDate = messageDate;
         }
-        
-        return viewItems;
+
+        // Consecutive grouping (safer)
+        const isConsecutive =
+            lastSenderId === senderId &&
+            messageDate === lastDate;
+
+        lastSenderId = senderId;
+
+        // Push message first (we need index stability)
+        const viewItem = {
+            type: 'message',
+            ...message,
+            sender_id: senderId,
+            isOwn,
+            isConsecutive,
+            isLastSent: false // set after index calc
+        };
+
+        viewItems.push(viewItem);
+
+        const currentIndex = viewItems.length - 1;
+
+        // Track last own message index
+        if (isOwn) {
+            lastOwnMessageIndex = currentIndex;
+        }
+
+        // Mark last sent message correctly
+        viewItem.isLastSent = isOwn && currentIndex === lastOwnMessageIndex;
     }
+
+    return viewItems;
+    }
+    
     
     formatDateLabel(dateString) {
         const date = new Date(dateString);
@@ -392,19 +432,57 @@ class MessagingManager {
                     console.log('Processing message:', data.data);
                     
                     // Decrypt message if encrypted
+                    let content = data.data.content;
+
                     if (data.data.is_encrypted && this.e2eEncryption) {
                         try {
-                            data.data.content = await this.e2eEncryption.decryptMessage(data.data.encrypted_content);
+                            content = await this.e2eEncryption.decryptMessage(data.data.encrypted_content);
                         } catch (error) {
                             console.error('Failed to decrypt message:', error);
-                            data.data.content = '[Encrypted message - unable to decrypt]';
+                            content = '[Encrypted message - unable to decrypt]';
                         }
                     }
                     
                     // STATE-DRIVEN: Add to state and render
                     console.log('Adding message to state:', data.data);
-                    this.addMessage(data.data);
-                    this.updateConversationPreview(data.data);
+                    // Normalize sender structure before adding to state
+                    const normalizedMessage = {
+                    id: data.data.id,
+                    conversation: Number(data.data.conversation),
+
+                    content,
+                    encrypted_content: data.data.encrypted_content || null,
+
+                    sender_id: Number(data.data.sender?.id ?? data.data.sender_id),
+
+                    sender: data.data.sender
+                        ? {
+                            ...data.data.sender,
+                            id: Number(data.data.sender.id)
+                        }
+                        : null,
+
+                    reply_to: data.data.reply_to || null,
+
+                    attachment: data.data.attachment || null,
+                    attachment_type: data.data.attachment_type || null,
+
+                    reactions: data.data.reactions || [],
+                    read_receipts: data.data.read_receipts || [],
+
+                    read_status: data.data.read_status || 'sent',
+                    read_avatar: data.data.read_avatar || null,
+
+                    is_deleted: data.data.is_deleted ?? false,
+                    is_optimistic: data.data.is_optimistic ?? false,
+
+                    created_at: new Date(data.data.created_at).toISOString(),
+                    edited_at: data.data.edited_at
+                        ? new Date(data.data.edited_at).toISOString()
+                        : null
+                };
+                    this.addMessage(normalizedMessage);
+                    this.updateConversationPreview(normalizedMessage);
                     break;
                 case 'typing':
                     this.handleTypingIndicator(data);
@@ -423,8 +501,36 @@ class MessagingManager {
     async sendMessage(messageContent = null) {
         const input = document.getElementById('messageInput');
         const content = messageContent || input.value.trim();
+        const userId = Number(this.currentUserId);
 
         if (!content) return;
+
+        // Create optimistic message for immediate UI feedback
+        const tempId = `temp_${Date.now()}_${Math.random()}`;
+        const optimisticMessage = {
+            id: tempId,
+            conversation: Number(this.conversationId),
+            sender_id: userId,
+            sender: {
+                id: userId,
+                username: 'You'
+            },
+            content: content,
+            encrypted_content: null,
+            is_encrypted: false,
+            attachment: null,
+            attachment_type: null,
+            reply_to: this.replyToMessageId || null,
+            reactions: [],
+            read_receipts: [],
+            created_at: new Date().toISOString(),
+            edited_at: null,
+            is_deleted: false,
+            is_optimistic: true
+        };
+
+        // Add optimistic message to state
+        this.addMessage(optimisticMessage);
 
         let messageData = {
             type: 'chat_message',
@@ -455,7 +561,21 @@ class MessagingManager {
             }
             this.cancelReply();
         } else {
-            this.messageQueue.push(messageData);
+            this.messageQueue.push({
+                ...messageData,
+                conversation: Number(this.conversationId),
+                sender_id: Number(this.currentUserId),
+                sender: {
+                    id: Number(this.currentUserId),
+                    username: 'You'
+                },
+                content: content,
+                encrypted_content: messageData.encrypted_content || null,
+                is_encrypted: messageData.is_encrypted || false,
+                reply_to: this.replyToMessageId || null,
+                created_at: new Date().toISOString(),
+                is_optimistic: true
+            });
             console.log('Message queued (socket not connected)');
         }
     }

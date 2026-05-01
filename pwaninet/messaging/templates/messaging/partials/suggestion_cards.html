@@ -1,0 +1,200 @@
+{% load static %}
+{% load messaging_extras %}
+
+<div class="suggestion-cards-grid">
+  {% for user in suggested_users %}
+  <div class="suggestion-card">
+    <div class="card-header">
+      <a href="{% url 'users:profile' user.username %}" class="user-avatar-link">
+        {% if user.profile_picture %}
+        <img src="{{ user.profile_picture.url }}" alt="{{ user.get_full_name }}" class="user-avatar">
+        {% else %}
+        <div class="user-avatar-placeholder">
+          <i class="bi bi-person-circle"></i>
+        </div>
+        {% endif %}
+      </a>
+    </div>
+
+    <div class="card-body">
+      <h4 class="user-name">
+        <a href="{% url 'users:profile' user.username %}">{{ user.get_full_name }}</a>
+      </h4>
+      <p class="user-username">@{{ user.username }}</p>
+
+      {% if user.bio %}
+      <p class="user-bio">{{ user.bio|truncatechars:80 }}</p>
+      {% endif %}
+    </div>
+
+    <div class="card-actions">
+      {% if user.id in following_ids %}
+      <button class="btn btn-primary start-conversation"
+              data-user-id="{{ user.id }}"
+              type="button">
+        <i class="bi bi-chat-dots me-1"></i> Message
+      </button>
+      {% else %}
+      <button class="btn btn-outline-primary btn-follow"
+              data-user-id="{{ user.id }}"
+              type="button">
+        <i class="bi bi-person-plus me-1"></i> Follow
+      </button>
+      {% endif %}
+    </div>
+  </div>
+  {% empty %}
+  <div class="no-suggestions">
+    <div class="empty-state">
+      <i class="bi bi-people"></i>
+      <h3>No suggestions available</h3>
+      <p>Try following more people to get personalized suggestions!</p>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<style>
+.suggestion-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.suggestion-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  transition: all var(--ease) 0.2s;
+  box-shadow: var(--shadow-card);
+}
+
+.suggestion-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+.card-header {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.user-avatar-link {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.user-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--brand-light);
+}
+
+.user-avatar-placeholder {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--brand-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand);
+  font-size: 2rem;
+}
+
+.card-body {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.user-name {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.user-name a {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.user-name a:hover {
+  color: var(--brand);
+}
+
+.user-username {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.user-bio {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.card-actions {
+  text-align: center;
+}
+
+.card-actions .btn {
+  min-width: 120px;
+  font-weight: 500;
+}
+
+.no-suggestions {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.empty-state {
+  color: var(--text-muted);
+}
+
+.empty-state i {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.empty-state h3 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-secondary);
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* Mobile responsive */
+@media (max-width: 767px) {
+  .suggestion-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .suggestion-card {
+    padding: 1rem;
+  }
+
+  .user-avatar {
+    width: 60px;
+    height: 60px;
+  }
+
+  .user-avatar-placeholder {
+    width: 60px;
+    height: 60px;
+    font-size: 1.5rem;
+  }
+}
+</style>

@@ -182,103 +182,102 @@ div.chat-container .messages-area .message-bubble,
 div.chat-container .messages-area div.message-bubble,
 div.chat-container div.messages-area .message-bubble,
 div.chat-container div.messages-area div.message-bubble {
-  max-width: 70% !important;
-  padding: 6px 10px !important;
+  /* max-width: 70% !important; REMOVED: Conflicts with new CSS */
+  /* padding: 6px 10px !important; REMOVED: Conflicts with new CSS */
   position: relative !important;
-  margin: 0 !important;
+  /* margin: 0 !important; REMOVED: Conflicts with new CSS */
   cursor: pointer !important;
   user-select: none !important;
   box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13) !important;
   transition: transform 0.1s ease !important;
   border: none !important;
-  background: none !important;
+  /* background: none !important; REMOVED: Conflicts with sent/received backgrounds */
 }
 
-/* Consecutive messages styling */
-.messages-area .message-bubble.consecutive-message,
-.chat-container .messages-area .message-bubble.consecutive-message,
-div.messages-area div.message-bubble.consecutive-message {
-  border-top: 1px solid rgba(0, 0, 0, 0.05) !important;
-  margin: 0 !important;
+/* Message wrapper for avatar support */
+.message-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  width: 100%;
+  margin: 2px 0;
 }
 
-[data-theme="dark"] .messages-area .message-bubble.consecutive-message,
-[data-theme="dark"] .chat-container .messages-area .message-bubble.consecutive-message,
-[data-theme="dark"] div.messages-area div.message-bubble.consecutive-message {
-  border-top: 1px solid rgba(255, 255, 255, 0.03) !important;
+.sent-wrapper {
+  justify-content: flex-end;
 }
 
-.messages-area .message-bubble:hover,
-.chat-container .messages-area .message-bubble:hover,
-div.messages-area div.message-bubble:hover {
-  transform: scale(0.98) !important;
+.received-wrapper {
+  justify-content: flex-start;
+  padding-left: 8px;
 }
 
-.messages-area .message-bubble.sent,
-.chat-container .messages-area .message-bubble.sent,
-div.messages-area div.message-bubble.sent {
-  background-color: var(--chat-bg-sent) !important;
-  color: var(--chat-text-sent) !important;
+.message-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  align-self: flex-end;
+  margin-bottom: 2px;
+}
+
+/* Base bubble - MISSING padding is the main culprit */
+.messages-area .message-bubble {
+  padding: 8px 12px !important;
+  max-width: 75% !important;
+  width: fit-content !important;
+  word-wrap: break-word !important;
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+  position: relative !important;
+}
+
+/* Sent messages */
+.messages-area .message-bubble.sent {
+  background-color: var(--chat-bg-sent, #d4f1c4) !important;
+  color: var(--chat-text-sent, #111) !important;
   align-self: flex-end !important;
-  border-radius: 18px !important;
+  border-radius: 18px 18px 4px 18px !important;
   margin: 6px 8px 2px auto !important;
+  padding: 8px 12px !important;
 }
 
-.messages-area .message-bubble.sent.consecutive-message,
-.chat-container .messages-area .message-bubble.sent.consecutive-message,
-div.messages-area div.message-bubble.sent.consecutive-message {
-  border-radius: 18px !important;
-  margin: 0 8px 0 auto !important;
-  border-top: 1px solid rgba(0, 0, 0, 0.05) !important;
-}
-
-
-.messages-area .message-bubble.received,
-.chat-container .messages-area .message-bubble.received,
-div.messages-area div.message-bubble.received {
-  background-color: var(--chat-bg-received) !important;
-  color: var(--chat-text-received) !important;
+/* Received messages */
+.messages-area .message-bubble.received {
+  background-color: var(--chat-bg-received, #f0f0f0) !important;
+  color: var(--chat-text-received, #111) !important;
   align-self: flex-start !important;
-  border-radius: 18px !important;
-  margin: 6px auto 2px 2px !important;
-  border: 1px solid var(--border) !important;
+  border-radius: 18px 18px 18px 4px !important;
+  margin: 6px 8px 2px 8px !important;
+  padding: 8px 12px !important;
+  border: none !important;
 }
 
-.messages-area .message-bubble.received.consecutive-message,
-.chat-container .messages-area .message-bubble.received.consecutive-message,
-div.messages-area div.message-bubble.received.consecutive-message {
-  border-radius: 18px !important;
-  margin: 0 auto 0 2px !important;
-  border: 1px solid var(--border) !important;
+/* Sent consecutive */
+.messages-area .message-bubble.sent.consecutive-message {
+  border-radius: 18px 18px 4px 18px !important;
+  margin: 2px 8px 2px auto !important;
+  border-top: none !important;
 }
 
-
-/* Dark mode overrides */
-[data-theme="dark"] .messages-area .message-bubble.sent,
-[data-theme="dark"] .chat-container .messages-area .message-bubble.sent,
-[data-theme="dark"] div.messages-area div.message-bubble.sent {
-  background-color: var(--chat-bg-sent) !important;
-  color: var(--chat-text-sent) !important;
+/* Received consecutive */
+.messages-area .message-bubble.received.consecutive-message {
+  border-radius: 18px 18px 18px 4px !important;
+  margin: 2px 8px 2px 8px !important;
+  border-top: none !important;
 }
 
-[data-theme="dark"] .messages-area .message-bubble.sent.consecutive-message,
-[data-theme="dark"] .chat-container .messages-area .message-bubble.sent.consecutive-message,
-[data-theme="dark"] div.messages-area div.message-bubble.sent.consecutive-message {
-  border-top: 1px solid rgba(255, 255, 255, 0.03) !important;
+/* Dark mode */
+[data-theme="dark"] .messages-area .message-bubble.sent {
+  background-color: var(--chat-bg-sent, #005c4b) !important;
+  color: var(--chat-text-sent, #fff) !important;
 }
 
-[data-theme="dark"] .messages-area .message-bubble.received,
-[data-theme="dark"] .chat-container .messages-area .message-bubble.received,
-[data-theme="dark"] div.messages-area div.message-bubble.received {
-  background-color: var(--chat-bg-received) !important;
-  color: var(--chat-text-received) !important;
-  border: 1px solid var(--border) !important;
-}
-
-[data-theme="dark"] .messages-area .message-bubble.received.consecutive-message,
-[data-theme="dark"] .chat-container .messages-area .message-bubble.received.consecutive-message,
-[data-theme="dark"] div.messages-area div.message-bubble.received.consecutive-message {
-  border-top: 1px solid rgba(255, 255, 255, 0.03) !important;
+[data-theme="dark"] .messages-area .message-bubble.received {
+  background-color: var(--chat-bg-received, #1e1e1e) !important;
+  color: var(--chat-text-received, #fff) !important;
+  border: none !important;
 }
 
 

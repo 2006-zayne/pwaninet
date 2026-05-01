@@ -431,7 +431,7 @@ def conversation_detail(request, conversation_id):
         'today': today.strftime('%Y-%m-%d'),
         'yesterday': yesterday.strftime('%Y-%m-%d'),
     }
-    
+
     return render(request, 'messaging/conversation_detail.html', context)
 
 

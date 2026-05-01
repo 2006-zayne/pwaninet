@@ -91,16 +91,16 @@
             }
             
             .mobile-bottom-nav {
-                width: 98%;
-                max-width: 320px;
+                width: 95%;
+                max-width: 380px;
                 height: 55px;
                 bottom: 6px;
                 padding: 0 4px;
                 border-radius: 16px;
             }
-            
+
             .mobile-bottom-nav .nav-chip i {
-                font-size: 1.1rem;
+                font-size: 1.3rem;
             }
             
             .mobile-bottom-nav .nav-chip {
@@ -159,7 +159,7 @@
             left: 50%;
             transform: translateX(-50%);
             width: 95%;
-            max-width: 360px;
+            max-width: 420px;
             display: flex;
             justify-content: space-around;
             align-items: center;
@@ -169,7 +169,7 @@
         }
 
         .mobile-bottom-nav .nav-chip i {
-            font-size: 1.2rem;
+            font-size: 1.4rem;
         }
 
         .mobile-bottom-nav .nav-chip {
@@ -335,7 +335,8 @@
         }
     </style>
 </head>
-<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+      data-user-id="{{ request.user.id }}">
     
     <nav class="navbar navbar-top fixed-top">
         <div class="container d-flex justify-content-between align-items-center">
@@ -463,7 +464,7 @@
 
             // Save to server if user is authenticated
             if ('{{ request.user.is_authenticated }}' === 'True') {
-                fetch('/api/users/update_theme/', {
+                fetch('/users/api/users/update_theme/', {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',

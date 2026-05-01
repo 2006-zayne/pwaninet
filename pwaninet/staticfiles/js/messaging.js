@@ -59,11 +59,52 @@ class MessagingManager {
     }
     
     addMessage(messageData) {
-        // Add message to state array
-        this.messages.push(messageData);
-        // Sort messages by created_at to maintain order
-        this.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-        this.render();
+        try {
+            console.log('addMessage called with:', messageData);
+
+            // Check if this is a confirmation of an optimistic message
+            if (messageData.sender_id === parseInt(this.currentUserId) && !messageData.is_optimistic) {
+                // Find and remove the optimistic message
+                const optimisticIndex = this.messages.findIndex(m =>
+                    m.is_optimistic &&
+                    m.content === messageData.content &&
+                    (new Date(messageData.created_at) - new Date(m.created_at)) < 10000
+                );
+
+                if (optimisticIndex !== -1) {
+                    console.log('Replacing optimistic message with server confirmed message');
+                    this.messages[optimisticIndex] = messageData;
+                    this.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                    this.render();
+                    return;
+                }
+            }
+
+            // Normalize message data structure to match state expectations
+            const normalizedMessage = {
+                ...messageData,
+                sender_id: messageData.sender_id || messageData.sender?.id,
+                created_at: messageData.created_at || messageData.timestamp
+            };
+
+            console.log('Normalized message:', normalizedMessage);
+
+            // Validate required fields
+            if (!normalizedMessage.id || !normalizedMessage.content || !normalizedMessage.sender_id) {
+                console.error('Invalid message data:', normalizedMessage);
+                return;
+            }
+
+            // Add message to state array
+            this.messages.push(normalizedMessage);
+            // Sort messages by created_at to maintain order
+            this.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            this.render();
+
+            console.log('Message added successfully. Total messages:', this.messages.length);
+        } catch (error) {
+            console.error('Error in addMessage:', error, messageData);
+        }
     }
     
     // VIEW MODEL LAYER: Pure function for derived data
@@ -71,11 +112,12 @@ class MessagingManager {
         const viewItems = [];
         let lastDate = null;
         let lastSenderId = null;
-        
+
         for (const message of messages) {
             const messageDate = new Date(message.created_at).toDateString();
-            const isOwn = message.sender_id === this.currentUserId;
-            
+            const senderId = message.sender?.id ?? message.sender_id;
+            const isOwn = senderId === this.currentUserId;
+
             // Add date separator if needed
             if (messageDate !== lastDate) {
                 viewItems.push({
@@ -84,21 +126,22 @@ class MessagingManager {
                 });
                 lastDate = messageDate;
             }
-            
+
             // Determine if this is a consecutive message
-            const isConsecutive = lastSenderId === message.sender_id;
-            lastSenderId = message.sender_id;
-            
+            const isConsecutive = lastSenderId === senderId;
+            lastSenderId = senderId;
+
             // Add message to view
             viewItems.push({
                 type: 'message',
                 ...message,
+                sender_id: senderId,
                 isOwn,
                 isConsecutive,
-                isLastSent: isOwn && message === messages.filter(m => m.sender_id === this.currentUserId).pop()
+                isLastSent: isOwn && message === messages.filter(m => (m.sender?.id ?? m.sender_id) === this.currentUserId).pop()
             });
         }
-        
+
         return viewItems;
     }
     
@@ -318,27 +361,35 @@ class MessagingManager {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws/chat/${this.conversationId}/`;
             
+            console.log('Connecting WebSocket to:', wsUrl);
+            
             this.socket = new WebSocket(wsUrl);
             
             this.socket.onopen = () => {
-                console.log('WebSocket connected');
+                console.log('WebSocket connected successfully');
                 this.reconnectAttempts = 0;
                 this.processMessageQueue();
             };
             
             this.socket.onmessage = (e) => {
-                const data = JSON.parse(e.data);
-                this.handleMessage(data);
+                try {
+                    const data = JSON.parse(e.data);
+                    this.handleMessage(data);
+                } catch (error) {
+                    console.error('Failed to parse WebSocket message:', error, e.data);
+                }
             };
             
-            this.socket.onclose = () => {
-                console.log('WebSocket disconnected');
+            this.socket.onclose = (event) => {
+                console.log('WebSocket disconnected:', event.code, event.reason);
                 this.attemptReconnect();
             };
             
             this.socket.onerror = (error) => {
                 console.error('WebSocket error:', error);
             };
+        } else {
+            console.warn('No conversation ID available for WebSocket connection');
         }
     }
     
@@ -353,28 +404,44 @@ class MessagingManager {
     }
     
     async handleMessage(data) {
-        switch (data.type) {
-            case 'message':
-                // Decrypt message if encrypted
-                if (data.data.is_encrypted && this.e2eEncryption) {
-                    try {
-                        data.data.content = await this.e2eEncryption.decryptMessage(data.data.encrypted_content);
-                    } catch (error) {
-                        console.error('Failed to decrypt message:', error);
-                        data.data.content = '[Encrypted message - unable to decrypt]';
+        console.log('WebSocket message received:', data);
+        
+        try {
+            switch (data.type) {
+                case 'message':
+                    console.log('Processing message:', data.data);
+                    
+                    // Decrypt message if encrypted
+                    if (data.data.is_encrypted && this.e2eEncryption) {
+                        try {
+                            data.data.content = await this.e2eEncryption.decryptMessage(data.data.encrypted_content);
+                        } catch (error) {
+                            console.error('Failed to decrypt message:', error);
+                            data.data.content = '[Encrypted message - unable to decrypt]';
+                        }
                     }
-                }
-                
-                // STATE-DRIVEN: Add to state and render
-                this.addMessage(data.data);
-                this.updateConversationPreview(data.data);
-                break;
-            case 'typing':
-                this.handleTypingIndicator(data);
-                break;
-            case 'read_receipt':
-                this.handleReadReceipt(data);
-                break;
+                    
+                    // STATE-DRIVEN: Add to state and render
+                    console.log('Adding message to state:', data.data);
+                    // Normalize sender structure before adding to state
+                    const normalizedMessage = {
+                        ...data.data,
+                        sender_id: data.data.sender?.id ?? data.data.sender_id
+                    };
+                    this.addMessage(normalizedMessage);
+                    this.updateConversationPreview(normalizedMessage);
+                    break;
+                case 'typing':
+                    this.handleTypingIndicator(data);
+                    break;
+                case 'read_receipt':
+                    this.handleReadReceipt(data);
+                    break;
+                default:
+                    console.warn('Unknown message type:', data.type);
+            }
+        } catch (error) {
+            console.error('Error handling WebSocket message:', error, data);
         }
     }
     
@@ -383,6 +450,33 @@ class MessagingManager {
         const content = messageContent || input.value.trim();
 
         if (!content) return;
+
+        // Create optimistic message for immediate UI feedback
+        const tempId = `temp_${Date.now()}_${Math.random()}`;
+        const optimisticMessage = {
+            id: tempId,
+            conversation: parseInt(this.conversationId),
+            sender_id: parseInt(this.currentUserId),
+            sender: {
+                id: parseInt(this.currentUserId),
+                username: 'You'
+            },
+            content: content,
+            encrypted_content: null,
+            is_encrypted: false,
+            attachment: null,
+            attachment_type: null,
+            reply_to: this.replyToMessageId || null,
+            reactions: [],
+            read_receipts: [],
+            created_at: new Date().toISOString(),
+            edited_at: null,
+            is_deleted: false,
+            is_optimistic: true
+        };
+
+        // Add optimistic message to state
+        this.addMessage(optimisticMessage);
 
         let messageData = {
             type: 'chat_message',
@@ -574,11 +668,12 @@ class MessagingManager {
     }
     
     updateConversationPreview(message) {
-        const conversationItem = document.querySelector(`[data-conversation-id="${message.conversation}"]`);
+        const conversationItem = document.querySelector(`[data-conversation-id="${message.conversation || message.conversation_id}"]`);
         if (conversationItem) {
             const preview = conversationItem.querySelector('.text-truncate.small');
             if (preview) {
-                preview.textContent = `${message.sender.username}: ${message.content.substring(0, 30)}`;
+                const senderName = message.sender?.username || message.sender_name || 'Unknown';
+                preview.textContent = `${senderName}: ${message.content.substring(0, 30)}`;
             }
         }
     }
