@@ -9,6 +9,19 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="{% static 'manifest.json' %}">
     <meta name="theme-color" content="#2563eb">
+
+    <!-- iOS PWA: enable standalone and provide startup images -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+    <!-- Generic apple-touch-icon already present; add startup images for common sizes -->
+    <link rel="apple-touch-startup-image" href="{% static 'images/splash-640x1136.svg' %}" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" href="{% static 'images/splash-750x1334.svg' %}" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" href="{% static 'images/splash-1125x2436.svg' %}" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">
+    <link rel="apple-touch-startup-image" href="{% static 'images/splash-1242x2208.svg' %}" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)">
+    <link rel="apple-touch-startup-image" href="{% static 'images/splash-1536x2048.svg' %}" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" href="{% static 'images/splash-1668x2388.svg' %}" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" href="{% static 'images/splash-2048x2732.svg' %}" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)">
     
     <!-- PWA Icons - Comprehensive Favicon Support -->
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}">
