@@ -4,7 +4,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PwaniNet | Command Center</title>
+    <title>PwaniNet</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <meta name="theme-color" content="#2563eb">
+    
+    <!-- PWA Icons - Comprehensive Favicon Support -->
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/favicon-96x96.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/favicon-96x96.png' %}">
+    <link rel="icon" type="image/svg+xml" href="{% static 'images/favicon.svg' %}">
+    <link rel="shortcut icon" href="{% static 'images/favicon.ico' %}">
+    
+    <!-- Force favicon caching and display -->
+    <meta name="msapplication-TileColor" content="#2563eb">
+    <meta name="msapplication-config" content="{% static 'images/browserconfig.xml' %}">
+    <meta name="theme-color" content="#2563eb">
     <script>
         // Set theme immediately to prevent flash
         (function() {
@@ -22,6 +38,26 @@
                 document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
             }
         })();
+        
+        // Force favicon caching and display
+        (function() {
+            // Preload favicon to force caching
+            const favicon = new Image();
+            favicon.src = '{% static "images/favicon.ico" %}';
+            
+            // Force favicon refresh if needed
+            setTimeout(() => {
+                const links = document.querySelectorAll('link[rel*="icon"]');
+                links.forEach(link => {
+                    if (link.href.includes('favicon')) {
+                        // Add timestamp to force refresh
+                        const url = new URL(link.href);
+                        url.searchParams.set('v', Date.now());
+                        link.href = url.toString();
+                    }
+                });
+            }, 1000);
+        })();
     </script>
     
     <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
@@ -32,6 +68,26 @@
     <script src="{% static 'js/htmx.min.js' %}"></script>
     <script src="{% static 'js/device_manager.js' %}"></script>
     <script src="{% static 'js/auto_video_play.js' %}"></script>
+    
+    <!-- Native PWA Install Manager -->
+    <script src="{% static 'js/native-pwa-install.js' %}"></script>
+    
+    <!-- PWA Service Worker Registration (use root service-worker.js so the SW controls the app scope) -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                .then((registration) => {
+                    console.log('Service Worker registered successfully:', registration.scope);
+                }).catch((error) => {
+                    console.log('Service Worker registration failed:', error);
+                });
+            });
+        }
+    </script>
+    
+    <!-- PWA Splash Screen -->
+    <script src="{% static 'js/splash-screen.js' %}"></script>
     
     <style>
         :root, [data-theme="light"] {
@@ -519,6 +575,75 @@ document.addEventListener('htmx:afterSwap', function(evt) {
         setTimeout(() => {
             refreshPage();
         }, 100);
+    }
+});
+</script>
+
+<!-- Service Worker Registration -->
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+        navigator.serviceWorker.register('{% static "service-worker.js" %}')
+            .then(function(registration) {
+                console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                
+                // Check for service worker updates
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // New service worker is available, show update notification
+                            if (confirm('PwaniNet has been updated. Reload to get the latest version?')) {
+                                window.location.reload();
+                            }
+                        }
+                    });
+                });
+                
+            })
+            .catch(function(error) {
+                console.log('ServiceWorker registration failed: ', error);
+            });
+    });
+}
+
+// Handle offline/online events
+window.addEventListener('online', function() {
+    console.log('App is now online');
+    // Hide any offline indicators
+    const offlineBanner = document.getElementById('offline-banner');
+    if (offlineBanner) {
+        offlineBanner.style.display = 'none';
+    }
+});
+
+window.addEventListener('offline', function() {
+    console.log('App is now offline');
+    // Show offline indication if needed
+    console.log('You are offline. Some features may be limited.');
+});
+
+// PWA Install Prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    
+    // Show install button (optional)
+    const installButton = document.getElementById('install-button');
+    if (installButton) {
+        installButton.style.display = 'block';
+        installButton.addEventListener('click', () => {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                } else {
+                    console.log('User dismissed the install prompt');
+                }
+                deferredPrompt = null;
+            });
+        });
     }
 });
 </script>

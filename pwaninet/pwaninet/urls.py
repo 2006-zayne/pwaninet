@@ -19,11 +19,35 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
+from django.views.generic import TemplateView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     # This maps 'accounts/login/' and 'accounts/logout/' automatically
     path('accounts/', include('django.contrib.auth.urls')),
+    # PWA Offline Page
+    path('offline/', TemplateView.as_view(template_name='offline.html'), name='offline'),
+    path('test/offline/', TemplateView.as_view(template_name='offline.html'), name='offline_test'),
+    # Service worker served from app root so it controls entire scope (important for offline/splash)
+    path('service-worker.js', TemplateView.as_view(template_name='service-worker.js', content_type='application/javascript'), name='service_worker'),
+    # PWA Test Pages
+    path('test/splash/', TemplateView.as_view(template_name='splash_test.html'), name='splash_test'),
+    path('test/splash-debug/', TemplateView.as_view(template_name='splash_debug.html'), name='splash_debug'),
+    path('test/splash-offline/', TemplateView.as_view(template_name='splash_offline_test.html'), name='splash_offline_test'),
+    path('test/splash-always/', TemplateView.as_view(template_name='splash_always_test.html'), name='splash_always_test'),
+    path('test/native-pwa/', TemplateView.as_view(template_name='native_pwa_test.html'), name='native_pwa_test'),
+    path('test/pwa-debug/', TemplateView.as_view(template_name='debug_pwa_launch.html'), name='debug_pwa_launch'),
+    path('test/pwa-detection/', TemplateView.as_view(template_name='debug_pwa_detection.html'), name='debug_pwa_detection'),
+    path('clear-cache/', TemplateView.as_view(template_name='clear_cache.html'), name='clear_cache'),
+    # Messaging Test Pages
+    path('test/messaging/', TemplateView.as_view(template_name='test_messaging_architecture.html'), name='test_messaging_architecture'),
+    path('test/messaging-debug/', TemplateView.as_view(template_name='debug_messaging.html'), name='debug_messaging'),
+    path('test/messaging-debug-fixed/', TemplateView.as_view(template_name='debug_messaging_fixed.html'), name='debug_messaging_fixed'),
+    path('test/messaging-offline/', TemplateView.as_view(template_name='messaging_offline_test.html'), name='messaging_offline_test'),
+    # PWA Test Pages
+    path('test/pwa/', TemplateView.as_view(template_name='pwa_test.html'), name='pwa_test'),
+    path('test/pwa-install/', TemplateView.as_view(template_name='pwa_install_test.html'), name='pwa_install_test'),
+    path('test/static-js/', TemplateView.as_view(template_name='test_static_js.html'), name='test_static_js'),
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
