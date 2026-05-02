@@ -87,14 +87,18 @@
     
     <!-- PWA Service Worker Registration (use root service-worker.js so the SW controls the app scope) -->
     <script>
+        // Register service worker as early as possible so it can satisfy PWA criteria
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
-                .then((registration) => {
-                    console.log('Service Worker registered successfully:', registration.scope);
-                }).catch((error) => {
-                    console.log('Service Worker registration failed:', error);
-                });
+            navigator.serviceWorker.register('/service-worker.js')
+            .then((registration) => {
+                console.log('Service Worker registered successfully:', registration.scope);
+                return navigator.serviceWorker.ready;
+            })
+            .then((reg) => {
+                console.log('Service Worker ready:', reg.scope);
+            })
+            .catch((error) => {
+                console.log('Service Worker registration failed:', error);
             });
         }
     </script>

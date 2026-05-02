@@ -103,9 +103,11 @@ class NativePWAInstallManager {
     checkInstallPrompt() {
         if (this.isInstalled()) return;
         // If browser didn't fire beforeinstallprompt, show instructions after short delay
+        const isMobileChrome = /Android/.test(navigator.userAgent) && /Chrome\//.test(navigator.userAgent);
+        const delay = isMobileChrome ? 3000 : 5000;
         setTimeout(() => {
             if (!this.deferredPrompt && !this.installPromptShown) this.showInstallInstructions();
-        }, 5000);
+        }, delay);
     }
 
     // create a prominent install banner with explicit Install button
