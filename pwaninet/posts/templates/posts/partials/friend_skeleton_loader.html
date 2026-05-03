@@ -1,0 +1,190 @@
+{% load static %}
+
+<!-- Friend Suggestions Skeleton Loader -->
+<div class="friend-suggestions-skeleton">
+    <div class="d-flex gap-3 overflow-auto pb-2" style="scrollbar-width: none; -webkit-overflow-scrolling: touch;">
+        {% for i in skeleton_count|default:5 %}
+            <div class="friend-skeleton-card" style="min-width: 180px;">
+                <div class="friend-skeleton-image">
+                    <div class="skeleton-shimmer"></div>
+                </div>
+                <div class="friend-skeleton-info">
+                    <div class="friend-skeleton-name">
+                        <div class="skeleton-shimmer"></div>
+                    </div>
+                    <div class="friend-skeleton-details">
+                        <div class="skeleton-shimmer"></div>
+                    </div>
+                    <div class="friend-skeleton-button">
+                        <div class="skeleton-shimmer"></div>
+                    </div>
+                </div>
+                <div class="friend-skeleton-dismiss">
+                    <div class="skeleton-shimmer"></div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+/* Friend Skeleton Loader Styles */
+.friend-suggestions-skeleton {
+    padding: 0;
+}
+
+.friend-skeleton-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 0;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    position: relative;
+}
+
+.friend-skeleton-image {
+    width: 100%;
+    height: 180px;
+    background: #f1f5f9;
+    position: relative;
+    overflow: hidden;
+}
+
+.friend-skeleton-info {
+    padding: 16px;
+}
+
+.friend-skeleton-name {
+    width: 80%;
+    height: 16px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+.friend-skeleton-details {
+    width: 90%;
+    height: 12px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+}
+
+.friend-skeleton-button {
+    width: 100%;
+    height: 32px;
+    background: #e2e8f0;
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+}
+
+.friend-skeleton-dismiss {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    background: #e2e8f0;
+    border-radius: 50%;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Shimmer Animation */
+.skeleton-shimmer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        #f1f5f9 0%,
+        #e2e8f0 20%,
+        #f1f5f9 40%,
+        #e2e8f0 60%,
+        #f1f5f9 80%,
+        #e2e8f0 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* Dark theme support */
+[data-theme="dark"] .friend-skeleton-card {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .friend-skeleton-image {
+    background: #374151;
+}
+
+[data-theme="dark"] .friend-skeleton-name,
+[data-theme="dark"] .friend-skeleton-details,
+[data-theme="dark"] .friend-skeleton-button,
+[data-theme="dark"] .friend-skeleton-dismiss {
+    background: #374151;
+}
+
+[data-theme="dark"] .skeleton-shimmer {
+    background: linear-gradient(
+        90deg,
+        #374151 0%,
+        #4b5563 20%,
+        #374151 40%,
+        #4b5563 60%,
+        #374151 80%,
+        #4b5563 100%
+    );
+}
+
+/* Mobile responsiveness */
+@media (max-width: 767px) {
+    .friend-skeleton-card {
+        min-width: 170px !important;
+    }
+    
+    .friend-skeleton-image {
+        height: 160px;
+    }
+    
+    .friend-skeleton-info {
+        padding: 12px;
+    }
+    
+    .friend-skeleton-name {
+        height: 14px;
+    }
+    
+    .friend-skeleton-details {
+        height: 11px;
+    }
+    
+    .friend-skeleton-button {
+        height: 28px;
+    }
+}
+
+/* Small mobile devices */
+@media (max-width: 375px) {
+    .friend-skeleton-card {
+        min-width: 160px !important;
+    }
+}
+</style>

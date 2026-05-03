@@ -1,0 +1,700 @@
+/**
+ * PWA Install Manager
+ * Ensures install prompt always appears when PWA is not installed
+ */
+
+class PWAInstallManager {
+    constructor() {
+        this.deferredPrompt = null;
+        this.installPromptShown = false;
+        this.userEngagement = {
+            pageViews: 0,
+            timeSpent: 0,
+            interactions: 0,
+            lastInteraction: Date.now()
+        };
+        this.installCriteria = {
+            minTimeSpent: 30000, // 30 seconds
+            minInteractions: 3,
+            minPageViews: 2
+        };
+        
+        this.init();
+    }
+
+    init() {
+        // Check if already installed
+        if (this.isInstalled()) {
+            console.log('PWA already installed');
+            return;
+        }
+
+        // Listen for beforeinstallprompt event
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            this.deferredPrompt = e;
+            console.log('Install prompt captured');
+            
+            // Show install prompt after meeting criteria
+            this.scheduleInstallPrompt();
+        });
+
+        // Listen for app installed event
+        window.addEventListener('appinstalled', () => {
+            console.log('PWA installed successfully');
+            this.hideInstallPrompt();
+            this.showInstallSuccess();
+        });
+
+        // Track user engagement
+        this.trackUserEngagement();
+        
+        // Check for install prompt on page load
+        this.checkInstallPrompt();
+    }
+
+    isInstalled() {
+        // Check if running in standalone mode (PWA installed)
+        return window.matchMedia('(display-mode: standalone)').matches ||
+               window.navigator.standalone === true ||
+               document.referrer.includes('android-app://');
+    }
+
+    trackUserEngagement() {
+        // Track page views
+        this.userEngagement.pageViews++;
+        
+        // Track time spent
+        const startTime = Date.now();
+        setInterval(() => {
+            this.userEngagement.timeSpent = Date.now() - startTime;
+        }, 1000);
+
+        // Track interactions
+        ['click', 'scroll', 'keydown', 'touchstart'].forEach(event => {
+            document.addEventListener(event, () => {
+                this.userEngagement.interactions++;
+                this.userEngagement.lastInteraction = Date.now();
+            }, { passive: true });
+        });
+
+        // Track scroll depth
+        let maxScroll = 0;
+        window.addEventListener('scroll', () => {
+            const scrollPercent = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
+            maxScroll = Math.max(maxScroll, scrollPercent);
+            if (scrollPercent > 50) {
+                this.userEngagement.interactions++;
+            }
+        }, { passive: true });
+    }
+
+    meetsInstallCriteria() {
+        const { minTimeSpent, minInteractions, minPageViews } = this.installCriteria;
+        const { timeSpent, interactions, pageViews } = this.userEngagement;
+
+        const meetsCriteria = timeSpent >= minTimeSpent && 
+                            interactions >= minInteractions && 
+                            pageViews >= minPageViews;
+
+        console.log('Install criteria check:', {
+            timeSpent: Math.floor(timeSpent / 1000) + 's',
+            interactions,
+            pageViews,
+            meetsCriteria,
+            criteria: { minTimeSpent: minTimeSpent / 1000 + 's', minInteractions, minPageViews }
+        });
+
+        return meetsCriteria;
+    }
+
+    scheduleInstallPrompt() {
+        // Check criteria every 5 seconds
+        const checkInterval = setInterval(() => {
+            if (this.installPromptShown) {
+                clearInterval(checkInterval);
+                return;
+            }
+
+            if (this.meetsInstallCriteria()) {
+                clearInterval(checkInterval);
+                this.showInstallPrompt();
+            }
+        }, 5000);
+
+        // Fallback: show after 60 seconds regardless
+        setTimeout(() => {
+            if (!this.installPromptShown && this.deferredPrompt) {
+                clearInterval(checkInterval);
+                this.showInstallPrompt();
+            }
+        }, 60000);
+    }
+
+    checkInstallPrompt() {
+        // Force check after 10 seconds for new users
+        setTimeout(() => {
+            if (!this.installPromptShown && !this.deferredPrompt) {
+                console.log('No install prompt available, creating manual prompt');
+                this.createManualInstallPrompt();
+            }
+        }, 10000);
+    }
+
+    createManualInstallPrompt() {
+        // Create install banner for browsers that don't support beforeinstallprompt
+        const banner = this.createInstallBanner();
+        document.body.appendChild(banner);
+        
+        // Show after meeting criteria or 30 seconds
+        setTimeout(() => {
+            if (!this.installPromptShown) {
+                this.showInstallBanner();
+            }
+        }, 30000);
+    }
+
+    showInstallPrompt() {
+        if (this.installPromptShown || !this.deferredPrompt) return;
+
+        console.log('Showing PWA install prompt');
+        this.installPromptShown = true;
+
+        // Create install banner
+        const banner = this.createInstallBanner();
+        document.body.appendChild(banner);
+        
+        // Show banner with animation
+        setTimeout(() => banner.classList.add('show'), 100);
+    }
+
+    createInstallBanner() {
+        const banner = document.createElement('div');
+        banner.id = 'pwa-install-banner';
+        banner.className = 'pwa-install-banner';
+        banner.innerHTML = `
+            <div class="pwa-install-content">
+                <div class="pwa-install-icon">
+                    <img src="/static/images/web-app-manifest-192x192.png" alt="PwaniNet">
+                </div>
+                <div class="pwa-install-text">
+                    <h4>Install PwaniNet</h4>
+                    <p>Get the full campus experience - install our app for faster access and offline features!</p>
+                </div>
+                <div class="pwa-install-actions">
+                    <button class="pwa-install-btn" onclick="window.pwaInstallManager.installPWA()">
+                        <i class="bi bi-download"></i> Install
+                    </button>
+                    <button class="pwa-dismiss-btn" onclick="window.pwaInstallManager.dismissInstall()">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Add styles
+        const style = document.createElement('style');
+        style.textContent = `
+            .pwa-install-banner {
+                position: fixed;
+                bottom: -100px;
+                left: 0;
+                right: 0;
+                background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+                color: white;
+                padding: 16px;
+                box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+                z-index: 10000;
+                transition: bottom 0.3s ease;
+                backdrop-filter: blur(10px);
+            }
+
+            [data-theme="dark"] .pwa-install-banner {
+                background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+            }
+
+            .pwa-install-banner.show {
+                bottom: 0;
+            }
+
+            .pwa-install-content {
+                max-width: 1200px;
+                margin: 0 auto;
+                display: flex;
+                align-items: center;
+                gap: 16px;
+            }
+
+            .pwa-install-icon img {
+                width: 48px;
+                height: 48px;
+                border-radius: 12px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            }
+
+            .pwa-install-text {
+                flex: 1;
+            }
+
+            .pwa-install-text h4 {
+                margin: 0 0 4px 0;
+                font-size: 16px;
+                font-weight: 600;
+            }
+
+            .pwa-install-text p {
+                margin: 0;
+                font-size: 14px;
+                opacity: 0.9;
+                line-height: 1.4;
+            }
+
+            .pwa-install-actions {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+
+            .pwa-install-btn {
+                background: rgba(255, 255, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                color: white;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                transition: all 0.2s ease;
+            }
+
+            .pwa-install-btn:hover {
+                background: rgba(255, 255, 255, 0.3);
+                transform: translateY(-1px);
+            }
+
+            .pwa-dismiss-btn {
+                background: rgba(255, 255, 255, 0.1);
+                border: none;
+                color: white;
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                font-size: 16px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s ease;
+            }
+
+            .pwa-dismiss-btn:hover {
+                background: rgba(255, 255, 255, 0.2);
+            }
+
+            /* Mobile optimizations */
+            @media (max-width: 768px) {
+                .pwa-install-content {
+                    flex-direction: column;
+                    text-align: center;
+                    gap: 12px;
+                }
+
+                .pwa-install-text h4 {
+                    font-size: 18px;
+                }
+
+                .pwa-install-text p {
+                    font-size: 13px;
+                }
+
+                .pwa-install-actions {
+                    justify-content: center;
+                }
+
+                .pwa-install-btn {
+                    padding: 10px 20px;
+                    font-size: 15px;
+                }
+            }
+
+            @media (max-width: 480px) {
+                .pwa-install-banner {
+                    padding: 12px;
+                }
+
+                .pwa-install-icon img {
+                    width: 40px;
+                    height: 40px;
+                }
+
+                .pwa-install-text h4 {
+                    font-size: 16px;
+                }
+
+                .pwa-install-text p {
+                    font-size: 12px;
+                }
+            }
+        `;
+
+        document.head.appendChild(style);
+        return banner;
+    }
+
+    showInstallBanner() {
+        const banner = document.getElementById('pwa-install-banner');
+        if (banner && !banner.classList.contains('show')) {
+            banner.classList.add('show');
+            this.installPromptShown = true;
+        }
+    }
+
+    hideInstallPrompt() {
+        const banner = document.getElementById('pwa-install-banner');
+        if (banner) {
+            banner.classList.remove('show');
+            setTimeout(() => {
+                if (banner.parentNode) {
+                    banner.parentNode.removeChild(banner);
+                }
+            }, 300);
+        }
+    }
+
+    async installPWA() {
+        if (!this.deferredPrompt) {
+            // Fallback for manual install
+            this.showManualInstallInstructions();
+            return;
+        }
+
+        console.log('Installing PWA...');
+        
+        try {
+            // Show the install prompt
+            this.deferredPrompt.prompt();
+            
+            // Wait for user response
+            const { outcome } = await this.deferredPrompt.userChoice;
+            
+            if (outcome === 'accepted') {
+                console.log('User accepted PWA install');
+                this.hideInstallPrompt();
+            } else {
+                console.log('User dismissed PWA install');
+                this.showInstallReminder();
+            }
+            
+            // Clear the deferred prompt
+            this.deferredPrompt = null;
+            
+        } catch (error) {
+            console.error('PWA install failed:', error);
+            this.showManualInstallInstructions();
+        }
+    }
+
+    dismissInstall() {
+        console.log('Install prompt dismissed');
+        this.hideInstallPrompt();
+        
+        // Show reminder after 5 minutes
+        setTimeout(() => {
+            if (!this.isInstalled()) {
+                this.showInstallReminder();
+            }
+        }, 300000); // 5 minutes
+    }
+
+    showInstallReminder() {
+        const reminder = document.createElement('div');
+        reminder.className = 'pwa-install-reminder';
+        reminder.innerHTML = `
+            <div class="reminder-content">
+                <i class="bi bi-info-circle"></i>
+                <span>Install PwaniNet for the best experience!</span>
+                <button onclick="this.parentElement.parentElement.remove()">×</button>
+            </div>
+        `;
+
+        const style = document.createElement('style');
+        style.textContent = `
+            .pwa-install-reminder {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(37, 99, 235, 0.9);
+                color: white;
+                padding: 12px 16px;
+                border-radius: 8px;
+                font-size: 14px;
+                z-index: 9999;
+                animation: slideIn 0.3s ease;
+                backdrop-filter: blur(10px);
+            }
+
+            [data-theme="dark"] .pwa-install-reminder {
+                background: rgba(30, 64, 175, 0.9);
+            }
+
+            .reminder-content {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .reminder-content button {
+                background: none;
+                border: none;
+                color: white;
+                font-size: 16px;
+                cursor: pointer;
+                padding: 0;
+                margin-left: 8px;
+            }
+
+            @keyframes slideIn {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+
+            @media (max-width: 768px) {
+                .pwa-install-reminder {
+                    top: auto;
+                    bottom: 80px;
+                    right: 16px;
+                    left: 16px;
+                    font-size: 13px;
+                }
+            }
+        `;
+
+        document.head.appendChild(style);
+        document.body.appendChild(reminder);
+
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+            if (reminder.parentNode) {
+                reminder.parentNode.removeChild(reminder);
+            }
+        }, 10000);
+    }
+
+    showInstallSuccess() {
+        const success = document.createElement('div');
+        success.className = 'pwa-install-success';
+        success.innerHTML = `
+            <div class="success-content">
+                <i class="bi bi-check-circle"></i>
+                <span>PwaniNet installed successfully!</span>
+            </div>
+        `;
+
+        const style = document.createElement('style');
+        style.textContent = `
+            .pwa-install-success {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: white;
+                padding: 16px 20px;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                z-index: 10001;
+                animation: slideIn 0.3s ease;
+                box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+            }
+
+            .success-content {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            @keyframes slideIn {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+
+            @media (max-width: 768px) {
+                .pwa-install-success {
+                    top: auto;
+                    bottom: 80px;
+                    right: 16px;
+                    left: 16px;
+                }
+            }
+        `;
+
+        document.head.appendChild(style);
+        document.body.appendChild(success);
+
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (success.parentNode) {
+                success.parentNode.removeChild(success);
+            }
+        }, 5000);
+    }
+
+    showManualInstallInstructions() {
+        const instructions = document.createElement('div');
+        instructions.className = 'pwa-install-instructions';
+        instructions.innerHTML = `
+            <div class="instructions-content">
+                <h4><i class="bi bi-download"></i> How to Install PwaniNet</h4>
+                <div class="instructions-steps">
+                    ${this.getInstallSteps()}
+                </div>
+                <button onclick="this.parentElement.parentElement.remove()">Close</button>
+            </div>
+        `;
+
+        const style = document.createElement('style');
+        style.textContent = `
+            .pwa-install-instructions {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10002;
+                padding: 20px;
+            }
+
+            .instructions-content {
+                background: white;
+                border-radius: 12px;
+                padding: 24px;
+                max-width: 400px;
+                width: 100%;
+                text-align: center;
+            }
+
+            [data-theme="dark"] .instructions-content {
+                background: #1e293b;
+                color: #f8fafc;
+            }
+
+            .instructions-content h4 {
+                margin: 0 0 16px 0;
+                color: #2563eb;
+            }
+
+            [data-theme="dark"] .instructions-content h4 {
+                color: #3b82f6;
+            }
+
+            .instructions-steps {
+                text-align: left;
+                margin: 16px 0;
+            }
+
+            .instructions-steps ol {
+                margin: 0;
+                padding-left: 20px;
+            }
+
+            .instructions-steps li {
+                margin: 8px 0;
+                line-height: 1.4;
+            }
+
+            .instructions-content button {
+                background: #2563eb;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+            }
+
+            [data-theme="dark"] .instructions-content button {
+                background: #3b82f6;
+            }
+        `;
+
+        document.head.appendChild(style);
+        document.body.appendChild(instructions);
+    }
+
+    getInstallSteps() {
+        const userAgent = navigator.userAgent.toLowerCase();
+        
+        if (userAgent.includes('chrome') && !userAgent.includes('edg')) {
+            return `
+                <ol>
+                    <li>Click the menu icon (⋮) in the address bar</li>
+                    <li>Select "Install PwaniNet"</li>
+                    <li>Click "Install" in the dialog</li>
+                </ol>
+            `;
+        } else if (userAgent.includes('firefox')) {
+            return `
+                <ol>
+                    <li>Click the menu icon (≡) in the toolbar</li>
+                    <li>Select "Install this site as an app"</li>
+                    <li>Click "Install" in the dialog</li>
+                </ol>
+            `;
+        } else if (userAgent.includes('safari')) {
+            return `
+                <ol>
+                    <li>Tap the Share button (□ with arrow)</li>
+                    <li>Scroll down and tap "Add to Home Screen"</li>
+                    <li>Tap "Add" to install</li>
+                </ol>
+            `;
+        } else {
+            return `
+                <ol>
+                    <li>Look for "Install" or "Add to Home Screen" in your browser menu</li>
+                    <li>Follow the on-screen instructions</li>
+                    <li>Enjoy the PwaniNet app experience!</li>
+                </ol>
+            `;
+        }
+    }
+
+    // Public API
+    forceShowInstallPrompt() {
+        if (!this.isInstalled()) {
+            this.showInstallPrompt();
+        }
+    }
+
+    getInstallStatus() {
+        return {
+            isInstalled: this.isInstalled(),
+            deferredPromptAvailable: !!this.deferredPrompt,
+            promptShown: this.installPromptShown,
+            userEngagement: this.userEngagement,
+            meetsCriteria: this.meetsInstallCriteria()
+        };
+    }
+}
+
+// Global instance
+window.pwaInstallManager = new PWAInstallManager();

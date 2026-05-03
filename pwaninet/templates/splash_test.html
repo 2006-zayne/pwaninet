@@ -1,0 +1,409 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">PWA Splash Screen Test</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-info-circle"></i> About PWA Splash Screens</h5>
+                        <p class="mb-2">Splash screens appear when the PWA is launched from the home screen, providing a smooth loading experience.</p>
+                        <p class="mb-0"><strong>Note:</strong> Splash screens only appear in standalone PWA mode, not in regular browser mode.</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Splash Screen Status</h5>
+                            <div id="splash-status" class="alert alert-info">
+                                Checking splash screen status...
+                            </div>
+                            
+                            <h5 class="mt-4">PWA Mode Detection</h5>
+                            <div id="pwa-mode" class="alert alert-info">
+                                Checking PWA mode...
+                            </div>
+                            
+                            <h5 class="mt-4">Launch Information</h5>
+                            <div id="launch-info" class="alert alert-info">
+                                Checking launch information...
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5>Test Actions</h5>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-primary" onclick="checkSplashStatus()">
+                                    Check Splash Status
+                                </button>
+                                <button class="btn btn-success" onclick="showTestSplash()">
+                                    Show Test Splash
+                                </button>
+                                <button class="btn btn-warning" onclick="hideTestSplash()">
+                                    Hide Test Splash
+                                </button>
+                                <button class="btn btn-info" onclick="simulatePWALaunch()">
+                                    Simulate PWA Launch
+                                </button>
+                                <button class="btn btn-secondary" onclick="resetSplashState()">
+                                    Reset Splash State
+                                </button>
+                            </div>
+                            
+                            <h5 class="mt-4">Splash Screen Features</h5>
+                            <div class="list-group">
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">PWA Detection</h6>
+                                        <span id="pwa-detection" class="badge bg-secondary">Checking...</span>
+                                    </div>
+                                    <small class="text-muted">Detects if running in standalone PWA mode</small>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Splash Active</h6>
+                                        <span id="splash-active" class="badge bg-secondary">Checking...</span>
+                                    </div>
+                                    <small class="text-muted">Current splash screen visibility status</small>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Auto Hide</h6>
+                                        <span id="auto-hide" class="badge bg-secondary">Checking...</span>
+                                    </div>
+                                    <small class="text-muted">Automatic hide after page load</small>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Min Time</h6>
+                                        <span id="min-time" class="badge bg-secondary">Checking...</span>
+                                    </div>
+                                    <small class="text-muted">Minimum splash display time (2s)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>Test Results</h5>
+                            <div id="test-results" style="max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <div>Test results will appear here...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>Splash Screen Requirements</h5>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Requirement</th>
+                                            <th>Status</th>
+                                            <th>Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="requirements-table">
+                                        <tr><td colspan="3">Loading requirements...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>How to Test Splash Screen</h5>
+                            <div class="accordion" id="testInstructions">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#method1">
+                                            Method 1: Install PWA
+                                        </button>
+                                    </h2>
+                                    <div id="method1" class="accordion-collapse collapse show" data-bs-parent="#testInstructions">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Install PwaniNet as a PWA using the browser install prompt</li>
+                                                <li>Launch the app from your home screen</li>
+                                                <li>Splash screen should appear automatically</li>
+                                                <li>Screen should hide after page loads (minimum 2 seconds)</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#method2">
+                                            Method 2: Developer Tools
+                                        </button>
+                                    </h2>
+                                    <div id="method2" class="accordion-collapse collapse" data-bs-parent="#testInstructions">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Open Chrome DevTools (F12)</li>
+                                                <li>Click the three dots → "More tools" → "Application"</li>
+                                                <li>Go to "Manifest" section</li>
+                                                <li>Check "Add to home screen" box</li>
+                                                <li>Reload the page to simulate PWA launch</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#method3">
+                                            Method 3: URL Parameter
+                                        </button>
+                                    </h2>
+                                    <div id="method3" class="accordion-collapse collapse" data-bs-parent="#testInstructions">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Add "?standalone=true" to the URL</li>
+                                                <li>This simulates standalone mode for testing</li>
+                                                <li>Splash screen should appear in browser mode too</li>
+                                                <li>Use "Simulate PWA Launch" button for easier testing</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let testResults = [];
+
+function log(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const entry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+    testResults.push(entry);
+    
+    const resultsDiv = document.getElementById('test-results');
+    resultsDiv.innerHTML = testResults.join('\n');
+    resultsDiv.scrollTop = resultsDiv.scrollHeight;
+    
+    console.log(entry);
+}
+
+function updateStatus(elementId, message, type = 'info') {
+    const element = document.getElementById(elementId);
+    element.className = `alert alert-${type}`;
+    element.textContent = message;
+}
+
+function updateBadge(elementId, status, type = 'secondary') {
+    const element = document.getElementById(elementId);
+    element.className = `badge bg-${type}`;
+    element.textContent = status;
+}
+
+// Test functions
+function checkSplashStatus() {
+    log('Checking splash screen status...');
+    
+    if (window.splashScreenManager) {
+        const status = window.splashScreenManager.getSplashStatus();
+        
+        log(`PWA Mode: ${status.isPWA}`, status.isPWA ? 'success' : 'info');
+        log(`Splash Visible: ${status.isVisible}`, status.isVisible ? 'warning' : 'success');
+        log(`Elapsed Time: ${Math.floor(status.elapsed / 1000)}s`, 'info');
+        log(`Min Time Met: ${status.minTimeMet}`, status.minTimeMet ? 'success' : 'info');
+        
+        updateStatus('splash-status', 
+            `PWA: ${status.isPWA ? 'Yes' : 'No'}, Visible: ${status.isVisible ? 'Yes' : 'No'}`,
+            status.isPWA ? 'success' : 'info'
+        );
+        
+        updateBadge('pwa-detection', status.isPWA ? 'Detected' : 'Not Detected', 
+                   status.isPWA ? 'success' : 'warning');
+        updateBadge('splash-active', status.isVisible ? 'Active' : 'Hidden', 
+                   status.isVisible ? 'warning' : 'success');
+        updateBadge('auto-hide', 'Enabled', 'success');
+        updateBadge('min-time', '2s', 'primary');
+        
+        updateRequirementsTable(status);
+        
+    } else {
+        log('Splash Screen Manager not available', 'error');
+        updateStatus('splash-status', 'Splash Screen Manager not available', 'danger');
+    }
+}
+
+function getDisplayMode() {
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+        return 'Standalone (PWA)';
+    } else if (window.navigator.standalone) {
+        return 'Standalone (iOS)';
+    } else {
+        return 'Browser';
+    }
+}
+
+function updateRequirementsTable(status) {
+    const tbody = document.getElementById('requirements-table');
+    const requirements = [
+        { 
+            name: 'PWA Mode', 
+            status: status.isPWA ? '✅ Detected' : '⏳ Browser Mode',
+            details: status.isPWA ? 'Running in standalone PWA mode' : 'Running in browser mode'
+        },
+        { 
+            name: 'Splash Manager', 
+            status: '✅ Available',
+            details: 'Splash screen manager is loaded and ready'
+        },
+        { 
+            name: 'Auto Display', 
+            status: status.isPWA ? '✅ Enabled' : '⏳ PWA Required',
+            details: status.isPWA ? 'Auto-displays in PWA mode' : 'Only displays in PWA mode'
+        },
+        { 
+            name: 'Min Display Time', 
+            status: '✅ 2 seconds',
+            details: 'Minimum splash screen display time to prevent flicker'
+        },
+        { 
+            name: 'Auto Hide', 
+            status: '✅ Enabled',
+            details: 'Automatically hides when page is ready and min time met'
+        },
+        { 
+            name: 'Current Status', 
+            status: status.isVisible ? '👁️ Visible' : '✅ Hidden',
+            details: status.isVisible ? 'Splash screen is currently visible' : 'Splash screen is hidden'
+        }
+    ];
+    
+    tbody.innerHTML = requirements.map(req => `
+        <tr>
+            <td><strong>${req.name}</strong></td>
+            <td>${req.status}</td>
+            <td><small>${req.details}</small></td>
+        </tr>
+    `).join('');
+    
+    updateStatus('pwa-mode', `Display Mode: ${getDisplayMode()}`, 
+                  status.isPWA ? 'success' : 'info');
+    
+    updateStatus('launch-info', 
+        `Elapsed: ${Math.floor(status.elapsed / 1000)}s, Min Time Met: ${status.minTimeMet ? 'Yes' : 'No'}`, 
+        'info');
+}
+
+function showTestSplash() {
+    log('Showing test splash screen...');
+    
+    if (window.splashScreenManager) {
+        // Force show splash for testing (even in browser mode)
+        const originalIsPWA = window.splashScreenManager.isPWA;
+        window.splashScreenManager.isPWA = () => true;
+        
+        // Recreate splash screen
+        window.splashScreenManager.createSplashScreen();
+        
+        // Restore original PWA detection after 5 seconds
+        setTimeout(() => {
+            window.splashScreenManager.isPWA = originalIsPWA;
+        }, 5000);
+        
+        log('Test splash screen shown (will auto-hide in 5 seconds)', 'success');
+        updateStatus('splash-status', 'Test splash screen displayed', 'success');
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            window.splashScreenManager.forceHideSplash();
+            log('Test splash screen hidden', 'info');
+        }, 5000);
+        
+    } else {
+        log('Splash Screen Manager not available', 'error');
+    }
+}
+
+function hideTestSplash() {
+    log('Hiding test splash screen...');
+    
+    if (window.splashScreenManager) {
+        window.splashScreenManager.forceHideSplash();
+        log('Test splash screen hidden', 'success');
+        updateStatus('splash-status', 'Test splash screen hidden', 'success');
+    } else {
+        log('Splash Screen Manager not available', 'error');
+    }
+}
+
+function simulatePWALaunch() {
+    log('Simulating PWA launch...');
+    
+    // Show test splash
+    showTestSplash();
+    
+    // Simulate page loading
+    setTimeout(() => {
+        log('PWA launch simulation complete', 'success');
+    }, 3000);
+}
+
+function resetSplashState() {
+    log('Resetting splash screen state...');
+    
+    if (window.splashScreenManager) {
+        // Hide any existing splash
+        window.splashScreenManager.forceHideSplash();
+        
+        // Reset timing
+        window.splashScreenManager.startTime = Date.now();
+        
+        log('Splash screen state reset', 'success');
+        updateStatus('splash-status', 'Splash screen state reset', 'info');
+        checkSplashStatus();
+    } else {
+        log('Splash Screen Manager not available', 'error');
+    }
+}
+
+// Listen for splash hidden events
+window.addEventListener('splashHidden', () => {
+    log('Splash screen hidden event received', 'info');
+    checkSplashStatus();
+});
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    log('Splash Screen Test Page Loaded');
+    
+    // Initial status check
+    setTimeout(() => {
+        checkSplashStatus();
+    }, 1000);
+    
+    // Update status periodically
+    setInterval(() => {
+        if (window.splashScreenManager) {
+            const status = window.splashScreenManager.getSplashStatus();
+            if (status.isVisible) {
+                const elapsed = Math.floor(status.elapsed / 1000);
+                // Could update a timer display here if needed
+            }
+        }
+    }, 1000);
+    
+    log('Splash Screen Test Page initialized');
+});
+</script>
+
+{% endblock %}

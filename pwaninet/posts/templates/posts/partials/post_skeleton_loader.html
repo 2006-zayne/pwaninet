@@ -1,0 +1,285 @@
+{% load static %}
+
+<!-- Post Skeleton Loader -->
+<div class="post-skeleton-card shadow-sm mb-2 bg-white rounded-3 overflow-hidden border-0">
+    <!-- Top Row: Avatar, Username, Timestamp -->
+    <div class="d-flex align-items-center p-3 border-bottom">
+        <div class="post-skeleton-avatar">
+            <div class="skeleton-shimmer"></div>
+        </div>
+        <div class="flex-grow-1 ms-3">
+            <div class="post-skeleton-username">
+                <div class="skeleton-shimmer"></div>
+            </div>
+            <div class="post-skeleton-timestamp">
+                <div class="skeleton-shimmer"></div>
+            </div>
+        </div>
+        <div class="post-skeleton-menu">
+            <div class="skeleton-shimmer"></div>
+        </div>
+    </div>
+
+    <!-- Body: Text Content -->
+    <div class="px-3 pb-3">
+        <div class="post-skeleton-text">
+            <div class="skeleton-shimmer"></div>
+        </div>
+        <div class="post-skeleton-text">
+            <div class="skeleton-shimmer"></div>
+        </div>
+        <div class="post-skeleton-text short">
+            <div class="skeleton-shimmer"></div>
+        </div>
+    </div>
+
+    <!-- Media: Image/Video Placeholder -->
+    <div class="post-skeleton-media">
+        <div class="skeleton-shimmer"></div>
+    </div>
+
+    <!-- Bottom: Like, Comment, Share -->
+    <div class="d-flex align-items-center justify-content-between px-3 py-2 border-top">
+        <div class="d-flex align-items-center gap-4">
+            <div class="post-skeleton-action">
+                <div class="skeleton-shimmer"></div>
+            </div>
+            <div class="post-skeleton-action">
+                <div class="skeleton-shimmer"></div>
+            </div>
+            <div class="post-skeleton-action">
+                <div class="skeleton-shimmer"></div>
+            </div>
+            <div class="post-skeleton-action">
+                <div class="skeleton-shimmer"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Comment Input -->
+    <div class="px-3 pb-3 pt-1 border-top bg-white">
+        <div class="d-flex align-items-center gap-2">
+            <div class="post-skeleton-comment-avatar">
+                <div class="skeleton-shimmer"></div>
+            </div>
+            <div class="flex-grow-1">
+                <div class="post-skeleton-comment-input">
+                    <div class="skeleton-shimmer"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Post Skeleton Loader Styles */
+.post-skeleton-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Top Row Skeleton Elements */
+.post-skeleton-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.post-skeleton-username {
+    width: 120px;
+    height: 16px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    position: relative;
+    overflow: hidden;
+}
+
+.post-skeleton-timestamp {
+    width: 80px;
+    height: 12px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+}
+
+.post-skeleton-menu {
+    width: 32px;
+    height: 32px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+/* Text Content Skeleton */
+.post-skeleton-text {
+    width: 100%;
+    height: 16px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+.post-skeleton-text.short {
+    width: 60%;
+}
+
+/* Media Skeleton */
+.post-skeleton-media {
+    width: 100%;
+    height: 300px;
+    background: #f1f5f9;
+    position: relative;
+    overflow: hidden;
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+/* Action Buttons Skeleton */
+.post-skeleton-action {
+    width: 60px;
+    height: 20px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Comment Input Skeleton */
+.post-skeleton-comment-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.post-skeleton-comment-input {
+    width: 100%;
+    height: 42px;
+    background: #e9ecef;
+    border-radius: 21px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Shimmer Animation */
+.skeleton-shimmer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        #f1f5f9 0%,
+        #e2e8f0 20%,
+        #f1f5f9 40%,
+        #e2e8f0 60%,
+        #f1f5f9 80%,
+        #e2e8f0 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* Dark theme support */
+[data-theme="dark"] .post-skeleton-card {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .post-skeleton-avatar,
+[data-theme="dark"] .post-skeleton-menu,
+[data-theme="dark"] .post-skeleton-comment-avatar {
+    background: #374151;
+}
+
+[data-theme="dark"] .post-skeleton-username,
+[data-theme="dark"] .post-skeleton-timestamp,
+[data-theme="dark"] .post-skeleton-text,
+[data-theme="dark"] .post-skeleton-action {
+    background: #374151;
+}
+
+[data-theme="dark"] .post-skeleton-media {
+    background: #374151;
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .post-skeleton-comment-input {
+    background: #374151;
+}
+
+[data-theme="dark"] .skeleton-shimmer {
+    background: linear-gradient(
+        90deg,
+        #374151 0%,
+        #4b5563 20%,
+        #374151 40%,
+        #4b5563 60%,
+        #374151 80%,
+        #4b5563 100%
+    );
+}
+
+/* Mobile responsiveness */
+@media (max-width: 767px) {
+    .post-skeleton-media {
+        height: 250px;
+    }
+    
+    .post-skeleton-username {
+        width: 100px;
+    }
+    
+    .post-skeleton-timestamp {
+        width: 60px;
+    }
+    
+    .post-skeleton-action {
+        width: 50px;
+        height: 18px;
+    }
+}
+
+/* Fade-in animation for skeleton cards */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.post-skeleton-card {
+    animation: fadeIn 0.3s ease forwards;
+}
+
+/* Multiple skeleton cards with staggered animation */
+.post-skeleton-card:nth-child(1) { animation-delay: 0.1s; }
+.post-skeleton-card:nth-child(2) { animation-delay: 0.2s; }
+.post-skeleton-card:nth-child(3) { animation-delay: 0.3s; }
+</style>

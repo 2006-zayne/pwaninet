@@ -1,0 +1,413 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Always-On Splash Screen Test</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-info-circle"></i> Always-On Splash Screen</h5>
+                        <p class="mb-2">The splash screen should ALWAYS appear when launching PwaniNet PWA, regardless of recent activity or login state.</p>
+                        <p class="mb-0"><strong>Expected Behavior:</strong> Every PWA launch → Splash Screen → Main App (or Offline Page)</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Current Status</h5>
+                            <div id="status-display" class="alert alert-info">
+                                Loading status...
+                            </div>
+                            
+                            <h5 class="mt-4">Launch Detection</h5>
+                            <div id="launch-status" class="alert alert-info">
+                                Checking launch context...
+                            </div>
+                            
+                            <h5 class="mt-4">Login Detection</h5>
+                            <div id="login-status" class="alert alert-info">
+                                Checking login context...
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5>Test Actions</h5>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-primary" onclick="checkCurrentStatus()">
+                                    Check Current Status
+                                </button>
+                                <button class="btn btn-success" onclick="simulateLogin()">
+                                    Simulate Login Flow
+                                </button>
+                                <button class="btn btn-warning" onclick="simulateDirectLaunch()">
+                                    Simulate Direct Launch
+                                </button>
+                                <button class="btn btn-info" onclick="forceAlwaysSplash()">
+                                    Force Always-On Splash
+                                </button>
+                                <button class="btn btn-secondary" onclick="testLoginRedirect()">
+                                    Test Login Redirect
+                                </button>
+                            </div>
+                            
+                            <h5 class="mt-4">Test Scenarios</h5>
+                            <div class="list-group">
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Fresh Launch</h6>
+                                        <span class="badge bg-primary">Always</span>
+                                    </div>
+                                    <small class="text-muted">First time or after clearing app</small>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Recent Activity</h6>
+                                        <span class="badge bg-primary">Always</span>
+                                    </div>
+                                    <small class="text-muted">Recently used app, reopened</small>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">After Login</h6>
+                                        <span class="badge bg-primary">Always</span>
+                                    </div>
+                                    <small class="text-muted">Just logged in, redirected to home</small>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Offline Launch</h6>
+                                        <span class="badge bg-primary">Always</span>
+                                    </div>
+                                    <small class="text-muted">No internet connection</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>Debug Log</h5>
+                            <div id="debug-log" style="max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <div>Debug log will appear here...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>Always-On Splash Logic</h5>
+                            <div class="logic-flow">
+                                <div class="logic-step">
+                                    <div class="step-number">1</div>
+                                    <div class="step-content">
+                                        <h6>PWA Launch Detection</h6>
+                                        <p>Every time PwaniNet PWA is launched from home screen</p>
+                                    </div>
+                                </div>
+                                <div class="logic-step">
+                                    <div class="step-number">2</div>
+                                    <div class="step-content">
+                                        <h6>Splash Screen Display</h6>
+                                        <p>ALWAYS show splash screen, no exceptions</p>
+                                    </div>
+                                </div>
+                                <div class="logic-step">
+                                    <div class="step-number">3</div>
+                                    <div class="step-content">
+                                        <h6>Context Detection</h6>
+                                        <p>Check if coming from login, direct launch, etc.</p>
+                                    </div>
+                                </div>
+                                <div class="logic-step">
+                                    <div class="step-number">4</div>
+                                    <div class="step-content">
+                                        <h6>Network Check</h6>
+                                        <p>Test connectivity during splash</p>
+                                    </div>
+                                </div>
+                                <div class="logic-step">
+                                    <div class="step-number">5</div>
+                                    <div class="step-content">
+                                        <h6>Route Resolution</h6>
+                                        <p>Home screen (online) or Offline page (no internet)</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>Real Testing Instructions</h5>
+                            <div class="accordion" id="testInstructions">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#scenario1">
+                                            Scenario 1: Fresh PWA Install
+                                        </button>
+                                    </h2>
+                                    <div id="scenario1" class="accordion-collapse collapse show" data-bs-parent="#testInstructions">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Install PwaniNet as PWA (or reinstall)</li>
+                                                <li>Launch from home screen</li>
+                                                <li>Expected: Splash screen appears → Home page</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#scenario2">
+                                            Scenario 2: Recent Activity
+                                        </button>
+                                    </h2>
+                                    <div id="scenario2" class="accordion-collapse collapse" data-bs-parent="#testInstructions">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Use PwaniNet normally, then close it</li>
+                                                <li>Immediately reopen from home screen</li>
+                                                <li>Expected: Splash screen appears → Home page</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#scenario3">
+                                            Scenario 3: After Login
+                                        </button>
+                                    </h2>
+                                    <div id="scenario3" class="accordion-collapse collapse" data-bs-parent="#testInstructions">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Logout of PwaniNet</li>
+                                                <li>Launch PWA and login</li>
+                                                <li>Expected: Splash screen appears → Login → After login: Splash screen → Home</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#scenario4">
+                                            Scenario 4: Offline Launch
+                                        </button>
+                                    </h2>
+                                    <div id="scenario4" class="accordion-collapse collapse" data-bs-parent="#testInstructions">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Disconnect from internet</li>
+                                                <li>Launch PWA from home screen</li>
+                                                <li>Expected: Splash screen appears → "No Internet" splash → Offline page</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.logic-flow {
+    position: relative;
+    padding-left: 40px;
+}
+
+.logic-step {
+    position: relative;
+    margin-bottom: 25px;
+    display: flex;
+    align-items: flex-start;
+}
+
+.step-number {
+    position: absolute;
+    left: -40px;
+    top: 0;
+    width: 30px;
+    height: 30px;
+    background: #2563eb;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    flex-shrink: 0;
+}
+
+.step-content {
+    margin-left: 0;
+    flex: 1;
+}
+
+.step-content h6 {
+    margin: 0 0 4px 0;
+    color: #2563eb;
+    font-weight: 600;
+}
+
+.step-content p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 14px;
+}
+</style>
+
+<script>
+let debugLog = [];
+
+function log(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const entry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+    debugLog.push(entry);
+    
+    const logDiv = document.getElementById('debug-log');
+    logDiv.innerHTML = debugLog.join('\n');
+    logDiv.scrollTop = logDiv.scrollHeight;
+    
+    console.log(entry);
+}
+
+function updateStatus(elementId, message, type = 'info') {
+    const element = document.getElementById(elementId);
+    element.className = `alert alert-${type}`;
+    element.textContent = message;
+}
+
+function checkCurrentStatus() {
+    log('Checking current always-on splash status...');
+    
+    if (window.splashScreenManager) {
+        const status = window.splashScreenManager.getSplashStatus();
+        
+        log(`PWA Mode: ${status.isPWA}`, status.isPWA ? 'success' : 'info');
+        log(`Splash Visible: ${status.isVisible}`, status.isVisible ? 'warning' : 'success');
+        log(`From Login: ${status.fromLogin}`, status.fromLogin ? 'info' : 'info');
+        log(`Current Path: ${status.currentPath}`, 'info');
+        
+        updateStatus('status-display', 
+            `PWA: ${status.isPWA ? 'Yes' : 'No'}, Splash: ${status.isVisible ? 'Visible' : 'Hidden'}, Always-On: ${status.isPWA ? 'Enabled' : 'N/A'}`,
+            status.isPWA ? 'success' : 'info'
+        );
+        
+        updateStatus('launch-status', 
+            `Mode: ${status.displayMode}, Path: ${status.currentPath}, Referrer: ${status.referrer || 'none'}`,
+            'info'
+        );
+        
+        updateStatus('login-status', 
+            `From Login: ${status.fromLogin ? 'Yes' : 'No'}, Always Show: ${status.isPWA ? 'Yes' : 'No'}`,
+            status.fromLogin ? 'info' : 'info'
+        );
+        
+    } else {
+        log('Splash Screen Manager not available', 'error');
+        updateStatus('status-display', 'Splash Screen Manager not available', 'danger');
+    }
+}
+
+function simulateLogin() {
+    log('Simulating login flow...');
+    
+    // Set login indicators
+    sessionStorage.setItem('justLoggedIn', 'true');
+    
+    // Simulate coming from login
+    Object.defineProperty(document, 'referrer', {
+        value: '/accounts/login/',
+        writable: true
+    });
+    
+    // Force splash to test
+    if (window.splashScreenManager) {
+        window.splashScreenManager.forceShowSplash();
+        log('Login flow simulation - splash should show', 'success');
+        updateStatus('login-status', 'Login flow simulated', 'success');
+    }
+    
+    // Clear after 5 seconds
+    setTimeout(() => {
+        sessionStorage.removeItem('justLoggedIn');
+        log('Login simulation cleared', 'info');
+    }, 5000);
+}
+
+function simulateDirectLaunch() {
+    log('Simulating direct PWA launch...');
+    
+    // Clear any login indicators
+    sessionStorage.removeItem('justLoggedIn');
+    
+    // Force splash to test
+    if (window.splashScreenManager) {
+        window.splashScreenManager.forceShowSplash();
+        log('Direct launch simulation - splash should show', 'success');
+        updateStatus('launch-status', 'Direct launch simulated', 'success');
+    }
+}
+
+function forceAlwaysSplash() {
+    log('Testing always-on splash behavior...');
+    
+    if (window.splashScreenManager) {
+        // Override PWA detection to always return true for testing
+        const originalIsPWA = window.splashScreenManager.isPWA;
+        window.splashScreenManager.isPWA = () => true;
+        
+        // Recreate splash
+        window.splashScreenManager.createSplashScreen();
+        
+        log('Always-on splash forced - should appear regardless of context', 'success');
+        updateStatus('status-display', 'Always-on splash forced', 'success');
+        
+        // Restore after 3 seconds
+        setTimeout(() => {
+            window.splashScreenManager.isPWA = originalIsPWA;
+            log('Always-on test ended', 'info');
+        }, 3000);
+    }
+}
+
+function testLoginRedirect() {
+    log('Testing login redirect flow...');
+    
+    // Simulate login redirect scenario
+    window.location.search = '?from_login=true';
+    
+    // Force splash
+    if (window.splashScreenManager) {
+        window.splashScreenManager.forceShowSplash();
+        log('Login redirect test - splash should detect from_login parameter', 'success');
+    }
+}
+
+// Auto-check status on load
+document.addEventListener('DOMContentLoaded', function() {
+    log('Always-on splash test page loaded');
+    
+    setTimeout(() => {
+        checkCurrentStatus();
+    }, 1000);
+    
+    log('Test page initialized');
+});
+</script>
+
+{% endblock %}

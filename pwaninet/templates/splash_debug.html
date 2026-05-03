@@ -1,0 +1,328 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Desktop PWA Splash Screen Debug</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h5><i class="bi bi-exclamation-triangle"></i> Desktop PWA Splash Screen Issue</h5>
+                        <p class="mb-2">The splash screen should appear in desktop PWA mode. Let's debug why it's not showing.</p>
+                        <p class="mb-0"><strong>Instructions:</strong> Install PwaniNet as a desktop PWA, then launch it from your desktop/applications.</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Current Status</h5>
+                            <div id="status-display" class="alert alert-info">
+                                Loading status...
+                            </div>
+                            
+                            <h5 class="mt-4">Debug Information</h5>
+                            <div id="debug-info" class="alert alert-info">
+                                Collecting debug info...
+                            </div>
+                            
+                            <h5 class="mt-4">PWA Detection</h5>
+                            <div id="pwa-detection" class="alert alert-info">
+                                Testing PWA detection...
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5>Debug Actions</h5>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-primary" onclick="checkCurrentStatus()">
+                                    Check Current Status
+                                </button>
+                                <button class="btn btn-success" onclick="forceShowSplash()">
+                                    Force Show Splash
+                                </button>
+                                <button class="btn btn-warning" onclick="simulateDesktopPWA()">
+                                    Simulate Desktop PWA
+                                </button>
+                                <button class="btn btn-info" onclick="testPWADetection()">
+                                    Test PWA Detection
+                                </button>
+                                <button class="btn btn-secondary" onclick="hideSplash()">
+                                    Hide Splash
+                                </button>
+                            </div>
+                            
+                            <h5 class="mt-4">Console Commands</h5>
+                            <div class="list-group">
+                                <div class="list-group-item">
+                                    <code>window.debugSplashScreen()</code>
+                                    <small class="text-muted d-block">Show splash screen debug info</small>
+                                </div>
+                                <div class="list-group-item">
+                                    <code>window.splashScreenManager.forceShowSplash()</code>
+                                    <small class="text-muted d-block">Force show splash screen</small>
+                                </div>
+                                <div class="list-group-item">
+                                    <code>window.splashScreenManager.getSplashStatus()</code>
+                                    <small class="text-muted d-block">Get detailed status</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>Debug Log</h5>
+                            <div id="debug-log" style="max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <div>Debug log will appear here...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>Troubleshooting Steps</h5>
+                            <div class="accordion" id="troubleshooting">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#step1">
+                                            Step 1: Check Console Logs
+                                        </button>
+                                    </h2>
+                                    <div id="step1" class="accordion-collapse collapse show" data-bs-parent="#troubleshooting">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Open Developer Tools (F12)</li>
+                                                <li>Go to Console tab</li>
+                                                <li>Look for "Splash Screen Init:" messages</li>
+                                                <li>Check if PWA was detected</li>
+                                                <li>Run <code>window.debugSplashScreen()</code> in console</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#step2">
+                                            Step 2: Verify PWA Installation
+                                        </button>
+                                    </h2>
+                                    <div id="step2" class="accordion-collapse collapse" data-bs-parent="#troubleshooting">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Check if PwaniNet is installed as desktop app</li>
+                                                <li>Launch from desktop/applications (not browser)</li>
+                                                <li>Check address bar - should be minimal/hidden</li>
+                                                <li>Verify standalone window appearance</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#step3">
+                                            Step 3: Test Force Show
+                                        </button>
+                                    </h2>
+                                    <div id="step3" class="accordion-collapse collapse" data-bs-parent="#troubleshooting">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Click "Force Show Splash" button above</li>
+                                                <li>Splash should appear regardless of PWA mode</li>
+                                                <li>If it appears, the splash system works</li>
+                                                <li>Issue is likely with PWA detection</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#step4">
+                                            Step 4: Check Display Mode
+                                        </button>
+                                    </h2>
+                                    <div id="step4" class="accordion-collapse collapse" data-bs-parent="#troubleshooting">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>In console, run: <code>window.matchMedia('(display-mode: standalone)').matches</code>
+                                                <li>Should return <code>true</code> in PWA mode</li>
+                                                <li>Also check: <code>window.matchMedia('(display-mode: browser)').matches</code>
+                                                <li>Should return <code>false</code> in PWA mode</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let debugLog = [];
+
+function log(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const entry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+    debugLog.push(entry);
+    
+    const logDiv = document.getElementById('debug-log');
+    logDiv.innerHTML = debugLog.join('\n');
+    logDiv.scrollTop = logDiv.scrollHeight;
+    
+    console.log(entry);
+}
+
+function updateStatus(elementId, message, type = 'info') {
+    const element = document.getElementById(elementId);
+    element.className = `alert alert-${type}`;
+    element.textContent = message;
+}
+
+function checkCurrentStatus() {
+    log('Checking current splash screen status...');
+    
+    if (window.splashScreenManager) {
+        const status = window.splashScreenManager.getSplashStatus();
+        
+        log(`PWA Mode: ${status.isPWA}`, status.isPWA ? 'success' : 'warning');
+        log(`Display Mode: ${status.displayMode}`, 'info');
+        log(`Splash Visible: ${status.isVisible}`, status.isVisible ? 'warning' : 'success');
+        log(`Elapsed: ${Math.floor(status.elapsed / 1000)}s`, 'info');
+        
+        updateStatus('status-display', 
+            `PWA: ${status.isPWA ? 'Yes' : 'No'}, Visible: ${status.isVisible ? 'Yes' : 'No'}, Mode: ${status.displayMode}`,
+            status.isPWA ? 'success' : 'warning'
+        );
+        
+        // Show detailed debug info
+        const debugInfo = `
+User Agent: ${status.userAgent}
+Standalone: ${status.standalone}
+Display Mode Match: ${status.displayModeMatch}
+Min Time Met: ${status.minTimeMet}
+        `.trim();
+        
+        updateStatus('debug-info', debugInfo, 'info');
+        
+    } else {
+        log('Splash Screen Manager not available', 'error');
+        updateStatus('status-display', 'Splash Screen Manager not available', 'danger');
+    }
+}
+
+function forceShowSplash() {
+    log('Force showing splash screen...');
+    
+    if (window.splashScreenManager) {
+        window.splashScreenManager.forceShowSplash();
+        log('Splash screen forced to show', 'success');
+        updateStatus('status-display', 'Splash screen forced to show', 'success');
+    } else {
+        log('Splash Screen Manager not available', 'error');
+    }
+}
+
+function simulateDesktopPWA() {
+    log('Simulating desktop PWA mode...');
+    
+    // Temporarily override PWA detection
+    if (window.splashScreenManager) {
+        const originalIsPWA = window.splashScreenManager.isPWA;
+        window.splashScreenManager.isPWA = () => true;
+        
+        // Recreate splash
+        window.splashScreenManager.createSplashScreen();
+        
+        log('Desktop PWA simulation active', 'success');
+        updateStatus('status-display', 'Desktop PWA simulation - splash should be visible', 'success');
+        
+        // Restore after 5 seconds
+        setTimeout(() => {
+            window.splashScreenManager.isPWA = originalIsPWA;
+            log('Simulation ended', 'info');
+        }, 5000);
+        
+    } else {
+        log('Splash Screen Manager not available', 'error');
+    }
+}
+
+function testPWADetection() {
+    log('Testing PWA detection methods...');
+    
+    const tests = [
+        {
+            name: 'display-mode: standalone',
+            result: window.matchMedia('(display-mode: standalone)').matches
+        },
+        {
+            name: 'display-mode: minimal-ui',
+            result: window.matchMedia('(display-mode: minimal-ui)').matches
+        },
+        {
+            name: 'display-mode: fullscreen',
+            result: window.matchMedia('(display-mode: fullscreen)').matches
+        },
+        {
+            name: 'display-mode: browser',
+            result: window.matchMedia('(display-mode: browser)').matches
+        },
+        {
+            name: 'navigator.standalone',
+            result: window.navigator.standalone
+        },
+        {
+            name: 'referrer android-app',
+            result: document.referrer.includes('android-app://')
+        }
+    ];
+    
+    let results = 'PWA Detection Results:\n';
+    tests.forEach(test => {
+        results += `${test.name}: ${test.result}\n`;
+        log(`${test.name}: ${test.result}`, test.result ? 'success' : 'info');
+    });
+    
+    updateStatus('pwa-detection', results.trim(), 'info');
+}
+
+function hideSplash() {
+    log('Hiding splash screen...');
+    
+    if (window.splashScreenManager) {
+        window.splashScreenManager.forceHideSplash();
+        log('Splash screen hidden', 'success');
+    } else {
+        log('Splash Screen Manager not available', 'error');
+    }
+}
+
+// Auto-check status on load
+document.addEventListener('DOMContentLoaded', function() {
+    log('Splash debug page loaded');
+    
+    setTimeout(() => {
+        checkCurrentStatus();
+        testPWADetection();
+    }, 1000);
+    
+    // Listen for splash events
+    window.addEventListener('splashHidden', () => {
+        log('Splash screen hidden event received', 'info');
+        checkCurrentStatus();
+    });
+    
+    log('Debug page initialized');
+});
+</script>
+
+{% endblock %}

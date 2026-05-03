@@ -1,0 +1,436 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Native PWA Install Test</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-info-circle"></i> About Native PWA Install Prompts</h5>
+                        <p class="mb-2">This test checks for the native browser install prompt (Chrome omnibox prompt with download arrow) like YouTube uses.</p>
+                        <p class="mb-0"><strong>Note:</strong> Native prompts only appear in browsers that support PWA installation and when criteria are met.</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Install Status</h5>
+                            <div id="install-status" class="alert alert-info">
+                                Checking native PWA install status...
+                            </div>
+                            
+                            <h5 class="mt-4">Browser Compatibility</h5>
+                            <div id="browser-status" class="alert alert-info">
+                                Checking browser PWA support...
+                            </div>
+                            
+                            <h5 class="mt-4">Install Criteria</h5>
+                            <div id="criteria-status" class="alert alert-info">
+                                Checking install criteria...
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5>Test Actions</h5>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-primary" onclick="checkNativeInstallStatus()">
+                                    Check Native Install Status
+                                </button>
+                                <button class="btn btn-success" onclick="simulateEngagement()">
+                                    Simulate User Engagement
+                                </button>
+                                <button class="btn btn-warning" onclick="forceNativePrompt()">
+                                    Force Native Prompt (if available)
+                                </button>
+                                <button class="btn btn-info" onclick="showInstallInstructions()">
+                                    Show Install Instructions
+                                </button>
+                                <button class="btn btn-secondary" onclick="resetInstallState()">
+                                    Reset Install State
+                                </button>
+                            </div>
+                            
+                            <h5 class="mt-4">PWA Information</h5>
+                            <div class="list-group">
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">PWA Support</h6>
+                                        <span id="pwa-support" class="badge bg-secondary">Checking...</span>
+                                    </div>
+                                    <small class="text-muted">Browser PWA installation support</small>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Native Prompt</h6>
+                                        <span id="native-prompt" class="badge bg-secondary">Checking...</span>
+                                    </div>
+                                    <small class="text-muted">Native install prompt availability</small>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Display Mode</h6>
+                                        <span id="display-mode" class="badge bg-secondary">Checking...</span>
+                                    </div>
+                                    <small class="text-muted">Current app display mode</small>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Manifest Valid</h6>
+                                        <span id="manifest-valid" class="badge bg-secondary">Checking...</span>
+                                    </div>
+                                    <small class="text-muted">PWA manifest validation</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>Test Results</h5>
+                            <div id="test-results" style="max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <div>Test results will appear here...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>Native Install Prompt Requirements</h5>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Requirement</th>
+                                            <th>Status</th>
+                                            <th>Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="requirements-table">
+                                        <tr><td colspan="3">Loading requirements...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>Browser-Specific Instructions</h5>
+                            <div class="accordion" id="browserInstructions">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#chrome">
+                                            <i class="bi bi-browser-chrome me-2"></i> Chrome/Edge
+                                        </button>
+                                    </h2>
+                                    <div id="chrome" class="accordion-collapse collapse show" data-bs-parent="#browserInstructions">
+                                        <div class="accordion-body">
+                                            <p><strong>Native Install Prompt:</strong> Look for the install icon (⬇) in the address bar (omnibox).</p>
+                                            <ul>
+                                                <li>Appears automatically when PWA criteria are met</li>
+                                                <li>Click the download arrow to install</li>
+                                                <li>Confirm installation in the dialog</li>
+                                            </ul>
+                                            <p><strong>Manual Install:</strong> Menu (⋮) → "Install PwaniNet"</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#firefox">
+                                            <i class="bi bi-browser-firefox me-2"></i> Firefox
+                                        </button>
+                                    </h2>
+                                    <div id="firefox" class="accordion-collapse collapse" data-bs-parent="#browserInstructions">
+                                        <div class="accordion-body">
+                                            <p><strong>Install Process:</strong> Firefox uses a different install flow.</p>
+                                            <ul>
+                                                <li>Click the menu icon (≡) in the toolbar</li>
+                                                <li>Select "Install this site as an app"</li>
+                                                <li>Confirm installation in the dialog</li>
+                                            </ul>
+                                            <p><strong>Note:</strong> Firefox doesn't show the omnibox install prompt like Chrome.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#safari">
+                                            <i class="bi bi-browser-safari me-2"></i> Safari
+                                        </button>
+                                    </h2>
+                                    <div id="safari" class="accordion-collapse collapse" data-bs-parent="#browserInstructions">
+                                        <div class="accordion-body">
+                                            <p><strong>Install Process:</strong> Safari iOS uses Share menu for installation.</p>
+                                            <ul>
+                                                <li>Tap the Share button (□ with arrow)</li>
+                                                <li>Scroll down and tap "Add to Home Screen"</li>
+                                                <li>Tap "Add" to install</li>
+                                            </ul>
+                                            <p><strong>Note:</strong> Safari doesn't support native install prompts like Chrome.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let testResults = [];
+
+function log(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const entry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+    testResults.push(entry);
+    
+    const resultsDiv = document.getElementById('test-results');
+    resultsDiv.innerHTML = testResults.join('\n');
+    resultsDiv.scrollTop = resultsDiv.scrollHeight;
+    
+    console.log(entry);
+}
+
+function updateStatus(elementId, message, type = 'info') {
+    const element = document.getElementById(elementId);
+    element.className = `alert alert-${type}`;
+    element.textContent = message;
+}
+
+function updateBadge(elementId, status, type = 'secondary') {
+    const element = document.getElementById(elementId);
+    element.className = `badge bg-${type}`;
+    element.textContent = status;
+}
+
+// Test functions
+function checkNativeInstallStatus() {
+    log('Checking native PWA install status...');
+    
+    if (window.nativePWAInstallManager) {
+        const status = window.nativePWAInstallManager.getInstallStatus();
+        
+        log(`PWA Installed: ${status.isInstalled}`, status.isInstalled ? 'success' : 'info');
+        log(`Native Prompt Available: ${status.deferredPromptAvailable}`, status.deferredPromptAvailable ? 'success' : 'warning');
+        log(`Prompt Shown: ${status.promptShown}`, status.promptShown ? 'info' : 'info');
+        
+        updateStatus('install-status', 
+            `Installed: ${status.isInstalled}, Native Prompt: ${status.deferredPromptAvailable ? 'Available' : 'Not Available'}`,
+            status.isInstalled ? 'success' : 'info'
+        );
+        
+        updateBadge('pwa-support', checkPWASupport(), 'success');
+        updateBadge('native-prompt', status.deferredPromptAvailable ? 'Available' : 'Not Available', 
+                   status.deferredPromptAvailable ? 'success' : 'warning');
+        updateBadge('display-mode', getDisplayMode(), 'primary');
+        updateBadge('manifest-valid', checkManifestValid(), 'success');
+        
+        updateRequirementsTable(status);
+        
+    } else {
+        log('Native PWA Install Manager not available', 'error');
+        updateStatus('install-status', 'Native PWA Install Manager not available', 'danger');
+    }
+}
+
+function checkPWASupport() {
+    const hasServiceWorker = 'serviceWorker' in navigator;
+    const hasManifest = !!document.querySelector('link[rel="manifest"]');
+    const hasBeforeInstallPrompt = 'onbeforeinstallprompt' in window;
+    
+    return hasServiceWorker && hasManifest && hasBeforeInstallPrompt ? 'Full' : 'Partial';
+}
+
+function getDisplayMode() {
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+        return 'Standalone (PWA)';
+    } else if (window.navigator.standalone) {
+        return 'Standalone (iOS)';
+    } else {
+        return 'Browser';
+    }
+}
+
+function checkManifestValid() {
+    const manifestLink = document.querySelector('link[rel="manifest"]');
+    if (!manifestLink) return 'No Manifest';
+    
+    // Basic validation
+    const manifestUrl = manifestLink.href;
+    return manifestUrl.includes('manifest.json') ? 'Valid' : 'Invalid';
+}
+
+function updateRequirementsTable(status) {
+    const tbody = document.getElementById('requirements-table');
+    const requirements = [
+        { 
+            name: 'Service Worker', 
+            status: 'serviceWorker' in navigator ? '✅ Supported' : '❌ Not Supported',
+            details: 'Required for offline functionality and PWA installation'
+        },
+        { 
+            name: 'HTTPS', 
+            status: location.protocol === 'https:' || location.hostname === 'localhost' ? '✅ Secure' : '❌ Not Secure',
+            details: 'Required for PWA installation (except localhost)'
+        },
+        { 
+            name: 'Manifest', 
+            status: !!document.querySelector('link[rel="manifest"]') ? '✅ Found' : '❌ Missing',
+            details: 'PWA manifest file with app configuration'
+        },
+        { 
+            name: 'Icons', 
+            status: '✅ Configured',
+            details: 'Multiple icon sizes (96x96, 192x192, 512x512) available'
+        },
+        { 
+            name: 'User Engagement', 
+            status: status.meetsCriteria ? '✅ Met' : '⏳ Pending',
+            details: `Time: ${Math.floor(status.userEngagement.timeSpent / 1000)}s, Interactions: ${status.userEngagement.interactions}, Page Views: ${status.userEngagement.pageViews}`
+        },
+        { 
+            name: 'Native Prompt', 
+            status: status.deferredPromptAvailable ? '✅ Available' : '⏳ Not Available',
+            details: status.deferredPromptAvailable ? 'Browser ready to show install prompt' : 'Criteria not met or browser not supported'
+        }
+    ];
+    
+    tbody.innerHTML = requirements.map(req => `
+        <tr>
+            <td><strong>${req.name}</strong></td>
+            <td>${req.status}</td>
+            <td><small>${req.details}</small></td>
+        </tr>
+    `).join('');
+    
+    updateStatus('criteria-status', status.meetsCriteria ? 'All criteria met - Native prompt should appear' : 'Criteria not met - Keep engaging with the site', 
+                  status.meetsCriteria ? 'success' : 'warning');
+    
+    updateStatus('browser-status', `PWA Support: ${checkPWASupport()}, Native Prompt: ${status.deferredPromptAvailable ? 'Available' : 'Not Available'}`, 
+                  checkPWASupport() === 'Full' ? 'success' : 'warning');
+}
+
+function simulateEngagement() {
+    log('Simulating user engagement for native install...');
+    
+    if (window.nativePWAInstallManager) {
+        const manager = window.nativePWAInstallManager;
+        
+        // Simulate time spent
+        manager.userEngagement.timeSpent = 35000; // 35 seconds
+        
+        // Simulate interactions
+        manager.userEngagement.interactions = 5;
+        
+        // Simulate page views
+        manager.userEngagement.pageViews = 3;
+        
+        log('Engagement simulated: 35s, 5 interactions, 3 page views', 'success');
+        
+        // Update display
+        checkNativeInstallStatus();
+        
+        // Trigger native install prompt if criteria met
+        if (manager.meetsInstallCriteria()) {
+            log('Install criteria met, native prompt should appear...', 'info');
+            setTimeout(() => {
+                if (manager.deferredPrompt) {
+                    log('Native install prompt should now be visible in the address bar', 'success');
+                } else {
+                    log('Native install prompt still not available - check browser support', 'warning');
+                }
+            }, 1000);
+        }
+        
+    } else {
+        log('Native PWA Install Manager not available', 'error');
+    }
+}
+
+function forceNativePrompt() {
+    log('Attempting to force native install prompt...');
+    
+    if (window.nativePWAInstallManager) {
+        const manager = window.nativePWAInstallManager;
+        
+        if (manager.deferredPrompt) {
+            manager.forceShowNativeInstall();
+            log('Native install prompt triggered', 'success');
+        } else {
+            log('Native install prompt not available - meet engagement criteria first', 'warning');
+            simulateEngagement();
+        }
+    } else {
+        log('Native PWA Install Manager not available', 'error');
+    }
+}
+
+function showInstallInstructions() {
+    log('Showing install instructions...');
+    
+    if (window.nativePWAInstallManager) {
+        window.nativePWAInstallManager.showInstallInstructions();
+        log('Install instructions displayed', 'success');
+    } else {
+        log('Native PWA Install Manager not available', 'error');
+    }
+}
+
+function resetInstallState() {
+    log('Resetting native install state...');
+    
+    if (window.nativePWAInstallManager) {
+        const manager = window.nativePWAInstallManager;
+        
+        // Reset prompt shown flag
+        manager.installPromptShown = false;
+        
+        // Reset engagement
+        manager.userEngagement = {
+            pageViews: 1,
+            timeSpent: 0,
+            interactions: 0,
+            lastInteraction: Date.now()
+        };
+        
+        log('Native install state reset', 'success');
+        updateStatus('install-status', 'Install state reset - ready for testing', 'info');
+        checkNativeInstallStatus();
+    } else {
+        log('Native PWA Install Manager not available', 'error');
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    log('Native PWA Install Test Page Loaded');
+    
+    // Initial status check
+    setTimeout(() => {
+        checkNativeInstallStatus();
+    }, 1000);
+    
+    // Update engagement status periodically
+    setInterval(() => {
+        if (window.nativePWAInstallManager) {
+            const engagement = window.nativePWAInstallManager.userEngagement;
+            const statusText = `Time: ${Math.floor(engagement.timeSpent / 1000)}s, Interactions: ${engagement.interactions}, Page Views: ${engagement.pageViews}`;
+            // Could update a status element here if needed
+        }
+    }, 2000);
+    
+    log('Native PWA Install Test Page initialized');
+});
+</script>
+
+{% endblock %}

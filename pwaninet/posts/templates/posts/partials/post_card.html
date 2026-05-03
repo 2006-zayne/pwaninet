@@ -71,6 +71,153 @@
       margin-right: 0 !important;
     }
   }
+
+  /* Enhanced Post Card Micro-interactions */
+  .post-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+  }
+
+  .post-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  }
+
+  .post-card:active {
+    transform: translateY(-1px);
+    transition: all 0.1s ease;
+  }
+
+  /* Enhanced button interactions */
+  .post-card .btn {
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .post-card .btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .post-card .btn:active {
+    transform: translateY(0);
+  }
+
+  /* Touch feedback for mobile */
+  .post-card .btn {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Enhanced like button animation */
+  .post-card .btn:hover i {
+    transform: scale(1.1);
+    transition: transform 0.2s ease;
+  }
+
+  /* Smooth fade-in for new posts */
+  @keyframes slideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .post-card {
+    animation: slideInUp 0.5s ease forwards;
+  }
+
+  /* Enhanced media hover effects */
+  .post-media {
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+
+  .post-media:hover {
+    transform: scale(1.02);
+  }
+
+  /* Enhanced comment input */
+  .post-card .form-control {
+    transition: all 0.2s ease;
+  }
+
+  .post-card .form-control:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  }
+
+  /* Enhanced dropdown menu */
+  .post-card .dropdown-menu {
+    animation: fadeInDown 0.2s ease;
+  }
+
+  @keyframes fadeInDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Loading states for buttons */
+  .btn.loading {
+    pointer-events: none;
+    opacity: 0.7;
+  }
+
+  .btn.loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    margin: auto;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    border-top-color: currentColor;
+    animation: spin 1s linear infinite;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Enhanced Dark Mode Support for Micro-interactions */
+  [data-theme="dark"] .post-card:hover {
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4) !important;
+  }
+
+  [data-theme="dark"] .post-media:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  [data-theme="dark"] .post-card .form-control:focus {
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25) !important;
+  }
+
+  [data-theme="dark"] .btn:hover {
+    background-color: var(--border) !important;
+  }
+
+  [data-theme="dark"] .btn-primary:hover {
+    background-color: #2563eb !important;
+  }
+
+  [data-theme="dark"] .btn-outline-primary:hover {
+    background-color: #2563eb !important;
+    border-color: #2563eb !important;
+  }
 </style>
 <div id="post-card-{{ post.id }}" class="post-card shadow-sm mb-2 bg-white rounded-3 overflow-hidden border-0">
     {% if post.repost_of %}
@@ -608,6 +755,62 @@ document.addEventListener('DOMContentLoaded', function() {
         videoContainer.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
+        });
+    }
+
+    // Enhanced post card interactions
+    const postCard = document.getElementById('post-card-{{ post.id }}');
+    if (postCard) {
+        // Touch feedback for mobile
+        postCard.addEventListener('touchstart', function() {
+            this.style.transform = 'translateY(-1px)';
+        });
+        
+        postCard.addEventListener('touchend', function() {
+            this.style.transform = '';
+        });
+
+        // Enhanced button interactions
+        const buttons = postCard.querySelectorAll('.btn');
+        buttons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Add loading state for async actions
+                if (this.classList.contains('start-conversation') || 
+                    this.id === 'repost-btn-{{ post.id }}' ||
+                    this.closest('[data-bs-toggle="modal"]')) {
+                    return; // Skip these as they have their own handling
+                }
+
+                // Add click feedback
+                this.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    this.style.transform = '';
+                }, 100);
+            });
+        });
+
+        // Enhanced comment input interactions
+        const commentInput = postCard.querySelector('input[name="content"]');
+        if (commentInput) {
+            commentInput.addEventListener('focus', function() {
+                this.parentElement.style.transform = 'translateY(-1px)';
+            });
+            
+            commentInput.addEventListener('blur', function() {
+                this.parentElement.style.transform = '';
+            });
+        }
+
+        // Media hover effects
+        const mediaElements = postCard.querySelectorAll('.post-media');
+        mediaElements.forEach(media => {
+            media.addEventListener('mouseenter', function() {
+                this.style.transform = 'scale(1.02)';
+            });
+            
+            media.addEventListener('mouseleave', function() {
+                this.style.transform = '';
+            });
         });
     }
 });

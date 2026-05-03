@@ -1129,4 +1129,25 @@ document.addEventListener('click', function(e) {
 </div>
 </div>
 </div>
+<!-- Offline Messaging Support -->
+<script src="{% static 'js/messaging/offline-cache.js' %}"></script>
+<script src="{% static 'js/messaging/network-status.js' %}"></script>
+<script src="{% static 'js/messaging/sync-manager.js' %}"></script>
+<script src="{% static 'js/messaging/offline-ui.js' %}"></script>
+<script src="{% static 'js/messaging/offline-integration.js' %}"></script>
+
+<script>
+// Initialize offline support for conversation list
+document.addEventListener('DOMContentLoaded', function() {
+    // Load conversations from cache when offline
+    if (window.networkStatus && !window.networkStatus.isOnline) {
+        setTimeout(() => {
+            if (window.offlineIntegration) {
+                window.offlineIntegration.loadConversationsFromCache();
+            }
+        }, 1000);
+    }
+});
+</script>
+
 {% endblock %}

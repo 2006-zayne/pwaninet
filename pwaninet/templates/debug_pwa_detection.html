@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">PWA Detection Debug</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-bug"></i> PWA Detection Analysis</h5>
+                        <p class="mb-2">This page will show exactly how your PWA is being detected (or not detected).</p>
+                        <p class="mb-0"><strong>Current Status:</strong> Installed PWA but no splash/offline features.</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Display Mode Detection</h5>
+                            <div id="display-modes" class="alert alert-info">
+                                Checking display modes...
+                            </div>
+                            
+                            <h5 class="mt-4">PWA Status</h5>
+                            <div id="pwa-status" class="alert alert-info">
+                                Checking PWA status...
+                            </div>
+                            
+                            <h5 class="mt-4">Browser Info</h5>
+                            <div id="browser-info" class="alert alert-info">
+                                Getting browser info...
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5>Debug Actions</h5>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-primary" onclick="checkAllDetection()">
+                                    Check All Detection
+                                </button>
+                                <button class="btn btn-success" onclick="forcePWADetection()">
+                                    Force PWA Detection
+                                </button>
+                                <button class="btn btn-warning" onclick="simulateDisplayModes()">
+                                    Simulate Display Modes
+                                </button>
+                                <button class="btn btn-info" onclick="testSplashScreen()">
+                                    Test Splash Screen
+                                </button>
+                                <button class="btn btn-outline-primary" onclick="reloadAsPWA()">
+                                    Reload as PWA Test
+                                </button>
+                            </div>
+                            
+                            <h5 class="mt-4">Manual Overrides</h5>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-outline-success" onclick="setStandaloneMode()">
+                                    Set Standalone Mode
+                                </button>
+                                <button class="btn btn-outline-warning" onclick="setBrowserMode()">
+                                    Set Browser Mode
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="clearPWAFlags()">
+                                    Clear PWA Flags
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <h5>Detection Log</h5>
+                        <textarea id="detection-log" class="form-control" rows="8" readonly></textarea>
+                        <button class="btn btn-sm btn-outline-primary mt-2" onclick="clearLog()">Clear Log</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let detectionLog = [];
+
+function log(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const entry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+    detectionLog.push(entry);
+    
+    const logArea = document.getElementById('detection-log');
+    if (logArea) {
+        logArea.value = detectionLog.join('\n');
+        logArea.scrollTop = logArea.scrollHeight;
+    }
+    
+    console.log(entry);
+}
+
+function updateStatus(elementId, content, type = 'info') {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.className = `alert alert-${type}`;
+        element.innerHTML = content;
+    }
+}
+
+function checkAllDetection() {
+    log('Starting comprehensive PWA detection check...');
+    
+    // Check all display modes
+    const displayModes = {
+        'standalone': window.matchMedia('(display-mode: standalone)').matches,
+        'minimal-ui': window.matchMedia('(display-mode: minimal-ui)').matches,
+        'fullscreen': window.matchMedia('(display-mode: fullscreen)').matches,
+        'browser': window.matchMedia('(display-mode: browser)').matches
+    };
+    
+    log('Display modes detected:', 'info');
+    Object.entries(displayModes).forEach(([mode, matches]) => {
+        log(`  ${mode}: ${matches}`, matches ? 'success' : 'info');
+    });
+    
+    // Check navigator properties
+    const navigatorProps = {
+        'standalone': window.navigator.standalone,
+        'userAgent': navigator.userAgent,
+        'platform': navigator.platform,
+        'vendor': navigator.vendor
+    };
+    
+    log('Navigator properties:', 'info');
+    Object.entries(navigatorProps).forEach(([prop, value]) => {
+        log(`  ${prop}: ${value}`, 'info');
+    });
+    
+    // Check window properties
+    const windowProps = {
+        'innerHeight': window.innerHeight,
+        'innerWidth': window.innerWidth,
+        'screenX': window.screenX,
+        'screenY': window.screenY,
+        'outerHeight': window.outerHeight,
+        'outerWidth': window.outerWidth
+    };
+    
+    log('Window properties:', 'info');
+    Object.entries(windowProps).forEach(([prop, value]) => {
+        log(`  ${prop}: ${value}`, 'info');
+    });
+    
+    // Update UI
+    updateStatus('display-modes', 
+        Object.entries(displayModes).map(([mode, matches]) => 
+            `${mode}: ${matches ? '✅' : '❌'}`
+        ).join('<br>'),
+        displayModes.standalone || displayModes.minimal-ui ? 'success' : 'warning'
+    );
+    
+    // Check PWA status using our detection logic
+    const isPWA = checkPWADetection();
+    updateStatus('pwa-status', 
+        `PWA Detected: ${isPWA ? 'YES ✅' : 'NO ❌'}`,
+        isPWA ? 'success' : 'danger'
+    );
+    
+    updateStatus('browser-info', 
+        `UA: ${navigator.userAgent.substring(0, 50)}...<br>
+         Platform: ${navigator.platform}<br>
+         Screen: ${window.screen.width}x${window.screen.height}`,
+        'info'
+    );
+    
+    log(`Final PWA detection result: ${isPWA}`, isPWA ? 'success' : 'warning');
+}
+
+function checkPWADetection() {
+    // Use the same logic as splash-screen.js
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    const isIOSStandalone = window.navigator.standalone === true;
+    const isAndroidApp = document.referrer.includes('android-app://');
+    const isFromPWA = window.matchMedia('(display-mode: minimal-ui)').matches;
+    const isDesktopPWA = !window.matchMedia('(display-mode: browser)').matches && 
+                         (isStandalone || isFromPWA);
+    
+    const isPWA = isStandalone || isIOSStandalone || isAndroidApp || isDesktopPWA;
+    
+    log(`PWA Detection Logic:`, 'info');
+    log(`  isStandalone: ${isStandalone}`, 'info');
+    log(`  isIOSStandalone: ${isIOSStandalone}`, 'info');
+    log(`  isAndroidApp: ${isAndroidApp}`, 'info');
+    log(`  isFromPWA: ${isFromPWA}`, 'info');
+    log(`  isDesktopPWA: ${isDesktopPWA}`, 'info');
+    log(`  Final result: ${isPWA}`, isPWA ? 'success' : 'warning');
+    
+    return isPWA;
+}
+
+function forcePWADetection() {
+    log('Forcing PWA detection for testing...');
+    
+    // Set a flag to force PWA mode
+    localStorage.setItem('forcePWAMode', 'true');
+    
+    log('PWA mode forced - reload page to test splash screen', 'success');
+    
+    // Check status
+    setTimeout(() => {
+        checkAllDetection();
+    }, 100);
+}
+
+function simulateDisplayModes() {
+    log('Simulating different display modes...');
+    
+    // Test what would happen in different modes
+    const modes = ['standalone', 'minimal-ui', 'fullscreen', 'browser'];
+    
+    modes.forEach(mode => {
+        const matches = window.matchMedia(`(display-mode: ${mode})`).matches;
+        log(`Simulated ${mode}: ${matches ? 'Would trigger PWA' : 'Would not trigger PWA'}`, 
+            matches ? 'success' : 'info');
+    });
+}
+
+function testSplashScreen() {
+    log('Testing splash screen with current detection...');
+    
+    if (window.splashScreenManager) {
+        log('Splash screen manager found', 'success');
+        
+        // Check current status
+        const status = window.splashScreenManager.getSplashStatus();
+        log(`Current splash status:`, 'info');
+        log(`  PWA Mode: ${status.isPWA}`, status.isPWA ? 'success' : 'warning');
+        log(`  Splash Visible: ${status.isVisible}`, status.isVisible ? 'warning' : 'success');
+        
+        if (!status.isPWA) {
+            log('PWA not detected - splash will not show automatically', 'warning');
+            log('Try forcing PWA mode or installing as proper PWA', 'info');
+        }
+        
+    } else {
+        log('Splash screen manager not found', 'error');
+    }
+}
+
+function setStandaloneMode() {
+    log('Setting standalone mode override...');
+    localStorage.setItem('overrideDisplayMode', 'standalone');
+    log('Standalone mode set - reload page to test', 'success');
+}
+
+function setBrowserMode() {
+    log('Setting browser mode override...');
+    localStorage.setItem('overrideDisplayMode', 'browser');
+    log('Browser mode set - reload page to test', 'info');
+}
+
+function clearPWAFlags() {
+    log('Clearing all PWA flags...');
+    localStorage.removeItem('forcePWAMode');
+    localStorage.removeItem('overrideDisplayMode');
+    log('PWA flags cleared - reload page to test', 'info');
+}
+
+function reloadAsPWA() {
+    log('Reloading with PWA simulation...');
+    localStorage.setItem('forcePWAMode', 'true');
+    window.location.reload();
+}
+
+// Auto-check on page load
+document.addEventListener('DOMContentLoaded', () => {
+    log('PWA Detection Debug page loaded');
+    
+    setTimeout(() => {
+        checkAllDetection();
+        testSplashScreen();
+    }, 1000);
+});
+
+function clearLog() {
+    detectionLog = [];
+    document.getElementById('detection-log').value = '';
+}
+</script>
+{% endblock %}

@@ -103,6 +103,300 @@
         }
     </script>
     
+    <!-- Critical: Detect fresh PWA launch BEFORE body renders -->
+    <script>
+        (function(){
+            var isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+            var alreadyLaunched = sessionStorage.getItem('pwaninet_launched');
+            if (isPWA && !alreadyLaunched) {
+                document.documentElement.classList.add('fresh-launch');
+                sessionStorage.setItem('pwaninet_launched', 'true');
+            }
+        })();
+    </script>
+
+    <!-- Startup Splash Screen CSS -->
+    <style>
+        /* Splash hidden by default - no flash on internal navigation */
+        #startup-splash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: var(--background);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999999;
+            opacity: 0;
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: opacity;
+        }
+        
+        /* Show splash immediately on fresh launch (class set by inline script in <head>) */
+        html.fresh-launch #startup-splash {
+            opacity: 1;
+        }
+        
+        /* App visible by default */
+        #app {
+            opacity: 1;
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: opacity;
+        }
+        
+        /* Hide app only on fresh launch */
+        html.fresh-launch #app {
+            opacity: 0;
+        }
+        
+        /* JS-controlled classes (for fallback) */
+        #startup-splash.show-splash {
+            opacity: 1;
+        }
+        #app.hide-for-splash {
+            opacity: 0;
+        }
+        
+        #startup-splash.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .splash-logo-container {
+            text-align: center;
+            animation: logoGlow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes logoGlow {
+            0% {
+                filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.3));
+                transform: scale(1);
+            }
+            100% {
+                filter: drop-shadow(0 0 40px rgba(99, 102, 241, 0.6));
+                transform: scale(1.02);
+            }
+        }
+        
+        .splash-logo {
+            width: 80px;
+            height: 80px;
+            background: var(--card-bg);
+            border: 2px solid var(--border);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .splash-logo::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                transparent 30%,
+                rgba(255, 255, 255, 0.1) 50%,
+                transparent 70%
+            );
+            animation: shine 3s ease-in-out infinite;
+        }
+        
+        @keyframes shine {
+            0% {
+                transform: translateX(-100%) translateY(-100%) rotate(45deg);
+            }
+            50% {
+                transform: translateX(100%) translateY(100%) rotate(45deg);
+            }
+            100% {
+                transform: translateX(-100%) translateY(-100%) rotate(45deg);
+            }
+        }
+        
+        .splash-brand {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 30px;
+            letter-spacing: -0.5px;
+        }
+        
+        .splash-brand::after {
+            content: '|';
+            animation: blink 1s ease-in-out infinite;
+            color: var(--primary);
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        .splash-loading {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        .splash-dot {
+            width: 12px;
+            height: 12px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: bounce 1.4s ease-in-out infinite both;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        
+        .splash-dot:nth-child(1) { animation-delay: -0.32s; }
+        .splash-dot:nth-child(2) { animation-delay: -0.16s; }
+        .splash-dot:nth-child(3) { animation-delay: 0; }
+        
+        @keyframes bounce {
+            0%, 80%, 100% {
+                transform: scale(0.8);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
+        }
+        
+        .splash-text {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+        
+        .splash-progress {
+            width: 200px;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        .splash-progress-bar {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        
+        .splash-progress-bar.filling {
+            width: 70%;
+        }
+        
+        .splash-progress-bar.ready {
+            width: 100%;
+            transition: width 0.3s ease;
+        }
+        
+        #app.show {
+            opacity: 1 !important;
+        }
+        
+        /* Theme-aware colors are now handled by CSS variables */
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .splash-logo {
+                width: 60px;
+                height: 60px;
+            }
+            
+            .splash-brand {
+                font-size: 24px;
+                margin-bottom: 20px;
+            }
+            
+            .splash-dot {
+                width: 10px;
+                height: 10px;
+            }
+            
+            .splash-text {
+                font-size: 12px;
+            }
+        }
+        
+        /* Performance optimizations */
+        .splash-logo-container,
+        .splash-logo,
+        .splash-brand,
+        .splash-loading,
+        .splash-dot {
+            will-change: transform, opacity;
+            backface-visibility: hidden;
+            perspective: 1000px;
+        }
+        
+        /* Pulse animation for text changes */
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        /* Offline icon styling */
+        .splash-offline-icon {
+            font-size: 24px;
+            opacity: 0.8;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        /* Connection status animations */
+        .splash-text.connecting {
+            animation: pulse 1s ease-in-out infinite;
+        }
+        
+        .splash-text.error {
+            color: var(--text-secondary);
+            animation: shake 0.5s ease-in-out;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            .splash-logo-container,
+            .splash-logo::before,
+            .splash-dot,
+            .splash-offline-icon {
+                animation: none;
+            }
+            
+            .splash-progress-bar {
+                transition: none;
+            }
+            
+            .splash-brand::after {
+                animation: none;
+                content: '';
+            }
+        }
+    </style>
+    
     <!-- PWA Splash Screen -->
     <script src="{% static 'js/splash-screen.js' %}"></script>
     
@@ -270,7 +564,43 @@
             color: #d1d5db !important;
         }
 
-        /* Modal Styles */
+        /* Modal Styles - Fix z-index hierarchy
+           Bootstrap modals must be ABOVE all custom overlays (max 1200 in messaging)
+           but below critical system UI (splash: 999999, offline: 99999)
+           Modal: 2050, Backdrop: 2040 creates clean separation layer
+        */
+        .modal {
+            z-index: 2050 !important;
+        }
+        .modal-backdrop {
+            z-index: 2040 !important;
+        }
+        /* Ensure modal content is always interactive */
+        .modal-dialog {
+            position: relative;
+            z-index: 2051;
+            pointer-events: auto !important;
+        }
+        .modal-content {
+            pointer-events: auto !important;
+        }
+        /* Ensure all interactive elements inside modals work */
+        .modal button, .modal a, .modal input, .modal textarea, .modal select {
+            pointer-events: auto !important;
+        }
+        /* Prevent any parent transforms from creating new stacking contexts */
+        body.modal-open {
+            overflow: hidden;
+            /* Remove any transforms that could break fixed positioning */
+            transform: none !important;
+        }
+        /* Mobile: Ensure bottom nav stays below modals but above other content */
+        @media (max-width: 768px) {
+            body.modal-open .mobile-bottom-nav {
+                z-index: 2039 !important; /* Just below modal backdrop */
+                display: none !important; /* Hide entirely when modal is open */
+            }
+        }
         .modal-content {
             background-color: var(--card-bg);
             border: 1px solid var(--border);
@@ -410,6 +740,28 @@
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
       data-user-id="{{ request.user.id }}">
+    
+    <!-- Startup Splash Screen - ENABLED -->
+    <div id="startup-splash">
+        <div class="splash-logo-container">
+            <div class="splash-logo">
+                <img src="/static/images/web-app-manifest-192x192.png" alt="PwaniNet" style="width: 100%; height: 100%; object-fit: cover; border-radius: 18px;">
+            </div>
+            <div class="splash-brand">PwaniNet</div>
+            <div class="splash-loading">
+                <div class="splash-dot"></div>
+                <div class="splash-dot"></div>
+                <div class="splash-dot"></div>
+            </div>
+            <div class="splash-text">Loading your campus network...</div>
+            <div class="splash-progress">
+                <div class="splash-progress-bar"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main App Container - Hidden initially -->
+    <div id="app" style="opacity: 1; /* SHOW IMMEDIATELY */">
     
     <nav class="navbar navbar-top fixed-top">
         <div class="container d-flex justify-content-between align-items-center">
@@ -578,6 +930,44 @@
                     <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
                 </div>`;
         });
+
+        // MODAL COORDINATION: Close custom overlays when Bootstrap modals open
+        // Prevents z-index conflicts and interaction blocking
+        document.addEventListener('show.bs.modal', function (event) {
+            // Close any open custom overlays from messaging
+            const customOverlays = document.querySelectorAll('.overlay.show, .emoji-picker-modal.show, .attachment-modal.show');
+            customOverlays.forEach(overlay => {
+                overlay.classList.remove('show');
+            });
+
+            // Hide voice recording preview if active
+            const voicePreview = document.querySelector('.voice-recording-preview.show');
+            if (voicePreview) {
+                voicePreview.classList.remove('show');
+            }
+
+            // Hide context menu if open
+            const contextMenu = document.querySelector('.context-menu.show');
+            if (contextMenu) {
+                contextMenu.style.display = 'none';
+                contextMenu.classList.remove('show');
+            }
+
+            console.log('[ModalCoordination] Custom overlays closed for Bootstrap modal');
+        });
+
+        // Handle ESC key to close all modal types
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                // Close custom overlays if no Bootstrap modal is open
+                const openBootstrapModal = document.querySelector('.modal.show');
+                if (!openBootstrapModal) {
+                    document.querySelectorAll('.overlay.show, .emoji-picker-modal.show, .attachment-modal.show').forEach(el => {
+                        el.classList.remove('show');
+                    });
+                }
+            }
+        });
     </script>
     {% block extra_js %}
 <script>
@@ -665,5 +1055,25 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 </script>
 {% endblock %}
+</div>
+    
+    <!-- Startup Manager - Critical for PWA experience -->
+    <script>
+        // Set theme immediately to prevent flash
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+    
+    <!-- Load startup manager -->
+    <script src="/static/js/startup-v2.js"></script>
+    
+    <!-- Load offline skeleton manager (page-aware) -->
+    <script src="/static/js/offline-skeleton-v2.js"></script>
+    
+    <!-- Load main app styles -->
+    <link rel="stylesheet" href="/static/css/splash.css">
+    
 </body>
 </html>

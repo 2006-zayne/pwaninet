@@ -1,0 +1,398 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Offline Messaging Test</h2>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Network Status</h5>
+                </div>
+                <div class="card-body">
+                    <div id="network-status">
+                        <p><strong>Status:</strong> <span id="status-text">Checking...</span></p>
+                        <p><strong>Connection Type:</strong> <span id="connection-type">Unknown</span></p>
+                        <p><strong>Offline Duration:</strong> <span id="offline-duration">N/A</span></p>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <button class="btn btn-primary" onclick="testOfflineMode()">Simulate Offline</button>
+                        <button class="btn btn-success" onclick="testOnlineMode()">Simulate Online</button>
+                        <button class="btn btn-info" onclick="testConnectivity()">Test Connectivity</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Cache Status</h5>
+                </div>
+                <div class="card-body">
+                    <div id="cache-status">
+                        <p><strong>Cache Size:</strong> <span id="cache-size">Checking...</span></p>
+                        <p><strong>Conversations:</strong> <span id="conversation-count">0</span></p>
+                        <p><strong>Messages:</strong> <span id="message-count">0</span></p>
+                        <p><strong>Outbox:</strong> <span id="outbox-count">0</span></p>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <button class="btn btn-warning" onclick="clearCache()">Clear Cache</button>
+                        <button class="btn btn-info" onclick="loadTestData()">Load Test Data</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Test Results</h5>
+                </div>
+                <div class="card-body">
+                    <div id="test-results" style="max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px;">
+                        <div>Test results will appear here...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Manual Test Scenarios</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        <div class="list-group-item">
+                            <h6>Scenario 1: Load messages offline</h6>
+                            <p>1. Go online and load a conversation</p>
+                            <p>2. Disconnect from internet</p>
+                            <p>3. Open the same conversation</p>
+                            <p>4. Should see cached messages with offline banner</p>
+                            <button class="btn btn-sm btn-primary" onclick="testScenario1()">Test Scenario 1</button>
+                        </div>
+                        
+                        <div class="list-group-item">
+                            <h6>Scenario 2: Send message offline</h6>
+                            <p>1. Disconnect from internet</p>
+                            <p>2. Type and send a message</p>
+                            <p>3. Should see pending indicator</p>
+                            <p>4. Reconnect and message should send</p>
+                            <button class="btn btn-sm btn-primary" onclick="testScenario2()">Test Scenario 2</button>
+                        </div>
+                        
+                        <div class="list-group-item">
+                            <h6>Scenario 3: Reconnect sync</h6>
+                            <p>1. Send multiple messages offline</p>
+                            <p>2. Reconnect to internet</p>
+                            <p>3. All pending messages should send</p>
+                            <p>4. New messages should sync automatically</p>
+                            <button class="btn btn-sm btn-primary" onclick="testScenario3()">Test Scenario 3</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Offline Messaging Support -->
+<script src="{% static 'js/messaging/offline-cache.js' %}"></script>
+<script src="{% static 'js/messaging/network-status.js' %}"></script>
+<script src="{% static 'js/messaging/sync-manager.js' %}"></script>
+<script src="{% static 'js/messaging/offline-ui.js' %}"></script>
+<script src="{% static 'js/messaging/offline-integration.js' %}"></script>
+
+<script>
+let testResults = [];
+
+function log(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const entry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+    testResults.push(entry);
+    
+    const resultsDiv = document.getElementById('test-results');
+    resultsDiv.innerHTML = testResults.join('\n');
+    resultsDiv.scrollTop = resultsDiv.scrollHeight;
+    
+    console.log(entry);
+}
+
+async function updateNetworkStatus() {
+    if (!window.networkStatus) {
+        log('Network status not available', 'error');
+        return;
+    }
+    
+    const status = window.networkStatus.getConnectionStatus();
+    document.getElementById('status-text').textContent = status.isOnline ? 'Online' : 'Offline';
+    document.getElementById('connection-type').textContent = status.connectionType ? status.connectionType.type : 'Unknown';
+    
+    if (status.offlineStartTime) {
+        const duration = Date.now() - status.offlineStartTime;
+        const minutes = Math.floor(duration / 60000);
+        const seconds = Math.floor((duration % 60000) / 1000);
+        document.getElementById('offline-duration').textContent = `${minutes}m ${seconds}s`;
+    } else {
+        document.getElementById('offline-duration').textContent = 'N/A';
+    }
+}
+
+async function updateCacheStatus() {
+    if (!window.offlineCache || !window.offlineCache.db) {
+        log('Cache not available', 'error');
+        return;
+    }
+    
+    try {
+        const cacheSize = await window.offlineCache.getCacheSize();
+        const conversations = await window.offlineCache.getConversations(100);
+        const messages = await window.offlineCache.getMessages(1, 1000); // Get all messages
+        const outbox = await window.offlineCache.getOutboxMessages();
+        
+        document.getElementById('cache-size').textContent = `${cacheSize} items`;
+        document.getElementById('conversation-count').textContent = conversations.length;
+        document.getElementById('message-count').textContent = messages.length;
+        document.getElementById('outbox-count').textContent = outbox.length;
+        
+        log(`Cache updated: ${conversations.length} conversations, ${messages.length} messages, ${outbox.length} pending`);
+    } catch (error) {
+        log(`Cache update failed: ${error.message}`, 'error');
+    }
+}
+
+function testOfflineMode() {
+    log('Simulating offline mode');
+    window.networkStatus.handleOffline();
+    updateNetworkStatus();
+}
+
+function testOnlineMode() {
+    log('Simulating online mode');
+    window.networkStatus.handleOnline();
+    updateNetworkStatus();
+}
+
+async function testConnectivity() {
+    log('Testing connectivity...');
+    try {
+        await window.networkStatus.verifyConnectivity();
+        log('Connectivity test passed');
+    } catch (error) {
+        log(`Connectivity test failed: ${error.message}`, 'error');
+    }
+    updateNetworkStatus();
+}
+
+async function clearCache() {
+    if (!window.offlineCache) {
+        log('Cache not available', 'error');
+        return;
+    }
+    
+    log('Clearing cache...');
+    try {
+        await window.offlineCache.clearCache();
+        log('Cache cleared successfully');
+        updateCacheStatus();
+    } catch (error) {
+        log(`Cache clear failed: ${error.message}`, 'error');
+    }
+}
+
+async function loadTestData() {
+    if (!window.offlineCache || !window.offlineCache.db) {
+        log('Cache not available', 'error');
+        return;
+    }
+    
+    log('Loading test data...');
+    
+    try {
+        // Test conversation
+        const testConversation = {
+            id: 1,
+            other_user_name: 'Test User',
+            other_user_profile_pic: '/static/images/default-avatar.png',
+            last_message_content: 'Hello, this is a test message',
+            updated_at: new Date().toISOString(),
+            cached_at: new Date().toISOString()
+        };
+        
+        await window.offlineCache.saveConversation(testConversation);
+        
+        // Test messages
+        const testMessages = [
+            {
+                id: 1,
+                conversation_id: 1,
+                sender: 1,
+                content: 'Hello from test user',
+                timestamp: new Date(Date.now() - 300000).toISOString(),
+                cached_at: new Date().toISOString()
+            },
+            {
+                id: 2,
+                conversation_id: 1,
+                sender: 2,
+                content: 'Hi there! This is a test response',
+                timestamp: new Date(Date.now() - 240000).toISOString(),
+                cached_at: new Date().toISOString()
+            },
+            {
+                id: 3,
+                conversation_id: 1,
+                sender: 1,
+                content: 'How are you doing today?',
+                timestamp: new Date(Date.now() - 180000).toISOString(),
+                cached_at: new Date().toISOString()
+            }
+        ];
+        
+        await window.offlineCache.saveMessages(testMessages);
+        
+        log('Test data loaded successfully');
+        updateCacheStatus();
+        
+    } catch (error) {
+        log(`Test data load failed: ${error.message}`, 'error');
+    }
+}
+
+async function testScenario1() {
+    log('=== Testing Scenario 1: Load messages offline ===');
+    
+    // Load test data first
+    await loadTestData();
+    
+    // Simulate offline
+    testOfflineMode();
+    
+    // Wait a moment
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Try to load messages from cache
+    try {
+        const messages = await window.offlineCache.getMessages(1, 10);
+        log(`Loaded ${messages.length} messages from cache`);
+        messages.forEach(msg => {
+            log(`Message: ${msg.content} (${msg.sender === 1 ? 'sent' : 'received'})`);
+        });
+        log('Scenario 1 completed successfully');
+    } catch (error) {
+        log(`Scenario 1 failed: ${error.message}`, 'error');
+    }
+}
+
+async function testScenario2() {
+    log('=== Testing Scenario 2: Send message offline ===');
+    
+    // Load test data first
+    await loadTestData();
+    
+    // Simulate offline
+    testOfflineMode();
+    
+    // Create a test message
+    const testMessage = {
+        conversationId: 1,
+        content: 'This is a test offline message',
+        type: 'text',
+        tempId: 'temp_' + Date.now()
+    };
+    
+    try {
+        // Save to outbox
+        const outboxId = await window.syncManager.saveToOutbox(testMessage);
+        log(`Message saved to outbox with ID: ${outboxId}`);
+        
+        // Check outbox
+        const outboxMessages = await window.offlineCache.getOutboxMessages();
+        log(`Outbox now contains ${outboxMessages.length} messages`);
+        
+        // Show in UI
+        window.offlineUI.showPendingMessage({ ...testMessage, id: outboxId });
+        
+        log('Scenario 2 completed successfully');
+    } catch (error) {
+        log(`Scenario 2 failed: ${error.message}`, 'error');
+    }
+}
+
+async function testScenario3() {
+    log('=== Testing Scenario 3: Reconnect sync ===');
+    
+    // First send some messages offline
+    await testScenario2();
+    
+    // Wait a moment
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Simulate reconnection
+    testOnlineMode();
+    
+    // Wait for sync to complete
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    try {
+        // Check if sync happened
+        const outboxMessages = await window.offlineCache.getOutboxMessages();
+        log(`Outbox now contains ${outboxMessages.length} messages (should be 0)`);
+        
+        if (outboxMessages.length === 0) {
+            log('Scenario 3 completed successfully - messages synced');
+        } else {
+            log('Scenario 3 partially completed - some messages still in outbox', 'warning');
+        }
+    } catch (error) {
+        log(`Scenario 3 failed: ${error.message}`, 'error');
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', async function() {
+    log('Offline messaging test page loaded');
+    
+    // Wait for components to initialize
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Update status displays
+    updateNetworkStatus();
+    updateCacheStatus();
+    
+    // Set up periodic updates
+    setInterval(() => {
+        updateNetworkStatus();
+        updateCacheStatus();
+    }, 5000);
+    
+    log('Test page initialized');
+});
+</script>
+
+<style>
+.test-results {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 10px;
+    white-space: pre-wrap;
+}
+
+[data-theme="dark"] .test-results {
+    background: #2d3748;
+    border-color: #4a5568;
+    color: #e2e8f0;
+}
+</style>
+
+{% endblock %}

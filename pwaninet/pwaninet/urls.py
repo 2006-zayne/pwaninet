@@ -39,6 +39,9 @@ urlpatterns = [
     path('test/pwa-debug/', TemplateView.as_view(template_name='debug_pwa_launch.html'), name='debug_pwa_launch'),
     path('test/pwa-detection/', TemplateView.as_view(template_name='debug_pwa_detection.html'), name='debug_pwa_detection'),
     path('clear-cache/', TemplateView.as_view(template_name='clear_cache.html'), name='clear_cache'),
+    path('startup/', TemplateView.as_view(template_name='startup_base.html'), name='startup_base'),
+    path('api/health/', TemplateView.as_view(template_name='health_check.html'), name='health_check'),
+    path('debug/startup/', TemplateView.as_view(template_name='debug_startup.html'), name='debug_startup'),
     # Messaging Test Pages
     path('test/messaging/', TemplateView.as_view(template_name='test_messaging_architecture.html'), name='test_messaging_architecture'),
     path('test/messaging-debug/', TemplateView.as_view(template_name='debug_messaging.html'), name='debug_messaging'),

@@ -22,10 +22,20 @@
     {% include 'posts/partials/post_list.html' %}
 </div>
 
-<div id="feed-spinner" class="htmx-indicator text-center py-4">
-    <div class="spinner-border text-primary spinner-border-sm"></div>
-    <span class="ms-2 small text-muted fw-bold">FETCHING MORE PERSONALIZED POSTS...</span>
+<!-- Post Skeleton Loader for HTMX -->
+<div id="feed-skeleton" class="htmx-indicator">
+    {% include 'posts/partials/post_skeleton_loader.html' %}
+    {% include 'posts/partials/post_skeleton_loader.html' %}
+    {% include 'posts/partials/post_skeleton_loader.html' %}
 </div>
+
+<!-- Fallback spinner for non-JS users -->
+<noscript>
+    <div id="feed-spinner" class="text-center py-4">
+        <div class="spinner-border text-primary spinner-border-sm"></div>
+        <span class="ms-2 small text-muted fw-bold">FETCHING MORE PERSONALIZED POSTS...</span>
+    </div>
+</noscript>
 
 <script>
 // Scroll-aware auto-play/pause for videos and audio
@@ -114,5 +124,97 @@
             pauseMedia(currentPlayingMedia);
         }
     });
+
+    // Enhanced skeleton loader management
+    function manageSkeletonLoaders() {
+        const feedSkeleton = document.getElementById('feed-skeleton');
+        const feedSpinner = document.getElementById('feed-spinner');
+        
+        // Show skeleton loaders when HTMX requests start
+        document.body.addEventListener('htmx:beforeRequest', function(event) {
+            const target = event.target;
+            
+            // Check if this is a feed loading request
+            if (target.id === 'feed-sector' || target.closest('#feed-sector')) {
+                if (feedSkeleton) {
+                    feedSkeleton.style.display = 'block';
+                }
+                if (feedSpinner) {
+                    feedSpinner.style.display = 'none';
+                }
+            }
+            
+            // Check if this is a friend suggestions loading request
+            const friendSection = target.querySelector('.friend-suggestions-section');
+            if (friendSection) {
+                showFriendSkeleton(friendSection);
+            }
+        });
+        
+        // Hide skeleton loaders when HTMX requests complete
+        document.body.addEventListener('htmx:afterRequest', function(event) {
+            const target = event.target;
+            
+            // Check if this is a feed loading request
+            if (target.id === 'feed-sector' || target.closest('#feed-sector')) {
+                if (feedSkeleton) {
+                    setTimeout(() => {
+                        feedSkeleton.style.display = 'none';
+                    }, 500);
+                }
+            }
+        });
+        
+        // Handle initial page load
+        hideInitialSkeletons();
+    }
+    
+    function showFriendSkeleton(container) {
+        // Replace friend suggestions with skeleton loader
+        const existingCards = container.querySelector('.friend-suggestions-scroll');
+        if (existingCards && !container.querySelector('.friend-suggestions-skeleton')) {
+            const skeletonHtml = `
+                <div class="friend-suggestions-skeleton">
+                    <div class="d-flex gap-3 overflow-auto pb-2" style="scrollbar-width: none; -webkit-overflow-scrolling: touch;">
+                        ${Array(5).fill(0).map(() => `
+                            <div class="friend-skeleton-card" style="min-width: 180px;">
+                                <div class="friend-skeleton-image">
+                                    <div class="skeleton-shimmer"></div>
+                                </div>
+                                <div class="friend-skeleton-info">
+                                    <div class="friend-skeleton-name">
+                                        <div class="skeleton-shimmer"></div>
+                                    </div>
+                                    <div class="friend-skeleton-details">
+                                        <div class="skeleton-shimmer"></div>
+                                    </div>
+                                    <div class="friend-skeleton-button">
+                                        <div class="skeleton-shimmer"></div>
+                                    </div>
+                                </div>
+                                <div class="friend-skeleton-dismiss">
+                                    <div class="skeleton-shimmer"></div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            
+            existingCards.style.display = 'none';
+            existingCards.insertAdjacentHTML('afterend', skeletonHtml);
+        }
+    }
+    
+    function hideInitialSkeletons() {
+        // Hide skeleton loaders on initial page load if content is already available
+        const feedSkeleton = document.getElementById('feed-skeleton');
+        if (feedSkeleton && document.querySelector('.post-card')) {
+            feedSkeleton.style.display = 'none';
+        }
+    }
+    
+    // Initialize skeleton loader management
+    manageSkeletonLoaders();
 })();
 </script>
