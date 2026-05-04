@@ -568,20 +568,20 @@
         }
 
         /* Modal Styles - Fix z-index hierarchy
-           Bootstrap modals must be ABOVE all custom overlays (max 1200 in messaging)
-           but below critical system UI (splash: 999999, offline: 99999)
-           Modal: 2050, Backdrop: 2040 creates clean separation layer
+           Ensure modals sit above transient overlays (splash/offline) and are interactive.
         */
         .modal {
-            z-index: 2050 !important;
+            position: fixed !important; /* Ensure fixed positioning relative to viewport */
+            z-index: 1000001 !important; /* Above splash (999999) and other overlays */
         }
         .modal-backdrop {
-            z-index: 2040 !important;
+            z-index: 1000000 !important; /* Just below modal */
+            pointer-events: auto; /* allow backdrop clicks to dismiss modal when needed */
         }
         /* Ensure modal content is always interactive */
         .modal-dialog {
             position: relative;
-            z-index: 2051;
+            z-index: 1000002 !important;
             pointer-events: auto !important;
         }
         .modal-content {
