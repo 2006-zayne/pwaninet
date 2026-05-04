@@ -117,6 +117,10 @@
 
     <!-- Startup Splash Screen CSS -->
     <style>
+        :root {
+            --bs-backdrop-zindex: 1000000;
+            --bs-modal-zindex: 1000001;
+        }
         /* Splash hidden by default - no flash on internal navigation */
         #startup-splash {
             position: fixed;
