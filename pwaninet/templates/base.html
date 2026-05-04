@@ -130,13 +130,16 @@
             justify-content: center;
             z-index: 999999;
             opacity: 0;
+            pointer-events: none; /* Ensure it doesn't intercept clicks when hidden */
             transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             will-change: opacity;
         }
         
         /* Show splash immediately on fresh launch (class set by inline script in <head>) */
-        html.fresh-launch #startup-splash {
+        html.fresh-launch #startup-splash,
+        #startup-splash.show-splash {
             opacity: 1;
+            pointer-events: auto; /* Allow interaction while splash is visible intentionally */
         }
         
         /* App visible by default */
