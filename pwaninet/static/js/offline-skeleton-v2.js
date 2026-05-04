@@ -142,7 +142,7 @@ function injectCSS(){
   var s=document.createElement('style');
   s.id='skel-css-v2';
   s.textContent=
-  '#'+overlayId+'{position:fixed;top:0;left:0;width:100vw;height:100vh;background:var(--background,#f8fafc);z-index:99999;overflow-y:auto;padding-bottom:80px;animation:skelFadeIn .3s ease}'+
+  '#'+overlayId+'{position:fixed;top:0;left:0;width:100vw;height:100vh;background:var(--background,#f8fafc);z-index:99999;overflow-y:auto;padding-bottom:80px;animation:skelFadeIn .3s ease;pointer-events:none}'+ '#'+overlayId+'.show{pointer-events:auto}'+
   '@keyframes skelFadeIn{from{opacity:0}to{opacity:1}}'+
 
   '.skel-offline-banner{position:sticky;top:0;z-index:100000;background:#ef4444;color:#fff;text-align:center;padding:8px 16px;font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px}'+
@@ -227,13 +227,15 @@ function show(){
   console.log('Showing skeleton for:',pageType);
   injectCSS();
   document.body.insertAdjacentHTML('beforeend',buildHTML(pageType));
+  var el=document.getElementById(overlayId);
+  if(el){ el.style.pointerEvents='auto'; el.style.opacity='1'; }
 }
 
 function hide(){
   if(!isShowing)return;
   isShowing=false;
   var el=document.getElementById(overlayId);
-  if(el){el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},300);}
+  if(el){ el.style.pointerEvents='none'; el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},300); }
 }
 
 window.addEventListener('offline',function(){console.log('Offline detected');show();});

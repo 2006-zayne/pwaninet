@@ -189,7 +189,10 @@ class SplashScreenManager {
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 opacity: 1;
                 transform: translateY(0);
+                pointer-events: none; /* Don't block interactions unless explicitly shown */
             }
+
+            .pwa-splash-screen.show { pointer-events: auto; }
 
             /* Theme-aware splash screen colors */
             [data-theme="light"] .pwa-splash-screen {
@@ -426,7 +429,7 @@ class SplashScreenManager {
 
         document.head.appendChild(style);
         document.body.appendChild(this.splashElement);
-        
+        this.splashElement.classList.add('show');
         // Prevent scrolling while splash is visible
         document.body.style.overflow = 'hidden';
     }
@@ -599,6 +602,7 @@ class SplashScreenManager {
         console.log('Hiding splash screen');
         
         // Add hide animation
+        this.splashElement.classList.remove('show');
         this.splashElement.classList.add('hide');
         
         // Remove element after animation

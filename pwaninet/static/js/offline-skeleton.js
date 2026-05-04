@@ -136,7 +136,9 @@
             overflow-y: auto;
             padding-bottom: 80px;
             animation: skeletonFadeIn 0.3s ease;
+            pointer-events: none;
         }
+        #${overlayId}.show { pointer-events: auto; }
         
         @keyframes skeletonFadeIn {
             from { opacity: 0; }
