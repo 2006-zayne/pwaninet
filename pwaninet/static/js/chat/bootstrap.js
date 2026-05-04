@@ -8,6 +8,10 @@ import { messageService } from './core/message-service.js';
 import { webSocketManager } from './core/websocket.js';
 import { store } from './core/store.js';
 import { uiController } from './ui/ui-controller.js';
+import { attachmentService } from './features/attachments/attachment.service.js';
+import { attachmentUI } from './features/attachments/attachment-ui.js';
+import { cameraService } from './features/camera/camera.service.js';
+import { voiceService } from './features/voice/voice.service.js';
 
 // Load encryption module if available
 if (typeof E2EEncryption === 'undefined') {
@@ -49,7 +53,17 @@ document.addEventListener('DOMContentLoaded', () => {
     uiController.init();
     console.log('✅ UI controller initialized (read-only consumer)');
 
-    // 5. App controller (orchestration ONLY)
+    // 5. Attachment services
+    attachmentService.init();
+    cameraService.init();
+    voiceService.init();
+    console.log('✅ Attachment services initialized');
+
+    // 6. Attachment UI
+    attachmentUI.init();
+    console.log('✅ Attachment UI initialized');
+
+    // 7. App controller (orchestration ONLY)
     appController.init(config);
     console.log('✅ App controller initialized (orchestration)');
 
@@ -59,6 +73,10 @@ document.addEventListener('DOMContentLoaded', () => {
     window.messageService = messageService;
     window.webSocketManager = webSocketManager;
     window.uiController = uiController;
+    window.attachmentService = attachmentService;
+    window.attachmentUI = attachmentUI;
+    window.cameraService = cameraService;
+    window.voiceService = voiceService;
 
     console.log('🎉 SOT architecture initialized with mandatory data flow enforcement');
     console.log('📊 Data flow: websocket → message-service → store → ui-controller → renderer');

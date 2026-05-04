@@ -8,7 +8,8 @@ from .views import (
     conversation_list,
     conversation_detail,
     search_followed_users,
-    create_conversation
+    create_conversation,
+    attachment_upload
 )
 
 router = DefaultRouter()
@@ -25,4 +26,5 @@ urlpatterns = [
     path('conversation/<int:conversation_id>/', conversation_detail, name='conversation_detail'),
     path('search-followed-users/', search_followed_users, name='search_followed_users'),
     path('create/', create_conversation, name='create_conversation'),
+    path('api/attachments/upload/', attachment_upload, name='attachment_upload'),
 ]

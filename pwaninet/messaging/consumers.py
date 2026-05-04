@@ -48,10 +48,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
         if not tracked:
-            await self.send(text_data=json.dumps({
-                'type': 'error',
-                'message': 'Too many active connections'
-            }))
             await self.close()
             return
 
@@ -143,6 +139,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         encrypted_content = data.get('encrypted_content')
         is_encrypted = data.get('is_encrypted', False)
         reply_to_id = data.get('reply_to')
+        temp_id = data.get('temp_id')  # Get temp_id for optimistic update matching
 
         # Must have either plain content or encrypted content
         if not content and not encrypted_content:
@@ -150,6 +147,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Create message in database
         message = await self.create_message(content, encrypted_content, is_encrypted, reply_to_id)
+
+        # Add temp_id to message for client-side optimistic update matching
+        if temp_id:
+            message['temp_id'] = temp_id
 
         # Broadcast to room group
         await self.channel_layer.group_send(

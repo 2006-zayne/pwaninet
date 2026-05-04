@@ -109,7 +109,8 @@ export class MessageRenderer {
                 ? ownMessages[ownMessages.length - 1].id
                 : null;
 
-        for (const message of messages) {
+        for (let i = 0; i < messages.length; i++) {
+            const message = messages[i];
             const messageDate = new Date(message.timestamp).toDateString();
             const isOwn = message.senderId === this.currentUserId;
 
@@ -119,17 +120,36 @@ export class MessageRenderer {
                     label: formatDateLabel(message.timestamp)
                 });
                 lastDate = messageDate;
+                // Reset sender tracking - date separator breaks the group
+                lastSenderId = null;
             }
 
             const isConsecutive = lastSenderId === message.senderId;
             lastSenderId = message.senderId;
+
+            // Determine group position
+            const nextMessage = messages[i + 1];
+            // Only count next message as same group if same sender AND same date
+            const nextMessageDate = nextMessage ? new Date(nextMessage.timestamp).toDateString() : null;
+            const isNextSameDate = nextMessageDate === messageDate;
+            const isNextFromSameSender = nextMessage && isNextSameDate && nextMessage.senderId === message.senderId;
+
+            let groupPosition = 'single';
+            if (isConsecutive && isNextFromSameSender) {
+                groupPosition = 'middle'; // Has prev and next from same sender
+            } else if (isConsecutive && !isNextFromSameSender) {
+                groupPosition = 'last'; // Has prev but no next from same sender
+            } else if (!isConsecutive && isNextFromSameSender) {
+                groupPosition = 'first'; // No prev but has next from same sender
+            }
 
             viewItems.push({
                 viewType: 'message',
                 ...message,
                 isOwn,
                 isConsecutive,
-                isLastSent: isOwn && message.id === lastOwnMessageId
+                isLastSent: isOwn && message.id === lastOwnMessageId,
+                groupPosition
             });
         }
 
@@ -167,10 +187,14 @@ export class MessageRenderer {
         }
         // Create message bubble (pure DOM manipulation)
         const messageDiv = document.createElement('div');
-        messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} ${message.isConsecutive ? 'consecutive-message' : 'first-in-group'} ${message.isLastSent ? 'last-sent' : ''}`;
+        messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition} ${message.isLastSent ? 'last-sent' : ''}`;
         messageDiv.setAttribute('data-message-id', message.id);
         messageDiv.setAttribute('data-sender-id', message.senderId);
         messageDiv.setAttribute('data-status', message.status);
+        messageDiv.setAttribute('data-group-position', message.groupPosition);
+
+        // Apply custom bubble style if set
+        this._applyBubbleStyle(messageDiv);
 
         // Use canonical schema fields
         const status = message.status || 'sent';
@@ -211,6 +235,19 @@ export class MessageRenderer {
     }
 
     /**
+     * Apply custom bubble style from user preferences
+     * @param {HTMLElement} bubble - Message bubble element
+     */
+    _applyBubbleStyle(bubble) {
+        const currentStyle = document.body?.dataset?.bubbleStyle;
+        // CSS handles the actual styling via data-bubble-shape attribute
+        // We just need to ensure the document has the attribute set
+        if (currentStyle && currentStyle !== 'default') {
+            document.documentElement.dataset.bubbleShape = currentStyle;
+        }
+    }
+
+    /**
      * Create system message element (pure DOM creation)
      * @param {Object} message - System message object
      * @returns {HTMLElement} System message element
@@ -229,12 +266,14 @@ export class MessageRenderer {
      */
     _createEmojiMessage(message) {
         const element = document.createElement('div');
-        element.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} emoji-message`;
+        element.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} emoji-message group-${message.groupPosition}`;
         element.setAttribute('data-message-id', message.id);
+        element.setAttribute('data-group-position', message.groupPosition);
         element.innerHTML = `
             <div class="emoji-content">${escapeHtml(message.content || '')}</div>
             <div class="message-time">${formatTime(message.timestamp)}</div>
         `;
+        this._applyBubbleStyle(element);
         return element;
     }
 
@@ -245,8 +284,10 @@ export class MessageRenderer {
      */
     _createMediaMessage(message) {
         const element = document.createElement('div');
-        element.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} media-message`;
+        element.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} media-message group-${message.groupPosition}`;
         element.setAttribute('data-message-id', message.id);
+        element.setAttribute('data-group-position', message.groupPosition);
+        this._applyBubbleStyle(element);
         
         let mediaContent = '';
         const metadata = message.metadata || {};

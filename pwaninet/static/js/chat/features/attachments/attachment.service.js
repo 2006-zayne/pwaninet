@@ -53,24 +53,31 @@ export class AttachmentService {
   /**
    * Handle file upload
    * @param {File} file - File to upload
+   * @param {number} conversationId - Conversation ID
    */
-  async handleFileUpload(file) {
+  async handleFileUpload(file, conversationId) {
     // Validate file
     if (!this.validateFile(file)) {
       eventBus.emit(EVENTS.ATTACHMENT_ERROR, { message: 'Invalid file' });
       return;
     }
 
+    if (!conversationId) {
+      eventBus.emit(EVENTS.ATTACHMENT_ERROR, { message: 'Conversation ID is required' });
+      return;
+    }
+
     // Create form data
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('conversation_id', conversationId);
 
     try {
       // Emit upload start event
       eventBus.emit(EVENTS.ATTACHMENT_UPLOAD_START, { file });
 
-      // Upload file (implementation depends on backend)
-      const response = await fetch('/api/attachments/upload/', {
+      // Upload file to messaging app endpoint
+      const response = await fetch('/messaging/api/attachments/upload/', {
         method: 'POST',
         body: formData,
         headers: {
@@ -82,7 +89,8 @@ export class AttachmentService {
         const data = await response.json();
         eventBus.emit(EVENTS.ATTACHMENT_UPLOAD_SUCCESS, data);
       } else {
-        throw new Error('Upload failed');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
       }
     } catch (error) {
       console.error('Attachment upload error:', error);

@@ -156,13 +156,28 @@
     max-height: none;
     border-radius: 0;
   }
-  
+
   .theme-btn {
     padding: 6px;
   }
-  
+
   .theme-btn i {
     font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .theme-selector-content {
+    padding: 16px;
+  }
+
+  .theme-preview {
+    height: 100px;
+  }
+
+  .theme-preview-message {
+    font-size: 0.75rem;
+    padding: 6px 10px;
   }
 }
 

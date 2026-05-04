@@ -571,25 +571,27 @@
             color: #d1d5db !important;
         }
 
-        /* Modal Styles - Fix z-index hierarchy
-           Ensure modals sit above transient overlays (splash/offline) and are interactive.
-        */
+        /* Modal Styles - Custom backdrop solution */
         .modal {
-            position: fixed !important; /* Ensure fixed positioning relative to viewport */
-            z-index: 1000001 !important; /* Above splash (999999) and other overlays */
+            z-index: 1050 !important;
         }
         .modal-backdrop {
-            z-index: 1000000 !important; /* Just below modal */
-            pointer-events: auto; /* allow backdrop clicks to dismiss modal when needed */
+            z-index: 1040 !important;
+            pointer-events: none !important; /* Let clicks pass through */
         }
-        /* Ensure modal content is always interactive */
         .modal-dialog {
-            position: relative;
-            z-index: 1000002 !important;
-            pointer-events: auto !important;
+            z-index: 1051 !important;
         }
-        .modal-content {
-            pointer-events: auto !important;
+        /* Create custom backdrop that doesn't block clicks */
+        .modal-backdrop::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            pointer-events: none;
         }
         /* Ensure all interactive elements inside modals work */
         .modal button, .modal a, .modal input, .modal textarea, .modal select {
@@ -941,6 +943,13 @@
         // MODAL COORDINATION: Close custom overlays when Bootstrap modals open
         // Prevents z-index conflicts and interaction blocking
         document.addEventListener('show.bs.modal', function (event) {
+            // Move modal to body to avoid stacking context issues
+            const modal = event.target;
+            if (modal && modal.parentNode !== document.body) {
+                document.body.appendChild(modal);
+                console.log('[ModalCoordination] Modal moved to body');
+            }
+
             // Close any open custom overlays from messaging
             const customOverlays = document.querySelectorAll('.overlay.show, .emoji-picker-modal.show, .attachment-modal.show');
             customOverlays.forEach(overlay => {
@@ -972,6 +981,30 @@
                     document.querySelectorAll('.overlay.show, .emoji-picker-modal.show, .attachment-modal.show').forEach(el => {
                         el.classList.remove('show');
                     });
+                }
+            }
+        });
+
+        // Configure Bootstrap modals to append to body (prevents stacking context issues)
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            bootstrap.Modal.Default.backdrop = false; // Disable Bootstrap backdrop
+            bootstrap.Modal.Default.keyboard = true;
+            bootstrap.Modal.Default.focus = true;
+            // Force modals to be appended to body to avoid stacking context issues
+            bootstrap.Modal.Default.rootElement = document.body;
+        }
+
+        // Handle click-outside-to-dismiss since backdrop has pointer-events: none
+        document.addEventListener('click', function(e) {
+            const openModal = document.querySelector('.modal.show');
+            if (openModal) {
+                const modalContent = openModal.querySelector('.modal-content');
+                if (modalContent && !modalContent.contains(e.target)) {
+                    // Click is outside modal content, close it
+                    const modalInstance = bootstrap.Modal.getInstance(openModal);
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
                 }
             }
         });
@@ -1081,6 +1114,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
     
     <!-- Load main app styles -->
     <link rel="stylesheet" href="/static/css/splash.css">
-    
+
 </body>
 </html>

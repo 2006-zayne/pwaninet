@@ -8,6 +8,8 @@ import { messageService } from './message-service.js';
 import { webSocketManager } from './websocket.js';
 import { store } from './store.js';
 import { uiController } from '../ui/ui-controller.js';
+import { voiceService } from '../features/voice/voice.service.js';
+import { attachmentUI } from '../features/attachments/attachment-ui.js';
 
 // Load encryption module if available
 if (typeof E2EEncryption === 'undefined') {
@@ -53,12 +55,22 @@ document.addEventListener('DOMContentLoaded', () => {
     appController.init(config);
     console.log('✅ App controller initialized (orchestration)');
 
+    // 6. Voice service
+    voiceService.init();
+    console.log('✅ Voice service initialized');
+
+    // 7. Attachment UI
+    attachmentUI.init();
+    console.log('✅ Attachment UI initialized');
+
     // Expose globally for debugging
     window.appController = appController;
     window.store = store;
     window.messageService = messageService;
     window.webSocketManager = webSocketManager;
     window.uiController = uiController;
+    window.voiceService = voiceService;
+    window.attachmentUI = attachmentUI;
 
     console.log('🎉 SOT architecture initialized with mandatory data flow enforcement');
     console.log('📊 Data flow: websocket → message-service → store → ui-controller → renderer');

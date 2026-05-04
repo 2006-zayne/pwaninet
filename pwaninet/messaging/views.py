@@ -1,13 +1,15 @@
 from rest_framework import viewsets, status, filters
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes, parser_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
 from django.db import models
+from django.http import JsonResponse
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from .models import Conversation, ConversationMember, Message, MessageRead, MessageReaction, ConversationTheme
@@ -482,6 +484,8 @@ class ConversationThemeViewSet(viewsets.ModelViewSet):
     """ViewSet for managing conversation themes."""
     permission_classes = [IsAuthenticated]
     serializer_class = ConversationThemeSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['conversation']
 
     def get_queryset(self):
         """Return themes for the current user."""
@@ -566,4 +570,98 @@ class ConversationThemeViewSet(viewsets.ModelViewSet):
                 'light_overlay_color': '#ffffff',
                 'dark_overlay_color': '#000000'
             })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def attachment_upload(request):
+    """Handle file attachment uploads for messages."""
+    try:
+        file = request.FILES.get('file')
+        conversation_id = request.data.get('conversation_id')
+        
+        if not file:
+            return Response(
+                {'error': 'No file provided'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not conversation_id:
+            return Response(
+                {'error': 'conversation_id is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verify user is a member of the conversation
+        conversation = get_object_or_404(Conversation, id=conversation_id)
+        if not conversation.members.filter(user=request.user).exists():
+            return Response(
+                {'error': 'You are not a member of this conversation'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Validate file size (50MB limit)
+        max_size = 50 * 1024 * 1024
+        if file.size > max_size:
+            return Response(
+                {'error': 'File size exceeds 50MB limit'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate file type
+        allowed_types = [
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+            'video/mp4', 'video/webm',
+            'audio/mpeg', 'audio/wav', 'audio/webm',
+            'application/pdf', 'text/plain'
+        ]
+        
+        if file.content_type not in allowed_types:
+            return Response(
+                {'error': f'File type {file.content_type} is not allowed'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Determine attachment type
+        attachment_type = 'document'
+        if file.content_type.startswith('image/'):
+            attachment_type = 'image'
+        elif file.content_type.startswith('video/'):
+            attachment_type = 'video'
+        elif file.content_type.startswith('audio/'):
+            attachment_type = 'audio'
+        
+        # Create message with attachment
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=request.user,
+            attachment=file,
+            attachment_type=attachment_type,
+            content=''  # Empty content for attachment-only messages
+        )
+        
+        # Update conversation timestamp
+        conversation.save()
+        
+        # Broadcast message via WebSocket
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"chat_{conversation.id}",
+            {
+                'type': 'chat_message',
+                'message': MessageSerializer(message).data
+            }
+        )
+        
+        return Response(
+            MessageSerializer(message).data,
+            status=status.HTTP_201_CREATED
+        )
+        
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
