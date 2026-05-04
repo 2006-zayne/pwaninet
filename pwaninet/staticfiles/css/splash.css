@@ -13,9 +13,17 @@
     align-items: center;
     justify-content: center;
     z-index: 999999;
-    opacity: 1;
+    opacity: 0; /* Hidden by default so it doesn't block interactions */
+    pointer-events: none; /* Prevent blocking when hidden */
     transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: opacity;
+}
+
+/* Ensure splash is interactive and visible only on fresh PWA launches */
+html.fresh-launch #startup-splash,
+#startup-splash.show-splash {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 #startup-splash.fade-out {
