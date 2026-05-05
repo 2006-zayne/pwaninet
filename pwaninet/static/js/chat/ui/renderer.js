@@ -109,6 +109,35 @@ export class MessageRenderer {
                 ? ownMessages[ownMessages.length - 1].id
                 : null;
 
+        // Find last message that was READ by the receiver (for avatar display)
+        const readMessages = ownMessages.filter(m => m.status === 'read');
+        const lastReadMessageId =
+            readMessages.length > 0
+                ? readMessages[readMessages.length - 1].id
+                : null;
+
+        // Find last message from receiver
+        const receiverMessages = messages.filter(m => m.senderId !== this.currentUserId);
+        const lastReceiverMessageId =
+            receiverMessages.length > 0
+                ? receiverMessages[receiverMessages.length - 1].id
+                : null;
+
+        // Determine if read receipt should float to receiver's last message
+        // This happens when receiver sent a message after reading
+        let floatingReadReceiptTargetId = null;
+        if (lastReadMessageId && lastReceiverMessageId) {
+            const lastReadMsg = messages.find(m => m.id === lastReadMessageId);
+            const lastReceiverMsg = messages.find(m => m.id === lastReceiverMessageId);
+            if (lastReadMsg && lastReceiverMsg) {
+                const readTimestamp = new Date(lastReadMsg.timestamp).getTime();
+                const receiverTimestamp = new Date(lastReceiverMsg.timestamp).getTime();
+                if (receiverTimestamp > readTimestamp) {
+                    floatingReadReceiptTargetId = lastReceiverMessageId;
+                }
+            }
+        }
+
         for (let i = 0; i < messages.length; i++) {
             const message = messages[i];
             const messageDate = new Date(message.timestamp).toDateString();
@@ -143,12 +172,24 @@ export class MessageRenderer {
                 groupPosition = 'first'; // No prev but has next from same sender
             }
 
+            const isLastRead = isOwn && message.id === lastReadMessageId;
+            const hasFloatingReadReceipt = message.id === floatingReadReceiptTargetId;
+            // Hide read receipt avatar on sender's message only when:
+            // 1. There's a floating receipt on receiver's message, AND
+            // 2. This is the sender's last message, AND
+            // 3. This message is actually READ (not sent/delivered)
+            // This ensures new unread messages show checkmarks, not hidden receipt
+            const hideReadReceipt = floatingReadReceiptTargetId && isOwn && message.id === lastOwnMessageId && message.status === 'read';
+
             viewItems.push({
                 viewType: 'message',
                 ...message,
                 isOwn,
                 isConsecutive,
                 isLastSent: isOwn && message.id === lastOwnMessageId,
+                isLastRead,
+                hasFloatingReadReceipt,
+                hideReadReceipt,
                 groupPosition
             });
         }
@@ -206,8 +247,31 @@ export class MessageRenderer {
                 ${formatTime(message.timestamp)}
         `;
 
-        if (message.isOwn) {
-            messageHTML += `<span class="message-read-receipt">${this._getStatusIcon(status)}</span>`;
+        // Show read receipt on last sent message (hidden when floating to receiver's message)
+        if (message.isOwn && message.isLastSent && !message.hideReadReceipt) {
+            if (message.status === 'read') {
+                const receiverAvatar = document.body.dataset.receiverAvatar;
+                const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
+                messageHTML += `
+                    <span class="message-read-receipt read-avatar-only">
+                        <img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">
+                    </span>
+                `;
+            } else {
+                // For sent/delivered/failed, show checkmarks
+                messageHTML += `<span class="message-read-receipt status-${status}">${this._getStatusIcon(status)}</span>`;
+            }
+        }
+
+        // Floating read receipt on receiver's last message (when they sent after reading)
+        if (message.hasFloatingReadReceipt) {
+            const receiverAvatar = document.body.dataset.receiverAvatar;
+            const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
+            messageHTML += `
+                <span class="message-read-receipt floating-read-receipt">
+                    <img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">
+                </span>
+            `;
         }
         
 
@@ -222,15 +286,20 @@ export class MessageRenderer {
     /**
      * Get status icon (pure data transformation)
      * @param {string} status - Message status from canonical schema
-     * @returns {string} Icon HTML
+     * @returns {string} Icon HTML - checkmark inside circle
      */
     _getStatusIcon(status) {
+        // Single checkmark inside circle
+        const singleCheck = '<span class="check-circle"><span class="check-mark">&#10003;</span></span>';
+        // Double checkmark inside circle (for delivered/read before avatar)
+        const doubleCheck = '<span class="check-circle"><span class="check-mark double">&#10003;&#10003;</span></span>';
+        
         switch (status) {
-            case 'sent': return '&#10003;';
-            case 'delivered': return '&#10003;&#10003;';
-            case 'read': return '&#10003;&#10003;';
-            case 'failed': return '❌';
-            default: return '&#10003;';
+            case 'sent': return singleCheck;
+            case 'delivered': return doubleCheck;
+            case 'read': return doubleCheck; // Will be replaced by avatar, but fallback
+            case 'failed': return '<span class="check-circle error">&#10007;</span>';
+            default: return singleCheck;
         }
     }
 

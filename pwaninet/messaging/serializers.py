@@ -30,13 +30,14 @@ class MessageSerializer(serializers.ModelSerializer):
     read_receipts = MessageReadSerializer(many=True, read_only=True)
     reply_to_details = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
+    read_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
         fields = [
             'id', 'conversation', 'sender', 'content', 'encrypted_content', 'is_encrypted',
             'attachment', 'attachment_type', 'reply_to', 'reactions', 'read_receipts',
-            'reply_to_details', 'attachment_url', 'created_at', 'edited_at', 'is_deleted'
+            'reply_to_details', 'attachment_url', 'read_status', 'created_at', 'edited_at', 'is_deleted'
         ]
         read_only_fields = ['id', 'created_at', 'edited_at', 'is_encrypted']
 
@@ -51,6 +52,40 @@ class MessageSerializer(serializers.ModelSerializer):
         if obj.attachment:
             return obj.attachment.url
         return None
+
+    def get_read_status(self, obj):
+        """Get the read status of the message."""
+        request = self.context.get('request')
+
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # If there's no request user, default to sent
+        if not request or not request.user.is_authenticated:
+            logger.debug(f"Message {obj.id}: No request or auth, returning 'sent'")
+            return 'sent'
+
+        # If the current user sent this message, check if others have read it
+        if obj.sender == request.user:
+            # Check if any other member has read this message
+            other_members = obj.conversation.members.exclude(user=request.user)
+            for member in other_members:
+                if obj.read_receipts.filter(user=member.user).exists():
+                    logger.debug(f"Message {obj.id}: Sender {request.user.id}, read by {member.user.id}, returning 'read'")
+                    return 'read'
+            # If no one has read it, it's just 'sent'
+            logger.debug(f"Message {obj.id}: Sender {request.user.id}, not read, returning 'sent'")
+            return 'sent'
+
+        # If the current user received this message, check if they've read it
+        if obj.read_receipts.filter(user=request.user).exists():
+            logger.debug(f"Message {obj.id}: Receiver {request.user.id} has read, returning 'read'")
+            return 'read'
+
+        # For the receiver, if they see the message but haven't read it, it's 'delivered'
+        logger.debug(f"Message {obj.id}: Receiver {request.user.id} not read, returning 'delivered'")
+        return 'delivered'
 
 
 class MessageCreateSerializer(serializers.ModelSerializer):

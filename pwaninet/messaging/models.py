@@ -41,16 +41,16 @@ class Conversation(models.Model):
         last_msg = self.last_message
         if not last_msg or last_msg.sender != user:
             return None
-        
+
         # Check if any other member has read this message
         other_members = self.members.exclude(user=user)
         for member in other_members:
             if MessageRead.objects.filter(message=last_msg, user=member.user).exists():
                 return 'read'
-        
-        # Check if message was delivered (exists in database)
-        # For now, we'll consider it delivered if it's been sent
-        return 'delivered' if last_msg else 'sent'
+
+        # If message exists but hasn't been read yet, it's just 'sent'
+        # 'delivered' status should only be set when receiver confirms receipt via WebSocket
+        return 'sent' if last_msg else None
 
     @classmethod
     def get_direct_conversation_between(cls, user1, user2):

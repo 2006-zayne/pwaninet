@@ -327,14 +327,10 @@ def conversation_list(request):
         # Get last message efficiently from the queryset
         last_message = conversation.messages.order_by('-created_at').first()
         
-        # Check if last message is read by current user
-        read_status = 'sent'  # Default
-        if last_message and last_message.sender != request.user:
-            # Check if current user has read this message
-            if last_message.read_receipts.filter(user=request.user).exists():
-                read_status = 'read'
-            else:
-                read_status = 'delivered'
+        # Get read status from conversation model (which checks if other members have read)
+        read_status = None
+        if last_message and last_message.sender == request.user:
+            read_status = conversation.get_last_message_read_status(request.user) or 'sent'
         
         conversation_data.append({
             'conversation': conversation,

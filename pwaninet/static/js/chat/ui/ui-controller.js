@@ -24,11 +24,15 @@ export class UIController {
 
         // Get state FIRST
         const initialState = store.getState();
+        this.currentUserId = initialState.currentUserId;
 
         // Initialize renderer with valid currentUserId
         this.renderer = new MessageRenderer();
-        this.renderer.init(initialState.currentUserId);
+        this.renderer.init(this.currentUserId);
         window.__store = store;
+
+        // Setup read receipt observer
+        this._setupReadReceiptObserver();
 
         // Subscribe to store changes (read-only consumer)
         this.unsubscribe = store.subscribe((state) => {
@@ -50,10 +54,11 @@ export class UIController {
      * @param {Object} state - Current state from store
      */
     _handleStateChange(state) {
-        this._log('STATE_CHANGE_RECEIVED', { 
+        this._log('STATE_CHANGE_RECEIVED', {
             messagesCount: state.messages.length,
             connectionState: state.connectionState,
-            typingUsers: state.typingUsers.size
+            typingUsers: state.typingUsers.size,
+            peerOnlineStatus: state.peerOnlineStatus.size
         });
 
         // Only render if state actually changed
@@ -61,11 +66,16 @@ export class UIController {
             // Update connection status in UI
             this._updateConnectionStatus(state.connectionState);
 
-            // Update typing indicators
-            this._updateTypingIndicators(state.typingUsers);
+            // Update typing indicators and peer status
+            this._updateTypingIndicators(state.typingUsers, state.peerOnlineStatus);
 
             // Render messages (pure rendering)
             this.renderer.render(state.messages);
+
+            // Observe received messages for read receipts (with small delay for DOM settling)
+            setTimeout(() => {
+                this._observeReceivedMessages();
+            }, 100);
 
             // Update UI state
             this._updateUIState(state.uiState);
@@ -187,20 +197,83 @@ export class UIController {
     }
 
     /**
-     * Update typing indicators (pure UI update)
+     * Update typing indicators and peer online status (pure UI update)
      * @param {Map} typingUsers - Typing users map
+     * @param {Map} peerOnlineStatus - Peer online status map
      */
-    _updateTypingIndicators(typingUsers) {
-        const indicator = document.getElementById('typingIndicator');
-        if (indicator) {
-            const typingArray = Array.from(typingUsers.values());
-            if (typingArray.length > 0) {
-                indicator.textContent = `${typingArray[0]} is typing...`;
-                indicator.style.display = 'block';
-            } else {
-                indicator.textContent = '';
-                indicator.style.display = 'none';
+    _updateTypingIndicators(typingUsers, peerOnlineStatus) {
+        const chatStatus = document.getElementById('chatStatus');
+        const chatAvatar = document.querySelector('.chat-avatar');
+
+        if (!chatStatus) return;
+
+        const typingArray = Array.from(typingUsers.values());
+        const peerArray = Array.from(peerOnlineStatus.entries());
+
+        // Get the first peer (other user in conversation)
+        const peer = peerArray.length > 0 ? peerArray[0][1] : null;
+        const isPeerOnline = peer ? peer.isOnline : false;
+        const lastSeen = peer ? peer.lastSeen : null;
+
+        if (typingArray.length > 0) {
+            // User is typing - show typing indicator with blue color and pulse
+            chatStatus.textContent = 'typing...';
+            chatStatus.className = 'chat-status typing';
+            // Remove green border when typing
+            if (chatAvatar) {
+                chatAvatar.classList.remove('avatar-online');
             }
+        } else if (isPeerOnline) {
+            // User is online but not typing - show nothing in status, add green border to avatar
+            chatStatus.textContent = '';
+            chatStatus.className = 'chat-status';
+            // Add green border to avatar
+            if (chatAvatar) {
+                chatAvatar.classList.add('avatar-online');
+            }
+        } else if (lastSeen) {
+            // User is offline - show last seen
+            const lastSeenStr = this._formatLastSeen(lastSeen);
+            chatStatus.textContent = `last seen ${lastSeenStr}`;
+            chatStatus.className = 'chat-status';
+            // Remove green border from avatar
+            if (chatAvatar) {
+                chatAvatar.classList.remove('avatar-online');
+            }
+        } else {
+            // Unknown status - default empty
+            chatStatus.textContent = '';
+            chatStatus.className = 'chat-status';
+            if (chatAvatar) {
+                chatAvatar.classList.remove('avatar-online');
+            }
+        }
+    }
+
+    /**
+     * Format last seen timestamp to human readable string
+     * @param {number} timestamp - Last seen timestamp
+     * @returns {string} Formatted string
+     */
+    _formatLastSeen(timestamp) {
+        const now = Date.now();
+        const diff = now - timestamp;
+        const seconds = Math.floor(diff / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+
+        if (seconds < 60) {
+            return 'just now';
+        } else if (minutes < 60) {
+            return `${minutes}m ago`;
+        } else if (hours < 24) {
+            return `${hours}h ago`;
+        } else if (days < 7) {
+            return `${days}d ago`;
+        } else {
+            const date = new Date(timestamp);
+            return date.toLocaleDateString();
         }
     }
 
@@ -230,6 +303,160 @@ export class UIController {
     }
 
     /**
+     * Setup read receipt observer to detect when received messages become visible
+     */
+    _setupReadReceiptObserver() {
+        this._log('SETUP_READ_RECEIPT_OBSERVER');
+
+        // Cleanup existing observer
+        if (this.readReceiptObserver) {
+            this.readReceiptObserver.disconnect();
+        }
+
+        // Track already-read messages to avoid duplicate receipts
+        this.readMessageIds = new Set();
+
+        // Create intersection observer
+        this.readReceiptObserver = new IntersectionObserver((entries) => {
+            const messageIdsToMark = [];
+
+            entries.forEach(entry => {
+                console.log('[INTERSECTION_OBSERVER] Entry:', {
+                    isIntersecting: entry.isIntersecting,
+                    messageId: entry.target.getAttribute('data-message-id'),
+                    senderId: entry.target.getAttribute('data-sender-id'),
+                    currentUserId: this.currentUserId
+                });
+
+                if (entry.isIntersecting) {
+                    const messageId = entry.target.getAttribute('data-message-id');
+                    const senderId = entry.target.getAttribute('data-sender-id');
+
+                    // Only mark received messages (not own messages) that haven't been read yet
+                    if (messageId &&
+                        senderId &&
+                        String(senderId) !== String(this.currentUserId) &&
+                        !this.readMessageIds.has(messageId)) {
+
+                        console.log('[INTERSECTION_OBSERVER] Marking message as read:', messageId);
+                        messageIdsToMark.push(messageId);
+                        this.readMessageIds.add(messageId);
+
+                        // Stop observing this message
+                        this.readReceiptObserver.unobserve(entry.target);
+                    } else {
+                        console.log('[INTERSECTION_OBSERVER] Skipping message:', {
+                            messageId,
+                            hasMessageId: !!messageId,
+                            hasSenderId: !!senderId,
+                            isOwnMessage: senderId ? String(senderId) === String(this.currentUserId) : 'no sender',
+                            alreadyRead: messageId ? this.readMessageIds.has(messageId) : 'no id'
+                        });
+                    }
+                }
+            });
+
+            // Send read receipts for visible messages
+            if (messageIdsToMark.length > 0) {
+                console.log('[INTERSECTION_OBSERVER] Sending read receipts for visible messages:', messageIdsToMark);
+                this._log('MESSAGES_BECAME_VISIBLE', { count: messageIdsToMark.length });
+                messageService.markMessagesAsRead(messageIdsToMark);
+            }
+        }, {
+            root: document.getElementById('messagesContainer'),
+            threshold: 0.5 // Message must be 50% visible
+        });
+
+        this._log('READ_RECEIPT_OBSERVER_SETUP');
+    }
+
+    /**
+     * Observe a message element for read receipt
+     * @param {HTMLElement} element - Message element
+     */
+    _observeMessageForReadReceipt(element) {
+        if (this.readReceiptObserver && element) {
+            this.readReceiptObserver.observe(element);
+        }
+    }
+
+    /**
+     * Observe all received (non-own) messages in the container for read receipts
+     * Also immediately marks visible messages as read (for real-time updates)
+     */
+    _observeReceivedMessages() {
+        const container = document.getElementById('messagesContainer');
+        if (!container || !this.readReceiptObserver) return;
+
+        // Find all received message bubbles (not sent by current user)
+        const receivedMessages = container.querySelectorAll('.message-bubble.received[data-message-id]');
+        const immediatelyVisibleIds = [];
+
+        receivedMessages.forEach(messageEl => {
+            const messageId = messageEl.getAttribute('data-message-id');
+            // Only observe if not already read
+            if (messageId && !this.readMessageIds.has(messageId)) {
+                this.readReceiptObserver.observe(messageEl);
+
+                // Check if message is already visible in viewport (for real-time messages)
+                if (this._isElementVisible(messageEl, container)) {
+                    immediatelyVisibleIds.push(messageId);
+                    this.readMessageIds.add(messageId);
+                    this.readReceiptObserver.unobserve(messageEl);
+                }
+            }
+        });
+
+        // Immediately mark visible messages as read (don't wait for scroll)
+        if (immediatelyVisibleIds.length > 0) {
+            console.log('[READ_RECEIPTS] Sending immediate read receipts for:', immediatelyVisibleIds);
+            this._log('MESSAGES_ALREADY_VISIBLE', { count: immediatelyVisibleIds.length });
+            messageService.markMessagesAsRead(immediatelyVisibleIds);
+        } else {
+            console.log('[READ_RECEIPTS] No immediately visible messages found');
+        }
+
+        this._log('OBSERVING_RECEIVED_MESSAGES', {
+            total: receivedMessages.length,
+            newlyObserved: receivedMessages.length - immediatelyVisibleIds.length,
+            immediatelyRead: immediatelyVisibleIds.length
+        });
+    }
+
+    /**
+     * Check if an element is visible in its container's viewport
+     * @param {HTMLElement} element - Element to check
+     * @param {HTMLElement} container - Container element
+     * @returns {boolean} True if element is visible
+     */
+    _isElementVisible(element, container) {
+        const containerRect = container.getBoundingClientRect();
+        const elementRect = element.getBoundingClientRect();
+
+        // More lenient visibility check - element should be at least partially visible
+        // and not completely above or below the container
+        const isVisible = (
+            elementRect.bottom > containerRect.top &&  // Not completely above
+            elementRect.top < containerRect.bottom &&   // Not completely below
+            elementRect.height > 0
+        );
+
+        // Debug logging
+        if (element.getAttribute('data-message-id')) {
+            console.log('[VISIBILITY_CHECK]', {
+                messageId: element.getAttribute('data-message-id'),
+                isVisible,
+                elementTop: elementRect.top,
+                elementBottom: elementRect.bottom,
+                containerTop: containerRect.top,
+                containerBottom: containerRect.bottom
+            });
+        }
+
+        return isVisible;
+    }
+
+    /**
      * Check if state changed (pure comparison)
      * @param {Object} newState - New state
      * @param {Object} lastState - Last state
@@ -238,13 +465,37 @@ export class UIController {
     _stateChanged(newState, lastState) {
         if (!lastState) return true;
 
+        // Check message count
+        if (newState.messages.length !== lastState.messagesLength) {
+            return true;
+        }
+
+        // Check message statuses (for read receipts)
+        if (newState.messages.length > 0 && lastState.messagesChecksum) {
+            const newChecksum = this._computeMessagesChecksum(newState.messages);
+            if (newChecksum !== lastState.messagesChecksum) {
+                return true;
+            }
+        }
+
         return (
-            newState.messages.length !== lastState.messagesLength ||
             newState.connectionState !== lastState.connectionState ||
             newState.typingUsers.size !== lastState.typingUsersSize ||
+            newState.peerOnlineStatus.size !== lastState.peerOnlineStatusSize ||
             newState.uiState !== lastState.uiState ||
             JSON.stringify(newState.currentTheme) !== JSON.stringify(lastState.currentTheme)
         );
+    }
+
+    /**
+     * Compute a checksum of message statuses for detecting read receipt updates
+     * @param {Array} messages - Messages array
+     * @returns {string} Checksum string
+     */
+    _computeMessagesChecksum(messages) {
+        // Create a simple checksum based on message IDs and statuses
+        // This allows us to detect when a message status changes (e.g., sent -> read)
+        return messages.map(m => `${m.id}:${m.status || 'sent'}`).join('|');
     }
 
     /**
@@ -255,8 +506,12 @@ export class UIController {
     _createStateSnapshot(state) {
         return {
             messagesLength: state.messages.length,
+            messagesChecksum: state.messages.length > 0
+                ? this._computeMessagesChecksum(state.messages)
+                : null,
             connectionState: state.connectionState,
             typingUsersSize: state.typingUsers.size,
+            peerOnlineStatusSize: state.peerOnlineStatus.size,
             uiState: state.uiState,
             currentTheme: state.currentTheme ? JSON.parse(JSON.stringify(state.currentTheme)) : null
         };
@@ -290,6 +545,17 @@ export class UIController {
         if (this.renderer) {
             this.renderer.destroy();
             this.renderer = null;
+        }
+
+        // Clean up read receipt observer
+        if (this.readReceiptObserver) {
+            this.readReceiptObserver.disconnect();
+            this.readReceiptObserver = null;
+        }
+
+        if (this.readMessageIds) {
+            this.readMessageIds.clear();
+            this.readMessageIds = null;
         }
 
         this.lastState = null;

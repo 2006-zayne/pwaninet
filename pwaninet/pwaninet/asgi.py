@@ -29,3 +29,6 @@ application = ProtocolTypeRouter({
         )
     ),
 })
+
+# Debug: Log ASGI startup
+print('[ASGI] Application initialized with WebSocket support')

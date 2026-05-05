@@ -20,6 +20,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
         """Handle WebSocket connection with heartbeat task and rate limiting."""
+        print(f'[BACKEND] WebSocket connection attempt from user {self.scope["user"].id} to conversation {self.scope["url_route"]["kwargs"]["conversation_id"]}')
         self.conversation_id = self.scope['url_route']['kwargs']['conversation_id']
         self.room_group_name = f'chat_{self.conversation_id}'
         self.user = self.scope['user']
@@ -28,12 +29,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.connection_id = self.channel_name  # Unique per connection
 
         if not self.user.is_authenticated:
+            print(f'[BACKEND] User {self.user.id} is not authenticated, closing connection')
             await self.close()
             return
 
         # Check if user is a member of the conversation
         is_member = await self.is_conversation_member()
+        print(f'[BACKEND] User {self.user.id} is_member check: {is_member}')
         if not is_member:
+            print(f'[BACKEND] User {self.user.id} is not a member of conversation {self.conversation_id}, closing connection')
             await self.close()
             return
 
@@ -46,26 +50,42 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'ip': self.scope.get('client', ['unknown'])[0],
             }
         )
+        print(f'[BACKEND] Connection tracking result: {tracked}')
 
         if not tracked:
+            print(f'[BACKEND] Connection not tracked, closing')
             await self.close()
             return
 
         # Join room group
+        print(f'[BACKEND] User {self.user.id} joining room group: {self.room_group_name}')
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
+        print(f'[BACKEND] User {self.user.id} accepted and joined room: {self.room_group_name}')
 
-        # Set user online in Redis
-        await self.set_user_online(True)
+        # Register this connection
+        WebSocketConnectionTracker.register_connection(self.user.id, self.channel_name)
+
+        # Set user online in Redis (only if this is the first connection)
+        connection_count = WebSocketConnectionTracker.get_connection_count(self.user.id)
+        if connection_count == 1:
+            await self.set_user_online(True)
+            # Broadcast user online status to room members
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'user_status',
+                    'user_id': self.user.id,
+                    'username': self.user.username,
+                    'is_online': True
+                }
+            )
 
         # Start heartbeat task to detect stale connections
         self.heartbeat_task = asyncio.create_task(self.heartbeat_loop())
 
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection and cleanup."""
-        # Unregister connection
-        WebSocketConnectionTracker.unregister_connection(self.user.id, self.connection_id)
-
         # Cancel heartbeat task
         if self.heartbeat_task:
             self.heartbeat_task.cancel()
@@ -77,15 +97,35 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Leave room group
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
-        # Set user offline in Redis
-        await self.set_user_online(False)
+        # Unregister this connection (synchronous method, handle None user)
+        if self.user and hasattr(self.user, 'id'):
+            WebSocketConnectionTracker.unregister_connection(self.user.id, self.channel_name)
+
+        # Only set user offline if this was the last connection
+        connection_count = WebSocketConnectionTracker.get_connection_count(self.user.id)
+        if connection_count == 0:
+            await self.set_user_online(False)
+            # Broadcast user offline status to room members
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'user_status',
+                    'user_id': self.user.id,
+                    'username': self.user.username,
+                    'is_online': False,
+                    'last_seen': asyncio.get_event_loop().time()
+                }
+            )
 
     async def heartbeat_loop(self):
-        """Send periodic heartbeat messages to keep connection alive."""
+        """Send periodic heartbeat messages to keep connection alive and refresh online status."""
         try:
             while True:
                 await asyncio.sleep(HEARTBEAT_INTERVAL)
                 try:
+                    # Refresh Redis TTL to keep user online
+                    await self.set_user_online(True)
+
                     await self.send(text_data=json.dumps({
                         'type': 'ping',
                         'timestamp': asyncio.get_event_loop().time()
@@ -139,6 +179,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         encrypted_content = data.get('encrypted_content')
         is_encrypted = data.get('is_encrypted', False)
         reply_to_id = data.get('reply_to')
+        
+        print(f'[BACKEND] Handling chat message from user {self.user.id} in conversation {self.conversation_id}')
         temp_id = data.get('temp_id')  # Get temp_id for optimistic update matching
 
         # Must have either plain content or encrypted content
@@ -153,6 +195,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message['temp_id'] = temp_id
 
         # Broadcast to room group
+        print(f'[BACKEND] Broadcasting message {message["id"]} to room group: {self.room_group_name}')
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -160,6 +203,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'message': message
             }
         )
+        print(f'[BACKEND] Message {message["id"]} broadcasted to room group')
 
     async def handle_typing_indicator(self, data):
         """Handle typing indicator."""
@@ -183,8 +227,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not message_id:
             return
 
+        print(f'[BACKEND] Processing read receipt for message {message_id} from user {self.user.id}')
+
         # Mark message as read
         await self.mark_message_as_read(message_id)
+
+        # Get user avatar for the read receipt
+        read_avatar = await self.get_user_avatar()
+        print(f'[BACKEND] Got avatar for read receipt: {read_avatar}')
 
         # Broadcast to room group
         await self.channel_layer.group_send(
@@ -192,17 +242,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
             {
                 'type': 'read_receipt',
                 'message_id': message_id,
-                'user_id': self.user.id
+                'user_id': self.user.id,
+                'read_avatar': read_avatar
             }
         )
+        print(f'[BACKEND] Broadcasted read receipt for message {message_id}')
 
     async def chat_message(self, event):
         """Send chat message to WebSocket."""
         message = event['message']
+        print(f'[BACKEND] Sending message to client: {message["id"]}')
         await self.send(text_data=json.dumps({
             'type': 'message',
             'data': message
         }))
+        print(f'[BACKEND] Message sent to client')
 
     async def typing_indicator(self, event):
         """Send typing indicator to WebSocket."""
@@ -213,12 +267,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'is_typing': event['is_typing']
         }))
 
+    async def user_status(self, event):
+        """Send user online/offline status to WebSocket."""
+        await self.send(text_data=json.dumps({
+            'type': 'user_status',
+            'user_id': event['user_id'],
+            'username': event['username'],
+            'is_online': event['is_online'],
+            'last_seen': event.get('last_seen')
+        }))
+
     async def read_receipt(self, event):
         """Send read receipt to WebSocket."""
         await self.send(text_data=json.dumps({
             'type': 'read_receipt',
             'message_id': event['message_id'],
-            'user_id': event['user_id']
+            'user_id': event['user_id'],
+            'read_avatar': event.get('read_avatar')
         }))
 
     @database_sync_to_async
@@ -273,7 +338,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         try:
             from .models import MessageRead
             message = Message.objects.get(id=message_id)
-            
+
             # Create read receipt
             MessageRead.objects.get_or_create(
                 message=message,
@@ -287,6 +352,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 member.save()
         except Message.DoesNotExist:
             pass
+
+    @database_sync_to_async
+    def get_user_avatar(self):
+        """Get current user's avatar URL for read receipts."""
+        try:
+            if self.user.profile_photo:
+                return self.user.profile_photo.url
+        except Exception:
+            pass
+        return None
 
     async def set_user_online(self, is_online):
         """Set user online status in Redis using connection pool."""

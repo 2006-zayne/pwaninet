@@ -401,12 +401,12 @@ class PWAInstallManager {
         console.log('Install prompt dismissed');
         this.hideInstallPrompt();
         
-        // Show reminder after 5 minutes
+        // Show reminder after 30 minutes
         setTimeout(() => {
             if (!this.isInstalled()) {
                 this.showInstallReminder();
             }
-        }, 300000); // 5 minutes
+        }, 1800000); // 30 minutes
     }
 
     showInstallReminder() {

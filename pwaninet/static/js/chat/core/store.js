@@ -39,6 +39,9 @@ export class Store {
             uiState: UI_STATE.IDLE,
             typingUsers: new Map(), // userId -> username
 
+            // Peer online status
+            peerOnlineStatus: new Map(), // userId -> { isOnline: boolean, lastSeen: timestamp }
+
             // Theme state
             currentTheme: null,
             themeMode: 'light'
@@ -98,6 +101,7 @@ export class Store {
             processedMessageIds: new Set(this._state.processedMessageIds),
             uiState: this._state.uiState,
             typingUsers: new Map(this._state.typingUsers),
+            peerOnlineStatus: new Map(this._state.peerOnlineStatus),
             currentTheme: this._state.currentTheme,
             themeMode: this._state.themeMode
         };
@@ -188,13 +192,15 @@ export class Store {
      * @param {Object} updates - Message updates
      */
     updateMessage(messageId, updates) {
+        console.log('[STORE] Updating message:', messageId, 'with updates:', updates);
         this._logMutation('UPDATE_MESSAGE', { messageId, updates });
 
         const existingMessage = this._state.messages.get(messageId);
         if (!existingMessage) {
-            console.error('Store: Message not found for update', messageId);
+            console.error('[STORE] Message not found for update', messageId);
             return;
         }
+        console.log('[STORE] Existing message before update:', existingMessage);
 
         // Validate updates against canonical schema
         const updatedMessage = this._validateCanonicalMessage({
@@ -302,6 +308,23 @@ export class Store {
     }
 
     /**
+     * Set peer online status
+     * @param {number} userId - User ID
+     * @param {boolean} isOnline - Is online
+     * @param {number|null} lastSeen - Last seen timestamp
+     */
+    setPeerOnlineStatus(userId, isOnline, lastSeen = null) {
+        this._logMutation('SET_PEER_ONLINE_STATUS', { userId, isOnline, lastSeen });
+
+        this._state.peerOnlineStatus.set(userId, {
+            isOnline,
+            lastSeen: lastSeen || Date.now()
+        });
+
+        this._notifySubscribers();
+    }
+
+    /**
      * Set UI state
      * @param {string} state - UI state
      */
@@ -335,6 +358,7 @@ export class Store {
         this._state.messageOrder = [];
         this._state.processedMessageIds.clear();
         this._state.typingUsers.clear();
+        this._state.peerOnlineStatus.clear();
         this._state.uiState = UI_STATE.IDLE;
 
         this._notifySubscribers();

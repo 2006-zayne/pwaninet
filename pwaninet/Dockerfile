@@ -34,5 +34,5 @@ RUN python manage.py collectstatic --noinput --settings=pwaninet.settings.local
 # Expose port
 EXPOSE 8000
 
-# Run the application
-CMD ["gunicorn", "pwaninet.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+# Run the application with Daphne for WebSocket support
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "pwaninet.asgi:application"]

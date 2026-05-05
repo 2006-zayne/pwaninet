@@ -107,6 +107,12 @@
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid var(--border);
+  transition: border-color 0.3s ease;
+}
+
+.chat-avatar.avatar-online {
+  border-color: #31a24c !important;
+  box-shadow: 0 0 0 2px rgba(49, 162, 76, 0.3);
 }
 
 .chat-username {
@@ -362,98 +368,142 @@ div.chat-container div.messages-area div.message-bubble {
 
 .message-read-receipt {
   font-size: 12px;
-  margin-left: 2px;
+  display: inline-flex;
+  align-items: center;
+  /* Position absolutely on wall side (bottom right for sent messages) */
+  position: absolute;
+  bottom: -16px;
+  right: 4px;
+  z-index: 10;
+}
+
+/* Circular checkmark container - same size as avatar */
+.check-circle {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  line-height: 1;
+}
+
+/* Sent: Grey circle with black check */
+.message-read-receipt.status-sent .check-circle {
+  background-color: #e0e0e0;
+  color: #000;
+  border: 1px solid #ccc;
+}
+
+/* Delivered: Brand blue circle with black check */
+.message-read-receipt.status-delivered .check-circle {
+  background-color: var(--brand, #2563eb);
+  color: #000;
+  border: 1px solid var(--brand, #2563eb);
+}
+
+/* Read: Blue circle with blue check (fallback if no avatar) */
+.message-read-receipt.status-read .check-circle {
+  background-color: #e3f2fd;
+  color: var(--brand, #2563eb);
+  border: 1px solid #90caf9;
+}
+
+/* Failed: Red circle */
+.message-read-receipt .check-circle.error {
+  background-color: #ffebee;
+  color: #d32f2f;
+  border: 1px solid #ef9a9a;
+}
+
+/* Checkmark styling inside circle */
+.check-mark {
+  font-weight: bold;
+  font-size: 9px;
+}
+
+.check-mark.double {
+  font-size: 7px;
+  letter-spacing: -1px;
+}
+
+/* Read receipt avatar - same size as check circle, inline next to time */
+.read-avatar-img {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #90caf9;
+  background-color: #e3f2fd;
+}
+
+/* Avatar-only container (no checkmark, just avatar) */
+.message-read-receipt.read-avatar-only {
   display: inline-flex;
   align-items: center;
 }
 
-/* Read Receipt Indicator Styles */
+/* Extra margin for messages with read receipt so it doesn't overlap */
+.message-bubble.sent:has(.message-read-receipt) {
+  margin-bottom: 16px !important;
+}
+
+/* Read receipt indicator positioned on wall side */
 .read-receipt-indicator {
   position: absolute;
-  bottom: -8px;
-  right: -4px;
+  bottom: -16px;
+  right: 4px;
   z-index: 10;
 }
 
-.read-receipt-circle {
-  width: 18px;
-  height: 18px;
+/* Avatar below message for read status */
+.read-receipt-avatar-below {
+  position: absolute;
+  bottom: -18px;
+  right: 0;
+  z-index: 10;
+}
+
+/* Floating read receipt - appears on receiver's last message at same level */
+/* Positioned at bottom of receiver's message, on sender's wall side (right) */
+.message-bubble.received .message-read-receipt.floating-read-receipt {
+  position: absolute;
+  right: -22px;
+  bottom: 4px;
+  top: auto;
+  z-index: 10;
+  /* Animation for the "jump" from sender's message down to receiver's level */
+  animation: receiptJump 0.3s ease-out;
+}
+
+/* Animation keyframes for the jump transition */
+@keyframes receiptJump {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Ensure receiver message has room for floating receipt */
+.message-bubble.received:has(.floating-read-receipt) {
+  margin-right: 22px !important;
+}
+
+.read-avatar-img {
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: white;
-  border: 2px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-.read-receipt-icon {
-  font-size: 10px;
-  color: #888;
-  font-weight: bold;
-}
-
-/* State: Sent (user not online) - White/gray */
-.read-receipt-indicator[data-status="sent"] .read-receipt-circle {
-  background: white;
-  border-color: #ddd;
-}
-
-.read-receipt-indicator[data-status="sent"] .read-receipt-icon {
-  color: #888;
-}
-
-/* State: Online - Blue circle */
-.read-receipt-indicator[data-status="online"] .read-receipt-circle {
-  background: var(--brand);
-  border-color: var(--brand);
-}
-
-.read-receipt-indicator[data-status="online"] .read-receipt-icon {
-  color: white;
-}
-
-/* State: Read/Seen - Profile picture */
-.read-receipt-indicator[data-status="read"] .read-receipt-circle {
-  background: transparent;
-  border: none;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.read-receipt-indicator[data-status="read"] .read-receipt-avatar {
-  width: 100%;
-  height: 100%;
   object-fit: cover;
-  border-radius: 50%;
-}
-
-.read-receipt-indicator[data-status="read"] .read-receipt-icon {
-  display: none;
-}
-
-[data-theme="dark"] .read-receipt-circle {
-  background: #2a3942;
-  border-color: #2a3942;
-}
-
-[data-theme="dark"] .read-receipt-indicator[data-status="sent"] .read-receipt-circle {
-  background: #2a3942;
-  border-color: #3a4a54;
-}
-
-[data-theme="dark"] .read-receipt-indicator[data-status="sent"] .read-receipt-icon {
-  color: #8696a0;
-}
-
-[data-theme="dark"] .read-receipt-indicator[data-status="online"] .read-receipt-circle {
-  background: var(--brand);
-  border-color: var(--brand);
-}
-
-[data-theme="dark"] .read-receipt-indicator[data-status="online"] .read-receipt-icon {
-  color: white;
+  border: 1px solid #90caf9;
+  background-color: #e3f2fd;
 }
 
 .input-area {
@@ -1727,7 +1777,7 @@ body {
           {% endfor %}
         {% endif %}
       </div>
-      <div class="chat-status" id="chatStatus">Online</div>
+      <div class="chat-status" id="chatStatus"></div>
     </div>
     <button class="icon-btn" id="searchBtn" title="Search in conversation">
       <i class="bi bi-search"></i>
@@ -2418,6 +2468,13 @@ console.log('=== CONVERSATION DETAIL REFACTORED SCRIPT LOADING ===');
 document.body.dataset.userId = '{{ request.user.id }}';
 document.body.dataset.conversationId = '{{ conversation.id }}';
 document.body.dataset.isEncrypted = '{{ conversation.is_encrypted|yesno:"true,false" }}';
+{% if conversation.type == 'direct' %}
+  {% for member in conversation.members.all %}
+    {% if member.user != request.user %}
+      document.body.dataset.receiverAvatar = '{{ member.user.profile_pic.url|default:"/static/images/default_pic1.jpg" }}';
+    {% endif %}
+  {% endfor %}
+{% endif %}
 </script>
 
 <script src="{% static 'js/encryption.js' %}"></script>

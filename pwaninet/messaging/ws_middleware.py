@@ -111,7 +111,7 @@ class WebSocketConnectionTracker:
     """
 
     KEY_PREFIX = 'ws_conn'
-    MAX_CONNECTIONS_PER_USER = 5
+    MAX_CONNECTIONS_PER_USER = 20
     CONNECTION_TIMEOUT = 3600  # 1 hour
 
     @classmethod
@@ -136,7 +136,20 @@ class WebSocketConnectionTracker:
             redis_client = get_redis_client()
             conn_key = cls.get_connections_key(user_id)
 
-            # Check current connection count
+            # Clean up stale connections (older than CONNECTION_TIMEOUT)
+            connections = redis_client.smembers(conn_key)
+            now = datetime.now()
+            for conn_json in connections:
+                try:
+                    conn_data = json.loads(conn_json)
+                    connected_at = datetime.fromisoformat(conn_data.get('connected_at', '2000-01-01'))
+                    if (now - connected_at).total_seconds() > cls.CONNECTION_TIMEOUT:
+                        redis_client.srem(conn_key, conn_json)
+                except (json.JSONDecodeError, ValueError):
+                    # Remove malformed entries
+                    redis_client.srem(conn_key, conn_json)
+
+            # Check current connection count after cleanup
             conn_count = redis_client.scard(conn_key)
             if conn_count >= cls.MAX_CONNECTIONS_PER_USER:
                 return False
