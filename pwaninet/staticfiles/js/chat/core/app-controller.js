@@ -58,6 +58,8 @@ export class AppController {
             store.setConnectionState('connected');
             // Process queued messages through message service
             messageService.processMessageQueue();
+            // Send any queued read receipts
+            messageService.sendQueuedReadReceipts();
         } else {
             store.setConnectionState('disconnected');
         }
@@ -127,24 +129,33 @@ export class AppController {
 
         try {
             // 1. stop interference
-            webSocketManager.pause?.();
+            console.log('[APP_CONTROLLER] Pausing WebSocket before loading messages');
+            webSocketManager.pause();
 
             // 2. reset store FIRST
+            console.log('[APP_CONTROLLER] Resetting store');
             store.reset();
 
             // 3. load history
+            console.log('[APP_CONTROLLER] Loading conversation history for ID:', this.config.conversationId);
             await messageService.loadConversationHistory(
                 this.config.conversationId
             );
+            console.log('[APP_CONTROLLER] Messages loaded successfully');
             console.log("STATE SNAPSHOT:", store.getState().messages);
 
             // 4. resume live stream
-            webSocketManager.resume?.();
+            console.log('[APP_CONTROLLER] Resuming WebSocket after loading messages');
+            webSocketManager.resume();
 
             this._log('INITIAL_MESSAGES_LOADED');
 
         } catch (error) {
-            console.error(error);
+            console.error('[APP_CONTROLLER] ERROR loading initial messages:', error);
+            console.error('[APP_CONTROLLER] Error stack:', error.stack);
+            // Still try to resume WebSocket even if loading fails
+            console.log('[APP_CONTROLLER] Attempting to resume WebSocket despite error');
+            webSocketManager.resume();
         }
     }
 

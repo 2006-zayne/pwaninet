@@ -55,12 +55,14 @@ export class MessageService {
     }
 
     normalizeServerMessage(raw) {
+        const mappedStatus = this.mapStatus(raw.read_status || raw.status);
+        console.log(`[MESSAGE_SERVICE] Normalizing message ${raw.id}: raw_status='${raw.read_status || raw.status}', mapped='${mappedStatus}'`);
         return this._createCanonicalMessage({
             id: String(raw.id),
             conversationId: Number(raw.conversation || raw.conversationId),
             senderId: Number(raw.sender?.id ?? raw.sender_id),
             timestamp: new Date(raw.created_at || raw.timestamp).toISOString(),
-            status: this.mapStatus(raw.read_status || raw.status),
+            status: mappedStatus,
             content: raw.content || raw.body || "",
             type: this.mapType(raw.message_type || raw.type),
             metadata: raw.metadata || {},
@@ -70,29 +72,37 @@ export class MessageService {
     }
 
     async loadConversationHistory(conversationId) {
+        console.log('[MESSAGE_SERVICE] Loading conversation history for:', conversationId);
         try {
+            console.log('[MESSAGE_SERVICE] Fetching messages from API');
             const res = await fetch(`/messaging/v1/messages/?conversation=${conversationId}`, {
                 headers: {
                     'X-CSRFToken': getCSRFToken()
                 }
             });
 
+            console.log('[MESSAGE_SERVICE] Fetch response status:', res.status);
             if (!res.ok) throw new Error('HTTP error');
 
             const data = await res.json();
+            console.log('[MESSAGE_SERVICE] Received data:', data);
 
             // DRF ViewSet returns array directly, not object with messages property
             const messages = Array.isArray(data) ? data : (data.results || data.messages || []);
+            console.log('[MESSAGE_SERVICE] Processing', messages.length, 'messages');
 
             for (const raw of messages) {
                 store.addMessage(this.normalizeServerMessage(raw));
             }
+            console.log('[MESSAGE_SERVICE] All messages added to store');
 
         }
         catch (error) {
-            console.error('History load failed', error);
+            console.error('[MESSAGE_SERVICE] History load failed:', error);
+            console.error('[MESSAGE_SERVICE] Error stack:', error.stack);
             throw error;
         }
+        console.log('[MESSAGE_SERVICE] loadConversationHistory completed');
     }
 
 
@@ -223,6 +233,12 @@ export class MessageService {
                 case 'read_receipt':
                     this._processReadReceipt(data);
                     break;
+                case 'message_delivered':
+                    this._processMessageDelivered(data);
+                    break;
+                case 'user_status':
+                    this._processUserStatus(data);
+                    break;
                 default:
                     this._log('UNKNOWN_MESSAGE_TYPE', data.type);
             }
@@ -313,10 +329,11 @@ export class MessageService {
     }
 
     /**
-     * Process read receipt
+     * Process read receipt from WebSocket
      * @param {Object} data - Read receipt data
      */
     _processReadReceipt(data) {
+        console.log('[MESSAGE_SERVICE] Processing read receipt:', data);
         this._log('PROCESS_READ_RECEIPT', data);
 
         // Update message read status in store (ONLY store mutates)
@@ -326,6 +343,43 @@ export class MessageService {
                 read_avatar: data.read_avatar
             }
         });
+        console.log('[MESSAGE_SERVICE] Updated message', data.message_id, 'to read status with avatar:', data.read_avatar);
+    }
+
+    /**
+     * Process message delivered status from WebSocket
+     * @param {Object} data - Message delivered data
+     */
+    _processMessageDelivered(data) {
+        console.log('[MESSAGE_SERVICE] Processing message delivered:', data);
+        this._log('PROCESS_MESSAGE_DELIVERED', data);
+
+        const state = store.getState();
+        const message = store.getMessageById(data.message_id);
+
+        // Only update if message hasn't been read yet (keep read status if it exists)
+        if (message && message.status === 'sent') {
+            store.updateMessage(data.message_id, {
+                status: 'delivered'
+            });
+            console.log('[MESSAGE_SERVICE] Updated message', data.message_id, 'to delivered status');
+        }
+    }
+
+    /**
+     * Process user online/offline status
+     * @param {Object} data - User status data
+     */
+    _processUserStatus(data) {
+        this._log('PROCESS_USER_STATUS', data);
+
+        const state = store.getState();
+
+        // Only process if it's not the current user
+        if (data.user_id !== state.currentUserId) {
+            // Update peer online status in store (ONLY store mutates)
+            store.setPeerOnlineStatus(data.user_id, data.is_online, data.last_seen);
+        }
     }
 
     /**
@@ -392,6 +446,92 @@ export class MessageService {
     setRecipientPublicKey(publicKey) {
         this._log('SET_RECIPIENT_PUBLIC_KEY');
         this.recipientPublicKey = publicKey;
+    }
+
+    /**
+     * Send read receipt for a message
+     * @param {string} messageId - Message ID to mark as read
+     */
+    sendReadReceipt(messageId) {
+        console.log('[MESSAGE_SERVICE] Sending read receipt for message:', messageId);
+        this._log('SEND_READ_RECEIPT', { messageId });
+
+        if (!messageId) {
+            console.log('[MESSAGE_SERVICE] No messageId provided, skipping read receipt');
+            return false;
+        }
+
+        // Send via WebSocket (transport ONLY)
+        const sent = webSocketManager.send({
+            type: 'read_receipt',
+            message_id: messageId
+        });
+
+        if (sent) {
+            console.log('[MESSAGE_SERVICE] Read receipt sent successfully for:', messageId);
+            this._log('READ_RECEIPT_SENT', { messageId });
+        } else {
+            console.log('[MESSAGE_SERVICE] Read receipt FAILED for:', messageId, '- WebSocket not connected, queuing...');
+            this._log('READ_RECEIPT_FAILED', { messageId });
+            
+            // Queue the read receipt for when WebSocket reconnects
+            this.queueReadReceipt(messageId);
+        }
+
+        return sent;
+    }
+
+    /**
+     * Queue a read receipt to send later when WebSocket reconnects
+     * @param {string} messageId - Message ID to queue
+     */
+    queueReadReceipt(messageId) {
+        // Add to read receipt queue (avoid duplicates)
+        if (!this.readReceiptQueue) {
+            this.readReceiptQueue = new Set();
+        }
+        this.readReceiptQueue.add(messageId);
+        console.log('[MESSAGE_SERVICE] Queued read receipt for:', messageId, 'Queue size:', this.readReceiptQueue.size);
+    }
+
+    /**
+     * Send all queued read receipts when WebSocket reconnects
+     */
+    sendQueuedReadReceipts() {
+        if (!this.readReceiptQueue || this.readReceiptQueue.size === 0) {
+            return;
+        }
+
+        console.log('[MESSAGE_SERVICE] Sending', this.readReceiptQueue.size, 'queued read receipts');
+        const messageIds = Array.from(this.readReceiptQueue);
+        this.readReceiptQueue.clear();
+        
+        // Send all queued read receipts
+        messageIds.forEach(messageId => {
+            webSocketManager.send({
+                type: 'read_receipt',
+                message_id: messageId
+            });
+        });
+    }
+
+    /**
+     * Mark multiple messages as read (batch operation)
+     * @param {Array} messageIds - Array of message IDs to mark as read
+     */
+    markMessagesAsRead(messageIds) {
+        if (!Array.isArray(messageIds) || messageIds.length === 0) {
+            console.log('[MESSAGE_SERVICE] No message IDs to mark as read');
+            return;
+        }
+
+        console.log('[MESSAGE_SERVICE] Marking', messageIds.length, 'messages as read:', messageIds);
+        this._log('MARK_MESSAGES_AS_READ', { count: messageIds.length });
+
+        // Send read receipt for each message
+        messageIds.forEach(messageId => {
+            this.sendReadReceipt(messageId);
+        });
     }
 
     /**

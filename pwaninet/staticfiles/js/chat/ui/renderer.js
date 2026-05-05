@@ -109,7 +109,37 @@ export class MessageRenderer {
                 ? ownMessages[ownMessages.length - 1].id
                 : null;
 
-        for (const message of messages) {
+        // Find last message that was READ by the receiver (for avatar display)
+        const readMessages = ownMessages.filter(m => m.status === 'read');
+        const lastReadMessageId =
+            readMessages.length > 0
+                ? readMessages[readMessages.length - 1].id
+                : null;
+
+        // Find last message from receiver
+        const receiverMessages = messages.filter(m => m.senderId !== this.currentUserId);
+        const lastReceiverMessageId =
+            receiverMessages.length > 0
+                ? receiverMessages[receiverMessages.length - 1].id
+                : null;
+
+        // Determine if read receipt should float to receiver's last message
+        // This happens when receiver sent a message after reading
+        let floatingReadReceiptTargetId = null;
+        if (lastReadMessageId && lastReceiverMessageId) {
+            const lastReadMsg = messages.find(m => m.id === lastReadMessageId);
+            const lastReceiverMsg = messages.find(m => m.id === lastReceiverMessageId);
+            if (lastReadMsg && lastReceiverMsg) {
+                const readTimestamp = new Date(lastReadMsg.timestamp).getTime();
+                const receiverTimestamp = new Date(lastReceiverMsg.timestamp).getTime();
+                if (receiverTimestamp > readTimestamp) {
+                    floatingReadReceiptTargetId = lastReceiverMessageId;
+                }
+            }
+        }
+
+        for (let i = 0; i < messages.length; i++) {
+            const message = messages[i];
             const messageDate = new Date(message.timestamp).toDateString();
             const isOwn = message.senderId === this.currentUserId;
 
@@ -119,17 +149,48 @@ export class MessageRenderer {
                     label: formatDateLabel(message.timestamp)
                 });
                 lastDate = messageDate;
+                // Reset sender tracking - date separator breaks the group
+                lastSenderId = null;
             }
 
             const isConsecutive = lastSenderId === message.senderId;
             lastSenderId = message.senderId;
+
+            // Determine group position
+            const nextMessage = messages[i + 1];
+            // Only count next message as same group if same sender AND same date
+            const nextMessageDate = nextMessage ? new Date(nextMessage.timestamp).toDateString() : null;
+            const isNextSameDate = nextMessageDate === messageDate;
+            const isNextFromSameSender = nextMessage && isNextSameDate && nextMessage.senderId === message.senderId;
+
+            let groupPosition = 'single';
+            if (isConsecutive && isNextFromSameSender) {
+                groupPosition = 'middle'; // Has prev and next from same sender
+            } else if (isConsecutive && !isNextFromSameSender) {
+                groupPosition = 'last'; // Has prev but no next from same sender
+            } else if (!isConsecutive && isNextFromSameSender) {
+                groupPosition = 'first'; // No prev but has next from same sender
+            }
+
+            const isLastRead = isOwn && message.id === lastReadMessageId;
+            const hasFloatingReadReceipt = message.id === floatingReadReceiptTargetId;
+            // Hide read receipt avatar on sender's message only when:
+            // 1. There's a floating receipt on receiver's message, AND
+            // 2. This is the sender's last message, AND
+            // 3. This message is actually READ (not sent/delivered)
+            // This ensures new unread messages show checkmarks, not hidden receipt
+            const hideReadReceipt = floatingReadReceiptTargetId && isOwn && message.id === lastOwnMessageId && message.status === 'read';
 
             viewItems.push({
                 viewType: 'message',
                 ...message,
                 isOwn,
                 isConsecutive,
-                isLastSent: isOwn && message.id === lastOwnMessageId
+                isLastSent: isOwn && message.id === lastOwnMessageId,
+                isLastRead,
+                hasFloatingReadReceipt,
+                hideReadReceipt,
+                groupPosition
             });
         }
 
@@ -167,46 +228,115 @@ export class MessageRenderer {
         }
         // Create message bubble (pure DOM manipulation)
         const messageDiv = document.createElement('div');
-        messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} ${message.isConsecutive ? 'consecutive-message' : 'first-in-group'} ${message.isLastSent ? 'last-sent' : ''}`;
+        messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition} ${message.isLastSent ? 'last-sent' : ''}`;
         messageDiv.setAttribute('data-message-id', message.id);
         messageDiv.setAttribute('data-sender-id', message.senderId);
         messageDiv.setAttribute('data-status', message.status);
+        messageDiv.setAttribute('data-group-position', message.groupPosition);
+
+        // Apply custom bubble style if set
+        this._applyBubbleStyle(messageDiv);
 
         // Use canonical schema fields
         const status = message.status || 'sent';
         
-        // Build message content (pure HTML generation)
-        let messageHTML = `
+        // Build wrapper containing bubble and meta (timestamp + read receipt)
+        const wrapperDiv = document.createElement('div');
+        wrapperDiv.className = `message-wrapper ${message.isOwn ? 'sent-wrapper' : 'received-wrapper'} group-${message.groupPosition}`;
+        wrapperDiv.setAttribute('data-message-id', message.id);
+        wrapperDiv.setAttribute('data-sender-id', message.senderId);
+        wrapperDiv.setAttribute('data-status', message.status);
+        wrapperDiv.setAttribute('data-group-position', message.groupPosition);
+
+        // Create bubble (no timestamp/read receipt inside)
+        const messageDivNew = document.createElement('div');
+        messageDivNew.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition} ${message.isLastSent ? 'last-sent' : ''}`;
+        messageDivNew.setAttribute('data-message-id', message.id);
+        messageDivNew.setAttribute('data-sender-id', message.senderId);
+        messageDivNew.setAttribute('data-status', message.status);
+        messageDivNew.setAttribute('data-group-position', message.groupPosition);
+
+        // Apply custom bubble style if set
+        this._applyBubbleStyle(messageDivNew);
+
+        // Bubble content
+        messageDivNew.innerHTML = `
             <p class="message-content">${escapeHtml(message.content || '')}</p>
-            <div class="message-time">
-                ${formatTime(message.timestamp)}
         `;
 
-        if (message.isOwn) {
-            messageHTML += `<span class="message-read-receipt">${this._getStatusIcon(status)}</span>`;
+        // Determine whether to render meta (timestamp + receipt): single messages or last in group
+        const shouldRenderMetaNew = message.groupPosition === 'single' || message.groupPosition === 'last' || !!message.hasFloatingReadReceipt;
+        if (shouldRenderMetaNew) {
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'message-meta';
+
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'timestamp';
+            timeSpan.textContent = formatTime(message.timestamp);
+            metaDiv.appendChild(timeSpan);
+
+            // Read receipt / status to appear next to timestamp
+            if (message.isOwn) {
+                if (message.status === 'read' && message.isLastRead) {
+                    const receiverAvatar = document.body.dataset.receiverAvatar;
+                    const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
+                    const receiptSpan = document.createElement('span');
+                    receiptSpan.className = 'message-read-receipt read-avatar-only';
+                    receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
+                    metaDiv.appendChild(receiptSpan);
+                } else if (message.isLastSent && !message.hideReadReceipt) {
+                    const receiptSpan = document.createElement('span');
+                    receiptSpan.className = `message-read-receipt status-${status}`;
+                    receiptSpan.innerHTML = this._getStatusIcon(status);
+                    metaDiv.appendChild(receiptSpan);
+                }
+            } else if (message.hasFloatingReadReceipt) {
+                const receiverAvatar = document.body.dataset.receiverAvatar;
+                const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
+                const receiptSpan = document.createElement('span');
+                receiptSpan.className = 'message-read-receipt floating-read-receipt';
+                receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
+                metaDiv.appendChild(receiptSpan);
+            }
+
+            wrapperDiv.appendChild(messageDivNew);
+            wrapperDiv.appendChild(metaDiv);
+            return wrapperDiv;
         }
-        
 
-        messageHTML += `
-            </div>
-        `;
-
-        messageDiv.innerHTML = messageHTML;
-        return messageDiv;
+        return messageDivNew;
     }
 
     /**
      * Get status icon (pure data transformation)
      * @param {string} status - Message status from canonical schema
-     * @returns {string} Icon HTML
+     * @returns {string} Icon HTML - checkmark inside circle
      */
     _getStatusIcon(status) {
+        // Single checkmark inside circle
+        const singleCheck = '<span class="check-circle"><span class="check-mark">&#10003;</span></span>';
+        // Double checkmark inside circle (for delivered/read before avatar)
+        const doubleCheck = '<span class="check-circle"><span class="check-mark double">&#10003;&#10003;</span></span>';
+        
         switch (status) {
-            case 'sent': return '&#10003;';
-            case 'delivered': return '&#10003;&#10003;';
-            case 'read': return '&#10003;&#10003;';
-            case 'failed': return '❌';
-            default: return '&#10003;';
+            case 'sent': return singleCheck;
+            case 'delivered': return doubleCheck;
+            case 'read': return doubleCheck; // Will be replaced by avatar, but fallback
+            case 'failed': return '<span class="check-circle error">&#10007;</span>';
+            default: return singleCheck;
+        }
+    }
+
+    /**
+     * Apply custom bubble style from user preferences
+     * @param {HTMLElement} bubble - Message bubble element
+     */
+    _applyBubbleStyle(bubble) {
+        const currentStyle = document.body?.dataset?.bubbleStyle;
+        // CSS handles the actual styling via data-bubble-shape attribute
+        // We just need to ensure the document has the attribute set
+        if (currentStyle && currentStyle !== 'default') {
+            document.documentElement.dataset.bubbleShape = currentStyle;
         }
     }
 
@@ -229,12 +359,14 @@ export class MessageRenderer {
      */
     _createEmojiMessage(message) {
         const element = document.createElement('div');
-        element.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} emoji-message`;
+        element.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} emoji-message group-${message.groupPosition}`;
         element.setAttribute('data-message-id', message.id);
+        element.setAttribute('data-group-position', message.groupPosition);
         element.innerHTML = `
             <div class="emoji-content">${escapeHtml(message.content || '')}</div>
             <div class="message-time">${formatTime(message.timestamp)}</div>
         `;
+        this._applyBubbleStyle(element);
         return element;
     }
 
@@ -245,8 +377,10 @@ export class MessageRenderer {
      */
     _createMediaMessage(message) {
         const element = document.createElement('div');
-        element.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} media-message`;
+        element.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} media-message group-${message.groupPosition}`;
         element.setAttribute('data-message-id', message.id);
+        element.setAttribute('data-group-position', message.groupPosition);
+        this._applyBubbleStyle(element);
         
         let mediaContent = '';
         const metadata = message.metadata || {};

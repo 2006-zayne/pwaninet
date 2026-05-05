@@ -7,6 +7,16 @@ class ChatThemeManager {
         this.currentConversationId = null;
         this.currentTheme = null;
         this.currentThemeMode = 'light';
+        this.uploadedImages = {
+            light: null,
+            dark: null
+        };
+        this.isPreviewMode = false;
+        this.imagePosition = {
+            x: 50,
+            y: 50
+        };
+        this.isDragging = false;
         this.init();
     }
 
@@ -64,6 +74,9 @@ class ChatThemeManager {
 
         // Theme button in chat header (add this to chat header)
         this.addThemeButtonToHeader();
+
+        // Setup drag-to-position for image backgrounds
+        this.setupDragToPosition();
     }
 
     setupColorInputs() {
@@ -126,6 +139,110 @@ class ChatThemeManager {
         }
     }
 
+    setupDragToPosition() {
+        const messagesArea = document.querySelector('.messages-area');
+        if (!messagesArea) return;
+
+        messagesArea.addEventListener('mousedown', (e) => {
+            if (this.isPreviewMode && e.target === messagesArea) {
+                this.isDragging = true;
+                this.updateImagePosition(e);
+                e.preventDefault();
+            }
+        });
+
+        messagesArea.addEventListener('mousemove', (e) => {
+            if (this.isDragging) {
+                this.updateImagePosition(e);
+                e.preventDefault();
+            }
+        });
+
+        messagesArea.addEventListener('mouseup', () => {
+            this.isDragging = false;
+        });
+
+        messagesArea.addEventListener('mouseleave', () => {
+            this.isDragging = false;
+        });
+
+        // Touch events for mobile
+        messagesArea.addEventListener('touchstart', (e) => {
+            if (this.isPreviewMode && e.target === messagesArea) {
+                this.isDragging = true;
+                const touch = e.touches[0];
+                this.updateImagePosition(touch);
+                e.preventDefault();
+            }
+        });
+
+        messagesArea.addEventListener('touchmove', (e) => {
+            if (this.isDragging) {
+                const touch = e.touches[0];
+                this.updateImagePosition(touch);
+                e.preventDefault();
+            }
+        });
+
+        messagesArea.addEventListener('touchend', () => {
+            this.isDragging = false;
+        });
+    }
+
+    updateImagePosition(e) {
+        const messagesArea = document.querySelector('.messages-area');
+        if (!messagesArea) return;
+
+        const rect = messagesArea.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+        this.imagePosition.x = Math.max(0, Math.min(100, x));
+        this.imagePosition.y = Math.max(0, Math.min(100, y));
+
+        // Update background position
+        messagesArea.style.backgroundPosition = `${this.imagePosition.x}% ${this.imagePosition.y}%`;
+
+        // Show position indicator
+        this.showPositionIndicator();
+    }
+
+    showPositionIndicator() {
+        const messagesArea = document.querySelector('.messages-area');
+        if (!messagesArea) return;
+
+        // Remove existing indicator
+        const existingIndicator = messagesArea.querySelector('.position-indicator');
+        if (existingIndicator) existingIndicator.remove();
+
+        // Create position indicator
+        const indicator = document.createElement('div');
+        indicator.className = 'position-indicator';
+        indicator.style.cssText = `
+            position: absolute;
+            left: ${this.imagePosition.x}%;
+            top: ${this.imagePosition.y}%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            border: 2px solid white;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            z-index: 10;
+            animation: pulse 1s infinite;
+        `;
+
+        messagesArea.appendChild(indicator);
+
+        // Auto-hide after 2 seconds
+        setTimeout(() => {
+            if (indicator.parentNode) {
+                indicator.remove();
+            }
+        }, 2000);
+    }
+
     handleImageUpload(event, mode) {
         const file = event.target.files[0];
         if (file && file.type.startsWith('image/')) {
@@ -137,6 +254,8 @@ class ChatThemeManager {
                     preview.style.backgroundImage = `url(${e.target.result})`;
                     preview.parentElement.querySelector('.upload-placeholder').style.display = 'none';
                 }
+                // Store the data URL for later use
+                this.uploadedImages[mode] = e.target.result;
                 this.updatePreview();
             };
             reader.readAsDataURL(file);
@@ -171,22 +290,40 @@ class ChatThemeManager {
         // Get conversation ID from URL or data attribute
         this.currentConversationId = this.getCurrentConversationId();
         
-        if (!this.currentConversationId) return;
+        console.log('=== LOAD THEME FOR CONVERSATION ===');
+        console.log('currentConversationId:', this.currentConversationId);
+        
+        if (!this.currentConversationId) {
+            console.log('No conversation ID found');
+            return;
+        }
 
         try {
-            const response = await fetch(`/api/messaging/v1/themes/by_conversation/?conversation_id=${this.currentConversationId}`, {
+            const response = await fetch(`/messaging/v1/themes/by_conversation/?conversation_id=${this.currentConversationId}`, {
                 headers: {
                     'X-CSRFToken': this.getCSRFToken()
                 }
             });
             
+            console.log('Theme response status:', response.status);
+            console.log('Theme response ok:', response.ok);
+            
             if (response.ok) {
                 this.currentTheme = await response.json();
+                console.log('Theme loaded successfully:', this.currentTheme);
                 this.applyTheme();
                 this.populateThemeForm();
+            } else {
+                console.log('Theme response not ok, using default');
+                const error = await response.json();
+                console.log('Theme load error:', error);
+                // Apply default theme if none exists
+                this.applyDefaultTheme();
             }
         } catch (error) {
             console.error('Failed to load theme:', error);
+            // Apply default theme on error
+            this.applyDefaultTheme();
         }
     }
 
@@ -205,15 +342,25 @@ class ChatThemeManager {
     }
 
     applyTheme() {
-        if (!this.currentTheme) return;
+        console.log('=== APPLY THEME CALLED ===');
+        console.log('currentTheme:', this.currentTheme);
+        console.log('currentThemeMode:', this.currentThemeMode);
 
-        const cssVars = this.currentThemeMode === 'light' ? 
-            this.currentTheme.css_variables_light : 
+        if (!this.currentTheme) {
+            console.log('No current theme to apply');
+            return;
+        }
+
+        const cssVars = this.currentThemeMode === 'light' ?
+            this.currentTheme.css_variables_light :
             this.currentTheme.css_variables_dark;
-        
-        const overlayVars = this.currentThemeMode === 'light' ? 
-            this.currentTheme.overlay_light : 
+
+        const overlayVars = this.currentThemeMode === 'light' ?
+            this.currentTheme.overlay_light :
             this.currentTheme.overlay_dark;
+
+        console.log('cssVars:', cssVars);
+        console.log('overlayVars:', overlayVars);
 
         if (cssVars) {
             Object.entries(cssVars).forEach(([key, value]) => {
@@ -241,16 +388,25 @@ class ChatThemeManager {
         const overlayColor = getComputedStyle(document.documentElement).getPropertyValue('--chat-overlay-color');
         const overlayOpacity = getComputedStyle(document.documentElement).getPropertyValue('--chat-overlay-opacity');
 
+        console.log('=== THEME MANAGER APPLYING TO CHAT AREA ===');
+        console.log('chatBg:', chatBg);
+        console.log('chatBgType:', chatBgType);
+        console.log('chatBgFit:', chatBgFit);
+
         // Apply background
         if (chatBg && chatBg !== 'none') {
             if (chatBgType === 'image') {
+                console.log('Applying image background');
                 messagesArea.style.backgroundImage = chatBg;
                 messagesArea.style.backgroundSize = chatBgFit || 'cover';
-                messagesArea.style.backgroundPosition = 'center';
+                messagesArea.style.backgroundPosition = `${this.imagePosition.x}% ${this.imagePosition.y}%`;
                 messagesArea.style.backgroundRepeat = chatBgFit === 'repeat' ? 'repeat' : 'no-repeat';
             } else {
+                console.log('Applying solid/gradient background');
                 messagesArea.style.background = chatBg;
             }
+        } else {
+            console.log('No background to apply (chatBg is none or empty)');
         }
 
         // Apply overlay for readability
@@ -284,6 +440,7 @@ class ChatThemeManager {
         if (modal) {
             modal.style.display = 'flex';
             this.populateThemeForm();
+            this.enablePreviewMode();
         }
     }
 
@@ -291,7 +448,20 @@ class ChatThemeManager {
         const modal = document.getElementById('themeSelectorModal');
         if (modal) {
             modal.style.display = 'none';
+            this.disablePreviewMode();
         }
+    }
+
+    enablePreviewMode() {
+        this.isPreviewMode = true;
+        console.log('Preview mode enabled - drag to position image');
+        this.showNotification('Preview mode: Drag to position background image', 'info');
+    }
+
+    disablePreviewMode() {
+        this.isPreviewMode = false;
+        this.isDragging = false;
+        console.log('Preview mode disabled');
     }
 
     switchThemeTab(themeType) {
@@ -313,6 +483,12 @@ class ChatThemeManager {
 
         // Set theme type
         this.switchThemeTab(this.currentTheme.theme_type || 'solid');
+
+        // Restore image position if available
+        if (this.currentTheme.image_position_x !== undefined && this.currentTheme.image_position_y !== undefined) {
+            this.imagePosition.x = this.currentTheme.image_position_x;
+            this.imagePosition.y = this.currentTheme.image_position_y;
+        }
 
         // Set solid colors
         if (this.currentTheme.light_color) {
@@ -369,15 +545,26 @@ class ChatThemeManager {
     }
 
     async saveTheme() {
-        if (!this.currentConversationId) return;
+        console.log('=== SAVE THEME CALLED ===');
+        console.log('currentConversationId:', this.currentConversationId);
+
+        if (!this.currentConversationId) {
+            console.error('No conversation ID');
+            this.showNotification('No conversation ID', 'error');
+            return;
+        }
 
         const formData = this.collectFormData();
-        
+        console.log('formData:', formData);
+
         try {
             let response;
+            let url;
             if (this.currentTheme && this.currentTheme.id) {
                 // Update existing theme
-                response = await fetch(`/api/messaging/v1/themes/${this.currentTheme.id}/`, {
+                url = `/messaging/v1/themes/${this.currentTheme.id}/`;
+                console.log('Updating existing theme at:', url);
+                response = await fetch(url, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -387,7 +574,9 @@ class ChatThemeManager {
                 });
             } else {
                 // Create new theme
-                response = await fetch('/api/messaging/v1/themes/', {
+                url = '/messaging/v1/themes/';
+                console.log('Creating new theme at:', url);
+                response = await fetch(url, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -400,18 +589,35 @@ class ChatThemeManager {
                 });
             }
 
+            console.log('Response status:', response.status);
+            console.log('Response ok:', response.ok);
+
             if (response.ok) {
                 this.currentTheme = await response.json();
+                console.log('Theme saved successfully:', this.currentTheme);
                 this.applyTheme();
                 this.hideThemeSelector();
-                this.showNotification('Theme applied successfully!');
+                this.showNotification('Theme saved and applied successfully!');
             } else {
                 const error = await response.json();
-                this.showNotification('Failed to save theme: ' + (error.detail || 'Unknown error'), 'error');
+                console.error('Theme save error:', error);
+                let errorMessage = 'Failed to save theme';
+                
+                if (error.detail) {
+                    errorMessage = `Theme save failed: ${error.detail}`;
+                } else if (error.error) {
+                    errorMessage = `Theme save failed: ${error.error}`;
+                } else if (typeof error === 'string') {
+                    errorMessage = `Theme save failed: ${error}`;
+                } else {
+                    errorMessage = 'Theme save failed: Unknown error occurred';
+                }
+                
+                this.showNotification(errorMessage, 'error');
             }
         } catch (error) {
             console.error('Failed to save theme:', error);
-            this.showNotification('Failed to save theme', 'error');
+            this.showNotification(`Theme save failed: ${error.message}`, 'error');
         }
     }
 
@@ -421,7 +627,10 @@ class ChatThemeManager {
             theme_type: themeType,
             overlay_opacity: parseFloat(document.getElementById('overlayOpacity').value) / 100,
             light_overlay_color: document.getElementById('lightOverlayColor').value,
-            dark_overlay_color: document.getElementById('darkOverlayColor').value
+            dark_overlay_color: document.getElementById('darkOverlayColor').value,
+            // Include image position for image themes
+            image_position_x: this.imagePosition.x,
+            image_position_y: this.imagePosition.y
         };
 
         if (themeType === 'solid') {
@@ -435,7 +644,13 @@ class ChatThemeManager {
             formData.gradient_angle = parseInt(document.getElementById('gradientAngle').value);
         } else if (themeType === 'image') {
             formData.image_fit = document.getElementById('imageFit').value;
-            // Handle file uploads separately
+            // Include uploaded image data URLs
+            if (this.uploadedImages.light) {
+                formData.light_image = this.uploadedImages.light;
+            }
+            if (this.uploadedImages.dark) {
+                formData.dark_image = this.uploadedImages.dark;
+            }
         }
 
         return formData;
@@ -446,7 +661,7 @@ class ChatThemeManager {
 
         try {
             if (this.currentTheme && this.currentTheme.id) {
-                await fetch(`/api/messaging/v1/themes/${this.currentTheme.id}/`, {
+                await fetch(`/messaging/v1/themes/${this.currentTheme.id}/`, {
                     method: 'DELETE',
                     headers: {
                         'X-CSRFToken': this.getCSRFToken()
@@ -468,14 +683,14 @@ class ChatThemeManager {
         // Reset CSS variables to defaults
         document.documentElement.style.setProperty('--chat-bg', '#f8fafc');
         document.documentElement.style.setProperty('--chat-bg-type', 'solid');
-        document.documentElement.style.setProperty('--chat-overlay-color', '#ffffff');
-        document.documentElement.style.setProperty('--chat-overlay-opacity', '0.3');
+        document.documentElement.style.setProperty('--chat-overlay-color', 'transparent');
+        document.documentElement.style.setProperty('--chat-overlay-opacity', '0');
         
         // Remove custom background from messages area
         const messagesArea = document.querySelector('.messages-area');
         if (messagesArea) {
             messagesArea.style.background = '';
-            messagesArea.style.backgroundImage = '';
+            messagesArea.style.backgroundImage = ''
             const overlay = messagesArea.querySelector('.chat-overlay');
             if (overlay) overlay.remove();
         }
@@ -507,7 +722,7 @@ class ChatThemeManager {
 
     generateCSSVariables(formData, mode) {
         const vars = {};
-        
+
         if (formData.theme_type === 'solid') {
             vars['--chat-bg'] = mode === 'light' ? formData.light_color : formData.dark_color;
             vars['--chat-bg-type'] = 'solid';
@@ -516,8 +731,17 @@ class ChatThemeManager {
             const end = mode === 'light' ? formData.light_gradient_end : formData.dark_gradient_end;
             vars['--chat-bg'] = `linear-gradient(${formData.gradient_angle}deg, ${start}, ${end})`;
             vars['--chat-bg-type'] = 'gradient';
+        } else if (formData.theme_type === 'image') {
+            // For image type, the background image URL should be stored in the theme data
+            // This will be set when the image is uploaded and saved
+            const imageKey = mode === 'light' ? 'light_image' : 'dark_image';
+            if (formData[imageKey]) {
+                vars['--chat-bg'] = `url(${formData[imageKey]})`;
+                vars['--chat-bg-type'] = 'image';
+                vars['--chat-bg-fit'] = formData.image_fit || 'cover';
+            }
         }
-        
+
         return vars;
     }
 

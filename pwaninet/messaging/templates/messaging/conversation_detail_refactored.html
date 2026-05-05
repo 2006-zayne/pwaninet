@@ -208,19 +208,20 @@ div.chat-container div.messages-area div.message-bubble {
 /* Message wrapper for avatar support */
 .message-wrapper {
   display: flex;
+  flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  gap: 0px;
   width: 100%;
   margin: 2px 0;
 }
 
 .sent-wrapper {
-  justify-content: flex-end;
+  align-items: flex-end;
 }
 
 .received-wrapper {
-  justify-content: flex-start;
-  padding-left: 8px;
+  align-items: flex-start;
+  padding-left: 0px;
 }
 
 .message-avatar {
@@ -250,9 +251,8 @@ div.chat-container div.messages-area div.message-bubble {
 .messages-area .message-bubble.sent {
   background-color: var(--chat-bg-sent, #d4f1c4) !important;
   color: var(--chat-text-sent, #111) !important;
-  align-self: flex-end !important;
   border-radius: 18px 18px 4px 18px !important;
-  margin: 6px 8px 2px auto !important;
+  margin: 6px 8px 0px auto !important;
   padding: 8px 12px !important;
 }
 
@@ -260,9 +260,8 @@ div.chat-container div.messages-area div.message-bubble {
 .messages-area .message-bubble.received {
   background-color: var(--chat-bg-received, #f0f0f0) !important;
   color: var(--chat-text-received, #111) !important;
-  align-self: flex-start !important;
   border-radius: 18px 18px 18px 4px !important;
-  margin: 6px 8px 2px 8px !important;
+  margin: 6px 8px 0px 8px !important;
   padding: 8px 12px !important;
   border: none !important;
 }
@@ -278,51 +277,51 @@ div.chat-container div.messages-area div.message-bubble {
 }
 
 [data-bubble-shape="square"] {
-  --bubble-radius: 4px;
+  --bubble-radius: 8px;
 }
 
 /* SINGLE messages - uniform border radius on all corners */
 .messages-area .message-bubble.sent.group-single {
   border-radius: var(--bubble-radius) !important;
-  margin: 6px 8px 6px auto !important;
+  margin: 6px 8px 0px auto !important;
 }
 
 .messages-area .message-bubble.received.group-single {
   border-radius: var(--bubble-radius) !important;
-  margin: 6px 8px 6px 8px !important;
+  margin: 6px 8px 0px 8px !important;
 }
 
 /* FIRST in group - bottom wall-side corner flat to connect to next */
 .messages-area .message-bubble.sent.group-first {
-  border-radius: var(--bubble-radius) var(--bubble-radius) 0 var(--bubble-radius) !important;
-  margin: 3px 8px 0 auto !important;
+  border-radius: var(--bubble-radius) var(--bubble-radius) 5px var(--bubble-radius) !important;
+  margin: 3px 8px 0px auto !important;
 }
 
 .messages-area .message-bubble.received.group-first {
-  border-radius: var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) 0 !important;
-  margin: 3px 8px 0 8px !important;
+  border-radius: var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) 5px !important;
+  margin: 3px 8px 0px 8px !important;
 }
 
 /* MIDDLE in group - top and bottom wall-side corners flat */
 .messages-area .message-bubble.sent.group-middle {
-  border-radius: var(--bubble-radius) 0 0 var(--bubble-radius) !important;
-  margin: 0 8px 0 auto !important;
+  border-radius: var(--bubble-radius) 5px 5px var(--bubble-radius) !important;
+  margin: 0px 8px 0px auto !important;
 }
 
 .messages-area .message-bubble.received.group-middle {
-  border-radius: 0 var(--bubble-radius) var(--bubble-radius) 0 !important;
-  margin: 0 8px 0 8px !important;
+  border-radius: 5px var(--bubble-radius) var(--bubble-radius) 0 !important;
+  margin: 0px 8px 0px 8px !important;
 }
 
 /* LAST in group - top wall-side corner flat to connect from prev */
 .messages-area .message-bubble.sent.group-last {
-  border-radius: var(--bubble-radius) 0 var(--bubble-radius) var(--bubble-radius) !important;
-  margin: 0 8px 3px auto !important;
+  border-radius: var(--bubble-radius) 5px var(--bubble-radius) var(--bubble-radius) !important;
+  margin: 0px 8px 0px auto !important;
 }
 
 .messages-area .message-bubble.received.group-last {
-  border-radius: 0 var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) !important;
-  margin: 0 8px 3px 8px !important;
+  border-radius: 5px var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) !important;
+  margin: 0 8px 0px 8px !important;
 }
 
 /* Dark mode */
@@ -346,35 +345,44 @@ div.chat-container div.messages-area div.message-bubble {
   white-space: pre-wrap;
 }
 
-.message-time {
-  font-size: 11px;
-  opacity: 0.8;
-  margin-top: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 2px;
+
+/* Meta row placed below the bubble: timestamp + read receipt */
+.message-meta {
+  /* Use same font size and family as the bubble content */
+  font-size: 14px;
+  font-family: inherit;
+  opacity: 0.85;
+  margin-top: 0px;
+  display: block; /* ensure it sits below the bubble */
 }
 
-.message-bubble.sent .message-time {
+.sent-wrapper .message-meta {
+  text-align: right;
   color: var(--chat-text-sent) !important;
-  opacity: 0.7;
+  opacity: 0.85;
+  margin-right: 8px;
 }
 
-.message-bubble.received .message-time {
+.received-wrapper .message-meta {
+  text-align: left;
   color: var(--chat-text-received) !important;
-  opacity: 0.6;
+  opacity: 0.85;
+  left: 0px;
 }
 
+.message-meta .timestamp {
+  display: inline-block;
+  font-size: 11px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Samsung One", "Samsung Sans", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Read receipt inline, next to timestamp */
 .message-read-receipt {
   font-size: 12px;
   display: inline-flex;
   align-items: center;
-  /* Position absolutely on wall side (bottom right for sent messages) */
-  position: absolute;
-  bottom: -16px;
-  right: 4px;
-  z-index: 10;
+  margin-left: 6px;
+  vertical-align: middle;
 }
 
 /* Circular checkmark container - same size as avatar */
@@ -444,36 +452,9 @@ div.chat-container div.messages-area div.message-bubble {
   align-items: center;
 }
 
-/* Extra margin for messages with read receipt so it doesn't overlap */
-.message-bubble.sent:has(.message-read-receipt) {
-  margin-bottom: 16px !important;
-}
-
-/* Read receipt indicator positioned on wall side */
-.read-receipt-indicator {
-  position: absolute;
-  bottom: -16px;
-  right: 4px;
-  z-index: 10;
-}
-
-/* Avatar below message for read status */
-.read-receipt-avatar-below {
-  position: absolute;
-  bottom: -18px;
-  right: 0;
-  z-index: 10;
-}
-
-/* Floating read receipt - appears on receiver's last message at same level */
-/* Positioned at bottom of receiver's message, on sender's wall side (right) */
-.message-bubble.received .message-read-receipt.floating-read-receipt {
-  position: absolute;
-  right: -22px;
-  bottom: 4px;
-  top: auto;
-  z-index: 10;
-  /* Animation for the "jump" from sender's message down to receiver's level */
+/* Floating read receipt animation (appears inline for receiver messages) */
+.message-read-receipt.floating-read-receipt {
+  margin-left: 6px;
   animation: receiptJump 0.3s ease-out;
 }
 
@@ -481,7 +462,7 @@ div.chat-container div.messages-area div.message-bubble {
 @keyframes receiptJump {
   0% {
     opacity: 0;
-    transform: translateY(-20px);
+    transform: translateY(-8px);
   }
   50% {
     opacity: 0.7;
@@ -490,20 +471,6 @@ div.chat-container div.messages-area div.message-bubble {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-/* Ensure receiver message has room for floating receipt */
-.message-bubble.received:has(.floating-read-receipt) {
-  margin-right: 22px !important;
-}
-
-.read-avatar-img {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid #90caf9;
-  background-color: #e3f2fd;
 }
 
 .input-area {

@@ -44,6 +44,26 @@ export class WebSocketManager {
     }
 
     /**
+     * Pause WebSocket connection (for loading initial messages)
+     */
+    pause() {
+        console.log('[WEBSOCKET] Pausing WebSocket');
+        this.paused = true;
+        if (this.socket) {
+            this.disconnect();
+        }
+    }
+
+    /**
+     * Resume WebSocket connection (after loading initial messages)
+     */
+    resume() {
+        console.log('[WEBSOCKET] Resuming WebSocket');
+        this.paused = false;
+        this.connect();
+    }
+
+    /**
      * Connect to WebSocket
      */
     connect() {
@@ -93,6 +113,7 @@ export class WebSocketManager {
             
             try {
                 const data = JSON.parse(event.data);
+                console.log('[WEBSOCKET] Received message:', data);
                 
                 // Forward to message service (ONLY ingestion layer)
                 // NO direct state updates, NO UI updates, NO business logic

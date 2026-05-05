@@ -84,6 +84,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Start heartbeat task to detect stale connections
         self.heartbeat_task = asyncio.create_task(self.heartbeat_loop())
 
+        # FIX 3: Send peer's current online status to newly connected user
+        # This ensures the online indicator is shown immediately on page load/reconnect
+        await self.send_peer_online_status()
+
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection and cleanup."""
         # Cancel heartbeat task
@@ -204,6 +208,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }
         )
         print(f'[BACKEND] Message {message["id"]} broadcasted to room group')
+        
+        # FIX 1: Broadcast "delivered" status to other members (not the sender)
+        # This ensures sent → delivered transition when receiver is online
+        other_members = await self.get_other_conversation_members()
+        for other_member_id in other_members:
+            if other_member_id != self.user.id:
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'message_delivered',
+                        'message_id': message['id'],
+                        'user_id': other_member_id,
+                        'status': 'delivered'
+                    }
+                )
 
     async def handle_typing_indicator(self, data):
         """Handle typing indicator."""
@@ -286,6 +305,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'read_avatar': event.get('read_avatar')
         }))
 
+    async def message_delivered(self, event):
+        """Send message delivered status to WebSocket."""
+        # Only send to the recipient (user_id in event), not back to all room members
+        if event.get('user_id') == self.user.id or not event.get('user_id'):
+            # Broadcast to all in room
+            await self.send(text_data=json.dumps({
+                'type': 'message_delivered',
+                'message_id': event['message_id'],
+                'status': 'delivered'
+            }))
+
     @database_sync_to_async
     def is_conversation_member(self):
         """Check if user is a member of the conversation."""
@@ -362,6 +392,48 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except Exception:
             pass
         return None
+
+    @database_sync_to_async
+    def get_other_conversation_members(self):
+        """Get list of other user IDs in this conversation."""
+        try:
+            conversation = Conversation.objects.get(id=self.conversation_id)
+            return list(
+                conversation.members.exclude(user=self.user).values_list('user_id', flat=True)
+            )
+        except Conversation.DoesNotExist:
+            return []
+
+    def is_peer_online(self, peer_id):
+        """Check if a peer user is currently online in Redis."""
+        try:
+            redis_client = get_redis_client()
+            key = f'user_online:{peer_id}'
+            return redis_client.exists(key) == 1
+        except Exception:
+            return False
+
+    async def send_peer_online_status(self):
+        """Send the current peer's online status to the connected user."""
+        try:
+            # Get all other members in conversation
+            other_members = await self.get_other_conversation_members()
+            
+            # For direct conversations, there should be only one other member
+            if other_members:
+                peer_id = other_members[0]
+                is_online = self.is_peer_online(peer_id)
+                
+                # Send peer's current online status
+                await self.send(text_data=json.dumps({
+                    'type': 'user_status',
+                    'user_id': peer_id,
+                    'is_online': is_online,
+                    'last_seen': None
+                }))
+                print(f'[BACKEND] Sent peer {peer_id} status (online={is_online}) to user {self.user.id}')
+        except Exception as e:
+            print(f'[BACKEND] Error sending peer online status: {e}')
 
     async def set_user_online(self, is_online):
         """Set user online status in Redis using connection pool."""

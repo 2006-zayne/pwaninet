@@ -226,7 +226,15 @@ export class MessageRenderer {
         if (message.type === 'media') {
         return this._createMediaMessage(message);
         }
-        // Create message bubble (pure DOM manipulation)
+        // Build wrapper containing bubble and meta (timestamp + read receipt)
+        const wrapperDiv = document.createElement('div');
+        wrapperDiv.className = `message-wrapper ${message.isOwn ? 'sent-wrapper' : 'received-wrapper'} group-${message.groupPosition}`;
+        wrapperDiv.setAttribute('data-message-id', message.id);
+        wrapperDiv.setAttribute('data-sender-id', message.senderId);
+        wrapperDiv.setAttribute('data-status', message.status);
+        wrapperDiv.setAttribute('data-group-position', message.groupPosition);
+
+        // Create bubble (no timestamp/read receipt inside)
         const messageDiv = document.createElement('div');
         messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition} ${message.isLastSent ? 'last-sent' : ''}`;
         messageDiv.setAttribute('data-message-id', message.id);
@@ -239,47 +247,52 @@ export class MessageRenderer {
 
         // Use canonical schema fields
         const status = message.status || 'sent';
-        
-        // Build message content (pure HTML generation)
-        let messageHTML = `
+
+        // Bubble content
+        messageDiv.innerHTML = `
             <p class="message-content">${escapeHtml(message.content || '')}</p>
-            <div class="message-time">
-                ${formatTime(message.timestamp)}
         `;
 
-        // Show read receipt on last sent message (hidden when floating to receiver's message)
-        if (message.isOwn && message.isLastSent && !message.hideReadReceipt) {
-            if (message.status === 'read') {
+        // Determine whether to render meta (timestamp + receipt): single messages or last in group
+        const shouldRenderMeta = message.groupPosition === 'single' || message.groupPosition === 'last' || !!message.hasFloatingReadReceipt;
+        if (shouldRenderMeta) {
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'message-meta';
+
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'timestamp';
+            timeSpan.textContent = formatTime(message.timestamp);
+            metaDiv.appendChild(timeSpan);
+
+            // Read receipt / status to appear next to timestamp
+            if (message.isOwn) {
+                if (message.status === 'read' && message.isLastRead) {
+                    const receiverAvatar = document.body.dataset.receiverAvatar;
+                    const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
+                    const receiptSpan = document.createElement('span');
+                    receiptSpan.className = 'message-read-receipt read-avatar-only';
+                    receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
+                    metaDiv.appendChild(receiptSpan);
+                } else if (message.isLastSent && !message.hideReadReceipt) {
+                    const receiptSpan = document.createElement('span');
+                    receiptSpan.className = `message-read-receipt status-${status}`;
+                    receiptSpan.innerHTML = this._getStatusIcon(status);
+                    metaDiv.appendChild(receiptSpan);
+                }
+            } else if (message.hasFloatingReadReceipt) {
                 const receiverAvatar = document.body.dataset.receiverAvatar;
                 const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                messageHTML += `
-                    <span class="message-read-receipt read-avatar-only">
-                        <img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">
-                    </span>
-                `;
-            } else {
-                // For sent/delivered/failed, show checkmarks
-                messageHTML += `<span class="message-read-receipt status-${status}">${this._getStatusIcon(status)}</span>`;
+                const receiptSpan = document.createElement('span');
+                receiptSpan.className = 'message-read-receipt floating-read-receipt';
+                receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
+                metaDiv.appendChild(receiptSpan);
             }
+
+            wrapperDiv.appendChild(messageDiv);
+            wrapperDiv.appendChild(metaDiv);
+            return wrapperDiv;
         }
 
-        // Floating read receipt on receiver's last message (when they sent after reading)
-        if (message.hasFloatingReadReceipt) {
-            const receiverAvatar = document.body.dataset.receiverAvatar;
-            const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-            messageHTML += `
-                <span class="message-read-receipt floating-read-receipt">
-                    <img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">
-                </span>
-            `;
-        }
-        
-
-        messageHTML += `
-            </div>
-        `;
-
-        messageDiv.innerHTML = messageHTML;
         return messageDiv;
     }
 

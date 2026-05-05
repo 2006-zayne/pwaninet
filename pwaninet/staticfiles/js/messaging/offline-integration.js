@@ -276,9 +276,11 @@ class OfflineIntegration {
         div.dataset.messageId = message.id;
         
         div.innerHTML = `
-            <div class="message-content">
+            <div class="message-bubble ${isSent ? 'sent' : 'received'}">
                 <div class="message-text">${this.escapeHtml(message.content)}</div>
-                <div class="message-time">${this.formatTime(message.timestamp)}</div>
+            </div>
+            <div class="message-meta">
+                <span class="timestamp">${this.formatTime(message.timestamp)}</span>
             </div>
         `;
         

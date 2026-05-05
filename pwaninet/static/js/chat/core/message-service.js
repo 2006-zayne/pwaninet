@@ -233,6 +233,9 @@ export class MessageService {
                 case 'read_receipt':
                     this._processReadReceipt(data);
                     break;
+                case 'message_delivered':
+                    this._processMessageDelivered(data);
+                    break;
                 case 'user_status':
                     this._processUserStatus(data);
                     break;
@@ -341,6 +344,26 @@ export class MessageService {
             }
         });
         console.log('[MESSAGE_SERVICE] Updated message', data.message_id, 'to read status with avatar:', data.read_avatar);
+    }
+
+    /**
+     * Process message delivered status from WebSocket
+     * @param {Object} data - Message delivered data
+     */
+    _processMessageDelivered(data) {
+        console.log('[MESSAGE_SERVICE] Processing message delivered:', data);
+        this._log('PROCESS_MESSAGE_DELIVERED', data);
+
+        const state = store.getState();
+        const message = store.getMessageById(data.message_id);
+
+        // Only update if message hasn't been read yet (keep read status if it exists)
+        if (message && message.status === 'sent') {
+            store.updateMessage(data.message_id, {
+                status: 'delivered'
+            });
+            console.log('[MESSAGE_SERVICE] Updated message', data.message_id, 'to delivered status');
+        }
     }
 
     /**

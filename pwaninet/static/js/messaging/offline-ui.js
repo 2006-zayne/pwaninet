@@ -302,13 +302,13 @@ class OfflineUI {
         div.dataset.tempId = messageData.tempId;
         
         div.innerHTML = `
-            <div class="message-content">
+            <div class="message-bubble sent">
                 <div class="message-text">${this.escapeHtml(messageData.content)}</div>
-                <div class="message-time">
-                    <span class="pending-indicator">
-                        <i class="bi bi-clock"></i> Sending when connection returns...
-                    </span>
-                </div>
+            </div>
+            <div class="message-meta">
+                <span class="pending-indicator">
+                    <i class="bi bi-clock"></i> Sending when connection returns...
+                </span>
             </div>
         `;
         

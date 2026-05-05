@@ -243,19 +243,30 @@
             }
             
             createMessageElement(message) {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} ${message.isConsecutive ? 'consecutive-message' : 'first-in-group'} ${message.isLastSent ? 'last-sent' : ''}`;
-                messageDiv.setAttribute('data-message-id', message.id);
-                messageDiv.setAttribute('data-sender-id', message.sender_id);
-                
-                messageDiv.innerHTML = `
-                    <p class="message-content">${message.content || ''}</p>
-                    <div class="message-time">
-                        ${new Date(message.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </div>
-                `;
-                
-                return messageDiv;
+                const wrapper = document.createElement('div');
+                wrapper.className = `message-wrapper ${message.isOwn ? 'sent-wrapper' : 'received-wrapper'}`;
+                wrapper.setAttribute('data-message-id', message.id);
+                wrapper.setAttribute('data-sender-id', message.sender_id);
+
+                const bubble = document.createElement('div');
+                bubble.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} ${message.isConsecutive ? 'consecutive-message' : 'first-in-group'} ${message.isLastSent ? 'last-sent' : ''}`;
+                bubble.innerHTML = `<p class="message-content">${message.content || ''}</p>`;
+
+                // Render timestamp/meta for single or last-in-group messages
+                const shouldRenderMeta = !message.isConsecutive || message.isLastSent;
+                if (shouldRenderMeta) {
+                    const meta = document.createElement('div');
+                    meta.className = 'message-meta';
+                    const ts = document.createElement('span');
+                    ts.className = 'timestamp';
+                    ts.textContent = new Date(message.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    meta.appendChild(ts);
+                    wrapper.appendChild(bubble);
+                    wrapper.appendChild(meta);
+                    return wrapper;
+                }
+
+                return bubble;
             }
         }
         
