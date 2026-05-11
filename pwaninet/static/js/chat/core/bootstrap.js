@@ -10,6 +10,7 @@ import { store } from './store.js';
 import { uiController } from '../ui/ui-controller.js';
 import { voiceService } from '../features/voice/voice.service.js';
 import { attachmentUI } from '../features/attachments/attachment-ui.js';
+import { contextMenuService } from '../features/context-menu/context-menu.service.js';
 
 // Load encryption module if available
 if (typeof E2EEncryption === 'undefined') {
@@ -63,6 +64,10 @@ document.addEventListener('DOMContentLoaded', () => {
     attachmentUI.init();
     console.log('✅ Attachment UI initialized');
 
+    // 8. Context menu service
+    contextMenuService.init();
+    console.log('✅ Context menu service initialized');
+
     // Expose globally for debugging
     window.appController = appController;
     window.store = store;
@@ -71,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.uiController = uiController;
     window.voiceService = voiceService;
     window.attachmentUI = attachmentUI;
+    window.contextMenuService = contextMenuService;
 
     console.log('🎉 SOT architecture initialized with mandatory data flow enforcement');
     console.log('📊 Data flow: websocket → message-service → store → ui-controller → renderer');

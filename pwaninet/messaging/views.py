@@ -9,9 +9,12 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
 from django.db import models
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+import requests
+from urllib.parse import urlparse
+import re
 from .models import Conversation, ConversationMember, Message, MessageRead, MessageReaction, ConversationTheme
 from .serializers import (
     ConversationSerializer,
@@ -318,10 +321,11 @@ def conversation_list(request):
         'messages__read_receipts'
     ).annotate(
         # Optimize: get last message in one query instead of N+1
-        last_msg_id=models.Max('messages__id')
-    ).distinct()
+        last_msg_id=models.Max('messages__id'),
+        last_msg_time=models.Max('messages__created_at')
+    ).order_by('-last_msg_time').distinct()
 
-    # Calculate read status efficiently
+    # Calculate read status and unread count efficiently
     conversation_data = []
     for conversation in conversations:
         # Get last message efficiently from the queryset
@@ -332,9 +336,19 @@ def conversation_list(request):
         if last_message and last_message.sender == request.user:
             read_status = conversation.get_last_message_read_status(request.user) or 'sent'
         
+        # Calculate unread count for this user
+        member = conversation.members.filter(user=request.user).first()
+        if member and member.last_read_message:
+            unread_count = conversation.messages.filter(
+                created_at__gt=member.last_read_message.created_at
+            ).count()
+        else:
+            unread_count = conversation.messages.count()
+        
         conversation_data.append({
             'conversation': conversation,
-            'read_status': read_status
+            'read_status': read_status,
+            'unread_count': unread_count
         })
 
     from users.models import User, Follow
@@ -661,3 +675,161 @@ def attachment_upload(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def fetch_link_metadata(request):
+    """Fetch OpenGraph metadata for a URL."""
+    try:
+        url = request.data.get('url')
+        if not url:
+            return Response(
+                {'error': 'URL is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate URL format
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            return Response(
+                {'error': 'Invalid URL format'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Detect link type
+        link_type = detect_link_type(url)
+        
+        # For internal links, we can skip external fetching
+        if link_type in ['internal_post', 'internal_profile']:
+            # TODO: Fetch internal metadata from database
+            return Response({
+                'url': url,
+                'title': 'Internal Link',
+                'description': 'View this content',
+                'image': None,
+                'type': link_type
+            })
+        
+        # Fetch page content
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            html = response.text
+        except requests.RequestException as e:
+            return Response(
+                {'error': f'Failed to fetch URL: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Extract OpenGraph metadata
+        metadata = extract_opengraph_metadata(html, url)
+        metadata['type'] = link_type
+        
+        return Response(metadata, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+def detect_link_type(url):
+    """Detect the type of link based on URL patterns."""
+    parsed = urlparse(url)
+    domain = parsed.netloc.lower()
+    
+    # Internal links
+    if domain in ['localhost', '127.0.0.1'] or domain.endswith('.local'):
+        if '/post/' in url or '/p/' in url:
+            return 'internal_post'
+        elif '/profile/' in url or '/u/' in url:
+            return 'internal_profile'
+    
+    # Social media platforms
+    if 'facebook.com' in domain or 'fb.com' in domain:
+        return 'facebook'
+    elif 'youtube.com' in domain or 'youtu.be' in domain:
+        return 'youtube'
+    elif 'instagram.com' in domain:
+        return 'instagram'
+    elif 'twitter.com' in domain or 'x.com' in domain:
+        return 'twitter'
+    
+    return 'link'
+
+
+def extract_opengraph_metadata(html, url):
+    """Extract OpenGraph metadata from HTML."""
+    metadata = {
+        'url': url,
+        'title': None,
+        'description': None,
+        'image': None
+    }
+    
+    # Extract title
+    title_match = re.search(r'<meta[^>]*property=["\']og:title["\'][^>]*content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    if not title_match:
+        title_match = re.search(r'<title>([^<]+)</title>', html, re.IGNORECASE)
+    if title_match:
+        metadata['title'] = title_match.group(1).strip()
+    
+    # Extract description
+    desc_match = re.search(r'<meta[^>]*property=["\']og:description["\'][^>]*content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    if not desc_match:
+        desc_match = re.search(r'<meta[^>]*name=["\']description["\'][^>]*content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    if desc_match:
+        metadata['description'] = desc_match.group(1).strip()
+    
+    # Extract image
+    image_match = re.search(r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    if image_match:
+        image_url = image_match.group(1).strip()
+        # Make image URL absolute if it's relative
+        if image_url.startswith('//'):
+            image_url = 'https:' + image_url
+        elif image_url.startswith('/'):
+            parsed = urlparse(url)
+            image_url = f"{parsed.scheme}://{parsed.netloc}{image_url}"
+        metadata['image'] = image_url
+    
+    # Fallback to URL as title if no title found
+    if not metadata['title']:
+        metadata['title'] = url
+    
+    return metadata
+
+
+@login_required
+def unread_message_count(request):
+    """Return HTML for unread message count badge (similar to notifications)."""
+    # Calculate total unread messages across all conversations
+    total_unread = 0
+    conversations = Conversation.objects.filter(members__user=request.user).prefetch_related('members', 'messages')
+    
+    for conversation in conversations:
+        member = conversation.members.filter(user=request.user).first()
+        if member and member.last_read_message:
+            unread = conversation.messages.filter(
+                created_at__gt=member.last_read_message.created_at
+            ).count()
+        else:
+            # If no last_read_message, count all messages as unread
+            unread = conversation.messages.count()
+        total_unread += unread
+    
+    # Build HTML similar to notification badge
+    html = '<i class="bi bi-chat-dots-fill"></i>'
+    if total_unread > 0:
+        html += f'''
+            <span class="position-absolute top-0 end-0 translate-middle badge rounded-pill bg-danger border border-light"
+                style="font-size: 0.6rem; padding: 0.35em 0.5em; min-width: 18px; text-align: center; margin-top: -2px; margin-right: -2px;">
+                {total_unread}
+                <span class="visually-hidden">unread messages</span>
+            </span>'''
+    
+    return HttpResponse(html)

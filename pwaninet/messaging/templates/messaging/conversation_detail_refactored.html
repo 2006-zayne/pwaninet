@@ -37,6 +37,11 @@
   --peer-chat-color: #1f2c34;
 }
 
+/* Force system fonts for all elements */
+*, *::before, *::after {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif !important;
+}
+
 .chat-container {
   height: 100vh;
   padding-top: 0;
@@ -57,6 +62,7 @@
   flex: 1;
   overflow-y: auto;
   padding: 16px;
+  padding-bottom: 120px;
 }
 
 .messages-area::before {
@@ -144,7 +150,7 @@
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-  padding-bottom: 80px;
+  padding-bottom: 120px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -252,7 +258,7 @@ div.chat-container div.messages-area div.message-bubble {
   background-color: var(--chat-bg-sent, #d4f1c4) !important;
   color: var(--chat-text-sent, #111) !important;
   border-radius: 18px 18px 4px 18px !important;
-  margin: 6px 8px 0px auto !important;
+  margin: 1px 8px 0px auto !important;
   padding: 8px 12px !important;
 }
 
@@ -261,7 +267,7 @@ div.chat-container div.messages-area div.message-bubble {
   background-color: var(--chat-bg-received, #f0f0f0) !important;
   color: var(--chat-text-received, #111) !important;
   border-radius: 18px 18px 18px 4px !important;
-  margin: 6px 8px 0px 8px !important;
+  margin: 1px 8px 0px 8px !important;
   padding: 8px 12px !important;
   border: none !important;
 }
@@ -283,23 +289,23 @@ div.chat-container div.messages-area div.message-bubble {
 /* SINGLE messages - uniform border radius on all corners */
 .messages-area .message-bubble.sent.group-single {
   border-radius: var(--bubble-radius) !important;
-  margin: 6px 8px 0px auto !important;
+  margin: 1px 8px 0px auto !important;
 }
 
 .messages-area .message-bubble.received.group-single {
   border-radius: var(--bubble-radius) !important;
-  margin: 6px 8px 0px 8px !important;
+  margin: 1px 8px 0px 8px !important;
 }
 
 /* FIRST in group - bottom wall-side corner flat to connect to next */
 .messages-area .message-bubble.sent.group-first {
   border-radius: var(--bubble-radius) var(--bubble-radius) 5px var(--bubble-radius) !important;
-  margin: 3px 8px 0px auto !important;
+  margin: 1px 8px 0px auto !important;
 }
 
 .messages-area .message-bubble.received.group-first {
   border-radius: var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) 5px !important;
-  margin: 3px 8px 0px 8px !important;
+  margin: 1px 8px 0px 8px !important;
 }
 
 /* MIDDLE in group - top and bottom wall-side corners flat */
@@ -309,7 +315,7 @@ div.chat-container div.messages-area div.message-bubble {
 }
 
 .messages-area .message-bubble.received.group-middle {
-  border-radius: 5px var(--bubble-radius) var(--bubble-radius) 0 !important;
+  border-radius: 5px var(--bubble-radius) var(--bubble-radius) 5px !important;
   margin: 0px 8px 0px 8px !important;
 }
 
@@ -446,6 +452,180 @@ div.chat-container div.messages-area div.message-bubble {
   background-color: #e3f2fd;
 }
 
+/* Emoji message styles - larger font, no bubble for standalone emoji */
+.messages-area .message-bubble.emoji-message,
+.message-bubble.emoji-message {
+  background: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  max-width: none !important;
+  width: auto !important;
+  margin: 1px 8px 0px 8px !important;
+}
+
+.messages-area .message-bubble.sent.emoji-message {
+  margin: 1px 8px 0px auto !important;
+}
+
+.messages-area .message-bubble.received.emoji-message {
+  margin: 1px 8px 0px 8px !important;
+}
+
+.emoji-content {
+  font-size: 48px !important;
+  line-height: 1 !important;
+  display: inline-block;
+}
+
+/* Emoji message timestamp positioning */
+.message-bubble.emoji-message .message-time {
+  font-size: 11px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Samsung One", "Samsung Sans", "Helvetica Neue", Arial, sans-serif;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
+/* Media message styles */
+.media-message {
+  max-width: 75%;
+  padding: 2px 2px !important;
+}
+
+.media-image {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: 2px;
+  object-fit: contain;
+  cursor: pointer;
+}
+
+.media-image:hover {
+  opacity: 0.9;
+}
+
+.media-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: background-color 0.2s;
+}
+
+.media-link:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .media-link {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .media-link:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.media-link i {
+  font-size: 24px;
+}
+
+.message-time {
+  font-size: 11px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Samsung One", "Samsung Sans", "Helvetica Neue", Arial, sans-serif;
+  opacity: 0.85;
+  margin-top: 4px;
+}
+
+/* Typing indicator ghost bubble */
+.typing-indicator {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin: 2px 0;
+  align-items: flex-start;
+}
+
+.typing-indicator.sent-wrapper {
+  align-items: flex-end;
+}
+
+.typing-indicator.received-wrapper {
+  align-items: flex-start;
+}
+
+.typing-bubble {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 18px;
+  max-width: 75%;
+  opacity: 0.6;
+  animation: fadeIn 0.2s ease-in;
+}
+
+.typing-bubble.sent {
+  background-color: var(--chat-bg-sent, #d4f1c4);
+  margin: 6px 8px 0px auto;
+}
+
+.typing-bubble.received {
+  background-color: var(--chat-bg-received, #f0f0f0);
+  margin: 6px 8px 0px 8px;
+}
+
+/* Animated dots */
+.typing-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.typing-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--text-secondary, #666);
+  animation: typingPulse 1.4s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingPulse {
+  0%, 60%, 100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  30% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 0.6;
+    transform: translateY(0);
+  }
+}
+
 /* Avatar-only container (no checkmark, just avatar) */
 .message-read-receipt.read-avatar-only {
   display: inline-flex;
@@ -487,7 +667,18 @@ div.chat-container div.messages-area div.message-bubble {
   max-width: 100vw;
   box-sizing: border-box;
   transition: transform 0.3s ease;
-  flex-direction: row-reverse;
+}
+
+/* Mobile-specific fixes */
+@media (max-width: 768px) {
+  .input-area {
+    flex-direction: row;
+    padding: 8px 12px;
+  }
+  
+  .input-area.hidden {
+    transform: translateY(100%);
+  }
 }
 
 .input-area.hidden {
@@ -655,27 +846,7 @@ div.chat-container div.messages-area div.message-bubble {
   color: #dc3545;
 }
 
-.emoji-picker-modal {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background-color: var(--card-bg);
-  border-radius: 20px 20px 0 0;
-  padding: 20px;
-  z-index: 1040;
-  transform: translateY(100%);
-  transition: transform 0.3s ease;
-  max-width: 100vw;
-  box-sizing: border-box;
-  max-height: 70vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.emoji-picker-modal.show {
-  transform: translateY(0);
-}
+/* Emoji picker styles moved to consolidated section below */
 
 .emoji-picker-header {
   display: flex;
@@ -907,25 +1078,48 @@ div.chat-container div.messages-area div.message-bubble {
   text-align: center;
 }
 
+/* Emoji Picker Modal Styles */
+.emoji-picker-modal {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  top: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: none;
+  flex-direction: column;
+  z-index: 1040;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+}
+
+.emoji-picker-modal.show {
+  display: flex;
+  transform: translateY(0);
+}
+
 /* Theme Modal Styles */
 .theme-modal {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  background-color: var(--card-bg);
-  border-radius: 20px 20px 0 0;
+  top: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: none;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
   padding: 20px;
-  z-index: 1040;
+  z-index: 1000;
   transform: translateY(100%);
   transition: transform 0.3s ease;
-  max-width: 100vw;
-  box-sizing: border-box;
-  max-height: 80vh;
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .theme-modal.show {
+  display: flex;
   transform: translateY(0);
 }
 
@@ -1273,6 +1467,186 @@ div.chat-container div.messages-area div.message-bubble {
   margin: 0;
 }
 
+/* Media Message Styles */
+.media-message {
+  padding: 4px !important;
+  max-width: 75% !important;
+}
+
+.media-image {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: var(--bubble-radius);
+  display: block;
+  object-fit: cover;
+}
+
+.media-video {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: 2px;
+  display: block;
+}
+
+.media-audio-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.media-audio {
+  max-width: 100%;
+  height: 32px;
+}
+
+.media-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.media-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  transition: background-color 0.2s;
+}
+
+.media-file:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.file-icon {
+  font-size: 24px;
+}
+
+.file-name {
+  font-size: 14px;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+[data-theme="dark"] .media-file {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .media-file:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Link Preview Styles */
+.link-message {
+  padding: 8px !important;
+  max-width: 75% !important;
+}
+
+.link-preview-card {
+  display: flex;
+  text-decoration: none;
+  color: inherit;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: background-color 0.2s;
+  max-width: 300px;
+}
+
+.link-preview-card:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.link-preview-image {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  display: block;
+}
+
+.link-preview-content {
+  padding: 12px;
+}
+
+.link-preview-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.link-preview-description {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.link-preview-domain {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+[data-theme="dark"] .link-preview-card {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .link-preview-card:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Video Embed Styles */
+.video-embed {
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 16/9;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.youtube-embed {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Facebook Embed Placeholder */
+.facebook-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: linear-gradient(135deg, #1877f2 0%, #0a66c2 100%);
+  color: white;
+  border-radius: 8px;
+}
+
+.facebook-embed-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.facebook-icon {
+  font-size: 24px;
+}
+
+.facebook-text {
+  font-weight: 600;
+  font-size: 14px;
+}
+
 /* Bubble Styles */
 .bubble-options {
   display: grid;
@@ -1509,6 +1883,22 @@ div.chat-container div.messages-area div.message-bubble {
   display: flex;
   justify-content: space-around;
   align-items: center;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  padding: 8px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  transition: background-color 0.2s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .voice-recording-btn {
@@ -1758,14 +2148,14 @@ body {
         <li><a class="dropdown-item" href="#" id="viewMediaBtn"><i class="bi bi-images me-2"></i>View Media</a></li>
         <li><a class="dropdown-item" href="#" id="starBtn"><i class="bi bi-star me-2"></i>Star Messages</a></li>
         <li><hr class="dropdown-divider"></li>
-        <li><a class="dropdown-item" href="#" id="themeBtn"><i class="bi bi-palette me-2"></i>Chat Theme</a></li>
+        <li><a class="dropdown-item" href="#" id="themeBtn" data-bs-no-dropdown="true"><i class="bi bi-palette me-2"></i>Chat Theme</a></li>
         <li><hr class="dropdown-divider"></li>
         <li><a class="dropdown-item text-danger" href="#" id="leaveBtn"><i class="bi bi-box-arrow-right me-2"></i>Leave</a></li>
       </ul>
     </div>
   </div>
 
-  <div class="messages-area" id="messagesContainer">
+  <div class="messages-area" id="messagesContainer" data-skeleton="messaging-detail">
     <!-- Messages will be rendered by JavaScript -->
   </div>
 
@@ -2435,50 +2825,52 @@ console.log('=== CONVERSATION DETAIL REFACTORED SCRIPT LOADING ===');
 document.body.dataset.userId = '{{ request.user.id }}';
 document.body.dataset.conversationId = '{{ conversation.id }}';
 document.body.dataset.isEncrypted = '{{ conversation.is_encrypted|yesno:"true,false" }}';
+document.body.dataset.conversationType = '{{ conversation.type }}';
+</script>
+
 {% if conversation.type == 'direct' %}
   {% for member in conversation.members.all %}
     {% if member.user != request.user %}
+      <script>
       document.body.dataset.receiverAvatar = '{{ member.user.profile_pic.url|default:"/static/images/default_pic1.jpg" }}';
+      </script>
     {% endif %}
   {% endfor %}
 {% endif %}
-</script>
 
 <script src="{% static 'js/encryption.js' %}"></script>
 <script type="module" src="{% static 'js/chat/bootstrap.js' %}?v=12"></script>
 
+<!-- Chat theme manager for per-conversation customization -->
+<script src="{% static 'js/chat_theme_manager.js' %}"></script>
+
+<!-- NEW: Modular messaging bootstrap -->
+<script type="module" src="{% static 'js/messaging/bootstrap.js' %}?v=1"></script>
+
+<!-- Initialize UI features: emoji picker, theme button, context menu -->
 <script>
-console.log('=== BUTTON INITIALIZATION SCRIPT ===');
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('=== DOM CONTENT LOADED ===');
-  
-  // Get conversation ID for immediate theme loading
-  const conversationId = document.body.dataset.conversationId;
-  
-  // Initialize wallpaper caching system first
-  initializeWallpaperCaching();
-  
-  // Load theme immediately (don't wait for SOT system)
-  if (conversationId) {
-    loadConversationTheme(conversationId);
-  }
-  
-  // Wait for SOT system to be ready before initializing other legacy scripts
-  function waitForSOTSystem() {
-    if (window.messageService && window.messageService.getStatus && window.messageService.getStatus().initialized) {
-      console.log('=== SOT SYSTEM READY, INITIALIZING LEGACY SCRIPTS ===');
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('🎯 DOM Content Loaded - Initializing UI features...');
+    
+    // Initialize basic UI elements (emoji picker, theme button)
+    if (typeof initBasicUI === 'function') {
+      console.log('✅ Calling initBasicUI()');
+      initBasicUI();
+    } else {
+      console.warn('⚠️ initBasicUI not found');
+    }
+    
+    // Initialize page scripts (attachment buttons, etc.)
+    if (typeof initPageScripts === 'function') {
+      console.log('✅ Calling initPageScripts()');
       initPageScripts();
     } else {
-      console.log('=== WAITING FOR SOT SYSTEM ===');
-      setTimeout(waitForSOTSystem, 100);
+      console.warn('⚠️ initPageScripts not found');
     }
-  }
-  
-  waitForSOTSystem();
+  });
+</script>
 
-  // Load conversation theme (called immediately, not waiting for SOT)
-  async function loadConversationTheme(conversationId) {
-    console.log('=== LOADING THEME FOR CONVERSATION:', conversationId);
+{% endblock %}
     
     try {
       const response = await fetch(`/api/messaging/themes/?conversation=${conversationId}`, {
@@ -2728,16 +3120,16 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Wallpaper cache updated for conversation:', conversationId);
   }
 
-  function initPageScripts() {
-    console.log('=== INIT PAGE SCRIPTS CALLED ===');
-
+  function initBasicUI() {
+    console.log('=== INIT BASIC UI (IMMEDIATE) ===');
+    
     // Emoji picker toggle
     const emojiBtn = document.getElementById('emojiBtn');
     const emojiPicker = document.getElementById('emojiPicker');
     const overlay = document.getElementById('overlay');
     const closeEmojiPicker = document.getElementById('closeEmojiPicker');
 
-    console.log('Button elements:', {
+    console.log('Basic UI Button elements:', {
       emojiBtn: !!emojiBtn,
       emojiPicker: !!emojiPicker,
       overlay: !!overlay,
@@ -2745,14 +3137,21 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     if (emojiBtn && emojiPicker) {
-      console.log('Adding emojiBtn click listener');
-      emojiBtn.addEventListener('click', (e) => {
-        console.log('emojiBtn clicked', e);
+      console.log('Adding emojiBtn click listener (immediate)');
+      
+      // Handle both click and touch events for mobile
+      const openEmojiPicker = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('emojiBtn triggered (immediate)', e);
         emojiPicker.classList.add('show');
         overlay.classList.add('show');
-      });
+      };
+      
+      emojiBtn.addEventListener('click', openEmojiPicker);
+      emojiBtn.addEventListener('touchstart', openEmojiPicker, {passive: false});
     } else {
-      console.error('emojiBtn or emojiPicker not found');
+      console.error('emojiBtn or emojiPicker not found for immediate init');
     }
 
     if (closeEmojiPicker) {
@@ -2761,6 +3160,47 @@ document.addEventListener('DOMContentLoaded', function() {
         overlay.classList.remove('show');
       });
     }
+
+    // Theme modal toggle
+    const themeBtn = document.getElementById('themeBtn');
+    const themeModal = document.getElementById('themeModal');  
+    const closeThemeModal = document.getElementById('closeThemeModal');
+
+    console.log('Basic UI Theme elements:', { 
+      themeBtn: !!themeBtn,
+      themeModal: !!themeModal,
+      closeThemeModal: !!closeThemeModal
+    });
+
+    // Open theme modal when themeBtn is clicked
+    if (themeBtn && themeModal) {
+      const openThemeModal = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Theme button triggered (immediate), opening modal');
+        themeModal.classList.add('show');
+        overlay.classList.add('show');
+      };
+      
+      themeBtn.addEventListener('click', openThemeModal);
+      themeBtn.addEventListener('touchstart', openThemeModal, {passive: false});
+    }
+
+    if (closeThemeModal) {
+      closeThemeModal.addEventListener('click', () => {
+        themeModal.classList.remove('show');
+        overlay.classList.remove('show');
+      });
+    }
+
+    // Initialize emoji picker content
+   /* initializeEmojiPicker(); */
+  }
+
+  function initPageScripts() {
+    console.log('=== INIT PAGE SCRIPTS CALLED ===');
+
+    // Emoji picker handled by initBasicUI - removed duplicate listeners
 
     // Attachment modal
     const attachBtn = document.getElementById('attachBtn');
@@ -2775,14 +3215,93 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (attachBtn && attachmentModal) {
       console.log('Adding attachBtn click listener');
-      attachBtn.addEventListener('click', (e) => {
-        console.log('attachBtn clicked', e);
+      const openAttachmentModal = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('attachBtn triggered', e);
         attachmentModal.classList.add('show');
         overlay.classList.add('show');
-      });
+      };
+      
+      attachBtn.addEventListener('click', openAttachmentModal);
+      attachBtn.addEventListener('touchstart', openAttachmentModal, {passive: false});
     }
 
-    const themeBtn = document.getElementById('themeBtn');
+    // Attachment options functionality
+    const attachmentOptions = document.querySelectorAll('.attachment-option');
+    const fileInput = document.getElementById('fileInput');
+    
+    attachmentOptions.forEach(option => {
+      option.addEventListener('click', () => {
+        const type = option.dataset.type;
+        let accept = '';
+        
+        switch(type) {
+          case 'photos':
+            accept = 'image/*';
+            break;
+          case 'videos':
+            accept = 'video/*';
+            break;
+          case 'documents':
+            accept = '.pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx';
+            break;
+          case 'audio':
+            accept = 'audio/*';
+            break;
+        }
+        
+        fileInput.accept = accept;
+        fileInput.click();
+        attachmentModal.classList.remove('show');
+        overlay.classList.remove('show');
+      });
+    });
+
+    // Handle file upload
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const conversationId = document.querySelector('.chat-container').dataset.conversationId;
+      if (!conversationId) {
+        console.error('No conversation ID found');
+        return;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('conversation_id', conversationId);
+
+        const response = await fetch('/messaging/api/attachments/upload/', {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+          },
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to upload file');
+        }
+
+        const messageData = await response.json();
+        console.log('File uploaded successfully:', messageData);
+        
+        // The message will be broadcasted via WebSocket automatically
+        // No need to manually add it to the UI
+      } catch (error) {
+        console.error('File upload error:', error);
+        alert('Failed to upload file: ' + error.message);
+      }
+
+      // Reset file input
+      fileInput.value = '';
+    });
+
+   /* const themeBtn = document.getElementById('themeBtn');
     const themeModal = document.getElementById('themeModal');  
     const closeThemeModal = document.getElementById('closeThemeModal');
     const themeOptions = document.querySelectorAll('.theme-option'); 
@@ -2796,13 +3315,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Open theme modal when themeBtn is clicked
     if (themeBtn && themeModal) {
-      themeBtn.addEventListener('click', (e) => {
+      const openThemeModal = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        console.log('Theme button clicked, opening modal');
+        console.log('Theme button triggered, opening modal');
         themeModal.classList.add('show');
         overlay.classList.add('show');
-      });
+      };
+      
+      themeBtn.addEventListener('click', openThemeModal);
+      themeBtn.addEventListener('touchstart', openThemeModal, {passive: false});
     }
 
     if (closeThemeModal) {
@@ -2810,7 +3332,7 @@ document.addEventListener('DOMContentLoaded', function() {
         themeModal.classList.remove('show');
         overlay.classList.remove('show');
       });
-    }
+    }*/
 
     if (closeAttachmentModal) {
       closeAttachmentModal.addEventListener('click', () => {
@@ -3122,11 +3644,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // User is typing - show send icon, hide camera
         voiceBtn.innerHTML = '<i class="bi bi-send-fill"></i>';
         voiceBtn.title = 'Send message';
+        voiceBtn.style.background = 'var(--brand, #0084ff)';
+        voiceBtn.style.color = 'white';
         cameraBtn.style.display = 'none';
       } else {
         // User stopped typing - show voice icon, show camera
         voiceBtn.innerHTML = '<i class="bi bi-mic"></i>';
         voiceBtn.title = 'Voice message';
+        voiceBtn.style.background = 'none';
+        voiceBtn.style.color = 'var(--text-primary)';
         cameraBtn.style.display = 'flex';
       }
     }
@@ -3139,11 +3665,38 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update state immediately
         updateInputState();
         
+        // Handle typing detection
+        if (messageInput.value.trim().length > 0) {
+          startTyping();
+        }
+        
         // Set timeout to detect when user stops typing
         typingTimeout = setTimeout(() => {
           // Check if input is empty after delay
           if (messageInput.value.trim().length === 0) {
             updateInputState();
+            stopTyping();
+          }
+        }, 1000);
+      });
+
+      // Also handle keyboard input events for mobile
+      messageInput.addEventListener('keyup', () => {
+        // Update state immediately on keyup
+        updateInputState();
+        
+        // Handle typing detection
+        if (messageInput.value.trim().length > 0) {
+          startTyping();
+        }
+        
+        // Set timeout to detect when user stops typing
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+          // Check if input is empty after delay
+          if (messageInput.value.trim().length === 0) {
+            updateInputState();
+            stopTyping();
           }
         }, 1000);
       });
@@ -3192,6 +3745,150 @@ document.addEventListener('DOMContentLoaded', function() {
       messageInput.value = '';
       updateInputState();
     }
+
+    // Typing indicator functions
+    let typingIndicators = new Map(); // Track typing indicators by user ID
+    let isTyping = false;
+    let typingTimeout;
+    let stopTypingTimeout;
+
+    function showTypingIndicator(userId, isOwnMessage) {
+      // Remove existing indicator for this user if any
+      hideTypingIndicator(userId);
+      
+      const messagesContainer = document.getElementById('messagesContainer');
+      if (!messagesContainer) return;
+      
+      const indicatorDiv = document.createElement('div');
+      indicatorDiv.className = `typing-indicator ${isOwnMessage ? 'sent-wrapper' : 'received-wrapper'}`;
+      indicatorDiv.setAttribute('data-user-id', userId);
+      indicatorDiv.innerHTML = `
+        <div class="typing-bubble ${isOwnMessage ? 'sent' : 'received'}">
+          <div class="typing-dots">
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+          </div>
+        </div>
+      `;
+      
+      // Add to messages container
+      messagesContainer.appendChild(indicatorDiv);
+      
+      // Store reference
+      typingIndicators.set(userId, indicatorDiv);
+      
+      // Scroll to bottom
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function hideTypingIndicator(userId) {
+      const indicator = typingIndicators.get(userId);
+      if (indicator && indicator.parentNode) {
+        indicator.parentNode.removeChild(indicator);
+        typingIndicators.delete(userId);
+      }
+    }
+
+    function startTyping() {
+      if (!isTyping) {
+        isTyping = true;
+        
+        // Emit typing event via WebSocket
+        if (window.webSocketManager && window.webSocketManager.isConnected()) {
+          window.webSocketManager.send({
+            type: 'typing_start',
+            conversation_id: window.currentConversationId,
+            user_id: window.currentUserId
+          });
+        } else {
+          // Fallback: emit custom event for testing
+          window.dispatchEvent(new CustomEvent('typing_start', {
+            detail: {
+              user_id: 'other_user',
+              isOwn: false
+            }
+          }));
+        }
+      }
+      
+      // Clear existing stop timeout
+      clearTimeout(stopTypingTimeout);
+      
+      // Set timeout to stop typing after 1 second of inactivity
+      stopTypingTimeout = setTimeout(() => {
+        stopTyping();
+      }, 1000);
+    }
+
+    function stopTyping() {
+      if (isTyping) {
+        isTyping = false;
+        
+        // Emit stop typing event via WebSocket
+        if (window.webSocketManager && window.webSocketManager.isConnected()) {
+          window.webSocketManager.send({
+            type: 'typing_stop',
+            conversation_id: window.currentConversationId,
+            user_id: window.currentUserId
+          });
+        } else {
+          // Fallback: emit custom event for testing
+          window.dispatchEvent(new CustomEvent('typing_stop', {
+            detail: {
+              user_id: 'other_user'
+            }
+          }));
+        }
+      }
+      clearTimeout(stopTypingTimeout);
+    }
+
+    // WebSocket listeners for typing events
+    function setupTypingListeners() {
+      // Fallback: simulate typing events for testing
+      if (!window.webSocketManager) {
+        console.log('WebSocket not available, using fallback for typing testing');
+        window.typingEvents = new Map();
+        
+        // Listen for custom typing events
+        window.addEventListener('typing_start', (data) => {
+          console.log('User started typing:', data);
+          if (data.detail && data.detail.user_id !== window.currentUserId) {
+            showTypingIndicator(data.detail.user_id, data.detail.isOwn);
+          }
+        });
+        
+        window.addEventListener('typing_stop', (data) => {
+          console.log('User stopped typing:', data);
+          if (data.detail && data.detail.user_id !== window.currentUserId) {
+            hideTypingIndicator(data.detail.user_id);
+          }
+        });
+        return;
+      }
+      
+      // Listen for typing start events
+      window.webSocketManager.on('typing_start', (data) => {
+        console.log('User started typing:', data);
+        // Don't show indicator for own typing
+        if (data.user_id === window.currentUserId) return;
+        
+        showTypingIndicator(data.user_id, false);
+      });
+      
+      // Listen for typing stop events
+      window.webSocketManager.on('typing_stop', (data) => {
+        console.log('User stopped typing:', data);
+        // Don't hide indicator for own typing
+        if (data.user_id === window.currentUserId) return;
+        
+        hideTypingIndicator(data.user_id);
+      });
+    }
+
+    // Initialize typing listeners
+    setupTypingListeners();
 
     // Handle voice/send button clicks
     if (voiceBtn) {
@@ -3667,5 +4364,4 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
-
-{% endblock %}
+-->

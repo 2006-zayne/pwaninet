@@ -7,6 +7,8 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from django.views.decorators.http import require_http_methods
+from django.http import JsonResponse
 from users.models import User, Follow, DeviceAccount
 from posts.models import Post, Like
 from users.forms import PwaniSignupForm, ProfileUpdateForm, NotificationPreferencesForm
@@ -507,3 +509,29 @@ class DeviceAccountViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return DeviceAccount.objects.filter(user=self.request.user)
+
+
+@require_http_methods(["GET"])
+def user_online_status_api(request, user_id):
+    """
+    API endpoint to check if a user is online.
+    Returns JSON with is_online status.
+    """
+    try:
+        from pwaninet.redis_client import get_redis_client
+        redis_client = get_redis_client()
+        
+        # Check if user is online in Redis
+        key = f'user_online:{user_id}'
+        is_online = redis_client.exists(key) == 1
+        
+        return JsonResponse({
+            'is_online': is_online,
+            'user_id': int(user_id)
+        })
+    except Exception as e:
+        return JsonResponse({
+            'is_online': False,
+            'user_id': int(user_id),
+            'error': str(e)
+        }, status=500)

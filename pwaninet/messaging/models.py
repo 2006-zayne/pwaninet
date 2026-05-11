@@ -136,6 +136,26 @@ class Message(models.Model):
         null=True,
         blank=True
     )
+    # Link metadata for rich link previews
+    link_url = models.URLField(max_length=2048, null=True, blank=True)
+    link_title = models.CharField(max_length=500, null=True, blank=True)
+    link_description = models.TextField(null=True, blank=True)
+    link_image = models.URLField(max_length=2048, null=True, blank=True)
+    link_type = models.CharField(
+        max_length=50,
+        choices=[
+            ('link', 'Link'),
+            ('facebook', 'Facebook'),
+            ('youtube', 'YouTube'),
+            ('instagram', 'Instagram'),
+            ('twitter', 'Twitter'),
+            ('internal_post', 'Internal Post'),
+            ('internal_profile', 'Internal Profile'),
+        ],
+        default='link',
+        null=True,
+        blank=True
+    )
     reply_to = models.ForeignKey(
         'self',
         null=True,
@@ -146,6 +166,15 @@ class Message(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     edited_at = models.DateTimeField(null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('sent', 'Sent'),
+            ('delivered', 'Delivered'),
+            ('read', 'Read'),
+        ],
+        default='sent'
+    )
 
     class Meta:
         ordering = ['created_at']

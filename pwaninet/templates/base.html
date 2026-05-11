@@ -82,6 +82,10 @@
     <script src="{% static 'js/device_manager.js' %}"></script>
     <script src="{% static 'js/auto_video_play.js' %}"></script>
     
+    <!-- Skeleton Loading System -->
+    <script src="{% static 'js/skeleton-loader.js' %}"></script>
+    <script src="{% static 'js/skeleton-init.js' %}"></script>
+    
     <!-- Native PWA Install Manager -->
     <script src="{% static 'js/native-pwa-install.js' %}"></script>
     
@@ -858,7 +862,14 @@
             <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}"><i class="bi bi-house-door-fill"></i></a>
             <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}"><i class="bi bi-people-fill"></i></a>
             {% if user.is_authenticated %}
-                <a href="{% url 'messaging:conversation_list' %}" class="nav-chip {% if request.resolver_match.url_name == 'conversation_list' %}active{% endif %}"><i class="bi bi-chat-dots-fill"></i></a>
+                <a href="{% url 'messaging:conversation_list' %}"
+                    class="nav-chip position-relative {% if request.resolver_match.url_name == 'conversation_list' %}active{% endif %}"
+                    hx-get="{% url 'messaging:unread_message_count' %}"
+                    hx-trigger="every 30s"
+                    hx-swap="innerHTML"
+                    id="message-badge-container">
+                    <i class="bi bi-chat-dots-fill"></i>
+                </a>
                 <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}"><i class="bi bi-plus-circle-fill"></i></a>
                 <a href="{% url 'notifications:notifications' %}"
                     class="nav-chip position-relative {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
@@ -934,10 +945,10 @@
         // Protocol: Reset modal intel on close
         const likersModal = document.getElementById('likersModal');
         likersModal.addEventListener('hidden.bs.modal', function () {
-            document.getElementById('modal-content-target').innerHTML = `
-                <div class="p-5 text-center">
-                    <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
-                </div>`;
+            document.getElementById('modal-content-target').innerHTML = 
+                '<div class="p-5 text-center">' +
+                    '<div class="spinner-border text-primary spinner-border-sm" role="status"></div>' +
+                '</div>';
         });
 
         // MODAL COORDINATION: Close custom overlays when Bootstrap modals open
@@ -1114,6 +1125,168 @@ window.addEventListener('beforeinstallprompt', (e) => {
     
     <!-- Load main app styles -->
     <link rel="stylesheet" href="/static/css/splash.css">
+
+    <!-- Global WebSocket Connection for Real-time Notifications -->
+    {% if request.user.is_authenticated %}
+    {% verbatim %}
+    <script>
+    // Global notification WebSocket connection
+    let globalNotificationsSocket = null;
+    let globalReconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+
+    function connectGlobalNotificationsWebSocket() {
+        if (globalNotificationsSocket && globalNotificationsSocket.readyState === WebSocket.OPEN) {
+            return; // Already connected
+        }
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = protocol + '//' + window.location.host + '/ws/notifications/';
+        
+        console.log('[GLOBAL] Connecting to notifications WebSocket:', wsUrl);
+        
+        try {
+            globalNotificationsSocket = new WebSocket(wsUrl);
+            
+            globalNotificationsSocket.onopen = function(e) {
+                console.log('[GLOBAL] Notifications WebSocket connected successfully');
+                globalReconnectAttempts = 0;
+                
+                // Hide any connection error indicators
+                const errorIndicator = document.getElementById('websocket-error');
+                if (errorIndicator) {
+                    errorIndicator.style.display = 'none';
+                }
+            };
+            
+            globalNotificationsSocket.onmessage = function(e) {
+                try {
+                    const data = JSON.parse(e.data);
+                    console.log('[GLOBAL] Received notification:', data);
+                    
+                    // Handle different notification types
+                    if (data.type === 'conversation_update') {
+                        // Update conversation list if we're on that page
+                        if (typeof updateConversationInList === 'function') {
+                            updateConversationInList(data);
+                        }
+                        // Update unread count in navigation
+                        updateUnreadCount(data.unread_count);
+                    } else if (data.type === 'typing_indicator') {
+                        // Handle typing indicators if we're on conversation list
+                        if (typeof updateTypingIndicator === 'function') {
+                            updateTypingIndicator(data);
+                        }
+                    } else if (data.type === 'notification') {
+                        // Handle general notifications
+                        showNotification(data.notification);
+                    } else if (data.type === 'user_status') {
+                        // Handle user online/offline status updates
+                        if (typeof handleUserStatusUpdate === 'function') {
+                            handleUserStatusUpdate(data);
+                        }
+                    }
+                } catch (error) {
+                    console.error('[GLOBAL] Error parsing WebSocket message:', error);
+                }
+            };
+            
+            globalNotificationsSocket.onclose = function(e) {
+                console.log('[GLOBAL] Notifications WebSocket disconnected:', e.code, e.reason);
+                
+                // Attempt to reconnect with exponential backoff
+                if (globalReconnectAttempts < maxReconnectAttempts) {
+                    const delay = Math.min(1000 * Math.pow(2, globalReconnectAttempts), 30000);
+                    console.log('[GLOBAL] Reconnecting in ' + delay + 'ms...');
+                    
+                    setTimeout(() => {
+                        globalReconnectAttempts++;
+                        connectGlobalNotificationsWebSocket();
+                    }, delay);
+                } else {
+                    console.log('[GLOBAL] Max reconnect attempts reached');
+                    showWebSocketError();
+                }
+            };
+            
+            globalNotificationsSocket.onerror = function(e) {
+                console.error('[GLOBAL] Notifications WebSocket error:', e);
+            };
+            
+        } catch (error) {
+            console.error('[GLOBAL] Failed to create WebSocket connection:', error);
+            showWebSocketError();
+        }
+    }
+
+    function updateUnreadCount(unreadCount) {
+        // Update messages icon badge in navigation
+        const messagesBadge = document.querySelector('.messages-badge');
+        if (messagesBadge) {
+            if (unreadCount > 0) {
+                messagesBadge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+                messagesBadge.style.display = 'flex';
+            } else {
+                messagesBadge.style.display = 'none';
+            }
+        }
+    }
+
+    function showNotification(notification) {
+        // Show browser notification if permissions are granted
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(notification.title || 'New Message', {
+                body: notification.body || notification.message,
+                icon: '/static/images/logo.png'
+            });
+        }
+        
+        // Show in-page notification
+        const notificationDiv = document.createElement('div');
+        notificationDiv.className = 'alert alert-info alert-dismissible fade show position-fixed';
+        notificationDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        notificationDiv.innerHTML = 
+            (notification.body || notification.message) +
+            '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+        document.body.appendChild(notificationDiv);
+        setTimeout(() => notificationDiv.remove(), 5000);
+    }
+
+    function showWebSocketError() {
+        // Show a subtle indicator that real-time features are unavailable
+        let errorIndicator = document.getElementById('websocket-error');
+        if (!errorIndicator) {
+            errorIndicator = document.createElement('div');
+            errorIndicator.id = 'websocket-error';
+            errorIndicator.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: #dc3545; color: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; z-index: 1000;';
+            errorIndicator.innerHTML = 'Real-time features offline';
+            document.body.appendChild(errorIndicator);
+        }
+        errorIndicator.style.display = 'block';
+    }
+
+    // Connect when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        // User is authenticated if we're in this script block (wrapped in {% if request.user.is_authenticated %})
+        connectGlobalNotificationsWebSocket();
+    });
+
+    // Reconnect when page becomes visible again
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden && (!globalNotificationsSocket || globalNotificationsSocket.readyState !== WebSocket.OPEN)) {
+            connectGlobalNotificationsWebSocket();
+        }
+    });
+
+    // Cleanup when page unloads
+    window.addEventListener('beforeunload', function() {
+        if (globalNotificationsSocket) {
+            globalNotificationsSocket.close();
+        }
+    });
+    </script>
+    {% endverbatim %}
+    {% endif %}
 
 </body>
 </html>

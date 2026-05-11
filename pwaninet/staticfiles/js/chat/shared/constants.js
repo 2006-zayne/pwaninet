@@ -91,6 +91,11 @@ export const EVENTS = {
 
   // Header events
   HEADER_UPDATE_STATUS: 'header:update_status',
+
+  // Context menu events
+  CONTEXT_MENU_SHOWN: 'menu:context_shown',
+  CONTEXT_MENU_HIDDEN: 'menu:context_hidden',
+  CONTEXT_MENU_ACTION: 'menu:context_action',
 };
 
 export const CONNECTION_STATE = {

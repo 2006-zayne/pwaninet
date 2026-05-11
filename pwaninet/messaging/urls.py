@@ -9,7 +9,9 @@ from .views import (
     conversation_detail,
     search_followed_users,
     create_conversation,
-    attachment_upload
+    attachment_upload,
+    fetch_link_metadata,
+    unread_message_count
 )
 
 router = DefaultRouter()
@@ -27,4 +29,6 @@ urlpatterns = [
     path('search-followed-users/', search_followed_users, name='search_followed_users'),
     path('create/', create_conversation, name='create_conversation'),
     path('api/attachments/upload/', attachment_upload, name='attachment_upload'),
+    path('api/links/fetch-metadata/', fetch_link_metadata, name='fetch_link_metadata'),
+    path('unread-count/', unread_message_count, name='unread_message_count'),
 ]

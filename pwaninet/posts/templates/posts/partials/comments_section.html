@@ -16,7 +16,7 @@
   }
 </style>
 <!-- Comments Section -->
-<div class="bg-white rounded-3 shadow-sm overflow-hidden mb-3" id="comments-section">
+<div class="bg-white rounded-3 shadow-sm overflow-hidden mb-3" id="comments-section" data-skeleton="post-detail">
     {% for comment in visible_comments %}
     <div class="d-flex gap-2 p-3 {% if not forloop.last %}border-bottom{% endif %}" id="comment-{{ comment.id }}">
         <a href="{% url 'users:profile' comment.author.username %}">

@@ -28,4 +28,7 @@ urlpatterns = [
     path('accounts/device-accounts/', views.get_device_accounts_view, name='device_accounts'),
     path('accounts/remove/<int:user_id>/', views.remove_account_from_device_view, name='remove_account_from_device'),
     path('user/<str:username>/photo/<str:photo_type>/', views.view_profile_photo_fullscreen, name='view_profile_photo_fullscreen'),
+    
+    # Online status API
+    path('api/users/<int:user_id>/online-status/', views.user_online_status_api, name='user_online_status_api'),
 ]

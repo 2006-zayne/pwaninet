@@ -9,7 +9,7 @@ ALLOWED_HOSTS = [
     host.split(':')[0].strip()
     for host in os.environ.get(
         'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,0.0.0.0,10.20.152.125,192.168.183.245,192.168.19.221,192.168.140.221,192.168.72.88,192.168.85.117,192.168.72.88,192.168.183.245,172.18.0.1,192.168.183.245'
+        'localhost,127.0.0.1,0.0.0.0,10.20.152.125,192.168.183.245,192.168.93.221,192.168.14.221,192.168.87.159,192.168.72.88,192.168.87.159,192.168.72.88,192.168.183.245,172.18.0.1,192.168.183.245'
     ).split(',')
     if host.strip()
 ]
@@ -33,28 +33,48 @@ SECURE_CONTENT_TYPE_NOSNIFF = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 
-# Allow all origins for CSRF in local development
+# Allow all origins for CSRF in local development (both HTTP and HTTPS)
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost',
     'http://localhost:8000',
+    'https://localhost',
+    'https://localhost:8000',
     'http://127.0.0.1',
     'http://127.0.0.1:8000',
+    'https://127.0.0.1',
+    'https://127.0.0.1:8000',
     'http://0.0.0.0',
     'http://0.0.0.0:8000',
+    'https://0.0.0.0',
+    'https://0.0.0.0:8000',
     'http://10.20.152.125',
     'http://10.20.152.125:8000',
+    'https://10.20.152.125',
+    'https://10.20.152.125:8000',
     'http://192.168.213.221',
     'http://192.168.213.221:8000',
+    'https://192.168.213.221',
+    'https://192.168.213.221:8000',
     'http://192.168.180.221',
     'http://192.168.180.221:8000',
+    'https://192.168.180.221',
+    'https://192.168.180.221:8000',
     'http://192.168.72.88',
     'http://192.168.72.88:8000',
+    'https://192.168.72.88',
+    'https://192.168.72.88:8000',
     'http://192.168.85.117',
     'http://192.168.85.117:8000',
+    'https://192.168.85.117',
+    'https://192.168.85.117:8000',
     'http://192.168.183.245',
     'http://192.168.183.245:8000',
+    'https://192.168.183.245',
+    'https://192.168.183.245:8000',
     'http://172.18.0.1',
     'http://172.18.0.1:8000',
+    'https://172.18.0.1',
+    'https://172.18.0.1:8000',
 ]
 
 # Disable CSRF for API endpoints in local development

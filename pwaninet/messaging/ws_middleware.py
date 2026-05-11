@@ -111,16 +111,16 @@ class WebSocketConnectionTracker:
     """
 
     KEY_PREFIX = 'ws_conn'
-    MAX_CONNECTIONS_PER_USER = 20
-    CONNECTION_TIMEOUT = 3600  # 1 hour
+    MAX_CONNECTIONS_PER_USER = 50
+    CONNECTION_TIMEOUT = 600  # 10 minutes
 
     @classmethod
-    def get_connections_key(cls, user_id: int) -> str:
+    def get_connections_key(cls, user_id: int, connection_type: str = 'default') -> str:
         """Get Redis key for user's connections."""
-        return f"{cls.KEY_PREFIX}:{user_id}"
+        return f"{cls.KEY_PREFIX}:{user_id}:{connection_type}"
 
     @classmethod
-    def register_connection(cls, user_id: int, connection_id: str, metadata: dict = None) -> bool:
+    def register_connection(cls, user_id: int, connection_id: str, metadata: dict = None, connection_type: str = 'default') -> bool:
         """
         Register a new WebSocket connection.
 
@@ -128,36 +128,49 @@ class WebSocketConnectionTracker:
             user_id: ID of user
             connection_id: Unique connection identifier
             metadata: Connection metadata (ip, user_agent, etc)
+            connection_type: Type of connection ('chat', 'notifications', 'default')
 
         Returns:
             True if registered, False if exceeded max connections
         """
         try:
             redis_client = get_redis_client()
-            conn_key = cls.get_connections_key(user_id)
+            conn_key = cls.get_connections_key(user_id, connection_type)
 
             # Clean up stale connections (older than CONNECTION_TIMEOUT)
             connections = redis_client.smembers(conn_key)
             now = datetime.now()
+            cleaned = 0
             for conn_json in connections:
                 try:
                     conn_data = json.loads(conn_json)
                     connected_at = datetime.fromisoformat(conn_data.get('connected_at', '2000-01-01'))
                     if (now - connected_at).total_seconds() > cls.CONNECTION_TIMEOUT:
                         redis_client.srem(conn_key, conn_json)
+                        cleaned += 1
                 except (json.JSONDecodeError, ValueError):
                     # Remove malformed entries
                     redis_client.srem(conn_key, conn_json)
+                    cleaned += 1
+
+            if cleaned > 0:
+                print(f'[TRACKER] Cleaned {cleaned} stale connections for user {user_id} ({connection_type})')
 
             # Check current connection count after cleanup
             conn_count = redis_client.scard(conn_key)
+            print(f'[TRACKER] User {user_id} has {conn_count} active {connection_type} connections (max: {cls.MAX_CONNECTIONS_PER_USER})')
             if conn_count >= cls.MAX_CONNECTIONS_PER_USER:
-                return False
+                print(f'[TRACKER] User {user_id} exceeded max connections, force clearing all stale connections')
+                # Force clear all connections for this user (emergency cleanup)
+                redis_client.delete(conn_key)
+                print(f'[TRACKER] Force cleared {conn_count} connections for user {user_id} ({connection_type})')
+                # Continue with registration after clearing
 
             # Register connection
             conn_data = {
                 'connection_id': connection_id,
                 'connected_at': datetime.now().isoformat(),
+                'connection_type': connection_type,
             }
             if metadata:
                 conn_data.update(metadata)
@@ -165,34 +178,43 @@ class WebSocketConnectionTracker:
             redis_client.sadd(conn_key, json.dumps(conn_data))
             redis_client.expire(conn_key, cls.CONNECTION_TIMEOUT)
 
+            print(f'[TRACKER] Registered {connection_type} connection {connection_id} for user {user_id}')
             return True
-        except Exception:
+        except Exception as e:
             # Fail open - allow connection if Redis fails
+            print(f'[TRACKER] Error registering connection for user {user_id}: {e}')
             return True
 
     @classmethod
-    def unregister_connection(cls, user_id: int, connection_id: str) -> None:
+    def unregister_connection(cls, user_id: int, connection_id: str, connection_type: str = 'default') -> None:
         """Unregister a WebSocket connection."""
         try:
             redis_client = get_redis_client()
-            conn_key = cls.get_connections_key(user_id)
+            conn_key = cls.get_connections_key(user_id, connection_type)
 
             # Find and remove connection
             connections = redis_client.smembers(conn_key)
+            removed = False
             for conn_json in connections:
                 conn_data = json.loads(conn_json)
                 if conn_data.get('connection_id') == connection_id:
                     redis_client.srem(conn_key, conn_json)
+                    removed = True
                     break
-        except Exception:
-            pass
+            
+            if removed:
+                print(f'[TRACKER] Unregistered {connection_type} connection {connection_id} for user {user_id}')
+            else:
+                print(f'[TRACKER] {connection_type} connection {connection_id} not found for user {user_id}')
+        except Exception as e:
+            print(f'[TRACKER] Error unregistering connection {connection_id} for user {user_id}: {e}')
 
     @classmethod
-    def get_active_connections(cls, user_id: int) -> list:
+    def get_active_connections(cls, user_id: int, connection_type: str = 'default') -> list:
         """Get list of active connections for a user."""
         try:
             redis_client = get_redis_client()
-            conn_key = cls.get_connections_key(user_id)
+            conn_key = cls.get_connections_key(user_id, connection_type)
 
             connections = redis_client.smembers(conn_key)
             return [json.loads(c) for c in connections]
@@ -200,11 +222,25 @@ class WebSocketConnectionTracker:
             return []
 
     @classmethod
-    def get_connection_count(cls, user_id: int) -> int:
+    def get_connection_count(cls, user_id: int, connection_type: str = 'default') -> int:
         """Get number of active connections for a user."""
         try:
             redis_client = get_redis_client()
-            conn_key = cls.get_connections_key(user_id)
+            conn_key = cls.get_connections_key(user_id, connection_type)
             return redis_client.scard(conn_key)
         except Exception:
+            return 0
+
+    @classmethod
+    def clear_all_connections(cls, user_id: int) -> int:
+        """Force clear all connections for a user (emergency cleanup)."""
+        try:
+            redis_client = get_redis_client()
+            conn_key = cls.get_connections_key(user_id)
+            count = redis_client.scard(conn_key)
+            redis_client.delete(conn_key)
+            print(f'[TRACKER] Cleared {count} connections for user {user_id}')
+            return count
+        except Exception as e:
+            print(f'[TRACKER] Error clearing connections for user {user_id}: {e}')
             return 0

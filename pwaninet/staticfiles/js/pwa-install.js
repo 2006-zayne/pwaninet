@@ -122,13 +122,13 @@ class PWAInstallManager {
             }
         }, 5000);
 
-        // Fallback: show after 60 seconds regardless
+        // Fallback: show after 30 min regardless
         setTimeout(() => {
             if (!this.installPromptShown && this.deferredPrompt) {
                 clearInterval(checkInterval);
                 this.showInstallPrompt();
             }
-        }, 60000);
+        }, 1800000);
     }
 
     checkInstallPrompt() {
@@ -146,12 +146,12 @@ class PWAInstallManager {
         const banner = this.createInstallBanner();
         document.body.appendChild(banner);
         
-        // Show after meeting criteria or 30 seconds
+        // Show after meeting criteria or 30 minutes
         setTimeout(() => {
             if (!this.installPromptShown) {
                 this.showInstallBanner();
             }
-        }, 30000);
+        }, 1800000);
     }
 
     showInstallPrompt() {

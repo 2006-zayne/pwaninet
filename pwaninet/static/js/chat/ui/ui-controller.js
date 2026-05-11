@@ -7,6 +7,7 @@
 import { store } from '../core/store.js';
 import { messageService } from '../core/message-service.js';
 import { MessageRenderer } from './renderer.js';
+import { contextMenuService } from '../features/context-menu/context-menu.service.js';
 
 export class UIController {
     constructor() {
@@ -72,6 +73,11 @@ export class UIController {
             // Render messages (pure rendering)
             this.renderer.render(state.messages);
 
+            // Attach context menu listeners to newly rendered messages
+            setTimeout(() => {
+                contextMenuService.attachToMessages();
+            }, 50);
+
             // Observe received messages for read receipts (with small delay for DOM settling)
             setTimeout(() => {
                 this._observeReceivedMessages();
@@ -98,6 +104,7 @@ export class UIController {
         const sendButton = document.getElementById('sendBtn');
 
         if (messageInput) {
+            // Keyboard events
             messageInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -110,7 +117,19 @@ export class UIController {
                 // Auto-expand textarea (pure UI behavior)
                 messageInput.style.height = 'auto';
                 const newHeight = Math.min(messageInput.scrollHeight, 120);
-                messageInput.style.height = newHeight + 'px';
+                messageInput.style.height = `${newHeight}px`;
+
+                // Send typing indicator
+                this._handleTyping();
+            });
+
+            // Touch events for mobile devices
+            messageInput.addEventListener('touchstart', () => {
+                this._handleTyping();
+            });
+
+            messageInput.addEventListener('focus', () => {
+                this._handleTyping();
             });
         }
 
@@ -159,9 +178,19 @@ export class UIController {
      * Handle typing indicator (UI interaction only)
      */
     _handleTyping() {
-        // Typing indicator would be handled by message service if needed
-        // For now, we keep it simple as UI-only behavior
-        this._log('TYPING_INDICATOR');
+        // Send typing indicator start
+        messageService.sendTypingIndicator(true);
+
+        // Debounce stop indicator
+        if (this.typingTimeout) {
+            clearTimeout(this.typingTimeout);
+        }
+
+        this.typingTimeout = setTimeout(() => {
+            messageService.sendTypingIndicator(false);
+        }, 1000); // Stop typing indicator after 1 second of inactivity
+
+        this._log('TYPING_INDICATOR_SENT');
     }
 
     /**
@@ -216,36 +245,34 @@ export class UIController {
         const lastSeen = peer ? peer.lastSeen : null;
 
         if (typingArray.length > 0) {
-            // User is typing - show typing indicator with blue color and pulse
+            // User is typing - show ghost bubble with animated dots
+            const username = typingArray[0];
+            this.renderer.showTypingIndicator(username);
+
+            // Also show status text
             chatStatus.textContent = 'typing...';
             chatStatus.className = 'chat-status typing';
-            // Remove green border when typing
-            if (chatAvatar) {
-                chatAvatar.classList.remove('avatar-online');
-            }
-        } else if (isPeerOnline) {
-            // User is online but not typing - show nothing in status, add green border to avatar
-            chatStatus.textContent = '';
-            chatStatus.className = 'chat-status';
-            // Add green border to avatar
-            if (chatAvatar) {
-                chatAvatar.classList.add('avatar-online');
-            }
-        } else if (lastSeen) {
-            // User is offline - show last seen
-            const lastSeenStr = this._formatLastSeen(lastSeen);
-            chatStatus.textContent = `last seen ${lastSeenStr}`;
-            chatStatus.className = 'chat-status';
-            // Remove green border from avatar
             if (chatAvatar) {
                 chatAvatar.classList.remove('avatar-online');
             }
         } else {
-            // Unknown status - default empty
-            chatStatus.textContent = '';
-            chatStatus.className = 'chat-status';
-            if (chatAvatar) {
-                chatAvatar.classList.remove('avatar-online');
+            // User is not typing - hide ghost bubble
+            this.renderer.hideTypingIndicator();
+
+            if (isPeerOnline) {
+                // User is online but not typing
+                chatStatus.textContent = '';
+                chatStatus.className = 'chat-status';
+                if (chatAvatar) {
+                    chatAvatar.classList.add('avatar-online');
+                }
+            } else {
+                // User is offline
+                chatStatus.textContent = '';
+                chatStatus.className = 'chat-status';
+                if (chatAvatar) {
+                    chatAvatar.classList.remove('avatar-online');
+                }
             }
         }
     }

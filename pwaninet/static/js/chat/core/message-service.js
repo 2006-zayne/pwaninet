@@ -51,12 +51,41 @@ export class MessageService {
         if (media.includes(type)) return 'media';
         if (type === 'emoji') return 'emoji';
         if (type === 'system') return 'system';
+        if (type === 'link') return 'link';
         return 'text';
     }
 
     normalizeServerMessage(raw) {
         const mappedStatus = this.mapStatus(raw.read_status || raw.status);
         console.log(`[MESSAGE_SERVICE] Normalizing message ${raw.id}: raw_status='${raw.read_status || raw.status}', mapped='${mappedStatus}'`);
+        console.log(`[MESSAGE_SERVICE] Raw data - link_url:`, raw.link_url, 'link_type:', raw.link_type, 'attachment_url:', raw.attachment_url);
+        
+        // Build metadata with attachment information if present
+        const metadata = raw.metadata || {};
+        if (raw.attachment_url) {
+            metadata.url = raw.attachment_url;
+            metadata.type = raw.attachment_type || 'file';
+        }
+        
+        // Add link metadata if present
+        if (raw.link_url) {
+            console.log('[MESSAGE_SERVICE] Link metadata found:', raw.link_url);
+            metadata.link_url = raw.link_url;
+            metadata.link_title = raw.link_title;
+            metadata.link_description = raw.link_description;
+            metadata.link_image = raw.link_image;
+            metadata.link_type = raw.link_type;
+        }
+        
+        // Determine message type based on attachment or link
+        let messageType = this.mapType(raw.message_type || raw.type);
+        if (raw.attachment_type) {
+            messageType = 'media';
+        } else if (raw.link_url) {
+            console.log('[MESSAGE_SERVICE] Setting message type to link');
+            messageType = 'link';
+        }
+        
         return this._createCanonicalMessage({
             id: String(raw.id),
             conversationId: Number(raw.conversation || raw.conversationId),
@@ -64,8 +93,8 @@ export class MessageService {
             timestamp: new Date(raw.created_at || raw.timestamp).toISOString(),
             status: mappedStatus,
             content: raw.content || raw.body || "",
-            type: this.mapType(raw.message_type || raw.type),
-            metadata: raw.metadata || {},
+            type: messageType,
+            metadata: metadata,
             isOptimistic: false,
             sortOrder: new Date(raw.created_at || raw.timestamp).getTime()
         });
@@ -122,6 +151,22 @@ export class MessageService {
         }
 
         const cleanContent = content.trim();
+        
+        // Detect URLs in content and fetch metadata
+        const urls = this.extractUrls(cleanContent);
+        let linkMetadata = null;
+        
+        if (urls.length > 0) {
+            // Use the first URL found
+            const url = urls[0];
+            try {
+                linkMetadata = await this.fetchLinkMetadata(url);
+                this._log('LINK_METADATA_FETCHED', linkMetadata);
+            } catch (error) {
+                this._log('LINK_METADATA_FETCH_FAILED', error);
+                console.error('Failed to fetch link metadata:', error);
+            }
+        }
 
         // Create optimistic message with canonical schema
         const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -141,7 +186,7 @@ export class MessageService {
         // Add optimistic update to store (ONLY store mutates)
         store.addMessage(optimisticMessage);
 
-        // Prepare message data for WebSocket (transport only);
+        // Prepare message data for WebSocket (transport only)
         let messageData = {
             type: 'chat_message',
             temp_id : tempId,
@@ -149,6 +194,15 @@ export class MessageService {
             message_type: options.type || 'text',
             metadata: options.metadata || {}
         };
+        
+        // Add link metadata if available
+        if (linkMetadata) {
+            messageData.link_url = linkMetadata.url;
+            messageData.link_title = linkMetadata.title;
+            messageData.link_description = linkMetadata.description;
+            messageData.link_image = linkMetadata.image;
+            messageData.link_type = linkMetadata.type;
+        }
 
         // Handle encryption if needed
         if (state.isEncrypted && this.e2eEncryption && this.recipientPublicKey) {
@@ -254,6 +308,9 @@ export class MessageService {
      */
     async _processChatMessage(messageData) {
         this._log('PROCESS_CHAT_MESSAGE', messageData);
+        
+        // DEBUG: Check for link data
+        console.log('[MESSAGE_SERVICE] Processing message:', messageData.id, 'Link URL:', messageData.link_url, 'Link Type:', messageData.link_type);
 
         // Decrypt message if encrypted
         let content = messageData.content;
@@ -274,6 +331,9 @@ export class MessageService {
             ...messageData,
             content
         });
+        
+        // DEBUG: Log canonical message type
+        console.log('[MESSAGE_SERVICE] Canonical message type:', canonicalMessage.type, 'Metadata:', canonicalMessage.metadata);
 
 
         // Check if this is a confirmation of an optimistic message
@@ -449,6 +509,23 @@ export class MessageService {
     }
 
     /**
+     * Send typing indicator to backend
+     * @param {boolean} isTyping - Whether user is typing
+     */
+    sendTypingIndicator(isTyping) {
+        this._log('SEND_TYPING_INDICATOR', { isTyping });
+        console.log('[MESSAGE_SERVICE] Sending typing indicator:', isTyping);
+
+        // Send via WebSocket (transport ONLY)
+        const sent = webSocketManager.send({
+            type: 'typing_indicator',
+            is_typing: isTyping
+        });
+
+        console.log('[MESSAGE_SERVICE] Typing indicator sent:', sent);
+    }
+
+    /**
      * Send read receipt for a message
      * @param {string} messageId - Message ID to mark as read
      */
@@ -563,6 +640,45 @@ export class MessageService {
     _log(action, data) {
         if (this.debugMode) {
             console.log(`[MESSAGE_SERVICE] ${action}:`, data);
+        }
+    }
+
+    /**
+     * Extract URLs from text
+     * @param {string} text - Text to search for URLs
+     * @returns {Array} Array of URLs found
+     */
+    extractUrls(text) {
+        const urlPattern = /(https?:\/\/[^\s]+)/g;
+        const matches = text.match(urlPattern);
+        return matches || [];
+    }
+
+    /**
+     * Fetch link metadata from backend
+     * @param {string} url - URL to fetch metadata for
+     * @returns {Object} Link metadata
+     */
+    async fetchLinkMetadata(url) {
+        try {
+            const response = await fetch('/messaging/api/links/fetch-metadata/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ url })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch link metadata');
+            }
+
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Error fetching link metadata:', error);
+            throw error;
         }
     }
 }

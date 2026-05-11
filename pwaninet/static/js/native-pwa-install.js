@@ -193,7 +193,11 @@ class NativePWAInstallManager {
         if (this.installPromptShown) return;
         if (!this.deferredPrompt) {
             // No native prompt available; show instructions instead
-            this.showInstallInstructions();
+           /* setTimeout(() => {
+                if (!this.showInstallInstructions) {
+                    this.showInstallInstructions();
+                }
+            }, 1800000);*/
             return;
         }
 

@@ -7,6 +7,11 @@ from pwaninet.redis_client import get_redis_client
 from .models import Conversation, ConversationMember, Message
 from .ws_middleware import WebSocketRateLimiter, WebSocketConnectionTracker
 
+# ARCHITECTURAL RULE:
+# Each WebSocket consumer must have a single source of truth file.
+# Duplicate class names across modules are forbidden.
+# This file contains ONLY ChatConsumer for messaging functionality.
+
 User = get_user_model()
 
 # Heartbeat interval in seconds
@@ -183,16 +188,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
         encrypted_content = data.get('encrypted_content')
         is_encrypted = data.get('is_encrypted', False)
         reply_to_id = data.get('reply_to')
+        attachment = data.get('attachment')
+        attachment_type = data.get('attachment_type')
+        link_url = data.get('link_url')
+        link_title = data.get('link_title')
+        link_description = data.get('link_description')
+        link_image = data.get('link_image')
+        link_type = data.get('link_type')
         
         print(f'[BACKEND] Handling chat message from user {self.user.id} in conversation {self.conversation_id}')
         temp_id = data.get('temp_id')  # Get temp_id for optimistic update matching
 
-        # Must have either plain content or encrypted content
-        if not content and not encrypted_content:
+        # Must have either plain content, encrypted content, attachment, or link
+        if not content and not encrypted_content and not attachment and not link_url:
             return
 
         # Create message in database
-        message = await self.create_message(content, encrypted_content, is_encrypted, reply_to_id)
+        message = await self.create_message(content, encrypted_content, is_encrypted, reply_to_id, attachment, attachment_type, link_url, link_title, link_description, link_image, link_type)
 
         # Add temp_id to message for client-side optimistic update matching
         if temp_id:
@@ -208,6 +220,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }
         )
         print(f'[BACKEND] Message {message["id"]} broadcasted to room group')
+        
+        # Update message status to 'delivered' since it was broadcast to the room
+        await self.update_message_status(message['id'], 'delivered')
+        
+        # Broadcast conversation update to other members (not sender) for real-time list updates
+        await self.broadcast_conversation_update_to_others(message)
         
         # FIX 1: Broadcast "delivered" status to other members (not the sender)
         # This ensures sent → delivered transition when receiver is online
@@ -238,6 +256,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'is_typing': is_typing
             }
         )
+        
+        # Broadcast to notification groups for conversation list updates
+        await self.broadcast_typing_indicator(is_typing)
 
     async def handle_read_receipt(self, data):
         """Handle read receipt."""
@@ -250,6 +271,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Mark message as read
         await self.mark_message_as_read(message_id)
+
+        # Update message status to 'read'
+        await self.update_message_status(message_id, 'read')
 
         # Get user avatar for the read receipt
         read_avatar = await self.get_user_avatar()
@@ -326,7 +350,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return False
 
     @database_sync_to_async
-    def create_message(self, content, encrypted_content, is_encrypted, reply_to_id):
+    def create_message(self, content, encrypted_content, is_encrypted, reply_to_id, attachment=None, attachment_type=None, link_url=None, link_title=None, link_description=None, link_image=None, link_type=None):
         """Create a new message in the database."""
         try:
             conversation = Conversation.objects.get(id=self.conversation_id)
@@ -342,14 +366,28 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     content=None,  # Don't store plaintext for encrypted messages
                     encrypted_content=encrypted_content,
                     is_encrypted=True,
-                    reply_to=reply_to
+                    reply_to=reply_to,
+                    attachment=attachment,
+                    attachment_type=attachment_type,
+                    link_url=link_url,
+                    link_title=link_title,
+                    link_description=link_description,
+                    link_image=link_image,
+                    link_type=link_type
                 )
             else:
                 message = Message.objects.create(
                     conversation=conversation,
                     sender=self.user,
                     content=content,
-                    reply_to=reply_to
+                    reply_to=reply_to,
+                    attachment=attachment,
+                    attachment_type=attachment_type,
+                    link_url=link_url,
+                    link_title=link_title,
+                    link_description=link_description,
+                    link_image=link_image,
+                    link_type=link_type
                 )
 
             # Update conversation timestamp
@@ -435,6 +473,173 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f'[BACKEND] Error sending peer online status: {e}')
 
+    async def update_message_status(self, message_id, status):
+        """Update message status in database."""
+        try:
+            from messaging.models import Message
+            message = await database_sync_to_async(Message.objects.get)(id=message_id)
+            message.status = status
+            await database_sync_to_async(message.save)()
+            print(f'[BACKEND] Updated message {message_id} status to {status}')
+        except Exception as e:
+            print(f'[BACKEND] Error updating message status: {e}')
+
+    async def broadcast_conversation_update_to_others(self, message):
+        """Broadcast conversation update to other members (not sender) for real-time list updates."""
+        try:
+            print(f'[BACKEND] Starting conversation update broadcast for conversation {self.conversation_id}')
+            
+            # Get conversation details for update
+            conversation = await database_sync_to_async(Conversation.objects.get)(id=self.conversation_id)
+            other_members = await self.get_other_conversation_members()
+            
+            # Only send to others, not the sender
+            all_member_ids = other_members
+            print(f'[BACKEND] Broadcasting to other members: {all_member_ids}')
+            
+            # Get message preview text
+            content = message.get('content', '')
+            encrypted_content = message.get('encrypted_content', '')
+            preview_text = content if content else (encrypted_content[:50] + '...' if encrypted_content else 'Encrypted message')
+            
+            # Get sender name
+            sender_name = self.user.username if self.user.username else 'Unknown'
+            
+            # Send update to other conversation members
+            for member_id in all_member_ids:
+                # Calculate unread count for this member
+                member = await database_sync_to_async(conversation.members.filter(user_id=member_id).first)()
+                unread_count = 0
+                if member and member.last_read_message:
+                    unread_count = await database_sync_to_async(
+                        lambda: conversation.messages.filter(
+                            created_at__gt=member.last_read_message.created_at
+                        ).count()
+                    )()
+                elif member:
+                    # If no last_read_message, count all messages as unread
+                    unread_count = await database_sync_to_async(conversation.messages.count)()
+                
+                update_data = {
+                    'type': 'conversation_update',
+                    'conversation_id': self.conversation_id,
+                    'message_preview': preview_text,
+                    'sender_name': sender_name,
+                    'timestamp': message.get('created_at'),
+                    'unread_count': unread_count
+                }
+                
+                print(f'[BACKEND] Sending conversation update to user {member_id}: {update_data}')
+                await self.channel_layer.group_send(
+                    f'notifications_{member_id}',
+                    update_data
+                )
+                print(f'[BACKEND] Successfully sent conversation update to user {member_id} for conversation {self.conversation_id}')
+                
+        except Exception as e:
+            print(f'[BACKEND] Error broadcasting conversation update: {e}')
+            import traceback
+            traceback.print_exc()
+
+    async def broadcast_conversation_update(self, message):
+        """Broadcast conversation update to all members for real-time list updates."""
+        try:
+            print(f'[BACKEND] Starting conversation update broadcast for conversation {self.conversation_id}')
+            
+            # Get conversation details for update
+            conversation = await database_sync_to_async(Conversation.objects.get)(id=self.conversation_id)
+            other_members = await self.get_other_conversation_members()
+            
+            # Include sender in the update list
+            all_member_ids = other_members + [self.user.id]
+            print(f'[BACKEND] Broadcasting to members: {all_member_ids}')
+            
+            # Get message preview text
+            content = message.get('content', '')
+            encrypted_content = message.get('encrypted_content', '')
+            preview_text = content if content else (encrypted_content[:50] + '...' if encrypted_content else 'Encrypted message')
+            
+            # Get sender name
+            sender_name = self.user.username if self.user.username else 'Unknown'
+            
+            # Send update to all conversation members
+            for member_id in all_member_ids:
+                # Calculate unread count for this member
+                member = await database_sync_to_async(conversation.members.filter(user_id=member_id).first)()
+                unread_count = 0
+                if member and member.last_read_message:
+                    unread_count = await database_sync_to_async(
+                        lambda: conversation.messages.filter(
+                            created_at__gt=member.last_read_message.created_at
+                        ).count()
+                    )()
+                elif member:
+                    # If no last_read_message, count all messages as unread
+                    unread_count = await database_sync_to_async(conversation.messages.count)()
+                
+                update_data = {
+                    'type': 'conversation_update',
+                    'conversation_id': self.conversation_id,
+                    'message_preview': preview_text,
+                    'sender_name': sender_name,
+                    'timestamp': message.get('created_at'),
+                    'unread_count': unread_count
+                }
+                
+                print(f'[BACKEND] Sending conversation update to user {member_id}: {update_data}')
+                await self.channel_layer.group_send(
+                    f'notifications_{member_id}',
+                    update_data
+                )
+                print(f'[BACKEND] Successfully sent conversation update to user {member_id} for conversation {self.conversation_id}')
+                
+        except Exception as e:
+            print(f'[BACKEND] Error broadcasting conversation update: {e}')
+            import traceback
+            traceback.print_exc()
+
+    async def broadcast_typing_indicator(self, is_typing):
+        """Broadcast typing indicator to all conversation members for list updates."""
+        try:
+            print(f'[BACKEND] Starting typing indicator broadcast for conversation {self.conversation_id}, typing: {is_typing}')
+            
+            # Get conversation details
+            conversation = await database_sync_to_async(Conversation.objects.get)(id=self.conversation_id)
+            other_members = await self.get_other_conversation_members()
+            
+            # Include sender in the update list (except sender doesn't need to see their own typing)
+            all_member_ids = other_members  # Only send to others, not self
+            print(f'[BACKEND] Broadcasting typing indicator to members: {all_member_ids}')
+            
+            # Get sender name
+            sender_name = self.user.username if self.user.username else 'Unknown'
+            
+            # Send typing indicator to all other conversation members
+            for member_id in all_member_ids:
+                typing_data = {
+                    'type': 'typing_indicator',
+                    'conversation_id': self.conversation_id,
+                    'user_id': self.user.id,
+                    'username': sender_name,
+                    'is_typing': is_typing
+                }
+                
+                print(f'[BACKEND] Sending typing indicator to user {member_id}: {typing_data}')
+                await self.channel_layer.group_send(
+                    f'notifications_{member_id}',
+                    typing_data
+                )
+                
+                if is_typing:
+                    print(f'[BACKEND] Successfully sent typing indicator to user {member_id} for conversation {self.conversation_id}')
+                else:
+                    print(f'[BACKEND] Successfully sent typing stopped indicator to user {member_id} for conversation {self.conversation_id}')
+                    
+        except Exception as e:
+            print(f'[BACKEND] Error broadcasting typing indicator: {e}')
+            import traceback
+            traceback.print_exc()
+
     async def set_user_online(self, is_online):
         """Set user online status in Redis using connection pool."""
         try:
@@ -448,109 +653,3 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 redis_client.delete(key)
         except Exception:
             pass
-
-
-class NotificationConsumer(AsyncWebsocketConsumer):
-    """WebSocket consumer for global notifications."""
-
-    async def connect(self):
-        """Handle WebSocket connection."""
-        self.user = self.scope['user']
-
-        if not self.user.is_authenticated:
-            await self.close()
-            return
-
-        self.user_group_name = f'notifications_{self.user.id}'
-
-        # Join user's notification group
-        await self.channel_layer.group_add(self.user_group_name, self.channel_name)
-        await self.accept()
-
-    async def disconnect(self, close_code):
-        """Handle WebSocket disconnection."""
-        await self.channel_layer.group_discard(self.user_group_name, self.channel_name)
-
-    async def notify(self, event):
-        """Send notification to WebSocket."""
-        await self.send(text_data=json.dumps({
-            'type': 'notification',
-            'data': event['data']
-        }))
-
-
-class OnlineStatusConsumer(AsyncWebsocketConsumer):
-    """WebSocket consumer for online status tracking."""
-
-    async def connect(self):
-        """Handle WebSocket connection."""
-        self.user = self.scope['user']
-
-        if not self.user.is_authenticated:
-            await self.close()
-            return
-
-        await self.accept()
-
-        # Set user online
-        await self.set_user_online(True)
-
-        # Send current online users
-        online_users = await self.get_online_users()
-        await self.send(text_data=json.dumps({
-            'type': 'online_users',
-            'data': online_users
-        }))
-
-    async def disconnect(self, close_code):
-        """Handle WebSocket disconnection."""
-        # Set user offline
-        await self.set_user_online(False)
-
-    async def set_user_online(self, is_online):
-        """Set user online status in Redis using connection pool."""
-        try:
-            redis_client = get_redis_client()
-            key = f'user_online:{self.user.id}'
-            
-            if is_online:
-                redis_client.setex(key, 300, '1')
-                # Broadcast to all online status consumers
-                await self.channel_layer.group_send(
-                    'online_status',
-                    {
-                        'type': 'user_status_change',
-                        'user_id': self.user.id,
-                        'is_online': True
-                    }
-                )
-            else:
-                redis_client.delete(key)
-                await self.channel_layer.group_send(
-                    'online_status',
-                    {
-                        'type': 'user_status_change',
-                        'user_id': self.user.id,
-                        'is_online': False
-                    }
-                )
-        except Exception:
-            pass
-
-    async def get_online_users(self):
-        """Get list of online users from Redis using connection pool."""
-        try:
-            redis_client = get_redis_client()
-            keys = redis_client.keys('user_online:*')
-            user_ids = [int(key.split(':')[1]) for key in keys]
-            return user_ids
-        except Exception:
-            return []
-
-    async def user_status_change(self, event):
-        """Send user status change to WebSocket."""
-        await self.send(text_data=json.dumps({
-            'type': 'user_status_change',
-            'user_id': event['user_id'],
-            'is_online': event['is_online']
-        }))

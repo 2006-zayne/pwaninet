@@ -37,6 +37,14 @@
                     </div>
                 </div>
             </div>
+        {% empty %}
+            <div class="no-suggestions">
+                <div class="empty-state">
+                    <i class="bi bi-people"></i>
+                    <h3>No suggestions available</h3>
+                    <p>Start following more users or join groups to get friend suggestions.</p>
+                </div>
+            </div>
         {% endfor %}
     </div>
 </div>
@@ -345,10 +353,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 button.style.transform = '';
             }, 100);
             
-            // Simulate API call and update button state
+            // Handle action based on button text and icon
             const userId = button.dataset.userId;
             if (userId) {
-                handleMessagingFriendAction(button, userId);
+                const buttonHTML = button.innerHTML;
+                if (buttonHTML.includes('bi-chat-dots') || buttonHTML.includes('Message')) {
+                    handleMessagingAction(button, userId);
+                } else if (buttonHTML.includes('bi-person-plus') || buttonHTML.includes('Add Friend')) {
+                    handleFollowAction(button, userId);
+                } else {
+                    console.warn('Unknown button type:', buttonHTML);
+                }
             }
         }
     });
@@ -396,7 +411,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function handleMessagingFriendAction(button, userId) {
+function handleFollowAction(button, userId) {
+    console.log('handleFollowAction called for user ID:', userId);
     const isFollowing = button.textContent.includes('Message');
     
     // Show loading state
@@ -404,18 +420,47 @@ function handleMessagingFriendAction(button, userId) {
     button.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Loading...';
     button.disabled = true;
     
-    // Simulate API call
-    setTimeout(() => {
-        if (isFollowing) {
-            // Unfollow action
-            button.innerHTML = '<i class="bi bi-person-plus me-1"></i>Add Friend';
-            button.classList.remove('btn-secondary');
-            button.classList.add('btn-primary');
-        } else {
-            // Follow action
+    // Get username from the card
+    const card = button.closest('.messaging-suggestion-card');
+    const usernameLink = card.querySelector('a[href*="/user/"]');
+    const username = usernameLink ? usernameLink.href.split('/user/')[1].split('/')[0] : null;
+    
+    if (!username) {
+        console.error('Could not find username for user ID:', userId);
+        button.innerHTML = originalContent;
+        button.disabled = false;
+        return;
+    }
+    
+    // Make actual API call to toggle follow
+    fetch(`/toggle-follow/${username}/`, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: JSON.stringify({})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('Error:', data.error);
+            button.innerHTML = originalContent;
+            button.disabled = false;
+            return;
+        }
+        
+        if (data.is_following) {
+            // Now following - show message button
             button.innerHTML = '<i class="bi bi-chat-dots me-1"></i>Message';
             button.classList.remove('btn-primary');
             button.classList.add('btn-secondary');
+        } else {
+            // Unfollowed - show add friend button
+            button.innerHTML = '<i class="bi bi-person-plus me-1"></i>Add Friend';
+            button.classList.remove('btn-secondary');
+            button.classList.add('btn-primary');
         }
         
         button.disabled = false;
@@ -425,7 +470,83 @@ function handleMessagingFriendAction(button, userId) {
         setTimeout(() => {
             button.style.animation = '';
         }, 500);
-    }, 1000);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        button.innerHTML = originalContent;
+        button.disabled = false;
+    });
+}
+
+function handleMessagingAction(button, userId) {
+    console.log('handleMessagingAction called for user ID:', userId);
+    // Show loading state
+    const originalContent = button.innerHTML;
+    button.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Loading...';
+    button.disabled = true;
+    
+    // Create form data for conversation creation
+    const formData = new FormData();
+    formData.append('user_id', userId);
+    formData.append('type', 'direct');
+    
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                      getCookie('csrftoken');
+    
+    // Make POST request to create conversation
+    fetch('/messaging/create/', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': csrfToken,
+        },
+        body: formData,
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (response.redirected) {
+            // Redirect to conversation
+            window.location.href = response.url;
+            return;
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data && data.error) {
+            console.error('Error:', data.error);
+            button.innerHTML = originalContent;
+            button.disabled = false;
+        } else if (data && data.redirect_url) {
+            window.location.href = data.redirect_url;
+        } else {
+            // Fallback: redirect to messages page
+            window.location.href = '/messaging/';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        button.innerHTML = originalContent;
+        button.disabled = false;
+        // Fallback: redirect to messages page
+        window.location.href = '/messaging/';
+    });
+}
+
+// Helper function to get CSRF token from cookies
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }
 
 function refreshMessagingSuggestions() {

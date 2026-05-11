@@ -37,9 +37,10 @@ class MessageSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'conversation', 'sender', 'content', 'encrypted_content', 'is_encrypted',
             'attachment', 'attachment_type', 'reply_to', 'reactions', 'read_receipts',
-            'reply_to_details', 'attachment_url', 'read_status', 'created_at', 'edited_at', 'is_deleted'
+            'reply_to_details', 'attachment_url', 'read_status', 'status', 'created_at', 'edited_at', 'is_deleted',
+            'link_url', 'link_title', 'link_description', 'link_image', 'link_type'
         ]
-        read_only_fields = ['id', 'created_at', 'edited_at', 'is_encrypted']
+        read_only_fields = ['id', 'created_at', 'edited_at', 'is_encrypted', 'status']
 
     def get_reply_to_details(self, obj):
         """Get details of the message being replied to."""
@@ -92,7 +93,8 @@ class MessageCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating messages."""
     class Meta:
         model = Message
-        fields = ['conversation', 'content', 'encrypted_content', 'is_encrypted', 'reply_to', 'attachment', 'attachment_type']
+        fields = ['conversation', 'content', 'encrypted_content', 'is_encrypted', 'reply_to', 'attachment', 'attachment_type',
+                  'link_url', 'link_title', 'link_description', 'link_image', 'link_type']
 
 
 class MessageUpdateSerializer(serializers.ModelSerializer):

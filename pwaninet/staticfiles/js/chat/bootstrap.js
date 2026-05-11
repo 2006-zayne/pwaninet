@@ -12,6 +12,8 @@ import { attachmentService } from './features/attachments/attachment.service.js'
 import { attachmentUI } from './features/attachments/attachment-ui.js';
 import { cameraService } from './features/camera/camera.service.js';
 import { voiceService } from './features/voice/voice.service.js';
+import { emojiService } from './features/emoji/emoji.service.js';
+import { contextMenuService } from './features/context-menu/context-menu.service.js';
 
 // Load encryption module if available
 if (typeof E2EEncryption === 'undefined') {
@@ -53,11 +55,15 @@ document.addEventListener('DOMContentLoaded', () => {
     uiController.init();
     console.log('✅ UI controller initialized (read-only consumer)');
 
-    // 5. Attachment services
+    // 5. Feature services (context menu, voice, emoji, camera, attachment)
+    contextMenuService.init();
+    console.log('✅ Context menu service initialized');
+    
     attachmentService.init();
     cameraService.init();
     voiceService.init();
-    console.log('✅ Attachment services initialized');
+    emojiService.init();
+    console.log('✅ Attachment and emoji services initialized');
 
     // 6. Attachment UI
     attachmentUI.init();
@@ -77,6 +83,8 @@ document.addEventListener('DOMContentLoaded', () => {
     window.attachmentUI = attachmentUI;
     window.cameraService = cameraService;
     window.voiceService = voiceService;
+    window.emojiService = emojiService;
+    window.contextMenuService = contextMenuService;
 
     console.log('🎉 SOT architecture initialized with mandatory data flow enforcement');
     console.log('📊 Data flow: websocket → message-service → store → ui-controller → renderer');

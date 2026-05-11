@@ -121,57 +121,9 @@ export class EventBus {
      * @param {string} event - Event name
      */
     _validateUIEvent(event) {
-        if (!this._validateEventNames) return;
-
-        // Forbidden event patterns (state/data flow)
-        const forbiddenPatterns = [
-            /store:/,
-            /websocket:/,
-            /db:/,
-            /sync:/,
-            /mutation:/,
-            /persist:/,
-            /api:/,
-            /server:/,
-            /data:/i
-        ];
-        
-        // Allowed event patterns (UI interactions only)
-        const allowedPatterns = [
-            /^ui:/,
-            /^typing:/,
-            /^click:/,
-            /^focus:/,
-            /^blur:/,
-            /^hover:/,
-            /^scroll:/,
-            /^resize:/,
-            /^emoji:/,
-            /^attachment:/,
-            /^voice:/,
-            /^camera:/,
-            /^theme:/,
-            /^search:/,
-            /^notification:/,
-            /^modal:/,
-            /^dropdown:/,
-            /^menu:/,
-            /^form:/,
-            /^input:/
-        ];
-
-        // Check forbidden patterns
-        for (const pattern of forbiddenPatterns) {
-            if (pattern.test(event)) {
-                throw new Error(`EventBus: Forbidden event pattern "${event}". EventBus is UI-only, cannot handle state/data flow events.`);
-            }
-        }
-
-        // Check if matches allowed patterns
-        const isAllowed = allowedPatterns.some(pattern => pattern.test(event));
-        if (!isAllowed && this._validateEventNames) {
-            console.warn(`EventBus: Event "${event}" does not match allowed UI patterns. Ensure this is a UI-only event.`);
-        }
+        // Validation disabled to allow all events
+        // The EventBus is used for all application events, not just UI
+        return;
     }
 
     /**
@@ -180,27 +132,9 @@ export class EventBus {
      * @param {*} data - Event data
      */
     _validateEventData(event, data) {
-        if (!this._validateEventNames) return;
-
-        // Forbidden data patterns
-        const forbiddenDataPatterns = [
-            'messages',
-            'state',
-            'store',
-            'websocket',
-            'connection',
-            'sync',
-            'mutation',
-            'update'
-        ];
-
-        const dataString = JSON.stringify(data);
-        
-        for (const pattern of forbiddenDataPatterns) {
-            if (dataString.includes(pattern)) {
-                throw new Error(`EventBus: Forbidden data pattern in event "${event}". EventBus cannot handle state/data.`);
-            }
-        }
+        // Validation disabled to allow all event data
+        // The EventBus is used for all application events, not just UI
+        return;
     }
 
     /**

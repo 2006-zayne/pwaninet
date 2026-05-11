@@ -12,6 +12,12 @@ export class WebSocketManager {
         this.reconnectTimer = null;
         this.messageCallback = null;
         this.connectionCallback = null;
+        this.isStale = false;
+        this.shouldReconnect = true;
+        this.paused = false;
+        this.currentSocketId = 0;
+        this.heartbeatInterval = null;
+        this.lastMessageTime = Date.now();
         this.debugMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     }
 
@@ -25,6 +31,48 @@ export class WebSocketManager {
         this.conversationId = conversationId;
         
         this.connect();
+    }
+
+
+    startHeartbeat() {
+        this.stopHeartbeat();
+
+        this.heartbeatInterval = setInterval(() => {
+            if (!this.isConnected()) return;
+
+            const now = Date.now();
+            const silence = now - this.lastMessageTime;
+
+            // send ping
+            this.send({ type: 'ping' });
+
+            // FIRST STAGE: mark stale ONLY
+            if (silence > 60000 && !this.isStale) {
+                this.isStale = true;
+                this._log('CONNECTION_STALE_MARKED', { silence });
+                return;
+            }
+
+            // SECOND STAGE: only reconnect if STILL stale after grace period
+            if (this.isStale && silence > 90000) {
+                this._log('CONNECTION_RECONNECTING', { silence });
+
+                this.isStale = false;
+
+                this.disconnect();
+                setTimeout(() => {
+                    this.connect();
+                }, 500);
+            }
+
+        }, 25000);
+    }
+
+    stopHeartbeat() {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
     }
 
     /**
@@ -49,86 +97,99 @@ export class WebSocketManager {
     pause() {
         console.log('[WEBSOCKET] Pausing WebSocket');
         this.paused = true;
-        if (this.socket) {
-            this.disconnect();
-        }
+        this.disconnect();
     }
 
     /**
      * Resume WebSocket connection (after loading initial messages)
      */
+
     resume() {
-        console.log('[WEBSOCKET] Resuming WebSocket');
+        this._log('WEBSOCKET_RESUME');
+
         this.paused = false;
+
+        if (this.isConnected()) {
+            this._log('ALREADY_CONNECTED_SKIP_RESUME');
+            return;
+        }
+
         this.connect();
     }
 
     /**
      * Connect to WebSocket
      */
+
     connect() {
+        if (this.paused) return;
+
+        this.shouldReconnect = true;
+
         if (this.socket) {
-            this.disconnect();
+            this._forceClose();
         }
 
-        this.reconnectAttempts = 0;
+        const socketId = ++this.currentSocketId;
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws/chat/${this.conversationId}/`;
 
-        try {
-            this._log('WEBSOCKET_CONNECTING', { wsUrl });
-            this.socket = new WebSocket(wsUrl);
-            this.setupSocketHandlers();
-        } catch (error) {
-            this._log('WEBSOCKET_CONNECTION_ERROR', error);
-            console.error('WebSocketManager: Connection error:', error);
-            this._notifyConnectionChange(false);
-        }
+        this.socket = new WebSocket(wsUrl);
+
+        this.setupSocketHandlers(socketId);
     }
+
 
     /**
      * Setup WebSocket event handlers (transport ONLY)
      */
-    setupSocketHandlers() {
-        this.socket.onopen = () => {
-            this._log('WEBSOCKET_CONNECTED');
+
+    setupSocketHandlers(socketId) {
+        const socket = this.socket;
+
+        socket.onopen = () => {
+            if (socketId !== this.currentSocketId) return;
+
             this.reconnectAttempts = 0;
+
+            this.lastMessageTime = Date.now();
+            this.startHeartbeat();
             this._notifyConnectionChange(true);
         };
 
-        this.socket.onclose = (event) => {
-            this._log('WEBSOCKET_DISCONNECTED', { code: event.code, reason: event.reason });
+        socket.onclose = () => {
+            if (socketId !== this.currentSocketId) return;
+
+            this.stopHeartbeat();
             this._notifyConnectionChange(false);
-            this.handleReconnect();
+
+            if (this.shouldReconnect && !this.paused) {
+                this.handleReconnect();
+            }
         };
 
-        this.socket.onerror = (error) => {
-            this._log('WEBSOCKET_ERROR', error);
-            console.error('WebSocketManager: Socket error:', error);
+        socket.onerror = () => {
+            if (socketId !== this.currentSocketId) return;
         };
 
-        this.socket.onmessage = (event) => {
-            this._log('WEBSOCKET_MESSAGE_RECEIVED');
-            
+        socket.onmessage = (event) => {
+            if (socketId !== this.currentSocketId) return;
+
             try {
                 const data = JSON.parse(event.data);
-                console.log('[WEBSOCKET] Received message:', data);
-                
-                // Forward to message service (ONLY ingestion layer)
-                // NO direct state updates, NO UI updates, NO business logic
+
+                this.lastMessageTime = Date.now();
+
                 if (this.messageCallback) {
                     this.messageCallback(data);
-                } else {
-                    this._log('NO_MESSAGE_CALLBACK_SET', data);
                 }
-                
-            } catch (error) {
-                this._log('WEBSOCKET_MESSAGE_PARSE_ERROR', { error, data: event.data });
-                console.error('WebSocketManager: Failed to parse message:', error);
+            } catch (err) {
+                this._log('INVALID_JSON_MESSAGE', event.data);
             }
         };
     }
+
 
     /**
      * Send message via WebSocket (transport ONLY)
@@ -158,7 +219,9 @@ export class WebSocketManager {
      * Disconnect WebSocket
      */
     disconnect() {
-        this._log('WEBSOCKET_DISCONNECT');
+        this.shouldReconnect = false;
+
+        this.stopHeartbeat();
 
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
@@ -176,19 +239,15 @@ export class WebSocketManager {
     /**
      * Handle reconnection logic (transport only)
      */
-    handleReconnect() {
-        if (this.reconnectAttempts >= 5) {
-            this._log('WEBSOCKET_RECONNECT_FAILED', 'Max attempts reached');
-            return;
-        }
 
-        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    handleReconnect() {
+        if (this.reconnectAttempts >= 5) return;
+
+        const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 30000);
         this.reconnectAttempts++;
 
-        this._log('WEBSOCKET_RECONNECT_SCHEDULED', { attempt: this.reconnectAttempts, delay });
-
         this.reconnectTimer = setTimeout(() => {
-          this.connect();
+            this.connect();
         }, delay);
     }
 
@@ -217,6 +276,13 @@ export class WebSocketManager {
         // NO state mutations here
         if (this.connectionCallback) {
             this.connectionCallback(isConnected);
+        }
+    }
+
+    _forceClose() {
+        if (this.socket) {
+            this.socket.close();
+            this.socket = null;
         }
     }
 
@@ -258,6 +324,8 @@ export class WebSocketManager {
         this.conversationId = null;
     }
 }
+
+
 
 // Create and export singleton instance
 export const webSocketManager = new WebSocketManager();
