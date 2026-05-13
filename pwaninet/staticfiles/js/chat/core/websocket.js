@@ -18,7 +18,10 @@ export class WebSocketManager {
         this.currentSocketId = 0;
         this.heartbeatInterval = null;
         this.lastMessageTime = Date.now();
+        this.lastHeartbeatTime = Date.now();
+        this.reconnectInProgress = false;
         this.debugMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        this.HEARTBEAT_TIMEOUT_MS = 180000; // 3 minutes
     }
 
     /**
@@ -41,31 +44,20 @@ export class WebSocketManager {
             if (!this.isConnected()) return;
 
             const now = Date.now();
-            const silence = now - this.lastMessageTime;
+            const heartbeatAge = now - this.lastHeartbeatTime;
 
-            // send ping
-            this.send({ type: 'ping' });
-
-            // FIRST STAGE: mark stale ONLY
-            if (silence > 60000 && !this.isStale) {
-                this.isStale = true;
-                this._log('CONNECTION_STALE_MARKED', { silence });
-                return;
-            }
-
-            // SECOND STAGE: only reconnect if STILL stale after grace period
-            if (this.isStale && silence > 90000) {
-                this._log('CONNECTION_RECONNECTING', { silence });
-
-                this.isStale = false;
-
+            // Check if heartbeat is lost (3-minute timeout)
+            if (heartbeatAge > this.HEARTBEAT_TIMEOUT_MS) {
+                this._log('HEARTBEAT_LOST', { heartbeatAge });
+                console.warn('[WS] Heartbeat lost — reconnecting');
                 this.disconnect();
                 setTimeout(() => {
                     this.connect();
                 }, 500);
+                return;
             }
 
-        }, 25000);
+        }, 10000);
     }
 
     stopHeartbeat() {
@@ -152,8 +144,10 @@ export class WebSocketManager {
             if (socketId !== this.currentSocketId) return;
 
             this.reconnectAttempts = 0;
+            this.reconnectInProgress = false;
 
             this.lastMessageTime = Date.now();
+            this.lastHeartbeatTime = Date.now();
             this.startHeartbeat();
             this._notifyConnectionChange(true);
         };
@@ -180,6 +174,14 @@ export class WebSocketManager {
                 const data = JSON.parse(event.data);
 
                 this.lastMessageTime = Date.now();
+
+                // Handle ping/pong heartbeat
+                if (data.type === 'ping') {
+                    this.send({ type: 'pong' });
+                    this.lastHeartbeatTime = Date.now();
+                    this._log('HEARTBEAT_RECEIVED');
+                    return;
+                }
 
                 if (this.messageCallback) {
                     this.messageCallback(data);
@@ -241,8 +243,10 @@ export class WebSocketManager {
      */
 
     handleReconnect() {
+        if (this.reconnectInProgress) return;
         if (this.reconnectAttempts >= 5) return;
 
+        this.reconnectInProgress = true;
         const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 30000);
         this.reconnectAttempts++;
 

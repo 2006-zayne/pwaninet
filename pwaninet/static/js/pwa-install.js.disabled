@@ -1,8 +1,13 @@
 /**
  * PWA Install Manager
- * Ensures install prompt always appears when PWA is not installed
+ * ENSURE install prompt always appears when PWA is not installed
+ *
+ * NOTE: This file is DISABLED and NOT LOADED in base.html
+ * The active PWA install logic is in native-pwa-install.js
+ * This file is kept for reference only - do not use both files simultaneously
  */
 
+/*
 class PWAInstallManager {
     constructor() {
         this.deferredPrompt = null;
@@ -697,4 +702,5 @@ class PWAInstallManager {
 }
 
 // Global instance
-window.pwaInstallManager = new PWAInstallManager();
+// window.pwaInstallManager = new PWAInstallManager();
+*/

@@ -33,6 +33,17 @@
                         <a href="{% url 'groups:groups_detail' n.group.id %}" class="text-primary text-decoration-none fw-bold" onclick="event.stopPropagation()">"{{ n.group.name }}"</a>
                     {% endif %}
                 </p>
+
+                {% if n.notification_type == 'GROUP_REQUEST' %}
+                <div class="notif-actions mt-2">
+                    <a href="{% url 'groups:approve_from_notification' n.group.id n.sender.id %}" class="btn-action btn-accept" onclick="event.stopPropagation()">
+                        <i class="bi bi-check2"></i> Approve
+                    </a>
+                    <a href="{% url 'groups:reject_from_notification' n.group.id n.sender.id %}" class="btn-action btn-decline" onclick="event.stopPropagation()">
+                        <i class="bi bi-x2"></i> Reject
+                    </a>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

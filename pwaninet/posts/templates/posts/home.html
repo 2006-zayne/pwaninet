@@ -194,6 +194,11 @@
       padding-left: 0 !important;
       padding-right: 0 !important;
     }
+    main > .container,
+    main.container {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
   }
 
   #main-content-area {
@@ -343,4 +348,11 @@
   </main>
 
 </div>
+
+{% if request.user.is_authenticated %}
+  <!-- Onboarding Components -->
+  {% include 'users/onboarding/tour_prompt.html' %}
+  {% include 'users/onboarding/tour.html' %}
+  {% include 'users/onboarding/profile_completion_prompt.html' %}
+{% endif %}
 {% endblock %}

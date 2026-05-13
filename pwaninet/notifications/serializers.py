@@ -66,3 +66,40 @@ class NotificationBulkActionSerializer(serializers.Serializer):
     action = serializers.ChoiceField(
         choices=['mark_read', 'mark_unread', 'delete']
     )
+
+
+class SubscriptionSerializer(serializers.Serializer):
+    """Serializer for push subscription data."""
+    endpoint = serializers.CharField(required=True, allow_blank=False)
+    p256dh = serializers.CharField(required=True, allow_blank=False)
+    auth = serializers.CharField(required=True, allow_blank=False)
+    user_agent = serializers.CharField(required=False, allow_blank=True, default='')
+
+    def validate_endpoint(self, value):
+        """Validate endpoint is not empty."""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Endpoint cannot be empty.")
+        return value.strip()
+
+    def validate_p256dh(self, value):
+        """Validate p256dh key is not empty."""
+        if not value or not value.strip():
+            raise serializers.ValidationError("p256dh key cannot be empty.")
+        return value.strip()
+
+    def validate_auth(self, value):
+        """Validate auth key is not empty."""
+        if not value or not value.strip():
+            raise serializers.ValidationError("auth key cannot be empty.")
+        return value.strip()
+
+
+class UnsubscribeSerializer(serializers.Serializer):
+    """Serializer for unsubscribe request."""
+    endpoint = serializers.CharField(required=True, allow_blank=False)
+
+    def validate_endpoint(self, value):
+        """Validate endpoint is not empty."""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Endpoint cannot be empty.")
+        return value.strip()

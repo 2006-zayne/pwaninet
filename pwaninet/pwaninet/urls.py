@@ -20,6 +20,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from django.views.generic import TemplateView
+from notifications import views as notification_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -55,6 +56,10 @@ urlpatterns = [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    # Push Notification API routes
+    path('api/push/vapid-public-key/', notification_views.VapidPublicKeyView.as_view(), name='vapid_public_key'),
+    path('api/push/subscribe/', notification_views.SubscribeView.as_view(), name='push_subscribe'),
+    path('api/push/unsubscribe/', notification_views.UnsubscribeView.as_view(), name='push_unsubscribe'),
     # Domain app URLs
     path('', include(('posts.urls', 'posts'), namespace='posts')),
     path('users/', include(('users.urls', 'users'), namespace='users')),

@@ -23,108 +23,146 @@ WS_MESSAGE_RATE = 100  # messages per minute
 class ChatConsumer(AsyncWebsocketConsumer):
     """WebSocket consumer for real-time chat in conversations with heartbeat."""
 
+    
     async def connect(self):
         """Handle WebSocket connection with heartbeat task and rate limiting."""
-        print(f'[BACKEND] WebSocket connection attempt from user {self.scope["user"].id} to conversation {self.scope["url_route"]["kwargs"]["conversation_id"]}')
+
+        self.user = self.scope.get('user')
+        self.user_id = getattr(self.user, "id", None)
+
         self.conversation_id = self.scope['url_route']['kwargs']['conversation_id']
         self.room_group_name = f'chat_{self.conversation_id}'
-        self.user = self.scope['user']
         self.heartbeat_task = None
-        self.message_timeout_handle = None
-        self.connection_id = self.channel_name  # Unique per connection
+        self.connection_id = self.channel_name
 
-        if not self.user.is_authenticated:
-            print(f'[BACKEND] User {self.user.id} is not authenticated, closing connection')
+        print(f"[BACKEND] WebSocket connection attempt from user {self.user_id} to conversation {self.conversation_id}")
+
+        if not self.user or not self.user.is_authenticated:
+            print("[BACKEND] Unauthenticated user, closing connection")
             await self.close()
             return
 
-        # Check if user is a member of the conversation
         is_member = await self.is_conversation_member()
-        print(f'[BACKEND] User {self.user.id} is_member check: {is_member}')
+
         if not is_member:
-            print(f'[BACKEND] User {self.user.id} is not a member of conversation {self.conversation_id}, closing connection')
+            print(f"[BACKEND] User {self.user_id} is not a member, closing connection")
             await self.close()
             return
 
-        # Register connection for tracking
         tracked = WebSocketConnectionTracker.register_connection(
-            self.user.id,
+            self.user_id,
             self.connection_id,
             metadata={
                 'conversation_id': self.conversation_id,
                 'ip': self.scope.get('client', ['unknown'])[0],
             }
         )
-        print(f'[BACKEND] Connection tracking result: {tracked}')
 
         if not tracked:
-            print(f'[BACKEND] Connection not tracked, closing')
+            print("[BACKEND] Connection not tracked, closing")
             await self.close()
             return
 
-        # Join room group
-        print(f'[BACKEND] User {self.user.id} joining room group: {self.room_group_name}')
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
-        print(f'[BACKEND] User {self.user.id} accepted and joined room: {self.room_group_name}')
 
-        # Register this connection
-        WebSocketConnectionTracker.register_connection(self.user.id, self.channel_name)
+        connection_count = WebSocketConnectionTracker.get_connection_count(self.user_id)
 
-        # Set user online in Redis (only if this is the first connection)
-        connection_count = WebSocketConnectionTracker.get_connection_count(self.user.id)
         if connection_count == 1:
             await self.set_user_online(True)
-            # Broadcast user online status to room members
+
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     'type': 'user_status',
-                    'user_id': self.user.id,
+                    'user_id': self.user_id,
                     'username': self.user.username,
                     'is_online': True
                 }
             )
 
-        # Start heartbeat task to detect stale connections
-        self.heartbeat_task = asyncio.create_task(self.heartbeat_loop())
+            other_members = await self.get_other_conversation_members()
 
-        # FIX 3: Send peer's current online status to newly connected user
-        # This ensures the online indicator is shown immediately on page load/reconnect
+            for member_id in other_members:
+                await self.channel_layer.group_send(
+                    f'notifications_{member_id}',
+                    {
+                        'type': 'user_status',
+                        'user_id': self.user_id,
+                        'username': self.user.username,
+                        'is_online': True
+                    }
+                )
+
+        self.heartbeat_task = asyncio.create_task(self.heartbeat_loop())
         await self.send_peer_online_status()
+   
 
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection and cleanup."""
-        # Cancel heartbeat task
-        if self.heartbeat_task:
+
+        # Safe guard: ensure user_id exists
+        user_id = getattr(self, "user_id", None)
+        if not user_id:
+            return
+
+        # Cancel heartbeat task safely
+        if getattr(self, "heartbeat_task", None):
             self.heartbeat_task.cancel()
             try:
                 await self.heartbeat_task
             except asyncio.CancelledError:
                 pass
 
-        # Leave room group
-        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+        # Leave room group safely
+        room_group_name = getattr(self, "room_group_name", None)
+        if room_group_name:
+            await self.channel_layer.group_discard(
+                room_group_name,
+                self.channel_name
+            )
 
-        # Unregister this connection (synchronous method, handle None user)
-        if self.user and hasattr(self.user, 'id'):
-            WebSocketConnectionTracker.unregister_connection(self.user.id, self.channel_name)
+        # Unregister connection safely
+        WebSocketConnectionTracker.unregister_connection(user_id, self.channel_name)
 
-        # Only set user offline if this was the last connection
-        connection_count = WebSocketConnectionTracker.get_connection_count(self.user.id)
+        # Check connection count safely and clamp to 0
+        connection_count = WebSocketConnectionTracker.get_connection_count(user_id)
+        if connection_count <= 0:
+            connection_count = 0
+
+        # Debug logging
+        print(f"[TRACKER] User {user_id} connections after disconnect: {connection_count}")
+
+        # Only mark offline when connection count is 0
         if connection_count == 0:
             await self.set_user_online(False)
-            # Broadcast user offline status to room members
+
+            username = getattr(self.user, "username", "")
+
             await self.channel_layer.group_send(
-                self.room_group_name,
+                room_group_name,
                 {
                     'type': 'user_status',
-                    'user_id': self.user.id,
-                    'username': self.user.username,
+                    'user_id': user_id,
+                    'username': username,
                     'is_online': False,
                     'last_seen': asyncio.get_event_loop().time()
                 }
             )
+
+            other_members = await self.get_other_conversation_members()
+
+            for member_id in other_members:
+                await self.channel_layer.group_send(
+                    f'notifications_{member_id}',
+                    {
+                        'type': 'user_status',
+                        'user_id': user_id,
+                        'username': username,
+                        'is_online': False,
+                        'last_seen': asyncio.get_event_loop().time()
+                    }
+                )
 
     async def heartbeat_loop(self):
         """Send periodic heartbeat messages to keep connection alive and refresh online status."""
@@ -433,12 +471,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_other_conversation_members(self):
-        """Get list of other user IDs in this conversation."""
         try:
+            if not self.user or not hasattr(self.user, "id"):
+                return []
+
             conversation = Conversation.objects.get(id=self.conversation_id)
+
             return list(
-                conversation.members.exclude(user=self.user).values_list('user_id', flat=True)
+                conversation.members
+                .exclude(user_id=self.user.id)
+                .values_list('user_id', flat=True)
             )
+
         except Conversation.DoesNotExist:
             return []
 
@@ -508,7 +552,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             # Send update to other conversation members
             for member_id in all_member_ids:
                 # Calculate unread count for this member
-                member = await database_sync_to_async(conversation.members.filter(user_id=member_id).first)()
+                member = await database_sync_to_async(
+                    lambda: conversation.members.filter(user_id=member_id).select_related('last_read_message').first()
+                )()
                 unread_count = 0
                 if member and member.last_read_message:
                     unread_count = await database_sync_to_async(
@@ -565,7 +611,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             # Send update to all conversation members
             for member_id in all_member_ids:
                 # Calculate unread count for this member
-                member = await database_sync_to_async(conversation.members.filter(user_id=member_id).first)()
+                member = await database_sync_to_async(
+                    lambda: conversation.members.filter(user_id=member_id).select_related('last_read_message').first()
+                )()
                 unread_count = 0
                 if member and member.last_read_message:
                     unread_count = await database_sync_to_async(

@@ -63,35 +63,53 @@ def clear_session_on_logout(sender, request, user, **kwargs):
 @receiver(post_save, sender=User)
 def auto_join_course_group(sender, instance, created, **kwargs):
     """
-    Scans registration data and assigns user to their official 
-    Academic Unit Group automatically.
+    Automatically enrolls new users in official academic groups based on their course and year.
+    
+    This function uses the new service-based approach that relies on database flags
+    (is_official=True and auto_join_on_signup=True) instead of hardcoded group names.
+    
+    For backwards compatibility, it falls back to the old naming convention approach
+    if no auto-join groups are found.
     """
     # Only execute for NEW users who have completed their profile intel
     if created and instance.course and instance.year:
         
-        # Standardize the naming convention for official groups
-        # e.g., "Computer Science - Year 1"
-        target_group_name = f"{instance.course.name} - Year {instance.year.level}"
+        # Try the new service-based approach first
+        from groups.services.academic_group_service import enroll_user_in_academic_groups
+        enrolled_groups = enroll_user_in_academic_groups(instance)
         
-        # Logic: Search for the group. If it doesn't exist, create it.
-        # 'get_or_create' returns a tuple: (object, created_bool)
-        group, created_group = Group.objects.get_or_create(
-            name=target_group_name,
-            defaults={
-                'description': f"Official academic hub for {target_group_name} operatives.",
-                'is_official': True,
-                'course': instance.course,
-                'year': instance.year
-            }
-        )
-        
-        # Create membership instead of using direct M2M
-        # Use PENDING status for official groups to require admin approval
-        Membership.objects.get_or_create(
-            user=instance,
-            group=group,
-            defaults={
-                'role': MembershipRole.MEMBER,
-                'status': MembershipStatus.PENDING
-            }
-        )
+        # Fallback: if no auto-join groups exist, use the old naming convention approach
+        # This ensures backwards compatibility while transitioning to the new system
+        if not enrolled_groups:
+            # Standardize the naming convention for official groups
+            # e.g., "Computer Science - Year 1"
+            target_group_name = f"{instance.course.name} - Year {instance.year.level}"
+            
+            # Logic: Search for the group. If it doesn't exist, create it.
+            # 'get_or_create' returns a tuple: (object, created_bool)
+            group, created_group = Group.objects.get_or_create(
+                name=target_group_name,
+                defaults={
+                    'description': f"Official academic hub for {target_group_name} operatives.",
+                    'is_official': True,
+                    'auto_join_on_signup': True,  # Enable auto-join for backwards compatibility
+                    'course': instance.course,
+                    'year': instance.year
+                }
+            )
+            
+            # Create membership instead of using direct M2M
+            # Use APPROVED status for official academic groups to allow immediate access
+            membership, created_membership = Membership.objects.get_or_create(
+                user=instance,
+                group=group,
+                defaults={
+                    'role': MembershipRole.MEMBER,
+                    'status': MembershipStatus.APPROVED  # Changed from PENDING to APPROVED
+                }
+            )
+            
+            # If membership already existed but was pending, approve it
+            if not created_membership and membership.status == MembershipStatus.PENDING:
+                membership.status = MembershipStatus.APPROVED
+                membership.save()

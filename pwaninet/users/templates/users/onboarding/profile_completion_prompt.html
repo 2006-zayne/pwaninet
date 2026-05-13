@@ -1,0 +1,29 @@
+<!-- Profile Completion Prompt Modal -->
+<div class="modal fade" id="profileCompletionModal" tabindex="-1" aria-labelledby="profileCompletionModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-body text-center p-4">
+        <div class="mb-3">
+          <i class="bi bi-person-check text-primary" style="font-size: 3rem;"></i>
+        </div>
+        <h5 class="modal-title fw-bold mb-3" id="profileCompletionModalLabel">Complete your profile</h5>
+        <p class="text-muted mb-4">Complete your profile so classmates can discover your skills and collaborate with you.</p>
+        
+        <div class="d-flex gap-2 justify-content-center">
+          <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Not Now</button>
+          <button type="button" class="btn btn-primary px-4" id="completeProfileBtn">Complete Profile</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Handle complete profile button
+  document.getElementById('completeProfileBtn').addEventListener('click', function() {
+    // Redirect to profile edit page
+    window.location.href = "{% url 'users:update_profile' %}";
+  });
+});
+</script>

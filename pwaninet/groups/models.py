@@ -15,6 +15,7 @@ class Group(models.Model):
     group_pic = models.ImageField(upload_to='group_profile_pic', null=True, blank=True)
     cover_photo = models.ImageField(upload_to='group_covers/', blank=True, null=True)
     is_official = models.BooleanField(default=False)
+    auto_join_on_signup = models.BooleanField(default=False, help_text="Automatically enroll new users matching course/year into this group")
     join_policy = models.CharField(
         max_length=20,
         choices=JoinPolicy.choices,

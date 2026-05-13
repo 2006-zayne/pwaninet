@@ -21,7 +21,7 @@ class CourseViewSet(viewsets.ModelViewSet):
     """
     API ViewSet for Course model.
     """
-    queryset = Course.objects.all()
+    queryset = Course.objects.all().select_related('school')
     serializer_class = CourseSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -40,7 +40,7 @@ class YearViewSet(viewsets.ModelViewSet):
     """
     API ViewSet for Year model.
     """
-    queryset = Year.objects.all()
+    queryset = Year.objects.all().select_related('course__school')
     serializer_class = YearSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -58,7 +58,7 @@ class UnitViewSet(viewsets.ModelViewSet):
     """
     API ViewSet for Unit model.
     """
-    queryset = Unit.objects.all()
+    queryset = Unit.objects.all().select_related('course__school', 'year')
     serializer_class = UnitSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]

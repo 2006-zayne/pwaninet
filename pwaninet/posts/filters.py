@@ -8,8 +8,8 @@ from courses.models import Course, Unit
 class PostFilter(django_filters.FilterSet):
     author = django_filters.ModelChoiceFilter(queryset=User.objects.all())
     group = django_filters.ModelChoiceFilter(queryset=Group.objects.all())
-    course = django_filters.ModelChoiceFilter(queryset=Course.objects.all())
-    unit = django_filters.ModelChoiceFilter(queryset=Unit.objects.all())
+    course = django_filters.ModelChoiceFilter(queryset=Course.objects.all().select_related('school'))
+    unit = django_filters.ModelChoiceFilter(queryset=Unit.objects.all().select_related('course__school', 'year'))
     gradient_class = django_filters.ChoiceFilter(choices=Post.GRADIENT_CHOICES)
     created_after = django_filters.DateTimeFilter(field_name='created_at', lookup_expr='gte')
     created_before = django_filters.DateTimeFilter(field_name='created_at', lookup_expr='lte')

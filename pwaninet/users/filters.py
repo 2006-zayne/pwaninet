@@ -8,8 +8,8 @@ class UserFilter(django_filters.FilterSet):
     first_name = django_filters.CharFilter(lookup_expr='icontains')
     last_name = django_filters.CharFilter(lookup_expr='icontains')
     global_role = django_filters.ChoiceFilter(choices=GlobalRole.choices)
-    course = django_filters.ModelChoiceFilter(queryset=Course.objects.all())
-    year = django_filters.ModelChoiceFilter(queryset=Year.objects.all())
+    course = django_filters.ModelChoiceFilter(queryset=Course.objects.all().select_related('school'))
+    year = django_filters.ModelChoiceFilter(queryset=Year.objects.all().select_related('course__school'))
     search = django_filters.CharFilter(method='search_filter')
 
     class Meta:

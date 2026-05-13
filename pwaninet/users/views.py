@@ -42,8 +42,11 @@ def register_view(request):
 @login_required
 def profile_view(request, username):
     from django.db.models import Count
-    profile_user = get_object_or_404(User, username=username)
-    profile_user = User.objects.filter(id=profile_user.id).annotate(
+    profile_user = get_object_or_404(
+        User.objects.select_related('course__school', 'year'),
+        username=username
+    )
+    profile_user = User.objects.filter(id=profile_user.id).select_related('course__school', 'year').annotate(
         followers_count=Count('follower_relationships', distinct=True),
         following_count=Count('following_relationships', distinct=True),
         total_likes=Count('posts__likes', distinct=True)
@@ -59,6 +62,12 @@ def profile_view(request, username):
     # Count unseen shared posts for the badge
     unseen_shared_count = shared_posts.filter(is_viewed=False).count()
     
+    # Determine if viewing own profile
+    is_own_profile = request.user == profile_user
+    
+    # Get profile completion percentage for owner
+    profile_completion = profile_user.profile_completion_percentage if is_own_profile else None
+    
     return render(request, 'users/profile.html', {
         'profile_user': profile_user,
         'posts': posts,
@@ -68,6 +77,8 @@ def profile_view(request, username):
         'total_likes': profile_user.total_likes,
         'shared_posts': shared_posts,
         'unseen_shared_count': unseen_shared_count,
+        'is_own_profile': is_own_profile,
+        'profile_completion': profile_completion,
     })
 
 
@@ -116,9 +127,21 @@ def update_profile_view(request):
     if request.method == 'POST':
         form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Profile updated successfully.')
-            return redirect('users:profile', username=request.user.username)
+            try:
+                form.save()
+                messages.success(request, 'Profile updated successfully.')
+                return redirect('users:profile', username=request.user.username)
+            except Exception as e:
+                messages.error(request, f'Error saving profile: {str(e)}')
+                # Add debugging info
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Profile save error: {str(e)}", exc_info=True)
+        else:
+            # Add form errors to messages for debugging
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
     else:
         form = ProfileUpdateForm(instance=request.user)
     return render(request, 'users/update_profile.html', {'form': form})
@@ -190,6 +213,17 @@ def notification_preferences_view(request):
     else:
         form = NotificationPreferencesForm(instance=request.user)
     return render(request, 'users/notification_preferences.html', {'form': form})
+
+
+@login_required
+@require_http_methods(["POST"])
+def mark_onboarding_complete(request):
+    """
+    Mark the current user's onboarding as completed.
+    """
+    request.user.has_completed_onboarding = True
+    request.user.save()
+    return JsonResponse({'status': 'success'})
 
 
 @login_required
@@ -349,7 +383,7 @@ class UserViewSet(viewsets.ModelViewSet):
     API ViewSet for User model.
     Provides list, create, retrieve, update, partial_update, delete actions.
     """
-    queryset = User.objects.all()
+    queryset = User.objects.all().select_related('course__school', 'year')
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = UserFilter

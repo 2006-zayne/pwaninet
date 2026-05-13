@@ -2,6 +2,33 @@ from django.db import models
 from django.conf import settings
 
 
+class PushSubscription(models.Model):
+    """Model for storing web push notification subscriptions."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='push_subscriptions',
+        db_index=True
+    )
+    endpoint = models.TextField(unique=True)
+    p256dh = models.TextField()
+    auth = models.TextField()
+    user_agent = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user']),
+            models.Index(fields=['is_active']),
+        ]
+
+    def __str__(self):
+        return f"PushSubscription for {self.user.username} (active={self.is_active})"
+
+
 class Notifications(models.Model):
     INVITE = 'INVITE'
     ALERTE = 'ALERT'

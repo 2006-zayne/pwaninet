@@ -116,6 +116,17 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             'is_typing': event['is_typing']
         }))
 
+    async def user_status(self, event):
+        """Send user online status to client for real-time online indicators."""
+        print(f'[NOTIFICATIONS] Sending user status to user {self.user.id}: {event}')
+        await self.send(text_data=json.dumps({
+            'type': 'user_status',
+            'user_id': event['user_id'],
+            'username': event['username'],
+            'is_online': event['is_online'],
+            'last_seen': event.get('last_seen')
+        }))
+
     async def set_user_online(self, is_online):
         """Set user online status in Redis."""
         try:

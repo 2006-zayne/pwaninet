@@ -11,7 +11,7 @@ class CourseFilter(django_filters.FilterSet):
 
 
 class YearFilter(django_filters.FilterSet):
-    course = django_filters.ModelChoiceFilter(queryset=Course.objects.all())
+    course = django_filters.ModelChoiceFilter(queryset=Course.objects.all().select_related('school'))
     level = django_filters.NumberFilter()
     level_gte = django_filters.NumberFilter(field_name='level', lookup_expr='gte')
     level_lte = django_filters.NumberFilter(field_name='level', lookup_expr='lte')
@@ -22,8 +22,8 @@ class YearFilter(django_filters.FilterSet):
 
 
 class UnitFilter(django_filters.FilterSet):
-    course = django_filters.ModelChoiceFilter(queryset=Course.objects.all())
-    year = django_filters.ModelChoiceFilter(queryset=Year.objects.all())
+    course = django_filters.ModelChoiceFilter(queryset=Course.objects.all().select_related('school'))
+    year = django_filters.ModelChoiceFilter(queryset=Year.objects.all().select_related('course__school'))
     code = django_filters.CharFilter(lookup_expr='icontains')
     name = django_filters.CharFilter(lookup_expr='icontains')
 

@@ -1059,7 +1059,7 @@ document.addEventListener('click', function(e) {
           </div>
 
           <!-- Tip Card -->
-          <div class="tip-card">
+          <div class="tip-card" style="margin-bottom: 16px;">
             <div class="tip-title">
               <i class="bi bi-lightbulb-fill" style="color: var(--brand);"></i>
               Quick tip
@@ -1321,7 +1321,7 @@ function checkOnlineStatusForAvatars() {
 
 async function checkUserOnlineStatus(userId, avatarElement) {
     try {
-        const response = await fetch(`/api/users/${userId}/online-status/`);
+        const response = await fetch(`/users/api/users/${userId}/online-status/`);
         if (response.ok) {
             const data = await response.json();
             if (data.is_online) {

@@ -1,13 +1,15 @@
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_serializer
-from .models import User, Follow, DeviceAccount
+from .models import User, Follow, DeviceAccount, CollaborationStatus
 from courses.models import Course, Year
 
 
 class CourseSerializer(serializers.ModelSerializer):
+    school_name = serializers.CharField(source='school.name', read_only=True)
+    
     class Meta:
         model = Course
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'school_name']
 
 
 class YearSerializer(serializers.ModelSerializer):
@@ -27,6 +29,8 @@ class UserSerializer(serializers.ModelSerializer):
     year = YearSerializer(read_only=True)
     profile_pic_url = serializers.SerializerMethodField()
     cover_photo_url = serializers.SerializerMethodField()
+    profile_completion_percentage = serializers.SerializerMethodField()
+    school_name = serializers.CharField(source='course.school.name', read_only=True)
 
     class Meta:
         model = User
@@ -38,9 +42,12 @@ class UserSerializer(serializers.ModelSerializer):
             'notify_on_like', 'notify_on_follow', 'notify_on_invite',
             'notify_on_group_request', 'notify_on_group_approved',
             'email_notifications', 'is_profile_complete',
+            'headline', 'interests', 'collaboration_status', 'skills', 'projects',
+            'github_url', 'linkedin_url', 'portfolio_url', 'twitter_url',
+            'profile_completion_percentage', 'school_name',
             'date_joined', 'last_login'
         ]
-        read_only_fields = ['date_joined', 'last_login', 'is_profile_complete']
+        read_only_fields = ['date_joined', 'last_login', 'is_profile_complete', 'profile_completion_percentage', 'school_name']
 
     def get_follower_count(self, obj):
         return obj.follower_relationships.count()
@@ -66,6 +73,9 @@ class UserSerializer(serializers.ModelSerializer):
             return obj.cover_photo.url
         return None
 
+    def get_profile_completion_percentage(self, obj):
+        return obj.profile_completion_percentage
+
 
 class UserPublicSerializer(serializers.ModelSerializer):
     follower_count = serializers.SerializerMethodField()
@@ -74,6 +84,7 @@ class UserPublicSerializer(serializers.ModelSerializer):
     course = CourseSerializer(read_only=True)
     year = YearSerializer(read_only=True)
     profile_pic_url = serializers.SerializerMethodField()
+    school_name = serializers.CharField(source='course.school.name', read_only=True)
 
     class Meta:
         model = User
@@ -81,7 +92,10 @@ class UserPublicSerializer(serializers.ModelSerializer):
             'id', 'username', 'first_name', 'second_name', 'last_name',
             'global_role', 'profile_pic', 'bio', 'course', 'year',
             'follower_count', 'following_count', 'is_following',
-            'profile_pic_url', 'is_profile_complete'
+            'profile_pic_url', 'is_profile_complete',
+            'headline', 'interests', 'collaboration_status', 'skills', 'projects',
+            'github_url', 'linkedin_url', 'portfolio_url', 'twitter_url',
+            'school_name'
         ]
 
     def get_follower_count(self, obj):
@@ -155,11 +169,53 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'first_name', 'second_name', 'last_name', 'bio',
-            'course', 'year', 'profile_pic', 'cover_photo',
+            'profile_pic', 'cover_photo',
+            'headline', 'interests', 'collaboration_status', 'skills', 'projects',
+            'github_url', 'linkedin_url', 'portfolio_url', 'twitter_url',
             'notify_on_like', 'notify_on_follow', 'notify_on_invite',
             'notify_on_group_request', 'notify_on_group_approved',
             'email_notifications'
         ]
+        read_only_fields = ['course', 'year']
+
+    def validate_skills(self, value):
+        """Ensure skills is a valid list"""
+        if value is None:
+            return []
+        if isinstance(value, str):
+            # If user sent a JSON string, try to parse it
+            try:
+                import json
+                value = json.loads(value)
+            except json.JSONDecodeError:
+                # If not valid JSON, treat as comma-separated string
+                value = [skill.strip() for skill in value.split(',') if skill.strip()]
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Skills must be a list of strings")
+        return value
+
+    def validate_projects(self, value):
+        """Ensure projects is a valid list of dicts"""
+        if value is None:
+            return []
+        if isinstance(value, str):
+            # If user sent a JSON string, try to parse it
+            try:
+                import json
+                value = json.loads(value)
+            except json.JSONDecodeError:
+                raise serializers.ValidationError(
+                    "Projects must be a valid JSON array of objects with title, description, and link"
+                )
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Projects must be a list of project objects")
+        # Validate each project has required fields
+        for project in value:
+            if not isinstance(project, dict):
+                raise serializers.ValidationError("Each project must be an object")
+            if 'title' not in project or 'description' not in project:
+                raise serializers.ValidationError("Each project must have title and description")
+        return value
 
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():

@@ -7,7 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
-from notifications.models import Notifications
+from notifications.models import Notifications, PushSubscription
 from notifications.services.notification_service import (
     build_notifications_context,
     build_unread_notification_html,
@@ -18,8 +18,15 @@ from notifications.services.notification_service import (
     delete_all_user_notifications,
     delete_user_read_notifications
 )
-from .serializers import NotificationSerializer, NotificationUpdateSerializer, NotificationBulkActionSerializer
+from .serializers import (
+    NotificationSerializer,
+    NotificationUpdateSerializer,
+    NotificationBulkActionSerializer,
+    SubscriptionSerializer,
+    UnsubscribeSerializer
+)
 from .filters import NotificationFilter
+from .services.subscription_service import SubscriptionService
 
 
 @login_required
@@ -262,4 +269,96 @@ class NotificationViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Push Notification Views
+from django.conf import settings
+from rest_framework.views import APIView
+
+
+class VapidPublicKeyView(APIView):
+    """
+    Public endpoint to expose VAPID public key for web push subscriptions.
+    No authentication required as the public key is safe to expose.
+    """
+    permission_classes = []
+
+    def get(self, request):
+        """Return the VAPID public key from Django settings."""
+        public_key = getattr(settings, 'VAPID_PUBLIC_KEY', '')
+        if not public_key:
+            return Response(
+                {'error': 'VAPID public key not configured'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        return Response({'public_key': public_key})
+
+
+class SubscribeView(APIView):
+    """
+    Endpoint for users to subscribe to push notifications.
+    Requires authentication. Handles deduplication by endpoint.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """Create or update a push subscription for the authenticated user."""
+        serializer = SubscriptionSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                subscription = SubscriptionService.subscribe(
+                    user=request.user,
+                    validated_data=serializer.validated_data
+                )
+                return Response(
+                    {
+                        'status': 'subscribed',
+                        'subscription_id': subscription.id,
+                        'is_active': subscription.is_active
+                    },
+                    status=status.HTTP_200_OK
+                )
+            except Exception as e:
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UnsubscribeView(APIView):
+    """
+    Endpoint for users to unsubscribe from push notifications.
+    Requires authentication. Performs soft delete by setting is_active=False.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """Deactivate a push subscription for the authenticated user."""
+        serializer = UnsubscribeSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                subscription = SubscriptionService.unsubscribe(
+                    user=request.user,
+                    endpoint=serializer.validated_data['endpoint']
+                )
+                return Response(
+                    {
+                        'status': 'unsubscribed',
+                        'subscription_id': subscription.id,
+                        'is_active': subscription.is_active
+                    },
+                    status=status.HTTP_200_OK
+                )
+            except PushSubscription.DoesNotExist:
+                return Response(
+                    {'error': 'Subscription not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            except Exception as e:
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

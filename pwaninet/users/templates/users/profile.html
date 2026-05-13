@@ -172,9 +172,9 @@
 
 </style>
 <div class="container-fluid p-0 profile-mobile-fullscreen">
-    <div class="row g-4 justify-content-center">
-        
-        <div class="col-12 col-lg-5 col-xl-4">
+    <div class="row g-3 g-md-4 justify-content-center">
+
+        <div class="col-12 col-md-6 col-lg-5 col-xl-4">
             <div class="sticky-top" style="top: 85px; z-index: 10;">
                 
                 <div class="post-card shadow-sm mb-4 border-0 rounded-3 overflow-visible profile-card">
@@ -205,7 +205,7 @@
                             {% endwith %}
                         </div>
                     </div>
-                    <div class="text-center pt-5 pb-3 px-3 mt-4">
+                    <div class="text-center pt-5 pb-3 px-3">
                         <h4 class="fw-bold mb-0">{{ profile_user.get_full_name }}</h4>
                         <p class="text-muted small">@{{ profile_user.username }}</p>
                         
@@ -254,21 +254,162 @@
                     </div>
                 </div>
 
-                <div class="post-card p-3 shadow-sm border-0">
+                <div class="post-card p-3 shadow-sm border-0 mb-3">
                     <h6 class="small fw-bold text-uppercase text-muted mb-3"><i class="bi bi-info-circle me-1"></i>Academic Details</h6>
+                    <div class="mb-2 d-flex justify-content-between">
+                        <small class="text-muted">School</small>
+                        <span class="fw-bold small">{{ profile_user.course.school.name|default:"N/A" }}</span>
+                    </div>
                     <div class="mb-2 d-flex justify-content-between">
                         <small class="text-muted">Course</small>
                         <span class="fw-bold small">{{ profile_user.course|default:"N/A" }}</span>
                     </div>
                     <div class="d-flex justify-content-between">
                         <small class="text-muted">Year</small>
-                        <span class="fw-bold small">Year {{ profile_user.year|default:"N/A" }}</span>
+                        <span class="fw-bold small">Year {{ profile_user.year.level|default:"N/A" }}</span>
                     </div>
+                </div>
+
+                {% if is_own_profile %}
+                <div id="profile-completion-card" class="post-card p-3 shadow-sm border-0 mb-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="small fw-bold text-uppercase text-muted mb-0"><i class="bi bi-trophy me-1"></i>Profile Completion</h6>
+                        <button id="dismiss-completion-card" class="btn btn-sm btn-link text-muted p-0" style="font-size: 12px;">Hide</button>
+                    </div>
+                    <div class="progress mb-2" style="height: 8px;">
+                        <div class="progress-bar bg-primary" role="progressbar"
+                             style="width: {{ profile_completion }}%;"
+                             aria-valuenow="{{ profile_completion }}"
+                             aria-valuemin="0"
+                             aria-valuemax="100">
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted">Completion</small>
+                        <span class="fw-bold small text-primary">{{ profile_completion }}%</span>
+                    </div>
+                    {% if profile_completion < 50 %}
+                    <div class="mt-2 p-2 bg-light rounded">
+                        <small class="text-muted mb-1 d-block">Suggestions to improve your profile:</small>
+                        {% if not profile_user.headline %}
+                        <small class="text-secondary d-block"><i class="bi bi-plus-circle me-1"></i>Add a headline to introduce yourself better</small>
+                        {% endif %}
+                        {% if not profile_user.skills %}
+                        <small class="text-secondary d-block"><i class="bi bi-plus-circle me-1"></i>Add skills so classmates can discover your strengths</small>
+                        {% endif %}
+                        {% if not profile_user.projects %}
+                        <small class="text-secondary d-block"><i class="bi bi-plus-circle me-1"></i>Add projects to showcase your work</small>
+                        {% endif %}
+                        {% if not profile_user.interests %}
+                        <small class="text-secondary d-block"><i class="bi bi-plus-circle me-1"></i>Add interests to find like-minded classmates</small>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="post-card p-3 shadow-sm border-0 mt-4">
+                    <h6 class="small fw-bold text-uppercase text-muted mb-3"><i class="bi bi-person me-1"></i>About {{ profile_user.username }}</h6>
+                    
+                    {% if profile_user.headline %}
+                    <p class="small mb-2 fw-bold">{{ profile_user.headline }}</p>
+                    {% endif %}
+                    
+                    {% if profile_user.collaboration_status %}
+                    <div class="mb-3">
+                        <span class="badge {% if profile_user.collaboration_status == 'not_looking' %}bg-secondary{% else %}bg-success{% endif %} rounded-pill">
+                            {% if profile_user.collaboration_status == 'open_to_projects' %}
+                                <i class="bi bi-people-fill me-1"></i>Open to Projects
+                            {% elif profile_user.collaboration_status == 'open_to_study_groups' %}
+                                <i class="bi bi-collection-fill me-1"></i>Open to Study Groups
+                            {% elif profile_user.collaboration_status == 'open_to_networking' %}
+                                <i class="bi bi-globe me-1"></i>Open to Networking
+                            {% else %}
+                                <i class="bi bi-person-x-fill me-1"></i>Not Looking
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endif %}
+
+                    <div class="collapse mt-3" id="profileMoreInfo">
+                        <div class="card card-body bg-light border-0">
+                            {% if profile_user.interests %}
+                            <div class="mb-3">
+                                <small class="text-muted text-uppercase fw-bold mb-1 d-block">Interests</small>
+                                <p class="small mb-0">{{ profile_user.interests }}</p>
+                            </div>
+                            {% endif %}
+                            
+                            {% if profile_user.skills %}
+                            <div class="mb-3">
+                                <small class="text-muted text-uppercase fw-bold mb-1 d-block">Skills</small>
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% for skill in profile_user.skills %}
+                                    <span class="badge bg-light text-dark border">{{ skill }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            {% if profile_user.projects %}
+                            <div class="mb-3">
+                                <small class="text-muted text-uppercase fw-bold mb-1 d-block">Projects</small>
+                                {% for project in profile_user.projects %}
+                                <div class="mb-2">
+                                    <p class="small fw-bold mb-0">{{ project.title }}</p>
+                                    <p class="small text-muted mb-1">{{ project.description }}</p>
+                                    {% if project.link %}
+                                    <a href="{{ project.link }}" target="_blank" class="small text-primary">View Project <i class="bi bi-box-arrow-up-right"></i></a>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            
+                            {% if profile_user.github_url or profile_user.linkedin_url or profile_user.portfolio_url or profile_user.twitter_url %}
+                            <div class="mb-3">
+                                <small class="text-muted text-uppercase fw-bold mb-1 d-block">Links</small>
+                                <div class="d-flex flex-column gap-1">
+                                    {% if profile_user.github_url %}
+                                    <a href="{{ profile_user.github_url }}" target="_blank" class="small text-decoration-none">
+                                        <i class="bi bi-github me-1"></i>GitHub
+                                    </a>
+                                    {% endif %}
+                                    {% if profile_user.linkedin_url %}
+                                    <a href="{{ profile_user.linkedin_url }}" target="_blank" class="small text-decoration-none">
+                                        <i class="bi bi-linkedin me-1"></i>LinkedIn
+                                    </a>
+                                    {% endif %}
+                                    {% if profile_user.portfolio_url %}
+                                    <a href="{{ profile_user.portfolio_url }}" target="_blank" class="small text-decoration-none">
+                                        <i class="bi bi-globe me-1"></i>Portfolio
+                                    </a>
+                                    {% endif %}
+                                    {% if profile_user.twitter_url %}
+                                    <a href="{{ profile_user.twitter_url }}" target="_blank" class="small text-decoration-none">
+                                        <i class="bi bi-twitter-x me-1"></i>Twitter/X
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <button class="btn btn-outline-secondary rounded-pill fw-bold btn-sm w-100 view-more-btn mt-3" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#profileMoreInfo"
+                            aria-expanded="false" aria-controls="profileMoreInfo"
+                            data-text-more="View More About {{ profile_user.username }}"
+                            data-text-less="View Less About {{ profile_user.username }}"
+                            data-icon-more="bi-chevron-down"
+                            data-icon-less="bi-chevron-up">
+                        <i class="bi bi-chevron-down me-1 view-more-icon"></i><span class="view-more-text">View More About {{ profile_user.username }}</span>
+                    </button>
                 </div>
             </div>
         </div>
 
-        <div class="col-12 col-lg-7 col-xl-6">
+        <div class="col-12 col-md-6 col-lg-7 col-xl-6">
             <ul class="nav nav-tabs mb-3 px-2" id="profileTabs" role="tablist">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="posts-tab" data-bs-toggle="tab" data-bs-target="#posts-content" type="button" role="tab">
@@ -321,6 +462,113 @@
 
     </div>
 </div>
+
+<style>
+/* Hide scrollbars globally */
+::-webkit-scrollbar {
+    display: none;
+}
+
+* {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Smooth collapse animation */
+#profileMoreInfo {
+    transition: height 0.35s ease-in-out, opacity 0.35s ease-in-out;
+}
+
+#profileMoreInfo .collapse {
+    transition: height 0.35s ease-in-out, opacity 0.35s ease-in-out;
+}
+
+/* Tablet responsiveness */
+@media (min-width: 768px) and (max-width: 991px) {
+    .profile-card .avatar {
+        width: 100px;
+        height: 100px;
+    }
+
+    .profile-card .avatar-wrapper {
+        bottom: -35px;
+    }
+
+    .profile-card .authority-badge {
+        bottom: -6px;
+        padding: 3px 10px;
+        font-size: 10px;
+    }
+
+    .profile-card .cover-container {
+        height: 140px;
+    }
+
+    .profile-card .text-center {
+        padding-top: 3rem !important;
+    }
+
+    .profile-card h4 {
+        font-size: 1.1rem;
+    }
+
+    .profile-card .bg-light {
+        font-size: 0.85rem;
+    }
+
+    .profile-card .btn-sm {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
+    }
+
+    .post-card {
+        font-size: 0.9rem;
+    }
+
+    .post-card h6 {
+        font-size: 0.8rem;
+    }
+
+    .post-card .small {
+        font-size: 0.8rem;
+    }
+
+    /* Adjust sticky positioning for tablets */
+    .sticky-top {
+        top: 75px !important;
+    }
+
+    /* Adjust card padding on tablets */
+    .post-card {
+        padding: 1rem !important;
+    }
+
+    /* Ensure proper spacing between elements */
+    .profile-card {
+        margin-bottom: 1rem !important;
+    }
+
+    /* Adjust tabs for tablets */
+    .nav-tabs {
+        font-size: 0.9rem;
+    }
+
+    .nav-tabs .nav-link {
+        padding: 0.5rem 1rem;
+    }
+}
+
+/* Ensure proper spacing on tablets */
+@media (min-width: 768px) and (max-width: 991px) {
+    .profile-mobile-fullscreen .row {
+        padding: 0 10px;
+    }
+
+    .profile-mobile-fullscreen .container-fluid {
+        padding: 0 15px;
+    }
+}
+</style>
 {% endblock %}
 
 {% block extra_js %}
@@ -424,6 +672,50 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
   });
+
+  // View More Button Toggle
+  const viewMoreBtns = document.querySelectorAll('.view-more-btn');
+
+  viewMoreBtns.forEach(btn => {
+    const collapseId = btn.getAttribute('data-bs-target');
+    const collapseElement = document.querySelector(collapseId);
+
+    if (collapseElement) {
+      collapseElement.addEventListener('show.bs.collapse', function() {
+        const icon = btn.querySelector('.view-more-icon');
+        const text = btn.querySelector('.view-more-text');
+        icon.classList.remove(btn.dataset.iconMore);
+        icon.classList.add(btn.dataset.iconLess);
+        text.textContent = btn.dataset.textLess;
+      });
+
+      collapseElement.addEventListener('hide.bs.collapse', function() {
+        const icon = btn.querySelector('.view-more-icon');
+        const text = btn.querySelector('.view-more-text');
+        icon.classList.remove(btn.dataset.iconLess);
+        icon.classList.add(btn.dataset.iconMore);
+        text.textContent = btn.dataset.textMore;
+      });
+    }
+  });
+
+  // Profile completion card dismissal
+  const completionCard = document.getElementById('profile-completion-card');
+  const dismissCompletionBtn = document.getElementById('dismiss-completion-card');
+
+  // Check if user dismissed the card in this session
+  const completionDismissed = sessionStorage.getItem('profileCompletionDismissed');
+  if (completionDismissed === 'true' && completionCard) {
+    completionCard.style.display = 'none';
+  }
+
+  // Handle dismiss button click
+  if (dismissCompletionBtn && completionCard) {
+    dismissCompletionBtn.addEventListener('click', function() {
+      completionCard.style.display = 'none';
+      sessionStorage.setItem('profileCompletionDismissed', 'true');
+    });
+  }
 });
 </script>
 {% endblock %}

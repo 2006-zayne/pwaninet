@@ -9,6 +9,11 @@ urlpatterns = [
     # API routes
     path('api/', include(router.urls)),
     
+    # Push notification API routes
+    path('api/push/vapid-public-key/', views.VapidPublicKeyView.as_view(), name='vapid_public_key'),
+    path('api/push/subscribe/', views.SubscribeView.as_view(), name='push_subscribe'),
+    path('api/push/unsubscribe/', views.UnsubscribeView.as_view(), name='push_unsubscribe'),
+    
     # Web routes
     path('', views.notifications_list, name='notifications'),
     path('unread-count/', views.unread_notification_count, name='unread_notification_count'),

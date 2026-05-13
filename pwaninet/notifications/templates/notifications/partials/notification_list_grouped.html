@@ -67,7 +67,7 @@
 
       {% if group.count > 1 %}
         <div style="margin-top: 0.75rem;">
-          <button class="btn-action" 
+          <button class="btn-action"
                   style="background: var(--brand-light); color: var(--brand); border: 1.5px solid var(--brand-mid);"
                   onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none';">
             <i class="bi bi-chevron-down"></i> See all {{ group.count }}
@@ -81,6 +81,15 @@
               </div>
             {% endfor %}
           </div>
+        </div>
+      {% elif group.notification_type == 'GROUP_REQUEST' and group.group %}
+        <div class="notif-actions">
+          <a href="{% url 'groups:approve_from_notification' group.group.id group.notifications.0.sender.id %}" class="btn-action btn-accept">
+            <i class="bi bi-check2"></i> Approve
+          </a>
+          <a href="{% url 'groups:reject_from_notification' group.group.id group.notifications.0.sender.id %}" class="btn-action btn-decline">
+            <i class="bi bi-x2"></i> Reject
+          </a>
         </div>
       {% endif %}
     </div>

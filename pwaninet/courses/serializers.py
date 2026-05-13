@@ -1,14 +1,22 @@
 from rest_framework import serializers
-from .models import Course, Year, Unit
+from .models import School, Course, Year, Unit
+
+
+class SchoolSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = School
+        fields = ['id', 'name', 'slug']
 
 
 class CourseSerializer(serializers.ModelSerializer):
+    school = SchoolSerializer(read_only=True)
+    school_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     years_count = serializers.SerializerMethodField()
     units_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
-        fields = ['id', 'name', 'years_count', 'units_count']
+        fields = ['id', 'name', 'school', 'school_id', 'years_count', 'units_count']
 
     def get_years_count(self, obj):
         return obj.years.count()
@@ -51,11 +59,12 @@ class UnitDetailSerializer(serializers.ModelSerializer):
 
 
 class CourseWithYearsSerializer(serializers.ModelSerializer):
+    school = SchoolSerializer(read_only=True)
     years = YearSerializer(many=True, read_only=True)
 
     class Meta:
         model = Course
-        fields = ['id', 'name', 'years']
+        fields = ['id', 'name', 'school', 'years']
 
 
 class YearWithUnitsSerializer(serializers.ModelSerializer):

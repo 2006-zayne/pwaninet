@@ -1,8 +1,157 @@
 # Changelog
 
+**Project Version:** Pwaninet v0.99.07
+
 All notable changes to the project will be documented in this file.
 
-## [v0.99] - 2026-04-28
+## [v0.99.07] - 2026-05-13
+
+### Added - Extended Profile & Identity System (2026-05-13)
+
+#### New Profile Fields
+- **Identity/Professional Fields**:
+  - `headline` - Professional tagline or headline (max 100 chars)
+  - `interests` - Comma-separated interests
+  - `collaboration_status` - Current collaboration availability with choices:
+    - `open_to_projects` - Open to collaborative projects
+    - `open_to_study_groups` - Open to joining study groups
+    - `open_to_networking` - Open to professional networking
+    - `not_looking` - Not currently looking for collaborations
+
+- **Skills & Projects**:
+  - `skills` - JSONField list of user skills (scalable, taggable approach)
+  - `projects` - JSONField list of projects with structure:
+    - `title` - Project name
+    - `description` - Project description
+    - `link` - Optional project URL
+
+- **External Links**:
+  - `github_url` - GitHub profile URL
+  - `linkedin_url` - LinkedIn profile URL
+  - `portfolio_url` - Portfolio website URL
+  - `twitter_url` - Twitter/X profile URL
+
+#### Profile Completion System
+- **Backend-Driven Completion Logic**:
+  - Profile Picture: 15%
+  - Bio: 10%
+  - Headline: 10%
+  - Skills: 20%
+  - Projects: 20%
+  - Collaboration Status: 10%
+  - External Links: 5%
+  - Interests: 10%
+- **Property**: Added `profile_completion_percentage` property to User model
+- **Serializer Exposure**: Completion percentage exposed via API serializers
+
+#### Profile Page Enhancements
+- **Academic Identity Rules Preserved**:
+  - School automatically derived from `user.course.school`
+  - School, course, and year displayed as read-only
+  - Users cannot edit academic identity fields after signup
+
+- **Owner vs Visitor Visibility**:
+  - **Profile Owner** sees:
+    - Profile completion percentage bar
+    - Completion suggestions/prompts when < 50%
+    - Edit profile and account management controls
+  - **Visitors** see:
+    - Public identity information
+    - Collaboration status badge
+    - Expandable "View More" section
+    - Social actions (follow, message)
+  - Both see the expandable additional details section
+
+- **Expandable "View More" Section**:
+  - Button: "View More About {username}"
+  - Collapsible inline section (no page redirect)
+  - Contains:
+    - Full interests
+    - Skills (displayed as badges)
+    - Projects (with title, description, and optional link)
+    - External links (GitHub, LinkedIn, Portfolio, Twitter/X)
+    - Extended identity information
+
+- **Profile Completion Bar**:
+  - Visual progress bar showing completion percentage
+  - Only visible to profile owner
+  - Suggestions displayed when completion < 50%:
+    - "Add a headline to introduce yourself better"
+    - "Add skills so classmates can discover your strengths"
+    - "Add projects to showcase your work"
+    - "Add interests to find like-minded classmates"
+
+#### Edit Profile Form Updates
+- **New Editable Fields**:
+  - headline, interests, collaboration_status
+  - skills (textarea, one skill per line)
+  - projects (textarea, format: Title|Description|Link)
+  - github_url, linkedin_url, portfolio_url, twitter_url
+
+- **Read-Only Display Fields**:
+  - School (displayed from `user.course.school.name`)
+  - Course (displayed from `user.course.name`)
+  - Year (displayed as "Year {level}")
+
+- **Form Validation**:
+  - Custom `clean_skills()` method - converts textarea to list
+  - Custom `clean_projects()` method - converts textarea to list of dicts
+  - Pre-formats current values for display in __init__
+
+#### API/Serializer Updates
+- **CourseSerializer**:
+  - Added `school_name` field (read-only, derived from school relationship)
+
+- **UserSerializer**:
+  - Added all new profile fields
+  - Added `profile_completion_percentage` (SerializerMethodField)
+  - Added `school_name` (derived from course.school)
+
+- **UserPublicSerializer**:
+  - Added public-facing profile fields
+  - Excludes private data (completion percentage, internal fields)
+  - Added `school_name` for academic context
+
+- **UserUpdateSerializer**:
+  - Added new editable fields
+  - Course and year marked as read_only
+  - Cannot modify academic identity via API
+
+#### Query Optimization
+- **Profile View**:
+  - Added `select_related('course__school', 'year')` to avoid N+1 queries
+  - Optimized database access for academic information display
+
+#### Database Schema Changes
+- **New Model Fields** (requires migration):
+  - Added `headline` (CharField)
+  - Added `interests` (TextField)
+  - Added `collaboration_status` (CharField with choices)
+  - Added `skills` (JSONField)
+  - Added `projects` (JSONField)
+  - Added `github_url`, `linkedin_url`, `portfolio_url`, `twitter_url` (URLField)
+
+#### Files Modified/Created:
+- `users/models.py` - Added new profile fields and completion property
+- `users/serializers.py` - Updated all serializers for new fields
+- `users/forms.py` - Updated ProfileUpdateForm with new fields and validation
+- `users/views.py` - Optimized profile_view with select_related, added owner context
+- `users/templates/users/profile.html` - Added completion bar, expandable section, school display
+- `users/templates/users/update_profile.html` - Form auto-updates with new fields (dynamic iteration)
+- `pwaninet/version.py` - Updated version to 0.00.07
+
+#### UX Principles Maintained:
+- ✅ Existing profile page structure preserved
+- ✅ Academic identity fields remain non-editable
+- ✅ Default profile view remains lightweight
+- ✅ Additional details hidden behind expandable section
+- ✅ Progressive disclosure pattern
+- ✅ Clean, student-centered design
+- ✅ No forced profile completion during signup
+
+---
+
+## [v0.99.06] - 2026-04-28
 
 ### Added - Complete Messaging System Overhaul (2026-04-28)
 

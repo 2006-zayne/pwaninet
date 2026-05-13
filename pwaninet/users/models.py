@@ -5,6 +5,7 @@ from PIL import Image
 from io import BytesIO
 from django.core.files.uploadedfile import InMemoryUploadedFile
 import sys
+from django.contrib.postgres.fields import JSONField
 
 
 class GlobalRole(models.TextChoices):
@@ -18,6 +19,13 @@ class ThemePreference(models.TextChoices):
     LIGHT = 'light', 'Light'
     DARK = 'dark', 'Dark'
     SYSTEM = 'system', 'System Default'
+
+
+class CollaborationStatus(models.TextChoices):
+    OPEN_TO_PROJECTS = 'open_to_projects', 'Open to Projects'
+    OPEN_TO_STUDY_GROUPS = 'open_to_study_groups', 'Open to Study Groups'
+    OPEN_TO_NETWORKING = 'open_to_networking', 'Open to Networking'
+    NOT_LOOKING = 'not_looking', 'Not Looking'
 
 
 class CustomUserManager(UserManager):
@@ -35,6 +43,23 @@ class User(AbstractUser):
     profile_pic = models.ImageField(default='profile_pic/default_pic1.jpg', upload_to='profile_pic', null=True, blank=True)
     cover_photo = models.ImageField(upload_to='covers/', blank=True, null=True)
     bio = models.TextField(max_length=500, blank=True)
+    
+    # Extended profile fields
+    headline = models.CharField(max_length=100, blank=True, help_text="Professional tagline or headline")
+    interests = models.TextField(blank=True, help_text="Comma-separated interests")
+    collaboration_status = models.CharField(
+        max_length=30,
+        choices=CollaborationStatus.choices,
+        blank=True,
+        default='',
+        help_text="Current collaboration availability"
+    )
+    skills = models.JSONField(default=list, blank=True, help_text="List of skills")
+    projects = models.JSONField(default=list, blank=True, help_text="List of projects with title, description, and link")
+    github_url = models.URLField(blank=True, help_text="GitHub profile URL")
+    linkedin_url = models.URLField(blank=True, help_text="LinkedIn profile URL")
+    portfolio_url = models.URLField(blank=True, help_text="Portfolio website URL")
+    twitter_url = models.URLField(blank=True, help_text="Twitter/X profile URL")
 
     # Notification preferences
     notify_on_like = models.BooleanField(default=True)
@@ -54,6 +79,9 @@ class User(AbstractUser):
     # Online status tracking
     is_online = models.BooleanField(default=False)
     last_seen = models.DateTimeField(auto_now=True)
+
+    # Onboarding tracking
+    has_completed_onboarding = models.BooleanField(default=False, help_text="Whether user has completed the onboarding tour")
 
     def clean(self):
         super().clean()
@@ -85,6 +113,61 @@ class User(AbstractUser):
     @property
     def is_profile_complete(self):
         return bool(self.course and self.year)
+    
+    @property
+    def profile_completion_percentage(self):
+        """
+        Calculate profile completion percentage based on:
+        - Profile Picture: 15%
+        - Bio: 10%
+        - Headline: 10%
+        - Skills: 20%
+        - Projects: 20%
+        - Collaboration Status: 10%
+        - Links: 5%
+        - Interests: 10%
+        """
+        score = 0
+        
+        # Profile Picture (15%)
+        if self.profile_pic and self.profile_pic.name != 'profile_pic/default_pic1.jpg':
+            score += 15
+        
+        # Bio (10%)
+        if self.bio:
+            score += 10
+        
+        # Headline (10%)
+        if self.headline:
+            score += 10
+        
+        # Skills (20%)
+        if self.skills and len(self.skills) > 0:
+            score += 20
+        
+        # Projects (20%)
+        if self.projects and len(self.projects) > 0:
+            score += 20
+        
+        # Collaboration Status (10%)
+        if self.collaboration_status:
+            score += 10
+        
+        # Links (5%)
+        links_count = sum([
+            bool(self.github_url),
+            bool(self.linkedin_url),
+            bool(self.portfolio_url),
+            bool(self.twitter_url)
+        ])
+        if links_count > 0:
+            score += 5
+        
+        # Interests (10%)
+        if self.interests:
+            score += 10
+        
+        return score
 
 
 class Follow(models.Model):

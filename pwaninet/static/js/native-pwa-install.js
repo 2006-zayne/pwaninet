@@ -20,6 +20,7 @@ class NativePWAInstallManager {
             minPageViews: 1
         };
         this._autoPromptListener = null;
+        this._dismissTimer = null; // Track dismiss timer to prevent spamming
 
         this.init();
     }
@@ -72,6 +73,12 @@ class NativePWAInstallManager {
         const banners = document.querySelectorAll('[id*="install"], [class*="install"]');
         banners.forEach(b => b.remove());
         this.detachAutoPrompt();
+
+        // DELAY FIX: Clear dismiss timer when PWA is installed to prevent reminder showing after install
+        if (this._dismissTimer) {
+            clearTimeout(this._dismissTimer);
+            this._dismissTimer = null;
+        }
     }
 
     trackUserEngagement() {
@@ -102,9 +109,8 @@ class NativePWAInstallManager {
 
     checkInstallPrompt() {
         if (this.isInstalled()) return;
-        // If browser didn't fire beforeinstallprompt, show instructions after short delay
-        const isMobileChrome = /Android/.test(navigator.userAgent) && /Chrome\//.test(navigator.userAgent);
-        const delay = isMobileChrome ? 3000 : 5000;
+        // If browser didn't fire beforeinstallprompt, show instructions after 30 minutes
+        const delay = 1800000; // 30 minutes in milliseconds
         setTimeout(() => {
             if (!this.deferredPrompt && !this.installPromptShown) this.showInstallInstructions();
         }, delay);
@@ -157,7 +163,18 @@ class NativePWAInstallManager {
             this.showNativeInstallPrompt();
         });
 
-        dismiss.addEventListener('click', () => { banner.remove(); this.detachAutoPrompt(); });
+        dismiss.addEventListener('click', () => {
+            banner.remove();
+            this.detachAutoPrompt();
+
+            // DELAY FIX: Prevent spamming by waiting 30 minutes before showing reminder
+            // This ensures users aren't annoyed by repeated install prompts
+            this._dismissTimer = setTimeout(() => {
+                if (!this.isInstalled()) {
+                    this.showInstallReminder();
+                }
+            }, 1800000); // 30 minutes in milliseconds
+        });
 
         // Auto-hide after 30s if not interacted
         setTimeout(() => { if (banner.parentNode) banner.parentNode.removeChild(banner); }, 30000);

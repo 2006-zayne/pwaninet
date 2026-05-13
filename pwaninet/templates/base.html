@@ -40,7 +40,7 @@
             const userPreference = '{{ request.user.theme_preference|default:"system" }}';
             const savedTheme = localStorage.getItem('theme');
             const theme = userPreference !== 'system' ? userPreference : (savedTheme || 'system');
-            
+
             if (theme === 'dark') {
                 document.documentElement.setAttribute('data-theme', 'dark');
             } else if (theme === 'light') {
@@ -51,7 +51,55 @@
                 document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
             }
         })();
-        
+    </script>
+
+    <!-- Critical Skeleton CSS - Loads before all other CSS -->
+    <style>
+        /* Critical: Ensure skeleton renders immediately with highest priority */
+        #page-skeleton {
+            display: block !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background: #f8fafc !important;
+            z-index: 9999999 !important;
+            overflow-y: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        #page-skeleton.hidden {
+            display: none !important;
+        }
+
+        [data-theme="dark"] #page-skeleton {
+            background: #0f172a !important;
+        }
+
+        /* Set initial body background to prevent flash (will be overridden by theme CSS) */
+        body {
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 0;
+        }
+
+        [data-theme="dark"] body {
+            background-color: #0f172a;
+        }
+
+        /* Hide app initially */
+        #app {
+            opacity: 0 !important;
+        }
+
+        #app.loaded {
+            opacity: 1 !important;
+        }
+    </style>
+
+    <script>
         // Force favicon caching and display
         (function() {
             // Preload favicon to force caching
@@ -88,25 +136,7 @@
     
     <!-- Native PWA Install Manager -->
     <script src="{% static 'js/native-pwa-install.js' %}"></script>
-    
-    <!-- PWA Service Worker Registration (use root service-worker.js so the SW controls the app scope) -->
-    <script>
-        // Register service worker as early as possible so it can satisfy PWA criteria
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js')
-            .then((registration) => {
-                console.log('Service Worker registered successfully:', registration.scope);
-                return navigator.serviceWorker.ready;
-            })
-            .then((reg) => {
-                console.log('Service Worker ready:', reg.scope);
-            })
-            .catch((error) => {
-                console.log('Service Worker registration failed:', error);
-            });
-        }
-    </script>
-    
+
     <!-- Critical: Detect fresh PWA launch BEFORE body renders -->
     <script>
         (function(){
@@ -125,6 +155,18 @@
             --bs-backdrop-zindex: 1000000;
             --bs-modal-zindex: 1000001;
         }
+
+        /* Prevent black screen during initial page load */
+        body {
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 0;
+        }
+
+        [data-theme="dark"] body {
+            background-color: #0f172a;
+        }
+
         /* Splash hidden by default - no flash on internal navigation */
         #startup-splash {
             position: fixed;
@@ -150,14 +192,19 @@
             pointer-events: auto; /* Allow interaction while splash is visible intentionally */
         }
         
-        /* App visible by default */
+        /* App hidden by default until page loads */
         #app {
-            opacity: 1;
+            opacity: 0;
             transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             will-change: opacity;
         }
-        
-        /* Hide app only on fresh launch */
+
+        /* Show app when loaded */
+        #app.loaded {
+            opacity: 1;
+        }
+
+        /* Hide app on fresh launch (handled by startup splash) */
         html.fresh-launch #app {
             opacity: 0;
         }
@@ -753,6 +800,325 @@
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
       data-user-id="{{ request.user.id }}">
+
+    <!-- Page Load Skeleton - HIGHEST PRIORITY - Renders immediately -->
+    <div id="page-skeleton" style="display: block; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #f8fafc; z-index: 9999999; overflow-y: auto; margin: 0; padding: 0;">
+        <style>
+            /* Critical inline skeleton styles - render immediately */
+            #page-skeleton {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+
+            [data-theme="dark"] #page-skeleton {
+                background: #0f172a;
+            }
+
+            .skeleton-nav {
+                height: 60px;
+                background: #ffffff;
+                border-bottom: 1px solid #e2e8f0;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 16px;
+                position: sticky;
+                top: 0;
+                z-index: 10;
+            }
+
+            [data-theme="dark"] .skeleton-nav {
+                background: #1e293b;
+                border-bottom: 1px solid #334155;
+            }
+
+            .skeleton-nav-brand {
+                width: 120px;
+                height: 24px;
+                background: #e2e8f0;
+                border-radius: 4px;
+            }
+
+            [data-theme="dark"] .skeleton-nav-brand {
+                background: #334155;
+            }
+
+            .skeleton-nav-items {
+                display: flex;
+                gap: 16px;
+            }
+
+            .skeleton-nav-item {
+                width: 32px;
+                height: 32px;
+                background: #e2e8f0;
+                border-radius: 50%;
+            }
+
+            [data-theme="dark"] .skeleton-nav-item {
+                background: #334155;
+            }
+
+            .skeleton-content {
+                padding: 16px;
+                max-width: 600px;
+                margin: 0 auto;
+            }
+
+            .skeleton-post {
+                background: #ffffff;
+                border-radius: 12px;
+                padding: 16px;
+                margin-bottom: 16px;
+                border: 1px solid #e2e8f0;
+            }
+
+            [data-theme="dark"] .skeleton-post {
+                background: #1e293b;
+                border: 1px solid #334155;
+            }
+
+            .skeleton-post-header {
+                display: flex;
+                gap: 12px;
+                margin-bottom: 12px;
+            }
+
+            .skeleton-avatar {
+                width: 48px;
+                height: 48px;
+                background: #e2e8f0;
+                border-radius: 50%;
+                flex-shrink: 0;
+            }
+
+            [data-theme="dark"] .skeleton-avatar {
+                background: #334155;
+            }
+
+            .skeleton-meta {
+                flex: 1;
+            }
+
+            .skeleton-name {
+                width: 120px;
+                height: 14px;
+                background: #e2e8f0;
+                border-radius: 4px;
+                margin-bottom: 6px;
+            }
+
+            [data-theme="dark"] .skeleton-name {
+                background: #334155;
+            }
+
+            .skeleton-time {
+                width: 80px;
+                height: 12px;
+                background: #e2e8f0;
+                border-radius: 4px;
+            }
+
+            [data-theme="dark"] .skeleton-time {
+                background: #334155;
+            }
+
+            .skeleton-body {
+                margin-bottom: 12px;
+            }
+
+            .skeleton-line {
+                height: 14px;
+                background: #e2e8f0;
+                border-radius: 4px;
+                margin-bottom: 8px;
+            }
+
+            [data-theme="dark"] .skeleton-line {
+                background: #334155;
+            }
+
+            .skeleton-line:nth-child(1) { width: 100%; }
+            .skeleton-line:nth-child(2) { width: 100%; }
+            .skeleton-line:nth-child(3) { width: 60%; }
+
+            .skeleton-media {
+                width: 100%;
+                height: 200px;
+                background: #e2e8f0;
+                border-radius: 8px;
+                margin-bottom: 12px;
+            }
+
+            [data-theme="dark"] .skeleton-media {
+                background: #334155;
+            }
+
+            .skeleton-actions {
+                display: flex;
+                justify-content: space-around;
+                padding-top: 12px;
+                border-top: 1px solid #e2e8f0;
+            }
+
+            [data-theme="dark"] .skeleton-actions {
+                border-top: 1px solid #334155;
+            }
+
+            .skeleton-action {
+                width: 50px;
+                height: 16px;
+                background: #e2e8f0;
+                border-radius: 4px;
+            }
+
+            [data-theme="dark"] .skeleton-action {
+                background: #334155;
+            }
+
+            /* Shimmer animation */
+            @keyframes shimmer {
+                0% { background-position: -200% 0; }
+                100% { background-position: 200% 0; }
+            }
+
+            .skeleton-nav-brand,
+            .skeleton-nav-item,
+            .skeleton-avatar,
+            .skeleton-name,
+            .skeleton-time,
+            .skeleton-line,
+            .skeleton-media,
+            .skeleton-action {
+                background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+                background-size: 200% 100%;
+                animation: shimmer 1.5s infinite;
+            }
+
+            [data-theme="dark"] .skeleton-nav-brand,
+            [data-theme="dark"] .skeleton-nav-item,
+            [data-theme="dark"] .skeleton-avatar,
+            [data-theme="dark"] .skeleton-name,
+            [data-theme="dark"] .skeleton-time,
+            [data-theme="dark"] .skeleton-line,
+            [data-theme="dark"] .skeleton-media,
+            [data-theme="dark"] .skeleton-action {
+                background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+            }
+
+            .skeleton-bottom-nav {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 60px;
+                background: #ffffff;
+                border-top: 1px solid #e2e8f0;
+                display: flex;
+                justify-content: space-around;
+                align-items: center;
+                z-index: 10;
+            }
+
+            [data-theme="dark"] .skeleton-bottom-nav {
+                background: #1e293b;
+                border-top: 1px solid #334155;
+            }
+
+            .skeleton-bottom-item {
+                width: 32px;
+                height: 32px;
+                background: #e2e8f0;
+                border-radius: 50%;
+            }
+
+            [data-theme="dark"] .skeleton-bottom-item {
+                background: #334155;
+            }
+
+            @media (min-width: 768px) {
+                .skeleton-bottom-nav {
+                    display: none;
+                }
+            }
+        </style>
+        <nav class="skeleton-nav">
+            <div class="skeleton-nav-brand"></div>
+            <div class="skeleton-nav-items">
+                <div class="skeleton-nav-item"></div>
+                <div class="skeleton-nav-item"></div>
+                <div class="skeleton-nav-item"></div>
+                <div class="skeleton-nav-item"></div>
+            </div>
+        </nav>
+        <div class="skeleton-content">
+            <div class="skeleton-post">
+                <div class="skeleton-post-header">
+                    <div class="skeleton-avatar"></div>
+                    <div class="skeleton-meta">
+                        <div class="skeleton-name"></div>
+                        <div class="skeleton-time"></div>
+                    </div>
+                </div>
+                <div class="skeleton-body">
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line"></div>
+                </div>
+                <div class="skeleton-media"></div>
+                <div class="skeleton-actions">
+                    <div class="skeleton-action"></div>
+                    <div class="skeleton-action"></div>
+                    <div class="skeleton-action"></div>
+                </div>
+            </div>
+            <div class="skeleton-post">
+                <div class="skeleton-post-header">
+                    <div class="skeleton-avatar"></div>
+                    <div class="skeleton-meta">
+                        <div class="skeleton-name"></div>
+                        <div class="skeleton-time"></div>
+                    </div>
+                </div>
+                <div class="skeleton-body">
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line"></div>
+                </div>
+                <div class="skeleton-actions">
+                    <div class="skeleton-action"></div>
+                    <div class="skeleton-action"></div>
+                    <div class="skeleton-action"></div>
+                </div>
+            </div>
+            <div class="skeleton-post">
+                <div class="skeleton-post-header">
+                    <div class="skeleton-avatar"></div>
+                    <div class="skeleton-meta">
+                        <div class="skeleton-name"></div>
+                        <div class="skeleton-time"></div>
+                    </div>
+                </div>
+                <div class="skeleton-body">
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line"></div>
+                </div>
+                <div class="skeleton-media"></div>
+                <div class="skeleton-actions">
+                    <div class="skeleton-action"></div>
+                    <div class="skeleton-action"></div>
+                    <div class="skeleton-action"></div>
+                </div>
+            </div>
+        </div>
+        <nav class="skeleton-bottom-nav">
+            <div class="skeleton-bottom-item"></div>
+            <div class="skeleton-bottom-item"></div>
+            <div class="skeleton-bottom-item"></div>
+            <div class="skeleton-bottom-item"></div>
+            <div class="skeleton-bottom-item"></div>
+        </nav>
+    </div>
+
     
     <!-- Startup Splash Screen - ENABLED -->
     <div id="startup-splash">
@@ -772,9 +1138,9 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Main App Container - Hidden initially -->
-    <div id="app" style="opacity: 1; /* SHOW IMMEDIATELY */">
+    <div id="app" style="opacity: 0; /* Hidden until page loads */">
     
     <nav class="navbar navbar-top fixed-top">
         <div class="container d-flex justify-content-between align-items-center">
@@ -1041,29 +1407,56 @@ document.addEventListener('htmx:afterSwap', function(evt) {
 <script>
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-        navigator.serviceWorker.register('{% static "service-worker.js" %}')
+        console.log('[ServiceWorker] Attempting to register service worker...');
+
+        // Try the static path first
+        const swPath = '{% static "service-worker.js" %}';
+        console.log('[ServiceWorker] Service worker path:', swPath);
+
+        navigator.serviceWorker.register(swPath)
             .then(function(registration) {
-                console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                
+                console.log('[ServiceWorker] Registration successful with scope: ', registration.scope);
+
                 // Check for service worker updates
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
+                    console.log('[ServiceWorker] New service worker found');
+
                     newWorker.addEventListener('statechange', () => {
+                        console.log('[ServiceWorker] Service worker state:', newWorker.state);
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                             // New service worker is available, show update notification
+                            console.log('[ServiceWorker] New version available');
                             if (confirm('PwaniNet has been updated. Reload to get the latest version?')) {
                                 window.location.reload();
                             }
                         }
                     });
                 });
-                
+
             })
             .catch(function(error) {
-                console.log('ServiceWorker registration failed: ', error);
+                console.error('[ServiceWorker] Registration failed with static path: ', error);
+                console.log('[ServiceWorker] Trying fallback path /static/service-worker.js');
+
+                // Fallback to direct static path
+                navigator.serviceWorker.register('/static/service-worker.js')
+                    .then(function(registration) {
+                        console.log('[ServiceWorker] Registration successful with fallback path, scope: ', registration.scope);
+                    })
+                    .catch(function(fallbackError) {
+                        console.error('[ServiceWorker] Fallback registration also failed: ', fallbackError);
+                        console.error('[ServiceWorker] Error details:', {
+                            message: fallbackError.message,
+                            name: fallbackError.name
+                        });
+                    });
             });
     });
+} else {
+    console.log('[ServiceWorker] Service workers are not supported in this browser');
 }
+
 
 // Handle offline/online events
 window.addEventListener('online', function() {
@@ -1287,6 +1680,79 @@ window.addEventListener('beforeinstallprompt', (e) => {
     </script>
     {% endverbatim %}
     {% endif %}
+
+    <!-- Page Skeleton Loading Logic -->
+    <script>
+    (function() {
+        'use strict';
+
+        console.log('[PageSkeleton] Initializing skeleton loader');
+
+        const pageSkeleton = document.getElementById('page-skeleton');
+        const app = document.getElementById('app');
+
+        console.log('[PageSkeleton] Elements found:', {
+            pageSkeleton: !!pageSkeleton,
+            app: !!app
+        });
+
+        // Function to hide page skeleton and show app
+        function hidePageSkeleton() {
+            if (pageSkeleton && !pageSkeleton.classList.contains('hidden')) {
+                pageSkeleton.classList.add('hidden');
+                if (app) {
+                    app.classList.add('loaded');
+                }
+                console.log('[PageSkeleton] Skeleton hidden, app visible');
+            } else {
+                console.log('[PageSkeleton] Skeleton already hidden or not found');
+            }
+        }
+
+        // Detect if this is a fresh PWA launch
+        const isFreshLaunch = document.documentElement.classList.contains('fresh-launch');
+        console.log('[PageSkeleton] Is fresh PWA launch:', isFreshLaunch);
+
+        // IMMEDIATE ACTION: Hide skeleton for fresh PWA launches (they use startup splash)
+        if (isFreshLaunch && pageSkeleton) {
+            pageSkeleton.classList.add('hidden');
+            console.log('[PageSkeleton] Fresh PWA launch - skeleton hidden immediately');
+        }
+
+        // Hide skeleton when page is fully loaded (for normal navigation)
+        window.addEventListener('load', function() {
+            console.log('[PageSkeleton] Window load event fired');
+            if (!isFreshLaunch) {
+                hidePageSkeleton();
+            }
+        });
+
+        // Also hide on DOMContentLoaded as fallback for fast-loading pages
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('[PageSkeleton] DOMContentLoaded event fired');
+            if (!isFreshLaunch) {
+                // Small delay to ensure DOM is ready
+                setTimeout(() => {
+                    hidePageSkeleton();
+                }, 100);
+            }
+        });
+
+        // Handle HTMX content loading - hide skeleton when HTMX content loads
+        document.addEventListener('htmx:afterRequest', function(evt) {
+            console.log('[PageSkeleton] HTMX afterRequest event fired');
+            if (!isFreshLaunch) {
+                hidePageSkeleton();
+            }
+        });
+
+        // Failsafe: Ensure skeleton is hidden after maximum timeout
+        setTimeout(function() {
+            console.log('[PageSkeleton] Failsafe timeout triggered');
+            hidePageSkeleton();
+        }, 3000);
+    })();
+    </script>
 
 </body>
 </html>
