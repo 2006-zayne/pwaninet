@@ -1,5 +1,7 @@
 from rest_framework import serializers
-from .models import Conversation, ConversationMember, Message, MessageRead, MessageReaction, ConversationTheme
+from django.core.validators import FileExtensionValidator
+import os
+from .models import Conversation, ConversationMember, Message, MessageReaction, ConversationTheme
 from users.serializers import UserSerializer
 
 
@@ -13,21 +15,10 @@ class MessageReactionSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
 
-class MessageReadSerializer(serializers.ModelSerializer):
-    """Serializer for message read receipts."""
-    user = UserSerializer(read_only=True)
-
-    class Meta:
-        model = MessageRead
-        fields = ['id', 'message', 'user', 'read_at']
-        read_only_fields = ['id', 'read_at']
-
-
 class MessageSerializer(serializers.ModelSerializer):
     """Serializer for messages."""
     sender = UserSerializer(read_only=True)
     reactions = MessageReactionSerializer(many=True, read_only=True)
-    read_receipts = MessageReadSerializer(many=True, read_only=True)
     reply_to_details = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
     read_status = serializers.SerializerMethodField()
@@ -36,7 +27,7 @@ class MessageSerializer(serializers.ModelSerializer):
         model = Message
         fields = [
             'id', 'conversation', 'sender', 'content', 'encrypted_content', 'is_encrypted',
-            'attachment', 'attachment_type', 'reply_to', 'reactions', 'read_receipts',
+            'attachment', 'attachment_type', 'reply_to', 'reactions',
             'reply_to_details', 'attachment_url', 'read_status', 'status', 'created_at', 'edited_at', 'is_deleted',
             'link_url', 'link_title', 'link_description', 'link_image', 'link_type'
         ]
@@ -55,38 +46,114 @@ class MessageSerializer(serializers.ModelSerializer):
         return None
 
     def get_read_status(self, obj):
-        """Get the read status of the message."""
+        """Get the read status of the message using ConversationMember.last_read_message."""
         request = self.context.get('request')
-
-        # Debug logging
-        import logging
-        logger = logging.getLogger(__name__)
 
         # If there's no request user, default to sent
         if not request or not request.user.is_authenticated:
-            logger.debug(f"Message {obj.id}: No request or auth, returning 'sent'")
             return 'sent'
 
         # If the current user sent this message, check if others have read it
         if obj.sender == request.user:
-            # Check if any other member has read this message
+            # Check if any other member has read this message using last_read_message
             other_members = obj.conversation.members.exclude(user=request.user)
             for member in other_members:
-                if obj.read_receipts.filter(user=member.user).exists():
-                    logger.debug(f"Message {obj.id}: Sender {request.user.id}, read by {member.user.id}, returning 'read'")
+                if member.last_read_message and member.last_read_message.id >= obj.id:
                     return 'read'
             # If no one has read it, it's just 'sent'
-            logger.debug(f"Message {obj.id}: Sender {request.user.id}, not read, returning 'sent'")
             return 'sent'
 
         # If the current user received this message, check if they've read it
-        if obj.read_receipts.filter(user=request.user).exists():
-            logger.debug(f"Message {obj.id}: Receiver {request.user.id} has read, returning 'read'")
+        member = obj.conversation.members.filter(user=request.user).first()
+        if member and member.last_read_message and member.last_read_message.id >= obj.id:
             return 'read'
 
         # For the receiver, if they see the message but haven't read it, it's 'delivered'
-        logger.debug(f"Message {obj.id}: Receiver {request.user.id} not read, returning 'delivered'")
         return 'delivered'
+
+
+class FileUploadValidator:
+    """Validator for file uploads with size, MIME type, and extension checks."""
+    
+    FILE_SIZE_LIMITS = {
+        'image': 10 * 1024 * 1024,      # 10MB for images
+        'video': 100 * 1024 * 1024,     # 100MB for videos
+        'audio': 25 * 1024 * 1024,      # 25MB for audio
+        'document': 50 * 1024 * 1024,    # 50MB for documents
+    }
+    
+    ALLOWED_TYPES = {
+        'image': ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
+        'video': ['video/mp4', 'video/webm', 'video/quicktime'],
+        'audio': ['audio/mpeg', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/aac'],
+        'document': ['application/pdf', 'text/plain', 'application/msword', 
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'application/vnd.ms-excel',
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+    }
+    
+    MIME_EXT_MAP = {
+        'image/jpeg': ['.jpg', '.jpeg'],
+        'image/png': ['.png'],
+        'image/gif': ['.gif'],
+        'image/webp': ['.webp'],
+        'image/svg+xml': ['.svg'],
+        'video/mp4': ['.mp4'],
+        'video/webm': ['.webm'],
+        'video/quicktime': ['.mov'],
+        'audio/mpeg': ['.mp3'],
+        'audio/wav': ['.wav'],
+        'audio/webm': ['.webm'],
+        'audio/ogg': ['.ogg'],
+        'audio/aac': ['.aac'],
+        'application/pdf': ['.pdf'],
+        'text/plain': ['.txt'],
+    }
+    
+    @classmethod
+    def validate(cls, file):
+        """Validate a file upload. Returns (is_valid, error_code, error_message, attachment_type)."""
+        if not file:
+            return False, 'NO_FILE', 'No file provided', None
+        
+        content_type = file.content_type.lower()
+        
+        # Determine attachment type and validate MIME type
+        attachment_type = None
+        max_size = None
+        
+        if content_type.startswith('image/'):
+            if content_type not in cls.ALLOWED_TYPES['image']:
+                return False, 'INVALID_IMAGE_TYPE', f'Image type {content_type} is not allowed. Allowed types: JPEG, PNG, GIF, WebP, SVG', None
+            attachment_type = 'image'
+            max_size = cls.FILE_SIZE_LIMITS['image']
+        elif content_type.startswith('video/'):
+            if content_type not in cls.ALLOWED_TYPES['video']:
+                return False, 'INVALID_VIDEO_TYPE', f'Video type {content_type} is not allowed. Allowed types: MP4, WebM, QuickTime', None
+            attachment_type = 'video'
+            max_size = cls.FILE_SIZE_LIMITS['video']
+        elif content_type.startswith('audio/'):
+            if content_type not in cls.ALLOWED_TYPES['audio']:
+                return False, 'INVALID_AUDIO_TYPE', f'Audio type {content_type} is not allowed. Allowed types: MP3, WAV, WebM, OGG, AAC', None
+            attachment_type = 'audio'
+            max_size = cls.FILE_SIZE_LIMITS['audio']
+        elif content_type in cls.ALLOWED_TYPES['document']:
+            attachment_type = 'document'
+            max_size = cls.FILE_SIZE_LIMITS['document']
+        else:
+            return False, 'INVALID_FILE_TYPE', f'File type {content_type} is not allowed', None
+        
+        # Validate file size
+        if file.size > max_size:
+            size_mb = max_size / (1024 * 1024)
+            return False, 'FILE_TOO_LARGE', f'File size exceeds {size_mb:.0f}MB limit for {attachment_type}s', attachment_type
+        
+        # Validate file extension matches MIME type
+        file_ext = os.path.splitext(file.name)[1].lower()
+        if content_type in cls.MIME_EXT_MAP and file_ext not in cls.MIME_EXT_MAP[content_type]:
+            return False, 'EXTENSION_MISMATCH', f'File extension {file_ext} does not match MIME type {content_type}', attachment_type
+        
+        return True, None, None, attachment_type
 
 
 class MessageCreateSerializer(serializers.ModelSerializer):

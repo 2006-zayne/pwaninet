@@ -3,50 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Messaging Architecture Test</title>
+    <title>Messaging Architecture Test - Message State System</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
         .success { color: green; }
         .error { color: red; }
-        .messages-container { 
-            max-height: 400px; 
-            overflow-y: auto; 
-            border: 1px solid #ccc; 
-            padding: 10px; 
+        .messages-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
             background: #f9f9f9;
         }
         .date-separator { text-align: center; margin: 10px 0; }
-        .date-separator span { 
-            background: #e0e0e0; 
-            padding: 4px 12px; 
-            border-radius: 12px; 
-            font-size: 12px; 
+        .date-separator span {
+            background: #e0e0e0;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
         }
-        .message-bubble { 
-            max-width: 70%; 
-            padding: 8px 12px; 
-            margin: 4px 0; 
-            border-radius: 18px; 
-            position: relative; 
+        .message-bubble {
+            max-width: 70%;
+            padding: 8px 12px;
+            margin: 4px 0;
+            border-radius: 18px;
+            position: relative;
         }
-        .sent { 
-            background: #cfd8dc; 
-            margin-left: auto; 
-            text-align: right; 
+        .sent {
+            background: #cfd8dc;
+            margin-left: auto;
+            text-align: right;
         }
-        .received { 
-            background: white; 
-            border: 1px solid #ddd; 
+        .received {
+            background: white;
+            border: 1px solid #ddd;
         }
-        .consecutive-message { 
-            border-top: 1px solid rgba(0,0,0,0.05); 
+        .consecutive-message {
+            border-top: 1px solid rgba(0,0,0,0.05);
         }
-        .message-time { 
-            font-size: 11px; 
-            opacity: 0.7; 
-            margin-top: 4px; 
+        .message-time {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 4px;
         }
+        .status-indicator {
+            display: inline-block;
+            margin-left: 8px;
+            font-size: 12px;
+        }
+        .check-circle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+        .check-circle.blue { background: #2196F3; color: white; }
+        .check-circle.grey { background: #9e9e9e; color: white; }
+        .check-circle.pending { background: #ff9800; color: white; }
+        .check-circle.error { background: #f44336; color: white; }
+        .check-circle.retrying { background: #ff9800; color: white; }
+        .check-circle.cancelled { background: #9e9e9e; color: white; }
+        .spinner {
+            width: 10px;
+            height: 10px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .state-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            margin-left: 8px;
+            background: #e0e0e0;
+        }
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        button {
+            padding: 8px 12px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            background: white;
+            border-radius: 4px;
+        }
+        button:hover { background: #f0f0f0; }
     </style>
 </head>
 <body>
@@ -70,7 +121,123 @@
         <button onclick="clearMessages()">Clear Messages</button>
     </div>
 
+    <div class="test-section">
+        <h2>Message State Testing</h2>
+        <div class="controls-grid">
+            <button onclick="simulateState('draft')">Simulate DRAFT</button>
+            <button onclick="simulateState('queued')">Simulate QUEUED</button>
+            <button onclick="simulateState('processing')">Simulate PROCESSING</button>
+            <button onclick="simulateState('uploading')">Simulate UPLOADING</button>
+            <button onclick="simulateState('sending')">Simulate SENDING</button>
+            <button onclick="simulateState('sent')">Simulate SENT</button>
+            <button onclick="simulateState('delivered')">Simulate DELIVERED</button>
+            <button onclick="simulateState('read')">Simulate READ</button>
+            <button onclick="simulateState('failed_upload')">Simulate FAILED_UPLOAD</button>
+            <button onclick="simulateState('failed_send')">Simulate FAILED_SEND</button>
+            <button onclick="simulateState('retrying')">Simulate RETRYING</button>
+            <button onclick="simulateState('cancelled')">Simulate CANCELLED</button>
+        </div>
+        <div style="margin-top: 15px;">
+            <button onclick="simulateOffline()">Simulate Offline</button>
+            <button onclick="simulateOnline()">Simulate Online</button>
+            <button onclick="simulateUploadFailure()">Simulate Upload Failure</button>
+            <button onclick="simulateWebSocketTimeout()">Simulate WebSocket Timeout</button>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>State Transition Testing</h2>
+        <div>
+            <label>Last Message ID: </label>
+            <input type="text" id="stateMessageId" placeholder="Enter message ID" style="width: 200px; padding: 5px;">
+            <select id="targetState" style="padding: 5px;">
+                <option value="">Select target state...</option>
+                <option value="draft">draft</option>
+                <option value="queued">queued</option>
+                <option value="processing">processing</option>
+                <option value="uploading">uploading</option>
+                <option value="sending">sending</option>
+                <option value="sent">sent</option>
+                <option value="delivered">delivered</option>
+                <option value="read">read</option>
+                <option value="failed_upload">failed_upload</option>
+                <option value="failed_send">failed_send</option>
+                <option value="retrying">retrying</option>
+                <option value="cancelled">cancelled</option>
+            </select>
+            <button onclick="transitionMessageState()">Transition State</button>
+        </div>
+        <div id="transitionResult" style="margin-top: 10px;"></div>
+    </div>
+
     <script>
+        // Unified Message State Enum
+        const MESSAGE_STATE = {
+            DRAFT: 'draft',
+            QUEUED: 'queued',
+            PROCESSING: 'processing',
+            UPLOADING: 'uploading',
+            SENDING: 'sending',
+            SENT: 'sent',
+            DELIVERED: 'delivered',
+            READ: 'read',
+            FAILED_UPLOAD: 'failed_upload',
+            FAILED_SEND: 'failed_send',
+            RETRYING: 'retrying',
+            CANCELLED: 'cancelled'
+        };
+
+        // Valid state transitions
+        const MESSAGE_STATE_TRANSITIONS = {
+            [MESSAGE_STATE.DRAFT]: [MESSAGE_STATE.QUEUED, MESSAGE_STATE.CANCELLED],
+            [MESSAGE_STATE.QUEUED]: [MESSAGE_STATE.PROCESSING, MESSAGE_STATE.SENDING, MESSAGE_STATE.CANCELLED],
+            [MESSAGE_STATE.PROCESSING]: [MESSAGE_STATE.UPLOADING, MESSAGE_STATE.SENDING, MESSAGE_STATE.FAILED_UPLOAD, MESSAGE_STATE.CANCELLED],
+            [MESSAGE_STATE.UPLOADING]: [MESSAGE_STATE.SENDING, MESSAGE_STATE.FAILED_UPLOAD, MESSAGE_STATE.CANCELLED],
+            [MESSAGE_STATE.SENDING]: [MESSAGE_STATE.SENT, MESSAGE_STATE.FAILED_SEND, MESSAGE_STATE.RETRYING],
+            [MESSAGE_STATE.SENT]: [MESSAGE_STATE.DELIVERED, MESSAGE_STATE.READ, MESSAGE_STATE.FAILED_SEND],
+            [MESSAGE_STATE.DELIVERED]: [MESSAGE_STATE.READ],
+            [MESSAGE_STATE.READ]: [],
+            [MESSAGE_STATE.FAILED_UPLOAD]: [MESSAGE_STATE.RETRYING, MESSAGE_STATE.CANCELLED],
+            [MESSAGE_STATE.FAILED_SEND]: [MESSAGE_STATE.RETRYING, MESSAGE_STATE.CANCELLED],
+            [MESSAGE_STATE.RETRYING]: [MESSAGE_STATE.SENDING, MESSAGE_STATE.FAILED_UPLOAD, MESSAGE_STATE.FAILED_SEND, MESSAGE_STATE.CANCELLED],
+            [MESSAGE_STATE.CANCELLED]: []
+        };
+
+        function isValidStateTransition(fromState, toState) {
+            if (!MESSAGE_STATE_TRANSITIONS[fromState]) {
+                return false;
+            }
+            return MESSAGE_STATE_TRANSITIONS[fromState].includes(toState);
+        }
+
+        function getStatusIcon(state, messageId) {
+            switch (state) {
+                case MESSAGE_STATE.DRAFT:
+                case MESSAGE_STATE.QUEUED:
+                case MESSAGE_STATE.PROCESSING:
+                    return '<span class="check-circle pending">🕐</span>';
+                case MESSAGE_STATE.UPLOADING:
+                    return '<span class="check-circle pending"><span class="spinner"></span></span>';
+                case MESSAGE_STATE.SENDING:
+                    return '<span class="check-circle pending">🕐</span>';
+                case MESSAGE_STATE.SENT:
+                    return '<span class="check-circle grey">✓</span>';
+                case MESSAGE_STATE.DELIVERED:
+                    return '<span class="check-circle blue">✓</span>';
+                case MESSAGE_STATE.READ:
+                    return '<span class="check-circle blue">✓</span>';
+                case MESSAGE_STATE.FAILED_UPLOAD:
+                case MESSAGE_STATE.FAILED_SEND:
+                    return '<span class="check-circle error">✗</span>';
+                case MESSAGE_STATE.RETRYING:
+                    return '<span class="check-circle retrying"><span class="spinner"></span></span>';
+                case MESSAGE_STATE.CANCELLED:
+                    return '<span class="check-circle cancelled">✕</span>';
+                default:
+                    return '<span class="check-circle grey">✓</span>';
+            }
+        }
+
         // Simplified MessagingManager for testing
         class TestMessagingManager {
             constructor() {
@@ -79,9 +246,13 @@
                 this.currentUserId = 'user1';
                 this.messageIdCounter = 1;
             }
-            
+
             // STATE LAYER
             addMessage(messageData) {
+                // Add default state if not provided
+                if (!messageData.state) {
+                    messageData.state = MESSAGE_STATE.SENT;
+                }
                 this.messages.push(messageData);
                 this.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
                 this.render();
@@ -178,14 +349,19 @@
                 messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} ${message.isConsecutive ? 'consecutive-message' : 'first-in-group'} ${message.isLastSent ? 'last-sent' : ''}`;
                 messageDiv.setAttribute('data-message-id', message.id);
                 messageDiv.setAttribute('data-sender-id', message.sender_id);
-                
+
+                const statusIcon = message.isOwn ? getStatusIcon(message.state, message.id) : '';
+                const stateBadge = message.isOwn ? `<span class="state-badge">${message.state}</span>` : '';
+
                 messageDiv.innerHTML = `
                     <p class="message-content">${message.content || ''}</p>
                     <div class="message-time">
                         ${new Date(message.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        ${statusIcon}
+                        ${stateBadge}
                     </div>
                 `;
-                
+
                 return messageDiv;
             }
         }
@@ -306,10 +482,11 @@
             const messages = [
                 { sender_id: 'user2', content: 'Hello there!', delay: 0 },
                 { sender_id: 'user1', content: 'Hi! How are you?', delay: 100 },
-                { sender_id: 'user2', content: 'I\\'m doing great, thanks!', delay: 200 },
+                { sender_id: 'user2', content: "I'm doing great, thanks!", delay: 200 },
                 { sender_id: 'user2', content: 'How about you?', delay: 300 },
-                { sender_id: 'user1', content: 'I\\'m good too!', delay: 400 },
+                { sender_id: 'user1', content: "I'm good too!", delay: 400 },
                 { sender_id: 'user1', content: 'Want to grab coffee?', delay: 500 }
+
             ];
             
             messages.forEach(msg => {
@@ -328,10 +505,132 @@
             testManager.messages = [];
             testManager.render();
         }
-        
+
+        // Message State Testing Functions
+        function simulateState(state) {
+            const lastMessage = testManager.messages[testManager.messages.length - 1];
+            if (lastMessage) {
+                const oldState = lastMessage.state;
+                if (isValidStateTransition(oldState, state)) {
+                    lastMessage.state = state;
+                    testManager.render();
+                    console.log(`State transition: ${oldState} -> ${state}`);
+                } else {
+                    console.error(`Invalid transition: ${oldState} -> ${state}`);
+                    alert(`Invalid transition: ${oldState} -> ${state}`);
+                }
+            } else {
+                // Add a new message with the specified state
+                testManager.addMessage({
+                    id: testManager.messageIdCounter++,
+                    sender_id: 'user1',
+                    content: `Test message in ${state} state`,
+                    created_at: new Date().toISOString(),
+                    state: state
+                });
+            }
+        }
+
+        function transitionMessageState() {
+            const messageId = document.getElementById('stateMessageId').value;
+            const targetState = document.getElementById('targetState').value;
+            const resultDiv = document.getElementById('transitionResult');
+
+            if (!messageId || !targetState) {
+                resultDiv.innerHTML = '<span class="error">Please enter message ID and select target state</span>';
+                return;
+            }
+
+            const message = testManager.messages.find(m => m.id == messageId);
+            if (!message) {
+                resultDiv.innerHTML = '<span class="error">Message not found</span>';
+                return;
+            }
+
+            const oldState = message.state;
+            if (isValidStateTransition(oldState, targetState)) {
+                message.state = targetState;
+                testManager.render();
+                resultDiv.innerHTML = `<span class="success">Transition successful: ${oldState} -> ${targetState}</span>`;
+            } else {
+                resultDiv.innerHTML = `<span class="error">Invalid transition: ${oldState} -> ${targetState}</span>`;
+            }
+        }
+
+        function simulateOffline() {
+            console.log('Simulating offline mode');
+            window.dispatchEvent(new Event('offline'));
+            alert('Offline mode simulated. Network requests will fail.');
+        }
+
+        function simulateOnline() {
+            console.log('Simulating online mode');
+            window.dispatchEvent(new Event('online'));
+            alert('Online mode simulated. Network requests will succeed.');
+        }
+
+        function simulateUploadFailure() {
+            console.log('Simulating upload failure');
+            const uploadingMessages = testManager.messages.filter(m => m.state === MESSAGE_STATE.UPLOADING);
+            if (uploadingMessages.length > 0) {
+                uploadingMessages.forEach(m => {
+                    m.state = MESSAGE_STATE.FAILED_UPLOAD;
+                });
+                testManager.render();
+                alert(`Upload failure simulated for ${uploadingMessages.length} message(s)`);
+            } else {
+                // Add a message and fail it
+                testManager.addMessage({
+                    id: testManager.messageIdCounter++,
+                    sender_id: 'user1',
+                    content: 'Test message with failed upload',
+                    created_at: new Date().toISOString(),
+                    state: MESSAGE_STATE.FAILED_UPLOAD
+                });
+                alert('Upload failure simulated (added new failed message)');
+            }
+        }
+
+        function simulateWebSocketTimeout() {
+            console.log('Simulating WebSocket timeout');
+            const sendingMessages = testManager.messages.filter(m => m.state === MESSAGE_STATE.SENDING);
+            if (sendingMessages.length > 0) {
+                sendingMessages.forEach(m => {
+                    m.state = MESSAGE_STATE.FAILED_SEND;
+                });
+                testManager.render();
+                alert(`WebSocket timeout simulated for ${sendingMessages.length} message(s)`);
+            } else {
+                // Add a message and fail it
+                testManager.addMessage({
+                    id: testManager.messageIdCounter++,
+                    sender_id: 'user1',
+                    content: 'Test message with failed send',
+                    created_at: new Date().toISOString(),
+                    state: MESSAGE_STATE.FAILED_SEND
+                });
+                alert('WebSocket timeout simulated (added new failed message)');
+            }
+        }
+
         // Run test on page load
         window.addEventListener('load', () => {
             testArchitecture();
+            // Add initial messages with different states for testing
+            testManager.addMessage({
+                id: testManager.messageIdCounter++,
+                sender_id: 'user2',
+                content: 'Hello! This is a received message',
+                created_at: new Date().toISOString(),
+                state: MESSAGE_STATE.READ
+            });
+            testManager.addMessage({
+                id: testManager.messageIdCounter++,
+                sender_id: 'user1',
+                content: 'This message is in SENT state',
+                created_at: new Date().toISOString(),
+                state: MESSAGE_STATE.SENT
+            });
         });
     </script>
 </body>

@@ -1,0 +1,199 @@
+/**
+ * Message Status Renderer
+ * Centralized component for rendering message status indicators
+ * Single source of truth for all status UI rendering
+ */
+
+import { MESSAGE_STATE } from './constants.js';
+
+export class MessageStatusRenderer {
+    /**
+     * Get status icon HTML for a given message state
+     * @param {string} state - Message state from MESSAGE_STATE enum
+     * @param {string} messageId - Message ID for retry button (optional)
+     * @returns {string} Icon HTML
+     */
+    static getStatusIcon(state, messageId = null, avatarUrl = null) {
+        const retryButton = messageId
+            ? `<button class="retry-button" data-message-id="${messageId}" title="Retry">&#8635;</button>`
+            : '';
+
+        switch (state) {
+            case MESSAGE_STATE.DRAFT:
+                return this._getClockIcon();
+
+            case MESSAGE_STATE.QUEUED:
+                return this._getClockIcon();
+
+            case MESSAGE_STATE.PROCESSING:
+                return this._getClockIcon();
+
+            case MESSAGE_STATE.UPLOADING:
+                return this._getUploadingIcon();
+
+            case MESSAGE_STATE.SENDING:
+                return this._getClockIcon();
+
+            case MESSAGE_STATE.SENT:
+                return this._getSingleCheckIcon('grey');
+
+            case MESSAGE_STATE.DELIVERED:
+                return this._getSingleCheckIcon('blue');
+
+            case MESSAGE_STATE.READ:
+                return this._getReadAvatar(avatarUrl);
+
+            case MESSAGE_STATE.FAILED_UPLOAD:
+                return this._getErrorIcon(retryButton);
+
+            case MESSAGE_STATE.FAILED_SEND:
+                return this._getErrorIcon(retryButton);
+
+            case MESSAGE_STATE.RETRYING:
+                return this._getSpinnerIcon();
+
+            case MESSAGE_STATE.CANCELLED:
+                return this._getCancelledIcon();
+
+            default:
+                return this._getSingleCheckIcon('grey');
+        }
+    }
+
+    /**
+     * Get status description for accessibility
+     * @param {string} state - Message state
+     * @returns {string} Status description
+     */
+    static getStatusDescription(state) {
+        const descriptions = {
+            [MESSAGE_STATE.DRAFT]: 'Draft - not yet sent',
+            [MESSAGE_STATE.QUEUED]: 'Queued - waiting to send',
+            [MESSAGE_STATE.PROCESSING]: 'Processing - preparing to send',
+            [MESSAGE_STATE.UPLOADING]: 'Uploading - uploading attachment',
+            [MESSAGE_STATE.SENDING]: 'Sending - message being sent',
+            [MESSAGE_STATE.SENT]: 'Sent - delivered to server',
+            [MESSAGE_STATE.DELIVERED]: 'Delivered - received by recipient',
+            [MESSAGE_STATE.READ]: 'Read - opened by recipient',
+            [MESSAGE_STATE.FAILED_UPLOAD]: 'Upload failed - tap to retry',
+            [MESSAGE_STATE.FAILED_SEND]: 'Send failed - tap to retry',
+            [MESSAGE_STATE.RETRYING]: 'Retrying - attempting to resend',
+            [MESSAGE_STATE.CANCELLED]: 'Cancelled - message not sent'
+        };
+
+        return descriptions[state] || 'Unknown status';
+    }
+
+    /**
+     * Check if state is a failure state
+     * @param {string} state - Message state
+     * @returns {boolean} True if failure state
+     */
+    static isFailureState(state) {
+        return state === MESSAGE_STATE.FAILED_UPLOAD || 
+               state === MESSAGE_STATE.FAILED_SEND;
+    }
+
+    /**
+     * Check if state is a retryable failure
+     * @param {string} state - Message state
+     * @returns {boolean} True if retryable
+     */
+    static isRetryable(state) {
+        return this.isFailureState(state);
+    }
+
+    /**
+     * Check if state shows progress indicator
+     * @param {string} state - Message state
+     * @returns {boolean} True if showing progress
+     */
+    static isProgressState(state) {
+        return [
+            MESSAGE_STATE.DRAFT,
+            MESSAGE_STATE.QUEUED,
+            MESSAGE_STATE.PROCESSING,
+            MESSAGE_STATE.UPLOADING,
+            MESSAGE_STATE.SENDING,
+            MESSAGE_STATE.RETRYING
+        ].includes(state);
+    }
+
+    /**
+     * Check if state is terminal (no further transitions)
+     * @param {string} state - Message state
+     * @returns {boolean} True if terminal
+     */
+    static isTerminalState(state) {
+        return state === MESSAGE_STATE.READ || 
+               state === MESSAGE_STATE.CANCELLED;
+    }
+
+    // === Private icon helpers ===
+
+    static _getClockIcon() {
+        // WhatsApp-style clock icon: outlined circle with two clock hands
+        return `<svg class="check-circle pending" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Waiting">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>`;
+    }
+
+    static _getUploadingIcon() {
+        return '<span class="check-circle uploading" aria-label="Uploading"><span class="upload-icon">&#8683;</span></span>';
+    }
+
+    static _getSingleCheckIcon(color) {
+        // Filled blue circle with white checkmark for delivered
+        // Hollow grey circle with grey checkmark for sent
+        if (color === 'blue') {
+            return `<svg class="check-circle blue" width="18" height="18" viewBox="0 0 24 24" fill="#2196F3" aria-label="Delivered">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9 12l2 2 4-4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"></path>
+            </svg>`;
+        } else {
+            return `<svg class="check-circle grey" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9e9e9e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Sent">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9 12l2 2 4-4" stroke="#9e9e9e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"></path>
+            </svg>`;
+        }
+    }
+
+    static _getErrorIcon(retryButton) {
+        return `<span class="check-circle error" aria-label="Failed">&#10007;</span>${retryButton}`;
+    }
+
+    static _getSpinnerIcon() {
+        return '<span class="check-circle retrying" aria-label="Retrying"><span class="spinner"></span></span>';
+    }
+
+    static _getCancelledIcon() {
+        return '<span class="check-circle cancelled" aria-label="Cancelled">&#10005;</span>';
+    }
+
+    static _getReadAvatar(avatarUrl) {
+        // Read state is avatar-only, no checkmarks
+        if (!avatarUrl) {
+            return `<span class="check-circle read-avatar" aria-label="Read">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2196F3" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 8v4l3 3"></path>
+                </svg>
+            </span>`;
+        }
+        return `<span class="check-circle read-avatar" aria-label="Read">
+            <img src="${avatarUrl}" alt="Read" width="18" height="18" style="border-radius: 50%;">
+        </span>`;
+    }
+}
+
+/**
+ * Convenience function for direct usage
+ * @param {string} state - Message state
+ * @param {string} messageId - Message ID (optional)
+ * @param {string} avatarUrl - Avatar URL for read state (optional)
+ * @returns {string} Icon HTML
+ */
+export function renderMessageStatus(state, messageId = null, avatarUrl = null) {
+    return MessageStatusRenderer.getStatusIcon(state, messageId, avatarUrl);
+}

@@ -42,10 +42,10 @@ class Conversation(models.Model):
         if not last_msg or last_msg.sender != user:
             return None
 
-        # Check if any other member has read this message
+        # Check if any other member has read this message using ConversationMember.last_read_message
         other_members = self.members.exclude(user=user)
         for member in other_members:
-            if MessageRead.objects.filter(message=last_msg, user=member.user).exists():
+            if member.last_read_message and member.last_read_message.id >= last_msg.id:
                 return 'read'
 
         # If message exists but hasn't been read yet, it's just 'sent'
@@ -190,31 +190,6 @@ class Message(models.Model):
         return f"Message from {self.sender.username}: {preview}"
 
 
-class MessageRead(models.Model):
-    """Per-user read receipts for messages."""
-    message = models.ForeignKey(
-        Message,
-        on_delete=models.CASCADE,
-        related_name='read_receipts'
-    )
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='message_reads'
-    )
-    read_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ('message', 'user')
-        indexes = [
-            models.Index(fields=['message', 'user']),
-            models.Index(fields=['user', 'read_at']),
-        ]
-
-    def __str__(self):
-        return f"{self.user.username} read message {self.message.id}"
-
-
 class MessageReaction(models.Model):
     """Reaction model for messages."""
     message = models.ForeignKey(
@@ -239,6 +214,126 @@ class MessageReaction(models.Model):
 
     def __str__(self):
         return f"{self.user.username} reacted {self.emoji} to message {self.message.id}"
+
+
+class PendingMessage(models.Model):
+    """Queue for outgoing messages with unified state machine."""
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('queued', 'Queued'),
+        ('uploading', 'Uploading'),
+        ('sending', 'Sending'),
+        ('sent', 'Sent'),
+        ('delivered', 'Delivered'),
+        ('read', 'Read'),
+        ('failed', 'Failed'),
+        ('retrying', 'Retrying'),
+    ]
+
+    MESSAGE_TYPE_CHOICES = [
+        ('text', 'Text'),
+        ('image', 'Image'),
+        ('video', 'Video'),
+        ('audio', 'Audio'),
+        ('document', 'Document'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='pending_messages'
+    )
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name='pending_messages'
+    )
+    temp_id = models.CharField(max_length=100, unique=True, db_index=True)
+    message_type = models.CharField(
+        max_length=20,
+        choices=MESSAGE_TYPE_CHOICES,
+        default='text'
+    )
+    content = models.TextField(blank=True, null=True)
+    encrypted_content = models.TextField(blank=True, null=True)
+    is_encrypted = models.BooleanField(default=False)
+    reply_to_id = models.IntegerField(null=True, blank=True)
+    
+    # Attachment fields
+    attachment = models.FileField(
+        upload_to='pending_attachments/%Y/%m/%d/',
+        null=True,
+        blank=True
+    )
+    attachment_type = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True
+    )
+    attachment_url = models.URLField(max_length=2048, null=True, blank=True)  # For uploaded attachment URL
+    
+    # Media preview fields
+    media_metadata = models.JSONField(default=dict, blank=True)  # Stores crop, rotation, trim data
+    
+    # Link fields
+    link_url = models.URLField(max_length=2048, null=True, blank=True)
+    link_title = models.CharField(max_length=500, null=True, blank=True)
+    link_description = models.TextField(null=True, blank=True)
+    link_image = models.URLField(max_length=2048, null=True, blank=True)
+    link_type = models.CharField(max_length=50, null=True, blank=True)
+    
+    # State machine fields
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='draft'
+    )
+    retry_count = models.IntegerField(default=0)
+    max_retries = models.IntegerField(default=3)
+    last_error = models.TextField(blank=True, null=True)
+    
+    # Sync fields
+    server_message_id = models.IntegerField(null=True, blank=True, db_index=True)  # Maps to actual Message.id after send
+    synced_at = models.DateTimeField(null=True, blank=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    queued_at = models.DateTimeField(null=True, blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'status']),
+            models.Index(fields=['conversation', 'status']),
+            models.Index(fields=['temp_id']),
+            models.Index(fields=['server_message_id']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['status', 'created_at']),
+        ]
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"PendingMessage {self.temp_id} ({self.status}) for user {self.user.username}"
+    
+    def can_retry(self):
+        """Check if message can be retried."""
+        return self.retry_count < self.max_retries and self.status in ['failed', 'retrying']
+    
+    def transition_to(self, new_status):
+        """Transition to new status with timestamp updates."""
+        old_status = self.status
+        self.status = new_status
+        
+        if new_status == 'queued' and not self.queued_at:
+            self.queued_at = timezone.now()
+        elif new_status == 'sent' and not self.sent_at:
+            self.sent_at = timezone.now()
+        elif new_status in ['sent', 'delivered', 'read'] and not self.synced_at:
+            self.synced_at = timezone.now()
+        
+        self.save()
+        return old_status
 
 
 class ConversationTheme(models.Model):

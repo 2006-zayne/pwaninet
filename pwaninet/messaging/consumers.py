@@ -4,8 +4,9 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 from pwaninet.redis_client import get_redis_client
-from .models import Conversation, ConversationMember, Message
+from .models import Conversation, ConversationMember, Message, PendingMessage
 from .ws_middleware import WebSocketRateLimiter, WebSocketConnectionTracker
+from .observability import metrics
 
 # ARCHITECTURAL RULE:
 # Each WebSocket consumer must have a single source of truth file.
@@ -68,6 +69,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         connection_count = WebSocketConnectionTracker.get_connection_count(self.user_id)
 
+        # Record reconnect metrics if this is a reconnection
+        if connection_count > 1:
+            metrics.record_websocket_reconnect(self.user_id, self.conversation_id)
+
         if connection_count == 1:
             await self.set_user_online(True)
 
@@ -96,6 +101,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         self.heartbeat_task = asyncio.create_task(self.heartbeat_loop())
         await self.send_peer_online_status()
+        
+        # Record active connection
+        metrics.record_active_connection(self.user_id, self.conversation_id, 'connect')
+        
+        # Retry pending messages on reconnect
+        await self.retry_pending_messages()
    
 
     async def disconnect(self, close_code):
@@ -103,6 +114,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Safe guard: ensure user_id exists
         user_id = getattr(self, "user_id", None)
+        conversation_id = getattr(self, "conversation_id", None)
         if not user_id:
             return
 
@@ -132,6 +144,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Debug logging
         print(f"[TRACKER] User {user_id} connections after disconnect: {connection_count}")
+
+        # Record disconnect metrics
+        if conversation_id:
+            metrics.record_active_connection(user_id, conversation_id, 'disconnect')
 
         # Only mark offline when connection count is 0
         if connection_count == 0:
@@ -221,7 +237,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }))
 
     async def handle_chat_message(self, data):
-        """Handle incoming chat message."""
+        """Handle incoming chat message with retry logic and latency tracking."""
         content = data.get('content')
         encrypted_content = data.get('encrypted_content')
         is_encrypted = data.get('is_encrypted', False)
@@ -241,44 +257,62 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not content and not encrypted_content and not attachment and not link_url:
             return
 
-        # Create message in database
-        message = await self.create_message(content, encrypted_content, is_encrypted, reply_to_id, attachment, attachment_type, link_url, link_title, link_description, link_image, link_type)
+        # Track message latency
+        start_time = asyncio.get_event_loop().time()
 
-        # Add temp_id to message for client-side optimistic update matching
-        if temp_id:
-            message['temp_id'] = temp_id
+        try:
+            # Create message in database
+            message = await self.create_message(content, encrypted_content, is_encrypted, reply_to_id, attachment, attachment_type, link_url, link_title, link_description, link_image, link_type)
 
-        # Broadcast to room group
-        print(f'[BACKEND] Broadcasting message {message["id"]} to room group: {self.room_group_name}')
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'chat_message',
-                'message': message
-            }
-        )
-        print(f'[BACKEND] Message {message["id"]} broadcasted to room group')
-        
-        # Update message status to 'delivered' since it was broadcast to the room
-        await self.update_message_status(message['id'], 'delivered')
-        
-        # Broadcast conversation update to other members (not sender) for real-time list updates
-        await self.broadcast_conversation_update_to_others(message)
-        
-        # FIX 1: Broadcast "delivered" status to other members (not the sender)
-        # This ensures sent → delivered transition when receiver is online
-        other_members = await self.get_other_conversation_members()
-        for other_member_id in other_members:
-            if other_member_id != self.user.id:
-                await self.channel_layer.group_send(
-                    self.room_group_name,
-                    {
-                        'type': 'message_delivered',
-                        'message_id': message['id'],
-                        'user_id': other_member_id,
-                        'status': 'delivered'
-                    }
-                )
+            # Add temp_id to message for client-side optimistic update matching
+            if temp_id:
+                message['temp_id'] = temp_id
+
+            # Broadcast to room group
+            print(f'[BACKEND] Broadcasting message {message["id"]} to room group: {self.room_group_name}')
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'chat_message',
+                    'message': message
+                }
+            )
+            print(f'[BACKEND] Message {message["id"]} broadcasted to room group')
+            
+            # Calculate and record latency
+            end_time = asyncio.get_event_loop().time()
+            latency_ms = (end_time - start_time) * 1000
+            metrics.record_message_latency(self.user.id, self.conversation_id, latency_ms)
+            
+            # Update message status to 'delivered' since it was broadcast to the room
+            await self.update_message_status(message['id'], 'delivered')
+            
+            # Broadcast conversation update to other members (not sender) for real-time list updates
+            await self.broadcast_conversation_update_to_others(message)
+            
+            # Broadcast "delivered" status to other members (not the sender)
+            other_members = await self.get_other_conversation_members()
+            for other_member_id in other_members:
+                if other_member_id != self.user.id:
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            'type': 'message_delivered',
+                            'message_id': message['id'],
+                            'user_id': other_member_id,
+                            'status': 'delivered'
+                        }
+                    )
+            
+            # Mark any pending message with this temp_id as sent
+            if temp_id:
+                await self.mark_pending_message_sent(temp_id)
+                
+        except Exception as e:
+            print(f'[BACKEND] Error sending message: {e}')
+            # Persist failed message for retry
+            if temp_id:
+                await self.persist_failed_message(data, str(e))
 
     async def handle_typing_indicator(self, data):
         """Handle typing indicator."""
@@ -440,18 +474,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def mark_message_as_read(self, message_id):
-        """Mark a message as read for the current user."""
+        """Mark a message as read for the current user using ConversationMember.last_read_message."""
         try:
-            from .models import MessageRead
             message = Message.objects.get(id=message_id)
 
-            # Create read receipt
-            MessageRead.objects.get_or_create(
-                message=message,
-                user=self.user
-            )
-
-            # Update member's last read message
+            # Update member's last read message (replaces per-message read receipts)
             member = message.conversation.members.filter(user=self.user).first()
             if member:
                 member.last_read_message = message
@@ -701,3 +728,110 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 redis_client.delete(key)
         except Exception:
             pass
+
+    async def retry_pending_messages(self):
+        """Retry pending messages for this user and conversation."""
+        try:
+            pending_messages = await database_sync_to_async(
+                lambda: list(PendingMessage.objects.filter(
+                    user=self.user,
+                    conversation_id=self.conversation_id,
+                    status='pending'
+                ).select_related('conversation')[:10])  # Limit to 10 retries per reconnect
+            )()
+            
+            for pending in pending_messages:
+                print(f'[BACKEND] Retrying pending message {pending.temp_id}')
+                try:
+                    # Reconstruct message data
+                    data = {
+                        'content': pending.content,
+                        'encrypted_content': pending.encrypted_content,
+                        'is_encrypted': pending.is_encrypted,
+                        'reply_to': pending.reply_to_id,
+                        'attachment': pending.attachment.name if pending.attachment else None,
+                        'attachment_type': pending.attachment_type,
+                        'link_url': pending.link_url,
+                        'link_title': pending.link_title,
+                        'link_description': pending.link_description,
+                        'link_image': pending.link_image,
+                        'link_type': pending.link_type,
+                        'temp_id': pending.temp_id
+                    }
+                    
+                    # Try to send the message again
+                    await self.handle_chat_message(data)
+                    
+                    # If successful, increment retry count and mark as sent
+                    await database_sync_to_async(
+                        lambda: PendingMessage.objects.filter(id=pending.id).update(
+                            status='sent',
+                            retry_count=pending.retry_count + 1
+                        )
+                    )()
+                    
+                except Exception as e:
+                    print(f'[BACKEND] Failed to retry pending message {pending.temp_id}: {e}')
+                    # Update retry count and error
+                    await database_sync_to_async(
+                        lambda: PendingMessage.objects.filter(id=pending.id).update(
+                            retry_count=pending.retry_count + 1,
+                            last_error=str(e)
+                        )
+                    )()
+                    
+        except Exception as e:
+            print(f'[BACKEND] Error retrying pending messages: {e}')
+
+    async def persist_failed_message(self, data, error):
+        """Persist a failed message to the queue for retry."""
+        try:
+            # Check if pending message already exists (prevent duplicates)
+            temp_id = data.get('temp_id')
+            if not temp_id:
+                return
+                
+            existing = await database_sync_to_async(
+                PendingMessage.objects.filter(temp_id=temp_id).exists
+            )()
+            
+            if existing:
+                print(f'[BACKEND] Pending message {temp_id} already exists, skipping')
+                return
+            
+            # Create pending message
+            await database_sync_to_async(
+                PendingMessage.objects.create
+            )(
+                user=self.user,
+                conversation_id=self.conversation_id,
+                temp_id=temp_id,
+                content=data.get('content'),
+                encrypted_content=data.get('encrypted_content'),
+                is_encrypted=data.get('is_encrypted', False),
+                reply_to_id=data.get('reply_to'),
+                attachment=data.get('attachment'),
+                attachment_type=data.get('attachment_type'),
+                link_url=data.get('link_url'),
+                link_title=data.get('link_title'),
+                link_description=data.get('link_description'),
+                link_image=data.get('link_image'),
+                link_type=data.get('link_type'),
+                status='pending',
+                last_error=error
+            )
+            
+            print(f'[BACKEND] Persisted failed message {temp_id} for retry')
+            
+        except Exception as e:
+            print(f'[BACKEND] Error persisting failed message: {e}')
+
+    async def mark_pending_message_sent(self, temp_id):
+        """Mark a pending message as successfully sent."""
+        try:
+            await database_sync_to_async(
+                PendingMessage.objects.filter(temp_id=temp_id).update
+            )(status='sent')
+            print(f'[BACKEND] Marked pending message {temp_id} as sent')
+        except Exception as e:
+            print(f'[BACKEND] Error marking pending message as sent: {e}')

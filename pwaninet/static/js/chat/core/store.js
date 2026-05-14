@@ -4,7 +4,7 @@
  * All mutations MUST go through explicit store methods
  */
 
-import { CONNECTION_STATE, UI_STATE } from '../shared/constants.js';
+import { CONNECTION_STATE, UI_STATE, MESSAGE_STATE } from '../shared/constants.js';
 
 // CANONICAL MESSAGE SCHEMA - All modules MUST conform to this
 export const MESSAGE_SCHEMA = {
@@ -12,9 +12,9 @@ export const MESSAGE_SCHEMA = {
     conversationId: 'number',         // Conversation identifier
     senderId: 'number',              // Sender identifier
     timestamp: 'string',             // ISO timestamp
-    status: 'string',                // sent | delivered | read | failed
+    status: 'string',                // MESSAGE_STATE enum values only
     content: 'string',               // Message content
-    type: 'string',                  // text | media | system | emoji
+    type: 'string',                  // text | media | system | emoji | link
     metadata: 'object',              // Additional data (media info, reactions, etc.)
     isOptimistic: 'boolean',         // Temporary optimistic state
     sortOrder: 'number'              // Deterministic ordering
@@ -386,14 +386,17 @@ export class Store {
         }
 
         // Type validation
+        const validStates = Object.values(MESSAGE_STATE);
+        const validTypes = ['text', 'media', 'system', 'emoji', 'link'];
+        
         const validation = {
             id: typeof message.id === 'string',
             conversationId: typeof message.conversationId === 'number',
             senderId: typeof message.senderId === 'number',
             timestamp: typeof message.timestamp === 'string',
-            status: ['sent', 'delivered', 'read', 'failed'].includes(message.status),
+            status: validStates.includes(message.status),
             content: typeof message.content === 'string',
-            type: ['text', 'media', 'system', 'emoji'].includes(message.type),
+            type: validTypes.includes(message.type),
             isOptimistic: typeof message.isOptimistic === 'boolean',
             sortOrder: typeof message.sortOrder === 'number'
         };

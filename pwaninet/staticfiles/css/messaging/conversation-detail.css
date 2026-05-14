@@ -426,6 +426,43 @@ div.chat-container div.messages-area div.message-bubble {
   border: 1px solid #ef9a9a;
 }
 
+/* Draft: Grey circle with clock icon */
+.message-read-receipt.status-draft .check-circle,
+.message-read-receipt.status-queued .check-circle,
+.message-read-receipt.status-sending .check-circle,
+.message-read-receipt.status-retrying .check-circle {
+  background-color: #e0e0e0;
+  color: #666;
+  border: 1px solid #ccc;
+}
+
+/* Clock icon for pending states */
+.check-circle.pending {
+  background-color: #e0e0e0;
+  color: #666;
+  border: 1px solid #ccc;
+}
+
+.clock-icon {
+  font-size: 8px;
+}
+
+/* Retry button styling */
+.retry-button {
+  background: none;
+  border: none;
+  color: #d32f2f;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 4px;
+  padding: 2px;
+  transition: transform 0.2s;
+}
+
+.retry-button:hover {
+  transform: rotate(180deg);
+}
+
 /* Checkmark styling inside circle */
 .check-mark {
   font-weight: bold;
@@ -1853,5 +1890,3 @@ body {
     grid-template-columns: repeat(6, 1fr);
   }
 }
-</style>
-<link rel="stylesheet" href="{% static 'css/chat_theme.css' %}">

@@ -8,6 +8,7 @@ import { store } from '../core/store.js';
 import { messageService } from '../core/message-service.js';
 import { MessageRenderer } from './renderer.js';
 import { contextMenuService } from '../features/context-menu/context-menu.service.js';
+import { messageSoundManager } from '../shared/message-sound.js';
 
 export class UIController {
     constructor() {
@@ -15,6 +16,7 @@ export class UIController {
         this.unsubscribe = null;
         this.debugMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         this.lastState = null;
+        this.audioInitialized = false;
     }
 
     /**
@@ -99,13 +101,32 @@ export class UIController {
      * Setup UI event handlers (user interactions only)
      */
     _setupUIEventHandlers() {
+        this._log('SETUP_UI_EVENT_HANDLERS');
+
+        // Message retry handler
+        window.addEventListener('messageRetry', (event) => {
+            this._log('MESSAGE_RETRY_EVENT', event.detail);
+            this._handleMessageRetry(event.detail);
+        });
+
         // Message input handler
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendBtn');
 
         if (messageInput) {
+            // Initialize audio context on first user interaction (browser autoplay policy)
+            const initAudioOnInteraction = () => {
+                if (!this.audioInitialized) {
+                    messageSoundManager.init().catch(err => {
+                        console.warn('[UI_CONTROLLER] Failed to init audio:', err);
+                    });
+                    this.audioInitialized = true;
+                }
+            };
+
             // Keyboard events
             messageInput.addEventListener('keypress', (e) => {
+                initAudioOnInteraction();
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     this._handleSendMessage(messageInput.value);
@@ -114,6 +135,7 @@ export class UIController {
             });
 
             messageInput.addEventListener('input', () => {
+                initAudioOnInteraction();
                 // Auto-expand textarea (pure UI behavior)
                 messageInput.style.height = 'auto';
                 const newHeight = Math.min(messageInput.scrollHeight, 120);
@@ -125,31 +147,43 @@ export class UIController {
 
             // Touch events for mobile devices
             messageInput.addEventListener('touchstart', () => {
+                initAudioOnInteraction();
                 this._handleTyping();
             });
 
             messageInput.addEventListener('focus', () => {
+                initAudioOnInteraction();
                 this._handleTyping();
             });
         }
-
+        
         if (sendButton) {
             sendButton.addEventListener('click', () => {
+                // Initialize audio context on send button click
+                if (!this.audioInitialized) {
+                    messageSoundManager.init().catch(err => {
+                        console.warn('[UI_CONTROLLER] Failed to init audio:', err);
+                    });
+                    this.audioInitialized = true;
+                }
                 this._handleSendMessage(messageInput.value);
             });
         }
-
-        // Connection status click to reconnect
-        const statusElement = document.getElementById('chatStatus');
-        if (statusElement) {
-            statusElement.addEventListener('click', () => {
-                if (!store.isConnected()) {
-                    this._handleReconnect();
-                }
-            });
+    }
+    
+    /**
+     * Handle message retry
+     * @param {Object} detail - Event detail with messageId
+     */
+    async _handleMessageRetry(detail) {
+        const { messageId } = detail;
+        this._log('HANDLE_MESSAGE_RETRY', { messageId });
+        
+        try {
+            await messageService.retryMessage(messageId);
+        } catch (error) {
+            console.error('[UI_CONTROLLER] Retry failed:', error);
         }
-
-        this._log('UI_EVENT_HANDLERS_SETUP');
     }
 
     /**

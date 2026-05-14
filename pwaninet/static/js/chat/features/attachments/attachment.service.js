@@ -6,10 +6,23 @@
 import { EVENTS } from '../../shared/constants.js';
 import { eventBus } from '../../core/event-bus.js';
 import { isImageFile, isVideoFile, isAudioFile } from '../../shared/utils.js';
+import { messageService } from '../../core/message-service.js';
 
 export class AttachmentService {
   constructor() {
     this.selectedFile = null;
+    
+    // Unified message state machine (sync with message-service.js)
+    this.MESSAGE_STATES = {
+      DRAFT: 'draft',
+      QUEUED: 'queued',
+      SENDING: 'sending',
+      SENT: 'sent',
+      DELIVERED: 'delivered',
+      READ: 'read',
+      FAILED: 'failed',
+      RETRYING: 'retrying'
+    };
   }
 
   /**
@@ -73,8 +86,8 @@ export class AttachmentService {
     formData.append('conversation_id', conversationId);
 
     try {
-      // Emit upload start event
-      eventBus.emit(EVENTS.ATTACHMENT_UPLOAD_START, { file });
+      // Emit upload start event (QUEUED state)
+      eventBus.emit(EVENTS.ATTACHMENT_UPLOAD_START, { file, status: this.MESSAGE_STATES.QUEUED });
 
       // Upload file to messaging app endpoint
       const response = await fetch('/messaging/api/attachments/upload/', {
@@ -87,14 +100,14 @@ export class AttachmentService {
 
       if (response.ok) {
         const data = await response.json();
-        eventBus.emit(EVENTS.ATTACHMENT_UPLOAD_SUCCESS, data);
+        eventBus.emit(EVENTS.ATTACHMENT_UPLOAD_SUCCESS, { ...data, status: this.MESSAGE_STATES.SENT });
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Upload failed');
       }
     } catch (error) {
       console.error('Attachment upload error:', error);
-      eventBus.emit(EVENTS.ATTACHMENT_ERROR, error);
+      eventBus.emit(EVENTS.ATTACHMENT_ERROR, { ...error, status: this.MESSAGE_STATES.FAILED });
     }
   }
 

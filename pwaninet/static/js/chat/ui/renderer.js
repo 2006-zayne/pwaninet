@@ -5,6 +5,7 @@
  */
 
 import { formatDateLabel, formatTime, escapeHtml } from '../shared/utils.js';
+import { renderMessageStatus } from '../shared/message-status-renderer.js';
 
 export class MessageRenderer {
     constructor() {
@@ -141,9 +142,33 @@ export class MessageRenderer {
             this.lastRenderedCount = messages.length;
             this._scrollToBottom();
 
+            // Add event listeners for retry buttons
+            this._attachRetryButtonListeners();
+
         } finally {
             this.isRendering = false;
         }
+    }
+    
+    /**
+     * Attach event listeners for retry buttons
+     */
+    _attachRetryButtonListeners() {
+        const retryButtons = this.container.querySelectorAll('.retry-button');
+        retryButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const messageId = button.getAttribute('data-message-id');
+                this._log('RETRY_BUTTON_CLICKED', { messageId });
+                
+                // Emit event for UI controller to handle retry
+                const event = new CustomEvent('messageRetry', {
+                    detail: { messageId }
+                });
+                window.dispatchEvent(event);
+            });
+        });
     }
         /**
      * Build view from messages (pure data transformation)
@@ -337,9 +362,11 @@ export class MessageRenderer {
                     receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
                     metaDiv.appendChild(receiptSpan);
                 } else if (message.isLastSent && !message.hideReadReceipt) {
+                    // Show status only on last sent message
                     const receiptSpan = document.createElement('span');
                     receiptSpan.className = `message-read-receipt status-${status}`;
-                    receiptSpan.innerHTML = this._getStatusIcon(status);
+                    const avatarUrl = message.metadata?.read_avatar || null;
+                    receiptSpan.innerHTML = this._getStatusIcon(status, message.id, avatarUrl);
                     metaDiv.appendChild(receiptSpan);
                 }
             } else if (message.hasFloatingReadReceipt) {
@@ -362,21 +389,12 @@ export class MessageRenderer {
     /**
      * Get status icon (pure data transformation)
      * @param {string} status - Message status from canonical schema
+     * @param {string} messageId - Message ID for retry button
      * @returns {string} Icon HTML - checkmark inside circle
+     * @deprecated Use renderMessageStatus from message-status-renderer.js instead
      */
-    _getStatusIcon(status) {
-        // Single checkmark inside circle
-        const singleCheck = '<span class="check-circle"><span class="check-mark">&#10003;</span></span>';
-        // Double checkmark inside circle (for delivered/read before avatar)
-        const doubleCheck = '<span class="check-circle"><span class="check-mark double">&#10003;&#10003;</span></span>';
-        
-        switch (status) {
-            case 'sent': return singleCheck;
-            case 'delivered': return doubleCheck;
-            case 'read': return doubleCheck; // Will be replaced by avatar, but fallback
-            case 'failed': return '<span class="check-circle error">&#10007;</span>';
-            default: return singleCheck;
-        }
+    _getStatusIcon(status, messageId) {
+        return renderMessageStatus(status, messageId);
     }
 
     /**

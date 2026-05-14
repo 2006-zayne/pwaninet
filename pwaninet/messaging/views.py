@@ -15,7 +15,7 @@ from asgiref.sync import async_to_sync
 import requests
 from urllib.parse import urlparse
 import re
-from .models import Conversation, ConversationMember, Message, MessageRead, MessageReaction, ConversationTheme
+from .models import Conversation, ConversationMember, Message, MessageReaction, ConversationTheme
 from .serializers import (
     ConversationSerializer,
     ConversationDetailSerializer,
@@ -23,11 +23,13 @@ from .serializers import (
     MessageSerializer,
     MessageCreateSerializer,
     MessageUpdateSerializer,
-    MessageReadSerializer,
     MessageReactionSerializer,
     ConversationThemeSerializer,
-    ConversationThemeCreateUpdateSerializer
+    ConversationThemeCreateUpdateSerializer,
+    FileUploadValidator
 )
+from .pagination import BeforeMessageIdPagination
+from .observability import metrics
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
@@ -183,8 +185,7 @@ class MessageViewSet(viewsets.ModelViewSet):
             'conversation',
             'reply_to'
         ).prefetch_related(
-            'reactions',
-            'read_receipts'
+            'reactions'
         ).distinct()
 
     def get_serializer_class(self):
@@ -227,7 +228,7 @@ class MessageViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def mark_read(self, request, pk=None):
-        """Mark a message as read for the current user."""
+        """Mark a message as read for the current user using ConversationMember.last_read_message."""
         message = self.get_object()
         
         # Check if user is a member of the conversation
@@ -237,20 +238,14 @@ class MessageViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Create or update read receipt
-        read_receipt, created = MessageRead.objects.get_or_create(
-            message=message,
-            user=request.user
-        )
-        
-        # Update member's last read message
+        # Update member's last read message (this replaces per-message read receipts)
         member = message.conversation.members.filter(user=request.user).first()
         if member:
             member.last_read_message = message
             member.save()
         
         return Response(
-            MessageReadSerializer(read_receipt).data,
+            {'status': 'marked as read', 'message_id': message.id},
             status=status.HTTP_200_OK
         )
 
@@ -292,6 +287,57 @@ class MessageViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED
         )
 
+    @action(detail=False, methods=['get'])
+    def paginated(self, request):
+        """
+        Get paginated messages for a conversation using cursor-based pagination.
+        Uses before_message_id cursor strategy for efficient message history loading.
+        
+        Query parameters:
+            - conversation_id: Required ID of the conversation
+            - before_message_id: Optional cursor to load messages older than this ID
+            - limit: Number of messages to return (default 30, max 100)
+        
+        Returns:
+            - results: List of messages (newest first)
+            - has_more: Whether there are older messages available
+            - next_cursor: The before_message_id for the next page
+            - count: Number of messages in this batch
+        """
+        conversation_id = request.query_params.get('conversation_id')
+        
+        if not conversation_id:
+            return Response(
+                {'error': 'conversation_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verify user is a member of the conversation
+        conversation = get_object_or_404(
+            Conversation,
+            id=conversation_id,
+            members__user=request.user
+        )
+        
+        # Get messages for this conversation
+        messages = Message.objects.filter(
+            conversation=conversation
+        ).select_related(
+            'sender',
+            'reply_to'
+        ).prefetch_related(
+            'reactions'
+        )
+        
+        # Apply cursor-based pagination
+        paginator = BeforeMessageIdPagination(default_limit=30, max_limit=100)
+        paginated_messages = paginator.paginate_queryset(messages, request)
+        
+        # Serialize paginated messages
+        serializer = MessageSerializer(paginated_messages, many=True, context={'request': request})
+        
+        return paginator.get_paginated_response(serializer.data)
+
 
 class MessageReactionViewSet(viewsets.ModelViewSet):
     """ViewSet for managing message reactions."""
@@ -317,8 +363,7 @@ def conversation_list(request):
         members__user=request.user
     ).prefetch_related(
         'members__user',
-        'messages__sender',
-        'messages__read_receipts'
+        'messages__sender'
     ).annotate(
         # Optimize: get last message in one query instead of N+1
         last_msg_id=models.Max('messages__id'),
@@ -592,55 +637,37 @@ def attachment_upload(request):
         conversation_id = request.data.get('conversation_id')
         
         if not file:
+            metrics.record_upload_failure(request.user.id, 'NO_FILE', 0)
             return Response(
-                {'error': 'No file provided'}, 
+                {'error': 'No file provided', 'error_code': 'NO_FILE'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         if not conversation_id:
+            metrics.record_upload_failure(request.user.id, 'NO_CONVERSATION_ID', 0)
             return Response(
-                {'error': 'conversation_id is required'}, 
+                {'error': 'conversation_id is required', 'error_code': 'NO_CONVERSATION_ID'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         # Verify user is a member of the conversation
         conversation = get_object_or_404(Conversation, id=conversation_id)
         if not conversation.members.filter(user=request.user).exists():
+            metrics.record_upload_failure(request.user.id, 'NOT_MEMBER', file.size)
             return Response(
-                {'error': 'You are not a member of this conversation'},
+                {'error': 'You are not a member of this conversation', 'error_code': 'NOT_MEMBER'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Validate file size (50MB limit)
-        max_size = 50 * 1024 * 1024
-        if file.size > max_size:
+        # Validate file using FileUploadValidator
+        is_valid, error_code, error_message, attachment_type = FileUploadValidator.validate(file)
+        
+        if not is_valid:
+            metrics.record_upload_failure(request.user.id, error_code, file.size)
             return Response(
-                {'error': 'File size exceeds 50MB limit'},
+                {'error': error_message, 'error_code': error_code},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # Validate file type
-        allowed_types = [
-            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-            'video/mp4', 'video/webm',
-            'audio/mpeg', 'audio/wav', 'audio/webm',
-            'application/pdf', 'text/plain'
-        ]
-        
-        if file.content_type not in allowed_types:
-            return Response(
-                {'error': f'File type {file.content_type} is not allowed'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Determine attachment type
-        attachment_type = 'document'
-        if file.content_type.startswith('image/'):
-            attachment_type = 'image'
-        elif file.content_type.startswith('video/'):
-            attachment_type = 'video'
-        elif file.content_type.startswith('audio/'):
-            attachment_type = 'audio'
         
         # Create message with attachment
         message = Message.objects.create(
@@ -671,7 +698,7 @@ def attachment_upload(request):
         
     except Exception as e:
         return Response(
-            {'error': str(e)},
+            {'error': str(e), 'error_code': 'SERVER_ERROR'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 

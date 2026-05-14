@@ -106,6 +106,64 @@ export const CONNECTION_STATE = {
   ERROR: 'error',
 };
 
+/**
+ * Unified Message State Machine
+ * Single authoritative source for all message lifecycle states
+ * All UI and services MUST use these states exclusively
+ */
+export const MESSAGE_STATE = {
+  DRAFT: 'draft',
+  QUEUED: 'queued',
+  PROCESSING: 'processing',
+  UPLOADING: 'uploading',
+  SENDING: 'sending',
+  SENT: 'sent',
+  DELIVERED: 'delivered',
+  READ: 'read',
+  FAILED_UPLOAD: 'failed_upload',
+  FAILED_SEND: 'failed_send',
+  RETRYING: 'retrying',
+  CANCELLED: 'cancelled',
+};
+
+/**
+ * Valid message state transitions
+ * Enforces state machine integrity - prevents invalid transitions
+ */
+export const MESSAGE_STATE_TRANSITIONS = {
+  [MESSAGE_STATE.DRAFT]: [MESSAGE_STATE.QUEUED, MESSAGE_STATE.CANCELLED],
+  [MESSAGE_STATE.QUEUED]: [MESSAGE_STATE.PROCESSING, MESSAGE_STATE.SENDING, MESSAGE_STATE.CANCELLED],
+  [MESSAGE_STATE.PROCESSING]: [MESSAGE_STATE.UPLOADING, MESSAGE_STATE.SENDING, MESSAGE_STATE.FAILED_UPLOAD, MESSAGE_STATE.CANCELLED],
+  [MESSAGE_STATE.UPLOADING]: [MESSAGE_STATE.SENDING, MESSAGE_STATE.FAILED_UPLOAD, MESSAGE_STATE.CANCELLED],
+  [MESSAGE_STATE.SENDING]: [MESSAGE_STATE.SENT, MESSAGE_STATE.FAILED_SEND, MESSAGE_STATE.RETRYING],
+  [MESSAGE_STATE.SENT]: [MESSAGE_STATE.DELIVERED, MESSAGE_STATE.READ, MESSAGE_STATE.FAILED_SEND],
+  [MESSAGE_STATE.DELIVERED]: [MESSAGE_STATE.READ],
+  [MESSAGE_STATE.READ]: [], // Terminal state
+  [MESSAGE_STATE.FAILED_UPLOAD]: [MESSAGE_STATE.RETRYING, MESSAGE_STATE.CANCELLED],
+  [MESSAGE_STATE.FAILED_SEND]: [MESSAGE_STATE.RETRYING, MESSAGE_STATE.CANCELLED],
+  [MESSAGE_STATE.RETRYING]: [MESSAGE_STATE.SENDING, MESSAGE_STATE.FAILED_UPLOAD, MESSAGE_STATE.FAILED_SEND, MESSAGE_STATE.CANCELLED],
+  [MESSAGE_STATE.CANCELLED]: [], // Terminal state
+};
+
+/**
+ * Check if a state transition is valid
+ * @param {string} fromState - Current state
+ * @param {string} toState - Target state
+ * @returns {boolean} True if transition is valid
+ */
+export function isValidStateTransition(fromState, toState) {
+  if (!MESSAGE_STATE_TRANSITIONS[fromState]) {
+    console.warn(`[STATE_MACHINE] Unknown fromState: ${fromState}`);
+    return false;
+  }
+  return MESSAGE_STATE_TRANSITIONS[fromState].includes(toState);
+}
+
+/**
+ * Legacy MESSAGE_STATUS for backward compatibility (deprecated)
+ * Use MESSAGE_STATE instead
+ * @deprecated Use MESSAGE_STATE enum instead
+ */
 export const MESSAGE_STATUS = {
   SENT: 'sent',
   DELIVERED: 'delivered',

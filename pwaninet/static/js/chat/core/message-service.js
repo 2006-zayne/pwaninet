@@ -7,6 +7,7 @@
 import { store } from './store.js';
 import { webSocketManager } from './websocket.js';
 import { getCSRFToken } from '../shared/utils.js';
+import { EVENTS, MESSAGE_STATE, CONNECTION_STATE, isValidStateTransition } from '../shared/constants.js';
 
 export class MessageService {
     constructor() {
@@ -15,6 +16,9 @@ export class MessageService {
         this.recipientPublicKey = null;
         this.debugMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         this.messageQueue = []; // Local queue for transport only
+        
+        // Track message states by temp_id for transition validation
+        this.messageStates = new Map();
     }
 
     /**
@@ -33,17 +37,33 @@ export class MessageService {
     }
 
     mapStatus(status) {
+        // Map legacy/alternative status names to unified MESSAGE_STATE
         const allowed = {
-            sent: 'sent',
-            delivered: 'delivered',
-            read: 'read',
-            seen: 'read',
-            received: 'delivered',
-            pending: 'sent',
-            failed: 'failed'
+            draft: MESSAGE_STATE.DRAFT,
+            queued: MESSAGE_STATE.QUEUED,
+            processing: MESSAGE_STATE.PROCESSING,
+            uploading: MESSAGE_STATE.UPLOADING,
+            sending: MESSAGE_STATE.SENDING,
+            sent: MESSAGE_STATE.SENT,
+            delivered: MESSAGE_STATE.DELIVERED,
+            read: MESSAGE_STATE.READ,
+            seen: MESSAGE_STATE.READ,
+            received: MESSAGE_STATE.DELIVERED,
+            pending: MESSAGE_STATE.QUEUED,
+            failed: MESSAGE_STATE.FAILED_SEND, // Default failed to failed_send
+            failed_upload: MESSAGE_STATE.FAILED_UPLOAD,
+            failed_send: MESSAGE_STATE.FAILED_SEND,
+            retrying: MESSAGE_STATE.RETRYING,
+            cancelled: MESSAGE_STATE.CANCELLED
         };
 
-        return allowed[status] || 'sent';
+        const mapped = allowed[status];
+        if (mapped) {
+            console.log('[MESSAGE_SERVICE] mapStatus:', status, '->', mapped);
+            return mapped;
+        }
+        console.log('[MESSAGE_SERVICE] mapStatus: unknown status', status, 'defaulting to SENT');
+        return MESSAGE_STATE.SENT;
     }
 
     mapType(type) {
@@ -152,6 +172,17 @@ export class MessageService {
 
         const cleanContent = content.trim();
         
+        // Create temp ID
+        const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Initialize message state as DRAFT
+        this.messageStates.set(tempId, {
+            status: MESSAGE_STATE.DRAFT,
+            retryCount: 0,
+            lastError: null,
+            createdAt: Date.now()
+        });
+        
         // Detect URLs in content and fetch metadata
         const urls = this.extractUrls(cleanContent);
         let linkMetadata = null;
@@ -168,14 +199,13 @@ export class MessageService {
             }
         }
 
-        // Create optimistic message with canonical schema
-        const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        // Create optimistic message with DRAFT status
         const optimisticMessage = this._createCanonicalMessage({
             id: tempId,
             conversationId: state.conversationId,
             senderId: state.currentUserId,
             timestamp: new Date().toISOString(),
-            status: 'sent',
+            status: MESSAGE_STATE.DRAFT,
             content: cleanContent,
             type: options.type || 'text',
             metadata: options.metadata || {},
@@ -185,6 +215,14 @@ export class MessageService {
 
         // Add optimistic update to store (ONLY store mutates)
         store.addMessage(optimisticMessage);
+        console.log('[MESSAGE_SERVICE] Message added to store with status:', optimisticMessage.status);
+
+        // Transition to QUEUED (with delay for UI to render)
+        setTimeout(() => {
+            this._transitionMessageState(tempId, MESSAGE_STATE.QUEUED);
+            store.updateMessage(tempId, { status: MESSAGE_STATE.QUEUED });
+            console.log('[MESSAGE_SERVICE] Status updated to QUEUED for:', tempId);
+        }, 3000);
 
         // Prepare message data for WebSocket (transport only)
         let messageData = {
@@ -227,44 +265,65 @@ export class MessageService {
             }
         }
 
-        // Send via WebSocket (transport ONLY)
-        const sent = await webSocketManager.send(messageData);
+        // Transition to SENDING (with delay for UI to render)
+        setTimeout(() => {
+            this._transitionMessageState(tempId, MESSAGE_STATE.SENDING);
+            store.updateMessage(tempId, { status: MESSAGE_STATE.SENDING });
+            console.log('[MESSAGE_SERVICE] Status updated to SENDING for:', tempId);
 
-        if (!sent) {
-            // WebSocket down - try REST API fallback
-            this._log('WEBSOCKET_FAILED_TRYING_REST', { tempId });
-            try {
-                const response = await fetch('/messaging/v1/messages/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCSRFToken()
-                    },
-                    body: JSON.stringify({
-                        conversation: state.conversationId,
-                        content: cleanContent
-                    })
-                });
+            // Send via WebSocket (transport ONLY)
+            webSocketManager.send(messageData).then(sent => {
+                if (!sent) {
+                    // WebSocket down - try REST API fallback
+                    this._log('WEBSOCKET_FAILED_TRYING_REST', { tempId });
+                    fetch('/messaging/v1/messages/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCSRFToken()
+                        },
+                        body: JSON.stringify({
+                            conversation: state.conversationId,
+                            content: cleanContent
+                        })
+                    }).then(response => {
+                        if (!response.ok) throw new Error('HTTP error');
+                        return response.json();
+                    }).then(savedMessage => {
+                        // Transition to SENT with delay
+                        setTimeout(() => {
+                            this._transitionMessageState(tempId, MESSAGE_STATE.SENT);
+                            console.log('[MESSAGE_SERVICE] Status updated to SENT for:', tempId);
+                            
+                            // Replace optimistic with confirmed message
+                            store.replaceOptimisticMessage(tempId, this.normalizeServerMessage(savedMessage));
+                            this._log('MESSAGE_SENT_VIA_REST', { tempId, id: savedMessage.id });
+                        }, 2000);
+                    }).catch(restError => {
+                        // Transition to FAILED
+                        this._transitionMessageState(tempId, MESSAGE_STATE.FAILED_SEND, restError.message);
+                        store.updateMessage(tempId, { status: MESSAGE_STATE.FAILED_SEND });
+                        console.log('[MESSAGE_SERVICE] Status updated to FAILED for:', tempId);
 
-                if (!response.ok) throw new Error('HTTP error');
-
-                const savedMessage = await response.json();
-
-                // Replace optimistic with confirmed message
-                store.replaceOptimisticMessage(tempId, this.normalizeServerMessage(savedMessage));
-                this._log('MESSAGE_SENT_VIA_REST', { tempId, id: savedMessage.id });
-
-            } catch (restError) {
-                // Queue message if REST also fails
-                this.messageQueue.push({
-                    ...messageData,
-                    tempId,
-                    timestamp: new Date().toISOString()
-                });
-                this._log('MESSAGE_QUEUED', { tempId, reason: 'REST failed' });
-                console.error('MessageService: REST fallback failed:', restError);
-            }
-        }
+                        // Queue message for retry
+                        this.messageQueue.push({
+                            ...messageData,
+                            tempId,
+                            timestamp: new Date().toISOString()
+                        });
+                        this._log('MESSAGE_QUEUED', { tempId, reason: 'REST failed' });
+                        console.error('MessageService: REST fallback failed:', restError);
+                    });
+                } else {
+                    // WebSocket sent successfully, transition to SENT with delay
+                    setTimeout(() => {
+                        this._transitionMessageState(tempId, MESSAGE_STATE.SENT);
+                        store.updateMessage(tempId, { status: MESSAGE_STATE.SENT });
+                        console.log('[MESSAGE_SERVICE] Status updated to SENT for:', tempId);
+                    }, 2000);
+                }
+            });
+        }, 3000);
 
         return tempId;
     }
@@ -308,7 +367,7 @@ export class MessageService {
      */
     async _processChatMessage(messageData) {
         this._log('PROCESS_CHAT_MESSAGE', messageData);
-        
+
         // DEBUG: Check for link data
         console.log('[MESSAGE_SERVICE] Processing message:', messageData.id, 'Link URL:', messageData.link_url, 'Link Type:', messageData.link_type);
 
@@ -331,10 +390,15 @@ export class MessageService {
             ...messageData,
             content
         });
-        
+
         // DEBUG: Log canonical message type
         console.log('[MESSAGE_SERVICE] Canonical message type:', canonicalMessage.type, 'Metadata:', canonicalMessage.metadata);
 
+        // Send delivery acknowledgement if this is an incoming message (not from current user)
+        const state = store.getState();
+        if (canonicalMessage.senderId !== state.currentUserId) {
+            this._sendDeliveryAcknowledgement(canonicalMessage.id);
+        }
 
         // Check if this is a confirmation of an optimistic message
 
@@ -398,7 +462,7 @@ export class MessageService {
 
         // Update message read status in store (ONLY store mutates)
         store.updateMessage(data.message_id, {
-            status: 'read',
+            status: MESSAGE_STATE.READ,
             metadata: {
                 read_avatar: data.read_avatar
             }
@@ -453,6 +517,12 @@ export class MessageService {
         
         for (const queuedMessage of queue) {
             try {
+                const tempId = queuedMessage.tempId;
+                
+                // Transition to RETRYING
+                this._transitionMessageState(tempId, MESSAGE_STATE.RETRYING);
+                store.updateMessage(tempId, { status: MESSAGE_STATE.RETRYING });
+                
                 const messageData = {
                     type: queuedMessage.type,
                     temp_id: queuedMessage.tempId,
@@ -468,14 +538,133 @@ export class MessageService {
                 if (!sent) {
                     // Re-queue if still not sent
                     this.messageQueue.push(queuedMessage);
+                    // Transition back to FAILED_SEND
+                    this._transitionMessageState(tempId, MESSAGE_STATE.FAILED_SEND, 'Retry failed');
+                    store.updateMessage(tempId, { status: MESSAGE_STATE.FAILED_SEND });
                 } else {
-                    this._log('QUEUED_MESSAGE_SENT', { tempId: queuedMessage.tempId });
+                    // Transition to SENT
+                    this._transitionMessageState(tempId, MESSAGE_STATE.SENT);
+                    this._log('QUEUED_MESSAGE_SENT', { tempId });
                 }
             } catch (error) {
                 this._log('QUEUE_SEND_ERROR', { error, queuedMessage });
                 // Re-queue on error
                 this.messageQueue.push(queuedMessage);
             }
+        }
+    }
+    
+    /**
+     * Transition message state with validation
+     * @param {string} tempId - Temporary message ID
+     * @param {string} newState - New state
+     * @param {string} error - Error message if transitioning to FAILED state
+     */
+    _transitionMessageState(tempId, newState, error = null) {
+        const currentState = this.messageStates.get(tempId);
+        if (!currentState) {
+            console.warn('[MESSAGE_SERVICE] No state found for tempId:', tempId);
+            return;
+        }
+        
+        const oldState = currentState.status;
+        
+        // Validate transition
+        if (!isValidStateTransition(oldState, newState)) {
+            console.error('[MESSAGE_SERVICE] Invalid state transition:', {
+                tempId,
+                from: oldState,
+                to: newState,
+                error
+            });
+            // Reject invalid transition
+            return;
+        }
+        
+        // Update state
+        currentState.status = newState;
+        if (error) {
+            currentState.lastError = error;
+            currentState.retryCount++;
+        }
+        
+        this.messageStates.set(tempId, currentState);
+        this._log('STATE_TRANSITION', { tempId, from: oldState, to: newState, error });
+        
+        // Clean up old states for sent/delivered/read messages
+        if ([MESSAGE_STATE.SENT, MESSAGE_STATE.DELIVERED, MESSAGE_STATE.READ].includes(newState)) {
+            // Keep state for a while, then clean up
+            setTimeout(() => {
+                this.messageStates.delete(tempId);
+            }, 60000); // 1 minute
+        }
+    }
+    
+    /**
+     * Retry a failed message
+     * @param {string} tempId - Temporary message ID
+     */
+    async retryMessage(tempId) {
+        this._log('RETRY_MESSAGE', { tempId });
+        
+        const messageState = this.messageStates.get(tempId);
+        if (!messageState) {
+            console.warn('[MESSAGE_SERVICE] No state found for retry:', tempId);
+            return false;
+        }
+        
+        if (messageState.status !== MESSAGE_STATE.FAILED_SEND && messageState.status !== MESSAGE_STATE.FAILED_UPLOAD) {
+            console.warn('[MESSAGE_SERVICE] Cannot retry message in state:', messageState.status);
+            return false;
+        }
+        
+        // Find the message in the queue
+        const queuedMessage = this.messageQueue.find(m => m.tempId === tempId);
+        if (!queuedMessage) {
+            console.warn('[MESSAGE_SERVICE] No queued message found for retry:', tempId);
+            return false;
+        }
+        
+        // Transition to RETRYING
+        this._transitionMessageState(tempId, MESSAGE_STATE.RETRYING);
+        store.updateMessage(tempId, { status: MESSAGE_STATE.RETRYING });
+        
+        try {
+            const messageData = {
+                type: queuedMessage.type,
+                temp_id: queuedMessage.tempId,
+                content: queuedMessage.content,
+                encrypted_content: queuedMessage.encrypted_content,
+                is_encrypted: queuedMessage.is_encrypted,
+                message_type: queuedMessage.message_type,
+                metadata: queuedMessage.metadata
+            };
+            
+            const sent = await webSocketManager.send(messageData);
+            
+            if (sent) {
+                // Transition to SENT
+                this._transitionMessageState(tempId, MESSAGE_STATE.SENT);
+                store.updateMessage(tempId, { status: MESSAGE_STATE.SENT });
+                
+                // Remove from queue
+                this.messageQueue = this.messageQueue.filter(m => m.tempId !== tempId);
+                
+                this._log('RETRY_SUCCESS', { tempId });
+                return true;
+            } else {
+                // Transition back to FAILED_SEND
+                this._transitionMessageState(tempId, MESSAGE_STATE.FAILED_SEND, 'Retry failed');
+                store.updateMessage(tempId, { status: MESSAGE_STATE.FAILED_SEND });
+                this._log('RETRY_FAILED', { tempId });
+                return false;
+            }
+        } catch (error) {
+            // Transition back to FAILED_SEND
+            this._transitionMessageState(tempId, MESSAGE_STATE.FAILED_SEND, error.message);
+            store.updateMessage(tempId, { status: MESSAGE_STATE.FAILED_SEND });
+            this._log('RETRY_ERROR', { tempId, error });
+            return false;
         }
     }
 

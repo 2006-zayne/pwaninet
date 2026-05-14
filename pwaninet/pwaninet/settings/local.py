@@ -14,6 +14,10 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+# Ensure the specific IP is in ALLOWED_HOSTS
+if '192.168.183.245' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('192.168.183.245')
+
 # Database - PostgreSQL for local development
 DATABASES = {
     'default': {
