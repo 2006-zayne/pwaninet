@@ -114,11 +114,11 @@ export class UIController {
         const sendButton = document.getElementById('sendBtn');
 
         if (messageInput) {
-            // Initialize audio context on first user interaction (browser autoplay policy)
-            const initAudioOnInteraction = () => {
+            // Unlock audio context on first user interaction (browser autoplay policy)
+            const unlockAudioOnInteraction = () => {
                 if (!this.audioInitialized) {
-                    messageSoundManager.init().catch(err => {
-                        console.warn('[UI_CONTROLLER] Failed to init audio:', err);
+                    messageSoundManager.unlock().catch(err => {
+                        console.warn('[UI_CONTROLLER] Failed to unlock audio:', err);
                     });
                     this.audioInitialized = true;
                 }
@@ -126,7 +126,7 @@ export class UIController {
 
             // Keyboard events
             messageInput.addEventListener('keypress', (e) => {
-                initAudioOnInteraction();
+                unlockAudioOnInteraction();
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     this._handleSendMessage(messageInput.value);
@@ -135,7 +135,7 @@ export class UIController {
             });
 
             messageInput.addEventListener('input', () => {
-                initAudioOnInteraction();
+                unlockAudioOnInteraction();
                 // Auto-expand textarea (pure UI behavior)
                 messageInput.style.height = 'auto';
                 const newHeight = Math.min(messageInput.scrollHeight, 120);
@@ -147,22 +147,22 @@ export class UIController {
 
             // Touch events for mobile devices
             messageInput.addEventListener('touchstart', () => {
-                initAudioOnInteraction();
+                unlockAudioOnInteraction();
                 this._handleTyping();
             });
 
             messageInput.addEventListener('focus', () => {
-                initAudioOnInteraction();
+                unlockAudioOnInteraction();
                 this._handleTyping();
             });
         }
         
         if (sendButton) {
             sendButton.addEventListener('click', () => {
-                // Initialize audio context on send button click
+                // Unlock audio context on send button click
                 if (!this.audioInitialized) {
-                    messageSoundManager.init().catch(err => {
-                        console.warn('[UI_CONTROLLER] Failed to init audio:', err);
+                    messageSoundManager.unlock().catch(err => {
+                        console.warn('[UI_CONTROLLER] Failed to unlock audio:', err);
                     });
                     this.audioInitialized = true;
                 }
@@ -273,10 +273,14 @@ export class UIController {
         const typingArray = Array.from(typingUsers.values());
         const peerArray = Array.from(peerOnlineStatus.entries());
 
+        console.log('[UI] _updateTypingIndicators called', { typingArray, peerArray });
+
         // Get the first peer (other user in conversation)
         const peer = peerArray.length > 0 ? peerArray[0][1] : null;
         const isPeerOnline = peer ? peer.isOnline : false;
         const lastSeen = peer ? peer.lastSeen : null;
+
+        console.log('[UI] Peer status', { peer, isPeerOnline, lastSeen });
 
         if (typingArray.length > 0) {
             // User is typing - show ghost bubble with animated dots
@@ -301,8 +305,12 @@ export class UIController {
                     chatAvatar.classList.add('avatar-online');
                 }
             } else {
-                // User is offline
-                chatStatus.textContent = '';
+                // User is offline - show last seen
+                if (lastSeen) {
+                    chatStatus.textContent = this._formatLastSeen(lastSeen);
+                } else {
+                    chatStatus.textContent = '';
+                }
                 chatStatus.className = 'chat-status';
                 if (chatAvatar) {
                     chatAvatar.classList.remove('avatar-online');
@@ -313,29 +321,64 @@ export class UIController {
 
     /**
      * Format last seen timestamp to human readable string
-     * @param {number} timestamp - Last seen timestamp
+     * @param {number} timestamp - Last seen timestamp (milliseconds since epoch)
      * @returns {string} Formatted string
      */
     _formatLastSeen(timestamp) {
-        const now = Date.now();
-        const diff = now - timestamp;
-        const seconds = Math.floor(diff / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
+        const now = new Date();
+        const lastSeen = new Date(timestamp);
+        const diffMs = now - lastSeen;
+        const diffSeconds = Math.floor(diffMs / 1000);
+        const diffMinutes = Math.floor(diffSeconds / 60);
 
-        if (seconds < 60) {
+        // < 60 seconds: "just now"
+        if (diffSeconds < 60) {
             return 'just now';
-        } else if (minutes < 60) {
-            return `${minutes}m ago`;
-        } else if (hours < 24) {
-            return `${hours}h ago`;
-        } else if (days < 7) {
-            return `${days}d ago`;
-        } else {
-            const date = new Date(timestamp);
-            return date.toLocaleDateString();
         }
+
+        // < 1 hour: "5 mins ago"
+        if (diffMinutes < 60) {
+            return `${diffMinutes} mins ago`;
+        }
+
+        // Check if same day
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        const lastSeenDate = new Date(lastSeen);
+        lastSeenDate.setHours(0, 0, 0, 0);
+
+        // Same day: "today at 2:31 PM"
+        if (lastSeenDate.getTime() === today.getTime()) {
+            const timeStr = lastSeen.toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
+            return `today at ${timeStr}`;
+        }
+
+        // Yesterday: "yesterday at 8:22 PM"
+        if (lastSeenDate.getTime() === yesterday.getTime()) {
+            const timeStr = lastSeen.toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
+            return `yesterday at ${timeStr}`;
+        }
+
+        // Older: "14 May at 11:30 AM"
+        const day = lastSeen.getDate();
+        const month = lastSeen.toLocaleDateString('en-US', { month: 'short' });
+        const timeStr = lastSeen.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+        return `${day} ${month} at ${timeStr}`;
     }
 
     /**

@@ -21,7 +21,9 @@ export class WebSocketManager {
         this.lastHeartbeatTime = Date.now();
         this.reconnectInProgress = false;
         this.debugMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        this.HEARTBEAT_TIMEOUT_MS = 180000; // 3 minutes
+        this.HEARTBEAT_TIMEOUT_MS = 90000; // 90 seconds - allow some buffer beyond server's 60s timeout
+        this.HEARTBEAT_SEND_INTERVAL_MS = 25000; // 25 seconds - send proactive heartbeat
+        this.proactiveHeartbeatInterval = null;
     }
 
     /**
@@ -40,6 +42,16 @@ export class WebSocketManager {
     startHeartbeat() {
         this.stopHeartbeat();
 
+        // Start proactive heartbeat sender (client-initiated)
+        this.proactiveHeartbeatInterval = setInterval(() => {
+            if (!this.isConnected()) return;
+
+            // Send proactive heartbeat to server for presence tracking
+            this.send({ type: 'heartbeat' });
+            this._log('HEARTBEAT_SENT');
+        }, this.HEARTBEAT_SEND_INTERVAL_MS);
+
+        // Start heartbeat monitor (check for server ping/pong)
         this.heartbeatInterval = setInterval(() => {
             if (!this.isConnected()) return;
 
@@ -64,6 +76,10 @@ export class WebSocketManager {
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval);
             this.heartbeatInterval = null;
+        }
+        if (this.proactiveHeartbeatInterval) {
+            clearInterval(this.proactiveHeartbeatInterval);
+            this.proactiveHeartbeatInterval = null;
         }
     }
 
@@ -236,6 +252,17 @@ export class WebSocketManager {
         }
 
         this._notifyConnectionChange(false);
+    }
+
+    /**
+     * Destroy WebSocket manager
+     */
+    destroy() {
+        this._log('WEBSOCKET_DESTROY');
+        this.disconnect();
+        this.messageCallback = null;
+        this.connectionCallback = null;
+        this.conversationId = null;
     }
 
     /**

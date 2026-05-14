@@ -85,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.voiceService = voiceService;
     window.emojiService = emojiService;
     window.contextMenuService = contextMenuService;
+    window.messageSoundManager = messageSoundManager;
 
     console.log('🎉 SOT architecture initialized with mandatory data flow enforcement');
     console.log('📊 Data flow: websocket → message-service → store → ui-controller → renderer');

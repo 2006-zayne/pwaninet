@@ -11,6 +11,7 @@ import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
+from messaging.presence import PresenceService
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -23,7 +24,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         """Handle WebSocket connection."""
         print(f'[NOTIFICATIONS] WebSocket connection attempt from user: {self.scope["user"]}')
         print(f'[NOTIFICATIONS] User is_anonymous: {self.scope["user"].is_anonymous}')
-        
+
         if self.scope["user"].is_anonymous:
             print('[NOTIFICATIONS] Closing connection - user is anonymous')
             await self.close()
@@ -31,7 +32,8 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
         self.user = self.scope["user"]
         self.user_group_name = f"notifications_{self.user.id}"
-        
+        self.connection_id = self.channel_name
+
         print(f'[NOTIFICATIONS] User {self.user.id} connecting to group {self.user_group_name}')
 
         # Join user's notification group
@@ -40,18 +42,23 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
 
-        # Register connection and set user online
+        # Register connection
         from messaging.ws_middleware import WebSocketConnectionTracker
         WebSocketConnectionTracker.register_connection(
-            self.user.id, 
+            self.user.id,
             self.channel_name
         )
 
-        # Set user online when they connect to any page
-        connection_count = WebSocketConnectionTracker.get_connection_count(self.user.id)
-        if connection_count == 1:
-            await self.set_user_online(True)
-            print(f'[NOTIFICATIONS] User {self.user.id} marked as online')
+        # Record initial heartbeat for presence tracking
+        PresenceService.record_heartbeat(
+            self.user.id,
+            self.connection_id
+        )
+
+        # Broadcast user online status based on heartbeat freshness
+        is_online = PresenceService.is_user_online(self.user.id)
+        if is_online:
+            print(f'[NOTIFICATIONS] User {self.user.id} is online (heartbeat-based)')
 
         print(f'[NOTIFICATIONS] User {self.user.id} accepted connection')
         await self.accept()
@@ -63,16 +70,25 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             self.user_group_name,
             self.channel_name
         )
-        
-        # Unregister connection and check if user should go offline
+
+        # Remove connection from presence tracking
+        PresenceService.remove_connection(self.user.id, self.channel_name)
+
+        # Unregister connection
         from messaging.ws_middleware import WebSocketConnectionTracker
         WebSocketConnectionTracker.unregister_connection(self.user.id, self.channel_name)
-        
-        # Only set user offline if this was the last connection
+
+        # Check if user is still online based on heartbeat freshness
         connection_count = WebSocketConnectionTracker.get_connection_count(self.user.id)
-        if connection_count == 0:
-            await self.set_user_online(False)
-            print(f'[NOTIFICATIONS] User {self.user.id} marked as offline')
+        is_online = PresenceService.is_user_online(self.user.id)
+
+        print(f'[NOTIFICATIONS] User {self.user.id} disconnect - connections: {connection_count}, online: {is_online}')
+
+        # If user is truly offline (no heartbeat, no connections), persist to DB
+        if not is_online and connection_count == 0:
+            await PresenceService.persist_last_seen_to_db(self.user.id)
+            PresenceService.cleanup_stale_presence(self.user.id)
+            print(f'[NOTIFICATIONS] User {self.user.id} marked as offline (heartbeat-based)')
 
     async def receive(self, text_data):
         """Handle incoming WebSocket messages."""
@@ -127,22 +143,6 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             'last_seen': event.get('last_seen')
         }))
 
-    async def set_user_online(self, is_online):
-        """Set user online status in Redis."""
-        try:
-            from pwaninet.redis_client import get_redis_client
-            redis_client = get_redis_client()
-            key = f'user_online:{self.user.id}'
-            
-            if is_online:
-                # Set with 5 minute TTL
-                redis_client.setex(key, 300, '1')
-                print(f'[NOTIFICATIONS] Set user {self.user.id} online in Redis')
-            else:
-                redis_client.delete(key)
-                print(f'[NOTIFICATIONS] Set user {self.user.id} offline in Redis')
-        except Exception as e:
-            print(f'[NOTIFICATIONS] Error setting user online status: {e}')
 
 
 class FeedConsumer(AsyncWebsocketConsumer):

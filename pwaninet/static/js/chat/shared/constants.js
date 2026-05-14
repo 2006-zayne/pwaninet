@@ -187,6 +187,12 @@ export const RECONNECT_CONFIG = {
 
 export const MESSAGE_DEDUP_WINDOW = 5000; // 5 seconds
 
+/**
+ * Queue visibility threshold for premium UX
+ * Queued icon is hidden if duration is below this threshold AND network is healthy
+ */
+export const SHOW_QUEUE_ICON_AFTER_MS = 400; // 400ms
+
 export const DEFAULT_THEME = {
   light: {
     '--chat-bg': '#f8fafc',

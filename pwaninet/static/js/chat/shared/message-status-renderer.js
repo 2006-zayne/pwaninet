@@ -4,16 +4,21 @@
  * Single source of truth for all status UI rendering
  */
 
-import { MESSAGE_STATE } from './constants.js';
+import { MESSAGE_STATE, SHOW_QUEUE_ICON_AFTER_MS } from './constants.js';
+import { networkHealthTracker } from './network-health-tracker.js';
 
 export class MessageStatusRenderer {
     /**
      * Get status icon HTML for a given message state
      * @param {string} state - Message state from MESSAGE_STATE enum
      * @param {string} messageId - Message ID for retry button (optional)
+     * @param {string} avatarUrl - Avatar URL for read state (optional)
+     * @param {Object} context - Additional context for rendering decisions
+     * @param {number} context.queuedAt - Timestamp when message was queued (optional)
+     * @param {boolean} context.forceShowQueued - Force show queued icon regardless of network (optional)
      * @returns {string} Icon HTML
      */
-    static getStatusIcon(state, messageId = null, avatarUrl = null) {
+    static getStatusIcon(state, messageId = null, avatarUrl = null, context = {}) {
         const retryButton = messageId
             ? `<button class="retry-button" data-message-id="${messageId}" title="Retry">&#8635;</button>`
             : '';
@@ -23,6 +28,12 @@ export class MessageStatusRenderer {
                 return this._getClockIcon();
 
             case MESSAGE_STATE.QUEUED:
+                // Check if queued icon should be visible based on duration and network health
+                if (!this._shouldShowQueuedIcon(context)) {
+                    // Hide queued icon for fast transitions on healthy network
+                    // Return empty string or a minimal placeholder
+                    return '';
+                }
                 return this._getClockIcon();
 
             case MESSAGE_STATE.PROCESSING:
@@ -185,6 +196,36 @@ export class MessageStatusRenderer {
             <img src="${avatarUrl}" alt="Read" width="18" height="18" style="border-radius: 50%;">
         </span>`;
     }
+
+    /**
+     * Determine if queued icon should be visible based on duration and network health
+     * @param {Object} context - Context object with queuedAt timestamp
+     * @returns {boolean} True if queued icon should be visible
+     */
+    static _shouldShowQueuedIcon(context) {
+        const { queuedAt, forceShowQueued } = context;
+
+        // If force show is set, always show queued icon
+        if (forceShowQueued) {
+            return true;
+        }
+
+        // If network is unhealthy, always show queued icon
+        if (!networkHealthTracker.isNetworkHealthy()) {
+            return true;
+        }
+
+        // If no queuedAt timestamp, show queued icon (fallback)
+        if (!queuedAt) {
+            return true;
+        }
+
+        // Calculate queued duration
+        const queuedDuration = Date.now() - queuedAt;
+
+        // Only show queued icon if duration exceeds threshold
+        return queuedDuration >= SHOW_QUEUE_ICON_AFTER_MS;
+    }
 }
 
 /**
@@ -192,8 +233,9 @@ export class MessageStatusRenderer {
  * @param {string} state - Message state
  * @param {string} messageId - Message ID (optional)
  * @param {string} avatarUrl - Avatar URL for read state (optional)
+ * @param {Object} context - Additional context for rendering decisions (optional)
  * @returns {string} Icon HTML
  */
-export function renderMessageStatus(state, messageId = null, avatarUrl = null) {
-    return MessageStatusRenderer.getStatusIcon(state, messageId, avatarUrl);
+export function renderMessageStatus(state, messageId = null, avatarUrl = null, context = {}) {
+    return MessageStatusRenderer.getStatusIcon(state, messageId, avatarUrl, context);
 }

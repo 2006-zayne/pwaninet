@@ -190,6 +190,52 @@
   z-index: 1;
 }
 
+/* Micro time separator - lightweight, ambient, unobtrusive */
+.time-separator {
+  text-align: center;
+  margin: 12px 0;
+  position: relative;
+}
+
+.time-separator .time-label {
+  color: var(--text-secondary);
+  font-size: 11px;
+  opacity: 0.7;
+  font-weight: 400;
+  letter-spacing: 0.3px;
+  cursor: help;
+  transition: opacity 0.2s ease;
+  position: relative;
+}
+
+.time-separator .time-label:hover {
+  opacity: 1;
+}
+
+/* Show precise timestamp on hover/tap */
+.time-separator .time-label::after {
+  content: attr(data-precise-time);
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.time-separator:hover .time-label::after {
+  opacity: 1;
+}
+
 /* DEBUG: Force WhatsApp-style message bubbles */
 .chat-container .messages-area .message-bubble,
 .chat-container .messages-area div.message-bubble,
@@ -214,20 +260,29 @@ div.chat-container div.messages-area div.message-bubble {
 /* Message wrapper for avatar support */
 .message-wrapper {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-end;
-  gap: 0px;
+  gap: 8px;
   width: 100%;
   margin: 2px 0;
 }
 
 .sent-wrapper {
-  align-items: flex-end;
+  justify-content: flex-end;
 }
 
 .received-wrapper {
-  align-items: flex-start;
-  padding-left: 0px;
+  justify-content: flex-start;
+}
+
+/* Avatar container - floats outside bubble alignment */
+.message-avatar-container {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
 }
 
 .message-avatar {
@@ -235,9 +290,20 @@ div.chat-container div.messages-area div.message-bubble {
   height: 32px;
   border-radius: 50%;
   object-fit: cover;
-  flex-shrink: 0;
-  align-self: flex-end;
-  margin-bottom: 2px;
+  border: 2px solid var(--border);
+  transition: border-color 0.3s ease;
+}
+
+/* Avatar visibility - only show on last/single messages */
+.message-avatar-container.hidden {
+  visibility: hidden;
+}
+
+/* Message content wrapper - holds bubble and meta */
+.message-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  max-width: 75%;
 }
 
 /* Base bubble - MISSING padding is the main culprit */
@@ -1473,19 +1539,87 @@ div.chat-container div.messages-area div.message-bubble {
   max-width: 75% !important;
 }
 
+/* Media bubble wrapper - media itself acts as the bubble surface */
+.media-bubble-wrapper {
+  max-width: 75% !important;
+  overflow: hidden;
+  border-radius: var(--bubble-radius) !important;
+  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+  display: inline-block;
+}
+
+/* Sent media bubbles align right */
+.media-bubble-wrapper.sent {
+  margin: 1px 8px 0px auto !important;
+}
+
+/* Received media bubbles align left */
+.media-bubble-wrapper.received {
+  margin: 1px 8px 0px 8px !important;
+}
+
+/* Group position variants for media bubbles */
+.media-bubble-wrapper.group-single {
+  border-radius: var(--bubble-radius) !important;
+}
+
+.media-bubble-wrapper.sent.group-first {
+  border-radius: var(--bubble-radius) var(--bubble-radius) 5px var(--bubble-radius) !important;
+}
+
+.media-bubble-wrapper.received.group-first {
+  border-radius: var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) 5px !important;
+}
+
+.media-bubble-wrapper.sent.group-middle {
+  border-radius: var(--bubble-radius) 5px 5px var(--bubble-radius) !important;
+}
+
+.media-bubble-wrapper.received.group-middle {
+  border-radius: 5px var(--bubble-radius) var(--bubble-radius) 5px !important;
+}
+
+.media-bubble-wrapper.sent.group-last {
+  border-radius: var(--bubble-radius) 5px var(--bubble-radius) var(--bubble-radius) !important;
+}
+
+.media-bubble-wrapper.received.group-last {
+  border-radius: 5px var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) !important;
+}
+
 .media-image {
   max-width: 100%;
   max-height: 300px;
-  border-radius: var(--bubble-radius);
   display: block;
   object-fit: cover;
+  border-radius: inherit;
 }
 
 .media-video {
   max-width: 100%;
   max-height: 300px;
-  border-radius: 2px;
   display: block;
+  border-radius: inherit;
+}
+
+/* Media caption styling */
+.media-caption {
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 4px 8px 6px 8px;
+  color: var(--text-primary);
+  max-width: 75%;
+  word-wrap: break-word;
+}
+
+.sent-wrapper .media-caption {
+  margin: 2px 8px 0px auto;
+  text-align: left;
+}
+
+.received-wrapper .media-caption {
+  margin: 2px 8px 0px 8px;
+  text-align: left;
 }
 
 .media-audio-container {

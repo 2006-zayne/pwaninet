@@ -549,19 +549,19 @@ class DeviceAccountViewSet(viewsets.ModelViewSet):
 def user_online_status_api(request, user_id):
     """
     API endpoint to check if a user is online.
-    Returns JSON with is_online status.
+    Returns JSON with is_online status using heartbeat-based presence tracking.
     """
     try:
-        from pwaninet.redis_client import get_redis_client
-        redis_client = get_redis_client()
+        from messaging.presence import PresenceService
         
-        # Check if user is online in Redis
-        key = f'user_online:{user_id}'
-        is_online = redis_client.exists(key) == 1
+        # Check if user is online based on heartbeat freshness
+        is_online = PresenceService.is_user_online(user_id)
+        last_seen = PresenceService.get_last_seen(user_id)
         
         return JsonResponse({
             'is_online': is_online,
-            'user_id': int(user_id)
+            'user_id': int(user_id),
+            'last_seen': last_seen.isoformat() if last_seen else None
         })
     except Exception as e:
         return JsonResponse({

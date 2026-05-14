@@ -7,6 +7,7 @@ from pwaninet.redis_client import get_redis_client
 from .models import Conversation, ConversationMember, Message, PendingMessage
 from .ws_middleware import WebSocketRateLimiter, WebSocketConnectionTracker
 from .observability import metrics
+from .presence import PresenceService
 
 # ARCHITECTURAL RULE:
 # Each WebSocket consumer must have a single source of truth file.
@@ -67,15 +68,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
 
+        # Record initial heartbeat for this connection
+        PresenceService.record_heartbeat(
+            self.user_id,
+            self.connection_id,
+            metadata={
+                'conversation_id': self.conversation_id,
+                'ip': self.scope.get('client', ['unknown'])[0],
+            }
+        )
+
         connection_count = WebSocketConnectionTracker.get_connection_count(self.user_id)
 
         # Record reconnect metrics if this is a reconnection
         if connection_count > 1:
             metrics.record_websocket_reconnect(self.user_id, self.conversation_id)
 
-        if connection_count == 1:
-            await self.set_user_online(True)
-
+        # Broadcast user online status based on heartbeat freshness
+        is_online = PresenceService.is_user_online(self.user_id)
+        if is_online:
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -99,12 +110,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     }
                 )
 
-        self.heartbeat_task = asyncio.create_task(self.heartbeat_loop())
         await self.send_peer_online_status()
-        
+
         # Record active connection
         metrics.record_active_connection(self.user_id, self.conversation_id, 'connect')
-        
+
         # Retry pending messages on reconnect
         await self.retry_pending_messages()
    
@@ -118,13 +128,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not user_id:
             return
 
-        # Cancel heartbeat task safely
-        if getattr(self, "heartbeat_task", None):
-            self.heartbeat_task.cancel()
-            try:
-                await self.heartbeat_task
-            except asyncio.CancelledError:
-                pass
 
         # Leave room group safely
         room_group_name = getattr(self, "room_group_name", None)
@@ -133,6 +136,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 room_group_name,
                 self.channel_name
             )
+
+        # Remove connection from presence tracking
+        PresenceService.remove_connection(user_id, self.channel_name)
 
         # Unregister connection safely
         WebSocketConnectionTracker.unregister_connection(user_id, self.channel_name)
@@ -149,55 +155,44 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if conversation_id:
             metrics.record_active_connection(user_id, conversation_id, 'disconnect')
 
-        # Only mark offline when connection count is 0
-        if connection_count == 0:
-            await self.set_user_online(False)
+        # Check if user is still online based on heartbeat freshness
+        # Do NOT rely solely on disconnect events
+        is_online = PresenceService.is_user_online(user_id)
 
-            username = getattr(self.user, "username", "")
+        # Broadcast current status based on heartbeat freshness
+        username = getattr(self.user, "")
+        last_seen = PresenceService.get_last_seen(user_id)
 
+        await self.channel_layer.group_send(
+            room_group_name,
+            {
+                'type': 'user_status',
+                'user_id': user_id,
+                'username': username,
+                'is_online': is_online,
+                'last_seen': last_seen.isoformat() if last_seen else None
+            }
+        )
+
+        other_members = await self.get_other_conversation_members()
+
+        for member_id in other_members:
             await self.channel_layer.group_send(
-                room_group_name,
+                f'notifications_{member_id}',
                 {
                     'type': 'user_status',
                     'user_id': user_id,
                     'username': username,
-                    'is_online': False,
-                    'last_seen': asyncio.get_event_loop().time()
+                    'is_online': is_online,
+                    'last_seen': last_seen.isoformat() if last_seen else None
                 }
             )
 
-            other_members = await self.get_other_conversation_members()
+        # If user is truly offline (no heartbeat, no connections), persist to DB
+        if not is_online and connection_count == 0:
+            await PresenceService.persist_last_seen_to_db(user_id)
+            PresenceService.cleanup_stale_presence(user_id)
 
-            for member_id in other_members:
-                await self.channel_layer.group_send(
-                    f'notifications_{member_id}',
-                    {
-                        'type': 'user_status',
-                        'user_id': user_id,
-                        'username': username,
-                        'is_online': False,
-                        'last_seen': asyncio.get_event_loop().time()
-                    }
-                )
-
-    async def heartbeat_loop(self):
-        """Send periodic heartbeat messages to keep connection alive and refresh online status."""
-        try:
-            while True:
-                await asyncio.sleep(HEARTBEAT_INTERVAL)
-                try:
-                    # Refresh Redis TTL to keep user online
-                    await self.set_user_online(True)
-
-                    await self.send(text_data=json.dumps({
-                        'type': 'ping',
-                        'timestamp': asyncio.get_event_loop().time()
-                    }))
-                except Exception:
-                    # Connection might be closed, let disconnect handle cleanup
-                    break
-        except asyncio.CancelledError:
-            pass
 
     async def receive(self, text_data):
         """Handle incoming WebSocket messages with timeout and rate limiting."""
@@ -212,6 +207,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         try:
             data = json.loads(text_data)
             message_type = data.get('type')
+
+            # Handle client heartbeat for presence tracking
+            if message_type == 'heartbeat':
+                await self.handle_heartbeat()
+                return
 
             # Skip heartbeat responses
             if message_type == 'pong':
@@ -362,6 +362,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }
         )
         print(f'[BACKEND] Broadcasted read receipt for message {message_id}')
+
+    async def handle_heartbeat(self):
+        """Handle client heartbeat for presence tracking."""
+        # Record heartbeat in presence service
+        PresenceService.record_heartbeat(
+            self.user.id,
+            self.connection_id,
+            metadata={
+                'conversation_id': self.conversation_id,
+                'ip': self.scope.get('client', ['unknown'])[0],
+            }
+        )
+        print(f'[BACKEND] Heartbeat received from user {self.user.id}')
 
     async def chat_message(self, event):
         """Send chat message to WebSocket."""
@@ -514,31 +527,27 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return []
 
     def is_peer_online(self, peer_id):
-        """Check if a peer user is currently online in Redis."""
-        try:
-            redis_client = get_redis_client()
-            key = f'user_online:{peer_id}'
-            return redis_client.exists(key) == 1
-        except Exception:
-            return False
+        """Check if a peer user is currently online based on heartbeat freshness."""
+        return PresenceService.is_user_online(peer_id)
 
     async def send_peer_online_status(self):
         """Send the current peer's online status to the connected user."""
         try:
             # Get all other members in conversation
             other_members = await self.get_other_conversation_members()
-            
+
             # For direct conversations, there should be only one other member
             if other_members:
                 peer_id = other_members[0]
                 is_online = self.is_peer_online(peer_id)
-                
+                last_seen = PresenceService.get_last_seen(peer_id)
+
                 # Send peer's current online status
                 await self.send(text_data=json.dumps({
                     'type': 'user_status',
                     'user_id': peer_id,
                     'is_online': is_online,
-                    'last_seen': None
+                    'last_seen': last_seen.isoformat() if last_seen else None
                 }))
                 print(f'[BACKEND] Sent peer {peer_id} status (online={is_online}) to user {self.user.id}')
         except Exception as e:
@@ -715,19 +724,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             import traceback
             traceback.print_exc()
 
-    async def set_user_online(self, is_online):
-        """Set user online status in Redis using connection pool."""
-        try:
-            redis_client = get_redis_client()
-            key = f'user_online:{self.user.id}'
-            
-            if is_online:
-                # Set with 5 minute TTL (heartbeat should refresh)
-                redis_client.setex(key, 300, '1')
-            else:
-                redis_client.delete(key)
-        except Exception:
-            pass
 
     async def retry_pending_messages(self):
         """Retry pending messages for this user and conversation."""

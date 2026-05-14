@@ -40,6 +40,39 @@ export function formatTime(dateString) {
 }
 
 /**
+ * Format precise time for display (with seconds)
+ * @param {string|Date} dateString - Date string or Date object
+ * @returns {string} Formatted precise time
+ */
+export function formatPreciseTime(dateString) {
+  const date = new Date(dateString);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  let dayLabel = '';
+  if (date.toDateString() === today.toDateString()) {
+    dayLabel = 'Today at';
+  } else if (date.toDateString() === yesterday.toDateString()) {
+    dayLabel = 'Yesterday at';
+  } else {
+    dayLabel = date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).replace(/\//g, '/') + ' at';
+  }
+
+  const timeStr = date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+
+  return `${dayLabel} ${timeStr}`;
+}
+
+/**
  * Escape HTML to prevent XSS
  * @param {string} text - Text to escape
  * @returns {string} Escaped text

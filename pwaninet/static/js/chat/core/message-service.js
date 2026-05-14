@@ -8,6 +8,7 @@ import { store } from './store.js';
 import { webSocketManager } from './websocket.js';
 import { getCSRFToken } from '../shared/utils.js';
 import { EVENTS, MESSAGE_STATE, CONNECTION_STATE, isValidStateTransition } from '../shared/constants.js';
+import { messageSoundManager } from '../shared/message-sound.js';
 
 export class MessageService {
     constructor() {
@@ -220,7 +221,10 @@ export class MessageService {
         // Transition to QUEUED (with delay for UI to render)
         setTimeout(() => {
             this._transitionMessageState(tempId, MESSAGE_STATE.QUEUED);
-            store.updateMessage(tempId, { status: MESSAGE_STATE.QUEUED });
+            store.updateMessage(tempId, { 
+                status: MESSAGE_STATE.QUEUED,
+                metadata: { ...options.metadata, queuedAt: Date.now() }
+            });
             console.log('[MESSAGE_SERVICE] Status updated to QUEUED for:', tempId);
         }, 3000);
 
@@ -499,9 +503,12 @@ export class MessageService {
 
         const state = store.getState();
 
+        console.log('[MESSAGE SERVICE] Received user_status', data);
+
         // Only process if it's not the current user
         if (data.user_id !== state.currentUserId) {
             // Update peer online status in store (ONLY store mutates)
+            console.log('[MESSAGE SERVICE] Updating peer status', data.user_id, data.is_online, data.last_seen);
             store.setPeerOnlineStatus(data.user_id, data.is_online, data.last_seen);
         }
     }
@@ -590,6 +597,11 @@ export class MessageService {
         
         this.messageStates.set(tempId, currentState);
         this._log('STATE_TRANSITION', { tempId, from: oldState, to: newState, error });
+        
+        // Play sound for queued/sending → sent transitions
+        if (messageSoundManager.shouldPlaySound(oldState, newState)) {
+            messageSoundManager.playSendSound(tempId);
+        }
         
         // Clean up old states for sent/delivered/read messages
         if ([MESSAGE_STATE.SENT, MESSAGE_STATE.DELIVERED, MESSAGE_STATE.READ].includes(newState)) {

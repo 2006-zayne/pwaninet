@@ -14,7 +14,6 @@ import { cameraService } from './features/camera/camera.service.js';
 import { voiceService } from './features/voice/voice.service.js';
 import { emojiService } from './features/emoji/emoji.service.js';
 import { contextMenuService } from './features/context-menu/context-menu.service.js';
-
 // Load encryption module if available
 if (typeof E2EEncryption === 'undefined') {
     console.warn('E2EEncryption module not loaded');
@@ -38,6 +37,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize with strict SOT data flow order
     console.log('🔒 Initializing with strict SOT architecture...');
+
+    // 0. Sound manager (preload audio buffer)
+    messageSoundManager.init().catch(err => {
+        console.warn('[BOOTSTRAP] Failed to init sound manager:', err);
+    });
+    console.log('✅ Sound manager initialized (audio preloaded)');
 
     // 1. Store first (SOT) - ONLY mutation source
     store.init(config);
@@ -79,7 +84,8 @@ document.addEventListener('DOMContentLoaded', () => {
     window.messageService = messageService;
     window.webSocketManager = webSocketManager;
     window.uiController = uiController;
-    window.attachmentService = attachmentService;
+    window.attachmentService = attachmentService;e;
+    window.messageSoundManager = messageSoundManagr
     window.attachmentUI = attachmentUI;
     window.cameraService = cameraService;
     window.voiceService = voiceService;

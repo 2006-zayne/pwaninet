@@ -9,6 +9,7 @@ import { store } from './store.js';
 import { messageService } from './message-service.js';
 import { webSocketManager } from './websocket.js';
 import { uiController } from '../ui/ui-controller.js';
+import { networkHealthTracker } from '../shared/network-health-tracker.js';
 
 export class AppController {
     constructor() {
@@ -30,6 +31,9 @@ export class AppController {
         window.__store = store;
 
         try {
+            // Initialize network health tracker
+            networkHealthTracker.init();
+            
             this._validateSOTInitialization();
             this._setupDataFlowConnections();
             this._setupConnectionMonitoring();
