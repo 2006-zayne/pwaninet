@@ -252,7 +252,71 @@ div.chat-container div.messages-area div.message-bubble {
   /* background: none !important; REMOVED: Conflicts with sent/received backgrounds */
 }
 
-/* Message wrapper for avatar support */
+/* === Message Group Layout (WhatsApp/Discord style) === */
+
+/* Message group: one avatar + stack of bubbles + one meta row */
+.message-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
+  margin: 6px 0 2px 0;
+}
+
+.sent-group {
+  flex-direction: row-reverse;
+}
+
+.received-group {
+  flex-direction: row;
+}
+
+/* Avatar — once per incoming group, aligned to bottom of last bubble */
+.group-avatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  align-self: flex-end;
+}
+
+.message-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border);
+  transition: border-color 0.3s ease;
+}
+
+/* Content column: bubble-group + meta */
+.group-content {
+  display: flex;
+  flex-direction: column;
+  max-width: 70%;
+  min-width: 0;
+}
+
+/* Bubble group: vertical stack of consecutive bubbles */
+.bubble-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Sent bubbles align to the right within their group */
+.sent-group .bubble-group {
+  align-items: flex-end;
+}
+
+/* Received bubbles align to the left within their group */
+.received-group .bubble-group {
+  align-items: flex-start;
+}
+
+/* Legacy wrapper support (kept for backward compat) */
 .message-wrapper {
   display: flex;
   flex-direction: row;
@@ -270,7 +334,6 @@ div.chat-container div.messages-area div.message-bubble {
   justify-content: flex-start;
 }
 
-/* Avatar container - floats outside bubble alignment */
 .message-avatar-container {
   flex-shrink: 0;
   width: 32px;
@@ -280,37 +343,27 @@ div.chat-container div.messages-area div.message-bubble {
   justify-content: center;
 }
 
-.message-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--border);
-  transition: border-color 0.3s ease;
-}
-
-/* Avatar visibility - only show on last/single messages */
 .message-avatar-container.hidden {
   visibility: hidden;
 }
 
-/* Message content wrapper - holds bubble and meta */
 .message-content-wrapper {
   display: flex;
   flex-direction: column;
-  max-width: 75%;
+  max-width: 70%;
 }
 
-/* Base bubble - MISSING padding is the main culprit */
+/* Base bubble */
 .messages-area .message-bubble {
   padding: 8px 12px !important;
-  max-width: 75% !important;
+  max-width: 100% !important;
   width: fit-content !important;
-  word-wrap: break-word !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: pre-wrap !important;
   font-size: 14px !important;
   line-height: 1.4 !important;
   position: relative !important;
-  /* Use device system font - will inherit user's phone font (Rosemary, etc.) */
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Samsung One", "Samsung Sans", "Helvetica Neue", Arial, sans-serif !important;
 }
 
@@ -319,8 +372,9 @@ div.chat-container div.messages-area div.message-bubble {
   background-color: var(--chat-bg-sent, #d4f1c4) !important;
   color: var(--chat-text-sent, #111) !important;
   border-radius: 18px 18px 4px 18px !important;
-  margin: 6px 8px 0px auto !important;
+  margin: 0 !important;
   padding: 8px 12px !important;
+  align-self: flex-end !important;
 }
 
 /* Received messages */
@@ -328,9 +382,10 @@ div.chat-container div.messages-area div.message-bubble {
   background-color: var(--chat-bg-received, #f0f0f0) !important;
   color: var(--chat-text-received, #111) !important;
   border-radius: 18px 18px 18px 4px !important;
-  margin: 6px 8px 0px 8px !important;
+  margin: 0 !important;
   padding: 8px 12px !important;
   border: none !important;
+  align-self: flex-start !important;
 }
 
 /* Bubble Shape Variables - Set by JS based on modal selection */
@@ -350,45 +405,45 @@ div.chat-container div.messages-area div.message-bubble {
 /* SINGLE messages - uniform border radius on all corners */
 .messages-area .message-bubble.sent.group-single {
   border-radius: var(--bubble-radius) !important;
-  margin: 4px 8px 0px auto !important;
+  margin: 0 !important;
 }
 
 .messages-area .message-bubble.received.group-single {
   border-radius: var(--bubble-radius) !important;
-  margin: 4px 8px 0px 8px !important;
+  margin: 0 !important;
 }
 
 /* FIRST in group - bottom wall-side corner flat to connect to next */
 .messages-area .message-bubble.sent.group-first {
   border-radius: var(--bubble-radius) var(--bubble-radius) 5px var(--bubble-radius) !important;
-  margin: 1px 8px 0px auto !important;
+  margin: 0 !important;
 }
 
 .messages-area .message-bubble.received.group-first {
   border-radius: var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) 5px !important;
-  margin: 1px 8px 0px 8px !important;
+  margin: 0 !important;
 }
 
 /* MIDDLE in group - top and bottom wall-side corners flat */
 .messages-area .message-bubble.sent.group-middle {
   border-radius: var(--bubble-radius) 5px 5px var(--bubble-radius) !important;
-  margin: 0px 8px 0px auto !important;
+  margin: 0 !important;
 }
 
 .messages-area .message-bubble.received.group-middle {
   border-radius: 5px var(--bubble-radius) var(--bubble-radius) 5px !important;
-  margin: 0px 8px 0px 8px !important;
+  margin: 0 !important;
 }
 
 /* LAST in group - top wall-side corner flat to connect from prev */
 .messages-area .message-bubble.sent.group-last {
   border-radius: var(--bubble-radius) 5px var(--bubble-radius) var(--bubble-radius) !important;
-  margin: 0px 8px 0px auto !important;
+  margin: 0 !important;
 }
 
 .messages-area .message-bubble.received.group-last {
   border-radius: 5px var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) !important;
-  margin: 0 8px 0px 8px !important;
+  margin: 0 !important;
 }
 
 /* Dark mode */
@@ -408,33 +463,44 @@ div.chat-container div.messages-area div.message-bubble {
   margin: 0;
   font-size: 14px;
   line-height: 1.4;
-  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
   white-space: pre-wrap;
 }
 
 
-/* Meta row placed below the bubble: timestamp + read receipt */
+/* Meta row placed below the bubble group: timestamp + read receipt */
 .message-meta {
-  /* Use same font size and family as the bubble content */
   font-size: 14px;
   font-family: inherit;
   opacity: 0.85;
-  margin-top: 0px;
-  display: block; /* ensure it sits below the bubble */
+  margin-top: 4px;
+  display: block;
 }
 
+.sent-group .message-meta {
+  text-align: right;
+  color: var(--chat-text-sent) !important;
+  opacity: 0.85;
+}
+
+.received-group .message-meta {
+  text-align: left;
+  color: var(--chat-text-received) !important;
+  opacity: 0.85;
+}
+
+/* Legacy wrapper meta support */
 .sent-wrapper .message-meta {
   text-align: right;
   color: var(--chat-text-sent) !important;
   opacity: 0.85;
-  margin-right: 8px;
 }
 
 .received-wrapper .message-meta {
   text-align: left;
   color: var(--chat-text-received) !important;
   opacity: 0.85;
-  left: 0px;
 }
 
 .message-meta .timestamp {
@@ -560,15 +626,17 @@ div.chat-container div.messages-area div.message-bubble {
   box-shadow: none !important;
   max-width: none !important;
   width: auto !important;
-  margin: 6px 8px 0px 8px !important;
+  margin: 0 !important;
 }
 
 .messages-area .message-bubble.sent.emoji-message {
-  margin: 6px 8px 0px auto !important;
+  margin: 0 !important;
+  align-self: flex-end !important;
 }
 
 .messages-area .message-bubble.received.emoji-message {
-  margin: 6px 8px 0px 8px !important;
+  margin: 0 !important;
+  align-self: flex-start !important;
 }
 
 .emoji-content {
@@ -588,12 +656,12 @@ div.chat-container div.messages-area div.message-bubble {
 /* Media Message Styles */
 .media-message {
   padding: 4px !important;
-  max-width: 75% !important;
+  max-width: 100% !important;
 }
 
 /* Media bubble wrapper - media itself acts as the bubble surface */
 .media-bubble-wrapper {
-  max-width: 75% !important;
+  max-width: 100% !important;
   overflow: hidden;
   border-radius: var(--bubble-radius) !important;
   box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
@@ -602,12 +670,14 @@ div.chat-container div.messages-area div.message-bubble {
 
 /* Sent media bubbles align right */
 .media-bubble-wrapper.sent {
-  margin: 1px 8px 0px auto !important;
+  margin: 0 !important;
+  align-self: flex-end;
 }
 
 /* Received media bubbles align left */
 .media-bubble-wrapper.received {
-  margin: 1px 8px 0px 8px !important;
+  margin: 0 !important;
+  align-self: flex-start;
 }
 
 /* Group position variants for media bubbles */
@@ -660,17 +730,17 @@ div.chat-container div.messages-area div.message-bubble {
   line-height: 1.4;
   padding: 4px 8px 6px 8px;
   color: var(--text-primary);
-  max-width: 75%;
-  word-wrap: break-word;
+  max-width: 100%;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
 }
 
-.sent-wrapper .media-caption {
-  margin: 2px 8px 0px auto;
+.sent-group .media-caption {
   text-align: left;
 }
 
-.received-wrapper .media-caption {
-  margin: 2px 8px 0px 8px;
+.received-group .media-caption {
   text-align: left;
 }
 

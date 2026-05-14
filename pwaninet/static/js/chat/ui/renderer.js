@@ -116,30 +116,48 @@ export class MessageRenderer {
             const viewItems = this._buildView(messages || []);
             console.log("[RENDERER] Built view items:", viewItems?.length);
 
+            // Group consecutive message items by sender into message-groups
+            let currentGroup = null;
+
+            const flushGroup = () => {
+                if (!currentGroup || currentGroup.messages.length === 0) return;
+                try {
+                    const groupEl = this._createMessageGroup(currentGroup);
+                    this.container.appendChild(groupEl);
+                } catch (err) {
+                    console.error("[RENDERER] ERROR creating message group:", err);
+                }
+                currentGroup = null;
+            };
+
             for (const item of viewItems || []) {
                 const viewType = item?.viewType;
-                console.log("[RENDERER] Processing item viewType:", JSON.stringify(viewType), "id:", item?.id, "label:", item?.label);
-                
+
                 if (viewType === 'date') {
-                    console.log("[RENDERER] Creating date element:", item.label);
+                    flushGroup();
                     this.container.appendChild(this._createDateElement(item.label));
                 } else if (viewType === 'time') {
-                    console.log("[RENDERER] Creating time element:", item.label);
+                    flushGroup();
                     this.container.appendChild(this._createTimeElement(item.label, item.preciseLabel));
                 } else if (viewType === 'message') {
-                    console.log("[RENDERER] >>> CREATING MESSAGE ELEMENT for:", item.id);
-                    try {
-                        const msgEl = this._createMessageElement(item);
-                        console.log("[RENDERER] Message element created:", msgEl?.tagName, msgEl?.className);
-                        this.container.appendChild(msgEl);
-                        console.log("[RENDERER] Message appended successfully");
-                    } catch (err) {
-                        console.error("[RENDERER] ERROR creating message:", err, item);
+                    // Check if this message belongs to the current group
+                    if (currentGroup && currentGroup.senderId === item.senderId && currentGroup.isOwn === item.isOwn) {
+                        currentGroup.messages.push(item);
+                    } else {
+                        flushGroup();
+                        currentGroup = {
+                            senderId: item.senderId,
+                            isOwn: item.isOwn,
+                            messages: [item]
+                        };
                     }
                 } else {
+                    flushGroup();
                     console.warn("[RENDERER] UNKNOWN item viewType:", viewType, item);
                 }
             }
+            flushGroup();
+
             console.log("[RENDERER] Render complete. Container children:", this.container?.children?.length);
 
             this.lastRenderedCount = messages.length;
@@ -151,6 +169,285 @@ export class MessageRenderer {
         } finally {
             this.isRendering = false;
         }
+    }
+
+    /**
+     * Create a message group element containing avatar, bubble group, and meta
+     * @param {Object} group - { senderId, isOwn, messages: [...] }
+     * @returns {HTMLElement} Message group element
+     */
+    _createMessageGroup(group) {
+        const { senderId, isOwn, messages } = group;
+        const lastMessage = messages[messages.length - 1];
+
+        const groupDiv = document.createElement('div');
+        groupDiv.className = `message-group ${isOwn ? 'sent-group' : 'received-group'}`;
+
+        // Avatar for received messages — appears once per group, aligned to bottom
+        if (!isOwn) {
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = 'group-avatar';
+            const avatarUrl = this._getSenderAvatar(senderId);
+            const avatarImg = document.createElement('img');
+            avatarImg.className = 'message-avatar';
+            avatarImg.src = avatarUrl;
+            avatarImg.alt = 'Avatar';
+            avatarDiv.appendChild(avatarImg);
+            groupDiv.appendChild(avatarDiv);
+        }
+
+        // Content column: bubble-group + meta
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'group-content';
+
+        const bubbleGroupDiv = document.createElement('div');
+        bubbleGroupDiv.className = 'bubble-group';
+
+        for (const message of messages) {
+            try {
+                const bubbleEl = this._createBubbleElement(message);
+                bubbleGroupDiv.appendChild(bubbleEl);
+            } catch (err) {
+                console.error("[RENDERER] ERROR creating bubble:", err, message);
+            }
+        }
+
+        contentDiv.appendChild(bubbleGroupDiv);
+
+        // Meta row (timestamp + read receipt) — once per group, below bubbles
+        const metaDiv = this._createGroupMeta(lastMessage);
+        if (metaDiv) {
+            contentDiv.appendChild(metaDiv);
+        }
+
+        groupDiv.appendChild(contentDiv);
+        return groupDiv;
+    }
+
+    /**
+     * Create the meta row for a message group (timestamp + read receipt)
+     * @param {Object} message - The last message in the group
+     * @returns {HTMLElement|null} Meta element or null
+     */
+    _createGroupMeta(message) {
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'message-meta';
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'timestamp';
+        timeSpan.textContent = formatTime(message.timestamp);
+        metaDiv.appendChild(timeSpan);
+
+        if (message.isOwn) {
+            const status = message.status || 'sent';
+            if (message.status === 'read' && message.isLastRead) {
+                const receiverAvatar = document.body.dataset.receiverAvatar;
+                const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
+                const receiptSpan = document.createElement('span');
+                receiptSpan.className = 'message-read-receipt read-avatar-only';
+                receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
+                metaDiv.appendChild(receiptSpan);
+            } else if (message.isLastSent && !message.hideReadReceipt) {
+                const receiptSpan = document.createElement('span');
+                receiptSpan.className = `message-read-receipt status-${status}`;
+                receiptSpan.innerHTML = this._getStatusIcon(status, message.id, message);
+                metaDiv.appendChild(receiptSpan);
+            }
+        } else if (message.hasFloatingReadReceipt) {
+            const receiverAvatar = document.body.dataset.receiverAvatar;
+            const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
+            const receiptSpan = document.createElement('span');
+            receiptSpan.className = 'message-read-receipt floating-read-receipt';
+            receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
+            metaDiv.appendChild(receiptSpan);
+        }
+
+        return metaDiv;
+    }
+
+    /**
+     * Create a bubble element for a single message (no wrapper/avatar/meta)
+     * @param {Object} message - Message with view properties
+     * @returns {HTMLElement} Bubble element
+     */
+    _createBubbleElement(message) {
+        if (message.type === 'system') {
+            return this._createSystemMessage(message);
+        }
+        if (message.type === 'emoji') {
+            return this._createEmojiBubble(message);
+        }
+        if (message.type === 'media') {
+            return this._createMediaBubble(message);
+        }
+        if (message.type === 'link') {
+            return this._createLinkBubble(message);
+        }
+        return this._createTextBubble(message);
+    }
+
+    /**
+     * Create a text bubble (no wrapper)
+     * @param {Object} message - Message object
+     * @returns {HTMLElement} Bubble element
+     */
+    _createTextBubble(message) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition} ${message.isLastSent ? 'last-sent' : ''}`;
+        messageDiv.setAttribute('data-message-id', message.id);
+        messageDiv.setAttribute('data-sender-id', message.senderId);
+        messageDiv.setAttribute('data-status', message.status);
+        messageDiv.setAttribute('data-group-position', message.groupPosition);
+        this._applyBubbleStyle(messageDiv);
+
+        messageDiv.innerHTML = `<p class="message-content">${escapeHtml(message.content || '')}</p>`;
+        return messageDiv;
+    }
+
+    /**
+     * Create an emoji bubble (no wrapper)
+     * @param {Object} message - Emoji message object
+     * @returns {HTMLElement} Bubble element
+     */
+    _createEmojiBubble(message) {
+        const emojiDiv = document.createElement('div');
+        emojiDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} emoji-message group-${message.groupPosition}`;
+        emojiDiv.setAttribute('data-message-id', message.id);
+        emojiDiv.setAttribute('data-sender-id', message.senderId);
+        emojiDiv.setAttribute('data-status', message.status);
+        emojiDiv.setAttribute('data-group-position', message.groupPosition);
+        emojiDiv.innerHTML = `<div class="emoji-content">${escapeHtml(message.content || '')}</div>`;
+        return emojiDiv;
+    }
+
+    /**
+     * Create a media bubble (no wrapper)
+     * @param {Object} message - Media message object
+     * @returns {HTMLElement} Bubble element
+     */
+    _createMediaBubble(message) {
+        const metadata = message.metadata || {};
+        const attachmentType = metadata.type || 'file';
+        const isImageOrVideo = attachmentType === 'image' || attachmentType === 'video';
+
+        let messageDiv;
+        let mediaContent = '';
+
+        if (isImageOrVideo && metadata.url) {
+            messageDiv = document.createElement('div');
+            messageDiv.className = `media-bubble-wrapper ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition}`;
+            messageDiv.setAttribute('data-message-id', message.id);
+            messageDiv.setAttribute('data-sender-id', message.senderId);
+            messageDiv.setAttribute('data-status', message.status);
+            messageDiv.setAttribute('data-group-position', message.groupPosition);
+
+            if (attachmentType === 'image') {
+                mediaContent = `<img src="${escapeHtml(metadata.url)}" alt="Image" class="media-image" loading="lazy">`;
+            } else {
+                mediaContent = `
+                    <video controls class="media-video">
+                        <source src="${escapeHtml(metadata.url)}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>`;
+            }
+            messageDiv.innerHTML = mediaContent;
+
+            // Wrap with caption if present
+            if (message.content && message.content.trim()) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'media-with-caption';
+                wrapper.appendChild(messageDiv);
+                const captionDiv = document.createElement('div');
+                captionDiv.className = 'media-caption';
+                captionDiv.textContent = message.content;
+                wrapper.appendChild(captionDiv);
+                return wrapper;
+            }
+        } else {
+            messageDiv = document.createElement('div');
+            messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} media-message group-${message.groupPosition}`;
+            messageDiv.setAttribute('data-message-id', message.id);
+            messageDiv.setAttribute('data-sender-id', message.senderId);
+            messageDiv.setAttribute('data-status', message.status);
+            messageDiv.setAttribute('data-group-position', message.groupPosition);
+            this._applyBubbleStyle(messageDiv);
+
+            if (metadata.url) {
+                switch (attachmentType) {
+                    case 'audio':
+                        mediaContent = `
+                            <div class="media-audio-container">
+                                <audio controls class="media-audio">
+                                    <source src="${escapeHtml(metadata.url)}" type="audio/mpeg">
+                                    Your browser does not support the audio tag.
+                                </audio>
+                            </div>`;
+                        break;
+                    default: {
+                        const fileName = message.content || 'Attachment';
+                        const fileIcon = this._getFileIcon(attachmentType);
+                        mediaContent = `
+                            <a href="${escapeHtml(metadata.url)}" target="_blank" class="media-link">
+                                <div class="media-file">
+                                    <span class="file-icon">${fileIcon}</span>
+                                    <span class="file-name">${escapeHtml(fileName)}</span>
+                                </div>
+                            </a>`;
+                        break;
+                    }
+                }
+            } else {
+                mediaContent = `<p class="message-content">${escapeHtml(message.content || '')}</p>`;
+            }
+            messageDiv.innerHTML = mediaContent;
+        }
+
+        return messageDiv;
+    }
+
+    /**
+     * Create a link bubble (no wrapper)
+     * @param {Object} message - Link message object
+     * @returns {HTMLElement} Bubble element
+     */
+    _createLinkBubble(message) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} link-message group-${message.groupPosition}`;
+        messageDiv.setAttribute('data-message-id', message.id);
+        messageDiv.setAttribute('data-sender-id', message.senderId);
+        messageDiv.setAttribute('data-status', message.status);
+        messageDiv.setAttribute('data-group-position', message.groupPosition);
+        this._applyBubbleStyle(messageDiv);
+
+        const metadata = message.metadata || {};
+        const linkUrl = metadata.link_url;
+        const linkTitle = metadata.link_title;
+        const linkDescription = metadata.link_description;
+        const linkImage = metadata.link_image;
+        const linkType = metadata.link_type || 'link';
+
+        let linkContent = '';
+
+        if (linkType === 'youtube') {
+            linkContent = this._createYouTubeEmbed(linkUrl);
+        } else if (linkType === 'facebook') {
+            linkContent = this._createFacebookEmbed(linkUrl);
+        } else {
+            linkContent = `
+                <a href="${escapeHtml(linkUrl)}" target="_blank" class="link-preview-card" rel="noopener noreferrer">
+                    ${linkImage ? `<img src="${escapeHtml(linkImage)}" alt="Link preview" class="link-preview-image" loading="lazy">` : ''}
+                    <div class="link-preview-content">
+                        <div class="link-preview-title">${escapeHtml(linkTitle || linkUrl)}</div>
+                        ${linkDescription ? `<div class="link-preview-description">${escapeHtml(linkDescription)}</div>` : ''}
+                        <div class="link-preview-domain">${this._extractDomain(linkUrl)}</div>
+                    </div>
+                </a>
+            `;
+        }
+
+        const textContent = message.content ? `<p class="message-content">${escapeHtml(message.content)}</p>` : '';
+        messageDiv.innerHTML = textContent + linkContent;
+        return messageDiv;
     }
     
     /**
@@ -341,123 +638,12 @@ export class MessageRenderer {
     }
 
     /**
-     * Create message element (pure DOM creation)
+     * Create message element (legacy entry point, delegates to _createBubbleElement)
      * @param {Object} message - Message object with view properties (canonical schema)
      * @returns {HTMLElement} Message element
      */
     _createMessageElement(message) {
-        // DEBUG: Log message type detection
-        console.log('[RENDERER] Creating message element. ID:', message.id, 'Type:', message.type, 'Metadata:', message.metadata);
-        
-        if (message.type === 'system') {
-        return this._createSystemMessage(message);
-        }
-
-        if (message.type === 'emoji') {
-        return this._createEmojiMessage(message);
-        }
-
-        if (message.type === 'media') {
-        return this._createMediaMessage(message);
-        }
-
-        if (message.type === 'link') {
-        console.log('[RENDERER] Creating link message for:', message.id);
-        return this._createLinkMessage(message);
-        }
-        // Build wrapper containing avatar, bubble and meta (timestamp + read receipt)
-        const wrapperDiv = document.createElement('div');
-        wrapperDiv.className = `message-wrapper ${message.isOwn ? 'sent-wrapper' : 'received-wrapper'} group-${message.groupPosition}`;
-        wrapperDiv.setAttribute('data-message-id', message.id);
-        wrapperDiv.setAttribute('data-sender-id', message.senderId);
-        wrapperDiv.setAttribute('data-status', message.status);
-        wrapperDiv.setAttribute('data-group-position', message.groupPosition);
-
-        // Add avatar for received messages (only on last/single in group)
-        if (!message.isOwn) {
-            const shouldShowAvatar = message.groupPosition === 'single' || message.groupPosition === 'last';
-            const avatarContainer = document.createElement('div');
-            avatarContainer.className = `message-avatar-container ${shouldShowAvatar ? '' : 'hidden'}`;
-            
-            if (shouldShowAvatar) {
-                const avatarUrl = this._getSenderAvatar(message.senderId);
-                const avatarImg = document.createElement('img');
-                avatarImg.className = 'message-avatar';
-                avatarImg.src = avatarUrl;
-                avatarImg.alt = 'Avatar';
-                avatarContainer.appendChild(avatarImg);
-            }
-            
-            wrapperDiv.appendChild(avatarContainer);
-        }
-
-        // Content wrapper for bubble and meta
-        const contentWrapper = document.createElement('div');
-        contentWrapper.className = 'message-content-wrapper';
-
-        // Create bubble (no timestamp/read receipt inside)
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition} ${message.isLastSent ? 'last-sent' : ''}`;
-        messageDiv.setAttribute('data-message-id', message.id);
-        messageDiv.setAttribute('data-sender-id', message.senderId);
-        messageDiv.setAttribute('data-status', message.status);
-        messageDiv.setAttribute('data-group-position', message.groupPosition);
-
-        // Apply custom bubble style if set
-        this._applyBubbleStyle(messageDiv);
-
-        // Use canonical schema fields
-        const status = message.status || 'sent';
-
-        // Bubble content
-        messageDiv.innerHTML = `
-            <p class="message-content">${escapeHtml(message.content || '')}</p>
-        `;
-
-        contentWrapper.appendChild(messageDiv);
-
-        // Determine whether to render meta (timestamp + receipt): single messages or last in group
-        const shouldRenderMeta = message.groupPosition === 'single' || message.groupPosition === 'last' || !!message.hasFloatingReadReceipt;
-        if (shouldRenderMeta) {
-            const metaDiv = document.createElement('div');
-            metaDiv.className = 'message-meta';
-
-            const timeSpan = document.createElement('span');
-            timeSpan.className = 'timestamp';
-            timeSpan.textContent = formatTime(message.timestamp);
-            metaDiv.appendChild(timeSpan);
-
-            // Read receipt / status to appear next to timestamp
-            if (message.isOwn) {
-                if (message.status === 'read' && message.isLastRead) {
-                    const receiverAvatar = document.body.dataset.receiverAvatar;
-                    const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = 'message-read-receipt read-avatar-only';
-                    receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                    metaDiv.appendChild(receiptSpan);
-                } else if (message.isLastSent && !message.hideReadReceipt) {
-                    // Show status only on last sent message
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = `message-read-receipt status-${status}`;
-                    const avatarUrl = message.metadata?.read_avatar || null;
-                    receiptSpan.innerHTML = this._getStatusIcon(status, message.id, avatarUrl, message);
-                    metaDiv.appendChild(receiptSpan);
-                }
-            } else if (message.hasFloatingReadReceipt) {
-                const receiverAvatar = document.body.dataset.receiverAvatar;
-                const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                const receiptSpan = document.createElement('span');
-                receiptSpan.className = 'message-read-receipt floating-read-receipt';
-                receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                metaDiv.appendChild(receiptSpan);
-            }
-
-            contentWrapper.appendChild(metaDiv);
-        }
-
-        wrapperDiv.appendChild(contentWrapper);
-        return wrapperDiv;
+        return this._createBubbleElement(message);
     }
 
     /**
@@ -506,255 +692,9 @@ export class MessageRenderer {
         return element;
     }
 
-    /**
-     * Create emoji message element (pure DOM creation)
-     * @param {Object} message - Emoji message object
-     * @returns {HTMLElement} Emoji message element
-     */
-    _createEmojiMessage(message) {
-        // Build wrapper containing avatar, emoji and meta (timestamp + read receipt)
-        const wrapperDiv = document.createElement('div');
-        wrapperDiv.className = `message-wrapper ${message.isOwn ? 'sent-wrapper' : 'received-wrapper'} group-${message.groupPosition}`;
-        wrapperDiv.setAttribute('data-message-id', message.id);
-        wrapperDiv.setAttribute('data-sender-id', message.senderId);
-        wrapperDiv.setAttribute('data-status', message.status);
-        wrapperDiv.setAttribute('data-group-position', message.groupPosition);
+    /* _createEmojiMessage removed — replaced by _createEmojiBubble + _createMessageGroup */
 
-        // Add avatar for received messages (only on last/single in group)
-        if (!message.isOwn) {
-            const shouldShowAvatar = message.groupPosition === 'single' || message.groupPosition === 'last';
-            const avatarContainer = document.createElement('div');
-            avatarContainer.className = `message-avatar-container ${shouldShowAvatar ? '' : 'hidden'}`;
-            
-            if (shouldShowAvatar) {
-                const avatarUrl = this._getSenderAvatar(message.senderId);
-                const avatarImg = document.createElement('img');
-                avatarImg.className = 'message-avatar';
-                avatarImg.src = avatarUrl;
-                avatarImg.alt = 'Avatar';
-                avatarContainer.appendChild(avatarImg);
-            }
-            
-            wrapperDiv.appendChild(avatarContainer);
-        }
-
-        // Content wrapper for emoji and meta
-        const contentWrapper = document.createElement('div');
-        contentWrapper.className = 'message-content-wrapper';
-
-        // Create emoji element (no bubble styling)
-        const emojiDiv = document.createElement('div');
-        emojiDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} emoji-message group-${message.groupPosition}`;
-        emojiDiv.setAttribute('data-message-id', message.id);
-        emojiDiv.setAttribute('data-sender-id', message.senderId);
-        emojiDiv.setAttribute('data-status', message.status);
-        emojiDiv.setAttribute('data-group-position', message.groupPosition);
-        
-        emojiDiv.innerHTML = `<div class="emoji-content">${escapeHtml(message.content || '')}</div>`;
-
-        contentWrapper.appendChild(emojiDiv);
-
-        // Determine whether to render meta (timestamp + receipt): single messages or last in group
-        const shouldRenderMeta = message.groupPosition === 'single' || message.groupPosition === 'last' || !!message.hasFloatingReadReceipt;
-        if (shouldRenderMeta) {
-            const metaDiv = document.createElement('div');
-            metaDiv.className = 'message-meta';
-
-            const timeSpan = document.createElement('span');
-            timeSpan.className = 'timestamp';
-            timeSpan.textContent = formatTime(message.timestamp);
-            metaDiv.appendChild(timeSpan);
-
-            // Read receipt / status to appear next to timestamp
-            if (message.isOwn) {
-                const status = message.status || 'sent';
-                if (message.status === 'read' && message.isLastRead) {
-                    const receiverAvatar = document.body.dataset.receiverAvatar;
-                    const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = 'message-read-receipt read-avatar-only';
-                    receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                    metaDiv.appendChild(receiptSpan);
-                } else if (message.isLastSent && !message.hideReadReceipt) {
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = `message-read-receipt status-${status}`;
-                    receiptSpan.innerHTML = this._getStatusIcon(status, message.id, message);
-                    metaDiv.appendChild(receiptSpan);
-                }
-            } else if (message.hasFloatingReadReceipt) {
-                const receiverAvatar = document.body.dataset.receiverAvatar;
-                const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                const receiptSpan = document.createElement('span');
-                receiptSpan.className = 'message-read-receipt floating-read-receipt';
-                receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                metaDiv.appendChild(receiptSpan);
-            }
-
-            contentWrapper.appendChild(metaDiv);
-        }
-
-        wrapperDiv.appendChild(contentWrapper);
-        return wrapperDiv;
-    }
-
-    /**
-     * Create media message element (pure DOM creation)
-     * @param {Object} message - Media message object
-     * @returns {HTMLElement} Media message element
-     */
-    _createMediaMessage(message) {
-        // Build wrapper containing avatar, bubble and meta (timestamp + read receipt)
-        const wrapperDiv = document.createElement('div');
-        wrapperDiv.className = `message-wrapper ${message.isOwn ? 'sent-wrapper' : 'received-wrapper'} group-${message.groupPosition}`;
-        wrapperDiv.setAttribute('data-message-id', message.id);
-        wrapperDiv.setAttribute('data-sender-id', message.senderId);
-        wrapperDiv.setAttribute('data-status', message.status);
-        wrapperDiv.setAttribute('data-group-position', message.groupPosition);
-
-        // Add avatar for received messages (only on last/single in group)
-        if (!message.isOwn) {
-            const shouldShowAvatar = message.groupPosition === 'single' || message.groupPosition === 'last';
-            const avatarContainer = document.createElement('div');
-            avatarContainer.className = `message-avatar-container ${shouldShowAvatar ? '' : 'hidden'}`;
-            
-            if (shouldShowAvatar) {
-                const avatarUrl = this._getSenderAvatar(message.senderId);
-                const avatarImg = document.createElement('img');
-                avatarImg.className = 'message-avatar';
-                avatarImg.src = avatarUrl;
-                avatarImg.alt = 'Avatar';
-                avatarContainer.appendChild(avatarImg);
-            }
-            
-            wrapperDiv.appendChild(avatarContainer);
-        }
-
-        // Content wrapper for media and meta
-        const contentWrapper = document.createElement('div');
-        contentWrapper.className = 'message-content-wrapper';
-
-        const metadata = message.metadata || {};
-        const attachmentType = metadata.type || 'file';
-        const isImageOrVideo = attachmentType === 'image' || attachmentType === 'video';
-        
-        // For images/videos, media itself is the bubble - no outer container
-        // For other types, use traditional bubble
-        let messageDiv;
-        let mediaContent = '';
-        
-        if (isImageOrVideo && metadata.url) {
-            // Media acts as the bubble surface directly
-            messageDiv = document.createElement('div');
-            messageDiv.className = `media-bubble-wrapper ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition}`;
-            messageDiv.setAttribute('data-message-id', message.id);
-            messageDiv.setAttribute('data-sender-id', message.senderId);
-            messageDiv.setAttribute('data-status', message.status);
-            messageDiv.setAttribute('data-group-position', message.groupPosition);
-            
-            if (attachmentType === 'image') {
-                mediaContent = `<img src="${escapeHtml(metadata.url)}" alt="Image" class="media-image" loading="lazy">`;
-            } else {
-                mediaContent = `
-                    <video controls class="media-video">
-                        <source src="${escapeHtml(metadata.url)}" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>`;
-            }
-            messageDiv.innerHTML = mediaContent;
-        } else {
-            // Traditional bubble for audio, files, etc.
-            messageDiv = document.createElement('div');
-            messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} media-message group-${message.groupPosition}`;
-            messageDiv.setAttribute('data-message-id', message.id);
-            messageDiv.setAttribute('data-sender-id', message.senderId);
-            messageDiv.setAttribute('data-status', message.status);
-            messageDiv.setAttribute('data-group-position', message.groupPosition);
-            this._applyBubbleStyle(messageDiv);
-            
-            if (metadata.url) {
-                switch (attachmentType) {
-                    case 'audio':
-                        mediaContent = `
-                            <div class="media-audio-container">
-                                <audio controls class="media-audio">
-                                    <source src="${escapeHtml(metadata.url)}" type="audio/mpeg">
-                                    Your browser does not support the audio tag.
-                                </audio>
-                            </div>`;
-                        break;
-                    default:
-                        // Document or other file types
-                        const fileName = message.content || 'Attachment';
-                        const fileIcon = this._getFileIcon(attachmentType);
-                        mediaContent = `
-                            <a href="${escapeHtml(metadata.url)}" target="_blank" class="media-link">
-                                <div class="media-file">
-                                    <span class="file-icon">${fileIcon}</span>
-                                    <span class="file-name">${escapeHtml(fileName)}</span>
-                                </div>
-                            </a>`;
-                        break;
-                }
-            } else {
-                mediaContent = `<p class="message-content">${escapeHtml(message.content || '')}</p>`;
-            }
-            
-            messageDiv.innerHTML = mediaContent;
-        }
-        
-        // Add caption if present (for image/video)
-        if (isImageOrVideo && message.content && message.content.trim()) {
-            const captionDiv = document.createElement('div');
-            captionDiv.className = 'media-caption';
-            captionDiv.textContent = message.content;
-            contentWrapper.appendChild(messageDiv);
-            contentWrapper.appendChild(captionDiv);
-        } else {
-            contentWrapper.appendChild(messageDiv);
-        }
-
-        // Determine whether to render meta (timestamp + receipt)
-        const shouldRenderMeta = message.groupPosition === 'single' || message.groupPosition === 'last' || !!message.hasFloatingReadReceipt;
-        if (shouldRenderMeta) {
-            const metaDiv = document.createElement('div');
-            metaDiv.className = 'message-meta';
-
-            const timeSpan = document.createElement('span');
-            timeSpan.className = 'timestamp';
-            timeSpan.textContent = formatTime(message.timestamp);
-            metaDiv.appendChild(timeSpan);
-
-            // Read receipt / status to appear next to timestamp
-            if (message.isOwn) {
-                const status = message.status || 'sent';
-                if (message.status === 'read' && message.isLastRead) {
-                    const receiverAvatar = document.body.dataset.receiverAvatar;
-                    const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = 'message-read-receipt read-avatar-only';
-                    receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                    metaDiv.appendChild(receiptSpan);
-                } else if (message.isLastSent && !message.hideReadReceipt) {
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = `message-read-receipt status-${status}`;
-                    receiptSpan.innerHTML = this._getStatusIcon(status, message.id, message);
-                    metaDiv.appendChild(receiptSpan);
-                }
-            } else if (message.hasFloatingReadReceipt) {
-                const receiverAvatar = document.body.dataset.receiverAvatar;
-                const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                const receiptSpan = document.createElement('span');
-                receiptSpan.className = 'message-read-receipt floating-read-receipt';
-                receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                metaDiv.appendChild(receiptSpan);
-            }
-
-            contentWrapper.appendChild(metaDiv);
-        }
-
-        wrapperDiv.appendChild(contentWrapper);
-        return wrapperDiv;
-    }
+    /* _createMediaMessage removed — replaced by _createMediaBubble + _createMessageGroup */
 
     /**
      * Get file icon based on attachment type
@@ -770,129 +710,7 @@ export class MessageRenderer {
         return icons[type] || icons['file'];
     }
 
-    /**
-     * Create link message element (pure DOM creation)
-     * @param {Object} message - Link message object
-     * @returns {HTMLElement} Link message element
-     */
-    _createLinkMessage(message) {
-        console.log('[RENDERER] _createLinkMessage called with:', message);
-        
-        // Build wrapper containing avatar, bubble and meta (timestamp + read receipt)
-        const wrapperDiv = document.createElement('div');
-        wrapperDiv.className = `message-wrapper ${message.isOwn ? 'sent-wrapper' : 'received-wrapper'} group-${message.groupPosition}`;
-        wrapperDiv.setAttribute('data-message-id', message.id);
-        wrapperDiv.setAttribute('data-sender-id', message.senderId);
-        wrapperDiv.setAttribute('data-status', message.status);
-        wrapperDiv.setAttribute('data-group-position', message.groupPosition);
-
-        // Add avatar for received messages (only on last/single in group)
-        if (!message.isOwn) {
-            const shouldShowAvatar = message.groupPosition === 'single' || message.groupPosition === 'last';
-            const avatarContainer = document.createElement('div');
-            avatarContainer.className = `message-avatar-container ${shouldShowAvatar ? '' : 'hidden'}`;
-            
-            if (shouldShowAvatar) {
-                const avatarUrl = this._getSenderAvatar(message.senderId);
-                const avatarImg = document.createElement('img');
-                avatarImg.className = 'message-avatar';
-                avatarImg.src = avatarUrl;
-                avatarImg.alt = 'Avatar';
-                avatarContainer.appendChild(avatarImg);
-            }
-            
-            wrapperDiv.appendChild(avatarContainer);
-        }
-
-        // Content wrapper for link and meta
-        const contentWrapper = document.createElement('div');
-        contentWrapper.className = 'message-content-wrapper';
-
-        // Create bubble
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} link-message group-${message.groupPosition}`;
-        messageDiv.setAttribute('data-message-id', message.id);
-        messageDiv.setAttribute('data-sender-id', message.senderId);
-        messageDiv.setAttribute('data-status', message.status);
-        messageDiv.setAttribute('data-group-position', message.groupPosition);
-        this._applyBubbleStyle(messageDiv);
-        
-        const metadata = message.metadata || {};
-        const linkUrl = metadata.link_url;
-        const linkTitle = metadata.link_title;
-        const linkDescription = metadata.link_description;
-        const linkImage = metadata.link_image;
-        const linkType = metadata.link_type || 'link';
-        
-        let linkContent = '';
-        
-        // Check if this is an embed type (Facebook, YouTube, etc.)
-        if (linkType === 'youtube') {
-            linkContent = this._createYouTubeEmbed(linkUrl);
-        } else if (linkType === 'facebook') {
-            linkContent = this._createFacebookEmbed(linkUrl);
-        } else {
-            // Rich link preview card
-            linkContent = `
-                <a href="${escapeHtml(linkUrl)}" target="_blank" class="link-preview-card" rel="noopener noreferrer">
-                    ${linkImage ? `<img src="${escapeHtml(linkImage)}" alt="Link preview" class="link-preview-image" loading="lazy">` : ''}
-                    <div class="link-preview-content">
-                        <div class="link-preview-title">${escapeHtml(linkTitle || linkUrl)}</div>
-                        ${linkDescription ? `<div class="link-preview-description">${escapeHtml(linkDescription)}</div>` : ''}
-                        <div class="link-preview-domain">${this._extractDomain(linkUrl)}</div>
-                    </div>
-                </a>
-            `;
-        }
-        
-        // Add text content if present
-        const textContent = message.content ? `<p class="message-content">${escapeHtml(message.content)}</p>` : '';
-        
-        messageDiv.innerHTML = textContent + linkContent;
-        contentWrapper.appendChild(messageDiv);
-
-        // Determine whether to render meta (timestamp + receipt)
-        const shouldRenderMeta = message.groupPosition === 'single' || message.groupPosition === 'last' || !!message.hasFloatingReadReceipt;
-        if (shouldRenderMeta) {
-            const metaDiv = document.createElement('div');
-            metaDiv.className = 'message-meta';
-
-            const timeSpan = document.createElement('span');
-            timeSpan.className = 'timestamp';
-            timeSpan.textContent = formatTime(message.timestamp);
-            metaDiv.appendChild(timeSpan);
-
-            // Read receipt / status to appear next to timestamp
-            if (message.isOwn) {
-                const status = message.status || 'sent';
-                if (message.status === 'read' && message.isLastRead) {
-                    const receiverAvatar = document.body.dataset.receiverAvatar;
-                    const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = 'message-read-receipt read-avatar-only';
-                    receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                    metaDiv.appendChild(receiptSpan);
-                } else if (message.isLastSent && !message.hideReadReceipt) {
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = `message-read-receipt status-${status}`;
-                    receiptSpan.innerHTML = this._getStatusIcon(status, message.id, message);
-                    metaDiv.appendChild(receiptSpan);
-                }
-            } else if (message.hasFloatingReadReceipt) {
-                const receiverAvatar = document.body.dataset.receiverAvatar;
-                const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                const receiptSpan = document.createElement('span');
-                receiptSpan.className = 'message-read-receipt floating-read-receipt';
-                receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                metaDiv.appendChild(receiptSpan);
-            }
-
-            contentWrapper.appendChild(metaDiv);
-        }
-
-        wrapperDiv.appendChild(contentWrapper);
-        return wrapperDiv;
-    }
+    /* _createLinkMessage removed — replaced by _createLinkBubble + _createMessageGroup */
 
     /**
      * Create YouTube embed
