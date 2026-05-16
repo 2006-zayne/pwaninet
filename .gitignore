@@ -1,24 +1,74 @@
-# Python artifacts
+# =========================
+# CORE PYTHON
+# =========================
 __pycache__/
-*.pyc
-ramsey-env/
+*.py[cod]
+*.pyo
+*.pyd
+
+# =========================
+# VIRTUAL ENVIRONMENTS
+# =========================
 venv/
-.vscode/
+env/
+.venv/
+ramsey-env/
 
-/media
-
-# Database and Secrets (DO NOT REMOVE)
+# =========================
+# DJANGO / DATABASE
+# =========================
 db.sqlite3
 db.sqlite3-journal
 
-# Distribution
-*.egg-info/
-dist/
-build/
-venv/
-.idea/
-__pycache__/
-*.pyc
+# =========================
+# STATIC / MEDIA OUTPUT
+# =========================
 staticfiles/
+media/
+
+# =========================
+# ENVIRONMENT SECRETS (CRITICAL)
+# =========================
 .env
+.env.*
+!.env.example
+
+# =========================
+# CELERY / BACKGROUND TASKS
+# =========================
+celerybeat-schedule
+celerybeat-schedule.db
+celerybeat.pid
+*.pid
+
+# =========================
+# LOGS
+# =========================
+*.log
+
+# =========================
+# SSL / KEYS (CRITICAL SECURITY)
+# =========================
+*.pem
+*-key.pem
+*.key
+*.crt
+
+# =========================
+# IDE / OS FILES
+# =========================
+.vscode/
+.idea/
 .DS_Store
+
+# =========================
+# BUILD / DISTRIBUTION
+# =========================
+build/
+dist/
+*.egg-info/
+
+# =========================
+# NODE / FRONTEND (if ever added)
+# =========================
+node_modules/
