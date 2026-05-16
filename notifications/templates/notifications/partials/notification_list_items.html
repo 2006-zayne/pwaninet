@@ -1,39 +1,50 @@
 {% for n in notifications %}
-    <div class="list-group-item list-group-item-action border-bottom p-3 transition-all {% if not n.is_read %}border-start border-4 border-primary bg-aliceblue{% endif %}" 
-         id="notification-{{ n.id }}">
-        
-        <div class="d-flex align-items-start gap-3">
-            <img src="{{ n.sender.profile_pic.url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover;">
-            
+    <div class="list-group-item list-group-item-action border-bottom py-4 px-4 transition-all {% if not n.is_read %}unread-notification{% endif %}"
+         id="notification-{{ n.id }}"
+         {% if not n.is_read %}
+         hx-post="{% url 'notifications:mark_notification_as_read' n.id %}"
+         hx-target="#notification-{{ n.id }}"
+         hx-swap="outerHTML"
+         style="cursor: pointer;"
+         {% endif %}>
+
+        <div class="d-flex gap-2">
+            <a href="{% url 'users:profile' n.sender.username %}" onclick="event.stopPropagation()">
+                <img src="{{ n.sender.profile_pic.url }}" class="rounded-circle border" style="width: 48px; height: 48px; object-fit: cover;">
+            </a>
+
             <div class="flex-grow-1">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h6 class="mb-1 fw-bold text-dark">
-                        {{ n.sender.username }}
-                        </h6>
-                    
-                    <div class="d-flex align-items-center gap-2">
-                        <small class="text-muted"><i class="bi bi-clock-history"></i> {{ n.timestamp|timesince }}</small>
-                        
-                        {% if not n.is_read %}
-                            <button class="btn btn-sm btn-outline-success border-0 rounded-circle p-1"
-                                    title="Mark as read"
-                                    hx-post="{% url 'notifications:mark_notification_as_read' n.id %}"
-                                    hx-target="#notification-{{ n.id }}"
-                                    hx-swap="outerHTML">
-                                <i class="bi bi-check-lg"></i>
-                            </button>
-                        {% endif %}
-                    </div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <h6 class="mb-0 fw-bold" style="font-size: 0.9rem; color: var(--text-primary);">
+                        <a href="{% url 'users:profile' n.sender.username %}" class="text-decoration-none" style="color: var(--text-primary);" onclick="event.stopPropagation()">
+                            {{ n.sender.username }}
+                        </a>
+                    </h6>
+
+                    <small class="text-muted" style="font-size: 0.75rem;">{{ n.timestamp|timesince }}</small>
                 </div>
-                
-                <p class="mb-0 text-secondary" style="font-size: 0.95rem;">
+
+                <p class="mb-0" style="font-size: 0.85rem; line-height: 1.3; color: var(--text-secondary);">
                     {{ n.msg }}
                     {% if n.post %}
-                        <a href="{% url 'posts:post_details' n.post.id %}" class="text-primary text-decoration-none fw-bold">"{{ n.post.content|truncatechars:30 }}"</a>
-                        <a href="{% url 'groups:groups_detail' group.id %}" class="text-primary text-decoration-none fw-bold">"{{ group.name }}"</a>
+                        <a href="{% url 'posts:post_details' n.post.id %}" class="text-primary text-decoration-none fw-bold" onclick="event.stopPropagation()">"{{ n.post.content|truncatechars:30 }}"</a>
+                    {% endif %}
+                    {% if n.group %}
+                        <a href="{% url 'groups:groups_detail' n.group.id %}" class="text-primary text-decoration-none fw-bold" onclick="event.stopPropagation()">"{{ n.group.name }}"</a>
                     {% endif %}
                 </p>
+
+                {% if n.notification_type == 'GROUP_REQUEST' %}
+                <div class="notif-actions mt-2">
+                    <a href="{% url 'groups:approve_from_notification' n.group.id n.sender.id %}" class="btn-action btn-accept" onclick="event.stopPropagation()">
+                        <i class="bi bi-check2"></i> Approve
+                    </a>
+                    <a href="{% url 'groups:reject_from_notification' n.group.id n.sender.id %}" class="btn-action btn-decline" onclick="event.stopPropagation()">
+                        <i class="bi bi-x2"></i> Reject
+                    </a>
                 </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 {% empty %}

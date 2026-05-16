@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Connection Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+    <div id="debug"></div>
+    
+    <script>
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/notifications/`;
+        
+        console.log('Testing WebSocket connection to:', wsUrl);
+        console.log('Current cookies:', document.cookie);
+        console.log('Current URL:', window.location.href);
+        
+        const socket = new WebSocket(wsUrl);
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+        const debugDiv = document.getElementById('debug');
+        
+        function addDebug(message) {
+            console.log(message);
+            const debugLine = document.createElement('div');
+            debugLine.textContent = message;
+            debugDiv.appendChild(debugLine);
+        }
+        
+        socket.onopen = function(e) {
+            addDebug('WebSocket connected successfully');
+            statusDiv.innerHTML = 'Connected! Ready to receive messages.';
+            statusDiv.style.color = 'green';
+        };
+        
+        socket.onmessage = function(e) {
+            addDebug('WebSocket message received: ' + e.data);
+            const messageDiv = document.createElement('div');
+            messageDiv.textContent = `Received: ${e.data}`;
+            messagesDiv.appendChild(messageDiv);
+        };
+        
+        socket.onclose = function(e) {
+            addDebug(`WebSocket disconnected. Code: ${e.code}, Reason: ${e.reason}`);
+            statusDiv.innerHTML = `Disconnected. Code: ${e.code}, Reason: ${e.reason}`;
+            statusDiv.style.color = 'red';
+            
+            // Common WebSocket close codes
+            if (e.code === 1006) {
+                addDebug('Close code 1006: Connection closed abnormally (possible auth issue)');
+            } else if (e.code === 4000) {
+                addDebug('Close code 4000: Custom close code');
+            }
+        };
+        
+        socket.onerror = function(e) {
+            addDebug('WebSocket error occurred');
+            console.error('WebSocket error:', e);
+            statusDiv.innerHTML = 'Error occurred. Check console for details.';
+            statusDiv.style.color = 'red';
+        };
+        
+        // Test connection status periodically
+        setInterval(() => {
+            addDebug(`WebSocket readyState: ${socket.readyState} (0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)`);
+        }, 5000);
+    </script>
+</body>
+</html>

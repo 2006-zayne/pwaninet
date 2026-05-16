@@ -1,25 +1,289 @@
-<div class="post-card shadow-sm mb-3 bg-white rounded-3 overflow-hidden border-0">
+<style>
+  [data-theme="dark"] .post-card {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] .bg-light {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .text-dark {
+    color: var(--text-primary) !important;
+  }
+  [data-theme="dark"] .text-muted {
+    color: var(--text-secondary) !important;
+  }
+  [data-theme="dark"] .border-top,
+  [data-theme="dark"] .border-bottom {
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] .dropdown-menu {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .dropdown-item {
+    color: var(--text-primary);
+  }
+  [data-theme="dark"] .dropdown-item:hover {
+    background-color: var(--border);
+  }
+  [data-theme="dark"] .form-control {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+    color: var(--text-primary);
+  }
+  [data-theme="dark"] .modal-content {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .modal-header {
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .form-label {
+    color: var(--text-primary);
+  }
+  [data-theme="dark"] .nav-tabs .nav-link {
+    color: var(--text-secondary);
+  }
+  [data-theme="dark"] .nav-tabs .nav-link.active {
+    color: var(--primary);
+    background-color: var(--card-bg);
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .tab-content {
+    color: var(--text-primary);
+  }
+  [data-theme="dark"] .bg-white {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .form-control {
+    background-color: #3a3b3c !important;
+    border-color: #3a3b3c !important;
+    color: #e4e6eb !important;
+  }
+  [data-theme="dark"] .form-control::placeholder {
+    color: #b0b3b8 !important;
+    opacity: 0.7;
+  }
+  @media (max-width: 767px) {
+    .post-card {
+      width: 100% !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
+  }
+
+  /* Enhanced Post Card Micro-interactions */
+  .post-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+  }
+
+  .post-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  }
+
+  .post-card:active {
+    transform: translateY(-1px);
+    transition: all 0.1s ease;
+  }
+
+  /* Enhanced button interactions */
+  .post-card .btn {
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .post-card .btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .post-card .btn:active {
+    transform: translateY(0);
+  }
+
+  /* Touch feedback for mobile */
+  .post-card .btn {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Enhanced like button animation */
+  .post-card .btn:hover i {
+    transform: scale(1.1);
+    transition: transform 0.2s ease;
+  }
+
+  /* Smooth fade-in for new posts */
+  @keyframes slideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .post-card {
+    animation: slideInUp 0.5s ease forwards;
+  }
+
+  /* Enhanced media hover effects */
+  .post-media {
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+
+  .post-media:hover {
+    transform: scale(1.02);
+  }
+
+  /* Enhanced comment input */
+  .post-card .form-control {
+    transition: all 0.2s ease;
+  }
+
+  .post-card .form-control:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  }
+
+  /* Enhanced dropdown menu */
+  .post-card .dropdown-menu {
+    animation: fadeInDown 0.2s ease;
+  }
+
+  @keyframes fadeInDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Loading states for buttons */
+  .btn.loading {
+    pointer-events: none;
+    opacity: 0.7;
+  }
+
+  .btn.loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    margin: auto;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    border-top-color: currentColor;
+    animation: spin 1s linear infinite;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Enhanced Dark Mode Support for Micro-interactions */
+  [data-theme="dark"] .post-card:hover {
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4) !important;
+  }
+
+  [data-theme="dark"] .post-media:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  [data-theme="dark"] .post-card .form-control:focus {
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25) !important;
+  }
+
+  [data-theme="dark"] .btn:hover {
+    background-color: var(--border) !important;
+  }
+
+  [data-theme="dark"] .btn-primary:hover {
+    background-color: #2563eb !important;
+  }
+
+  [data-theme="dark"] .btn-outline-primary:hover {
+    background-color: #2563eb !important;
+    border-color: #2563eb !important;
+  }
+</style>
+<div id="post-card-{{ post.id }}" class="post-card shadow-sm mb-2 bg-white rounded-3 overflow-hidden border-0">
+    {% if post.repost_of %}
+    <!-- Repost Header -->
+    <div class="d-flex align-items-center p-2 border-bottom bg-light">
+        <div class="position-relative me-3" style="width: 80px; height: 50px;">
+            <a href="{% url 'users:profile' post.author.username %}">
+                <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm position-absolute" style="width: 48px; height: 48px; object-fit: cover; left: 0; top: 0;">
+            </a>
+            <a href="{% url 'users:profile' post.repost_of.author.username %}">
+                <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm position-absolute" style="width: 48px; height: 48px; object-fit: cover; left: 32px; top: 0;">
+            </a>
+        </div>
+        <div class="d-flex align-items-center flex-grow-1">
+            <div>
+                <small class="fw-bold text-dark">{{ post.author.get_full_name|default:post.author.username }}</small>
+                <div class="d-flex align-items-center" style="font-size: 11px;">
+                    <i class="bi bi-repeat text-primary me-1"></i>
+                    <span class="text-muted">reposted</span>
+                    <i class="bi bi-dot mx-1"></i>
+                    <span class="text-muted">{{ post.created_at|timesince }} ago</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="d-flex align-items-center p-3">
         <div class="position-relative me-3" style="width: 50px; height: 50px;">
             {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
                 <a href="{% url 'groups:groups_detail' post.group.id %}">
                     <img src="{{ post.group.get_photo_url }}" class="rounded-circle border border-2 border-white shadow-sm" style="width: 48px; height: 48px; object-fit: cover;">
                 </a>
-                <a href="{% url 'users:profile' post.author.username %}">
-                    <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 24px; height: 24px; object-fit: cover; transform: translate(15%, 15%);">
-                </a>
+                {% if post.repost_of %}
+                    <a href="{% url 'users:profile' post.repost_of.author.username %}">
+                        <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 24px; height: 24px; object-fit: cover; transform: translate(15%, 15%);">
+                    </a>
+                {% else %}
+                    <a href="{% url 'users:profile' post.author.username %}">
+                        <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 24px; height: 24px; object-fit: cover; transform: translate(15%, 15%);">
+                    </a>
+                {% endif %}
             {% else %}
-                <a href="{% url 'users:profile' post.author.username %}">
-                    <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 48px; height: 48px; object-fit: cover;">
-                </a>
+                {% if post.repost_of %}
+                    <a href="{% url 'users:profile' post.repost_of.author.username %}">
+                        <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 48px; height: 48px; object-fit: cover;">
+                    </a>
+                {% else %}
+                    <a href="{% url 'users:profile' post.author.username %}">
+                        <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 48px; height: 48px; object-fit: cover;">
+                    </a>
+                {% endif %}
             {% endif %}
         </div>
 
         <div class="flex-grow-1">
             <h6 class="mb-0 fw-bold small">
-                <a href="{% url 'users:profile' post.author.username %}" class="text-dark text-decoration-none">
-                    {{ post.author.get_full_name|default:post.author.username }}
-                </a>
+                {% if post.repost_of %}
+                    <a href="{% url 'users:profile' post.repost_of.author.username %}" class="text-dark text-decoration-none">
+                        {{ post.repost_of.author.get_full_name|default:post.repost_of.author.username }}
+                    </a>
+                {% else %}
+                    <a href="{% url 'users:profile' post.author.username %}" class="text-dark text-decoration-none">
+                        {{ post.author.get_full_name|default:post.author.username }}
+                    </a>
+                {% endif %}
                 {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
                     {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
                         <span class="text-muted fw-normal mx-1">posted in</span>
@@ -29,63 +293,190 @@
             </h6>
             <small class="text-muted d-flex align-items-center" style="font-size: 11px;">
                 <span class="badge bg-light text-primary border-0 me-1">{{ post.unit.code|default:"GLOBAL" }}</span>
-                <i class="bi bi-dot"></i> {{ post.created_at|timesince }} ago
+                <i class="bi bi-dot"></i> {% if post.repost_of %}{{ post.repost_of.created_at|timesince }}{% else %}{{ post.created_at|timesince }}{% endif %} ago
             </small>
+        </div>
+
+        <div class="dropdown">
+            <button class="btn btn-sm border-0 text-muted" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-three-dots fs-5"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow">
+                <li>
+                    <button class="dropdown-item d-flex align-items-center gap-2"
+                            data-bs-toggle="modal" data-bs-target="#repostModal-{{ post.id }}">
+                        <i class="bi bi-repeat"></i> Repost
+                    </button>
+                </li>
+                <li>
+                    <button class="dropdown-item d-flex align-items-center gap-2"
+                            hx-post="/api/posts/{{ post.id }}/hide/"
+                            hx-target="#post-card-{{ post.id }}"
+                            hx-swap="outerHTML">
+                        <i class="bi bi-eye-slash"></i> Hide post
+                    </button>
+                </li>
+                <li>
+                    <button class="dropdown-item d-flex align-items-center gap-2"
+                            hx-post="/api/author-preferences/"
+                            hx-vals='{"author": {{ post.author.id }}, "preference": "less"}'
+                            hx-target="body"
+                            hx-swap="none">
+                        <i class="bi bi-person-dash"></i> See less from {{ post.author.username }}
+                    </button>
+                </li>
+                <li>
+                    <button class="dropdown-item d-flex align-items-center gap-2"
+                            data-bs-toggle="modal" data-bs-target="#shareModal-{{ post.id }}">
+                        <i class="bi bi-share"></i> Share to profile
+                    </button>
+                </li>
+                <li>
+                    <button class="dropdown-item d-flex align-items-center gap-2"
+                            data-bs-toggle="modal" data-bs-target="#reportModal-{{ post.id }}">
+                        <i class="bi bi-flag"></i> Report post
+                    </button>
+                </li>
+                {% if post.author == request.user or request.user.global_role == 'PRESIDENT' or request.user.global_role == 'DELEGATE' %}
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <button class="dropdown-item d-flex align-items-center gap-2 text-danger"
+                            hx-delete="/api/posts/{{ post.id }}/"
+                            hx-confirm="Are you sure you want to delete this post?"
+                            hx-target="#post-card-{{ post.id }}"
+                            hx-swap="outerHTML">
+                        <i class="bi bi-trash"></i> Delete post
+                    </button>
+                </li>
+                {% endif %}
+            </ul>
         </div>
     </div>
 
-    <div class="{% if post.gradient_class != 'none' %}{{ post.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %}">
-        <p class="mb-0 {% if post.gradient_class != 'none' %}text-white fw-bold fs-3{% else %}text-dark{% endif %}" 
-           style="{% if post.gradient_class == 'none' %}font-size: 15px;{% endif %} line-height: 1.5;">
-            {{ post.content }}
+    <div class="{% if post.repost_of %}{% if post.repost_of.gradient_class != 'none' %}{{ post.repost_of.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %}{% else %}{% if post.gradient_class != 'none' %}{{ post.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %}{% endif %}">
+        <p class="mb-0 {% if post.repost_of %}{% if post.repost_of.gradient_class != 'none' %}text-white fw-bold fs-3{% else %}text-dark{% endif %}{% else %}{% if post.gradient_class != 'none' %}text-white fw-bold fs-3{% else %}text-dark{% endif %}{% endif %}"
+           style="{% if post.repost_of %}{% if post.repost_of.gradient_class == 'none' %}font-size: 15px;{% endif %}{% else %}{% if post.gradient_class == 'none' %}font-size: 15px;{% endif %}{% endif %} line-height: 1.5;">
+            {% if post.repost_of %}
+                {% if post.content %}<p class="mb-2 text-dark" style="font-size: 14px;">{{ post.content }}</p>{% endif %}
+                {{ post.repost_of.content }}
+            {% else %}
+                {{ post.content }}
+            {% endif %}
         </p>
     </div>
 
-    {% if post.get_intel_file %}
+    {% if post.audio %}
+    <div class="post-media border-top border-bottom bg-light" data-media-type="audio" data-post-id="{{ post.id }}">
+        <div class="p-3 d-flex align-items-center gap-3">
+            <div class="bg-primary bg-opacity-10 p-3 rounded-3 flex-shrink-0">
+                <i class="bi bi-music-note-fill text-primary fs-3"></i>
+            </div>
+            <div class="flex-grow-1">
+                <h6 class="mb-0 fw-bold small">Music/Audio</h6>
+                <small class="text-muted">Attached audio</small>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light rounded-circle mute-toggle" data-post-id="{{ post.id }}" title="Unmute" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                    <i class="bi bi-volume-mute-fill" style="font-size: 14px;"></i>
+                </button>
+                <audio id="audio-{{ post.id }}" class="w-100" style="max-width: 300px;" muted loop>
+                    <source src="{{ post.audio.url }}" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if post.images.exists %}
+    <a href="{% url 'posts:post_details' post.id %}">
+        <div class="post-media border-top border-bottom bg-light">
+            <div class="image-grid-{{ post.id }}" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px; max-height: 400px;">
+                {% for post_image in post.images.all|slice:":3" %}
+                    <div class="image-grid-item position-relative overflow-hidden" style="{% if forloop.counter == 1 %}grid-column: span 2; grid-row: span 2; aspect-ratio: 2/1;{% elif forloop.counter == 2 %}aspect-ratio: 1/1;{% else %}aspect-ratio: 1/1;{% endif %}">
+                        <img src="{{ post_image.image.url }}" class="w-100 h-100" style="object-fit: cover;">
+                        {% if forloop.last and post.images.count > 3 %}
+                            <div class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background: rgba(0,0,0,0.5);">
+                                <span class="text-white fw-bold fs-4">+{{ post.images.count|add:"-3" }}</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </a>
+    {% elif post.get_intel_file %}
     <a href="{% url 'posts:post_details' post.id %}">
         <div class="post-media border-top border-bottom bg-light">
             {% with f_url=post.get_intel_file.url|lower %}
                 {% if ".jpg" in f_url or ".png" in f_url or ".jpeg" in f_url or ".webp" in f_url %}
                     <img src="{{ post.get_intel_file.url }}" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;">
                 {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
-                    <div class="ratio ratio-16x9 bg-black">
-                        <video controls preload="metadata" class="w-100 h-100">
+                    <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post-id="{{ post.id }}">
+                        <video id="video-{{ post.id }}" preload="metadata" class="w-100 h-100" muted loop playsinline autoplay data-autoplay="true">
                             <source src="{{ post.get_intel_file.url }}" type="video/mp4">
                         </video>
+                        <button class="btn btn-light rounded-circle position-absolute mute-toggle" data-post-id="{{ post.id }}" style="top: 10px; left: 10px; z-index: 10; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Unmute">
+                            <i class="bi bi-volume-mute-fill" style="font-size: 14px;"></i>
+                        </button>
                     </div>
-                {% elif ".pdf" in f_url %}
-                    <div class="p-4 d-flex align-items-center justify-content-between bg-white">
-                        <div class="d-flex align-items-center">
-                            <div class="bg-danger bg-opacity-10 p-3 rounded-3 me-3">
-                                <i class="bi bi-file-earmark-pdf-fill text-danger fs-3"></i>
+                {% elif ".mp3" in f_url or ".wav" in f_url or ".ogg" in f_url or ".m4a" in f_url %}
+                    <div class="p-3 d-flex align-items-center justify-content-between" style="background: transparent;" data-media-type="audio" data-post-id="{{ post.id }}">
+                        <div class="d-flex align-items-center flex-grow-1">
+                            <div class="me-2">
+                                <i class="bi bi-music-note-fill text-muted fs-4"></i>
                             </div>
-                            <div>
-                                <h6 class="mb-0 fw-bold small">Academic Files</h6>
-                                <small class="text-muted">PDF DOCUMENT</small>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-0 fw-bold small text-muted">Audio File</h6>
+                                <small class="text-muted">MUSIC/AUDIO</small>
                             </div>
                         </div>
-                        <span class="btn btn-outline-dark btn-sm rounded-pill px-3 fw-bold">VIEW PDF</span>
+                        <audio id="audio-{{ post.id }}" controls preload="metadata" class="w-100" style="max-width: 200px; background: transparent; background-color: transparent;" muted loop autoplay>
+                            <source src="{{ post.get_intel_file.url }}" type="audio/mpeg">
+                            Your browser does not support the audio element.
+                        </audio>
                     </div>
+                {% elif ".pdf" in f_url %}
+                    <a href="{{ post.get_intel_file.url }}" target="_blank" class="text-decoration-none">
+                        <div class="p-4 d-flex align-items-center justify-content-between bg-white">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-danger bg-opacity-10 p-3 rounded-3 me-3">
+                                    <i class="bi bi-file-earmark-pdf-fill text-danger fs-3"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold small">Academic Files</h6>
+                                    <small class="text-muted">PDF DOCUMENT</small>
+                                </div>
+                            </div>
+                            <span class="btn btn-outline-dark btn-sm rounded-pill px-3 fw-bold">VIEW PDF</span>
+                        </div>
+                    </a>
                 {% endif %}
             {% endwith %}
         </div>
     </a>
     {% endif %}
 
-    <div class="d-flex align-items-center gap-4 px-3 py-2 border-top">
-        <div id="like-section-{{ post.id }}">
-            {% include "posts/partials/like_button.html" with post=post %}
+    <div class="d-flex align-items-center justify-content-between px-3 py-2 border-top">
+        <div class="d-flex align-items-center gap-4">
+            <div id="like-section-{{ post.id }}">
+                {% include "posts/partials/like_button.html" with post=post %}
+            </div>
+            <a href="{% url 'posts:post_details' post.id %}" class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none">
+                <i class="bi bi-chat-dots fs-5"></i>
+                <span class="fw-bold">{{ post.comments.count }}</span>
+            </a>
+            <button id="repost-btn-{{ post.id }}" class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none"
+                    data-bs-toggle="modal" data-bs-target="#repostModal-{{ post.id }}">
+                <i class="bi bi-repeat fs-5"></i>
+                <span class="fw-bold">{{ post.repost_count }}</span>
+            </button>
+            <button class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none"
+                    data-bs-toggle="modal" data-bs-target="#shareModal-{{ post.id }}">
+                <i class="bi bi-share fs-5"></i>
+                <span class="fw-bold">Share</span>
+            </button>
         </div>
-        <a href="{% url 'posts:post_details' post.id %}" class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none">
-            <i class="bi bi-chat-dots fs-5"></i>
-            <span class="fw-bold">{{ post.comments.count }}</span>
-        </a>
-        <span class="small text-muted fw-bold" style="cursor:pointer;"
-              data-bs-toggle="modal" data-bs-target="#likersModal"
-              hx-get="{% url 'posts:post_likers_list' post.id %}"
-              hx-target="#modal-content-target">
-            <i class="bi bi-eye-fill me-1"></i>Likes
-        </span>
     </div>
 
     <!-- Inline comment input -->
@@ -97,12 +488,367 @@
                 <input type="text" name="content"
                        class="form-control border-0 rounded-pill"
                        placeholder="Write a comment..."
-                       style="font-size: 13px; background-color: #e9ecef; padding-right: 40px;">
+                       style="font-size: 13px; background-color: #e9ecef; padding-right: 40px; height: 42px;">
                 <button type="submit" class="btn border-0 rounded-circle position-absolute"
                         style="width: 32px; height: 32px; right: 4px; top: 50%; transform: translateY(-50%); padding: 0; display: flex; align-items: center; justify-content: center; background: transparent;">
-                    <i class="bi bi-send-fill" style="font-size: 13px; color: #0f172a;"></i>
+                    <i class="bi bi-send-fill" style="font-size: 20px; color: #0f172a;"></i>
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Repost Modal -->
+<div class="modal fade" id="repostModal-{{ post.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Repost</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form hx-post="/api/posts/{{ post.id }}/repost/"
+                      hx-target="#post-card-{{ post.id }}"
+                      hx-swap="outerHTML"
+                      hx-on::after-request="bootstrap.Modal.getInstance(document.getElementById('repostModal-{{ post.id }}')).hide()">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Add a comment (optional)</label>
+                        <textarea name="content" class="form-control" rows="3" placeholder="What do you think?"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Repost</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Share Modal -->
+<div class="modal fade" id="shareModal-{{ post.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Share Post</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs mb-3" id="shareTabs-{{ post.id }}" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="user-tab-{{ post.id }}" data-bs-toggle="tab" data-bs-target="#user-share-{{ post.id }}" type="button" role="tab">Share to Users</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="group-tab-{{ post.id }}" data-bs-toggle="tab" data-bs-target="#group-share-{{ post.id }}" type="button" role="tab">Share to Groups</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="shareTabContent-{{ post.id }}">
+                    <!-- Share to Users Tab -->
+                    <div class="tab-pane fade show active" id="user-share-{{ post.id }}" role="tabpanel">
+                        <form id="share-user-form-{{ post.id }}" hx-post="{% url 'posts:share_post' post.id %}" hx-target="#share-result-{{ post.id }}" hx-swap="innerHTML">
+                            {% csrf_token %}
+                            <input type="hidden" name="share_type" value="user">
+                            <div class="mb-3">
+                                <input type="text" 
+                                       class="form-control" 
+                                       placeholder="Search users you follow..." 
+                                       name="user_search"
+                                       hx-get="{% url 'posts:search_following_users' %}"
+                                       hx-target="#user-results-{{ post.id }}"
+                                       hx-trigger="keyup changed delay:300ms"
+                                       hx-indicator="#user-search-indicator-{{ post.id }}">
+                                <span id="user-search-indicator-{{ post.id }}" class="htmx-indicator">
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                </span>
+                            </div>
+                            <div id="user-results-{{ post.id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
+                                <div class="p-3 text-center text-muted">
+                                    <small>Start typing to search users you follow</small>
+                                </div>
+                            </div>
+                            <div id="selected-users-{{ post.id }}" class="mb-3">
+                                <small class="text-muted">Selected users will appear here</small>
+                            </div>
+                            <input type="hidden" name="shared_to_usernames" id="shared-to-usernames-{{ post.id }}">
+                            <div class="mb-3">
+                                <label class="form-label">Add a message (optional)</label>
+                                <textarea name="message" class="form-control" rows="3" placeholder="Check this out!"></textarea>
+                            </div>
+                            <button type="submit" 
+                                    class="btn btn-primary w-100"
+                                    hx-on::after-request="if(this.closest('form').querySelector('.alert-success')) { const modal = bootstrap.Modal.getInstance(document.getElementById('shareModal-{{ post.id }}')); if(modal) modal.hide(); this.closest('form').querySelector('.alert-success').remove(); }">
+                                Share to Selected Users
+                            </button>
+                            <div id="share-result-{{ post.id }}"></div>
+                        </form>
+                    </div>
+                    <!-- Share to Groups Tab -->
+                    <div class="tab-pane fade" id="group-share-{{ post.id }}" role="tabpanel">
+                        <form id="share-group-form-{{ post.id }}" hx-post="{% url 'posts:share_post' post.id %}" hx-target="#share-result-group-{{ post.id }}" hx-swap="innerHTML" onsubmit="updateSelectedGroups{{ post.id }}()">
+                            {% csrf_token %}
+                            <input type="hidden" name="share_type" value="group">
+                            <div class="mb-3">
+                                <input type="text" 
+                                       class="form-control" 
+                                       placeholder="Search your groups..." 
+                                       name="group_search"
+                                       hx-get="{% url 'posts:search_user_groups' %}"
+                                       hx-target="#group-results-{{ post.id }}"
+                                       hx-trigger="keyup changed delay:300ms"
+                                       hx-indicator="#group-search-indicator-{{ post.id }}">
+                                <span id="group-search-indicator-{{ post.id }}" class="htmx-indicator">
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                </span>
+                            </div>
+                            <div id="group-results-{{ post.id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
+                                <div class="p-3 text-center text-muted">
+                                    <small>Start typing to search your groups</small>
+                                </div>
+                            </div>
+                            <div id="selected-groups-{{ post.id }}" class="mb-3">
+                                <small class="text-muted">Selected groups will appear here</small>
+                            </div>
+                            <input type="hidden" name="shared_to_group_ids" id="shared-to-group-ids-{{ post.id }}">
+                            <div class="mb-3">
+                                <label class="form-label">Add a message (optional)</label>
+                                <textarea name="message" class="form-control" rows="3" placeholder="Check this out!"></textarea>
+                            </div>
+                            <button type="submit" 
+                                    class="btn btn-primary w-100"
+                                    hx-on::after-request="if(this.closest('form').querySelector('.alert-success')) { const modal = bootstrap.Modal.getInstance(document.getElementById('shareModal-{{ post.id }}')); if(modal) modal.hide(); this.closest('form').querySelector('.alert-success').remove(); }">
+                                Share to Selected Groups
+                            </button>
+                            <div id="share-result-group-{{ post.id }}"></div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('shareModal-{{ post.id }}');
+    if (!modal) return;
+    
+    const selectedUsers = new Set();
+    const selectedGroups = new Set();
+    
+    // Handle user checkbox changes
+    modal.addEventListener('change', function(e) {
+        if (e.target.classList.contains('user-checkbox')) {
+            const username = e.target.value;
+
+            if (e.target.checked) {
+                selectedUsers.add(username);
+            } else {
+                selectedUsers.delete(username);
+            }
+            updateSelectedUsers();
+        }
+
+        if (e.target.classList.contains('group-checkbox')) {
+            const groupId = e.target.value;
+
+            if (e.target.checked) {
+                selectedGroups.add(groupId);
+            } else {
+                selectedGroups.delete(groupId);
+            }
+            updateSelectedGroups();
+        }
+    });
+
+    // Also handle click events for better reliability
+    modal.addEventListener('click', function(e) {
+        if (e.target.classList.contains('group-checkbox') || e.target.closest('.group-checkbox')) {
+            const checkbox = e.target.classList.contains('group-checkbox') ? e.target : e.target.closest('.group-checkbox');
+            setTimeout(() => {
+                const groupId = checkbox.value;
+                if (checkbox.checked) {
+                    selectedGroups.add(groupId);
+                } else {
+                    selectedGroups.delete(groupId);
+                }
+                updateSelectedGroups();
+            }, 10);
+        }
+    });
+    
+    function updateSelectedUsers() {
+        const container = document.getElementById('selected-users-{{ post.id }}');
+        const input = document.getElementById('shared-to-usernames-{{ post.id }}');
+        
+        if (selectedUsers.size === 0) {
+            container.innerHTML = '<small class="text-muted">Selected users will appear here</small>';
+            input.value = '';
+        } else {
+            container.innerHTML = Array.from(selectedUsers).map(username => 
+                `<span class="badge bg-primary me-1 mb-1">${username} <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.5rem;" onclick="removeUser{{ post.id }}('${username}')">&times;</button></span>`
+            ).join('');
+            input.value = Array.from(selectedUsers).join(',');
+        }
+    }
+    
+    function updateSelectedGroups() {
+        const container = document.getElementById('selected-groups-{{ post.id }}');
+        const input = document.getElementById('shared-to-group-ids-{{ post.id }}');
+
+        if (selectedGroups.size === 0) {
+            container.innerHTML = '<small class="text-muted">Selected groups will appear here</small>';
+            input.value = '';
+        } else {
+            container.innerHTML = Array.from(selectedGroups).map(groupId => {
+                const label = document.querySelector(`#group-${groupId}`);
+                const boldElement = label ? label.querySelector('.fw-bold') : null;
+                const groupName = boldElement ? boldElement.textContent : groupId;
+                return `<span class="badge bg-success me-1 mb-1">${groupName} <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.5rem;" onclick="removeGroup{{ post.id }}('${groupId}')">&times;</button></span>`;
+            }).join('');
+            input.value = Array.from(selectedGroups).join(',');
+        }
+    }
+
+    // Expose globally for onsubmit handler
+    window['updateSelectedGroups' + {{ post.id }}] = updateSelectedGroups;
+    
+    window['removeUser' + {{ post.id }}] = function(username) {
+        selectedUsers.delete(username);
+        const checkbox = document.querySelector(`.user-checkbox[value="${username}"]`);
+        if (checkbox) checkbox.checked = false;
+        updateSelectedUsers();
+    };
+    
+    window['removeGroup' + {{ post.id }}] = function(groupId) {
+        selectedGroups.delete(groupId);
+        const checkbox = document.querySelector(`.group-checkbox[value="${groupId}"]`);
+        if (checkbox) checkbox.checked = false;
+        updateSelectedGroups();
+    };
+});
+
+// Mute toggle for this post's media
+document.addEventListener('DOMContentLoaded', function() {
+    const muteToggle = document.querySelector(`.mute-toggle[data-post-id="{{ post.id }}"]`);
+    if (muteToggle) {
+        muteToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const postId = this.dataset.postId;
+            const video = document.getElementById(`video-${postId}`);
+            const audio = document.getElementById(`audio-${postId}`);
+            const icon = this.querySelector('i');
+            
+            if (video) {
+                video.muted = !video.muted;
+                icon.className = video.muted ? 'bi bi-volume-mute-fill' : 'bi bi-volume-up-fill';
+                this.title = video.muted ? 'Unmute' : 'Mute';
+            } else if (audio) {
+                audio.muted = !audio.muted;
+                icon.className = audio.muted ? 'bi bi-volume-mute-fill' : 'bi bi-volume-up-fill';
+                this.title = audio.muted ? 'Unmute' : 'Mute';
+            }
+        });
+    }
+
+    // Prevent navigation when clicking on video container
+    const videoContainer = document.querySelector(`[data-media-type="video"][data-post-id="{{ post.id }}"]`);
+    if (videoContainer) {
+        videoContainer.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    }
+
+    // Enhanced post card interactions
+    const postCard = document.getElementById('post-card-{{ post.id }}');
+    if (postCard) {
+        // Touch feedback for mobile
+        postCard.addEventListener('touchstart', function() {
+            this.style.transform = 'translateY(-1px)';
+        });
+        
+        postCard.addEventListener('touchend', function() {
+            this.style.transform = '';
+        });
+
+        // Enhanced button interactions
+        const buttons = postCard.querySelectorAll('.btn');
+        buttons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Add loading state for async actions
+                if (this.classList.contains('start-conversation') || 
+                    this.id === 'repost-btn-{{ post.id }}' ||
+                    this.closest('[data-bs-toggle="modal"]')) {
+                    return; // Skip these as they have their own handling
+                }
+
+                // Add click feedback
+                this.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    this.style.transform = '';
+                }, 100);
+            });
+        });
+
+        // Enhanced comment input interactions
+        const commentInput = postCard.querySelector('input[name="content"]');
+        if (commentInput) {
+            commentInput.addEventListener('focus', function() {
+                this.parentElement.style.transform = 'translateY(-1px)';
+            });
+            
+            commentInput.addEventListener('blur', function() {
+                this.parentElement.style.transform = '';
+            });
+        }
+
+        // Media hover effects
+        const mediaElements = postCard.querySelectorAll('.post-media');
+        mediaElements.forEach(media => {
+            media.addEventListener('mouseenter', function() {
+                this.style.transform = 'scale(1.02)';
+            });
+            
+            media.addEventListener('mouseleave', function() {
+                this.style.transform = '';
+            });
+        });
+    }
+});
+</script>
+
+<!-- Report Modal -->
+<div class="modal fade" id="reportModal-{{ post.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Report post</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form hx-post="/api/reports/"
+                      hx-target="#post-card-{{ post.id }}"
+                      hx-swap="outerHTML"
+                      hx-on::after-request="bootstrap.Modal.getInstance(document.getElementById('reportModal-{{ post.id }}')).hide()">
+                    {% csrf_token %}
+                    <input type="hidden" name="post" value="{{ post.id }}">
+                    <div class="mb-3">
+                        <label class="form-label">Reason for reporting</label>
+                        <select name="reason" class="form-select" required>
+                            <option value="">Select a reason</option>
+                            <option value="spam">Spam</option>
+                            <option value="inappropriate">Inappropriate content</option>
+                            <option value="harassment">Harassment</option>
+                            <option value="false_information">False information</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Additional details (optional)</label>
+                        <textarea name="description" class="form-control" rows="3" placeholder="Please provide more details about why you're reporting this post..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-danger w-100">Submit Report</button>
+                </form>
+            </div>
+        </div>
     </div>
 </div>

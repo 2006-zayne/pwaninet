@@ -1,0 +1,1758 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PwaniNet</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <meta name="theme-color" content="#2563eb">
+
+    <!-- iOS PWA: enable standalone and provide startup images -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+    <!-- Generic apple-touch-icon already present; add startup images for common sizes -->
+    <link rel="apple-touch-startup-image" href="{% static 'images/splash-640x1136.png' %}" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" href="{% static 'images/splash-750x1334.png' %}" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" href="{% static 'images/splash-1125x2436.png' %}" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">
+    <link rel="apple-touch-startup-image" href="{% static 'images/splash-1242x2208.png' %}" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)">
+    <link rel="apple-touch-startup-image" href="{% static 'images/splash-1536x2048.png' %}" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" href="{% static 'images/splash-1668x2388.png' %}" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" href="{% static 'images/splash-2048x2732.png' %}" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)">
+    
+    <!-- PWA Icons - Comprehensive Favicon Support -->
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/favicon-96x96.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/favicon-96x96.png' %}">
+    <link rel="icon" type="image/svg+xml" href="{% static 'images/favicon.svg' %}">
+    <link rel="shortcut icon" href="{% static 'images/favicon.ico' %}">
+    
+    <!-- Force favicon caching and display -->
+    <meta name="msapplication-TileColor" content="#2563eb">
+    <meta name="msapplication-config" content="{% static 'images/browserconfig.xml' %}">
+    <meta name="theme-color" content="#2563eb">
+    <script>
+        // Set theme immediately to prevent flash
+        (function() {
+            const userPreference = '{{ request.user.theme_preference|default:"system" }}';
+            const savedTheme = localStorage.getItem('theme');
+            const theme = userPreference !== 'system' ? userPreference : (savedTheme || 'system');
+
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else if (theme === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+            } else {
+                // System preference
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+            }
+        })();
+    </script>
+
+    <!-- Critical Skeleton CSS - Loads before all other CSS -->
+    <style>
+        /* Critical: Ensure skeleton renders immediately with highest priority */
+        #page-skeleton {
+            display: block !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background: #f8fafc !important;
+            z-index: 9999999 !important;
+            overflow-y: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        #page-skeleton.hidden {
+            display: none !important;
+        }
+
+        [data-theme="dark"] #page-skeleton {
+            background: #0f172a !important;
+        }
+
+        /* Set initial body background to prevent flash (will be overridden by theme CSS) */
+        body {
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 0;
+        }
+
+        [data-theme="dark"] body {
+            background-color: #0f172a;
+        }
+
+        /* Hide app initially */
+        #app {
+            opacity: 0 !important;
+        }
+
+        #app.loaded {
+            opacity: 1 !important;
+        }
+    </style>
+
+    <script>
+        // Force favicon caching and display
+        (function() {
+            // Preload favicon to force caching
+            const favicon = new Image();
+            favicon.src = '{% static "images/favicon.ico" %}';
+            
+            // Force favicon refresh if needed
+            setTimeout(() => {
+                const links = document.querySelectorAll('link[rel*="icon"]');
+                links.forEach(link => {
+                    if (link.href.includes('favicon')) {
+                        // Add timestamp to force refresh
+                        const url = new URL(link.href);
+                        url.searchParams.set('v', Date.now());
+                        link.href = url.toString();
+                    }
+                });
+            }, 1000);
+        })();
+    </script>
+    
+    <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+    <script src="{% static 'js/htmx.min.js' %}"></script>
+    <script src="{% static 'js/device_manager.js' %}"></script>
+    <script src="{% static 'js/auto_video_play.js' %}"></script>
+    
+    <!-- Skeleton Loading System -->
+    <script src="{% static 'js/skeleton-loader.js' %}"></script>
+    <script src="{% static 'js/skeleton-init.js' %}"></script>
+    
+    <!-- Native PWA Install Manager -->
+    <script src="{% static 'js/native-pwa-install.js' %}"></script>
+
+    <!-- Critical: Detect fresh PWA launch BEFORE body renders -->
+    <script>
+        (function(){
+            var isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+            var alreadyLaunched = sessionStorage.getItem('pwaninet_launched');
+            if (isPWA && !alreadyLaunched) {
+                document.documentElement.classList.add('fresh-launch');
+                sessionStorage.setItem('pwaninet_launched', 'true');
+            }
+        })();
+    </script>
+
+    <!-- Startup Splash Screen CSS -->
+    <style>
+        :root {
+            --bs-backdrop-zindex: 1000000;
+            --bs-modal-zindex: 1000001;
+        }
+
+        /* Prevent black screen during initial page load */
+        body {
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 0;
+        }
+
+        [data-theme="dark"] body {
+            background-color: #0f172a;
+        }
+
+        /* Splash hidden by default - no flash on internal navigation */
+        #startup-splash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: var(--background);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999999;
+            opacity: 0;
+            pointer-events: none; /* Ensure it doesn't intercept clicks when hidden */
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: opacity;
+        }
+        
+        /* Show splash immediately on fresh launch (class set by inline script in <head>) */
+        html.fresh-launch #startup-splash,
+        #startup-splash.show-splash {
+            opacity: 1;
+            pointer-events: auto; /* Allow interaction while splash is visible intentionally */
+        }
+        
+        /* App hidden by default until page loads */
+        #app {
+            opacity: 0;
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: opacity;
+        }
+
+        /* Show app when loaded */
+        #app.loaded {
+            opacity: 1;
+        }
+
+        /* Hide app on fresh launch (handled by startup splash) */
+        html.fresh-launch #app {
+            opacity: 0;
+        }
+        
+        /* JS-controlled classes (for fallback) */
+        #startup-splash.show-splash {
+            opacity: 1;
+        }
+        #app.hide-for-splash {
+            opacity: 0;
+        }
+        
+        #startup-splash.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .splash-logo-container {
+            text-align: center;
+            animation: logoGlow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes logoGlow {
+            0% {
+                filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.3));
+                transform: scale(1);
+            }
+            100% {
+                filter: drop-shadow(0 0 40px rgba(99, 102, 241, 0.6));
+                transform: scale(1.02);
+            }
+        }
+        
+        .splash-logo {
+            width: 80px;
+            height: 80px;
+            background: var(--card-bg);
+            border: 2px solid var(--border);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .splash-logo::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                transparent 30%,
+                rgba(255, 255, 255, 0.1) 50%,
+                transparent 70%
+            );
+            animation: shine 3s ease-in-out infinite;
+        }
+        
+        @keyframes shine {
+            0% {
+                transform: translateX(-100%) translateY(-100%) rotate(45deg);
+            }
+            50% {
+                transform: translateX(100%) translateY(100%) rotate(45deg);
+            }
+            100% {
+                transform: translateX(-100%) translateY(-100%) rotate(45deg);
+            }
+        }
+        
+        .splash-brand {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 30px;
+            letter-spacing: -0.5px;
+        }
+        
+        .splash-brand::after {
+            content: '|';
+            animation: blink 1s ease-in-out infinite;
+            color: var(--primary);
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        .splash-loading {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        .splash-dot {
+            width: 12px;
+            height: 12px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: bounce 1.4s ease-in-out infinite both;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        
+        .splash-dot:nth-child(1) { animation-delay: -0.32s; }
+        .splash-dot:nth-child(2) { animation-delay: -0.16s; }
+        .splash-dot:nth-child(3) { animation-delay: 0; }
+        
+        @keyframes bounce {
+            0%, 80%, 100% {
+                transform: scale(0.8);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
+        }
+        
+        .splash-text {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+        
+        .splash-progress {
+            width: 200px;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        .splash-progress-bar {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        
+        .splash-progress-bar.filling {
+            width: 70%;
+        }
+        
+        .splash-progress-bar.ready {
+            width: 100%;
+            transition: width 0.3s ease;
+        }
+        
+        #app.show {
+            opacity: 1 !important;
+        }
+        
+        /* Theme-aware colors are now handled by CSS variables */
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .splash-logo {
+                width: 60px;
+                height: 60px;
+            }
+            
+            .splash-brand {
+                font-size: 24px;
+                margin-bottom: 20px;
+            }
+            
+            .splash-dot {
+                width: 10px;
+                height: 10px;
+            }
+            
+            .splash-text {
+                font-size: 12px;
+            }
+        }
+        
+        /* Performance optimizations */
+        .splash-logo-container,
+        .splash-logo,
+        .splash-brand,
+        .splash-loading,
+        .splash-dot {
+            will-change: transform, opacity;
+            backface-visibility: hidden;
+            perspective: 1000px;
+        }
+        
+        /* Pulse animation for text changes */
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        /* Offline icon styling */
+        .splash-offline-icon {
+            font-size: 24px;
+            opacity: 0.8;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        /* Connection status animations */
+        .splash-text.connecting {
+            animation: pulse 1s ease-in-out infinite;
+        }
+        
+        .splash-text.error {
+            color: var(--text-secondary);
+            animation: shake 0.5s ease-in-out;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            .splash-logo-container,
+            .splash-logo::before,
+            .splash-dot,
+            .splash-offline-icon {
+                animation: none;
+            }
+            
+            .splash-progress-bar {
+                transition: none;
+            }
+            
+            .splash-brand::after {
+                animation: none;
+                content: '';
+            }
+        }
+    </style>
+    
+    <!-- PWA Splash Screen -->
+    <script src="{% static 'js/splash-screen.js' %}"></script>
+    
+    <style>
+        :root, [data-theme="light"] {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --primary-light: #dbeafe;
+            --text-dark: #0f172a;
+            --text-secondary: #64748b;
+            --text-muted: #64748b;
+            --background: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+            --nav-bg: rgba(255, 255, 255, 0.9);
+            --mobile-nav-bg: #fff;
+        }
+
+        /* Dark theme variables */
+        [data-theme="dark"] {
+            --primary: #6366f1;
+            --primary-hover: #818cf8;
+            --primary-light: #312e81;
+            --text-dark: #e4e6eb;
+            --background: #18191f;
+            --card-bg: #242526;
+            --border: #3a3b3c;
+            --nav-bg: rgba(24, 25, 31, 0.9);
+            --mobile-nav-bg: #242526;
+            --text-secondary: #e4e6eb;
+            --text-muted: #e4e6eb;
+        }
+
+        [data-theme="dark"] .text-muted {
+            color: #e4e6eb !important;
+        }
+        [data-theme="dark"] .text-secondary {
+            color: #e4e6eb !important;
+        }
+
+        body {
+            background-color: var(--background) !important;
+            color: var(--text-dark);
+            font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+            padding-top: 75px;
+            padding-bottom: 80px;
+        }
+
+        @media (max-width: 767px) {
+            body {
+                padding-bottom: 80px;
+            }
+        }
+
+        /* iPhone SE and very small screens (320px width) */
+        @media (max-width: 360px) {
+            body {
+                padding-bottom: 75px;
+            }
+            
+            .mobile-bottom-nav {
+                width: 95%;
+                max-width: 380px;
+                height: 55px;
+                bottom: 6px;
+                padding: 0 4px;
+                border-radius: 16px;
+            }
+
+            .mobile-bottom-nav .nav-chip i {
+                font-size: 1.3rem;
+            }
+            
+            .mobile-bottom-nav .nav-chip {
+                padding: 6px 8px;
+                min-width: 40px;
+                min-height: 40px;
+            }
+            
+            /* Notification badge adjustments for small screens */
+            .mobile-bottom-nav .nav-chip .badge {
+                font-size: 0.5rem !important;
+                padding: 0.25em 0.35em !important;
+                min-width: 16px !important;
+                margin-top: -3px !important;
+                margin-right: -3px !important;
+            }
+        }
+
+        .nav-brand-tactical {
+            font-family: 'Nunito', sans-serif;
+            font-weight: 700;
+            font-style: italic;
+            letter-spacing: 2px;
+            color: var(--text-dark);
+            text-transform: uppercase;
+            text-decoration: none;
+            font-size: 1.4rem;
+        }
+
+        .brand-net { color: var(--primary); }
+
+        .navbar-top {
+            background: var(--nav-bg) !important;
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            height: 65px;
+        }
+
+        .nav-chip {
+            color: var(--text-secondary);
+            padding: 10px 18px;
+            border-radius: 12px;
+            transition: all 0.2s ease-in-out;
+            text-decoration: none;
+        }
+
+        .nav-chip.active { background: var(--primary-light); color: var(--primary); }
+
+        .mobile-bottom-nav {
+            background: var(--mobile-nav-bg);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            height: 60px;
+            position: fixed;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 95%;
+            max-width: 420px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+            z-index: 9999;
+            padding: 0 16px;
+        }
+
+        .mobile-bottom-nav .nav-chip i {
+            font-size: 1.4rem;
+        }
+
+        .mobile-bottom-nav .nav-chip {
+            color: var(--text-secondary);
+            padding: 8px 12px;
+            border-radius: 12px;
+            min-width: 44px;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mobile-bottom-nav .nav-chip.active {
+            color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        /* Mobile bottom nav active indicator */
+        [data-theme="dark"] .mobile-bottom-nav .nav-chip.active {
+            color: #9ca3af !important;
+            background: var(--border) !important;
+        }
+        [data-theme="dark"] .mobile-bottom-nav .nav-chip.active:hover {
+            color: #d1d5db !important;
+        }
+
+        /* Modal Styles - Custom backdrop solution */
+        .modal {
+            z-index: 1050 !important;
+        }
+        .modal-backdrop {
+            z-index: 1040 !important;
+            pointer-events: none !important; /* Let clicks pass through */
+        }
+        .modal-dialog {
+            z-index: 1051 !important;
+        }
+        /* Create custom backdrop that doesn't block clicks */
+        .modal-backdrop::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+        }
+        /* Ensure all interactive elements inside modals work */
+        .modal button, .modal a, .modal input, .modal textarea, .modal select {
+            pointer-events: auto !important;
+        }
+        /* Prevent any parent transforms from creating new stacking contexts */
+        body.modal-open {
+            overflow: hidden;
+            /* Remove any transforms that could break fixed positioning */
+            transform: none !important;
+        }
+        /* Mobile: Ensure bottom nav stays below modals but above other content */
+        @media (max-width: 768px) {
+            body.modal-open .mobile-bottom-nav {
+                z-index: 2039 !important; /* Just below modal backdrop */
+                display: none !important; /* Hide entirely when modal is open */
+            }
+        }
+        .modal-content {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+        }
+        .modal-header {
+            border-color: var(--border);
+        }
+        .modal-title {
+            color: var(--text-dark);
+        }
+        .btn-close {
+            color: var(--text-secondary);
+        }
+        .btn-close:hover {
+            color: var(--text-dark);
+        }
+        [data-theme="dark"] .btn-close {
+            color: #9ca3af !important;
+            opacity: 0.8;
+        }
+        [data-theme="dark"] .btn-close:hover {
+            color: #d1d5db !important;
+            opacity: 1;
+        }
+        .dropdown-menu {
+            background-color: var(--card-bg);
+            border-color: var(--border);
+        }
+        .dropdown-item {
+            color: var(--text-dark) !important;
+        }
+        .dropdown-item:hover {
+            background-color: var(--border);
+            color: var(--text-dark) !important;
+        }
+
+        /* Input placeholders for dark theme */
+        [data-theme="dark"] ::placeholder {
+            color: #d1d5db !important;
+            opacity: 1 !important;
+        }
+        [data-theme="dark"] ::-webkit-input-placeholder {
+            color: #d1d5db !important;
+            opacity: 1 !important;
+        }
+        [data-theme="dark"] ::-moz-placeholder {
+            color: #d1d5db !important;
+            opacity: 1 !important;
+        }
+        [data-theme="dark"] :-ms-input-placeholder {
+            color: #d1d5db !important;
+            opacity: 1 !important;
+        }
+
+        /* Primary Button */
+        .btn-primary {
+            background-color: var(--primary) !important;
+            border-color: var(--primary) !important;
+            color: white !important;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover) !important;
+            border-color: var(--primary-hover) !important;
+        }
+
+        /* Button text colors for dark theme */
+        [data-theme="dark"] .btn {
+            color: var(--text-primary) !important;
+        }
+        [data-theme="dark"] .btn-primary {
+            color: #fff !important;
+        }
+        [data-theme="dark"] .btn-outline-secondary {
+            color: var(--text-secondary) !important;
+            border-color: var(--border) !important;
+        }
+        [data-theme="dark"] .btn-outline-secondary:hover {
+            background-color: #4e4f50 !important;
+            border-color: #4e4f50 !important;
+            color: #ffffff !important;
+        }
+
+        [data-theme="dark"] .btn-secondary {
+            background-color: #3a3b3c !important;
+            border-color: #3a3b3c !important;
+            color: #e4e6eb !important;
+        }
+        [data-theme="dark"] .btn-secondary:hover {
+            background-color: #4e4f50 !important;
+            color: #ffffff !important;
+        }
+
+        [data-theme="dark"] .form-control {
+            background-color: #3a3b3c !important;
+            border-color: #3a3b3c !important;
+            color: #e4e6eb !important;
+        }
+        [data-theme="dark"] .form-control:focus {
+            background-color: #4e4f50 !important;
+            border-color: #6366f1 !important;
+        }
+
+        /* Form Inputs */
+        .form-control:focus {
+            border-color: var(--primary) !important;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+        }
+
+        /* Card Styles */
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        @media (min-width: 768px) { .mobile-bottom-nav { display: none; } }
+
+        /* Mobile full width fix */
+        @media (max-width: 767px) {
+            .container, .container-fluid {
+                max-width: 100% !important;
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+            }
+            .col-12, .col-lg-8, .col-md-5 {
+                max-width: 100% !important;
+                flex: 0 0 100% !important;
+            }
+            .row {
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+        }
+    </style>
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+      data-user-id="{{ request.user.id }}">
+
+    <!-- Page Load Skeleton - HIGHEST PRIORITY - Renders immediately -->
+    <div id="page-skeleton" style="display: block; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #f8fafc; z-index: 9999999; overflow-y: auto; margin: 0; padding: 0;">
+        <style>
+            /* Critical inline skeleton styles - render immediately */
+            #page-skeleton {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+
+            [data-theme="dark"] #page-skeleton {
+                background: #0f172a;
+            }
+
+            .skeleton-nav {
+                height: 60px;
+                background: #ffffff;
+                border-bottom: 1px solid #e2e8f0;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 16px;
+                position: sticky;
+                top: 0;
+                z-index: 10;
+            }
+
+            [data-theme="dark"] .skeleton-nav {
+                background: #1e293b;
+                border-bottom: 1px solid #334155;
+            }
+
+            .skeleton-nav-brand {
+                width: 120px;
+                height: 24px;
+                background: #e2e8f0;
+                border-radius: 4px;
+            }
+
+            [data-theme="dark"] .skeleton-nav-brand {
+                background: #334155;
+            }
+
+            .skeleton-nav-items {
+                display: flex;
+                gap: 16px;
+            }
+
+            .skeleton-nav-item {
+                width: 32px;
+                height: 32px;
+                background: #e2e8f0;
+                border-radius: 50%;
+            }
+
+            [data-theme="dark"] .skeleton-nav-item {
+                background: #334155;
+            }
+
+            .skeleton-content {
+                padding: 16px;
+                max-width: 600px;
+                margin: 0 auto;
+            }
+
+            .skeleton-post {
+                background: #ffffff;
+                border-radius: 12px;
+                padding: 16px;
+                margin-bottom: 16px;
+                border: 1px solid #e2e8f0;
+            }
+
+            [data-theme="dark"] .skeleton-post {
+                background: #1e293b;
+                border: 1px solid #334155;
+            }
+
+            .skeleton-post-header {
+                display: flex;
+                gap: 12px;
+                margin-bottom: 12px;
+            }
+
+            .skeleton-avatar {
+                width: 48px;
+                height: 48px;
+                background: #e2e8f0;
+                border-radius: 50%;
+                flex-shrink: 0;
+            }
+
+            [data-theme="dark"] .skeleton-avatar {
+                background: #334155;
+            }
+
+            .skeleton-meta {
+                flex: 1;
+            }
+
+            .skeleton-name {
+                width: 120px;
+                height: 14px;
+                background: #e2e8f0;
+                border-radius: 4px;
+                margin-bottom: 6px;
+            }
+
+            [data-theme="dark"] .skeleton-name {
+                background: #334155;
+            }
+
+            .skeleton-time {
+                width: 80px;
+                height: 12px;
+                background: #e2e8f0;
+                border-radius: 4px;
+            }
+
+            [data-theme="dark"] .skeleton-time {
+                background: #334155;
+            }
+
+            .skeleton-body {
+                margin-bottom: 12px;
+            }
+
+            .skeleton-line {
+                height: 14px;
+                background: #e2e8f0;
+                border-radius: 4px;
+                margin-bottom: 8px;
+            }
+
+            [data-theme="dark"] .skeleton-line {
+                background: #334155;
+            }
+
+            .skeleton-line:nth-child(1) { width: 100%; }
+            .skeleton-line:nth-child(2) { width: 100%; }
+            .skeleton-line:nth-child(3) { width: 60%; }
+
+            .skeleton-media {
+                width: 100%;
+                height: 200px;
+                background: #e2e8f0;
+                border-radius: 8px;
+                margin-bottom: 12px;
+            }
+
+            [data-theme="dark"] .skeleton-media {
+                background: #334155;
+            }
+
+            .skeleton-actions {
+                display: flex;
+                justify-content: space-around;
+                padding-top: 12px;
+                border-top: 1px solid #e2e8f0;
+            }
+
+            [data-theme="dark"] .skeleton-actions {
+                border-top: 1px solid #334155;
+            }
+
+            .skeleton-action {
+                width: 50px;
+                height: 16px;
+                background: #e2e8f0;
+                border-radius: 4px;
+            }
+
+            [data-theme="dark"] .skeleton-action {
+                background: #334155;
+            }
+
+            /* Shimmer animation */
+            @keyframes shimmer {
+                0% { background-position: -200% 0; }
+                100% { background-position: 200% 0; }
+            }
+
+            .skeleton-nav-brand,
+            .skeleton-nav-item,
+            .skeleton-avatar,
+            .skeleton-name,
+            .skeleton-time,
+            .skeleton-line,
+            .skeleton-media,
+            .skeleton-action {
+                background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+                background-size: 200% 100%;
+                animation: shimmer 1.5s infinite;
+            }
+
+            [data-theme="dark"] .skeleton-nav-brand,
+            [data-theme="dark"] .skeleton-nav-item,
+            [data-theme="dark"] .skeleton-avatar,
+            [data-theme="dark"] .skeleton-name,
+            [data-theme="dark"] .skeleton-time,
+            [data-theme="dark"] .skeleton-line,
+            [data-theme="dark"] .skeleton-media,
+            [data-theme="dark"] .skeleton-action {
+                background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+            }
+
+            .skeleton-bottom-nav {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 60px;
+                background: #ffffff;
+                border-top: 1px solid #e2e8f0;
+                display: flex;
+                justify-content: space-around;
+                align-items: center;
+                z-index: 10;
+            }
+
+            [data-theme="dark"] .skeleton-bottom-nav {
+                background: #1e293b;
+                border-top: 1px solid #334155;
+            }
+
+            .skeleton-bottom-item {
+                width: 32px;
+                height: 32px;
+                background: #e2e8f0;
+                border-radius: 50%;
+            }
+
+            [data-theme="dark"] .skeleton-bottom-item {
+                background: #334155;
+            }
+
+            @media (min-width: 768px) {
+                .skeleton-bottom-nav {
+                    display: none;
+                }
+            }
+        </style>
+        <nav class="skeleton-nav">
+            <div class="skeleton-nav-brand"></div>
+            <div class="skeleton-nav-items">
+                <div class="skeleton-nav-item"></div>
+                <div class="skeleton-nav-item"></div>
+                <div class="skeleton-nav-item"></div>
+                <div class="skeleton-nav-item"></div>
+            </div>
+        </nav>
+        <div class="skeleton-content">
+            <div class="skeleton-post">
+                <div class="skeleton-post-header">
+                    <div class="skeleton-avatar"></div>
+                    <div class="skeleton-meta">
+                        <div class="skeleton-name"></div>
+                        <div class="skeleton-time"></div>
+                    </div>
+                </div>
+                <div class="skeleton-body">
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line"></div>
+                </div>
+                <div class="skeleton-media"></div>
+                <div class="skeleton-actions">
+                    <div class="skeleton-action"></div>
+                    <div class="skeleton-action"></div>
+                    <div class="skeleton-action"></div>
+                </div>
+            </div>
+            <div class="skeleton-post">
+                <div class="skeleton-post-header">
+                    <div class="skeleton-avatar"></div>
+                    <div class="skeleton-meta">
+                        <div class="skeleton-name"></div>
+                        <div class="skeleton-time"></div>
+                    </div>
+                </div>
+                <div class="skeleton-body">
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line"></div>
+                </div>
+                <div class="skeleton-actions">
+                    <div class="skeleton-action"></div>
+                    <div class="skeleton-action"></div>
+                    <div class="skeleton-action"></div>
+                </div>
+            </div>
+            <div class="skeleton-post">
+                <div class="skeleton-post-header">
+                    <div class="skeleton-avatar"></div>
+                    <div class="skeleton-meta">
+                        <div class="skeleton-name"></div>
+                        <div class="skeleton-time"></div>
+                    </div>
+                </div>
+                <div class="skeleton-body">
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line"></div>
+                </div>
+                <div class="skeleton-media"></div>
+                <div class="skeleton-actions">
+                    <div class="skeleton-action"></div>
+                    <div class="skeleton-action"></div>
+                    <div class="skeleton-action"></div>
+                </div>
+            </div>
+        </div>
+        <nav class="skeleton-bottom-nav">
+            <div class="skeleton-bottom-item"></div>
+            <div class="skeleton-bottom-item"></div>
+            <div class="skeleton-bottom-item"></div>
+            <div class="skeleton-bottom-item"></div>
+            <div class="skeleton-bottom-item"></div>
+        </nav>
+    </div>
+
+    
+    <!-- Startup Splash Screen - ENABLED -->
+    <div id="startup-splash">
+        <div class="splash-logo-container">
+            <div class="splash-logo">
+                <img src="/static/images/web-app-manifest-192x192.png" alt="PwaniNet" style="width: 100%; height: 100%; object-fit: cover; border-radius: 18px;">
+            </div>
+            <div class="splash-brand">PwaniNet</div>
+            <div class="splash-loading">
+                <div class="splash-dot"></div>
+                <div class="splash-dot"></div>
+                <div class="splash-dot"></div>
+            </div>
+            <div class="splash-text">Loading your campus network...</div>
+            <div class="splash-progress">
+                <div class="splash-progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container - Hidden initially -->
+    <div id="app" style="opacity: 0; /* Hidden until page loads */">
+    
+    <nav class="navbar navbar-top fixed-top">
+        <div class="container d-flex justify-content-between align-items-center">
+            <a class="nav-brand-tactical" href="{% url 'posts:home' %}">
+                PWANI<span class="brand-net">NET</span>
+            </a>
+
+            <div class="d-none d-md-flex gap-2">
+                <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+                    <i class="bi bi-house-door-fill"></i>
+                </a>
+                <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}">
+                    <i class="bi bi-shield-shaded"></i>
+                </a>
+                {% if request.user.is_authenticated %}
+                <a href="{% url 'messaging:conversation_list' %}" class="nav-chip {% if request.resolver_match.url_name == 'conversation_list' %}active{% endif %}">
+                    <i class="bi bi-chat-dots-fill"></i>
+                </a>
+                <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}">
+                    <i class="bi bi-plus-circle-fill"></i>
+                </a>
+                {% endif %}
+                <a href="{% url 'notifications:notifications' %}" class="nav-chip">
+                    <i class="bi bi-bell-fill"></i>
+                </a>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+                <!-- Theme Toggle -->
+                <div class="dropdown">
+                    <button class="btn btn-link p-0" data-bs-toggle="dropdown" style="color: var(--text-dark);">
+                        <i class="bi bi-circle-half" style="font-size: 1.2rem;"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <button class="dropdown-item" onclick="setTheme('light')">
+                                <i class="bi bi-sun me-2"></i> Light
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item" onclick="setTheme('dark')">
+                                <i class="bi bi-moon me-2"></i> Dark
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item" onclick="setTheme('system')">
+                                <i class="bi bi-display me-2"></i> System
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                {% if request.user.is_authenticated %}
+                    <a href="{% url 'users:profile' request.user.username %}">
+                        <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 35px; height: 35px; object-fit: cover;">
+                    </a>
+                {% else %}
+                    <a href="{% url 'login' %}" class="btn btn-primary btn-sm rounded-pill px-3">Login</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-8">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </main>
+
+    {% block modals %}
+        <div class="modal fade" id="likersModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" id="modal-content-target">
+                    <div class="p-5 text-center">
+                        <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endblock %}
+
+    {% block mobile_bottom_nav %}
+        <div class="mobile-bottom-nav d-md-none">
+            <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}"><i class="bi bi-house-door-fill"></i></a>
+            <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}"><i class="bi bi-people-fill"></i></a>
+            {% if user.is_authenticated %}
+                <a href="{% url 'messaging:conversation_list' %}"
+                    class="nav-chip position-relative {% if request.resolver_match.url_name == 'conversation_list' %}active{% endif %}"
+                    hx-get="{% url 'messaging:unread_message_count' %}"
+                    hx-trigger="every 30s"
+                    hx-swap="innerHTML"
+                    id="message-badge-container">
+                    <i class="bi bi-chat-dots-fill"></i>
+                </a>
+                <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}"><i class="bi bi-plus-circle-fill"></i></a>
+                <a href="{% url 'notifications:notifications' %}"
+                    class="nav-chip position-relative {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
+                    hx-get="{% url 'notifications:unread_notification_count' %}" 
+                    hx-trigger="every 30s"
+                    hx-swap="innerHTML"
+                    id="notification-badge-container">
+                        <i class="bi bi-bell-fill"></i>
+                        {% if unread_notifications_count > 0 %}
+                            <span class="position-absolute top-0 end-0 translate-middle badge rounded-pill bg-danger border border-light" 
+                                style="font-size: 0.6rem; padding: 0.35em 0.5em; min-width: 18px; text-align: center; margin-top: -2px; margin-right: -2px;">
+                                {{ unread_notifications_count }}
+                                <span class="visually-hidden">unread messages</span>
+                            </span>
+                        {% endif %}
+                </a>
+                <a href="{% url 'users:profile' request.user.username %}" class="nav-chip {% if request.resolver_match.url_name == 'profile' %}active{% endif %}"><i class="bi bi-person-circle"></i></a>
+            {% endif %}
+        </div>
+    {% endblock %}
+
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    <script>
+        // Theme Management
+        function setTheme(theme) {
+            const html = document.documentElement;
+            const userPreference = '{{ request.user.theme_preference|default:"system" }}';
+
+            if (theme === 'system') {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+                localStorage.setItem('theme', 'system');
+            } else {
+                html.setAttribute('data-theme', theme);
+                localStorage.setItem('theme', theme);
+            }
+
+            // Save to server if user is authenticated
+            if ('{{ request.user.is_authenticated }}' === 'True') {
+                fetch('/users/api/users/update_theme/', {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ theme_preference: theme })
+                }).catch(error => console.error('Failed to save theme preference:', error));
+            }
+        }
+
+        // Initialize theme on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme');
+            const userPreference = '{{ request.user.theme_preference|default:"system" }}';
+
+            if (userPreference !== 'system') {
+                setTheme(userPreference);
+            } else if (savedTheme && savedTheme !== 'system') {
+                setTheme(savedTheme);
+            } else {
+                setTheme('system');
+            }
+
+            // Listen for system theme changes
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                const currentTheme = localStorage.getItem('theme');
+                if (currentTheme === 'system' || !currentTheme) {
+                    setTheme('system');
+                }
+            });
+        });
+
+        // Protocol: Reset modal intel on close
+        const likersModal = document.getElementById('likersModal');
+        likersModal.addEventListener('hidden.bs.modal', function () {
+            document.getElementById('modal-content-target').innerHTML = 
+                '<div class="p-5 text-center">' +
+                    '<div class="spinner-border text-primary spinner-border-sm" role="status"></div>' +
+                '</div>';
+        });
+
+        // MODAL COORDINATION: Close custom overlays when Bootstrap modals open
+        // Prevents z-index conflicts and interaction blocking
+        document.addEventListener('show.bs.modal', function (event) {
+            // Move modal to body to avoid stacking context issues
+            const modal = event.target;
+            if (modal && modal.parentNode !== document.body) {
+                document.body.appendChild(modal);
+                console.log('[ModalCoordination] Modal moved to body');
+            }
+
+            // Close any open custom overlays from messaging
+            const customOverlays = document.querySelectorAll('.overlay.show, .emoji-picker-modal.show, .attachment-modal.show');
+            customOverlays.forEach(overlay => {
+                overlay.classList.remove('show');
+            });
+
+            // Hide voice recording preview if active
+            const voicePreview = document.querySelector('.voice-recording-preview.show');
+            if (voicePreview) {
+                voicePreview.classList.remove('show');
+            }
+
+            // Hide context menu if open
+            const contextMenu = document.querySelector('.context-menu.show');
+            if (contextMenu) {
+                contextMenu.style.display = 'none';
+                contextMenu.classList.remove('show');
+            }
+
+            console.log('[ModalCoordination] Custom overlays closed for Bootstrap modal');
+        });
+
+        // Handle ESC key to close all modal types
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                // Close custom overlays if no Bootstrap modal is open
+                const openBootstrapModal = document.querySelector('.modal.show');
+                if (!openBootstrapModal) {
+                    document.querySelectorAll('.overlay.show, .emoji-picker-modal.show, .attachment-modal.show').forEach(el => {
+                        el.classList.remove('show');
+                    });
+                }
+            }
+        });
+
+        // Configure Bootstrap modals to append to body (prevents stacking context issues)
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            bootstrap.Modal.Default.backdrop = false; // Disable Bootstrap backdrop
+            bootstrap.Modal.Default.keyboard = true;
+            bootstrap.Modal.Default.focus = true;
+            // Force modals to be appended to body to avoid stacking context issues
+            bootstrap.Modal.Default.rootElement = document.body;
+        }
+
+        // Handle click-outside-to-dismiss since backdrop has pointer-events: none
+        document.addEventListener('click', function(e) {
+            const openModal = document.querySelector('.modal.show');
+            if (openModal) {
+                const modalContent = openModal.querySelector('.modal-content');
+                if (modalContent && !modalContent.contains(e.target)) {
+                    // Click is outside modal content, close it
+                    const modalInstance = bootstrap.Modal.getInstance(openModal);
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                }
+            }
+        });
+    </script>
+    {% block extra_js %}
+<script>
+// Auto-refresh functionality for user actions
+function refreshPage() {
+    window.location.reload();
+}
+
+// Listen for custom refresh trigger
+document.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.trigger === 'refreshPage') {
+        setTimeout(() => {
+            refreshPage();
+        }, 100);
+    }
+});
+</script>
+
+<!-- Service Worker Registration -->
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+        console.log('[ServiceWorker] Attempting to register service worker...');
+
+        // Try the static path first
+        const swPath = '{% static "service-worker.js" %}';
+        console.log('[ServiceWorker] Service worker path:', swPath);
+
+        navigator.serviceWorker.register(swPath)
+            .then(function(registration) {
+                console.log('[ServiceWorker] Registration successful with scope: ', registration.scope);
+
+                // Check for service worker updates
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    console.log('[ServiceWorker] New service worker found');
+
+                    newWorker.addEventListener('statechange', () => {
+                        console.log('[ServiceWorker] Service worker state:', newWorker.state);
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // New service worker is available, show update notification
+                            console.log('[ServiceWorker] New version available');
+                            if (confirm('PwaniNet has been updated. Reload to get the latest version?')) {
+                                window.location.reload();
+                            }
+                        }
+                    });
+                });
+
+            })
+            .catch(function(error) {
+                console.error('[ServiceWorker] Registration failed with static path: ', error);
+                console.log('[ServiceWorker] Trying fallback path /static/service-worker.js');
+
+                // Fallback to direct static path
+                navigator.serviceWorker.register('/static/service-worker.js')
+                    .then(function(registration) {
+                        console.log('[ServiceWorker] Registration successful with fallback path, scope: ', registration.scope);
+                    })
+                    .catch(function(fallbackError) {
+                        console.error('[ServiceWorker] Fallback registration also failed: ', fallbackError);
+                        console.error('[ServiceWorker] Error details:', {
+                            message: fallbackError.message,
+                            name: fallbackError.name
+                        });
+                    });
+            });
+    });
+} else {
+    console.log('[ServiceWorker] Service workers are not supported in this browser');
+}
+
+
+// Handle offline/online events
+window.addEventListener('online', function() {
+    console.log('App is now online');
+    // Hide any offline indicators
+    const offlineBanner = document.getElementById('offline-banner');
+    if (offlineBanner) {
+        offlineBanner.style.display = 'none';
+    }
+});
+
+window.addEventListener('offline', function() {
+    console.log('App is now offline');
+    // Show offline indication if needed
+    console.log('You are offline. Some features may be limited.');
+});
+
+// PWA Install Prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    
+    // Show install button (optional)
+    const installButton = document.getElementById('install-button');
+    if (installButton) {
+        installButton.style.display = 'block';
+        installButton.addEventListener('click', () => {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                } else {
+                    console.log('User dismissed the install prompt');
+                }
+                deferredPrompt = null;
+            });
+        });
+    }
+});
+</script>
+{% endblock %}
+</div>
+    
+    <!-- Startup Manager - Critical for PWA experience -->
+    <script>
+        // Set theme immediately to prevent flash
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+    
+    <!-- Load startup manager -->
+    <script src="/static/js/startup-v2.js"></script>
+    
+    <!-- Load offline skeleton manager (page-aware) -->
+    <script src="/static/js/offline-skeleton-v2.js"></script>
+    
+    <!-- Load main app styles -->
+    <link rel="stylesheet" href="/static/css/splash.css">
+
+    <!-- Global WebSocket Connection for Real-time Notifications -->
+    {% if request.user.is_authenticated %}
+    {% verbatim %}
+    <script>
+    // Global notification WebSocket connection
+    let globalNotificationsSocket = null;
+    let globalReconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+
+    function connectGlobalNotificationsWebSocket() {
+        if (globalNotificationsSocket && globalNotificationsSocket.readyState === WebSocket.OPEN) {
+            return; // Already connected
+        }
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = protocol + '//' + window.location.host + '/ws/notifications/';
+        
+        console.log('[GLOBAL] Connecting to notifications WebSocket:', wsUrl);
+        
+        try {
+            globalNotificationsSocket = new WebSocket(wsUrl);
+            
+            globalNotificationsSocket.onopen = function(e) {
+                console.log('[GLOBAL] Notifications WebSocket connected successfully');
+                globalReconnectAttempts = 0;
+                
+                // Hide any connection error indicators
+                const errorIndicator = document.getElementById('websocket-error');
+                if (errorIndicator) {
+                    errorIndicator.style.display = 'none';
+                }
+            };
+            
+            globalNotificationsSocket.onmessage = function(e) {
+                try {
+                    const data = JSON.parse(e.data);
+                    console.log('[GLOBAL] Received notification:', data);
+                    
+                    // Handle different notification types
+                    if (data.type === 'conversation_update') {
+                        // Update conversation list if we're on that page
+                        if (typeof updateConversationInList === 'function') {
+                            updateConversationInList(data);
+                        }
+                        // Update unread count in navigation
+                        updateUnreadCount(data.unread_count);
+                    } else if (data.type === 'typing_indicator') {
+                        // Handle typing indicators if we're on conversation list
+                        if (typeof updateTypingIndicator === 'function') {
+                            updateTypingIndicator(data);
+                        }
+                    } else if (data.type === 'notification') {
+                        // Handle general notifications
+                        showNotification(data.notification);
+                    } else if (data.type === 'user_status') {
+                        // Handle user online/offline status updates
+                        if (typeof handleUserStatusUpdate === 'function') {
+                            handleUserStatusUpdate(data);
+                        }
+                    }
+                } catch (error) {
+                    console.error('[GLOBAL] Error parsing WebSocket message:', error);
+                }
+            };
+            
+            globalNotificationsSocket.onclose = function(e) {
+                console.log('[GLOBAL] Notifications WebSocket disconnected:', e.code, e.reason);
+                
+                // Attempt to reconnect with exponential backoff
+                if (globalReconnectAttempts < maxReconnectAttempts) {
+                    const delay = Math.min(1000 * Math.pow(2, globalReconnectAttempts), 30000);
+                    console.log('[GLOBAL] Reconnecting in ' + delay + 'ms...');
+                    
+                    setTimeout(() => {
+                        globalReconnectAttempts++;
+                        connectGlobalNotificationsWebSocket();
+                    }, delay);
+                } else {
+                    console.log('[GLOBAL] Max reconnect attempts reached');
+                    showWebSocketError();
+                }
+            };
+            
+            globalNotificationsSocket.onerror = function(e) {
+                console.error('[GLOBAL] Notifications WebSocket error:', e);
+            };
+            
+        } catch (error) {
+            console.error('[GLOBAL] Failed to create WebSocket connection:', error);
+            showWebSocketError();
+        }
+    }
+
+    function updateUnreadCount(unreadCount) {
+        // Update messages icon badge in navigation
+        const messagesBadge = document.querySelector('.messages-badge');
+        if (messagesBadge) {
+            if (unreadCount > 0) {
+                messagesBadge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+                messagesBadge.style.display = 'flex';
+            } else {
+                messagesBadge.style.display = 'none';
+            }
+        }
+    }
+
+    function showNotification(notification) {
+        // Show browser notification if permissions are granted
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(notification.title || 'New Message', {
+                body: notification.body || notification.message,
+                icon: '/static/images/logo.png'
+            });
+        }
+        
+        // Show in-page notification
+        const notificationDiv = document.createElement('div');
+        notificationDiv.className = 'alert alert-info alert-dismissible fade show position-fixed';
+        notificationDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        notificationDiv.innerHTML = 
+            (notification.body || notification.message) +
+            '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+        document.body.appendChild(notificationDiv);
+        setTimeout(() => notificationDiv.remove(), 5000);
+    }
+
+    function showWebSocketError() {
+        // Show a subtle indicator that real-time features are unavailable
+        let errorIndicator = document.getElementById('websocket-error');
+        if (!errorIndicator) {
+            errorIndicator = document.createElement('div');
+            errorIndicator.id = 'websocket-error';
+            errorIndicator.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: #dc3545; color: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; z-index: 1000;';
+            errorIndicator.innerHTML = 'Real-time features offline';
+            document.body.appendChild(errorIndicator);
+        }
+        errorIndicator.style.display = 'block';
+    }
+
+    // Connect when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        // User is authenticated if we're in this script block (wrapped in {% if request.user.is_authenticated %})
+        connectGlobalNotificationsWebSocket();
+    });
+
+    // Reconnect when page becomes visible again
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden && (!globalNotificationsSocket || globalNotificationsSocket.readyState !== WebSocket.OPEN)) {
+            connectGlobalNotificationsWebSocket();
+        }
+    });
+
+    // Cleanup when page unloads
+    window.addEventListener('beforeunload', function() {
+        if (globalNotificationsSocket) {
+            globalNotificationsSocket.close();
+        }
+    });
+    </script>
+    {% endverbatim %}
+    {% endif %}
+
+    <!-- Page Skeleton Loading Logic -->
+    <script>
+    (function() {
+        'use strict';
+
+        console.log('[PageSkeleton] Initializing skeleton loader');
+
+        const pageSkeleton = document.getElementById('page-skeleton');
+        const app = document.getElementById('app');
+
+        console.log('[PageSkeleton] Elements found:', {
+            pageSkeleton: !!pageSkeleton,
+            app: !!app
+        });
+
+        // Function to hide page skeleton and show app
+        function hidePageSkeleton() {
+            if (pageSkeleton && !pageSkeleton.classList.contains('hidden')) {
+                pageSkeleton.classList.add('hidden');
+                if (app) {
+                    app.classList.add('loaded');
+                }
+                console.log('[PageSkeleton] Skeleton hidden, app visible');
+            } else {
+                console.log('[PageSkeleton] Skeleton already hidden or not found');
+            }
+        }
+
+        // Detect if this is a fresh PWA launch
+        const isFreshLaunch = document.documentElement.classList.contains('fresh-launch');
+        console.log('[PageSkeleton] Is fresh PWA launch:', isFreshLaunch);
+
+        // IMMEDIATE ACTION: Hide skeleton for fresh PWA launches (they use startup splash)
+        if (isFreshLaunch && pageSkeleton) {
+            pageSkeleton.classList.add('hidden');
+            console.log('[PageSkeleton] Fresh PWA launch - skeleton hidden immediately');
+        }
+
+        // Hide skeleton when page is fully loaded (for normal navigation)
+        window.addEventListener('load', function() {
+            console.log('[PageSkeleton] Window load event fired');
+            if (!isFreshLaunch) {
+                hidePageSkeleton();
+            }
+        });
+
+        // Also hide on DOMContentLoaded as fallback for fast-loading pages
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('[PageSkeleton] DOMContentLoaded event fired');
+            if (!isFreshLaunch) {
+                // Small delay to ensure DOM is ready
+                setTimeout(() => {
+                    hidePageSkeleton();
+                }, 100);
+            }
+        });
+
+        // Handle HTMX content loading - hide skeleton when HTMX content loads
+        document.addEventListener('htmx:afterRequest', function(evt) {
+            console.log('[PageSkeleton] HTMX afterRequest event fired');
+            if (!isFreshLaunch) {
+                hidePageSkeleton();
+            }
+        });
+
+        // Failsafe: Ensure skeleton is hidden after maximum timeout
+        setTimeout(function() {
+            console.log('[PageSkeleton] Failsafe timeout triggered');
+            hidePageSkeleton();
+        }, 3000);
+    })();
+    </script>
+
+</body>
+</html>

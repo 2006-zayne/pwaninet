@@ -1,6 +1,39 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<style>
+  [data-theme="dark"] .bg-white {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .bg-light {
+    background-color: var(--card-bg) !important;
+  }
+  [data-theme="dark"] .text-dark {
+    color: #ffffff !important;
+  }
+  [data-theme="dark"] .text-muted {
+    color: #d1d5db !important;
+  }
+  [data-theme="dark"] .card {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] .modal-content {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] .modal-title {
+    color: #ffffff !important;
+  }
+  [data-theme="dark"] .form-control {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+    color: #ffffff !important;
+  }
+  [data-theme="dark"] .form-control::placeholder {
+    color: #d1d5db !important;
+  }
+</style>
 <div class="container py-3">
     <div class="bg-white rounded-3 shadow-sm p-3 mb-4">
         <form method="GET" action="{% url 'posts:search' %}" class="d-flex align-items-center gap-2">

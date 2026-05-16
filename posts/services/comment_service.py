@@ -1,9 +1,7 @@
 from django.contrib import messages
 from posts.models import Comment, CommentLike
-from notifications.models import Notifications
 from posts.queries.comment_queries import get_liked_comment_ids_for_user, get_ranked_comments_queryset
-from posts.services.feed_service import invalidate_home_feed_context
-from notifications.services.notification_service import invalidate_unread_count_cache
+from users.services.feed_service import invalidate_home_feed_context
 
 DEFAULT_VISIBLE_COMMENTS = 3
 
@@ -23,9 +21,6 @@ def add_comment_to_post(post, author, content):
     if not content:
         return None
     comment = Comment.objects.create(post = post, author = author, content = content)
-    if post.author != author:
-        Notifications.objects.create(recipient = post.author, sender = author, post = post, notification_type = Notifications.ALERTE, msg = 'commented on your post.')
-        invalidate_unread_count_cache(post.author.id)
     invalidate_home_feed_context(author.id)
     return comment
 

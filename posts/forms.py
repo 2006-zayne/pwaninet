@@ -1,5 +1,6 @@
 from django import forms
 from posts.models import Post
+from posts.validators import validate_audio_size
 from courses.models import Unit
 
 
@@ -13,12 +14,7 @@ class PostForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-control'})
     )
    # group = Group.objects.all()
-    # save image and video and docs as optional fields
-    image = forms.ImageField(
-        required=False,
-        widget=forms.ClearableFileInput(
-            attrs={
-                'class': 'form-control-file'}))
+    # save video and docs as optional fields
     video = forms.FileField(
         required=False,
         widget=forms.ClearableFileInput(
@@ -29,6 +25,20 @@ class PostForm(forms.ModelForm):
         widget=forms.ClearableFileInput(
             attrs={
                 'class': 'form-control-file'}))
+    audio = forms.FileField(
+        required=False,
+        validators=[validate_audio_size],
+        widget=forms.ClearableFileInput(
+            attrs={
+                'class': 'form-control-file',
+                'accept': 'audio/*'
+            }))
+    images = forms.ImageField(
+        required=False,
+        widget=forms.ClearableFileInput(
+            attrs={
+                'class': 'form-control-file'
+            }))
 
     class Meta:
         model = Post
@@ -36,9 +46,10 @@ class PostForm(forms.ModelForm):
             'unit',
             'group',
             'content',
-            'image',
             'video',
             'docs',
+            'audio',
+            'images',
             'gradient_class']
 
         widgets = {

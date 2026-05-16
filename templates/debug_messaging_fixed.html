@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messaging Debug Test - Fixed</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        .messages-container { 
+            max-height: 400px; 
+            overflow-y: auto; 
+            border: 1px solid #ccc; 
+            padding: 10px; 
+            background: #f9f9f9;
+        }
+        .date-separator { text-align: center; margin: 10px 0; }
+        .date-separator span { 
+            background: #e0e0e0; 
+            padding: 4px 12px; 
+            border-radius: 12px; 
+            font-size: 12px; 
+        }
+        .message-bubble { 
+            max-width: 70%; 
+            padding: 8px 12px; 
+            margin: 4px 0; 
+            border-radius: 18px; ++=
+            position: relative; 
+        }
+        .sent { 
+            background: #cfd8dc; 
+            margin-left: auto; 
+            text-align: right; 
+        }
+        .received { 
+            background: white; 
+            border: 1px solid #ddd; 
+        }
+        .consecutive-message { 
+            border-top: 1px solid rgba(0,0,0,0.05); 
+        }
+        .message-time { 
+            font-size: 11px; 
+            opacity: 0.7; 
+            margin-top: 4px; 
+        }
+        .debug-log {
+            background: #f0f0f0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 4px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Messaging Debug Test - Fixed</h1>
+    
+    <div class="debug-section">
+        <h2>Debug Console</h2>
+        <div id="debugLog" class="debug-log"></div>
+        <button onclick="clearDebugLog()">Clear Log</button>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Test Results</h2>
+        <div id="testResults"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Messages Container</h2>
+        <div id="messagesContainer" class="messages-container"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Test Controls</h2>
+        <button onclick="testWebSocketMessage()">Test WebSocket Message</button>
+        <button onclick="testMessageNormalization()">Test Message Normalization</button>
+        <button onclick="testDifferentDataStructures()">Test Data Structures</button>
+        <button onclick="simulateRealTimeMessages()">Simulate Real-time</button>
+        <button onclick="clearMessages()">Clear Messages</button>
+    </div>
+
+    <script>
+        // Global debug manager
+        let debugManager;
+        
+        // Initialize everything when page loads
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('Page loaded, initializing debug manager...');
+            
+            // Set mock data attributes for testing
+            document.body.dataset.userId = 'user1';
+            document.body.dataset.conversationId = 'test-conversation-123';
+            document.body.dataset.isEncrypted = 'false';
+            
+            // Initialize debug manager
+            debugManager = new DebugMessagingManager();
+            
+            // Test that it's working
+            updateTestResults('Initialization', 'success', 'Debug manager ready for testing');
+            console.log('Debug manager initialized successfully');
+        });
+        
+        // Mock console methods to capture logs
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        function addToDebugLog(type, ...args) {
+            const logElement = document.getElementById('debugLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            
+            logElement.textContent += `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            // Also call original console method
+            if (type === 'error') originalError(...args);
+            else if (type === 'warn') originalWarn(...args);
+            else originalLog(...args);
+        }
+        
+        console.log = (...args) => addToDebugLog('log', ...args);
+        console.error = (...args) => addToDebugLog('error', ...args);
+        console.warn = (...args) => addToDebugLog('warn', ...args);
+        
+        function clearDebugLog() {
+            document.getElementById('debugLog').textContent = '';
+        }
+        
+        // Simplified MessagingManager for testing with same structure as production
+        class DebugMessagingManager {
+            constructor() {
+                this.messages = [];
+                this.isRendering = false;
+                this.currentUserId = 'user1';
+                this.messageIdCounter = 1;
+            }
+            
+            addMessage(messageData) {
+                try {
+                    console.log('addMessage called with:', messageData);
+                    
+                    // Normalize message data structure to match state expectations
+                    const normalizedMessage = {
+                        ...messageData,
+                        sender_id: messageData.sender_id || messageData.sender?.id,
+                        created_at: messageData.created_at || messageData.timestamp
+                    };
+                    
+                    console.log('Normalized message:', normalizedMessage);
+                    
+                    // Validate required fields
+                    if (!normalizedMessage.id || !normalizedMessage.content || !normalizedMessage.sender_id) {
+                        console.error('Invalid message data:', normalizedMessage);
+                        return;
+                    }
+                    
+                    // Add message to state array
+                    this.messages.push(normalizedMessage);
+                    // Sort messages by created_at to maintain order
+                    this.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                    this.render();
+                    
+                    console.log('Message added successfully. Total messages:', this.messages.length);
+                } catch (error) {
+                    console.error('Error in addMessage:', error, messageData);
+                }
+            }
+            
+            buildView(messages) {
+                const viewItems = [];
+                let lastDate = null;
+                let lastSenderId = null;
+                
+                for (const message of messages) {
+                    const messageDate = new Date(message.created_at).toDateString();
+                    const isOwn = message.sender_id === this.currentUserId;
+                    
+                    // Add date separator if needed
+                    if (messageDate !== lastDate) {
+                        viewItems.push({
+                            type: 'date',
+                            label: this.formatDateLabel(message.created_at)
+                        });
+                        lastDate = messageDate;
+                    }
+                    
+                    // Determine if this is a consecutive message
+                    const isConsecutive = lastSenderId === message.sender_id;
+                    lastSenderId = message.sender_id;
+                    
+                    // Add message to view
+                    viewItems.push({
+                        type: 'message',
+                        ...message,
+                        isOwn,
+                        isConsecutive,
+                        isLastSent: isOwn && message === messages.filter(m => m.sender_id === this.currentUserId).pop()
+                    });
+                }
+                
+                return viewItems;
+            }
+            
+            formatDateLabel(dateString) {
+                const date = new Date(dateString);
+                const today = new Date();
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                
+                if (date.toDateString() === today.toDateString()) {
+                    return 'Today';
+                } else if (date.toDateString() === yesterday.toDateString()) {
+                    return 'Yesterday';
+                } else {
+                    return date.toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    }).replace(/\//g, '/');
+                }
+            }
+            
+            render() {
+                if (this.isRendering) return;
+                this.isRendering = true;
+                
+                try {
+                    const container = document.getElementById('messagesContainer');
+                    if (!container) return;
+                    
+                    container.innerHTML = '';
+                    const viewItems = this.buildView(this.messages);
+                    
+                    viewItems.forEach(item => {
+                        if (item.type === 'date') {
+                            const dateElement = document.createElement('div');
+                            dateElement.className = 'date-separator';
+                            dateElement.innerHTML = `<span>${item.label}</span>`;
+                            container.appendChild(dateElement);
+                        } else if (item.type === 'message') {
+                            const messageElement = this.createMessageElement(item);
+                            container.appendChild(messageElement);
+                        }
+                    });
+                    
+                    container.scrollTop = container.scrollHeight;
+                    
+                } finally {
+                    this.isRendering = false;
+                }
+            }
+            
+            createMessageElement(message) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} ${message.isConsecutive ? 'consecutive-message' : 'first-in-group'} ${message.isLastSent ? 'last-sent' : ''}`;
+                messageDiv.setAttribute('data-message-id', message.id);
+                messageDiv.setAttribute('data-sender-id', message.sender_id);
+                
+                messageDiv.innerHTML = `
+                    <p class="message-content">${message.content || ''}</p>
+                    <div class="message-time">
+                        ${new Date(message.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </div>
+                `;
+                
+                return messageDiv;
+            }
+        }
+        
+        // Test functions
+        function testWebSocketMessage() {
+            console.log('=== Testing WebSocket Message Structure ===');
+            
+            if (!debugManager) {
+                updateTestResults('WebSocket Message', 'error', 'Debug manager not initialized');
+                return;
+            }
+            
+            // Simulate WebSocket message with different data structures
+            const testMessage = {
+                type: 'message',
+                data: {
+                    id: debugManager.messageIdCounter++,
+                    sender: {
+                        id: 'user2',
+                        username: 'TestUser'
+                    },
+                    content: 'WebSocket test message',
+                    created_at: new Date().toISOString()
+                }
+            };
+            
+            debugManager.addMessage(testMessage.data);
+            updateTestResults('WebSocket Message', 'success', 'Message processed correctly');
+        }
+        
+        function testMessageNormalization() {
+            console.log('=== Testing Message Normalization ===');
+            
+            if (!debugManager) {
+                updateTestResults('Message Normalization', 'error', 'Debug manager not initialized');
+                return;
+            }
+            
+            // Test different message structures
+            const testCases = [
+                {
+                    name: 'sender.id structure',
+                    data: {
+                        id: debugManager.messageIdCounter++,
+                        sender: { id: 'user2' },
+                        content: 'Test with sender.id',
+                        created_at: new Date().toISOString()
+                    }
+                },
+                {
+                    name: 'sender_id structure',
+                    data: {
+                        id: debugManager.messageIdCounter++,
+                        sender_id: 'user2',
+                        content: 'Test with sender_id',
+                        created_at: new Date().toISOString()
+                    }
+                },
+                {
+                    name: 'timestamp instead of created_at',
+                    data: {
+                        id: debugManager.messageIdCounter++,
+                        sender_id: 'user2',
+                        content: 'Test with timestamp',
+                        timestamp: new Date().toISOString()
+                    }
+                }
+            ];
+            
+            testCases.forEach(testCase => {
+                try {
+                    debugManager.addMessage(testCase.data);
+                    updateTestResults(testCase.name, 'success', 'Normalized correctly');
+                } catch (error) {
+                    updateTestResults(testCase.name, 'error', error.message);
+                }
+            });
+        }
+        
+        function testDifferentDataStructures() {
+            console.log('=== Testing Different Data Structures ===');
+            
+            if (!debugManager) {
+                updateTestResults('Data Structures', 'error', 'Debug manager not initialized');
+                return;
+            }
+            
+            // Test edge cases
+            const edgeCases = [
+                {
+                    name: 'Missing sender_id',
+                    data: {
+                        id: debugManager.messageIdCounter++,
+                        content: 'Missing sender',
+                        created_at: new Date().toISOString()
+                    }
+                },
+                {
+                    name: 'Missing content',
+                    data: {
+                        id: debugManager.messageIdCounter++,
+                        sender_id: 'user2',
+                        created_at: new Date().toISOString()
+                    }
+                },
+                {
+                    name: 'Missing id',
+                    data: {
+                        sender_id: 'user2',
+                        content: 'Missing id',
+                        created_at: new Date().toISOString()
+                    }
+                }
+            ];
+            
+            edgeCases.forEach(testCase => {
+                try {
+                    debugManager.addMessage(testCase.data);
+                    updateTestResults(testCase.name, 'warning', 'Should have been rejected but was accepted');
+                } catch (error) {
+                    updateTestResults(testCase.name, 'success', 'Correctly rejected invalid data');
+                }
+            });
+        }
+        
+        function simulateRealTimeMessages() {
+            console.log('=== Simulating Real-time Messages ===');
+            
+            if (!debugManager) {
+                updateTestResults('Real-time Simulation', 'error', 'Debug manager not initialized');
+                return;
+            }
+            
+            const messages = [
+                { sender_id: 'user2', content: 'Hello!', delay: 0 },
+                { sender_id: 'user1', content: 'Hi there!', delay: 500 },
+                { sender_id: 'user2', content: 'How are you?', delay: 1000 },
+                { sender_id: 'user1', content: 'I\\'m good, thanks!', delay: 1500 }
+            ];
+            
+            messages.forEach((msg, index) => {
+                setTimeout(() => {
+                    debugManager.addMessage({
+                        id: debugManager.messageIdCounter++,
+                        ...msg,
+                        created_at: new Date().toISOString()
+                    });
+                }, msg.delay);
+            });
+            
+            updateTestResults('Real-time Simulation', 'success', 'Started real-time message simulation');
+        }
+        
+        function clearMessages() {
+            if (!debugManager) {
+                updateTestResults('Clear Messages', 'error', 'Debug manager not initialized');
+                return;
+            }
+            
+            debugManager.messages = [];
+            debugManager.render();
+            console.log('Messages cleared');
+            updateTestResults('Clear Messages', 'success', 'All messages cleared');
+        }
+        
+        function updateTestResults(testName, status, message) {
+            const resultsDiv = document.getElementById('testResults');
+            const testDiv = document.createElement('div');
+            testDiv.className = status;
+            testDiv.innerHTML = `<strong>${testName}:</strong> ${message}`;
+            resultsDiv.appendChild(testDiv);
+        }
+    </script>
+</body>
+</html>

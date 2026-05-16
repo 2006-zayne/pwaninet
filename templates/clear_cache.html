@@ -1,0 +1,341 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Clear All Cache</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h5><i class="bi bi-exclamation-triangle"></i> Cache Clearing Utility</h5>
+                        <p class="mb-2">This tool will clear all browser cache, service worker cache, and storage to ensure a fresh PWA experience.</p>
+                        <p class="mb-0"><strong>Note:</strong> You will need to re-login after clearing cache.</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Cache Status</h5>
+                            <div id="cache-status" class="alert alert-info">
+                                Checking cache status...
+                            </div>
+                            
+                            <h5 class="mt-4">Storage Status</h5>
+                            <div id="storage-status" class="alert alert-info">
+                                Checking storage...
+                            </div>
+                            
+                            <h5 class="mt-4">Service Worker Status</h5>
+                            <div id="sw-status" class="alert alert-info">
+                                Checking service worker...
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5>Clear Actions</h5>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-danger" onclick="clearAllCache()">
+                                    <i class="bi bi-trash"></i> Clear All Cache
+                                </button>
+                                <button class="btn btn-warning" onclick="clearBrowserCache()">
+                                    <i class="bi bi-arrow-clockwise"></i> Clear Browser Cache
+                                </button>
+                                <button class="btn btn-warning" onclick="clearServiceWorkerCache()">
+                                    <i class="bi bi-gear"></i> Clear Service Worker
+                                </button>
+                                <button class="btn btn-warning" onclick="clearLocalStorage()">
+                                    <i class="bi bi-database"></i> Clear Storage
+                                </button>
+                                <button class="btn btn-info" onclick="checkCacheStatus()">
+                                    <i class="bi bi-search"></i> Check Status
+                                </button>
+                                <button class="btn btn-success" onclick="reloadPWA()">
+                                    <i class="bi bi-arrow-repeat"></i> Reload PWA
+                                </button>
+                            </div>
+                            
+                            <h5 class="mt-4">PWA Actions</h5>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-outline-danger" onclick="unregisterServiceWorker()">
+                                    Unregister Service Worker
+                                </button>
+                                <button class="btn btn-outline-warning" onclick="clearPWAFlags()">
+                                    Clear PWA Flags
+                                </button>
+                                <button class="btn btn-outline-info" onclick="resetPWADetection()">
+                                    Reset PWA Detection
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <h5>Action Log</h5>
+                        <textarea id="action-log" class="form-control" rows="8" readonly></textarea>
+                        <button class="btn btn-sm btn-outline-primary mt-2" onclick="clearLog()">Clear Log</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let actionLog = [];
+
+function log(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const entry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+    actionLog.push(entry);
+    
+    const logArea = document.getElementById('action-log');
+    if (logArea) {
+        logArea.value = actionLog.join('\n');
+        logArea.scrollTop = logArea.scrollHeight;
+    }
+    
+    console.log(entry);
+}
+
+function updateStatus(elementId, content, type = 'info') {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.className = `alert alert-${type}`;
+        element.innerHTML = content;
+    }
+}
+
+async function clearAllCache() {
+    log('Starting complete cache clearing...');
+    
+    try {
+        // Clear service worker cache
+        await clearServiceWorkerCache();
+        
+        // Clear browser storage
+        clearLocalStorage();
+        
+        // Clear browser cache
+        clearBrowserCache();
+        
+        log('All cache cleared successfully!', 'success');
+        updateStatus('cache-status', '✅ All cache cleared', 'success');
+        
+        // Ask user to reload
+        setTimeout(() => {
+            if (confirm('All cache cleared! Reload the page for fresh start?')) {
+                window.location.reload();
+            }
+        }, 1000);
+        
+    } catch (error) {
+        log(`Error clearing cache: ${error}`, 'error');
+        updateStatus('cache-status', '❌ Error clearing cache', 'danger');
+    }
+}
+
+async function clearServiceWorkerCache() {
+    log('Clearing service worker cache...');
+    
+    if ('serviceWorker' in navigator) {
+        try {
+            // Get all service worker registrations
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            
+            for (let registration of registrations) {
+                log(`Unregistering service worker: ${registration.scope}`, 'info');
+                await registration.unregister();
+            }
+            
+            // Clear caches
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                for (let cacheName of cacheNames) {
+                    log(`Deleting cache: ${cacheName}`, 'info');
+                    await caches.delete(cacheName);
+                }
+            }
+            
+            log('Service worker cache cleared', 'success');
+            updateStatus('sw-status', '✅ Service worker cleared', 'success');
+            
+        } catch (error) {
+            log(`Error clearing service worker: ${error}`, 'error');
+            updateStatus('sw-status', '❌ Error clearing service worker', 'danger');
+        }
+    } else {
+        log('Service worker not supported', 'warning');
+        updateStatus('sw-status', '⚠️ Service worker not supported', 'warning');
+    }
+}
+
+function clearLocalStorage() {
+    log('Clearing local storage...');
+    
+    try {
+        // Clear localStorage
+        const localStorageKeys = Object.keys(localStorage);
+        localStorageKeys.forEach(key => {
+            log(`Clearing localStorage: ${key}`, 'info');
+            localStorage.removeItem(key);
+        });
+        
+        // Clear sessionStorage
+        const sessionStorageKeys = Object.keys(sessionStorage);
+        sessionStorageKeys.forEach(key => {
+            log(`Clearing sessionStorage: ${key}`, 'info');
+            sessionStorage.removeItem(key);
+        });
+        
+        // Clear IndexedDB (if available)
+        if (window.indexedDB) {
+            log('IndexedDB detected - consider manual clearing', 'warning');
+        }
+        
+        log('Storage cleared successfully', 'success');
+        updateStatus('storage-status', '✅ Storage cleared', 'success');
+        
+    } catch (error) {
+        log(`Error clearing storage: ${error}`, 'error');
+        updateStatus('storage-status', '❌ Error clearing storage', 'danger');
+    }
+}
+
+function clearBrowserCache() {
+    log('Triggering browser cache clear...');
+    
+    // This is a best effort - browsers cache clearing is limited
+    try {
+        // Clear any application cache
+        if (window.applicationCache) {
+            window.applicationCache.update();
+            log('Application cache update triggered', 'info');
+        }
+        
+        // Force reload to bypass cache
+        log('Browser cache clear triggered', 'success');
+        
+    } catch (error) {
+        log(`Error triggering browser cache clear: ${error}`, 'error');
+    }
+}
+
+async function unregisterServiceWorker() {
+    log('Unregistering all service workers...');
+    
+    if ('serviceWorker' in navigator) {
+        try {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            
+            for (let registration of registrations) {
+                await registration.unregister();
+                log(`Unregistered: ${registration.scope}`, 'success');
+            }
+            
+            updateStatus('sw-status', '✅ All service workers unregistered', 'success');
+            
+        } catch (error) {
+            log(`Error unregistering service workers: ${error}`, 'error');
+        }
+    }
+}
+
+function clearPWAFlags() {
+    log('Clearing PWA flags...');
+    
+    const pwaFlags = [
+        'pwaInstalled',
+        'forcePWAMode',
+        'debugSplashMode',
+        'overrideDisplayMode',
+        'justLoggedIn'
+    ];
+    
+    pwaFlags.forEach(flag => {
+        localStorage.removeItem(flag);
+        log(`Cleared flag: ${flag}`, 'info');
+    });
+    
+    log('PWA flags cleared', 'success');
+}
+
+function resetPWADetection() {
+    log('Resetting PWA detection...');
+    
+    // Clear all PWA related storage
+    clearPWAFlags();
+    
+    // Reset any global variables
+    if (window.splashScreenManager) {
+        log('Resetting splash screen manager...', 'info');
+        // Force reinitialization
+        window.splashScreenManager = null;
+    }
+    
+    log('PWA detection reset', 'success');
+}
+
+async function checkCacheStatus() {
+    log('Checking cache status...');
+    
+    // Check localStorage
+    const localStorageSize = Object.keys(localStorage).length;
+    log(`LocalStorage items: ${localStorageSize}`, 'info');
+    
+    // Check sessionStorage
+    const sessionStorageSize = Object.keys(sessionStorage).length;
+    log(`SessionStorage items: ${sessionStorageSize}`, 'info');
+    
+    // Check service workers
+    if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        log(`Service workers registered: ${registrations.length}`, 'info');
+        
+        registrations.forEach(registration => {
+            log(`  - ${registration.scope}`, 'info');
+        });
+    }
+    
+    // Check caches
+    if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        log(`Caches: ${cacheNames.length}`, 'info');
+        
+        cacheNames.forEach(cacheName => {
+            log(`  - ${cacheName}`, 'info');
+        });
+    }
+    
+    // Update status displays
+    updateStatus('cache-status', `Cache items: ${localStorageSize + sessionStorageSize}`, 'info');
+    updateStatus('storage-status', `Storage: ${localStorageSize} local, ${sessionStorageSize} session`, 'info');
+    updateStatus('sw-status', `Service workers: ${registrations ? registrations.length : 0}`, 'info');
+    
+    log('Cache status check complete', 'success');
+}
+
+function reloadPWA() {
+    log('Reloading PWA...');
+    
+    // Force hard reload
+    window.location.href = window.location.href + '?cache_bust=' + Date.now();
+}
+
+// Auto-check on page load
+document.addEventListener('DOMContentLoaded', () => {
+    log('Cache clearing utility loaded');
+    
+    setTimeout(() => {
+        checkCacheStatus();
+    }, 1000);
+});
+
+function clearLog() {
+    actionLog = [];
+    document.getElementById('action-log').value = '';
+}
+</script>
+{% endblock %}

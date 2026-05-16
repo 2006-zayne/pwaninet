@@ -1,0 +1,57 @@
+<!-- Onboarding Tour Prompt Modal -->
+<div class="modal fade" id="onboardingTourModal" tabindex="-1" aria-labelledby="onboardingTourModalLabel" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-body text-center p-4">
+        <div class="mb-3">
+          <i class="bi bi-compass text-primary" style="font-size: 3rem;"></i>
+        </div>
+        <h5 class="modal-title fw-bold mb-3" id="onboardingTourModalLabel">Wanna take a quick tour around PwaniNet?</h5>
+        <p class="text-muted mb-4">Discover how to connect with classmates, join academic groups, and make the most of your campus network.</p>
+        
+        <div class="d-flex gap-2 justify-content-center">
+          <button type="button" class="btn btn-outline-secondary px-4" id="skipTourBtn">Skip for now</button>
+          <button type="button" class="btn btn-primary px-4" id="startTourBtn">Start Tour</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const tourModal = new bootstrap.Modal(document.getElementById('onboardingTourModal'));
+  
+  // Check if user should see onboarding
+  const hasCompletedOnboarding = {{ request.user.has_completed_onboarding|yesno:"true,false" }};
+  
+  if (!hasCompletedOnboarding) {
+    // Show the modal after a short delay
+    setTimeout(() => {
+      tourModal.show();
+    }, 1500);
+  }
+  
+  // Handle skip button
+  document.getElementById('skipTourBtn').addEventListener('click', function() {
+    tourModal.hide();
+    // Mark onboarding as completed
+    if (typeof window.markOnboardingCompleted === 'function') {
+      window.markOnboardingCompleted();
+    }
+    // Show profile completion prompt (function defined in tour.html)
+    if (typeof window.showProfileCompletionPrompt === 'function') {
+      window.showProfileCompletionPrompt();
+    }
+  });
+  
+  // Handle start tour button
+  document.getElementById('startTourBtn').addEventListener('click', function() {
+    tourModal.hide();
+    // Start the tour (function defined in tour.html)
+    if (typeof window.startOnboardingTour === 'function') {
+      window.startOnboardingTour();
+    }
+  });
+});
+</script>

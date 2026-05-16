@@ -1,12 +1,12 @@
 from django import forms
-from groups.models import Group
+from groups.models import Group, JoinPolicy
 
 
 class GroupForm(forms.ModelForm):
     class Meta:
         model = Group
         # We only want users to fill in these specific fields
-        fields = ['name', 'description', 'group_pic']
+        fields = ['name', 'description', 'group_pic', 'cover_photo', 'join_policy']
 
         # Adding Bootstrap classes so the form looks sharp on your ProBook
         widgets = {
@@ -22,4 +22,10 @@ class GroupForm(forms.ModelForm):
             'group_pic': forms.FileInput(
                 attrs={
                     'class': 'form-control'}),
+            'cover_photo': forms.FileInput(
+                attrs={
+                    'class': 'form-control'}),
+            'join_policy': forms.Select(
+                attrs={
+                    'class': 'form-control rounded-pill'}),
         }

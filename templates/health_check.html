@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Health Check</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success">
+                        <h5><i class="bi bi-check-circle"></i> System Health</h5>
+                        <p class="mb-2">PwaniNet is running and healthy.</p>
+                        <p class="mb-0">This endpoint is used for network connectivity checks during PWA startup.</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>System Information</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Status:</strong> <span class="badge bg-success">Healthy</span></li>
+                                <li><strong>Server:</strong> PwaniNet</li>
+                                <li><strong>Version:</strong> 1.0.0</li>
+                                <li><strong>Timestamp:</strong> <span id="timestamp"></span></li>
+                            </ul>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h6>Network Status</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Connection:</strong> <span class="badge bg-success">Online</span></li>
+                                <li><strong>Response Time:</strong> <span id="response-time"></span></li>
+                                <li><strong>User Agent:</strong> <span id="user-agent"></span></li>
+                                <li><strong>IP Address:</strong> <span id="ip-address"></span></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Update timestamp and client info
+document.getElementById('timestamp').textContent = new Date().toLocaleString();
+document.getElementById('user-agent').textContent = navigator.userAgent.substring(0, 50) + '...';
+
+// Get response time
+const startTime = performance.now();
+window.addEventListener('load', () => {
+    const responseTime = Math.round(performance.now() - startTime);
+    document.getElementById('response-time').textContent = responseTime + 'ms';
+});
+
+// Get IP address (simplified)
+fetch('https://api.ipify.org?format=json')
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('ip-address').textContent = data.ip;
+    })
+    .catch(() => {
+        document.getElementById('ip-address').textContent = 'Unknown';
+    });
+</script>
+{% endblock %}

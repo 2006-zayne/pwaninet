@@ -5,5 +5,16 @@
     {% if is_following %} Unfollow {% else %} Follow {% endif %}
 </button>
 
+{% if is_following %}
+<form method="POST" action="{% url 'messaging:create_conversation' %}" class="mb-2">
+    {% csrf_token %}
+    <input type="hidden" name="user_id" value="{{ profile_user.id }}">
+    <input type="hidden" name="type" value="direct">
+    <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold">
+        <i class="bi bi-chat-dots me-1"></i> Message
+    </button>
+</form>
+{% endif %}
+
 <!-- Update the follower count elsewhere on the page instantly -->
 <h6 id="follower-count" class="fw-bold mb-0" hx-swap-oob="true">{{ follower_count }}</h6>

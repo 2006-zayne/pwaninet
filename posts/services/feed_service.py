@@ -13,32 +13,30 @@ FEED_PAGE_SIZE = 10
 
 
 def encode_cursor(post):
-    """Encode post score, created_at, and id into a cursor string."""
-    score = post.score
-    created_at = post.created_at.isoformat()
-    post_id = post.id
-    return f"{score}|{created_at}|{post_id}"
+    """Encode post id and created_at into a cursor string."""
+    return f"{post.id}|{post.created_at.timestamp()}"
 
 
 def decode_cursor(cursor_string):
-    """Decode cursor string into score, created_at, and id."""
+    """Decode cursor string into post id and created_at."""
     if not cursor_string:
         return None
     try:
         parts = cursor_string.split('|')
-        if len(parts) != 3:
+        if len(parts) != 2:
             return None
-        score = float(parts[0])
-        created_at = datetime.fromisoformat(parts[1])
-        post_id = int(parts[2])
-        return {'score': score, 'created_at': created_at, 'id': post_id}
+        post_id = int(parts[0])
+        created_at_timestamp = float(parts[1])
+        from datetime import datetime, timezone
+        created_at = datetime.fromtimestamp(created_at_timestamp, tz=timezone.utc)
+        return {'id': post_id, 'created_at': created_at}
     except (ValueError, IndexError):
         return None
 
 
 def get_ranked_feed(user, cursor=None, limit=10):
     """
-    Get ranked feed with cursor-based pagination.
+    Get ranked feed with cursor-based pagination (scales well).
     
     Args:
         user: The user requesting the feed
@@ -52,35 +50,20 @@ def get_ranked_feed(user, cursor=None, limit=10):
     following_ids = get_following_ids(user)
     group_ids = get_user_group_ids(user)
     
-    # Build base queryset with filters for relevant posts
-    base_qs = Post.objects.filter(
-        Q(author_id__in=following_ids) |
-        Q(group_id__in=group_ids) |
-        Q(course=user.course, unit__year=user.year)
-    )
-    
-    # Annotate with counts and compute score
-    feed_qs = base_qs.annotate(
-        like_count_annotated=Count('likes', distinct=True),
-        comment_count_annotated=Count('comments', distinct=True),
-        score=Count('likes', distinct=True) + (2 * Count('comments', distinct=True))
-    )
+    # Use the improved feed algorithm from feed_queries (includes filters)
+    from posts.queries.feed_queries import get_prioritized_feed_queryset
+    feed_qs = get_prioritized_feed_queryset(user, following_ids, group_ids)
     
     # Apply cursor filtering if provided
     cursor_data = decode_cursor(cursor)
     if cursor_data:
+        # Filter posts that come after the cursor post
+        # Since we order by -priority_tier, -engagement_score, -created_at, -id
+        # We use id and created_at for reliable pagination
         feed_qs = feed_qs.filter(
-            Q(score__lt=cursor_data['score']) |
-            Q(score=cursor_data['score'], created_at__lt=cursor_data['created_at']) |
-            Q(score=cursor_data['score'], created_at=cursor_data['created_at'], id__lt=cursor_data['id'])
+            Q(created_at__lt=cursor_data['created_at']) |
+            Q(created_at=cursor_data['created_at'], id__lt=cursor_data['id'])
         )
-    
-    # Order by score DESC, created_at DESC, id DESC
-    feed_qs = feed_qs.order_by('-score', '-created_at', '-id')
-    
-    # Optimize with select_related and prefetch_related
-    feed_qs = feed_qs.select_related('author', 'group', 'course', 'unit')
-    feed_qs = feed_qs.prefetch_related('likes', 'comments')
     
     # Fetch one extra to check if there are more results
     posts = list(feed_qs[:limit + 1])
@@ -106,24 +89,27 @@ def build_home_feed_context(user, cursor=None, limit=10):
     posts = feed_data['posts']
     post_ids = [p.id for p in posts]
     liked_post_ids = get_liked_post_ids_for_user(user, post_ids)
-    suggested_groups = get_suggested_groups(user, get_following_ids(user))
-    user_suggestions = get_user_suggestions_from_groups(user)
     following_ids = get_following_ids(user)
+    
+    # Only include group suggestions on initial load (no cursor)
+    is_initial_load = cursor is None
     
     context = {
         'posts': posts,
         'liked_post_ids': liked_post_ids,
-        'suggested_groups': suggested_groups,
-        'suggested_friends': user_suggestions,
         'following_ids': following_ids,
-        'suggestion_index': random.randint(2, 6) if user_suggestions else None,
         'next_cursor': feed_data['next_cursor'],
         'has_more': feed_data['has_more'],
     }
+    
+    if is_initial_load:
+        suggested_groups = get_suggested_groups(user, following_ids)
+        context['suggested_groups'] = suggested_groups
+    
+    # Friend suggestions appear in feed on all loads (initial and paginated)
+    user_suggestions = get_user_suggestions_from_groups(user)
+    context['suggested_users'] = user_suggestions
+    context['following_ids'] = following_ids
+    context['suggestion_index'] = random.randint(2, 6) if user_suggestions else None
+    
     return context
-
-
-def invalidate_home_feed_context(user_id):
-    # Cursor-based pagination doesn't require page-based cache invalidation
-    # This function is kept for backwards compatibility
-    pass

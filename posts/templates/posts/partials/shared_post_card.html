@@ -1,0 +1,390 @@
+<div id="shared-post-card-{{ shared_post.id }}">
+<div class="post-card shadow-sm mb-3 bg-white rounded-3 overflow-hidden border-0">
+    <!-- Share Header -->
+    <div class="d-flex align-items-center p-2 border-bottom bg-light">
+        <a href="{% url 'users:profile' shared_post.sharer.username %}">
+            <img src="{{ shared_post.sharer.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm me-2" style="width: 40px; height: 40px; object-fit: cover;">
+        </a>
+        <div class="flex-grow-1">
+            <small class="fw-bold text-dark">
+                <a href="{% url 'users:profile' shared_post.sharer.username %}" class="text-dark text-decoration-none">{{ shared_post.sharer.get_full_name|default:shared_post.sharer.username }}</a>
+            </small>
+            <div class="d-flex align-items-center" style="font-size: 11px;">
+                <i class="bi bi-share-fill text-primary me-1"></i>
+                <span class="text-muted">shared a post with</span>
+                {% if shared_post.shared_to %}
+                    <a href="{% url 'users:profile' shared_post.shared_to.username %}" class="text-primary text-decoration-none ms-1">{{ shared_post.shared_to.username }}</a>
+                {% elif shared_post.shared_to_group %}
+                    <span class="text-primary ms-1">{{ shared_post.shared_to_group.name }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <small class="text-muted" style="font-size: 11px;">{{ shared_post.created_at|timesince }} ago</small>
+    </div>
+    
+    {% if shared_post.message %}
+    <div class="p-2 border-bottom bg-white">
+        <p class="mb-0 small text-muted fst-italic">"{{ shared_post.message }}"</p>
+    </div>
+    {% endif %}
+
+    <!-- Original Post Content -->
+    <div class="d-flex align-items-center p-3">
+        <div class="position-relative me-3" style="width: 50px; height: 50px;">
+            {% if shared_post.original_post.group %}
+                <a href="{% url 'groups:groups_detail' shared_post.original_post.group.id %}">
+                    <img src="{{ shared_post.original_post.group.get_photo_url }}" class="rounded-circle border border-2 border-white shadow-sm" style="width: 48px; height: 48px; object-fit: cover;">
+                </a>
+                <a href="{% url 'users:profile' shared_post.original_post.author.username %}">
+                    <img src="{{ shared_post.original_post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 24px; height: 24px; object-fit: cover; transform: translate(15%, 15%);">
+                </a>
+            {% else %}
+                <a href="{% url 'users:profile' shared_post.original_post.author.username %}">
+                    <img src="{{ shared_post.original_post.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 48px; height: 48px; object-fit: cover;">
+                </a>
+            {% endif %}
+        </div>
+
+        <div class="flex-grow-1">
+            <h6 class="mb-0 fw-bold small">
+                <a href="{% url 'users:profile' shared_post.original_post.author.username %}" class="text-dark text-decoration-none">
+                    {{ shared_post.original_post.author.get_full_name|default:shared_post.original_post.author.username }}
+                </a>
+                {% if shared_post.original_post.group %}
+                    <span class="text-muted fw-normal mx-1">posted in</span>
+                    <a href="{% url 'groups:groups_detail' shared_post.original_post.group.id %}" class="text-primary text-decoration-none">{{ shared_post.original_post.group.name }}</a>
+                {% endif %}
+            </h6>
+            <small class="text-muted d-flex align-items-center" style="font-size: 11px;">
+                <span class="badge bg-light text-primary border-0 me-1">{{ shared_post.original_post.unit.code|default:"GLOBAL" }}</span>
+                <i class="bi bi-dot"></i> {{ shared_post.original_post.created_at|timesince }} ago
+            </small>
+        </div>
+    </div>
+
+    <div class="{% if shared_post.original_post.gradient_class != 'none' %}{{ shared_post.original_post.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %}">
+        <p class="mb-0 {% if shared_post.original_post.gradient_class != 'none' %}text-white fw-bold fs-3{% else %}text-dark{% endif %}"
+           style="{% if shared_post.original_post.gradient_class == 'none' %}font-size: 15px;{% endif %} line-height: 1.5;">
+            {{ shared_post.original_post.content }}
+        </p>
+    </div>
+
+    {% if shared_post.original_post.images.exists %}
+    <a href="{% url 'posts:post_details' shared_post.original_post.id %}">
+        <div class="post-media border-top border-bottom bg-light">
+            <div class="image-grid-shared-{{ shared_post.id }}" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px; max-height: 400px;">
+                {% for post_image in shared_post.original_post.images.all|slice:":3" %}
+                    <div class="image-grid-item position-relative overflow-hidden" style="{% if forloop.counter == 1 %}grid-column: span 2; grid-row: span 2; aspect-ratio: 2/1;{% elif forloop.counter == 2 %}aspect-ratio: 1/1;{% else %}aspect-ratio: 1/1;{% endif %}">
+                        <img src="{{ post_image.image.url }}" class="w-100 h-100" style="object-fit: cover;">
+                        {% if forloop.last and shared_post.original_post.images.count > 3 %}
+                            <div class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background: rgba(0,0,0,0.5);">
+                                <span class="text-white fw-bold fs-4">+{{ shared_post.original_post.images.count|add:"-3" }}</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </a>
+    {% elif shared_post.original_post.get_intel_file %}
+    <a href="{% url 'posts:post_details' shared_post.original_post.id %}">
+        <div class="post-media border-top border-bottom bg-light">
+            {% with f_url=shared_post.original_post.get_intel_file.url|lower %}
+                {% if ".jpg" in f_url or ".png" in f_url or ".jpeg" in f_url or ".webp" in f_url %}
+                    <img src="{{ shared_post.original_post.get_intel_file.url }}" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;">
+                {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
+                    <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post-id="{{ shared_post.original_post.id }}">
+                        <video id="video-{{ shared_post.original_post.id }}" controls preload="metadata" class="w-100 h-100" muted loop playsinline autoplay data-autoplay="true">
+                            <source src="{{ shared_post.original_post.get_intel_file.url }}" type="video/mp4">
+                        </video>
+                        <button class="btn btn-light rounded-circle position-absolute mute-toggle" data-post-id="{{ shared_post.original_post.id }}" style="top: 10px; left: 10px; z-index: 10; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Unmute">
+                            <i class="bi bi-volume-mute-fill" style="font-size: 14px;"></i>
+                        </button>
+                    </div>
+                {% elif ".pdf" in f_url %}
+                    <a href="{{ shared_post.original_post.get_intel_file.url }}" target="_blank" class="text-decoration-none">
+                        <div class="p-4 d-flex align-items-center justify-content-between bg-white">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-danger bg-opacity-10 p-3 rounded-3 me-3">
+                                    <i class="bi bi-file-earmark-pdf-fill text-danger fs-3"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold small">Academic Files</h6>
+                                    <small class="text-muted">PDF DOCUMENT</small>
+                                </div>
+                            </div>
+                            <span class="btn btn-outline-dark btn-sm rounded-pill px-3 fw-bold">VIEW PDF</span>
+                        </div>
+                    </a>
+                {% endif %}
+            {% endwith %}
+        </div>
+    </a>
+    {% endif %}
+
+    <div class="d-flex align-items-center justify-content-between px-3 py-2 border-top">
+        <div class="d-flex align-items-center gap-4">
+            <div id="like-section-{{ shared_post.original_post.id }}">
+                {% include "posts/partials/like_button.html" with post=shared_post.original_post %}
+            </div>
+            <a href="{% url 'posts:post_details' shared_post.original_post.id %}" class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none">
+                <i class="bi bi-chat-dots fs-5"></i>
+                <span class="fw-bold">{{ shared_post.original_post.comments.count }}</span>
+            </a>
+            <button id="repost-btn-{{ shared_post.original_post.id }}" class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none"
+                    data-bs-toggle="modal" data-bs-target="#repostModal-{{ shared_post.original_post.id }}">
+                <i class="bi bi-repeat fs-5"></i>
+                <span class="fw-bold">{{ shared_post.original_post.repost_count }}</span>
+            </button>
+            <button class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none"
+                    data-bs-toggle="modal" data-bs-target="#shareModal-{{ shared_post.original_post.id }}">
+                <i class="bi bi-share fs-5"></i>
+                <span class="fw-bold">Share</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Inline comment input -->
+    <div class="px-3 pb-3 pt-1 border-top bg-white">
+        <form method="POST" action="{% url 'posts:add_comment' shared_post.original_post.id %}" class="d-flex align-items-center gap-2">
+            {% csrf_token %}
+            <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border flex-shrink-0" style="width: 32px; height: 32px; object-fit: cover;">
+            <div class="flex-grow-1 position-relative">
+                <input type="text" name="content"
+                       class="form-control border-0 rounded-pill"
+                       placeholder="Write a comment..."
+                       style="font-size: 13px; background-color: #e9ecef; padding-right: 40px;">
+                <button type="submit" class="btn border-0 rounded-circle position-absolute"
+                        style="width: 32px; height: 32px; right: 4px; top: 50%; transform: translateY(-50%); padding: 0; display: flex; align-items: center; justify-content: center; background: transparent;">
+                    <i class="bi bi-send-fill" style="font-size: 13px; color: #0f172a;"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Repost Modal -->
+<div class="modal fade" id="repostModal-{{ shared_post.original_post.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Repost</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form hx-post="/api/posts/{{ shared_post.original_post.id }}/repost/"
+                      hx-target="#shared-post-card-{{ shared_post.id }}"
+                      hx-swap="outerHTML"
+                      hx-on::after-request="bootstrap.Modal.getInstance(document.getElementById('repostModal-{{ shared_post.original_post.id }}')).hide()">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Add a comment (optional)</label>
+                        <textarea name="content" class="form-control" rows="3" placeholder="What do you think?"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Repost</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Share Modal -->
+<div class="modal fade" id="shareModal-{{ shared_post.original_post.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Share Post</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs mb-3" id="shareTabs-{{ shared_post.original_post.id }}" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="user-tab-{{ shared_post.original_post.id }}" data-bs-toggle="tab" data-bs-target="#user-share-{{ shared_post.original_post.id }}" type="button" role="tab">Share to Users</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="group-tab-{{ shared_post.original_post.id }}" data-bs-toggle="tab" data-bs-target="#group-share-{{ shared_post.original_post.id }}" type="button" role="tab">Share to Groups</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="shareTabContent-{{ shared_post.original_post.id }}">
+                    <!-- Share to Users Tab -->
+                    <div class="tab-pane fade show active" id="user-share-{{ shared_post.original_post.id }}" role="tabpanel">
+                        <div class="mb-3">
+                            <input type="text" 
+                                   class="form-control" 
+                                   placeholder="Search users you follow..." 
+                                   name="user_search"
+                                   hx-get="{% url 'posts:search_following_users' %}"
+                                   hx-target="#user-results-{{ shared_post.original_post.id }}"
+                                   hx-trigger="keyup changed delay:300ms"
+                                   hx-indicator="#user-search-indicator-{{ shared_post.original_post.id }}">
+                            <span id="user-search-indicator-{{ shared_post.original_post.id }}" class="htmx-indicator">
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                            </span>
+                        </div>
+                        <div id="user-results-{{ shared_post.original_post.id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
+                            <div class="p-3 text-center text-muted">
+                                <small>Start typing to search users you follow</small>
+                            </div>
+                        </div>
+                        <div id="selected-users-{{ shared_post.original_post.id }}" class="mb-3">
+                            <small class="text-muted">Selected users will appear here</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Add a message (optional)</label>
+                            <textarea name="message" class="form-control" rows="3" placeholder="Check this out!"></textarea>
+                        </div>
+                        <button type="button" 
+                                class="btn btn-primary w-100"
+                                hx-post="{% url 'posts:share_post' shared_post.original_post.id %}"
+                                hx-include="#share-form-data-{{ shared_post.original_post.id }}"
+                                hx-vals='{"share_type": "user"}'
+                                hx-target="#share-result-{{ shared_post.original_post.id }}"
+                                hx-swap="innerHTML"
+                                hx-on::after-request="if(this.querySelector('.alert-success')) { bootstrap.Modal.getInstance(document.getElementById('shareModal-{{ shared_post.original_post.id }}')).hide(); document.getElementById('share-result-{{ shared_post.original_post.id }}').innerHTML = ''; }">
+                            Share to Selected Users
+                        </button>
+                        <div id="share-result-{{ shared_post.original_post.id }}"></div>
+                    </div>
+                    <!-- Share to Groups Tab -->
+                    <div class="tab-pane fade" id="group-share-{{ shared_post.original_post.id }}" role="tabpanel">
+                        <div class="mb-3">
+                            <input type="text" 
+                                   class="form-control" 
+                                   placeholder="Search your groups..." 
+                                   name="group_search"
+                                   hx-get="{% url 'posts:search_user_groups' %}"
+                                   hx-target="#group-results-{{ shared_post.original_post.id }}"
+                                   hx-trigger="keyup changed delay:300ms"
+                                   hx-indicator="#group-search-indicator-{{ shared_post.original_post.id }}">
+                            <span id="group-search-indicator-{{ shared_post.original_post.id }}" class="htmx-indicator">
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                            </span>
+                        </div>
+                        <div id="group-results-{{ shared_post.original_post.id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
+                            <div class="p-3 text-center text-muted">
+                                <small>Start typing to search your groups</small>
+                            </div>
+                        </div>
+                        <div id="selected-groups-{{ shared_post.original_post.id }}" class="mb-3">
+                            <small class="text-muted">Selected groups will appear here</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Add a message (optional)</label>
+                            <textarea name="message" class="form-control" rows="3" placeholder="Check this out!"></textarea>
+                        </div>
+                        <button type="button" 
+                                class="btn btn-primary w-100"
+                                hx-post="{% url 'posts:share_post' shared_post.original_post.id %}"
+                                hx-include="#share-form-data-{{ shared_post.original_post.id }}"
+                                hx-vals='{"share_type": "group"}'
+                                hx-target="#share-result-group-{{ shared_post.original_post.id }}"
+                                hx-swap="innerHTML"
+                                hx-on::after-request="if(this.querySelector('.alert-success')) { bootstrap.Modal.getInstance(document.getElementById('shareModal-{{ shared_post.original_post.id }}')).hide(); document.getElementById('share-result-group-{{ shared_post.original_post.id }}').innerHTML = ''; }">
+                            Share to Selected Groups
+                        </button>
+                        <div id="share-result-group-{{ shared_post.original_post.id }}"></div>
+                    </div>
+                </div>
+                <!-- Hidden form data container for HTMX -->
+                <div id="share-form-data-{{ shared_post.original_post.id }}" style="display: none;">
+                    <input type="hidden" name="message" class="share-message-input">
+                    <input type="hidden" name="shared_to_usernames" class="share-users-input">
+                    <input type="hidden" name="shared_to_group_ids" class="share-groups-input">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('shareModal-{{ shared_post.original_post.id }}');
+    if (!modal) return;
+    
+    const selectedUsers = new Set();
+    const selectedGroups = new Set();
+    
+    // Handle user checkbox changes
+    modal.addEventListener('change', function(e) {
+        if (e.target.classList.contains('user-checkbox')) {
+            const username = e.target.value;
+            const label = e.target.closest('label');
+            const userName = label.querySelector('.fw-bold').textContent;
+            
+            if (e.target.checked) {
+                selectedUsers.add(username);
+            } else {
+                selectedUsers.delete(username);
+            }
+            updateSelectedUsers();
+        }
+        
+        if (e.target.classList.contains('group-checkbox')) {
+            const groupId = e.target.value;
+            const label = e.target.closest('label');
+            const groupName = label.querySelector('.fw-bold').textContent;
+            
+            if (e.target.checked) {
+                selectedGroups.add(groupId);
+            } else {
+                selectedGroups.delete(groupId);
+            }
+            updateSelectedGroups();
+        }
+    });
+    
+    function updateSelectedUsers() {
+        const container = document.getElementById('selected-users-{{ shared_post.original_post.id }}');
+        const input = document.querySelector('#share-form-data-{{ shared_post.original_post.id }} .share-users-input');
+        
+        if (selectedUsers.size === 0) {
+            container.innerHTML = '<small class="text-muted">Selected users will appear here</small>';
+            input.value = '';
+        } else {
+            container.innerHTML = Array.from(selectedUsers).map(username => 
+                `<span class="badge bg-primary me-1 mb-1">${username} <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.5rem;" onclick="removeUserShared{{ shared_post.original_post.id }}('${username}')">&times;</button></span>`
+            ).join('');
+            input.value = Array.from(selectedUsers).join(',');
+        }
+    }
+    
+    function updateSelectedGroups() {
+        const container = document.getElementById('selected-groups-{{ shared_post.original_post.id }}');
+        const input = document.querySelector('#share-form-data-{{ shared_post.original_post.id }} .share-groups-input');
+        
+        if (selectedGroups.size === 0) {
+            container.innerHTML = '<small class="text-muted">Selected groups will appear here</small>';
+            input.value = '';
+        } else {
+            container.innerHTML = Array.from(selectedGroups).map(groupId => {
+                const label = document.querySelector(`#group-${groupId}`);
+                const groupName = label ? label.querySelector('.fw-bold').textContent : groupId;
+                return `<span class="badge bg-success me-1 mb-1">${groupName} <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.5rem;" onclick="removeGroupShared{{ shared_post.original_post.id }}('${groupId}')">&times;</button></span>`;
+            }).join('');
+            input.value = Array.from(selectedGroups).join(',');
+        }
+    }
+    
+    window['removeUserShared' + {{ shared_post.original_post.id }}] = function(username) {
+        selectedUsers.delete(username);
+        const checkbox = document.querySelector(`.user-checkbox[value="${username}"]`);
+        if (checkbox) checkbox.checked = false;
+        updateSelectedUsers();
+    };
+    
+    window['removeGroupShared' + {{ shared_post.original_post.id }}] = function(groupId) {
+        selectedGroups.delete(groupId);
+        const checkbox = document.querySelector(`.group-checkbox[value="${groupId}"]`);
+        if (checkbox) checkbox.checked = false;
+        updateSelectedGroups();
+    };
+    
+    // Update message input on change
+    modal.addEventListener('input', function(e) {
+        if (e.target.name === 'message') {
+            const hiddenInput = document.querySelector('#share-form-data-{{ shared_post.original_post.id }} .share-message-input');
+            hiddenInput.value = e.target.value;
+        }
+    });
+});
+</script>

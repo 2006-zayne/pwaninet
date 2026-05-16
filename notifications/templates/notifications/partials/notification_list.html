@@ -22,9 +22,18 @@
             {% endif %}
           </h3>
         </div>
-        <span class="notif-time">
-          <i class="bi bi-clock-history"></i> {{ n.timestamp|timesince }}
-        </span>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span class="notif-time">
+            <i class="bi bi-clock-history"></i> {{ n.timestamp|timesince }}
+          </span>
+          <button class="btn-delete"
+                  hx-post="{% url 'notifications:delete_notification' n.id %}?type={% if current_filter_type %}{{ current_filter_type }}{% endif %}{% if current_filter_read %}&read={{ current_filter_read }}{% endif %}&page={% if notifications.number %}{{ notifications.number }}{% endif %}"
+                  hx-target="#notification-list .card-body"
+                  hx-swap="innerHTML"
+                  title="Delete notification">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
       </div>
       
       <p class="notif-message">
@@ -44,6 +53,15 @@
           </a>
           <a href="{% url 'groups:respond_to_invite' n.id 'decline' %}" class="btn-action btn-decline">
             <i class="bi bi-x-lg"></i> Decline
+          </a>
+        </div>
+      {% elif n.notification_type == 'GROUP_REQUEST' and n.group %}
+        <div class="notif-actions">
+          <a href="{% url 'groups:approve_from_notification' n.group.id n.sender.id %}" class="btn-action btn-accept">
+            <i class="bi bi-check-lg"></i> Approve
+          </a>
+          <a href="{% url 'groups:reject_from_notification' n.group.id n.sender.id %}" class="btn-action btn-decline">
+            <i class="bi bi-x-lg"></i> Reject
           </a>
         </div>
       {% endif %}

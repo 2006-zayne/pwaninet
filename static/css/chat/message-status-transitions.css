@@ -1,0 +1,147 @@
+/**
+ * Message Status Micro-Interactions
+ * Subtle transitions for receipt state changes
+ */
+
+/* Base transition for all status indicators */
+.check-circle {
+    transition: opacity 0.2s ease, transform 0.2s ease, background-color 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+}
+
+/* Pending states (clock icons) */
+.check-circle.pending {
+    opacity: 0.7;
+}
+
+.check-circle.pending:hover {
+    opacity: 0.9;
+}
+
+/* Sent state - grey checkmark */
+.check-circle.grey {
+    opacity: 0.8;
+}
+
+.check-circle.grey:hover {
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+/* Delivered state - blue filled circle */
+.check-circle.blue {
+    opacity: 0.9;
+}
+
+.check-circle.blue:hover {
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+/* Read avatar */
+.check-circle.read-avatar {
+    opacity: 0.9;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.check-circle.read-avatar:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.check-circle.read-avatar img {
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Error states */
+.check-circle.error {
+    opacity: 0.9;
+    animation: shake 0.3s ease;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-2px); }
+    75% { transform: translateX(2px); }
+}
+
+/* Retrying spinner */
+.check-circle.retrying {
+    opacity: 0.8;
+}
+
+.check-circle.retrying .spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Cancelled state */
+.check-circle.cancelled {
+    opacity: 0.6;
+}
+
+/* Uploading state */
+.check-circle.uploading {
+    opacity: 0.8;
+}
+
+/* Message read receipt container */
+.message-read-receipt {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.message-read-receipt:hover {
+    transform: scale(1.05);
+}
+
+/* Read avatar image */
+.read-avatar-img {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    object-fit: cover;
+    transition: transform 0.2s ease;
+}
+
+.read-avatar-img:hover {
+    transform: scale(1.1);
+}
+
+/* Retry button */
+.retry-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    margin-left: 4px;
+    font-size: 14px;
+    opacity: 0.7;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.retry-button:hover {
+    opacity: 1;
+    transform: rotate(180deg);
+}
+
+/* Ensure all status indicators have consistent sizing */
+.message-read-receipt .check-circle,
+.message-read-receipt svg,
+.message-read-receipt img {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    min-height: 18px;
+}

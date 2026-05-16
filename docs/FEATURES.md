@@ -128,7 +128,35 @@ Pwaninet is a university social network built with Django, designed for students
 
 ---
 
-### 6. Technical Features
+### 6. Messaging System (v0.99)
+- **Real-time Messaging**: WebSocket-based real-time message delivery
+- **Conversation Types**: Direct (one-on-one) and group conversations
+- **Message Features**:
+  - Text messages with date separators (Today, Yesterday, specific dates)
+  - File attachments (documents, videos, pictures, audio)
+  - Voice recording with MediaRecorder API
+  - Camera integration for photo/video capture
+  - Emoji picker with GIFs and stickers
+  - Message search with highlighting
+  - Reply, copy, delete, forward functionality
+  - Message reactions (👍, ❤️, 😂, 😮, 😢)
+  - Read receipts (blue checkmarks)
+  - Typing indicators
+- **UI Features**:
+  - Enhanced conversation header with avatar, username, status, search
+  - Empty conversation state with quick message suggestions
+  - Full-screen image viewer for profile pictures
+  - Theme support (light/dark/system)
+  - Right-click context menu (desktop)
+  - Long-press menu (mobile)
+- **Technical**:
+  - Message queue for offline support
+  - Auto-reconnect with exponential backoff
+  - Bootstrap JS served locally for offline testing
+
+---
+
+### 7. Technical Features
 
 #### Architecture
 - **Domain-Driven Design**: Separated into domain apps (users, posts, groups, notifications, courses)
@@ -236,15 +264,20 @@ Pwaninet is a university social network built with Django, designed for students
 - **Advanced Query**: Boolean operators, phrase search
 - **Search History**: User's recent searches
 
-#### 8. Messaging System
+#### 8. Messaging System ✅ COMPLETED (v0.99)
+**Status**: Implemented
 **Description**: Direct messaging between users
-**Features**:
-- One-on-one messaging
-- Group messaging
-- Message reactions
-- File sharing in messages
-- Read receipts
-- Message search
+**Features Implemented**:
+- ✅ One-on-one messaging
+- ✅ Group messaging
+- ✅ Message reactions
+- ✅ File sharing in messages
+- ✅ Read receipts
+- ✅ Message search
+- ✅ Voice recording
+- ✅ Camera integration
+- ✅ Emoji picker with GIFs
+- ✅ Real-time WebSocket delivery
 
 ---
 
@@ -334,6 +367,7 @@ Pwaninet is a university social network built with Django, designed for students
 - ✅ Celery configured
 - ✅ Docker setup completed
 - ✅ Feed ranking system with cursor-based pagination
+- ✅ Messaging system with real-time WebSocket (v0.99)
 
 ### In Progress
 - ⏳ Moving views from core to domain apps
@@ -344,8 +378,7 @@ Pwaninet is a university social network built with Django, designed for students
 - ⏳ Add admin.py for each domain app
 - ⏳ Create DRF serializers and viewsets for APIs
 - ⏳ Add tests for domain apps
-- ⏳ Implement real-time features
-- ⏳ Add messaging system
+- ⏳ Implement real-time feed updates
 
 ---
 

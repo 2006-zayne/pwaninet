@@ -1,0 +1,405 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">PWA Install Test</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Install Status</h5>
+                            <div id="install-status" class="alert alert-info">
+                                Checking PWA install status...
+                            </div>
+                            
+                            <h5 class="mt-4">User Engagement</h5>
+                            <div id="engagement-status" class="alert alert-info">
+                                Tracking user engagement...
+                            </div>
+                            
+                            <h5 class="mt-4">Install Criteria</h5>
+                            <div id="criteria-status" class="alert alert-info">
+                                Checking install criteria...
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5>Test Actions</h5>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-primary" onclick="checkInstallStatus()">
+                                    Check Install Status
+                                </button>
+                                <button class="btn btn-success" onclick="forceShowInstall()">
+                                    Force Show Install Prompt
+                                </button>
+                                <button class="btn btn-warning" onclick="simulateEngagement()">
+                                    Simulate User Engagement
+                                </button>
+                                <button class="btn btn-info" onclick="resetInstallPrompt()">
+                                    Reset Install Prompt
+                                </button>
+                                <button class="btn btn-secondary" onclick="testManualInstall()">
+                                    Test Manual Install
+                                </button>
+                            </div>
+                            
+                            <h5 class="mt-4">Install Information</h5>
+                            <div class="list-group">
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">PWA Support</h6>
+                                        <span id="pwa-support" class="badge bg-secondary">Checking...</span>
+                                    </div>
+                                    <small class="text-muted">Browser PWA capabilities</small>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Install Prompt</h6>
+                                        <span id="install-prompt" class="badge bg-secondary">Checking...</span>
+                                    </div>
+                                    <small class="text-muted">Install prompt availability</small>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Display Mode</h6>
+                                        <span id="display-mode" class="badge bg-secondary">Checking...</span>
+                                    </div>
+                                    <small class="text-muted">Current display mode</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>Test Results</h5>
+                            <div id="test-results" style="max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <div>Test results will appear here...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>Install Criteria Details</h5>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Criteria</th>
+                                            <th>Required</th>
+                                            <th>Current</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="criteria-table">
+                                        <tr><td colspan="4">Loading criteria...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>Test Scenarios</h5>
+                            <div class="accordion" id="testScenarios">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#scenario1">
+                                            Scenario 1: Fresh User Experience
+                                        </button>
+                                    </h2>
+                                    <div id="scenario1" class="accordion-collapse collapse show" data-bs-parent="#testScenarios">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Clear browser data or use incognito mode</li>
+                                                <li>Visit this page</li>
+                                                <li>Wait for install criteria to be met (30s, 3 interactions, 2 page views)</li>
+                                                <li>Install prompt should appear automatically</li>
+                                            </ol>
+                                            <button class="btn btn-sm btn-primary" onclick="runScenario1()">Run Test</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#scenario2">
+                                            Scenario 2: Manual Install Trigger
+                                        </button>
+                                    </h2>
+                                    <div id="scenario2" class="accordion-collapse collapse" data-bs-parent="#testScenarios">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Click "Force Show Install Prompt" button</li>
+                                                <li>Install banner should appear immediately</li>
+                                                <li>Test install and dismiss actions</li>
+                                                <li>Verify install success/failure handling</li>
+                                            </ol>
+                                            <button class="btn btn-sm btn-primary" onclick="runScenario2()">Run Test</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#scenario3">
+                                            Scenario 3: Install Criteria Testing
+                                        </button>
+                                    </h2>
+                                    <div id="scenario3" class="accordion-collapse collapse" data-bs-parent="#testScenarios">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Click "Simulate User Engagement" button</li>
+                                                <li>Watch engagement metrics update</li>
+                                                <li>Verify criteria calculation</li>
+                                                <li>Install prompt should trigger when criteria met</li>
+                                            </ol>
+                                            <button class="btn btn-sm btn-primary" onclick="runScenario3()">Run Test</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let testResults = [];
+
+function log(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const entry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+    testResults.push(entry);
+    
+    const resultsDiv = document.getElementById('test-results');
+    resultsDiv.innerHTML = testResults.join('\n');
+    resultsDiv.scrollTop = resultsDiv.scrollHeight;
+    
+    console.log(entry);
+}
+
+function updateStatus(elementId, message, type = 'info') {
+    const element = document.getElementById(elementId);
+    element.className = `alert alert-${type}`;
+    element.textContent = message;
+}
+
+function updateBadge(elementId, status, type = 'secondary') {
+    const element = document.getElementById(elementId);
+    element.className = `badge bg-${type}`;
+    element.textContent = status;
+}
+
+// Test functions
+function checkInstallStatus() {
+    log('Checking PWA install status...');
+    
+    if (window.pwaInstallManager) {
+        const status = window.pwaInstallManager.getInstallStatus();
+        
+        log(`PWA Installed: ${status.isInstalled}`, status.isInstalled ? 'success' : 'info');
+        log(`Deferred Prompt Available: ${status.deferredPromptAvailable}`, status.deferredPromptAvailable ? 'success' : 'warning');
+        log(`Prompt Shown: ${status.promptShown}`, status.promptShown ? 'info' : 'info');
+        
+        updateStatus('install-status', 
+            `Installed: ${status.isInstalled}, Prompt: ${status.deferredPromptAvailable ? 'Available' : 'Not Available'}`,
+            status.isInstalled ? 'success' : 'info'
+        );
+        
+        updateBadge('pwa-support', 'Available', 'success');
+        updateBadge('install-prompt', status.deferredPromptAvailable ? 'Available' : 'Not Available', 
+                   status.deferredPromptAvailable ? 'success' : 'warning');
+        updateBadge('display-mode', getDisplayMode(), 'primary');
+        
+        updateCriteriaTable(status);
+        
+    } else {
+        log('PWA Install Manager not available', 'error');
+        updateStatus('install-status', 'PWA Install Manager not available', 'danger');
+    }
+}
+
+function getDisplayMode() {
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+        return 'Standalone (PWA)';
+    } else if (window.navigator.standalone) {
+        return 'Standalone (iOS)';
+    } else {
+        return 'Browser';
+    }
+}
+
+function updateCriteriaTable(status) {
+    const tbody = document.getElementById('criteria-table');
+    const criteria = [
+        { name: 'Time Spent', required: '30 seconds', current: Math.floor(status.userEngagement.timeSpent / 1000) + ' seconds', met: status.userEngagement.timeSpent >= 30000 },
+        { name: 'Interactions', required: '3 interactions', current: status.userEngagement.interactions + ' interactions', met: status.userEngagement.interactions >= 3 },
+        { name: 'Page Views', required: '2 page views', current: status.userEngagement.pageViews + ' page views', met: status.userEngagement.pageViews >= 2 }
+    ];
+    
+    tbody.innerHTML = criteria.map(item => `
+        <tr>
+            <td>${item.name}</td>
+            <td>${item.required}</td>
+            <td>${item.current}</td>
+            <td><span class="badge bg-${item.met ? 'success' : 'warning'}">${item.met ? 'Met' : 'Not Met'}</span></td>
+        </tr>
+    `).join('');
+    
+    updateStatus('criteria-status', status.meetsCriteria ? 'All criteria met' : 'Criteria not met', 
+                  status.meetsCriteria ? 'success' : 'warning');
+}
+
+function forceShowInstall() {
+    log('Force showing install prompt...');
+    
+    if (window.pwaInstallManager) {
+        window.pwaInstallManager.forceShowInstallPrompt();
+        log('Install prompt forced to show', 'success');
+        updateStatus('install-status', 'Install prompt forced', 'success');
+    } else {
+        log('PWA Install Manager not available', 'error');
+    }
+}
+
+function simulateEngagement() {
+    log('Simulating user engagement...');
+    
+    if (window.pwaInstallManager) {
+        const manager = window.pwaInstallManager;
+        
+        // Simulate time spent
+        manager.userEngagement.timeSpent = 35000; // 35 seconds
+        
+        // Simulate interactions
+        manager.userEngagement.interactions = 5;
+        
+        // Simulate page views
+        manager.userEngagement.pageViews = 3;
+        
+        log('Engagement simulated: 35s, 5 interactions, 3 page views', 'success');
+        
+        // Update display
+        checkInstallStatus();
+        
+        // Trigger install prompt if criteria met
+        if (manager.meetsInstallCriteria()) {
+            log('Install criteria met, showing prompt...', 'info');
+            setTimeout(() => manager.forceShowInstallPrompt(), 1000);
+        }
+        
+    } else {
+        log('PWA Install Manager not available', 'error');
+    }
+}
+
+function resetInstallPrompt() {
+    log('Resetting install prompt...');
+    
+    if (window.pwaInstallManager) {
+        window.pwaInstallManager.installPromptShown = false;
+        window.pwaInstallManager.hideInstallPrompt();
+        
+        // Reset engagement
+        window.pwaInstallManager.userEngagement = {
+            pageViews: 1,
+            timeSpent: 0,
+            interactions: 0,
+            lastInteraction: Date.now()
+        };
+        
+        log('Install prompt reset', 'success');
+        updateStatus('install-status', 'Install prompt reset', 'info');
+        checkInstallStatus();
+    } else {
+        log('PWA Install Manager not available', 'error');
+    }
+}
+
+function testManualInstall() {
+    log('Testing manual install instructions...');
+    
+    if (window.pwaInstallManager) {
+        window.pwaInstallManager.showManualInstallInstructions();
+        log('Manual install instructions shown', 'success');
+    } else {
+        log('PWA Install Manager not available', 'error');
+    }
+}
+
+// Test scenarios
+function runScenario1() {
+    log('=== Running Scenario 1: Fresh User Experience ===');
+    
+    // Reset first
+    resetInstallPrompt();
+    
+    // Check initial state
+    checkInstallStatus();
+    
+    log('Scenario 1: Wait for automatic install prompt');
+    log('Expected: Install prompt should appear after 30 seconds and 3 interactions');
+    log('Action: Interact with the page (click, scroll, type) to meet criteria');
+}
+
+function runScenario2() {
+    log('=== Running Scenario 2: Manual Install Trigger ===');
+    
+    checkInstallStatus();
+    
+    // Force show install
+    forceShowInstall();
+    
+    log('Scenario 2: Manual install trigger complete');
+    log('Expected: Install banner should appear immediately');
+    log('Action: Test install and dismiss buttons');
+}
+
+function runScenario3() {
+    log('=== Running Scenario 3: Install Criteria Testing ===');
+    
+    // Reset and simulate
+    resetInstallPrompt();
+    
+    setTimeout(() => {
+        simulateEngagement();
+        log('Scenario 3: Install criteria testing complete');
+        log('Expected: Install prompt should trigger automatically');
+        log('Action: Verify criteria table shows all requirements met');
+    }, 1000);
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    log('PWA Install Test Page Loaded');
+    
+    // Initial status check
+    setTimeout(() => {
+        checkInstallStatus();
+    }, 1000);
+    
+    // Update engagement status periodically
+    setInterval(() => {
+        if (window.pwaInstallManager) {
+            const engagement = window.pwaInstallManager.userEngagement;
+            const statusText = `Time: ${Math.floor(engagement.timeSpent / 1000)}s, Interactions: ${engagement.interactions}, Page Views: ${engagement.pageViews}`;
+            updateStatus('engagement-status', statusText, 'info');
+        }
+    }, 2000);
+    
+    log('PWA Install Test Page initialized');
+});
+</script>
+
+{% endblock %}

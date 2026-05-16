@@ -1,20 +1,21 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 <style>
   /* ── Design Tokens ── */
-  :root {
-    --brand:          #1a1410;
-    --brand-light:    #f0eee9;
-    --brand-mid:      #dedad3;
-    --brand-glow:     rgba(26,20,16,0.10);
-    --page-bg:        #f5f2ef;
+  :root, [data-theme="light"] {
+    --brand:          #2563eb;
+    --brand-light:    #dbeafe;
+    --brand-mid:      #bfdbfe;
+    --brand-glow:     rgba(37, 99, 235, 0.10);
+    --page-bg:        #f8fafc;
     --card-bg:        #ffffff;
-    --border:         #ede8e3;
-    --border-hover:   #d6cfc8;
-    --text-primary:   #1a1410;
-    --text-secondary: #7a736c;
-    --text-muted:     #a89f98;
+    --border:         #e2e8f0;
+    --border-hover:   #cbd5e1;
+    --text-primary:   #0f172a;
+    --text-secondary: #64748b;
+    --text-muted:     #94a3b8;
     --success:        #16a34a;
     --success-light:  #f0fdf4;
     --danger:         #dc2626;
@@ -28,30 +29,78 @@
     --ease:           cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  [data-theme="dark"] {
+    --brand:          #6366f1;
+    --brand-light:    #312e81;
+    --brand-mid:      #4338ca;
+    --brand-glow:     rgba(99, 102, 241, 0.15);
+    --page-bg:        #18191f;
+    --card-bg:        #242526;
+    --border:         #3a3b3c;
+    --border-hover:   #4e4f50;
+    --text-primary:   #e4e6eb;
+    --text-secondary: #e4e6eb;
+    --text-muted:     #e4e6eb;
+    --success:        #22c55e;
+    --success-light:  #14532d;
+    --danger:         #ef4444;
+    --danger-light:   #450a0a;
+    --shadow-card:    0 1px 3px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.2);
+    --shadow-hover:   0 4px 12px rgba(0,0,0,0.4), 0 16px 40px rgba(0,0,0,0.3);
+  }
+
   *, *::before, *::after { font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif; box-sizing: border-box; }
-  body { background: var(--page-bg); }
+  body { background: var(--page-bg); color: var(--text-primary); }
+
+  /* ── Modal Styles ── */
+  [data-theme="dark"] .modal-content {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] .modal-header {
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] .modal-title {
+    color: var(--text-primary) !important;
+  }
+  [data-theme="dark"] .modal-body {
+    color: var(--text-primary) !important;
+  }
+  [data-theme="dark"] .modal-footer {
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] .form-field {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+    color: var(--text-primary) !important;
+  }
+  [data-theme="dark"] .form-field::placeholder {
+    color: var(--text-secondary) !important;
+  }
 
   /* ── Layout ── */
   .page-grid {
     display: grid;
-    grid-template-columns: 300px 1fr;
-    gap: 2rem;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
     max-width: 1200px;
-    margin: 2rem auto;
-    padding: 0 1.5rem 4rem;
+    margin: 0 auto;
+    padding: 0 1rem 4rem;
     align-items: start;
   }
-  @media (max-width: 960px) {
-    .page-grid { grid-template-columns: 1fr; }
-    .sticky-panel { position: static !important; }
+  @media (min-width: 992px) {
+    .page-grid { grid-template-columns: 380px 1fr; }
   }
   .sticky-panel { position: sticky; top: 88px; }
+  @media (max-width: 991px) {
+    .sticky-panel { position: static !important; }
+  }
 
   /* ── Card ── */
   .card {
     background: var(--card-bg);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
+    border-radius: 1rem;
+    border: none;
     box-shadow: var(--shadow-card);
     overflow: hidden;
     margin-bottom: 1.25rem;
@@ -59,24 +108,92 @@
   .card-body { padding: 1.5rem; }
 
   /* ── Group Hero (sidebar top card) ── */
-  .group-banner {
-    height: 80px;
-    background: linear-gradient(135deg, #3a3330 0%, #1a1410 60%, #0d0b09 100%);
+  .group-card {
     position: relative;
+  }
+  .group-banner {
+    height: 160px;
+    position: relative;
+    border-radius: 12px 12px 0 0;
   }
   .group-avatar-wrap {
     position: absolute;
-    bottom: -36px;
+    bottom: -40px;
     left: 50%;
     transform: translateX(-50%);
+    z-index: 10;
   }
   .group-avatar {
-    width: 76px; height: 76px;
+    width: 120px;
+    height: 120px;
     border-radius: 50%;
     object-fit: cover;
     border: 4px solid var(--card-bg);
     box-shadow: 0 4px 14px rgba(0,0,0,0.15);
     display: block;
+    position: relative;
+  }
+  .cover-container {
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    border-radius: 12px 12px 0 0;
+    position: relative;
+  }
+  .cover-upload-icon {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .cover-container:hover .cover-upload-icon {
+    opacity: 1;
+  }
+  .group-pic-upload-icon {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: var(--brand);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    border: 2px solid var(--card-bg);
+    font-size: 12px;
+  }
+
+  .clickable-photo {
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .clickable-photo:hover {
+    opacity: 0.9;
+  }
+
+  .clickable-cover {
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .clickable-cover:hover {
+    opacity: 0.9;
   }
   .group-info { padding: 48px 1.5rem 1.5rem; text-align: center; }
   .group-name {
@@ -136,7 +253,7 @@
     color: #fff;
   }
   .btn-primary-brand:hover {
-    background: #e85a26;
+    background: #1d4ed8;
     color: #fff;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px var(--brand-glow);
@@ -149,7 +266,7 @@
   }
   .btn-secondary-brand:hover {
     background: var(--brand-mid);
-    color: #1a1410;
+    color: #0f172a;
     transform: translateY(-1px);
   }
 
@@ -445,16 +562,34 @@
   }
 </style>
 
-<div class="page-grid">
+<div class="container-fluid py-3 px-2 px-md-4">
+  <div class="page-grid">
 
   <!-- ══ SIDEBAR ══ -->
   <aside class="sticky-panel">
 
     <!-- Group Card -->
-    <div class="card">
+    <div class="card group-card" style="position: relative; overflow: visible;">
       <div class="group-banner">
+        <div class="cover-container {% if is_member %}clickable-cover{% endif %}"
+             {% if is_member %}
+             onclick="window.location.href='{% url 'groups:view_group_photo_fullscreen' group.id 'cover' %}'"
+             {% endif %}
+             style="background-image: url('{% if group.cover_photo %}{{ group.cover_photo.url }}{% else %}{% static 'images/default-cover.jpg' %}{% endif %}')">
+          {% if is_admin %}
+          <a href="#" class="cover-upload-icon" data-bs-toggle="modal" data-bs-target="#editGroupModal" onclick="event.stopPropagation()"><i class="bi bi-camera-fill"></i></a>
+          {% endif %}
+        </div>
         <div class="group-avatar-wrap">
+          {% if is_member %}
+          <img src="{{ group.get_photo_url }}" class="group-avatar clickable-photo" alt="{{ group.name }}"
+               onclick="event.stopPropagation(); window.location.href='{% url 'groups:view_group_photo_fullscreen' group.id 'group' %}'">
+          {% else %}
           <img src="{{ group.get_photo_url }}" class="group-avatar" alt="{{ group.name }}">
+          {% endif %}
+          {% if is_admin %}
+          <a href="#" class="group-pic-upload-icon" data-bs-toggle="modal" data-bs-target="#editGroupModal" onclick="event.stopPropagation()"><i class="bi bi-camera-fill"></i></a>
+          {% endif %}
         </div>
       </div>
       <div class="group-info">
@@ -484,15 +619,19 @@
           <button class="btn-base btn-primary-brand" data-bs-toggle="modal" data-bs-target="#inviteModal">
             <i class="bi bi-person-plus-fill me-1"></i> Invite Friends
           </button>
-          <a href="{% url 'groups:toggle_membership' group.id %}" class="btn-base btn-ghost-danger">
+          <button id="leaveGroupBtn" class="btn-base btn-ghost-danger" onclick="handleLeaveGroup()">
             <i class="bi bi-box-arrow-left me-1"></i> Leave Group
-          </a>
+          </button>
         {% elif is_pending %}
           <button class="btn-base btn-secondary-brand" disabled style="opacity: 0.7; cursor: not-allowed;">
-            <i class="bi bi-clock-fill me-1"></i> Pending Verification
+            <i class="bi bi-clock-fill me-1"></i> Request Sent ⏳
           </button>
           <a href="{% url 'groups:toggle_membership' group.id %}" class="btn-base btn-ghost-danger">
             <i class="bi bi-x-circle-fill me-1"></i> Cancel Request
+          </a>
+        {% elif is_rejected %}
+          <a href="{% url 'groups:toggle_membership' group.id %}" class="btn-base btn-primary-brand">
+            <i class="bi bi-arrow-clockwise me-1"></i> Request Again
           </a>
         {% else %}
           <a href="{% url 'groups:toggle_membership' group.id %}" class="btn-base btn-primary-brand">
@@ -585,9 +724,21 @@
             <label class="field-label">Description</label>
             <textarea name="description" class="form-field" rows="3">{{ group.description }}</textarea>
           </div>
-          <div class="mb-4">
+          <div class="mb-3">
+            <label class="field-label">Join Policy</label>
+            <select name="join_policy" class="form-field">
+              <option value="open" {% if group.join_policy == 'open' %}selected{% endif %}>Open - Anyone can join</option>
+              <option value="approval" {% if group.join_policy == 'approval' %}selected{% endif %}>Requires Approval - Admin must approve requests</option>
+              <option value="invite" {% if group.join_policy == 'invite' %}selected{% endif %}>Invite Only - Only invited users can join</option>
+            </select>
+          </div>
+          <div class="mb-3">
             <label class="field-label">Group Photo</label>
-            <input type="file" name="photo" class="form-control form-control-sm" style="font-family:'Nunito',sans-serif; font-size:0.82rem;">
+            <input type="file" name="group_pic" class="form-control form-control-sm" style="font-family:'Nunito',sans-serif; font-size:0.82rem;">
+          </div>
+          <div class="mb-4">
+            <label class="field-label">Cover Photo</label>
+            <input type="file" name="cover_photo" class="form-control form-control-sm" style="font-family:'Nunito',sans-serif; font-size:0.82rem;">
           </div>
           <div class="d-flex justify-content-end">
             <button type="submit" class="btn-modal-submit">
@@ -611,36 +762,74 @@
       </div>
       <div class="modal-body">
         <div class="members-scroll">
+          <!-- Officials Section -->
           {% for membership in memberships %}
-            <div class="member-row">
-              <div class="member-meta">
-                <img src="{{ membership.user.profile_pic.url|default:'/static/images/default_user.jpg' }}"
-                     class="member-avatar" alt="">
-                <div>
-                  <div class="member-name">
-                    {{ membership.user.first_name }} {{ membership.user.second_name }} @{{ membership.user.username }}
-                  </div>
-                  <div class="member-sub">
-                    {% if membership.role == 'ADMIN' %}
-                      <span class="role-badge role-admin">Admin</span>
-                    {% elif membership.role == 'MODERATOR' %}
-                      <span class="role-badge role-moderator">Moderator</span>
-                    {% elif membership.role == 'DELEGATE' %}
-                      <span class="role-badge role-delegate">Delegate</span>
-                    {% else %}
-                      <span class="role-badge role-member">Member</span>
-                    {% endif %}
+            {% if membership.role == 'ADMIN' or membership.role == 'MODERATOR' or membership.role == 'DELEGATE' %}
+              {% if forloop.first %}
+                <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.09em; padding: 0.5rem 0.75rem 0.25rem;">
+                  <i class="bi bi-shield-fill me-1"></i> Officials
+                </div>
+              {% endif %}
+              <div class="member-row">
+                <div class="member-meta">
+                  <img src="{{ membership.user.profile_pic.url|default:'/static/images/default_user.jpg' }}"
+                       class="member-avatar" alt="">
+                  <div>
+                    <div class="member-name">
+                      {{ membership.user.first_name }} {{ membership.user.second_name }} @{{ membership.user.username }}
+                    </div>
+                    <div class="member-sub">
+                      {% if membership.role == 'ADMIN' %}
+                        <span class="role-badge role-admin">Admin</span>
+                      {% elif membership.role == 'MODERATOR' %}
+                        <span class="role-badge role-moderator">Moderator</span>
+                      {% elif membership.role == 'DELEGATE' %}
+                        <span class="role-badge role-delegate">Delegate</span>
+                      {% endif %}
+                    </div>
                   </div>
                 </div>
+                {% if membership.user != request.user %}
+                <button class="btn-follow btn-follow-manifest {% if membership.user.id in following_ids %}following{% endif %}"
+                        data-username="{{ membership.user.username }}"
+                        data-user-id="{{ membership.user.id }}">
+                  {% if membership.user.id in following_ids %}Following{% else %}Follow{% endif %}
+                </button>
+                {% endif %}
               </div>
-              {% if membership.user != request.user %}
-              <button class="btn-follow btn-follow-manifest {% if membership.user.id in following_ids %}following{% endif %}"
-                      data-username="{{ membership.user.username }}"
-                      data-user-id="{{ membership.user.id }}">
-                {% if membership.user.id in following_ids %}Following{% else %}Follow{% endif %}
-              </button>
+            {% endif %}
+          {% endfor %}
+
+          <!-- Members Section -->
+          {% for membership in memberships %}
+            {% if membership.role == 'MEMBER' %}
+              {% if forloop.first %}
+                <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.09em; padding: 0.75rem 0.75rem 0.25rem; margin-top: 0.5rem; border-top: 1px solid var(--border);">
+                  <i class="bi bi-people-fill me-1"></i> Members
+                </div>
               {% endif %}
-            </div>
+              <div class="member-row">
+                <div class="member-meta">
+                  <img src="{{ membership.user.profile_pic.url|default:'/static/images/default_user.jpg' }}"
+                       class="member-avatar" alt="">
+                  <div>
+                    <div class="member-name">
+                      {{ membership.user.first_name }} {{ membership.user.second_name }} @{{ membership.user.username }}
+                    </div>
+                    <div class="member-sub">
+                      <span class="role-badge role-member">Member</span>
+                    </div>
+                  </div>
+                </div>
+                {% if membership.user != request.user %}
+                <button class="btn-follow btn-follow-manifest {% if membership.user.id in following_ids %}following{% endif %}"
+                        data-username="{{ membership.user.username }}"
+                        data-user-id="{{ membership.user.id }}">
+                  {% if membership.user.id in following_ids %}Following{% else %}Follow{% endif %}
+                </button>
+                {% endif %}
+              </div>
+            {% endif %}
           {% endfor %}
         </div>
       </div>
@@ -743,6 +932,58 @@
 </div>
 
 
+<!-- ══ MODAL: Assign Roles ══ -->
+<div class="modal fade" id="assignRoleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Manage Roles</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="searchUserForm" class="mb-3">
+          <input type="text" id="userSearchInput" class="form-field" placeholder="Search users by username...">
+        </form>
+        <div id="searchResults" class="members-scroll">
+          <p style="text-align:center; font-size:0.78rem; color:var(--text-muted); padding:1rem 0; font-weight:600;">
+            Search for a user to assign a role
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL: Admin Succession ══ -->
+<div class="modal fade" id="adminSuccessionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Assign Successor</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          You are the last admin. Please assign a successor before leaving.
+        </p>
+        <div id="successorList" class="members-scroll" style="max-height: 250px;">
+          <p style="text-align:center; font-size:0.78rem; color:var(--text-muted); padding:1rem 0; font-weight:600;">
+            Loading successors...
+          </p>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top: 1px solid var(--border); padding: 1rem 1.4rem; display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="font-size: 0.8rem; padding: 0.5rem 1rem;">Cancel</button>
+        <button type="button" id="autoChooseBtn" class="btn btn-primary" style="font-size: 0.8rem; padding: 0.5rem 1rem; display: none;">
+          <i class="bi bi-magic me-1"></i> Let System Choose
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
@@ -808,9 +1049,67 @@ document.addEventListener('DOMContentLoaded', function () {
   if (inviteEl) new bootstrap.Modal(inviteEl).show();
   //{% endif %}
 
-  // ── 5. Update role via API ──
-  window.updateRole = function(userId, newRole) {
-    fetch(`/api/groups/{{ group.id }}/assign-role/`, {
+  // ── 5. Search users for role assignment ──
+  const userSearchInput = document.getElementById('userSearchInput');
+  const searchResults = document.getElementById('searchResults');
+  let searchTimeout;
+
+  if (userSearchInput) {
+    userSearchInput.addEventListener('input', function() {
+      clearTimeout(searchTimeout);
+      const query = this.value.trim();
+
+      if (query.length < 2) {
+        searchResults.innerHTML = '<p style="text-align:center; font-size:0.78rem; color:var(--text-muted); padding:1rem 0; font-weight:600;">Search for a user to assign a role</p>';
+        return;
+      }
+
+      searchTimeout = setTimeout(() => {
+        fetch(`/groups/search-users/?q=${encodeURIComponent(query)}`, {
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+        .then(r => r.json())
+        .then(users => {
+          if (users.length === 0) {
+            searchResults.innerHTML = '<p style="text-align:center; font-size:0.78rem; color:var(--text-muted); padding:1rem 0; font-weight:600;">No users found</p>';
+            return;
+          }
+
+          searchResults.innerHTML = users.map(user => `
+            <div class="member-row">
+              <div class="member-meta">
+                <img src="${user.profile_pic || '/static/images/default_user.jpg'}" class="member-avatar" alt="">
+                <div>
+                  <div class="member-name">@${user.username}</div>
+                  <div class="member-sub">${user.first_name || ''} ${user.last_name || ''}</div>
+                </div>
+              </div>
+              <select class="form-field" style="width: auto; padding: 0.4rem 0.8rem; font-size: 0.7rem;"
+                      onchange="assignRole(${user.id}, this.value)">
+                <option value="">Select Role</option>
+                <option value="MEMBER">Member</option>
+                <option value="DELEGATE">Delegate</option>
+                <option value="MODERATOR">Moderator</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </div>
+          `).join('');
+        })
+        .catch(err => {
+          console.error('Error searching users:', err);
+          searchResults.innerHTML = '<p style="text-align:center; font-size:0.78rem; color:var(--danger); padding:1rem 0; font-weight:600;">Error searching users</p>';
+        });
+      }, 300);
+    });
+  }
+
+  // ── 6. Assign role via API ──
+  window.assignRole = function(userId, newRole) {
+    if (!newRole) return;
+
+    fetch(`/groups/api/groups/{{ group.id }}/assign-role/`, {
       method: 'POST',
       headers: {
         'X-CSRFToken': '{{ csrf_token }}',
@@ -825,22 +1124,108 @@ document.addEventListener('DOMContentLoaded', function () {
     .then(data => {
       if (data.detail) {
         alert(data.detail);
-        // Reset select to previous value by reloading page
-        location.reload();
       } else {
-        // Success - show brief feedback
-        const btn = event.target;
-        const originalBg = btn.style.background;
-        btn.style.background = 'var(--success-light)';
-        setTimeout(() => {
-          btn.style.background = originalBg;
-        }, 500);
+        alert('Role assigned successfully!');
+        userSearchInput.value = '';
+        searchResults.innerHTML = '<p style="text-align:center; font-size:0.78rem; color:var(--text-muted); padding:1rem 0; font-weight:600;">Search for a user to assign a role</p>';
       }
     })
     .catch(err => {
-      console.error('Error updating role:', err);
-      alert('Failed to update role');
-      location.reload();
+      console.error('Error assigning role:', err);
+      alert('Failed to assign role');
+    });
+  };
+
+  // ── 7. Handle Leave Group with Admin Succession ──
+  window.handleLeaveGroup = function() {
+    fetch(`/groups/api/groups/{{ group.id }}/leave/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.is_last_admin) {
+        // Show succession modal with successors
+        showSuccessionModal(data.successors);
+      } else if (data.detail) {
+        alert(data.detail);
+      } else {
+        // Successfully left the group
+        window.location.href = '/groups/dashboard/';
+      }
+    })
+    .catch(err => {
+      console.error('Error leaving group:', err);
+      alert('Failed to leave group');
+    });
+  };
+
+  function showSuccessionModal(successors) {
+    const successorList = document.getElementById('successorList');
+    const autoChooseBtn = document.getElementById('autoChooseBtn');
+    const modal = new bootstrap.Modal(document.getElementById('adminSuccessionModal'));
+
+    if (successors.length === 0) {
+      successorList.innerHTML = '<p style="text-align:center; font-size:0.78rem; color:var(--text-muted); padding:1rem 0; font-weight:600;">No eligible successors found</p>';
+      autoChooseBtn.style.display = 'none';
+    } else {
+      successorList.innerHTML = successors.map(user => `
+        <div class="member-row" style="cursor: pointer;" onclick="assignAndLeave(${user.id}, '${user.username}')">
+          <div class="member-meta">
+            <div style="width: 38px; height: 38px; border-radius: 50%; background: var(--brand-light); display: flex; align-items: center; justify-content: center; color: var(--brand); font-weight: 700; font-size: 0.9rem;">
+              ${user.name.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <div class="member-name">${user.name}</div>
+              <div class="member-sub">@${user.username}</div>
+            </div>
+          </div>
+          <span class="role-badge ${user.role === 'MODERATOR' ? 'role-moderator' : 'role-member'}">${user.role}</span>
+        </div>
+      `).join('');
+      autoChooseBtn.style.display = 'block';
+      autoChooseBtn.onclick = () => autoChooseSuccessor(successors);
+    }
+
+    modal.show();
+  }
+
+  function autoChooseSuccessor(successors) {
+    // System chooses the best successor: first moderator, or first member if no moderators
+    const bestSuccessor = successors.find(s => s.role === 'MODERATOR') || successors[0];
+    if (bestSuccessor) {
+      assignAndLeave(bestSuccessor.id, bestSuccessor.username);
+    }
+  }
+
+  window.assignAndLeave = function(userId, username) {
+    if (!confirm(`Transfer admin role to ${username} and leave the group?`)) {
+      return;
+    }
+
+    fetch(`/groups/api/groups/{{ group.id }}/assign-and-leave/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        successor_id: userId
+      })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.detail) {
+        alert(data.detail);
+        window.location.href = '/groups/dashboard/';
+      }
+    })
+    .catch(err => {
+      console.error('Error assigning successor:', err);
+      alert('Failed to assign successor');
     });
   };
 });

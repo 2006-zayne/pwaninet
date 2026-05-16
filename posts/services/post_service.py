@@ -1,31 +1,57 @@
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 from groups.models import Group, Membership, MembershipStatus
-from posts.models import Like, Post
+from posts.models import Like, Post, PostImage
 from users.models import User
 from notifications.models import Notifications
-from posts.services.feed_service import invalidate_home_feed_context
+from users.services.feed_service import invalidate_home_feed_context
 
 def create_post_for_user(form, user, files, group_id=None):
-    post = form.save(commit=False)
+    with transaction.atomic():
+        post = form.save(commit=False)
 
-    post.author = user
-    post.course = user.course
-    post.year = user.year
+        post.author = user
+        post.course = user.course
+        post.year = user.year
 
-    # Group handling
-    if group_id:
-        post.group = get_object_or_404(Group, id=group_id)
+        # Group handling
+        if group_id:
+            post.group = get_object_or_404(Group, id=group_id)
 
-    # Unit override
-    if post.unit:
-        post.course = post.unit.course
+        # Unit override
+        if post.unit:
+            post.course = post.unit.course
 
-    post.save()
+        post.save()
 
-    # Invalidate feeds
+        # Handle multiple image uploads
+        if files and 'images' in files:
+            images = files.getlist('images')
+            for idx, image_file in enumerate(images[:15]):  # Max 15 images
+                PostImage.objects.create(
+                    post=post,
+                    image=image_file,
+                    order=idx
+                )
+
+        # Handle audio upload
+        if files and 'audio' in files:
+            audio_file = files.get('audio')
+            if audio_file and hasattr(audio_file, 'name') and audio_file.name:
+                try:
+                    post.audio = audio_file
+                    post.save()
+                except Exception as e:
+                    # Log error but don't fail the entire post creation
+                    print(f"Error saving audio file: {e}")
+                    pass
+
+    return post
+
+    # Invalidate feeds (outside transaction)
     invalidate_home_feed_context(user.id)
 
-    # Notifications
+    # Notifications (outside transaction)
     if post.group:
         recipients = User.objects.filter(
             group_memberships__group=post.group,
@@ -49,10 +75,9 @@ def create_post_for_user(form, user, files, group_id=None):
         )
         for recipient in recipients
     ])
-
-    return post
    
 
+@transaction.atomic
 
 
 def toggle_post_like_for_user(post, user):

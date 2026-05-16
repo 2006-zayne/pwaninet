@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+  .fullscreen-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    overflow: hidden;
+  }
+
+  .fullscreen-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    touch-action: pan-y;
+  }
+
+  .close-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    transition: background 0.2s;
+    text-decoration: none;
+  }
+
+  .close-btn:hover {
+    background: #fff;
+  }
+
+  .photo-info {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 25px;
+    font-size: 14px;
+    z-index: 10000;
+    max-width: 90%;
+    text-align: center;
+  }
+
+  .photo-info a {
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .photo-info a:hover {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 768px) {
+    .close-btn {
+      top: 15px;
+      right: 15px;
+      width: 45px;
+      height: 45px;
+      font-size: 20px;
+    }
+
+    .photo-info {
+      bottom: 15px;
+      font-size: 12px;
+      padding: 10px 16px;
+    }
+  }
+</style>
+
+<div class="fullscreen-container" id="fullscreenContainer">
+  <a href="{% url 'users:profile' profile_user.username %}" class="close-btn">
+    <i class="bi bi-x-lg"></i>
+  </a>
+
+  <img src="{{ photo_url }}" class="fullscreen-image" alt="{{ photo_title }}" id="fullscreenImage">
+
+  <div class="photo-info">
+    <a href="{% url 'users:profile' profile_user.username %}">{{ profile_user.get_full_name|default:profile_user.username }}</a>
+    {% if photo_type == 'profile' %}'s Profile Photo{% else %}'s Cover Photo{% endif %}
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Keyboard navigation
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      window.location.href = "{% url 'users:profile' profile_user.username %}";
+    }
+  });
+});
+</script>
+{% endblock %}

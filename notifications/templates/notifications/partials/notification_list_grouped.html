@@ -1,0 +1,113 @@
+{% for group in notifications %}
+  <div class="notif-item {% if not group.is_read %}unread{% endif %}">
+    {% if group.notifications.0.sender.profile_pic.url %}
+      <img src="{{ group.notifications.0.sender.profile_pic.url }}" class="notif-avatar" alt="{{ group.notifications.0.sender.username }}">
+    {% else %}
+      <div class="notif-avatar" style="background: var(--brand-light); display: flex; align-items: center; justify-content: center;">
+        <i class="bi bi-person-fill" style="color: var(--brand); font-size: 20px;"></i>
+      </div>
+    {% endif %}
+    
+    <div class="notif-content">
+      <div class="notif-header">
+        <div>
+          <h3 class="notif-user">
+            {% if group.count > 1 %}
+              <span style="color: var(--brand); font-weight: 900;">{{ group.count }}</span> people
+            {% else %}
+              {{ group.notifications.0.sender.username }}
+            {% endif %}
+            {% if group.notification_type == 'INVITE' %}
+              <span class="notif-badge badge-invite"><i class="bi bi-envelope-fill"></i> Invite</span>
+            {% elif group.notification_type == 'FOLLOW' %}
+              <span class="notif-badge badge-follow"><i class="bi bi-person-plus-fill"></i> Follow</span>
+            {% elif group.notification_type == 'LIKE' %}
+              <span class="notif-badge badge-like"><i class="bi bi-heart-fill"></i> Like</span>
+            {% elif group.notification_type == 'GROUP_REQUEST' %}
+              <span class="notif-badge badge-alert"><i class="bi bi-clock-fill"></i> Request</span>
+            {% elif group.notification_type == 'GROUP_APPROVED' %}
+              <span class="notif-badge badge-invite"><i class="bi bi-check-circle-fill"></i> Approved</span>
+            {% else %}
+              <span class="notif-badge badge-alert"><i class="bi bi-bell-fill"></i> Alert</span>
+            {% endif %}
+          </h3>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span class="notif-time">
+            <i class="bi bi-clock-history"></i> {{ group.latest_timestamp|timesince }}
+          </span>
+        </div>
+      </div>
+      
+      <p class="notif-message">
+        {% if group.count > 1 %}
+          {% if group.notification_type == 'LIKE' %}
+            liked your post
+          {% elif group.notification_type == 'FOLLOW' %}
+            followed you
+          {% elif group.notification_type == 'INVITE' %}
+            invited you to join
+          {% elif group.notification_type == 'GROUP_REQUEST' %}
+            requested to join
+          {% elif group.notification_type == 'GROUP_APPROVED' %}
+            approved your request to join
+          {% else %}
+            sent you notifications
+          {% endif %}
+        {% else %}
+          {{ group.notifications.0.msg }}
+        {% endif %}
+        {% if group.post %}
+          <a href="{% url 'posts:post_details' group.post.id %}">View post</a>
+        {% endif %}
+        {% if group.group %}
+          <a href="{% url 'groups:groups_detail' group.group.id %}">{{ group.group.name }}</a>
+        {% endif %}
+      </p>
+
+      {% if group.count > 1 %}
+        <div style="margin-top: 0.75rem;">
+          <button class="btn-action"
+                  style="background: var(--brand-light); color: var(--brand); border: 1.5px solid var(--brand-mid);"
+                  onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none';">
+            <i class="bi bi-chevron-down"></i> See all {{ group.count }}
+          </button>
+          <div style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+            {% for notif in group.notifications %}
+              <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; font-size: 0.8rem; color: var(--text-secondary);">
+                <img src="{{ notif.sender.profile_pic.url }}" style="width: 24px; height: 24px; border-radius: 50%;" alt="">
+                <span>{{ notif.sender.username }}</span>
+                <span style="margin-left: auto; font-size: 0.7rem;">{{ notif.timestamp|timesince }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% elif group.notification_type == 'GROUP_REQUEST' and group.group %}
+        <div class="notif-actions">
+          <a href="{% url 'groups:approve_from_notification' group.group.id group.notifications.0.sender.id %}" class="btn-action btn-accept">
+            <i class="bi bi-check2"></i> Approve
+          </a>
+          <a href="{% url 'groups:reject_from_notification' group.group.id group.notifications.0.sender.id %}" class="btn-action btn-decline">
+            <i class="bi bi-x2"></i> Reject
+          </a>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="notif-icon {% if group.notification_type == 'LIKE' %}icon-like{% elif group.notification_type == 'FOLLOW' %}icon-follow{% elif group.notification_type == 'INVITE' %}icon-invite{% elif group.notification_type == 'GROUP_REQUEST' %}icon-alert{% elif group.notification_type == 'GROUP_APPROVED' %}icon-invite{% else %}icon-alert{% endif %}">
+      {% if group.notification_type == 'LIKE' %}<i class="bi bi-heart-fill"></i>
+      {% elif group.notification_type == 'FOLLOW' %}<i class="bi bi-person-plus-fill"></i>
+      {% elif group.notification_type == 'INVITE' %}<i class="bi bi-envelope-fill"></i>
+      {% elif group.notification_type == 'GROUP_REQUEST' %}<i class="bi bi-clock-fill"></i>
+      {% elif group.notification_type == 'GROUP_APPROVED' %}<i class="bi bi-check-circle-fill"></i>
+      {% else %}<i class="bi bi-bell-fill"></i>
+      {% endif %}
+    </div>
+  </div>
+{% empty %}
+  <div class="empty-state">
+    <div class="empty-icon"><i class="bi bi-bell-slash"></i></div>
+    <div class="empty-title">No notifications</div>
+    <p class="empty-sub">You're all caught up!</p>
+  </div>
+{% endfor %}

@@ -13,6 +13,7 @@ def build_group_detail_context(user, group, query):
     user_membership = group.memberships.filter(user=user).first()
     is_admin = user_membership and user_membership.role == MembershipRole.ADMIN and user_membership.status == MembershipStatus.APPROVED
     is_pending = user_membership and user_membership.status == MembershipStatus.PENDING
+    is_rejected = user_membership and user_membership.status == MembershipStatus.REJECTED
     following_ids = list(get_following_ids(user))
     return {
         'group': group,
@@ -20,6 +21,7 @@ def build_group_detail_context(user, group, query):
         'is_member': is_group_member(group, user),
         'is_admin': is_admin,
         'is_pending': is_pending,
+        'is_rejected': is_rejected,
         'memberships': memberships,
         'search_results': search_invite_candidates(query, group, limit = 10),
         'query': query,

@@ -1,0 +1,400 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Splash Screen to Offline Fallback Test</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-info-circle"></i> Splash Screen → Offline Flow</h5>
+                        <p class="mb-2">This tests the flow where splash screen appears first, then redirects to offline page if no internet connection.</p>
+                        <p class="mb-0"><strong>Expected Flow:</strong> Splash → Network Check → Offline Splash → Offline Page</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Current Status</h5>
+                            <div id="status-display" class="alert alert-info">
+                                Loading status...
+                            </div>
+                            
+                            <h5 class="mt-4">Network Status</h5>
+                            <div id="network-status" class="alert alert-info">
+                                Checking network...
+                            </div>
+                            
+                            <h5 class="mt-4">Splash Information</h5>
+                            <div id="splash-info" class="alert alert-info">
+                                Checking splash...
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5>Test Actions</h5>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-primary" onclick="checkCurrentStatus()">
+                                    Check Current Status
+                                </button>
+                                <button class="btn btn-success" onclick="simulateOffline()">
+                                    Simulate Offline Mode
+                                </button>
+                                <button class="btn btn-warning" onclick="simulateOnline()">
+                                    Simulate Online Mode
+                                </button>
+                                <button class="btn btn-info" onclick="testSplashToOffline()">
+                                    Test Splash → Offline Flow
+                                </button>
+                                <button class="btn btn-secondary" onclick="forceSplash()">
+                                    Force Splash Screen
+                                </button>
+                            </div>
+                            
+                            <h5 class="mt-4">Test Scenarios</h5>
+                            <div class="list-group">
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Real Offline Test</h6>
+                                        <span class="badge bg-warning">Manual</span>
+                                    </div>
+                                    <small class="text-muted">Disconnect internet and launch PWA</small>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Simulated Offline</h6>
+                                        <span class="badge bg-info">Automated</span>
+                                    </div>
+                                    <small class="text-muted">Use "Simulate Offline Mode" button</small>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Network Flapping</h6>
+                                        <span class="badge bg-secondary">Advanced</span>
+                                    </div>
+                                    <small class="text-muted">Toggle connection during splash</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>Debug Log</h5>
+                            <div id="debug-log" style="max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                <div>Debug log will appear here...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>Expected Flow Timeline</h5>
+                            <div class="timeline">
+                                <div class="timeline-item">
+                                    <div class="timeline-marker">1</div>
+                                    <div class="timeline-content">
+                                        <h6>PWA Launch</h6>
+                                        <p>User launches PwaniNet PWA from home screen</p>
+                                    </div>
+                                </div>
+                                <div class="timeline-item">
+                                    <div class="timeline-marker">2</div>
+                                    <div class="timeline-content">
+                                        <h6>Splash Screen Appears</h6>
+                                        <p>PwaniNet logo and loading spinner shown immediately</p>
+                                    </div>
+                                </div>
+                                <div class="timeline-item">
+                                    <div class="timeline-marker">3</div>
+                                    <div class="timeline-content">
+                                        <h6>Network Check</h6>
+                                        <p>System checks internet connectivity in background</p>
+                                    </div>
+                                </div>
+                                <div class="timeline-item">
+                                    <div class="timeline-marker">4</div>
+                                    <div class="timeline-content">
+                                        <h6>Offline Detection</h6>
+                                        <p>No internet connection detected</p>
+                                    </div>
+                                </div>
+                                <div class="timeline-item">
+                                    <div class="timeline-marker">5</div>
+                                    <div class="timeline-content">
+                                        <h6>Offline Splash</h6>
+                                        <p>Splash changes to "No Internet Connection" with wifi-off icon</p>
+                                    </div>
+                                </div>
+                                <div class="timeline-item">
+                                    <div class="timeline-marker">6</div>
+                                    <div class="timeline-content">
+                                        <h6>Redirect to Offline</h6>
+                                        <p>User is redirected to /offline/ page after 1.5s</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>How to Test Real Offline Scenario</h5>
+                            <div class="accordion" id="testInstructions">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#mobile">
+                                            <i class="bi bi-phone me-2"></i> Mobile Device
+                                        </button>
+                                    </h2>
+                                    <div id="mobile" class="accordion-collapse collapse show" data-bs-parent="#testInstructions">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Install PwaniNet as PWA on your mobile device</li>
+                                                <li>Turn off WiFi and mobile data</li>
+                                                <li>Launch PwaniNet from home screen</li>
+                                                <li>Should see: Splash → "No Internet" → Offline page</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#desktop">
+                                            <i class="bi bi-laptop me-2"></i> Desktop PWA
+                                        </button>
+                                    </h2>
+                                    <div id="desktop" class="accordion-collapse collapse" data-bs-parent="#testInstructions">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Install PwaniNet as desktop PWA</li>
+                                                <li>Disconnect from internet (turn off WiFi/ethernet)</li>
+                                                <li>Launch PwaniNet from desktop/applications</li>
+                                                <li>Should see: Splash → "No Internet" → Offline page</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#devtools">
+                                            <i class="bi bi-tools me-2"></i> Developer Tools
+                                        </button>
+                                    </h2>
+                                    <div id="devtools" class="accordion-collapse collapse" data-bs-parent="#testInstructions">
+                                        <div class="accordion-body">
+                                            <ol>
+                                                <li>Open Chrome DevTools (F12)</li>
+                                                <li>Go to Network tab</li>
+                                                <li>Check "Offline" checkbox</li>
+                                                <li>Refresh the page</li>
+                                                <li>Should see: Splash → "No Internet" → Offline page</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    position: relative;
+    padding-left: 40px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e5e7eb;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 30px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -40px;
+    top: 0;
+    width: 30px;
+    height: 30px;
+    background: #2563eb;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.timeline-content h6 {
+    margin: 0 0 4px 0;
+    color: #2563eb;
+    font-weight: 600;
+}
+
+.timeline-content p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 14px;
+}
+</style>
+
+<script>
+let debugLog = [];
+
+function log(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const entry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+    debugLog.push(entry);
+    
+    const logDiv = document.getElementById('debug-log');
+    logDiv.innerHTML = debugLog.join('\n');
+    logDiv.scrollTop = logDiv.scrollHeight;
+    
+    console.log(entry);
+}
+
+function updateStatus(elementId, message, type = 'info') {
+    const element = document.getElementById(elementId);
+    element.className = `alert alert-${type}`;
+    element.textContent = message;
+}
+
+function checkCurrentStatus() {
+    log('Checking current splash and network status...');
+    
+    if (window.splashScreenManager) {
+        const status = window.splashScreenManager.getSplashStatus();
+        
+        log(`PWA Mode: ${status.isPWA}`, status.isPWA ? 'success' : 'info');
+        log(`Splash Visible: ${status.isVisible}`, status.isVisible ? 'warning' : 'success');
+        log(`Network Status: ${status.networkStatus}`, status.networkStatus === 'online' ? 'success' : 'warning');
+        log(`Navigator Online: ${status.navigatorOnline}`, status.navigatorOnline ? 'success' : 'warning');
+        
+        updateStatus('status-display', 
+            `PWA: ${status.isPWA ? 'Yes' : 'No'}, Splash: ${status.isVisible ? 'Visible' : 'Hidden'}, Network: ${status.networkStatus}`,
+            status.networkStatus === 'online' ? 'success' : 'warning'
+        );
+        
+        updateStatus('network-status', 
+            `Network: ${status.networkStatus}, Navigator: ${status.navigatorOnline ? 'Online' : 'Offline'}`,
+            status.networkStatus === 'online' ? 'success' : 'warning'
+        );
+        
+        updateStatus('splash-info', 
+            `Elapsed: ${Math.floor(status.elapsed / 1000)}s, Min Time Met: ${status.minTimeMet}`,
+            'info'
+        );
+        
+    } else {
+        log('Splash Screen Manager not available', 'error');
+        updateStatus('status-display', 'Splash Screen Manager not available', 'danger');
+    }
+}
+
+function simulateOffline() {
+    log('Simulating offline mode...');
+    
+    // Override network check to return offline
+    if (window.splashScreenManager) {
+        const originalTest = window.splashScreenManager.testNetworkConnection;
+        window.splashScreenManager.testNetworkConnection = () => {
+            window.splashScreenManager.networkStatus = 'offline';
+            log('Network status set to offline', 'warning');
+        };
+        
+        // Force splash to test the flow
+        window.splashScreenManager.forceShowSplash();
+        
+        log('Offline simulation active - splash should redirect to offline page', 'success');
+        updateStatus('network-status', 'Simulated offline mode', 'warning');
+    }
+}
+
+function simulateOnline() {
+    log('Simulating online mode...');
+    
+    // Restore normal network check
+    if (window.splashScreenManager) {
+        // Reset network status
+        window.splashScreenManager.networkStatus = 'online';
+        
+        log('Network status set to online', 'success');
+        updateStatus('network-status', 'Simulated online mode', 'success');
+    }
+}
+
+function testSplashToOffline() {
+    log('Testing splash to offline flow...');
+    
+    if (window.splashScreenManager) {
+        // Force splash and set offline
+        window.splashScreenManager.forceShowSplash();
+        
+        setTimeout(() => {
+            window.splashScreenManager.networkStatus = 'offline';
+            log('Network set to offline during splash', 'warning');
+            
+            // Trigger redirect
+            setTimeout(() => {
+                window.splashScreenManager.redirectToOffline();
+            }, 500);
+        }, 1000);
+        
+        log('Splash to offline flow initiated', 'info');
+    }
+}
+
+function forceSplash() {
+    log('Force showing splash screen...');
+    
+    if (window.splashScreenManager) {
+        window.splashScreenManager.forceShowSplash();
+        log('Splash screen forced to show', 'success');
+    }
+}
+
+// Auto-check status on load
+document.addEventListener('DOMContentLoaded', function() {
+    log('Splash offline test page loaded');
+    
+    setTimeout(() => {
+        checkCurrentStatus();
+    }, 1000);
+    
+    // Listen for network changes
+    window.addEventListener('online', () => {
+        log('Network status changed to online', 'success');
+        checkCurrentStatus();
+    });
+    
+    window.addEventListener('offline', () => {
+        log('Network status changed to offline', 'warning');
+        checkCurrentStatus();
+    });
+    
+    log('Test page initialized');
+});
+</script>
+
+{% endblock %}

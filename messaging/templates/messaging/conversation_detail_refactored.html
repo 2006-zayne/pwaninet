@@ -1,0 +1,2967 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<style>
+  /* Chat Styles - WhatsApp Message Bubbles */
+  :root {
+    --chat-bg-sent: #cfd8dc;
+    --chat-bg-received: #ffffff;
+    --chat-text-sent: #050505;
+    --chat-text-received: #050505;
+    --chat-wallpaper: none;
+    --chat-bg: #f8fafc;
+    --chat-bg-type: solid;
+    --chat-bg-fit: cover;
+    --chat-overlay-color: #ffffff;
+    --chat-overlay-opacity: 0.3;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --border: #e5e5e5;
+    --border-hover: #cbd5e1;
+    --brand: #0084ff;
+    --user-chat-color: #cfd8dc;
+    --peer-chat-color: #ffffff;
+  }
+
+  [data-theme="dark"] {
+    --chat-bg-sent: var(--brand);
+    --chat-bg-received: #1f2c34;
+    --chat-text-sent: #ffffff;
+    --chat-text-received: #e9edef;
+    --text-primary: #e9edef;
+    --text-secondary: #8696a0;
+    --border: #2a3942;
+    --border-hover: #2a3942;
+    --brand: #0084ff;
+    --user-chat-color: var(--brand);
+    --peer-chat-color: #1f2c34;
+  }
+
+  /* Force system fonts for all elements */
+  *,
+  *::before,
+  *::after {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif !important;
+  }
+
+  .chat-container {
+    height: 100vh;
+    padding-top: 0;
+    overflow: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+
+  .messages-area {
+    background: var(--chat-bg);
+    background-size: var(--chat-bg-fit);
+    background-position: center;
+    background-repeat: no-repeat;
+    position: relative;
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    padding-bottom: 120px;
+  }
+
+  .messages-area::before {
+    content: '';
+    position: fixed;
+    top: 64px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--chat-overlay-color);
+    opacity: var(--chat-overlay-opacity);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .messages-area .message {
+    position: relative;
+    z-index: 2;
+  }
+
+  .messages-area .message-bubble {
+    position: relative;
+    z-index: 2;
+  }
+
+  .chat-container .chat-header {
+    background-color: var(--background) !important;
+    border-bottom: 1px solid var(--border) !important;
+    padding: 12px 16px !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 100 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    backdrop-filter: blur(10px) !important;
+  }
+
+  [data-theme="dark"] .chat-container .chat-header {
+    background-color: var(--background) !important;
+  }
+
+  .chat-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border);
+    transition: border-color 0.3s ease;
+  }
+
+  .chat-avatar.avatar-online {
+    border-color: #31a24c !important;
+    box-shadow: 0 0 0 2px rgba(49, 162, 76, 0.3);
+  }
+
+  .chat-username {
+    color: var(--text-primary);
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .chat-status {
+    color: var(--text-secondary);
+    font-size: 12px;
+  }
+
+  .chat-status.online {
+    color: #31a24c;
+  }
+
+  .chat-status.typing {
+    color: var(--brand);
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  .messages-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    padding-bottom: 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 64px;
+    margin-bottom: 0px;
+    height: calc(100vh - 64px);
+    background-color: var(--background);
+  }
+
+  [data-theme="dark"] .messages-area {
+    background-color: var(--background);
+  }
+
+  .date-separator {
+    text-align: center;
+    margin: 16px 0;
+    position: relative;
+  }
+
+  .date-separator::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    right: 0;
+    height: 1px;
+    background-color: var(--border);
+  }
+
+  .date-separator span {
+    background-color: var(--card-bg);
+    padding: 4px 12px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    border-radius: 12px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Micro time separator - lightweight, ambient, unobtrusive */
+  .time-separator {
+    text-align: center;
+    margin: 12px 0;
+    position: relative;
+  }
+
+  .time-separator .time-label {
+    color: var(--text-secondary);
+    font-size: 11px;
+    opacity: 0.7;
+    font-weight: 400;
+    letter-spacing: 0.3px;
+    cursor: help;
+    transition: opacity 0.2s ease;
+    position: relative;
+  }
+
+  .time-separator .time-label:hover {
+    opacity: 1;
+  }
+
+  /* Show precise timestamp on hover/tap */
+  .time-separator .time-label::after {
+    content: attr(data-precise-time);
+    position: absolute;
+    top: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--card-bg);
+    color: var(--text-primary);
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .time-separator:hover .time-label::after {
+    opacity: 1;
+  }
+
+  /* DEBUG: Force WhatsApp-style message bubbles */
+  .chat-container .messages-area .message-bubble,
+  .chat-container .messages-area div.message-bubble,
+  .chat-container div.messages-area .message-bubble,
+  .chat-container div.messages-area div.message-bubble,
+  div.chat-container .messages-area .message-bubble,
+  div.chat-container .messages-area div.message-bubble,
+  div.chat-container div.messages-area .message-bubble,
+  div.chat-container div.messages-area div.message-bubble {
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+    transition: transform 0.1s ease;
+    border: none;
+  }
+
+  /* Message wrapper - row layout for side-by-side avatar/bubble */
+  .message-wrapper {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    margin: 2px 0;
+  }
+
+  .sent-wrapper {
+    justify-content: flex-end !important;
+  }
+
+  .received-wrapper {
+    justify-content: flex-start !important;
+    gap: 8px;
+  }
+
+  .message-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    transition: border-color 0.3s ease;
+  }
+
+  /* Base bubble - MISSING padding is the main culprit */
+  .messages-area .message-bubble {
+    padding: 8px 12px;
+    width: auto;
+    overflow-wrap: break-word;
+    word-break: normal;
+    font-size: 14px;
+    line-height: 1.4;
+    position: relative;
+    /* Use device system font - will inherit user's phone font (Rosemary, etc.) */
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Samsung One", "Samsung Sans", "Helvetica Neue", Arial, sans-serif;
+  }
+
+  /* Sent messages */
+  .messages-area .message-bubble.sent {
+    background-color: var(--chat-bg-sent, #d4f1c4) !important;
+    color: var(--chat-text-sent, #111) !important;
+    border-radius: 18px 18px 4px 18px;
+    margin: 0;
+    padding: 8px 12px;
+  }
+
+  /* Received messages */
+  .messages-area .message-bubble.received {
+    background-color: var(--chat-bg-received, #f0f0f0) !important;
+    color: var(--chat-text-received, #111) !important;
+    border-radius: 18px 18px 18px 4px;
+    margin: 0;
+    padding: 8px 12px;
+    border: none;
+  }
+
+  /* Bubble Shape Variables - Set by JS based on modal selection */
+  :root {
+    --bubble-radius: 18px;
+    /* Default/Medium */
+  }
+
+  /* Shape overrides via data attributes */
+  [data-bubble-shape="rounded"] {
+    --bubble-radius: 25px;
+  }
+
+  [data-bubble-shape="square"] {
+    --bubble-radius: 8px;
+  }
+
+  /* SINGLE messages - uniform border radius on all corners */
+  .messages-area .message-bubble.sent.group-single {
+    border-radius: var(--bubble-radius) !important;
+    margin: 0;
+  }
+
+  .messages-area .message-bubble.received.group-single {
+    border-radius: var(--bubble-radius) !important;
+    margin: 0;
+  }
+
+  /* FIRST in group - bottom wall-side corner flat to connect to next */
+  .messages-area .message-bubble.sent.group-first {
+    border-radius: var(--bubble-radius) var(--bubble-radius) 5px var(--bubble-radius) !important;
+    margin: 0;
+  }
+
+  .messages-area .message-bubble.received.group-first {
+    border-radius: var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) 5px !important;
+    margin: 0;
+  }
+
+  /* MIDDLE in group - top and bottom wall-side corners flat */
+  .messages-area .message-bubble.sent.group-middle {
+    border-radius: var(--bubble-radius) 5px 5px var(--bubble-radius) !important;
+    margin: 0;
+  }
+
+  .messages-area .message-bubble.received.group-middle {
+    border-radius: 5px var(--bubble-radius) var(--bubble-radius) 5px !important;
+    margin: 0;
+  }
+
+  /* LAST in group - top wall-side corner flat to connect from prev */
+  .messages-area .message-bubble.sent.group-last {
+    border-radius: var(--bubble-radius) 5px var(--bubble-radius) var(--bubble-radius) !important;
+    margin: 0;
+  }
+
+  .messages-area .message-bubble.received.group-last {
+    border-radius: 5px var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) !important;
+    margin: 0;
+  }
+
+  /* Dark mode */
+  [data-theme="dark"] .messages-area .message-bubble.sent {
+    background-color: var(--chat-bg-sent, #005c4b) !important;
+    color: var(--chat-text-sent, #fff) !important;
+  }
+
+  [data-theme="dark"] .messages-area .message-bubble.received {
+    background-color: var(--chat-bg-received, #1e1e1e) !important;
+    color: var(--chat-text-received, #fff) !important;
+    border: none;
+  }
+
+
+  .message-content {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.4;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+  }
+
+
+  /* Meta row placed below the bubble: timestamp + read receipt */
+  .meta-row {
+    /* Use same font size and family as the bubble content */
+    font-size: 14px;
+    font-family: inherit;
+    opacity: 0.85;
+    margin-top: 0px;
+    display: block;
+    /* ensure it sits below the bubble */
+    color: var(--text-secondary);
+  }
+
+  .message-meta .timestamp {
+    display: inline-block;
+    font-size: 11px;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Samsung One", "Samsung Sans", "Helvetica Neue", Arial, sans-serif;
+  }
+
+  /* Read receipt inline, next to timestamp */
+  .message-read-receipt {
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  /* Circular checkmark container - same size as avatar */
+  .check-circle {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    line-height: 1;
+  }
+
+  /* Sent: Grey circle with black check */
+  .message-read-receipt.status-sent .check-circle {
+    background-color: #e0e0e0;
+    color: #000;
+    border: 1px solid #ccc;
+  }
+
+  /* Delivered: Brand blue circle with black check */
+  .message-read-receipt.status-delivered .check-circle {
+    background-color: var(--brand, #2563eb);
+    color: #000;
+    border: 1px solid var(--brand, #2563eb);
+  }
+
+  /* Read: Blue circle with blue check (fallback if no avatar) */
+  .message-read-receipt.status-read .check-circle {
+    background-color: #e3f2fd;
+    color: var(--brand, #2563eb);
+    border: 1px solid #90caf9;
+  }
+
+  /* Failed: Red circle */
+  .message-read-receipt .check-circle.error {
+    background-color: #ffebee;
+    color: #d32f2f;
+    border: 1px solid #ef9a9a;
+  }
+
+  /* Checkmark styling inside circle */
+  .check-mark {
+    font-weight: bold;
+    font-size: 9px;
+  }
+
+  .check-mark.double {
+    font-size: 7px;
+    letter-spacing: -1px;
+  }
+
+  /* Read receipt avatar - same size as check circle, inline next to time */
+  .read-avatar-img {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid #90caf9;
+    background-color: #e3f2fd;
+  }
+
+  /* Emoji message styles - larger font, no bubble for standalone emoji */
+  .messages-area .message-bubble.emoji-message,
+  .message-bubble.emoji-message {
+    background: none !important;
+    padding: 0;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    max-width: none;
+    width: auto;
+    margin: 0;
+  }
+
+  .messages-area .message-bubble.sent.emoji-message {
+    margin: 0;
+  }
+
+  .messages-area .message-bubble.received.emoji-message {
+    margin: 0;
+  }
+
+  .emoji-content {
+    font-size: 48px;
+    line-height: 1;
+    display: inline-block;
+  }
+
+  /* Emoji message timestamp positioning */
+  .message-bubble.emoji-message .message-time {
+    font-size: 11px;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Samsung One", "Samsung Sans", "Helvetica Neue", Arial, sans-serif;
+    opacity: 0.85;
+    margin-top: 2px;
+  }
+
+  /* Media message styles */
+  .media-message {
+    max-width: 75%;
+    padding: 2px 2px;
+  }
+
+  .media-image {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 2px;
+    object-fit: contain;
+    cursor: pointer;
+  }
+
+  .media-image:hover {
+    opacity: 0.9;
+  }
+
+  .media-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--text-primary);
+    transition: background-color 0.2s;
+  }
+
+  .media-link:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+
+  [data-theme="dark"] .media-link {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  [data-theme="dark"] .media-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .media-link i {
+    font-size: 24px;
+  }
+
+  .message-time {
+    font-size: 11px;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Samsung One", "Samsung Sans", "Helvetica Neue", Arial, sans-serif;
+    opacity: 0.85;
+    margin-top: 4px;
+  }
+
+  /* Typing indicator ghost bubble */
+  .typing-indicator {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin: 2px 0;
+    align-items: flex-start;
+  }
+
+  .typing-bubble {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 18px;
+    max-width: 75%;
+    opacity: 0.6;
+    animation: fadeIn 0.2s ease-in;
+  }
+
+  .typing-bubble.sent {
+    background-color: var(--chat-bg-sent, #d4f1c4);
+    margin: 0;
+  }
+
+  .typing-bubble.received {
+    background-color: var(--chat-bg-received, #f0f0f0);
+    margin: 0;
+  }
+
+  /* Animated dots */
+  .typing-dots {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .typing-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--text-secondary, #666);
+    animation: typingPulse 1.4s infinite ease-in-out;
+  }
+
+  .typing-dot:nth-child(1) {
+    animation-delay: 0s;
+  }
+
+  .typing-dot:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .typing-dot:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  @keyframes typingPulse {
+
+    0%,
+    60%,
+    100% {
+      transform: scale(1);
+      opacity: 0.4;
+    }
+
+    30% {
+      transform: scale(1.2);
+      opacity: 0.8;
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(5px);
+    }
+
+    to {
+      opacity: 0.6;
+      transform: translateY(0);
+    }
+  }
+
+  /* Avatar-only container (no checkmark, just avatar) */
+  .message-read-receipt.read-avatar-only {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Floating read receipt animation (appears inline for receiver messages) */
+  .message-read-receipt.floating-read-receipt {
+    margin-left: 6px;
+    animation: receiptJump 0.3s ease-out;
+  }
+
+  /* Animation keyframes for the jump transition */
+  @keyframes receiptJump {
+    0% {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+
+    50% {
+      opacity: 0.7;
+    }
+
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .input-area {
+    background-color: transparent;
+    padding: 10px 12px;
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    max-width: 100vw;
+    box-sizing: border-box;
+    transition: transform 0.3s ease;
+  }
+
+  /* Mobile-specific fixes */
+  @media (max-width: 768px) {
+    .input-area {
+      flex-direction: row;
+      padding: 8px 12px;
+    }
+
+    .input-area.hidden {
+      transform: translateY(100%);
+    }
+  }
+
+  .input-area.hidden {
+    transform: translateY(100%);
+  }
+
+  .voice-btn-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+  }
+
+  .input-field-container {
+    flex: 1;
+    background-color: #cfd8dc;
+    border-radius: 24px;
+    display: flex;
+    align-items: flex-end;
+    padding: 2px 10px;
+    gap: 6px;
+    min-height: 44px;
+    max-height: 200px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    transition: height 0.2s ease;
+  }
+
+  [data-theme="dark"] .input-field-container {
+    background-color: #37474f;
+  }
+
+  .message-input {
+    background-color: transparent;
+    border: none;
+    color: var(--text-primary);
+    padding: 10px 4px;
+    flex: 1;
+    resize: none;
+    min-height: 24px;
+    max-height: 120px;
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.4;
+    overflow: hidden;
+    transition: height 0.2s ease;
+  }
+
+  .message-input::placeholder {
+    color: var(--text-secondary);
+  }
+
+  .message-input:focus {
+    outline: none;
+  }
+
+  .send-btn {
+    background: none;
+    border: none;
+    color: var(--brand);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 8px;
+    transition: transform 0.2s;
+  }
+
+  .send-btn:hover {
+    transform: scale(1.1);
+  }
+
+  .send-btn:disabled {
+    color: var(--text-secondary);
+    cursor: not-allowed;
+  }
+
+  .icon-btn {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 8px;
+    transition: color 0.2s;
+  }
+
+  .icon-btn:hover {
+    color: var(--brand);
+  }
+
+  .voice-send-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    margin-right: 8px;
+    background-color: var(--brand);
+    border-radius: 50%;
+    border: none;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .voice-send-btn:hover {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+
+  .voice-send-btn i {
+    font-size: 20px;
+  }
+
+  .input-area {
+    background-color: transparent;
+    padding: 10px 12px;
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    max-width: 100vw;
+    box-sizing: border-box;
+    transition: transform 0.3s ease;
+    flex-direction: row;
+  }
+
+  .context-menu {
+    position: fixed;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1060;
+    min-width: 150px;
+    display: none;
+  }
+
+  .context-menu.show {
+    display: block;
+  }
+
+  .context-menu-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.2s;
+  }
+
+  .context-menu-item:hover {
+    background-color: var(--border-hover);
+  }
+
+  .context-menu-item.danger {
+    color: #dc3545;
+  }
+
+  /* Emoji picker styles moved to consolidated section below */
+
+  .emoji-picker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .emoji-picker-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .emoji-picker-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .emoji-picker-content {
+    flex: 1;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 8px;
+    padding-bottom: 16px;
+  }
+
+  .emoji-item {
+    font-size: 24px;
+    cursor: pointer;
+    text-align: center;
+    padding: 8px;
+    border-radius: 8px;
+    transition: background-color 0.2s;
+  }
+
+  .emoji-item:hover {
+    background-color: var(--border);
+  }
+
+  .emoji-picker-tabs {
+    display: flex;
+    padding: 8px;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+
+  .emoji-picker-tab {
+    padding: 8px 16px;
+    border: none;
+    background: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+  }
+
+  .emoji-picker-tab.active {
+    background-color: var(--brand);
+    color: white;
+  }
+
+  .gif-search-container {
+    margin-bottom: 16px;
+  }
+
+  .gif-search-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background-color: var(--background);
+    color: var(--text-primary);
+    font-size: 14px;
+    box-sizing: border-box;
+  }
+
+  .gif-content {
+    flex: 1;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding-bottom: 16px;
+  }
+
+  .gif-item {
+    cursor: pointer;
+    border-radius: 8px;
+    overflow: hidden;
+    aspect-ratio: 1;
+    background-color: var(--border);
+  }
+
+  .gif-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.2s;
+  }
+
+  .gif-item:hover img {
+    transform: scale(1.05);
+  }
+
+  .sticker-content {
+    flex: 1;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding-bottom: 16px;
+  }
+
+  .sticker-item {
+    cursor: pointer;
+    border-radius: 8px;
+    overflow: hidden;
+    aspect-ratio: 1;
+    background-color: var(--border);
+  }
+
+  .sticker-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transition: transform 0.2s;
+  }
+
+  .sticker-item:hover img {
+    transform: scale(1.05);
+  }
+
+  .attachment-modal {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: var(--card-bg);
+    border-radius: 20px 20px 0 0;
+    padding: 20px;
+    z-index: 1050;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+    max-width: 100vw;
+    box-sizing: border-box;
+  }
+
+  .attachment-modal.show {
+    transform: translateY(0);
+  }
+
+  .attachment-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .attachment-modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .attachment-close-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  .attachment-options {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .attachment-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 12px;
+    border-radius: 12px;
+    transition: background-color 0.2s;
+  }
+
+  .attachment-option:hover {
+    background-color: var(--border);
+  }
+
+  .attachment-option-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: white;
+  }
+
+  .attachment-option-icon.photos {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  .attachment-option-icon.videos {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  }
+
+  .attachment-option-icon.documents {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  }
+
+  .attachment-option-icon.audio {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  }
+
+  .attachment-option-label {
+    font-size: 12px;
+    color: var(--text-primary);
+    text-align: center;
+  }
+
+  /* Emoji Picker Modal Styles */
+  .emoji-picker-modal {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: none;
+    flex-direction: column;
+    z-index: 1050;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+  }
+
+  .emoji-picker-modal.show {
+    display: flex;
+    transform: translateY(0);
+  }
+
+  /* Theme Modal Styles */
+  .theme-modal {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: none;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 20px;
+    z-index: 1050;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+
+  .theme-modal.show {
+    display: flex;
+    transform: translateY(0);
+  }
+
+  .theme-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+  }
+
+  .theme-modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .theme-modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 4px;
+    transition: color 0.2s;
+  }
+
+  .theme-modal-close:hover {
+    color: var(--text-primary);
+  }
+
+  .theme-options {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  @media (max-width: 600px) {
+    .theme-options {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .theme-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+    background-color: var(--background);
+  }
+
+  .theme-option:hover {
+    background-color: var(--border);
+    transform: translateY(-2px);
+  }
+
+  .theme-option.active {
+    border-color: var(--brand);
+    background-color: var(--border);
+  }
+
+  .theme-preview {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  .light-preview {
+    background-color: #f8fafc;
+    border: 1px solid var(--border);
+  }
+
+  .dark-preview {
+    background-color: #1f2937;
+    border: 1px solid #374151;
+  }
+
+  .theme-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    text-align: center;
+  }
+
+  /* Theme Tabs */
+  .theme-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .theme-tab {
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s ease;
+  }
+
+  .theme-tab:hover {
+    color: var(--text-primary);
+  }
+
+  .theme-tab.active {
+    color: var(--brand);
+    border-bottom-color: var(--brand);
+  }
+
+  .theme-tab-content {
+    display: none;
+  }
+
+  .theme-tab-content.active {
+    display: block;
+  }
+
+  .theme-section {
+    margin-bottom: 24px;
+  }
+
+  .theme-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    margin-top: 0;
+  }
+
+  .theme-options {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  @media (max-width: 600px) {
+    .theme-options {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  @media (max-width: 480px) {
+    .theme-modal {
+      padding: 16px;
+      border-radius: 16px 16px 0 0;
+      width: 100vw;
+      max-width: 100vw;
+      left: 0;
+      right: 0;
+    }
+
+    .theme-options {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .theme-option {
+      padding: 8px;
+    }
+
+    .theme-preview {
+      border-radius: 6px;
+    }
+
+    .theme-label {
+      font-size: 11px;
+    }
+
+    .bubble-options {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .bubble-option {
+      padding: 8px;
+    }
+
+    .bubble-preview {
+      padding: 8px;
+    }
+
+    .demo-bubble {
+      font-size: 11px;
+      padding: 6px 8px;
+    }
+
+    .theme-tabs {
+      gap: 4px;
+    }
+
+    .theme-tab {
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+
+    .theme-section-title {
+      font-size: 13px;
+    }
+
+    .opacity-presets {
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .preset-btn {
+      padding: 4px 8px;
+      font-size: 11px;
+    }
+
+    .color-presets {
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .image-upload-section {
+      padding: 12px;
+    }
+
+    .btn-upload-wallpaper {
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
+    .color-picker-input {
+      width: 40px;
+      height: 32px;
+    }
+
+    .color-input-wrapper span {
+      font-size: 12px;
+      padding: 6px 8px;
+    }
+
+    .btn-apply-bubbles {
+      padding: 10px 20px;
+      font-size: 14px;
+      width: 100%;
+    }
+
+    .demo-message-area {
+      padding: 12px;
+      min-height: 160px;
+    }
+
+    .demo-message-bubble {
+      font-size: 12px;
+      padding: 6px 10px;
+    }
+  }
+
+  @media (max-width: 360px) {
+    .theme-options {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+
+    .theme-option {
+      padding: 6px;
+    }
+
+    .theme-label {
+      font-size: 10px;
+    }
+
+    .bubble-options {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .theme-modal {
+      padding: 12px;
+    }
+
+    .theme-tab {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+
+    .opacity-presets {
+      gap: 4px;
+    }
+
+    .preset-btn {
+      padding: 4px 6px;
+      font-size: 10px;
+    }
+  }
+
+  /* Prevent horizontal overflow on modal */
+  .theme-modal {
+    overflow-x: hidden;
+  }
+
+  /* Image Upload Section */
+  .image-upload-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    background-color: var(--background);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .image-upload-section:hover {
+    border-color: var(--brand);
+    background-color: var(--border);
+  }
+
+  .btn-upload-wallpaper {
+    padding: 10px 16px;
+    background-color: var(--brand);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-upload-wallpaper:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+
+  .upload-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.3;
+  }
+
+  /* Media Message Styles */
+  .media-message {
+    padding: 4px;
+    max-width: 75%;
+  }
+
+  /* Media bubble wrapper - media itself acts as the bubble surface */
+  .media-bubble-wrapper {
+    max-width: 75%;
+    overflow: hidden;
+    border-radius: var(--bubble-radius) !important;
+    box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+    display: inline-block;
+  }
+
+  /* Sent media bubbles align right */
+  .media-bubble-wrapper.sent {
+    margin: 1px 8px 0px auto;
+  }
+
+  /* Received media bubbles align left */
+  .media-bubble-wrapper.received {
+    margin: 1px 8px 0px 8px;
+  }
+
+  /* Group position variants for media bubbles */
+  .media-bubble-wrapper.group-single {
+    border-radius: var(--bubble-radius) !important;
+  }
+
+  .media-bubble-wrapper.sent.group-first {
+    border-radius: var(--bubble-radius) var(--bubble-radius) 5px var(--bubble-radius) !important;
+  }
+
+  .media-bubble-wrapper.received.group-first {
+    border-radius: var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) 5px !important;
+  }
+
+  .media-bubble-wrapper.sent.group-middle {
+    border-radius: var(--bubble-radius) 5px 5px var(--bubble-radius) !important;
+  }
+
+  .media-bubble-wrapper.received.group-middle {
+    border-radius: 5px var(--bubble-radius) var(--bubble-radius) 5px !important;
+  }
+
+  .media-bubble-wrapper.sent.group-last {
+    border-radius: var(--bubble-radius) 5px var(--bubble-radius) var(--bubble-radius) !important;
+  }
+
+  .media-bubble-wrapper.received.group-last {
+    border-radius: 5px var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) !important;
+  }
+
+  .media-image {
+    max-width: 100%;
+    max-height: 300px;
+    display: block;
+    object-fit: cover;
+    border-radius: inherit;
+  }
+
+  .media-video {
+    max-width: 100%;
+    max-height: 300px;
+    display: block;
+    border-radius: inherit;
+  }
+
+  /* Media caption styling */
+  .media-caption {
+    font-size: 13px;
+    line-height: 1.4;
+    padding: 4px 8px 6px 8px;
+    color: var(--text-primary);
+    max-width: 75%;
+    word-wrap: break-word;
+  }
+
+  .sent-wrapper .media-caption {
+    margin: 2px 8px 0px auto;
+    text-align: left;
+  }
+
+  .received-wrapper .media-caption {
+    margin: 2px 8px 0px 8px;
+    text-align: left;
+  }
+
+  .media-audio-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .media-audio {
+    max-width: 100%;
+    height: 32px;
+  }
+
+  .media-link {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .media-file {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 5px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+    transition: background-color 0.2s;
+  }
+
+  .media-file:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .file-icon {
+    font-size: 24px;
+  }
+
+  .file-name {
+    font-size: 14px;
+    color: var(--text-primary);
+    word-break: break-all;
+  }
+
+  [data-theme="dark"] .media-file {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  [data-theme="dark"] .media-file:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Link Preview Styles */
+  .link-message {
+    padding: 8px !important;
+    max-width: 75% !important;
+  }
+
+  .link-preview-card {
+    display: flex;
+    text-decoration: none;
+    color: inherit;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: background-color 0.2s;
+    max-width: 300px;
+  }
+
+  .link-preview-card:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .link-preview-image {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    display: block;
+  }
+
+  .link-preview-content {
+    padding: 12px;
+  }
+
+  .link-preview-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .link-preview-description {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .link-preview-domain {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+  }
+
+  [data-theme="dark"] .link-preview-card {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  [data-theme="dark"] .link-preview-card:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Video Embed Styles */
+  .video-embed {
+    position: relative;
+    width: 100%;
+    max-width: 300px;
+    aspect-ratio: 16/9;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .youtube-embed {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+
+  /* Facebook Embed Placeholder */
+  .facebook-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: linear-gradient(135deg, #1877f2 0%, #0a66c2 100%);
+    color: white;
+    border-radius: 8px;
+  }
+
+  .facebook-embed-placeholder {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .facebook-icon {
+    font-size: 24px;
+  }
+
+  .facebook-text {
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  /* Bubble Styles */
+  .bubble-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 600px) {
+    .bubble-options {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .bubble-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+    background-color: var(--background);
+  }
+
+  .bubble-option:hover {
+    background-color: var(--border);
+    transform: translateY(-2px);
+  }
+
+  .bubble-option.active {
+    border-color: var(--brand);
+    background-color: var(--border);
+  }
+
+  .bubble-preview {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .demo-bubble {
+    padding: 8px 12px;
+    border-radius: 15px;
+    font-size: 12px;
+    width: fit-content;
+    word-wrap: break-word;
+    max-width: 80%;
+  }
+
+  .demo-bubble.sent {
+    background: linear-gradient(135deg, #0084ff 0%, #0066cc 100%);
+    color: white;
+    align-self: flex-end;
+  }
+
+  .demo-bubble.received {
+    background: var(--border);
+    color: var(--text-primary);
+    align-self: flex-start;
+  }
+
+  .bubble-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  /* Color Pickers */
+  .color-pickers {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 600px) {
+    .color-pickers {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .color-picker-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .color-picker-group label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .color-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .color-picker-input {
+    width: 50px;
+    height: 40px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .color-picker-input:hover {
+    border-color: var(--brand);
+  }
+
+  .color-input-wrapper span {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-family: monospace;
+    padding: 8px 12px;
+    background: var(--background);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  /* Demo Message Area */
+  .demo-message-area {
+    padding: 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 200px;
+    margin-bottom: 16px;
+  }
+
+  .demo-message {
+    display: flex;
+    margin-bottom: 4px;
+  }
+
+  .demo-message.sent {
+    justify-content: flex-end;
+  }
+
+  .demo-message.received {
+    justify-content: flex-start;
+  }
+
+  .demo-message-bubble {
+    padding: 8px 12px;
+    border-radius: 15px;
+    font-size: 13px;
+    max-width: 60%;
+    word-wrap: break-word;
+  }
+
+  .demo-message.sent .demo-message-bubble {
+    background: linear-gradient(135deg, #0084ff 0%, #0066cc 100%);
+    color: white;
+  }
+
+  .demo-message.received .demo-message-bubble {
+    background: rgba(255, 255, 255, 0.9);
+    color: #000;
+  }
+
+  .btn-apply-bubbles {
+    padding: 12px 24px;
+    background-color: var(--brand);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-weight: 600;
+  }
+
+  .btn-apply-bubbles:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+
+  .voice-recording-preview {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: var(--card-bg);
+    border-radius: 20px 20px 0 0;
+    padding: 16px;
+    z-index: 1035;
+    display: none;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .voice-recording-preview.show {
+    display: flex;
+  }
+
+  .voice-recording-waveform-container {
+    height: 60px;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+  }
+
+  .voice-recording-bar {
+    width: 4px;
+    background-color: #0095f6;
+    border-radius: 2px;
+    transition: height 0.05s ease;
+    min-height: 5px;
+  }
+
+  .voice-recording-timer {
+    font-size: 14px;
+    color: var(--text-primary);
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .voice-recording-actions {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+  }
+
+  .icon-btn {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    padding: 8px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    transition: background-color 0.2s;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .voice-recording-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 20px;
+    transition: background-color 0.2s, transform 0.1s;
+  }
+
+  .voice-recording-btn:active {
+    transform: scale(0.95);
+  }
+
+  .voice-recording-btn.discard {
+    background-color: #dc3545;
+    color: white;
+  }
+
+  .voice-recording-btn.send {
+    background-color: var(--brand);
+    color: white;
+  }
+
+  .voice-recording-btn.play-pause {
+    background-color: var(--border);
+    color: var(--text-primary);
+  }
+
+  .voice-recording-btn:hover {
+    opacity: 0.8;
+  }
+
+  .empty-conversation {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    padding: 20px;
+  }
+
+  .empty-conversation-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 20px;
+    border: 4px solid var(--border);
+  }
+
+  .empty-conversation-username {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .empty-conversation-handle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+  }
+
+  .empty-conversation-subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+  }
+
+  .empty-conversation-btn {
+    padding: 12px 24px;
+    background-color: #cfd8dc;
+    color: #000;
+    border: none;
+    border-radius: 24px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  [data-theme="dark"] .empty-conversation-btn {
+    background-color: #37474f;
+    color: #fff;
+  }
+
+  .empty-conversation-btn:hover {
+    background-color: #b0bec5;
+  }
+
+  [data-theme="dark"] .empty-conversation-btn:hover {
+    background-color: #455a64;
+  }
+
+  .quick-messages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 20px;
+    max-width: 100%;
+  }
+
+  .quick-message {
+    padding: 8px 16px;
+    background-color: #cfd8dc;
+    color: var(--text-primary);
+    border: none;
+    border-radius: 20px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  [data-theme="dark"] .quick-message {
+    background-color: #37474f;
+  }
+
+  .quick-message:hover {
+    background-color: #b0bec5;
+  }
+
+  [data-theme="dark"] .quick-message:hover {
+    background-color: #455a64;
+  }
+
+  .quick-message.view-more {
+    background-color: #cfd8dc;
+    color: var(--text-primary);
+  }
+
+  [data-theme="dark"] .quick-message.view-more {
+    background-color: #37474f;
+  }
+
+  .overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1040;
+    display: none;
+  }
+
+  /* Ensure overlay is hidden when Bootstrap modals open */
+  body.modal-open .overlay.show {
+    display: none !important;
+  }
+
+  .overlay.show {
+    display: block;
+  }
+
+  body {
+    background-color: var(--background) !important;
+    padding-top: 0 !important;
+  }
+
+  .navbar-top {
+    display: none;
+  }
+
+  .mobile-bottom-nav {
+    display: none;
+    background-color: transparent;
+  }
+
+  @media (max-width: 768px) {
+    .message-bubble {
+      max-width: 85%;
+    }
+
+    .emoji-picker-modal {
+      width: 90vw;
+      max-height: 60vh;
+    }
+
+    .emoji-picker-content {
+      grid-template-columns: repeat(6, 1fr);
+    }
+  }
+</style>
+<link rel="stylesheet" href="{% static 'css/chat_theme.css' %}">
+<link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}">
+
+<div class="chat-container d-flex flex-column" style="height: 100vh;" data-conversation-id="{{ conversation.id }}"
+  data-user-id="{{ request.user.id }}" data-is-encrypted="false">
+  <div class="chat-header" data-conversation-id="{{ conversation.id }}">
+    <a href="{% url 'messaging:conversation_list' %}" class="text-decoration-none" style="color: var(--text-primary);">
+      <i class="bi bi-arrow-left" style="font-size: 20px;"></i>
+    </a>
+    <div class="position-relative">
+      {% if conversation.type == 'group' %}
+      <div class="chat-avatar bg-primary d-flex align-items-center justify-content-center">
+        <i class="bi bi-people-fill text-white"></i>
+      </div>
+      {% else %}
+      {% for member in conversation.members.all %}
+      {% if member.user != request.user %}
+      <a href="/users/user/{{ member.user.username }}/" class="text-decoration-none">
+        {% if member.user.profile_pic %}
+        <img src="{{ member.user.profile_pic.url }}" class="chat-avatar">
+        {% else %}
+        <div class="chat-avatar bg-secondary d-flex align-items-center justify-content-center">
+          <i class="bi bi-person-fill text-white"></i>
+        </div>
+        {% endif %}
+      </a>
+      {% endif %}
+      {% endfor %}
+      {% endif %}
+    </div>
+    <div class="flex-grow-1">
+      <div class="chat-username">
+        {% if conversation.type == 'group' and conversation.name %}
+        {{ conversation.name }}
+        {% else %}
+        {% for member in conversation.members.all %}
+        {% if member.user != request.user %}
+        {{ member.user.username }}
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+      </div>
+      <div class="chat-status" id="chatStatus"></div>
+    </div>
+    <button class="icon-btn" id="searchBtn" title="Search in conversation">
+      <i class="bi bi-search"></i>
+    </button>
+    <div class="dropdown">
+      <button class="btn btn-link" data-bs-toggle="dropdown" style="color: var(--text-primary);">
+        <i class="bi bi-three-dots-vertical" style="font-size: 20px;"></i>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="#" id="muteBtn"><i class="bi bi-bell-slash me-2"></i>Mute</a></li>
+        <li><a class="dropdown-item" href="#" id="viewMediaBtn"><i class="bi bi-images me-2"></i>View Media</a></li>
+        <li><a class="dropdown-item" href="#" id="starBtn"><i class="bi bi-star me-2"></i>Star Messages</a></li>
+        <li>
+          <hr class="dropdown-divider">
+        </li>
+        <li><a class="dropdown-item" href="#" id="themeBtn" data-bs-no-dropdown="true"><i
+              class="bi bi-palette me-2"></i>Chat Theme</a></li>
+        <li>
+          <hr class="dropdown-divider">
+        </li>
+        <li><a class="dropdown-item text-danger" href="#" id="leaveBtn"><i
+              class="bi bi-box-arrow-right me-2"></i>Leave</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="messages-area" id="messagesContainer" data-skeleton="messaging-detail">
+    <!-- Messages will be rendered by JavaScript -->
+  </div>
+
+  <div class="input-area">
+    <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.mp4,.mp3,.wav"
+      style="display: none;">
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
+
+    <!-- Voice/Send button on the left -->
+    <button class="icon-btn voice-send-btn" id="voiceBtn" title="Voice message">
+      <i class="bi bi-mic"></i>
+    </button>
+
+    <!-- Input container on the right -->
+    <div class="input-field-container">
+      <button class="icon-btn" id="cameraBtn" title="Camera">
+        <i class="bi bi-camera"></i>
+      </button>
+      <button class="icon-btn" id="attachBtn" title="Attach file">
+        <i class="bi bi-paperclip"></i>
+      </button>
+      <textarea class="message-input" placeholder="Message..." id="messageInput" rows="1"></textarea>
+      <button class="icon-btn" id="emojiBtn" title="Emoji">
+        <i class="bi bi-emoji-smile"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Context Menu -->
+<div class="context-menu" id="contextMenu">
+  <div class="context-menu-item" data-action="reply">
+    <i class="bi bi-reply"></i> Reply
+  </div>
+  <div class="context-menu-item" data-action="copy">
+    <i class="bi bi-copy"></i> Copy
+  </div>
+  <div class="context-menu-item" data-action="forward">
+    <i class="bi bi-share"></i> Forward
+  </div>
+  <div class="context-menu-item danger" data-action="delete">
+    <i class="bi bi-trash"></i> Delete
+  </div>
+</div>
+
+<!-- Emoji Picker Modal -->
+<div class="overlay" id="overlay"></div>
+<div class="emoji-picker-modal" id="emojiPicker">
+  <div class="emoji-picker-header">
+    <span class="emoji-picker-title">Emoji</span>
+    <div class="emoji-picker-actions">
+      <button class="icon-btn" id="keyboardBtn" title="Keyboard">
+        <i class="bi bi-keyboard"></i>
+      </button>
+      <button class="icon-btn" id="closeEmojiPicker">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+  </div>
+  <div class="emoji-picker-tabs">
+    <button class="emoji-picker-tab active" data-tab="emojis">😀</button>
+    <button class="emoji-picker-tab" data-tab="gifs">GIF</button>
+    <button class="emoji-picker-tab" data-tab="stickers">Stickers</button>
+  </div>
+  <div class="emoji-picker-content" id="emojiContent">
+    <!-- Emojis will be loaded by JavaScript -->
+  </div>
+  <div class="gif-search-container" id="gifSearchContainer" style="display: none;">
+    <input type="text" class="gif-search-input" id="gifSearchInput" placeholder="Search GIFs...">
+  </div>
+  <div class="gif-content" id="gifContent" style="display: none;">
+    <!-- GIFs will be loaded by JavaScript -->
+  </div>
+  <div class="sticker-content" id="stickerContent" style="display: none;">
+    <!-- Stickers will be loaded by JavaScript -->
+  </div>
+</div>
+
+<!-- Attachment Options Modal -->
+<div class="attachment-modal" id="attachmentModal">
+  <div class="attachment-modal-header">
+    <span class="attachment-modal-title">Attach</span>
+    <button class="attachment-close-btn" id="closeAttachmentModal">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </div>
+  <div class="attachment-options">
+    <div class="attachment-option" data-type="photos">
+      <div class="attachment-option-icon photos">
+        <i class="bi bi-image"></i>
+      </div>
+      <span class="attachment-option-label">Photos</span>
+    </div>
+    <div class="attachment-option" data-type="videos">
+      <div class="attachment-option-icon videos">
+        <i class="bi bi-camera-video"></i>
+      </div>
+      <span class="attachment-option-label">Videos</span>
+    </div>
+    <div class="attachment-option" data-type="documents">
+      <div class="attachment-option-icon documents">
+        <i class="bi bi-file-earmark"></i>
+      </div>
+      <span class="attachment-option-label">Documents</span>
+    </div>
+    <div class="attachment-option" data-type="audio">
+      <div class="attachment-option-icon audio">
+        <i class="bi bi-music-note"></i>
+      </div>
+      <span class="attachment-option-label">Audio</span>
+    </div>
+  </div>
+</div>
+
+<!-- Chat Theme Selector Modal -->
+<div class="theme-modal" id="themeModal">
+  <div class="theme-modal-header">
+    <span class="theme-modal-title">Chat Theme</span>
+    <button class="theme-modal-close" id="closeThemeModal">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </div>
+
+  <!-- Theme Tabs -->
+  <div class="theme-tabs">
+    <button class="theme-tab active" data-tab="background">Background</button>
+    <button class="theme-tab" data-tab="bubbles">Message Bubbles</button>
+  </div>
+
+  <!-- Background Tab -->
+  <div class="theme-tab-content active" id="background-tab">
+    <div class="theme-section">
+      <h4 class="theme-section-title">Preset Backgrounds</h4>
+      <div class="theme-options">
+        <div class="theme-option" data-theme="light">
+          <div class="theme-preview light-preview"></div>
+          <span class="theme-label">Light</span>
+        </div>
+        <div class="theme-option" data-theme="dark">
+          <div class="theme-preview dark-preview"></div>
+          <span class="theme-label">Dark</span>
+        </div>
+        <div class="theme-option" data-theme="wallpaper-1">
+          <div class="theme-preview wallpaper-preview"
+            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+          <span class="theme-label">Purple</span>
+        </div>
+        <div class="theme-option" data-theme="wallpaper-2">
+          <div class="theme-preview wallpaper-preview"
+            style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
+          <span class="theme-label">Pink</span>
+        </div>
+        <div class="theme-option" data-theme="wallpaper-3">
+          <div class="theme-preview wallpaper-preview"
+            style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
+          <span class="theme-label">Cyan</span>
+        </div>
+        <div class="theme-option" data-theme="wallpaper-4">
+          <div class="theme-preview wallpaper-preview"
+            style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></div>
+          <span class="theme-label">Green</span>
+        </div>
+        <div class="theme-option" data-theme="wallpaper-5">
+          <div class="theme-preview wallpaper-preview"
+            style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);"></div>
+          <span class="theme-label">Warm</span>
+        </div>
+        <div class="theme-option" data-theme="wallpaper-6">
+          <div class="theme-preview wallpaper-preview"
+            style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);"></div>
+          <span class="theme-label">Ocean</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="theme-section">
+      <h4 class="theme-section-title">Custom Image Wallpaper</h4>
+      <div class="image-upload-section">
+        <input type="file" id="wallpaperImageInput" accept="image/*" style="display: none;">
+        <button class="btn-upload-wallpaper" id="uploadWallpaperBtn">
+          <i class="bi bi-image"></i> Upload Image
+        </button>
+        <p class="upload-hint">Max 5MB, JPG/PNG/GIF/WebP</p>
+      </div>
+    </div>
+
+    <div class="theme-section">
+      <h4 class="theme-section-title">Overlay Settings</h4>
+      <div class="overlay-controls">
+        <div class="overlay-control-group">
+          <label for="overlayEnabled">
+            <input type="checkbox" id="overlayEnabled" checked>
+            Enable Overlay
+          </label>
+          <p class="control-hint">Improves text readability over backgrounds</p>
+        </div>
+
+        <div class="overlay-control-group" id="overlayOpacityGroup">
+          <label for="overlayOpacitySlider">Overlay Opacity: <span id="overlayOpacityValue">30%</span></label>
+          <input type="range" id="overlayOpacitySlider" min="0" max="70" value="30" class="opacity-slider">
+          <div class="opacity-presets">
+            <button type="button" class="preset-btn" data-opacity="0">None</button>
+            <button type="button" class="preset-btn" data-opacity="10">10%</button>
+            <button type="button" class="preset-btn" data-opacity="20">20%</button>
+            <button type="button" class="preset-btn active" data-opacity="30">30%</button>
+            <button type="button" class="preset-btn" data-opacity="50">50%</button>
+          </div>
+        </div>
+
+        <div class="overlay-control-group" id="overlayColorGroup">
+          <label for="overlayColorPicker">Overlay Color</label>
+          <div class="color-input-wrapper">
+            <input type="color" id="overlayColorPicker" value="#ffffff" class="color-picker-input">
+            <span id="overlayColorHex">#ffffff</span>
+          </div>
+          <div class="color-presets">
+            <button type="button" class="color-preset-btn" data-color="#ffffff"
+              style="background: #ffffff; border: 1px solid #ddd;"></button>
+            <button type="button" class="color-preset-btn" data-color="#000000" style="background: #000000;"></button>
+            <button type="button" class="color-preset-btn" data-color="#1a1a1a" style="background: #1a1a1a;"></button>
+            <button type="button" class="color-preset-btn" data-color="#f8f9fa"
+              style="background: #f8f9fa; border: 1px solid #ddd;"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-apply-bubbles" id="applyBackgroundBtn">Apply Background Theme</button>
+  </div>
+
+  <!-- Message Bubbles Tab -->
+  <div class="theme-tab-content" id="bubbles-tab">
+    <div class="theme-section">
+      <h4 class="theme-section-title">Bubble Styles</h4>
+      <div class="bubble-options">
+        <div class="bubble-option" data-bubble="default">
+          <div class="bubble-preview">
+            <div class="demo-bubble sent">Hi there!</div>
+            <div class="demo-bubble received">Hey! How are you?</div>
+          </div>
+          <span class="bubble-label">Default</span>
+        </div>
+        <div class="bubble-option" data-bubble="rounded">
+          <div class="bubble-preview">
+            <div class="demo-bubble sent" style="border-radius: 25px;">Hi there!</div>
+            <div class="demo-bubble received" style="border-radius: 25px;">Hey! How are you?</div>
+          </div>
+          <span class="bubble-label">Rounded</span>
+        </div>
+        <div class="bubble-option" data-bubble="square">
+          <div class="bubble-preview">
+            <div class="demo-bubble sent" style="border-radius: 4px;">Hi there!</div>
+            <div class="demo-bubble received" style="border-radius: 4px;">Hey! How are you?</div>
+          </div>
+          <span class="bubble-label">Square</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="theme-section">
+      <h4 class="theme-section-title">Bubble Colors</h4>
+      <div class="color-pickers">
+        <div class="color-picker-group">
+          <label>Sent Messages</label>
+          <div class="color-input-wrapper">
+            <input type="color" id="sentBubbleColor" value="#0084ff" class="color-picker-input">
+            <span id="sentBubbleHex">#0084ff</span>
+          </div>
+        </div>
+        <div class="color-picker-group">
+          <label>Received Messages</label>
+          <div class="color-input-wrapper">
+            <input type="color" id="receivedBubbleColor" value="#e4e4ea" class="color-picker-input">
+            <span id="receivedBubbleHex">#e4e4ea</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="theme-section">
+      <h4 class="theme-section-title">Live Preview</h4>
+      <div class="demo-message-area" id="demoMessageArea">
+        <div class="demo-message sent">
+          <div class="demo-message-bubble">That's awesome! 🎉</div>
+        </div>
+        <div class="demo-message received">
+          <div class="demo-message-bubble">Thanks! How's everything?</div>
+        </div>
+        <div class="demo-message sent">
+          <div class="demo-message-bubble">Going great!</div>
+        </div>
+        <div class="demo-message received">
+          <div class="demo-message-bubble">Nice to hear that 😊</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-apply-bubbles" id="applyBubblesBtn">Apply Bubble Theme</button>
+  </div>
+</div>
+
+<!-- Voice Recording Preview -->
+<div class="voice-recording-preview" id="voiceRecordingPreview">
+  <div class="voice-recording-header">
+    <span class="voice-recording-title">Voice Message</span>
+    <button class="voice-recording-close" id="voiceClose" title="Close">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </div>
+  <div class="voice-recording-waveform-container" id="voiceWaveformContainer">
+    <!-- Waveform bars will be generated dynamically -->
+  </div>
+  <div class="voice-recording-timer" id="voiceTimer">0:00</div>
+  <div class="voice-recording-status" id="voiceStatus">Tap and hold to record</div>
+  <div class="voice-recording-actions">
+    <button class="voice-recording-btn stop" id="voiceStop" title="Stop Recording" style="display: none;">
+      <i class="bi bi-stop-fill"></i>
+    </button>
+    <button class="voice-recording-btn send" id="voiceSend" title="Send">
+      <i class="bi bi-send-fill"></i>
+    </button>
+    <button class="voice-recording-btn play-pause" id="voicePlayPause" title="Play/Pause">
+      <i class="bi bi-play-fill"></i>
+    </button>
+    <button class="voice-recording-btn discard" id="voiceDelete" title="Discard">
+      <i class="bi bi-trash"></i>
+    </button>
+  </div>
+</div>
+
+<!-- Camera View -->
+<div class="camera-view" id="cameraView">
+  <div class="camera-video-container">
+    <video class="camera-video" id="cameraVideo" autoplay playsinline></video>
+    <div class="camera-flash" id="cameraFlash"></div>
+    <div class="camera-mode-toggle">
+      <button class="camera-mode-btn active" data-mode="photo">Photo</button>
+      <button class="camera-mode-btn" data-mode="video">Video</button>
+    </div>
+  </div>
+  <div class="camera-controls">
+    <button class="camera-btn camera-close-btn" id="cameraCloseBtn" title="Close">
+      <i class="bi bi-x-lg"></i>
+    </button>
+    <button class="camera-btn camera-switch-btn" id="cameraSwitchBtn" title="Switch Camera">
+      <i class="bi bi-arrow-repeat"></i>
+    </button>
+    <button class="camera-capture-btn" id="cameraCaptureBtn" title="Capture">
+      <div class="camera-capture-btn-inner"></div>
+    </button>
+  </div>
+</div>
+
+<style>
+  .camera-view {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    z-index: 10000;
+    display: none;
+  }
+
+  .camera-view.show {
+    display: block;
+  }
+
+  .camera-video-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .camera-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .camera-controls {
+    position: absolute;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0 20px;
+  }
+
+  .camera-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .camera-capture-btn {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: 4px solid white;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .camera-capture-btn-inner {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: white;
+  }
+</style>
+
+<!-- Image Viewer -->
+<div class="image-viewer" id="imageViewer">
+  <span class="image-viewer-close" id="imageViewerClose">&times;</span>
+  <img id="imageViewerImg" src="" alt="Full screen image">
+</div>
+
+<style>
+  .image-viewer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 10001;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .image-viewer.show {
+    display: flex;
+  }
+
+  .image-viewer-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    color: white;
+    font-size: 40px;
+    cursor: pointer;
+    z-index: 10002;
+  }
+
+  .image-viewer img {
+    max-width: 90%;
+    max-height: 90%;
+    object-fit: contain;
+  }
+</style>
+
+<!-- Search Modal -->
+<div class="search-modal" id="searchModal">
+  <div class="search-modal-content">
+    <div class="search-input-container">
+      <input type="text" class="search-input" id="searchInput" placeholder="Search messages...">
+      <button class="search-close-btn" id="searchCloseBtn">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="search-results" id="searchResults"></div>
+  </div>
+</div>
+
+<style>
+  .search-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 100px;
+  }
+
+  .search-modal.show {
+    display: flex;
+  }
+
+  .search-modal-content {
+    background: var(--card-bg);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .search-input-container {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .search-input {
+    flex: 1;
+    border: none;
+    background: none;
+    font-size: 16px;
+    color: var(--text-primary);
+    outline: none;
+  }
+
+  .search-close-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 8px;
+  }
+
+  .search-results {
+    overflow-y: auto;
+    max-height: 60vh;
+    padding: 16px;
+  }
+
+  /* Overlay Controls Styles */
+  .overlay-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .overlay-control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .overlay-control-group label {
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .overlay-control-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+  }
+
+  .control-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.3;
+  }
+
+  .opacity-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .opacity-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--brand);
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .opacity-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--brand);
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .opacity-presets {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .preset-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--background);
+    color: var(--text-primary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .preset-btn:hover {
+    background: var(--border-hover);
+  }
+
+  .preset-btn.active {
+    background: var(--brand);
+    color: white;
+    border-color: var(--brand);
+  }
+
+  .color-presets {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .color-preset-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .color-preset-btn:hover {
+    transform: scale(1.1);
+    border-color: var(--brand);
+  }
+
+  .color-preset-btn.active {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 2px rgba(0, 132, 255, 0.2);
+  }
+
+  /* Disable overlay controls when overlay is disabled */
+  .overlay-control-group:has(#overlayEnabled:not(:checked)) .opacity-slider,
+  .overlay-control-group:has(#overlayEnabled:not(:checked)) .opacity-presets,
+  .overlay-control-group:has(#overlayEnabled:not(:checked)) .color-input-wrapper,
+  .overlay-control-group:has(#overlayEnabled:not(:checked)) .color-presets {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+
+<script>
+  console.log('=== CONVERSATION DETAIL REFACTORED SCRIPT LOADING ===');
+  document.body.dataset.userId = '{{ request.user.id }}';
+  document.body.dataset.conversationId = '{{ conversation.id }}';
+  document.body.dataset.isEncrypted = '{{ conversation.is_encrypted|yesno:"true,false" }}';
+  document.body.dataset.conversationType = '{{ conversation.type }}';
+</script>
+
+{% if conversation.type == 'direct' %}
+{% for member in conversation.members.all %}
+{% if member.user != request.user %}
+<script>
+  document.body.dataset.receiverAvatar = '{{ member.user.profile_pic.url|default:"/static/images/default_pic1.jpg" }}';
+</script>
+{% endif %}
+{% endfor %}
+{% endif %}
+
+<script src="{% static 'js/encryption.js' %}"></script>
+<script type="module" src="{% static 'js/chat/bootstrap.js' %}?v=12"></script>
+
+<!-- Chat theme manager for per-conversation customization -->
+<script src="{% static 'js/chat_theme_manager.js' %}"></script>
+
+{% endblock %}

@@ -3,7 +3,7 @@ from rest_framework import permissions
 
 class CanDeletePost(permissions.BasePermission):
     """
-    Author OR admin can delete post.
+    Author OR admin OR moderator OR global admin can delete post.
     """
     def has_object_permission(self, request, view, obj):
         if not request.user.is_authenticated:
@@ -13,14 +13,19 @@ class CanDeletePost(permissions.BasePermission):
         if obj.author == request.user:
             return True
         
-        # Group admin can delete any post in their group
+        # Global admins can delete any post
+        from users.models import GlobalRole
+        if request.user.global_role in [GlobalRole.PRESIDENT, GlobalRole.DELEGATE]:
+            return True
+        
+        # Group admin/moderator can delete posts in their group
         if obj.group:
             from groups.models import Membership, MembershipRole, MembershipStatus
             try:
                 membership = Membership.objects.get(
                     user=request.user,
                     group=obj.group,
-                    role=MembershipRole.ADMIN,
+                    role__in=[MembershipRole.ADMIN, MembershipRole.MODERATOR],
                     status=MembershipStatus.APPROVED
                 )
                 return True
