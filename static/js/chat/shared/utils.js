@@ -19,11 +19,21 @@ export function formatDateLabel(dateString) {
   } else if (date.toDateString() === yesterday.toDateString()) {
     return 'Yesterday';
   } else {
-    return date.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).replace(/\//g, '/');
+    // Check if date is within the last week (but not today/yesterday)
+    const oneWeekAgo = new Date(today);
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    
+    if (date >= oneWeekAgo) {
+      // Show day of week (Monday, Tuesday, etc.)
+      return date.toLocaleDateString('en-US', { weekday: 'long' });
+    } else {
+      // Show month date, full year (e.g., "May 7, 2026")
+      return date.toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
   }
 }
 
