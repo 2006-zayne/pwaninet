@@ -9,14 +9,14 @@ ALLOWED_HOSTS = [
     host.split(':')[0].strip()
     for host in os.environ.get(
         'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,0.0.0.0,10.20.152.125,192.168.183.245,192.168.93.221,192.168.14.221,192.168.87.159,192.168.72.88,192.168.87.159,192.168.72.88,192.168.183.245,172.18.0.1,192.168.183.245,192.168.83.192'
+        'localhost,127.0.0.1,0.0.0.0,10.20.152.125,192.168.183.245,192.168.0.221,192.168.93.221,192.168.14.221,192.168.87.159,192.168.72.88,192.168.87.159,192.168.72.88,192.168.183.245,172.18.0.1,192.168.183.245,192.168.83.192'
     ).split(',')
     if host.strip()
 ]
 
 # Ensure the specific IP is in ALLOWED_HOSTS
-if '192.168.183.245' not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append('192.168.183.245')
+if '192.168.0.221' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('192.168.0.221')
 
 # Database - PostgreSQL for local development
 DATABASES = {

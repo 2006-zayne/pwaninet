@@ -8,6 +8,7 @@ import { eventBus } from '../../core/event-bus.js';
 import { attachmentService } from './attachment.service.js';
 import { cameraService } from '../camera/camera.service.js';
 import { voiceService } from '../voice/voice.service.js';
+import { voiceModalController } from '../voice/voice-modal-controller.js';
 
 export class AttachmentUI {
     constructor() {
@@ -32,6 +33,9 @@ export class AttachmentUI {
         this._initializeElements();
         this._setupEventListeners();
         this._setupServiceListeners();
+        
+        // Initialize voice modal controller
+        voiceModalController.init();
 
         this.initialized = true;
         console.log('[ATTACHMENT_UI] Attachment UI initialized');
@@ -45,7 +49,7 @@ export class AttachmentUI {
         this.overlay = document.getElementById('overlay');
         this.fileInput = document.getElementById('fileInput');
         this.cameraInput = document.getElementById('cameraInput');
-        this.voiceRecordingPreview = document.getElementById('voiceRecordingPreview');
+        // Voice modal is now handled by voiceModalController
     }
 
     /**
@@ -70,6 +74,7 @@ export class AttachmentUI {
 
         // Voice button listeners removed - now handled by UIController to prevent conflicts
         // and support the voice/send toggle logic.
+        // Voice modal is now handled by voiceModalController
 
         // Close attachment modal
         const closeAttachmentModal = document.getElementById('closeAttachmentModal');
@@ -102,48 +107,13 @@ export class AttachmentUI {
             });
         }
 
-        // Voice recording actions
-        const voiceSend = document.getElementById('voiceSend');
-        const voiceDelete = document.getElementById('voiceDelete');
-        const voicePlayPause = document.getElementById('voicePlayPause');
-        const voiceStop = document.getElementById('voiceStop');
-        const voiceClose = document.getElementById('voiceClose');
-
-        if (voiceSend) {
-            voiceSend.addEventListener('click', () => {
-                this.sendVoiceRecording();
-            });
-        }
-
-        if (voiceDelete) {
-            voiceDelete.addEventListener('click', () => {
-                this.discardVoiceRecording();
-            });
-        }
-
-        if (voicePlayPause) {
-            voicePlayPause.addEventListener('click', () => {
-                this.playPauseVoiceRecording();
-            });
-        }
-
-        if (voiceStop) {
-            voiceStop.addEventListener('click', () => {
-                this.stopLockedVoiceRecording();
-            });
-        }
-
-        if (voiceClose) {
-            voiceClose.addEventListener('click', () => {
-                this.closeVoiceRecordingPreview();
-            });
-        }
+        // Voice recording actions are now handled by voiceModalController
 
         // Overlay click to close modals
         if (this.overlay) {
             this.overlay.addEventListener('click', () => {
                 this.hideAttachmentModal();
-                this.hideVoiceRecordingPreview();
+                // Voice modal overlay is handled by voiceModalController
             });
         }
     }
@@ -164,48 +134,8 @@ export class AttachmentUI {
             this.handleUploadError(error);
         });
 
-        eventBus.on(EVENTS.VOICE_START, () => {
-            this.showVoiceRecordingPreview();
-            this.updateVoiceStatus('Recording...');
-        });
-
-        eventBus.on(EVENTS.VOICE_STOP, (data) => {
-            this.updateVoiceRecordingPreview(data);
-            this.updateVoiceStatus('Tap to play');
-            this.showStopButton(false);
-        });
-
-        eventBus.on(EVENTS.VOICE_TIMER_UPDATE, (duration) => {
-            const voiceTimer = document.getElementById('voiceTimer');
-            if (voiceTimer) {
-                const minutes = Math.floor(duration / 60);
-                const seconds = duration % 60;
-                voiceTimer.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-            }
-        });
-
-        eventBus.on(EVENTS.VOICE_DISCARD, () => {
-            this.hideVoiceRecordingPreview();
-            this.resetVoiceButton();
-        });
-
-        eventBus.on(EVENTS.VOICE_LOCKED, () => {
-            this.updateVoiceRecordingUI();
-            this.updateVoiceStatus('Recording locked - Swipe up or tap stop');
-            this.showStopButton(true);
-        });
-
-        eventBus.on(EVENTS.VOICE_PLAYING, () => {
-            this.updatePlayPauseButton(true);
-        });
-
-        eventBus.on(EVENTS.VOICE_PAUSED, () => {
-            this.updatePlayPauseButton(false);
-        });
-
-        eventBus.on(EVENTS.VOICE_PLAYBACK_ENDED, () => {
-            this.updatePlayPauseButton(false);
-        });
+        // Voice events are now handled by voiceModalController
+        // Removed old voice event listeners
 
         eventBus.on(EVENTS.CAMERA_ERROR, (error) => {
             console.error('Camera error:', error);
@@ -318,237 +248,6 @@ export class AttachmentUI {
             this.fileInput.accept = accept;
             this.fileInput.click();
         }
-    }
-
-    /**
-     * Start voice recording
-     */
-    startVoiceRecording() {
-        console.log('[ATTACHMENT_UI] startVoiceRecording called');
-        eventBus.emit(EVENTS.VOICE_START);
-    }
-
-    /**
-     * Stop voice recording
-     */
-    stopVoiceRecording() {
-        eventBus.emit(EVENTS.VOICE_STOP);
-    }
-
-    /**
-     * Handle voice touch start
-     */
-    handleVoiceTouchStart(clientY) {
-        console.log('[ATTACHMENT_UI] handleVoiceTouchStart called with clientY:', clientY);
-        this.startVoiceRecording();
-        // Forward touch position to voice service for swipe detection
-        if (window.voiceService) {
-            window.voiceService.handleTouchStart(clientY);
-        }
-    }
-
-    /**
-     * Handle voice touch move
-     */
-    handleVoiceTouchMove(clientY) {
-        // Forward touch position to voice service for swipe detection
-        if (window.voiceService) {
-            window.voiceService.handleTouchMove(clientY);
-        }
-    }
-
-    /**
-     * Handle voice touch end
-     */
-    handleVoiceTouchEnd() {
-        // Check if recording is locked, if not, stop it
-        if (window.voiceService && !window.voiceService.isLocked) {
-            this.stopVoiceRecording();
-        }
-    }
-
-    /**
-     * Send voice recording
-     */
-    sendVoiceRecording() {
-        eventBus.emit(EVENTS.VOICE_SEND);
-    }
-
-    /**
-     * Discard voice recording
-     */
-    discardVoiceRecording() {
-        eventBus.emit(EVENTS.VOICE_DISCARD);
-    }
-
-    /**
-     * Play/pause voice recording
-     */
-    playPauseVoiceRecording() {
-        eventBus.emit(EVENTS.VOICE_PLAY_PAUSE);
-    }
-
-    /**
-     * Show voice recording preview
-     */
-    showVoiceRecordingPreview() {
-        if (this.voiceRecordingPreview && this.overlay) {
-            this.voiceRecordingPreview.classList.add('show');
-            this.overlay.classList.add('show');
-        }
-    }
-
-    /**
-     * Hide voice recording preview
-     */
-    hideVoiceRecordingPreview() {
-        if (this.voiceRecordingPreview && this.overlay) {
-            this.voiceRecordingPreview.classList.remove('show');
-            this.overlay.classList.remove('show');
-        }
-    }
-
-    /**
-     * Update voice recording preview
-     * @param {Object} data - Voice recording data
-     */
-    updateVoiceRecordingPreview(data) {
-        const voiceTimer = document.getElementById('voiceTimer');
-        if (voiceTimer && data.duration) {
-            const minutes = Math.floor(data.duration / 60);
-            const seconds = data.duration % 60;
-            voiceTimer.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        }
-
-        // Generate waveform visualization
-        this.generateWaveform();
-    }
-
-    /**
-     * Stop locked voice recording
-     */
-    stopLockedVoiceRecording() {
-        if (window.voiceService) {
-            window.voiceService.stopLockedRecording();
-        }
-    }
-
-    /**
-     * Close voice recording preview
-     */
-    closeVoiceRecordingPreview() {
-        if (window.voiceService && window.voiceService.isRecording) {
-            // If still recording, discard it
-            this.discardVoiceRecording();
-        } else {
-            // If not recording, just close the preview
-            this.hideVoiceRecordingPreview();
-        }
-    }
-
-    /**
-     * Update voice status text
-     */
-    updateVoiceStatus(status) {
-        const voiceStatus = document.getElementById('voiceStatus');
-        if (voiceStatus) {
-            voiceStatus.textContent = status;
-        }
-    }
-
-    /**
-     * Show/hide stop button
-     */
-    showStopButton(show) {
-        const voiceStop = document.getElementById('voiceStop');
-        if (voiceStop) {
-            voiceStop.style.display = show ? 'flex' : 'none';
-        }
-    }
-
-    /**
-     * Reset voice button state
-     */
-    resetVoiceButton() {
-        const voiceBtn = document.getElementById('voiceBtn');
-        if (voiceBtn) {
-            voiceBtn.innerHTML = '<i class="bi bi-mic"></i>';
-            voiceBtn.style.color = '';
-        }
-    }
-
-    /**
-     * Update voice recording UI for locked state
-     */
-    updateVoiceRecordingUI() {
-        const voiceBtn = document.getElementById('voiceBtn');
-        if (voiceBtn && window.voiceService && window.voiceService.isLocked) {
-            voiceBtn.innerHTML = '<i class="bi bi-lock-fill"></i>';
-            voiceBtn.style.color = '#dc3545';
-        }
-    }
-
-    /**
-     * Update play/pause button
-     * @param {boolean} isPlaying - Whether audio is playing
-     */
-    updatePlayPauseButton(isPlaying) {
-        const voicePlayPause = document.getElementById('voicePlayPause');
-        if (voicePlayPause) {
-            const icon = voicePlayPause.querySelector('i');
-            if (isPlaying) {
-                icon.className = 'bi bi-pause-fill';
-            } else {
-                icon.className = 'bi bi-play-fill';
-            }
-        }
-    }
-
-    /**
-     * Generate waveform visualization
-     */
-    generateWaveform() {
-        const waveformContainer = document.getElementById('voiceWaveformContainer');
-        if (!waveformContainer) return;
-
-        // Clear existing bars
-        waveformContainer.innerHTML = '';
-
-        // Generate random waveform bars
-        const barCount = 30;
-        for (let i = 0; i < barCount; i++) {
-            const bar = document.createElement('div');
-            bar.className = 'voice-recording-bar';
-            bar.style.height = Math.random() * 40 + 10 + 'px';
-            waveformContainer.appendChild(bar);
-        }
-
-        // Animate waveform bars
-        this.animateWaveform();
-    }
-
-    /**
-     * Animate waveform bars
-     */
-    animateWaveform() {
-        const bars = document.querySelectorAll('.voice-recording-bar');
-        if (bars.length === 0) return;
-
-        const animate = () => {
-            bars.forEach(bar => {
-                if (window.voiceService && window.voiceService.isRecording) {
-                    const currentHeight = parseInt(bar.style.height);
-                    const newHeight = Math.random() * 40 + 10;
-                    bar.style.height = newHeight + 'px';
-                }
-            });
-
-            if (window.voiceService && window.voiceService.isRecording) {
-                requestAnimationFrame(animate);
-            }
-        };
-
-        animate();
     }
 
     /**

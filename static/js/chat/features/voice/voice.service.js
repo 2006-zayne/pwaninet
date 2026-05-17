@@ -21,6 +21,10 @@ export class VoiceService {
     this.isSwipingUp = false;
     this.audioElement = null;
     this.isPlaying = false;
+    this.audioContext = null;
+    this.analyser = null;
+    this.dataArray = null;
+    this.source = null;
   }
 
   /**
@@ -75,6 +79,14 @@ export class VoiceService {
       this.mediaRecorder = new MediaRecorder(stream);
       this.audioChunks = [];
 
+      // Set up Web Audio API for frequency analysis
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = 256;
+      this.source = this.audioContext.createMediaStreamSource(stream);
+      this.source.connect(this.analyser);
+      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+
       this.mediaRecorder.ondataavailable = (e) => {
         console.log('[VOICE_SERVICE] Audio data available');
         this.audioChunks.push(e.data);
@@ -84,6 +96,7 @@ export class VoiceService {
         console.log('[VOICE_SERVICE] Recording stopped');
         this.audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
         this.audioUrl = URL.createObjectURL(this.audioBlob);
+        this.cleanupAudioContext();
         eventBus.emit(EVENTS.VOICE_STOP, {
           blob: this.audioBlob,
           url: this.audioUrl,
@@ -96,9 +109,9 @@ export class VoiceService {
       this.isLocked = false;
       this.duration = 0;
       this.startTimer();
+      this.startFrequencyAnalysis();
 
       console.log('[VOICE_SERVICE] Recording started successfully');
-      eventBus.emit(EVENTS.VOICE_START);
     } catch (error) {
       console.error('[VOICE_SERVICE] Voice recording error:', error);
       eventBus.emit(EVENTS.VOICE_ERROR, error);
@@ -109,13 +122,16 @@ export class VoiceService {
    * Stop recording
    */
   stopRecording() {
-    if (this.mediaRecorder && this.isRecording && !this.isLocked) {
+    console.log('[VOICE_SERVICE] stopRecording() called, isRecording:', this.isRecording, 'isLocked:', this.isLocked);
+    if (this.mediaRecorder && this.isRecording) {
       this.mediaRecorder.stop();
       this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
       this.isRecording = false;
       this.isLocked = false;
       this.stopTimer();
+      this.stopFrequencyAnalysis();
     }
+    console.log('[VOICE_SERVICE] Recording stopped');
   }
 
   /**
@@ -132,13 +148,7 @@ export class VoiceService {
    * Stop locked recording
    */
   stopLockedRecording() {
-    if (this.mediaRecorder && this.isRecording && this.isLocked) {
-      this.mediaRecorder.stop();
-      this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
-      this.isRecording = false;
-      this.isLocked = false;
-      this.stopTimer();
-    }
+    this.stopRecording();
   }
 
   /**
@@ -205,6 +215,9 @@ export class VoiceService {
    * Start timer
    */
   startTimer() {
+    // Clear any existing timer first
+    this.stopTimer();
+    this.duration = 0;
     this.timerInterval = setInterval(() => {
       this.duration++;
       eventBus.emit(EVENTS.VOICE_TIMER_UPDATE, this.duration);
@@ -219,6 +232,62 @@ export class VoiceService {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
     }
+  }
+
+  /**
+   * Start frequency analysis for waveform
+   */
+  startFrequencyAnalysis() {
+    if (!this.analyser) return;
+    
+    const analyze = () => {
+      if (!this.isRecording || !this.analyser) return;
+      
+      this.analyser.getByteFrequencyData(this.dataArray);
+      
+      // Calculate average frequency for waveform
+      let sum = 0;
+      for (let i = 0; i < this.dataArray.length; i++) {
+        sum += this.dataArray[i];
+      }
+      const average = sum / this.dataArray.length;
+      
+      // Emit frequency data for waveform animation
+      eventBus.emit(EVENTS.VOICE_FREQUENCY_UPDATE, {
+        dataArray: this.dataArray,
+        average: average
+      });
+      
+      requestAnimationFrame(analyze);
+    };
+    
+    analyze();
+  }
+
+  /**
+   * Stop frequency analysis
+   */
+  stopFrequencyAnalysis() {
+    // Frequency analysis stops automatically when isRecording is false
+  }
+
+  /**
+   * Clean up audio context
+   */
+  cleanupAudioContext() {
+    if (this.source) {
+      this.source.disconnect();
+      this.source = null;
+    }
+    if (this.analyser) {
+      this.analyser.disconnect();
+      this.analyser = null;
+    }
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+    this.dataArray = null;
   }
 
   /**
@@ -257,6 +326,18 @@ export class VoiceService {
    * Discard recording
    */
   discardRecording() {
+    console.log('[VOICE_SERVICE] discardRecording() called, isRecording:', this.isRecording);
+    
+    // Stop recording if currently recording
+    if (this.isRecording && this.mediaRecorder) {
+      this.mediaRecorder.stop();
+      this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      this.isRecording = false;
+      this.stopTimer();
+      this.stopFrequencyAnalysis();
+    }
+    
+    this.cleanupAudioContext();
     this.stopPlayback();
     this.audioBlob = null;
     this.audioChunks = [];

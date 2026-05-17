@@ -67,6 +67,7 @@ export const EVENTS = {
   VOICE_PAUSED: 'voice:paused',
   VOICE_PLAYBACK_ENDED: 'voice:playback_ended',
   VOICE_PLAYBACK_STOPPED: 'voice:playback_stopped',
+  VOICE_FREQUENCY_UPDATE: 'voice:frequency_update',
   ATTACHMENT_SELECTED: 'attachment:selected',
   ATTACHMENT_UPLOAD: 'attachment:upload',
   ATTACHMENT_UPLOAD_START: 'attachment:upload_start',

@@ -373,32 +373,80 @@
   </div>
 </div>
 
-<!-- Voice Recording Preview -->
-<div class="voice-recording-preview" id="voiceRecordingPreview">
-  <div class="voice-recording-header">
-    <span class="voice-recording-title">Voice Message</span>
-    <button class="voice-recording-close" id="voiceClose" title="Close">
-      <i class="bi bi-x-lg"></i>
-    </button>
-  </div>
-  <div class="voice-recording-waveform-container" id="voiceWaveformContainer">
-    <!-- Waveform bars will be generated dynamically -->
-  </div>
-  <div class="voice-recording-timer" id="voiceTimer">0:00</div>
-  <div class="voice-recording-status" id="voiceStatus">Tap and hold to record</div>
-  <div class="voice-recording-actions">
-    <button class="voice-recording-btn stop" id="voiceStop" title="Stop Recording" style="display: none;">
-      <i class="bi bi-stop-fill"></i>
-    </button>
-    <button class="voice-recording-btn send" id="voiceSend" title="Send">
-      <i class="bi bi-send-fill"></i>
-    </button>
-    <button class="voice-recording-btn play-pause" id="voicePlayPause" title="Play/Pause">
-      <i class="bi bi-play-fill"></i>
-    </button>
-    <button class="voice-recording-btn discard" id="voiceDelete" title="Discard">
-      <i class="bi bi-trash"></i>
-    </button>
+<!-- Voice Recording Modal -->
+<div class="voice-modal" id="voiceModal">
+  <div class="voice-modal-overlay" id="voiceModalOverlay"></div>
+  <div class="voice-modal-content">
+    <div class="voice-modal-header">
+      <button class="voice-modal-close" id="voiceModalClose">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    
+    <div class="voice-modal-body">
+      <!-- Recording State -->
+      <div class="voice-state recording" id="voiceRecordingState">
+        <div class="voice-recording-indicator">
+          <div class="voice-recording-dot"></div>
+          <span class="voice-recording-text">Recording...</span>
+        </div>
+        <div class="voice-timer" id="voiceTimer">0:00</div>
+        <div class="voice-waveform" id="voiceWaveform">
+          <!-- Waveform bars generated dynamically -->
+        </div>
+        <div class="voice-controls">
+          <button class="voice-control-btn delete" id="voiceRecordingDelete" title="Cancel">
+            <i class="bi bi-x-lg"></i>
+          </button>
+          <button class="voice-control-btn stop" id="voiceRecordingStop" title="Stop Recording">
+            <i class="bi bi-stop-fill"></i>
+          </button>
+        </div>
+        <div class="voice-hint">Release to send, swipe up to lock</div>
+      </div>
+      
+      <!-- Preview State -->
+      <div class="voice-state preview" id="voicePreviewState" style="display: none;">
+        <div class="voice-preview-info">
+          <span class="voice-preview-label">Voice Message</span>
+          <span class="voice-preview-duration" id="voicePreviewDuration">0:00</span>
+        </div>
+        <div class="voice-waveform-static" id="voiceWaveformStatic">
+          <!-- Static waveform -->
+        </div>
+        <div class="voice-controls">
+          <button class="voice-control-btn delete" id="voiceDelete" title="Delete">
+            <i class="bi bi-trash"></i>
+          </button>
+          <button class="voice-control-btn play" id="voicePlayPause" title="Play/Pause">
+            <i class="bi bi-play-fill"></i>
+          </button>
+          <button class="voice-control-btn send" id="voiceSend" title="Send">
+            <i class="bi bi-send-fill"></i>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Locked State -->
+      <div class="voice-state locked" id="voiceLockedState" style="display: none;">
+        <div class="voice-locked-indicator">
+          <i class="bi bi-lock-fill"></i>
+          <span>Recording Locked</span>
+        </div>
+        <div class="voice-timer" id="voiceLockedTimer">0:00</div>
+        <div class="voice-waveform" id="voiceLockedWaveform">
+          <!-- Waveform bars generated dynamically -->
+        </div>
+        <div class="voice-controls">
+          <button class="voice-control-btn delete" id="voiceLockedDelete" title="Cancel">
+            <i class="bi bi-x-lg"></i>
+          </button>
+          <button class="voice-control-btn stop" id="voiceLockedStop" title="Stop Recording">
+            <i class="bi bi-stop-fill"></i>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 

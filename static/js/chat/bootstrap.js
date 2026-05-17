@@ -12,6 +12,7 @@ import { attachmentService } from './features/attachments/attachment.service.js'
 import { attachmentUI } from './features/attachments/attachment-ui.js';
 import { cameraService } from './features/camera/camera.service.js';
 import { voiceService } from './features/voice/voice.service.js';
+import { voiceModalController } from './features/voice/voice-modal-controller.js';
 import { emojiService } from './features/emoji/emoji.service.js';
 import { contextMenuService } from './features/context-menu/context-menu.service.js';
 
@@ -62,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     attachmentService.init();
     cameraService.init();
     voiceService.init();
+    voiceModalController.init();
     emojiService.init();
     console.log('✅ Attachment and emoji services initialized');
 
@@ -83,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.attachmentUI = attachmentUI;
     window.cameraService = cameraService;
     window.voiceService = voiceService;
+    window.voiceModalController = voiceModalController;
     window.emojiService = emojiService;
     window.contextMenuService = contextMenuService;
     window.messageSoundManager = messageSoundManager;

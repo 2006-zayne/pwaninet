@@ -176,13 +176,7 @@ export class UIController {
                 if (isSendMode) {
                     this._handleSendClick(messageInput);
                 } else {
-                    // Start voice recording UI flow
-                    const voiceRecordingPreview = document.getElementById('voiceRecordingPreview');
-                    if (voiceRecordingPreview) {
-                        voiceRecordingPreview.classList.add('show');
-                    }
-                    
-                    // Signal voice service
+                    // Signal voice service - voice modal controller handles UI
                     eventBus.emit(EVENTS.VOICE_START);
                 }
             });
