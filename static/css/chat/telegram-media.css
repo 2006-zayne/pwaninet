@@ -1,0 +1,688 @@
+/**
+ * Media Rendering Architecture
+ */
+
+/* ==================== DEDICATED MEDIA BUBBLE ==================== */
+/* Media has its own bubble architecture - separate from text bubbles */
+
+/* Bubble Shape Variables - Set by JS based on modal selection */
+:root {
+  --bubble-radius: 18px;
+  /* Default/Medium */
+}
+
+/* Shape overrides via data attributes */
+[data-bubble-shape="rounded"] {
+  --bubble-radius: 25px;
+}
+
+[data-bubble-shape="square"] {
+  --bubble-radius: 8px;
+}
+
+.media-bubble {
+    /* Media bubble has its own padding system */
+    padding: -2px;
+    overflow: hidden;
+    background: transparent;
+    box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+    max-width: 400px;
+    position: relative;
+    border-radius: var(--bubble-radius);
+}
+
+/* Sent media bubble */
+.media-bubble.sent {
+    /* Media itself is the bubble - no background needed */
+    background-color: var(--chat-bg-sent, #d4f1c4) !important;
+    /*background: transparent;*/
+}
+
+/* Received media bubble */
+.media-bubble.received {
+    /* Media itself is the bubble - no background needed */
+    background-color: var(--chat-bg-received, #f0f0f0) !important;
+    /*background: transparent;*/
+}
+
+/* Group position variants for media bubbles */
+.media-bubble.group-single {
+    border-radius: var(--bubble-radius);
+}
+
+.media-bubble.group-first {
+    border-radius: var(--bubble-radius) var(--bubble-radius) 5px var(--bubble-radius);
+}
+
+.media-bubble.group-middle {
+    border-radius: var(--bubble-radius) 5px 5px var(--bubble-radius);
+}
+
+.media-bubble.group-last {
+    border-radius: var(--bubble-radius) 5px var(--bubble-radius) var(--bubble-radius);
+}
+
+/* ==================== SINGLE MEDIA BUBBLE ==================== */
+/* Media itself becomes the bubble - no outer container */
+
+.media-bubble.single-media {
+    max-width: 300px;
+    max-height: 350px;
+    overflow: hidden;
+    border-radius: var(--bubble-radius);
+}
+
+.media-bubble.single-media img,
+.media-bubble.single-media video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: inherit;
+}
+
+/* Video play icon overlay */
+.media-bubble.single-media .video-play-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.media-bubble.single-media .video-play-overlay:hover {
+    background: rgba(0, 0, 0, 0.7);
+    transform: translate(-50%, -50%) scale(1.1);
+}
+
+.media-bubble.single-media .video-play-overlay svg {
+    width: 24px;
+    height: 24px;
+    fill: white;
+}
+
+/* ==================== MEDIA GROUP BUBBLE ==================== */
+/* Dedicated media group bubble - not reusing text bubble */
+
+.media-bubble.media-group {
+    max-width: 400px;
+    padding: -2px;
+    border-radius: var(--bubble-radius);
+    overflow: hidden;
+}
+
+/* ==================== TELEGRAM-STYLE CURATED GRID SYSTEM ==================== */
+/* CSS Grid for 2D composition - NOT flexbox */
+
+.media-content {
+    display: grid;
+    gap: 2px;
+    overflow: hidden;
+    /*border-radius: inherit;*/
+}
+
+/* 1 MEDIA - Single large preview */
+.media-content.media-group--1 {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+}
+
+/* 2 MEDIA - Clean split layout */
+.media-content.media-group--2 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+}
+
+/* 3 MEDIA - Telegram-style asymmetrical layout */
+/* Large left, 2 right stacked */
+.media-content.media-group--3 {
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
+
+.media-content.media-group--3 .media-tile:nth-child(1) {
+    grid-row: 1 / span 2;
+}
+
+/* Hide any extra tiles beyond 3 in 3-item layout */
+.media-content.media-group--3 .media-tile:nth-child(n+4) {
+    display: none;
+}
+
+/* 4 MEDIA - Balanced 2x2 grid */
+.media-content.media-group--4 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
+
+/* 5+ MEDIA - Show first 4, overlay on last */
+.media-content.media-group--many {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
+
+/* ==================== MEDIA TILE SYSTEM ==================== */
+/* Each attachment renders as a tile */
+
+.media-tile {
+    position: relative;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.05);
+    aspect-ratio: 1;
+    cursor: pointer;
+}
+
+.media-tile img,
+.media-tile video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Video tile play icon */
+.media-tile.video-tile .tile-play-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.media-tile.video-tile .tile-play-icon svg {
+    width: 16px;
+    height: 16px;
+    fill: white;
+}
+
+/* ==================== OVERLAY COUNT SYSTEM ==================== */
+/* For groups larger than visible limit */
+
+.media-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.media-overlay:hover {
+    background: rgba(0, 0, 0, 0.8);
+}
+
+/* ==================== CAPTION SYSTEM ==================== */
+/* Captions render INSIDE media bubble */
+
+.media-caption {
+    width: 100%;
+    padding: 8px 12px 10px 12px;
+    font-size: 14px;
+    line-height: 1.25;
+    display: flex;
+    align-items: start;
+    color: var(--text-primary, #0f172a);
+    word-break: normal;
+    overflow-wrap: break-word;
+    background: inherit;
+    /* Minimal padding - caption is integrated */
+}
+
+/* Dark mode caption */
+[data-theme="dark"] .media-caption {
+    color: var(--text-primary, #e9edef);
+}
+
+/* ==================== MEDIA BUBBLE SPACING ==================== */
+/* Media dominates the bubble visually */
+
+.media-bubble .media-content {
+    /* Near-zero top padding */
+    padding-top: -1px;
+    /* Near-zero side padding */
+    padding-left: -1px;
+    padding-right: -1px;
+    /* Bottom section reserved for caption/meta */
+    padding-bottom: -1px;
+}
+
+/* ==================== RESPONSIVE BEHAVIOR ==================== */
+
+@media (max-width: 768px) {
+    .media-bubble {
+        max-width: 280px;
+    }
+
+    .media-bubble.single-media {
+        max-width: 250px;
+        max-height: 300px;
+    }
+
+    .media-content.media-group--3 {
+        grid-template-columns: 2fr 1fr;
+        grid-template-rows: 1fr 1fr;
+    }
+
+    .media-content.media-group--3 .media-tile:nth-child(1) {
+        grid-row: 1 / span 2;
+    }
+
+    .media-content.media-group--3 .media-tile:nth-child(n+4) {
+        display: none;
+    }
+
+    
+}
+
+/* ==================== FULLSCREEN IMMERSIVE VIEWER ==================== */
+
+.media-viewer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(10px);
+    z-index: 10000;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.media-viewer-overlay.show {
+    display: flex;
+    opacity: 1;
+}
+
+.media-viewer-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.media-viewer-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 10;
+}
+
+.media-viewer-close {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.media-viewer-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.media-viewer-main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+}
+
+.media-viewer-content {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transition: transform 0.1s ease;
+}
+
+.media-viewer-content.zoomed {
+    cursor: grab;
+}
+
+.media-viewer-content.zoomed:active {
+    cursor: grabbing;
+}
+
+.media-viewer-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 10;
+}
+
+.media-viewer-nav:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.media-viewer-nav.prev {
+    left: 16px;
+}
+
+.media-viewer-nav.next {
+    right: 16px;
+}
+
+.media-viewer-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+}
+
+.media-viewer-counter {
+    color: white;
+    font-size: 14px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 8px 16px;
+    border-radius: 20px;
+}
+
+.media-viewer-caption {
+    color: white;
+    font-size: 16px;
+    text-align: center;
+    padding: 8px 16px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 8px;
+    max-width: 600px;
+}
+
+/* ==================== VIDEO IN VIEWER ==================== */
+
+.media-viewer-video {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+/* ==================== ANIMATIONS ==================== */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.media-tile {
+    animation: fadeIn 0.3s ease;
+}
+
+/* ==================== LINK PREVIEW BUBBLE ==================== */
+/* Link preview uses Telegram media bubble style */
+
+/* Link message bubble - minimal padding like media bubbles */
+.message-bubble.link-message {
+    padding: 2px !important;
+    overflow: hidden;
+}
+
+.link-preview-card {
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: inherit;
+    overflow: hidden;
+    border-radius: var(--bubble-radius);
+    max-width: 300px;
+    background: inherit;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    cursor: pointer;
+}
+
+.link-preview-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Link preview image - fits inside bubble like media */
+.link-preview-image {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    display: block;
+    background: rgba(0, 0, 0, 0.05);
+    min-height: 150px;
+}
+
+/* Lazy loading support */
+.link-preview-image[loading="lazy"] {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.link-preview-image.loaded {
+    opacity: 1;
+}
+
+/* Link preview content wrapper */
+.link-preview-content {
+    padding: 10px 12px 12px 12px;
+    background: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Link preview title */
+.link-preview-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary, #0f172a);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* Link preview description */
+.link-preview-description {
+    font-size: 13px;
+    color: var(--text-secondary, #64748b);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* Link preview domain - at the bottom like caption */
+.link-preview-domain {
+    font-size: 12px;
+    color: var(--text-secondary, #64748b);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Favicon in domain display */
+.link-preview-favicon {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+/* Domain initials fallback */
+.link-preview-domain-initials {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent-color, #3b82f6);
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+
+/* No thumbnail fallback */
+.link-preview-no-thumbnail {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    background: rgba(0, 0, 0, 0.03);
+    min-height: 120px;
+}
+
+.link-preview-no-thumbnail .link-preview-favicon-large {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    object-fit: contain;
+}
+
+.link-preview-no-thumbnail .link-preview-domain-initials-large {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    background: var(--accent-color, #3b82f6);
+    color: white;
+    font-size: 18px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-transform: uppercase;
+}
+
+/* Dark mode link preview */
+[data-theme="dark"] .link-preview-title {
+    color: var(--text-primary, #e9edef);
+}
+
+[data-theme="dark"] .link-preview-description {
+    color: var(--text-secondary, #8696a0);
+}
+
+[data-theme="dark"] .link-preview-domain {
+    color: var(--text-secondary, #8696a0);
+}
+
+[data-theme="dark"] .link-preview-no-thumbnail {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* YouTube embed styling - contained within bubble */
+.video-embed {
+    width: 100%;
+    max-width: 300px;
+    border-radius: var(--bubble-radius);
+    overflow: hidden;
+    background: #000;
+    display: block;
+}
+
+.youtube-embed {
+    width: 100%;
+    aspect-ratio: 16/9;
+    border: none;
+    display: block;
+    object-fit: cover;
+}
+
+/* Facebook link placeholder */
+.facebook-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: var(--bubble-radius);
+    min-width: 200px;
+}
+
+.facebook-embed-placeholder {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.facebook-icon {
+    font-size: 24px;
+}
+
+.facebook-text {
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+/* ==================== ACCESSIBILITY ==================== */
+
+.media-bubble:focus-visible,
+.media-tile:focus-visible,
+.media-viewer-close:focus-visible,
+.media-viewer-nav:focus-visible,
+.link-preview-card:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}

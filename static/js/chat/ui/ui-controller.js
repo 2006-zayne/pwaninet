@@ -238,13 +238,54 @@ export class UIController {
                 e.preventDefault();
                 e.stopPropagation();
                 eventBus.emit(EVENTS.EMOJI_PICKER_TOGGLE);
-                
-                const emojiPicker = document.getElementById('emojiPicker');
-                const overlay = document.getElementById('overlay');
-                if (emojiPicker) emojiPicker.classList.toggle('show');
-                if (overlay) overlay.classList.toggle('show');
             });
         }
+
+        // Close emoji picker button
+        const closeEmojiPicker = document.getElementById('closeEmojiPicker');
+        if (closeEmojiPicker) {
+            closeEmojiPicker.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                eventBus.emit(EVENTS.EMOJI_PICKER_TOGGLE);
+            });
+        }
+
+        // Overlay click to close picker
+        const overlay = document.getElementById('overlay');
+        if (overlay) {
+            overlay.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const picker = document.getElementById('emojiPicker');
+                if (picker && picker.classList.contains('show')) {
+                    eventBus.emit(EVENTS.EMOJI_PICKER_TOGGLE);
+                }
+            });
+        }
+
+        // Tab switching for emoji picker
+        const tabs = document.querySelectorAll('.emoji-picker-tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const tabName = tab.dataset.tab;
+                
+                // Update active tab
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Show/hide content
+                const emojiContent = document.getElementById('emojiContent');
+                const gifContent = document.getElementById('gifContent');
+                const stickerContent = document.getElementById('stickerContent');
+                
+                if (emojiContent) emojiContent.style.display = tabName === 'emojis' ? 'grid' : 'none';
+                if (gifContent) gifContent.style.display = tabName === 'gifs' ? 'block' : 'none';
+                if (stickerContent) stickerContent.style.display = tabName === 'stickers' ? 'grid' : 'none';
+            });
+        });
 
         const themeBtn = document.getElementById('themeBtn');
         if (themeBtn) {
@@ -268,13 +309,7 @@ export class UIController {
             });
         }
 
-        const attachBtn = document.getElementById('attachBtn');
-        if (attachBtn) {
-            attachBtn.addEventListener('click', () => {
-                const attachmentModal = document.getElementById('attachmentModal');
-                if (attachmentModal) attachmentModal.classList.add('show');
-            });
-        }
+        // Attach button is handled by attachmentUI to prevent conflicts
     }
 
     /**

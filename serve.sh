@@ -1,11 +1,6 @@
 #!/bin/bash
+# Terminal 3: Secure Global Uplink
+cloudflared tunnel run --token eyJhIjoiZmY3ZDU4NmNmYjhkNzc1MDgwMjIxYjk0OWRhMzkxMTQiLCJzIjoiTjRlcmFGRlI2R3E4bnFoMTU3cWk1cDNlR2hYVzljZGRUczViSFZZT0xuTT0iLCJ0IjoiOWI1ODdhYmMtM2QyMy00OGY0LTllNjQtOTMyNDEyZTFhNDk1In0=
 
-# Pwaninet Server Script
-mkcert -install && \
-mkcert localhost && \
-uvicorn pwaninet.asgi:application \
-  --host 0.0.0.0 \
-  --port 8080 \
-  --ssl-keyfile localhost-key.pem \
-  --ssl-certfile localhost.pem \
-  --reload
+
+

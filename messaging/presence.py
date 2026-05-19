@@ -15,7 +15,7 @@ This prevents ghost-online states from browser crashes, sleep mode, or network i
 
 import time
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List
 from pwaninet.redis_client import get_redis_client
 from channels.db import database_sync_to_async
@@ -237,7 +237,7 @@ class PresenceService:
                 return PresenceService._get_last_seen_from_db(user_id)
             
             last_seen_timestamp = float(last_seen_str)
-            return datetime.fromtimestamp(last_seen_timestamp)
+            return datetime.fromtimestamp(last_seen_timestamp, tz=timezone.utc)
         except Exception as e:
             print(f'[PRESENCE] Error getting last seen for user {user_id}: {e}')
             return None
@@ -273,7 +273,7 @@ class PresenceService:
                 return
             
             last_seen_timestamp = float(last_seen_str)
-            last_seen_datetime = datetime.fromtimestamp(last_seen_timestamp)
+            last_seen_datetime = datetime.fromtimestamp(last_seen_timestamp, tz=timezone.utc)
             
             user = User.objects.get(id=user_id)
             user.last_seen = last_seen_datetime

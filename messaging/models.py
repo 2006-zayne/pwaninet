@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from django.core.validators import RegexValidator, MinValueValidator, MaxValueValidator
+from django.core.validators import RegexValidator, MinValueValidator, MaxValueValidator, URLValidator
 
 
 class Conversation(models.Model):
@@ -103,6 +103,13 @@ class ConversationMember(models.Model):
 
 class Message(models.Model):
     """Message model for conversations with E2E encryption support."""
+    MESSAGE_TYPE_CHOICES = [
+        ('text', 'Text'),
+        ('media_group', 'Media Group'),
+        ('system', 'System'),
+        ('audio', 'Audio'),
+    ]
+    
     conversation = models.ForeignKey(
         Conversation,
         on_delete=models.CASCADE,
@@ -120,6 +127,8 @@ class Message(models.Model):
     # Encrypted content (for E2E encrypted messages)
     encrypted_content = models.TextField(blank=True, null=True)
     is_encrypted = models.BooleanField(default=False)
+    
+    # Legacy single attachment field (deprecated, kept for backward compatibility)
     attachment = models.FileField(
         upload_to='message_attachments/%Y/%m/%d/',
         null=True,
@@ -136,7 +145,16 @@ class Message(models.Model):
         null=True,
         blank=True
     )
-    # Link metadata for rich link previews
+    
+    # New fields for multi-file support
+    global_caption = models.TextField(blank=True, null=True)
+    message_type = models.CharField(
+        max_length=20,
+        choices=MESSAGE_TYPE_CHOICES,
+        default='text'
+    )
+    
+    # Link metadata for rich link previews (legacy fields - kept for backward compatibility)
     link_url = models.URLField(max_length=2048, null=True, blank=True)
     link_title = models.CharField(max_length=500, null=True, blank=True)
     link_description = models.TextField(null=True, blank=True)
@@ -155,6 +173,15 @@ class Message(models.Model):
         default='link',
         null=True,
         blank=True
+    )
+    
+    # New dedicated link preview relationship
+    link_preview = models.ForeignKey(
+        'LinkPreview',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='messages'
     )
     reply_to = models.ForeignKey(
         'self',
@@ -188,6 +215,44 @@ class Message(models.Model):
             return f"Encrypted message from {self.sender.username}"
         preview = self.content[:50] + '...' if self.content and len(self.content) > 50 else self.content
         return f"Message from {self.sender.username}: {preview}"
+
+
+class MessageAttachment(models.Model):
+    """Attachment model for supporting multiple files per message."""
+    message = models.ForeignKey(
+        Message,
+        on_delete=models.CASCADE,
+        related_name='attachments'
+    )
+    file = models.FileField(
+        upload_to='message_attachments/%Y/%m/%d/'
+    )
+    file_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('image', 'Image'),
+            ('video', 'Video'),
+            ('audio', 'Audio'),
+            ('document', 'Document'),
+        ]
+    )
+    caption = models.TextField(blank=True, null=True)
+    order = models.IntegerField(default=0)
+    size = models.BigIntegerField(default=0)
+    width = models.IntegerField(null=True, blank=True)
+    height = models.IntegerField(null=True, blank=True)
+    duration = models.FloatField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order']
+        indexes = [
+            models.Index(fields=['message', 'order']),
+            models.Index(fields=['file_type']),
+        ]
+
+    def __str__(self):
+        return f"Attachment {self.id} ({self.file_type}) for message {self.message.id}"
 
 
 class MessageReaction(models.Model):
@@ -334,6 +399,60 @@ class PendingMessage(models.Model):
         
         self.save()
         return old_status
+
+
+class LinkPreview(models.Model):
+    """Model for storing cached link preview metadata and images."""
+    
+    url = models.URLField(max_length=2048, unique=True, db_index=True)
+    title = models.CharField(max_length=500, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+    site_name = models.CharField(max_length=255, blank=True, null=True)
+    
+    # Locally cached images (not hotlinked)
+    image = models.ImageField(
+        upload_to='link_previews/%Y/%m/%d/',
+        null=True,
+        blank=True,
+        help_text="Cached OG image"
+    )
+    favicon = models.ImageField(
+        upload_to='link_favicons/%Y/%m/%d/',
+        null=True,
+        blank=True,
+        help_text="Cached favicon"
+    )
+    
+    # Domain extraction for fallback UI
+    domain = models.CharField(max_length=255, blank=True, null=True)
+    
+    # Cache management
+    cached_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Error tracking
+    fetch_error = models.TextField(blank=True, null=True)
+    fetch_failed = models.BooleanField(default=False)
+    
+    class Meta:
+        ordering = ['-cached_at']
+        indexes = [
+            models.Index(fields=['url']),
+            models.Index(fields=['cached_at']),
+        ]
+        verbose_name = "Link Preview"
+        verbose_name_plural = "Link Previews"
+    
+    def __str__(self):
+        return f"LinkPreview for {self.url[:50]}..."
+    
+    def has_thumbnail(self):
+        """Check if preview has a cached thumbnail image."""
+        return bool(self.image)
+    
+    def has_favicon(self):
+        """Check if preview has a cached favicon."""
+        return bool(self.favicon)
 
 
 class ConversationTheme(models.Model):

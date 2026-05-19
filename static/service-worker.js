@@ -19,7 +19,6 @@ const CORE_ASSETS = [
     '/static/images/apple-touch-icon.png',
     '/static/images/web-app-manifest-192x192.png',
     '/static/images/web-app-manifest-512x512.png',
-    '/static/images/site.webmanifest',
     '/static/images/browserconfig.xml',
     '/static/js/messaging/offline-cache.js',
     '/static/js/messaging/network-status.js',

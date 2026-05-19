@@ -3,6 +3,8 @@
 {% block content %}
 <link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}">
 <link rel="stylesheet" href="{% static 'css/chat_theme.css' %}">
+<link rel="stylesheet" href="{% static 'css/messaging/media-composer.css' %}">
+<link rel="stylesheet" href="{% static 'css/chat/telegram-media.css' %}">
 
 
 <div class="chat-container d-flex flex-column" style="height: 100vh;" data-conversation-id="{{ conversation.id }}"
@@ -80,24 +82,28 @@
       style="display: none;">
     <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
 
-    <!-- Voice/Send button on the left -->
-    <button class="icon-btn voice-send-btn" id="voiceBtn" title="Voice message">
-      <i class="bi bi-mic"></i>
-    </button>
+    
 
-    <!-- Input container on the right -->
+    <!-- Input container on the left -->
     <div class="input-field-container">
+      <button class="icon-btn" id="emojiBtn" title="Emoji">
+        <i class="bi bi-emoji-smile"></i>
+      </button>
+      <textarea class="message-input" placeholder="Message..." id="messageInput" rows="1"></textarea>
       <button class="icon-btn" id="cameraBtn" title="Camera">
         <i class="bi bi-camera"></i>
       </button>
       <button class="icon-btn" id="attachBtn" title="Attach file">
         <i class="bi bi-paperclip"></i>
       </button>
-      <textarea class="message-input" placeholder="Message..." id="messageInput" rows="1"></textarea>
-      <button class="icon-btn" id="emojiBtn" title="Emoji">
-        <i class="bi bi-emoji-smile"></i>
-      </button>
     </div>
+
+    <!-- Voice/Send button on the right -->
+    <button class="icon-btn voice-send-btn" id="voiceBtn" title="Voice message">
+      <i class="bi bi-mic"></i>
+    </button>
+
+
   </div>
 </div>
 
@@ -188,188 +194,190 @@
 
 <!-- Chat Theme Selector Modal -->
 <div class="theme-modal" id="themeModal">
-  <div class="theme-modal-header">
-    <span class="theme-modal-title">Chat Theme</span>
-    <button class="theme-modal-close" id="closeThemeModal">
-      <i class="bi bi-x-lg"></i>
-    </button>
-  </div>
-
-  <!-- Theme Tabs -->
-  <div class="theme-tabs">
-    <button class="theme-tab active" data-tab="background">Background</button>
-    <button class="theme-tab" data-tab="bubbles">Message Bubbles</button>
-  </div>
-
-  <!-- Background Tab -->
-  <div class="theme-tab-content active" id="background-tab">
-    <div class="theme-section">
-      <h4 class="theme-section-title">Preset Backgrounds</h4>
-      <div class="theme-options">
-        <div class="theme-option" data-theme="light">
-          <div class="theme-preview light-preview"></div>
-          <span class="theme-label">Light</span>
-        </div>
-        <div class="theme-option" data-theme="dark">
-          <div class="theme-preview dark-preview"></div>
-          <span class="theme-label">Dark</span>
-        </div>
-        <div class="theme-option" data-theme="wallpaper-1">
-          <div class="theme-preview wallpaper-preview"
-            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
-          <span class="theme-label">Purple</span>
-        </div>
-        <div class="theme-option" data-theme="wallpaper-2">
-          <div class="theme-preview wallpaper-preview"
-            style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
-          <span class="theme-label">Pink</span>
-        </div>
-        <div class="theme-option" data-theme="wallpaper-3">
-          <div class="theme-preview wallpaper-preview"
-            style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
-          <span class="theme-label">Cyan</span>
-        </div>
-        <div class="theme-option" data-theme="wallpaper-4">
-          <div class="theme-preview wallpaper-preview"
-            style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></div>
-          <span class="theme-label">Green</span>
-        </div>
-        <div class="theme-option" data-theme="wallpaper-5">
-          <div class="theme-preview wallpaper-preview"
-            style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);"></div>
-          <span class="theme-label">Warm</span>
-        </div>
-        <div class="theme-option" data-theme="wallpaper-6">
-          <div class="theme-preview wallpaper-preview"
-            style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);"></div>
-          <span class="theme-label">Ocean</span>
-        </div>
-      </div>
+  <div class="theme-modal-content">
+    <div class="theme-modal-header">
+      <span class="theme-modal-title">Chat Theme</span>
+      <button class="theme-modal-close" id="closeThemeModal">
+        <i class="bi bi-x-lg"></i>
+      </button>
     </div>
 
-    <div class="theme-section">
-      <h4 class="theme-section-title">Custom Image Wallpaper</h4>
-      <div class="image-upload-section">
-        <input type="file" id="wallpaperImageInput" accept="image/*" style="display: none;">
-        <button class="btn-upload-wallpaper" id="uploadWallpaperBtn">
-          <i class="bi bi-image"></i> Upload Image
-        </button>
-        <p class="upload-hint">Max 5MB, JPG/PNG/GIF/WebP</p>
-      </div>
+    <!-- Theme Tabs -->
+    <div class="theme-tabs">
+      <button class="theme-tab active" data-tab="background">Background</button>
+      <button class="theme-tab" data-tab="bubbles">Message Bubbles</button>
     </div>
 
-    <div class="theme-section">
-      <h4 class="theme-section-title">Overlay Settings</h4>
-      <div class="overlay-controls">
-        <div class="overlay-control-group">
-          <label for="overlayEnabled">
-            <input type="checkbox" id="overlayEnabled" checked>
-            Enable Overlay
-          </label>
-          <p class="control-hint">Improves text readability over backgrounds</p>
-        </div>
-
-        <div class="overlay-control-group" id="overlayOpacityGroup">
-          <label for="overlayOpacitySlider">Overlay Opacity: <span id="overlayOpacityValue">30%</span></label>
-          <input type="range" id="overlayOpacitySlider" min="0" max="70" value="30" class="opacity-slider">
-          <div class="opacity-presets">
-            <button type="button" class="preset-btn" data-opacity="0">None</button>
-            <button type="button" class="preset-btn" data-opacity="10">10%</button>
-            <button type="button" class="preset-btn" data-opacity="20">20%</button>
-            <button type="button" class="preset-btn active" data-opacity="30">30%</button>
-            <button type="button" class="preset-btn" data-opacity="50">50%</button>
+    <!-- Background Tab -->
+    <div class="theme-tab-content active" id="background-tab">
+      <div class="theme-section">
+        <h4 class="theme-section-title">Preset Backgrounds</h4>
+        <div class="theme-options">
+          <div class="theme-option" data-theme="light">
+            <div class="theme-preview light-preview"></div>
+            <span class="theme-label">Light</span>
           </div>
-        </div>
-
-        <div class="overlay-control-group" id="overlayColorGroup">
-          <label for="overlayColorPicker">Overlay Color</label>
-          <div class="color-input-wrapper">
-            <input type="color" id="overlayColorPicker" value="#ffffff" class="color-picker-input">
-            <span id="overlayColorHex">#ffffff</span>
+          <div class="theme-option" data-theme="dark">
+            <div class="theme-preview dark-preview"></div>
+            <span class="theme-label">Dark</span>
           </div>
-          <div class="color-presets">
-            <button type="button" class="color-preset-btn" data-color="#ffffff"
-              style="background: #ffffff; border: 1px solid #ddd;"></button>
-            <button type="button" class="color-preset-btn" data-color="#000000" style="background: #000000;"></button>
-            <button type="button" class="color-preset-btn" data-color="#1a1a1a" style="background: #1a1a1a;"></button>
-            <button type="button" class="color-preset-btn" data-color="#f8f9fa"
-              style="background: #f8f9fa; border: 1px solid #ddd;"></button>
+          <div class="theme-option" data-theme="wallpaper-1">
+            <div class="theme-preview wallpaper-preview"
+              style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+            <span class="theme-label">Purple</span>
+          </div>
+          <div class="theme-option" data-theme="wallpaper-2">
+            <div class="theme-preview wallpaper-preview"
+              style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
+            <span class="theme-label">Pink</span>
+          </div>
+          <div class="theme-option" data-theme="wallpaper-3">
+            <div class="theme-preview wallpaper-preview"
+              style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
+            <span class="theme-label">Cyan</span>
+          </div>
+          <div class="theme-option" data-theme="wallpaper-4">
+            <div class="theme-preview wallpaper-preview"
+              style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></div>
+            <span class="theme-label">Green</span>
+          </div>
+          <div class="theme-option" data-theme="wallpaper-5">
+            <div class="theme-preview wallpaper-preview"
+              style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);"></div>
+            <span class="theme-label">Warm</span>
+          </div>
+          <div class="theme-option" data-theme="wallpaper-6">
+            <div class="theme-preview wallpaper-preview"
+              style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);"></div>
+            <span class="theme-label">Ocean</span>
           </div>
         </div>
       </div>
-    </div>
 
-    <button class="btn-apply-bubbles" id="applyBackgroundBtn">Apply Background Theme</button>
-  </div>
-
-  <!-- Message Bubbles Tab -->
-  <div class="theme-tab-content" id="bubbles-tab">
-    <div class="theme-section">
-      <h4 class="theme-section-title">Bubble Styles</h4>
-      <div class="bubble-options">
-        <div class="bubble-option" data-bubble="default">
-          <div class="bubble-preview">
-            <div class="demo-bubble sent">Hi there!</div>
-            <div class="demo-bubble received">Hey! How are you?</div>
-          </div>
-          <span class="bubble-label">Default</span>
-        </div>
-        <div class="bubble-option" data-bubble="rounded">
-          <div class="bubble-preview">
-            <div class="demo-bubble sent" style="border-radius: 25px;">Hi there!</div>
-            <div class="demo-bubble received" style="border-radius: 25px;">Hey! How are you?</div>
-          </div>
-          <span class="bubble-label">Rounded</span>
-        </div>
-        <div class="bubble-option" data-bubble="square">
-          <div class="bubble-preview">
-            <div class="demo-bubble sent" style="border-radius: 4px;">Hi there!</div>
-            <div class="demo-bubble received" style="border-radius: 4px;">Hey! How are you?</div>
-          </div>
-          <span class="bubble-label">Square</span>
+      <div class="theme-section">
+        <h4 class="theme-section-title">Custom Image Wallpaper</h4>
+        <div class="image-upload-section">
+          <input type="file" id="wallpaperImageInput" accept="image/*" style="display: none;">
+          <button class="btn-upload-wallpaper" id="uploadWallpaperBtn">
+            <i class="bi bi-image"></i> Upload Image
+          </button>
+          <p class="upload-hint">Max 5MB, JPG/PNG/GIF/WebP</p>
         </div>
       </div>
-    </div>
 
-    <div class="theme-section">
-      <h4 class="theme-section-title">Bubble Colors</h4>
-      <div class="color-pickers">
-        <div class="color-picker-group">
-          <label>Sent Messages</label>
-          <div class="color-input-wrapper">
-            <input type="color" id="sentBubbleColor" value="#0084ff" class="color-picker-input">
-            <span id="sentBubbleHex">#0084ff</span>
+      <div class="theme-section">
+        <h4 class="theme-section-title">Overlay Settings</h4>
+        <div class="overlay-controls">
+          <div class="overlay-control-group">
+            <label for="overlayEnabled">
+              <input type="checkbox" id="overlayEnabled" checked>
+              Enable Overlay
+            </label>
+            <p class="control-hint">Improves text readability over backgrounds</p>
           </div>
-        </div>
-        <div class="color-picker-group">
-          <label>Received Messages</label>
-          <div class="color-input-wrapper">
-            <input type="color" id="receivedBubbleColor" value="#e4e4ea" class="color-picker-input">
-            <span id="receivedBubbleHex">#e4e4ea</span>
+
+          <div class="overlay-control-group" id="overlayOpacityGroup">
+            <label for="overlayOpacitySlider">Overlay Opacity: <span id="overlayOpacityValue">30%</span></label>
+            <input type="range" id="overlayOpacitySlider" min="0" max="70" value="30" class="opacity-slider">
+            <div class="opacity-presets">
+              <button type="button" class="preset-btn" data-opacity="0">None</button>
+              <button type="button" class="preset-btn" data-opacity="10">10%</button>
+              <button type="button" class="preset-btn" data-opacity="20">20%</button>
+              <button type="button" class="preset-btn active" data-opacity="30">30%</button>
+              <button type="button" class="preset-btn" data-opacity="50">50%</button>
+            </div>
+          </div>
+
+          <div class="overlay-control-group" id="overlayColorGroup">
+            <label for="overlayColorPicker">Overlay Color</label>
+            <div class="color-input-wrapper">
+              <input type="color" id="overlayColorPicker" value="#ffffff" class="color-picker-input">
+              <span id="overlayColorHex">#ffffff</span>
+            </div>
+            <div class="color-presets">
+              <button type="button" class="color-preset-btn" data-color="#ffffff"
+                style="background: #ffffff; border: 1px solid #ddd;"></button>
+              <button type="button" class="color-preset-btn" data-color="#000000" style="background: #000000;"></button>
+              <button type="button" class="color-preset-btn" data-color="#1a1a1a" style="background: #1a1a1a;"></button>
+              <button type="button" class="color-preset-btn" data-color="#f8f9fa"
+                style="background: #f8f9fa; border: 1px solid #ddd;"></button>
+            </div>
           </div>
         </div>
       </div>
+
+      <button class="btn-apply-bubbles" id="applyBackgroundBtn">Apply Background Theme</button>
     </div>
 
-    <div class="theme-section">
-      <h4 class="theme-section-title">Live Preview</h4>
-      <div class="demo-message-area" id="demoMessageArea">
-        <div class="demo-message sent">
-          <div class="demo-message-bubble">That's awesome! 🎉</div>
-        </div>
-        <div class="demo-message received">
-          <div class="demo-message-bubble">Thanks! How's everything?</div>
-        </div>
-        <div class="demo-message sent">
-          <div class="demo-message-bubble">Going great!</div>
-        </div>
-        <div class="demo-message received">
-          <div class="demo-message-bubble">Nice to hear that 😊</div>
+    <!-- Message Bubbles Tab -->
+    <div class="theme-tab-content" id="bubbles-tab">
+      <div class="theme-section">
+        <h4 class="theme-section-title">Bubble Styles</h4>
+        <div class="bubble-options">
+          <div class="bubble-option" data-bubble="default">
+            <div class="bubble-preview">
+              <div class="demo-bubble sent">Hi there!</div>
+              <div class="demo-bubble received">Hey! How are you?</div>
+            </div>
+            <span class="bubble-label">Default</span>
+          </div>
+          <div class="bubble-option" data-bubble="rounded">
+            <div class="bubble-preview">
+              <div class="demo-bubble sent" style="border-radius: 25px;">Hi there!</div>
+              <div class="demo-bubble received" style="border-radius: 25px;">Hey! How are you?</div>
+            </div>
+            <span class="bubble-label">Rounded</span>
+          </div>
+          <div class="bubble-option" data-bubble="square">
+            <div class="bubble-preview">
+              <div class="demo-bubble sent" style="border-radius: 4px;">Hi there!</div>
+              <div class="demo-bubble received" style="border-radius: 4px;">Hey! How are you?</div>
+            </div>
+            <span class="bubble-label">Square</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <button class="btn-apply-bubbles" id="applyBubblesBtn">Apply Bubble Theme</button>
+      <div class="theme-section">
+        <h4 class="theme-section-title">Bubble Colors</h4>
+        <div class="color-pickers">
+          <div class="color-picker-group">
+            <label>Sent Messages</label>
+            <div class="color-input-wrapper">
+              <input type="color" id="sentBubbleColor" value="#0084ff" class="color-picker-input">
+              <span id="sentBubbleHex">#0084ff</span>
+            </div>
+          </div>
+          <div class="color-picker-group">
+            <label>Received Messages</label>
+            <div class="color-input-wrapper">
+              <input type="color" id="receivedBubbleColor" value="#e4e4ea" class="color-picker-input">
+              <span id="receivedBubbleHex">#e4e4ea</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="theme-section">
+        <h4 class="theme-section-title">Live Preview</h4>
+        <div class="demo-message-area" id="demoMessageArea">
+          <div class="demo-message sent">
+            <div class="demo-message-bubble">That's awesome! 🎉</div>
+          </div>
+          <div class="demo-message received">
+            <div class="demo-message-bubble">Thanks! How's everything?</div>
+          </div>
+          <div class="demo-message sent">
+            <div class="demo-message-bubble">Going great!</div>
+          </div>
+          <div class="demo-message received">
+            <div class="demo-message-bubble">Nice to hear that 😊</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-apply-bubbles" id="applyBubblesBtn">Apply Bubble Theme</button>
+    </div>
   </div>
 </div>
 
@@ -895,11 +903,71 @@
 {% endfor %}
 {% endif %}
 
+<!-- Media Composer Fullscreen Overlay -->
+<div id="mediaComposerOverlay" class="media-composer-overlay">
+  <div class="media-composer-container">
+    <!-- Header -->
+    <div class="media-composer-header" id="mediaComposerHeader">
+      <button class="media-composer-close" id="mediaComposerClose">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+      <div class="media-composer-title">New Message</div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="media-composer-main" id="mediaComposerMain">
+      <!-- Preview Canvas -->
+      <div class="media-preview-container" id="mediaComposerPreview"></div>
+
+      <!-- Tool Rail -->
+      <div class="media-tools-rail" id="mediaComposerTools"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="media-composer-footer" id="mediaComposerFooter">
+      <!-- Thumbnail Strip -->
+      <div class="media-thumbnails" id="mediaComposerThumbnails"></div>
+
+      <!-- Caption Inputs -->
+      <div class="media-captions">
+        <div class="global-caption-container" id="mediaComposerGlobalCaption">
+          <textarea 
+            class="caption-input global-caption" 
+            placeholder="Add a caption for all media..."
+            rows="2"
+            maxlength="500"
+          ></textarea>
+        </div>
+        <div class="media-caption-container" id="mediaComposerMediaCaption" style="display: none;">
+          <textarea 
+            class="caption-input media-caption" 
+            placeholder="Add a caption for this media..."
+            rows="2"
+            maxlength="500"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Send Button -->
+      <button class="media-composer-send" id="mediaComposerSend">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+        Send
+      </button>
+    </div>
+  </div>
+</div>
+
 <script src="{% static 'js/encryption.js' %}"></script>
 <script type="module" src="{% static 'js/chat/bootstrap.js' %}?v=12"></script>
 
-<!-- Chat theme manager for per-conversation customization -->
-<script src="{% static 'js/chat_theme_manager.js' %}"></script>
+<!-- Chat theme handler for per-conversation customization -->
+<script src="{% static 'js/chat-theme-handler.js' %}"></script>
 
 <script>
   // Handle quick action chip clicks from renderer

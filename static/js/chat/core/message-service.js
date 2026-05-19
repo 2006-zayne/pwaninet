@@ -6,6 +6,7 @@
 
 import { store } from './store.js';
 import { webSocketManager } from './websocket.js';
+import { eventBus } from './event-bus.js';
 import { getCSRFToken } from '../shared/utils.js';
 import { EVENTS, MESSAGE_STATE, CONNECTION_STATE, isValidStateTransition } from '../shared/constants.js';
 import { messageSoundManager } from '../shared/message-sound.js';
@@ -33,8 +34,129 @@ export class MessageService {
             this.e2eEncryption = new E2EEncryption();
         }
 
+        // Setup optimistic messaging event listeners
+        this._setupOptimisticMessagingListeners();
+
         this._log('MESSAGE_SERVICE_INITIALIZED');
         this.initialized = true;
+    }
+
+    /**
+     * Setup optimistic messaging event listeners
+     */
+    _setupOptimisticMessagingListeners() {
+        // Handle optimistic message add (show temporary message while uploading)
+        eventBus.on(EVENTS.MESSAGE_OPTIMISTIC_ADD, (message) => {
+            this._handleOptimisticAdd(message);
+        });
+
+        // Handle upload success (replace optimistic message with server message)
+        eventBus.on(EVENTS.MESSAGE_UPLOAD_SUCCESS, (data) => {
+            this._handleUploadSuccess(data);
+        });
+
+        // Handle upload failure (mark optimistic message as failed)
+        eventBus.on(EVENTS.MESSAGE_UPLOAD_FAILED, (data) => {
+            this._handleUploadFailure(data);
+        });
+    }
+
+    /**
+     * Handle optimistic message add
+     * @param {Object} message - Optimistic message
+     */
+    _handleOptimisticAdd(message) {
+        console.log('[MESSAGE_SERVICE] Handling optimistic message add');
+        console.log('[MESSAGE_SERVICE] [DEBUG] FULL INPUT MESSAGE:', JSON.stringify(message, null, 2));
+        console.log('[MESSAGE_SERVICE] [DEBUG] INPUT ATTACHMENTS (top-level):', message.attachments);
+        console.log('[MESSAGE_SERVICE] [DEBUG] INPUT METADATA:', message.metadata);
+        console.log('[MESSAGE_SERVICE] [DEBUG] INPUT METADATA ATTACHMENTS:', message.metadata?.attachments);
+        
+        const state = store.getState();
+        console.log('[MESSAGE_SERVICE] Current state:', state);
+        
+        if (!state.conversationId) {
+            console.error('[MESSAGE_SERVICE] No conversation ID in state');
+            return;
+        }
+        
+        if (!state.currentUserId) {
+            console.error('[MESSAGE_SERVICE] No current user ID in state');
+            return;
+        }
+        
+        const canonicalMessage = this._createCanonicalMessage({
+            id: message.temp_id,
+            conversationId: state.conversationId,
+            senderId: state.currentUserId,
+            timestamp: message.created_at,
+            status: MESSAGE_STATE.UPLOADING,
+            content: message.content || '',
+            type: message.message_type || message.type || 'media_group',
+            metadata: {
+                attachments: message.attachments,
+                global_caption: message.global_caption
+            },
+            isOptimistic: true,
+            sortOrder: Date.now()
+        });
+
+        console.log('[MESSAGE_SERVICE] [DEBUG] CANONICAL MESSAGE CREATED:', JSON.stringify(canonicalMessage, null, 2));
+        console.log('[MESSAGE_SERVICE] [DEBUG] CANONICAL ATTACHMENTS (top-level):', canonicalMessage.attachments);
+        console.log('[MESSAGE_SERVICE] [DEBUG] CANONICAL METADATA:', canonicalMessage.metadata);
+        console.log('[MESSAGE_SERVICE] [DEBUG] CANONICAL METADATA ATTACHMENTS:', canonicalMessage.metadata?.attachments);
+        console.log('[MESSAGE_SERVICE] Adding canonical message to store');
+        store.addMessage(canonicalMessage);
+    }
+
+    /**
+     * Handle upload success
+     * @param {Object} data - Upload success data with tempId and serverMessage
+     */
+    _handleUploadSuccess(data) {
+        console.log('[MESSAGE_SERVICE] Handling upload success:', data);
+        
+        const { tempId, serverMessage } = data;
+        
+        if (!tempId) {
+            console.error('[MESSAGE_SERVICE] No tempId in upload success data');
+            return;
+        }
+        
+        if (!serverMessage) {
+            console.error('[MESSAGE_SERVICE] No serverMessage in upload success data');
+            return;
+        }
+        
+        // Remove optimistic message
+        console.log('[MESSAGE_SERVICE] Removing optimistic message:', tempId);
+        store.removeMessage(tempId);
+        
+        // Add server message
+        console.log('[MESSAGE_SERVICE] Adding server message:', serverMessage);
+        const normalizedMessage = this.normalizeServerMessage(serverMessage);
+        store.addMessage(normalizedMessage);
+    }
+
+    /**
+     * Handle upload failure
+     * @param {Object} data - Upload failure data with tempId and error
+     */
+    _handleUploadFailure(data) {
+        console.log('[MESSAGE_SERVICE] Handling upload failure:', data);
+        
+        const { tempId, error } = data;
+        
+        if (!tempId) {
+            console.error('[MESSAGE_SERVICE] No tempId in upload failure data');
+            return;
+        }
+        
+        // Update optimistic message status to failed
+        console.log('[MESSAGE_SERVICE] Updating message status to failed:', tempId);
+        store.updateMessageStatus(tempId, MESSAGE_STATE.FAILED_UPLOAD, {
+            error: error
+        });
     }
 
     mapStatus(status) {
@@ -98,13 +220,25 @@ export class MessageService {
             metadata.link_type = raw.link_type;
         }
         
-        // Determine message type based on attachment or link
+        // Determine message type based on attachment, media_group, or link
         let messageType = this.mapType(raw.message_type || raw.type);
-        if (raw.attachment_type) {
+        if (raw.message_type === 'media_group') {
+            messageType = 'media_group';
+        } else if (raw.attachment_type) {
             messageType = 'media';
         } else if (raw.link_url) {
             console.log('[MESSAGE_SERVICE] Setting message type to link');
             messageType = 'link';
+        }
+        
+        // Add attachments to metadata if present
+        if (raw.attachments && Array.isArray(raw.attachments)) {
+            metadata.attachments = raw.attachments;
+        }
+        
+        // Add global caption to metadata if present
+        if (raw.global_caption) {
+            metadata.global_caption = raw.global_caption;
         }
         
         return this._createCanonicalMessage({

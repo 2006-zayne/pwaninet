@@ -1,8 +1,45 @@
 from rest_framework import serializers
 from django.core.validators import FileExtensionValidator
 import os
-from .models import Conversation, ConversationMember, Message, MessageReaction, ConversationTheme
+from .models import Conversation, ConversationMember, Message, MessageAttachment, MessageReaction, ConversationTheme, LinkPreview
 from users.serializers import UserSerializer
+
+
+class LinkPreviewSerializer(serializers.ModelSerializer):
+    """Serializer for link previews."""
+    image_url = serializers.SerializerMethodField()
+    favicon_url = serializers.SerializerMethodField()
+    has_thumbnail = serializers.SerializerMethodField()
+    has_favicon = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LinkPreview
+        fields = [
+            'id', 'url', 'title', 'description', 'site_name', 'domain',
+            'image_url', 'favicon_url', 'has_thumbnail', 'has_favicon',
+            'cached_at', 'created_at', 'fetch_failed'
+        ]
+        read_only_fields = ['id', 'cached_at', 'created_at', 'fetch_failed']
+
+    def get_image_url(self, obj):
+        """Get the URL of the cached image."""
+        if obj.image:
+            return obj.image.url
+        return None
+
+    def get_favicon_url(self, obj):
+        """Get the URL of the cached favicon."""
+        if obj.favicon:
+            return obj.favicon.url
+        return None
+
+    def get_has_thumbnail(self, obj):
+        """Check if preview has a thumbnail."""
+        return obj.has_thumbnail()
+
+    def get_has_favicon(self, obj):
+        """Check if preview has a favicon."""
+        return obj.has_favicon()
 
 
 class MessageReactionSerializer(serializers.ModelSerializer):
@@ -15,6 +52,25 @@ class MessageReactionSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
 
+class MessageAttachmentSerializer(serializers.ModelSerializer):
+    """Serializer for message attachments."""
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MessageAttachment
+        fields = [
+            'id', 'file', 'file_url', 'file_type', 'caption', 'order',
+            'size', 'width', 'height', 'duration', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+    def get_file_url(self, obj):
+        """Get the URL of the attachment file."""
+        if obj.file:
+            return obj.file.url
+        return None
+
+
 class MessageSerializer(serializers.ModelSerializer):
     """Serializer for messages."""
     sender = UserSerializer(read_only=True)
@@ -22,6 +78,8 @@ class MessageSerializer(serializers.ModelSerializer):
     reply_to_details = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
     read_status = serializers.SerializerMethodField()
+    attachments = MessageAttachmentSerializer(many=True, read_only=True)
+    link_preview = LinkPreviewSerializer(read_only=True)
 
     class Meta:
         model = Message
@@ -29,7 +87,8 @@ class MessageSerializer(serializers.ModelSerializer):
             'id', 'conversation', 'sender', 'content', 'encrypted_content', 'is_encrypted',
             'attachment', 'attachment_type', 'reply_to', 'reactions',
             'reply_to_details', 'attachment_url', 'read_status', 'status', 'created_at', 'edited_at', 'is_deleted',
-            'link_url', 'link_title', 'link_description', 'link_image', 'link_type'
+            'link_url', 'link_title', 'link_description', 'link_image', 'link_type',
+            'global_caption', 'message_type', 'attachments', 'link_preview'
         ]
         read_only_fields = ['id', 'created_at', 'edited_at', 'is_encrypted', 'status']
 
@@ -40,7 +99,7 @@ class MessageSerializer(serializers.ModelSerializer):
         return None
 
     def get_attachment_url(self, obj):
-        """Get the URL of the attachment."""
+        """Get the URL of the attachment (legacy single attachment)."""
         if obj.attachment:
             return obj.attachment.url
         return None
@@ -161,7 +220,15 @@ class MessageCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = ['conversation', 'content', 'encrypted_content', 'is_encrypted', 'reply_to', 'attachment', 'attachment_type',
-                  'link_url', 'link_title', 'link_description', 'link_image', 'link_type']
+                  'link_url', 'link_title', 'link_description', 'link_image', 'link_type',
+                  'global_caption', 'message_type']
+
+
+class MessageAttachmentCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating message attachments."""
+    class Meta:
+        model = MessageAttachment
+        fields = ['file', 'file_type', 'caption', 'order', 'size', 'width', 'height', 'duration']
 
 
 class MessageUpdateSerializer(serializers.ModelSerializer):

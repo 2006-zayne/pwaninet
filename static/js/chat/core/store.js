@@ -159,6 +159,12 @@ export class Store {
      * @param {Object} message - Message object
      */
     addMessage(message) {
+        console.log('[STORE] [DEBUG] ADD MESSAGE called');
+        console.log('[STORE] [DEBUG] FULL INPUT MESSAGE:', JSON.stringify(message, null, 2));
+        console.log('[STORE] [DEBUG] INPUT ATTACHMENTS (top-level):', message.attachments);
+        console.log('[STORE] [DEBUG] INPUT METADATA:', message.metadata);
+        console.log('[STORE] [DEBUG] INPUT METADATA ATTACHMENTS:', message.metadata?.attachments);
+        
         this._logMutation('ADD_MESSAGE', message);
 
         // Validate against canonical schema
@@ -167,6 +173,11 @@ export class Store {
             console.error('Store: Invalid message rejected - violates canonical schema', message);
             return;
         }
+
+        console.log('[STORE] [DEBUG] VALIDATED MESSAGE:', JSON.stringify(validatedMessage, null, 2));
+        console.log('[STORE] [DEBUG] VALIDATED ATTACHMENTS (top-level):', validatedMessage.attachments);
+        console.log('[STORE] [DEBUG] VALIDATED METADATA:', validatedMessage.metadata);
+        console.log('[STORE] [DEBUG] VALIDATED METADATA ATTACHMENTS:', validatedMessage.metadata?.attachments);
 
         // Check for duplicates
         if (this._state.processedMessageIds.has(validatedMessage.id)) {
@@ -290,6 +301,43 @@ export class Store {
     }
 
     /**
+     * Update message status
+     * @param {string} messageId - Message ID
+     * @param {string} status - New status
+     * @param {Object} metadata - Optional metadata to update
+     */
+    updateMessageStatus(messageId, status, metadata = {}) {
+        console.log('[STORE] Updating message status:', messageId, 'to:', status);
+        this._logMutation('UPDATE_MESSAGE_STATUS', { messageId, status, metadata });
+
+        const existingMessage = this._state.messages.get(messageId);
+        if (!existingMessage) {
+            console.error('Store: Message not found for status update', messageId);
+            return;
+        }
+
+        // Update message with new status
+        const updatedMessage = {
+            ...existingMessage,
+            status: status,
+            metadata: {
+                ...existingMessage.metadata,
+                ...metadata
+            }
+        };
+
+        // Validate and store
+        const validatedMessage = this._validateCanonicalMessage(updatedMessage);
+        if (!validatedMessage) {
+            console.error('Store: Invalid message status update - violates canonical schema', updatedMessage);
+            return;
+        }
+
+        this._state.messages.set(messageId, validatedMessage);
+        this._notifySubscribers();
+    }
+
+    /**
      * Set typing indicator
      * @param {number} userId - User ID
      * @param {string} username - Username
@@ -387,7 +435,7 @@ export class Store {
 
         // Type validation
         const validStates = Object.values(MESSAGE_STATE);
-        const validTypes = ['text', 'media', 'system', 'emoji', 'link'];
+        const validTypes = ['text', 'media', 'system', 'emoji', 'link', 'media_group'];
         
         const validation = {
             id: typeof message.id === 'string',

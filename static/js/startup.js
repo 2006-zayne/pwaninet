@@ -47,8 +47,7 @@ class PwaniNetStartup {
             
             // Check navigation types that indicate fresh launch
             const isFreshNavigation = navigationType === 'navigate' || 
-                                   navigationType === 'reload' ||
-                                   navigationType === 'back_forward';
+                                   navigationType === 'reload';
             
             // Check if we have a session storage flag for this session
             const sessionStarted = sessionStorage.getItem('pwaninet_session_started');
@@ -59,10 +58,11 @@ class PwaniNetStartup {
             const hasValidReferrer = referrer && !referrer.includes(window.location.hostname);
             
             // Consider it fresh if:
-            // 1. It's a fresh navigation AND no session flag
+            // 1. It's a fresh navigation (navigate or reload)
             // 2. It's a PWA standalone launch
             // 3. It has an external referrer (coming from outside)
-            const isFresh = (isFreshNavigation && !sessionStarted) || 
+            // NOTE: Always show splash on PWA launch regardless of session flag
+            const isFresh = isFreshNavigation || 
                            isPWAStandalone || 
                            hasValidReferrer;
             
@@ -256,7 +256,7 @@ class PwaniNetStartup {
         
         if ('serviceWorker' in navigator) {
             try {
-                const registration = await navigator.serviceWorker.register('/static/service-worker.js');
+                const registration = await navigator.serviceWorker.register('/service-worker.js');
                 console.log('✅ Service worker registered:', registration.scope);
                 
                 // Wait for service worker to be active
@@ -498,85 +498,6 @@ if (document.readyState === 'loading') {
 } else {
     // Already loaded
     window.pwaninetStartup = new PwaniNetStartup();
-}
-
-    isFreshLaunch() {
-        // Check if this is a fresh PWA launch vs page refresh
-        const navigationEntries = performance.getEntriesByType('navigation');
-        
-        if (navigationEntries.length > 0) {
-            const navigationType = navigationEntries[0].type;
-            
-            // Check navigation types that indicate fresh launch
-            const isFreshNavigation = navigationType === 'navigate' || 
-                                   navigationType === 'reload' ||
-                                   navigationType === 'back_forward';
-            
-            // Check if we have a session storage flag for this session
-            const sessionStarted = sessionStorage.getItem('pwaninet_session_started');
-            
-            // Additional checks for PWA launch
-            const isPWAStandalone = window.matchMedia('(display-mode: standalone)').matches;
-            const referrer = document.referrer;
-            const hasValidReferrer = referrer && !referrer.includes(window.location.hostname);
-            
-            // Consider it fresh if:
-            // 1. It's a fresh navigation AND no session flag
-            // 2. It's a PWA standalone launch
-            // 3. It has an external referrer (coming from outside)
-            const isFresh = (isFreshNavigation && !sessionStarted) || 
-                           isPWAStandalone || 
-                           hasValidReferrer;
-            
-            if (isFresh) {
-                // Set session flag
-                sessionStorage.setItem('pwaninet_session_started', 'true');
-                console.log('🚀 Fresh launch detected:', {
-                    navigationType,
-                    isPWAStandalone,
-                    hasValidReferrer,
-                    sessionStarted
-                });
-            } else {
-                console.log('🔄 Refresh detected:', {
-                    navigationType,
-                    isPWAStandalone,
-                    hasValidReferrer,
-                    sessionStarted
-                });
-            }
-            
-            return isFresh;
-        }
-        
-        // Fallback: assume fresh if we can't determine
-        return !sessionStorage.getItem('pwaninet_session_started');
-    }
-
-    showMainApp() {
-        console.log('⚡ Showing main app immediately (refresh mode)');
-        
-        // Hide splash if it exists
-        if (this.splashElement) {
-            this.splashElement.style.display = 'none';
-        }
-        
-        // Show main app immediately
-        const appElement = document.getElementById('app');
-        if (appElement) {
-            appElement.style.opacity = '1';
-            appElement.style.pointerEvents = 'auto';
-            appElement.classList.add('show');
-        }
-        
-        // Set session flag
-        sessionStorage.setItem('pwaninet_session_started', 'true');
-        
-        // Dispatch ready event
-        window.dispatchEvent(new CustomEvent('pwaninet:ready', {
-            detail: { startupTime: 0, isRefresh: true }
-        }));
-    }
 }
 
 // Handle online/offline events

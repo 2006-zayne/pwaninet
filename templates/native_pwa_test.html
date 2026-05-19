@@ -267,7 +267,7 @@ function checkManifestValid() {
     
     // Basic validation
     const manifestUrl = manifestLink.href;
-    return manifestUrl.includes('manifest.json') ? 'Valid' : 'Invalid';
+    return manifestUrl.includes('manifest.webmanifest') ? 'Valid' : 'Invalid';
 }
 
 function updateRequirementsTable(status) {

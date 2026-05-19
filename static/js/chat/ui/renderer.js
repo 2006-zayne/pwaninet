@@ -6,6 +6,7 @@
 
 import { formatDateLabel, formatTime, formatPreciseTime, escapeHtml } from '../shared/utils.js';
 import { renderMessageStatus } from '../shared/message-status-renderer.js';
+import { linkPreviewRenderer } from '../features/link-preview/link-preview-renderer.js';
 
 export class MessageRenderer {
     constructor() {
@@ -361,6 +362,10 @@ export class MessageRenderer {
         return this._createMediaMessage(message);
         }
 
+        if (message.type === 'media_group') {
+        return this._createMediaGroupMessage(message);
+        }
+
         if (message.type === 'link') {
         console.log('[RENDERER] Creating link message for:', message.id);
         return this._createLinkMessage(message);
@@ -413,6 +418,16 @@ export class MessageRenderer {
         messageDiv.innerHTML = `
             <p class="message-content">${escapeHtml(message.content || '')}</p>
         `;
+
+        // Render link preview if available
+        if (message.link_preview && message.link_preview.url) {
+            console.log("[LINK_PREVIEW] Rendering preview for message:", message.id);
+            const previewCard = linkPreviewRenderer.render(message.link_preview);
+            if (previewCard) {
+                messageDiv.appendChild(previewCard);
+                messageDiv.classList.add('link-message');
+            }
+        }
 
         contentWrapper.appendChild(messageDiv);
 
@@ -598,11 +613,382 @@ export class MessageRenderer {
     }
 
     /**
-     * Create media message element (pure DOM creation)
+     * Render single media bubble (Telegram-style)
+     * Media itself becomes the bubble - NOT reusing text bubbles
      * @param {Object} message - Media message object
-     * @returns {HTMLElement} Media message element
+     * @returns {HTMLElement} Single media bubble element
      */
-    _createMediaMessage(message) {
+    renderSingleMediaBubble(message) {
+        console.log('[MEDIA_BUBBLE] Rendering single media bubble for:', message.id);
+
+        const metadata = message.metadata || {};
+        const attachmentType = metadata.type || 'image';
+        const mediaUrl = metadata.url || '';
+        const caption = message.content || '';
+
+        const bubble = document.createElement('div');
+        bubble.className = `media-bubble single-media ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition}`;
+        bubble.setAttribute('data-message-id', message.id);
+        bubble.setAttribute('data-sender-id', message.senderId);
+        bubble.setAttribute('data-status', message.status);
+        bubble.setAttribute('data-group-position', message.groupPosition);
+
+        let mediaContent = '';
+
+        if (attachmentType === 'image' && mediaUrl) {
+            mediaContent = `<img src="${escapeHtml(mediaUrl)}" alt="Image" loading="lazy">`;
+        } else if (attachmentType === 'video' && mediaUrl) {
+            mediaContent = `
+                <div class="video-play-overlay">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5,3 19,12 5,21"></polygon>
+                    </svg>
+                </div>
+                <video src="${escapeHtml(mediaUrl)}" muted preload="metadata"></video>
+            `;
+        }
+
+        bubble.innerHTML = mediaContent;
+
+        // Add caption if present (inside the bubble)
+        if (caption && caption.trim()) {
+            console.log('[MEDIA_CAPTION] Rendering caption:', caption);
+            const captionDiv = document.createElement('div');
+            captionDiv.className = 'media-caption';
+            captionDiv.textContent = caption;
+            bubble.appendChild(captionDiv);
+        }
+
+        // Add click handler for fullscreen viewer
+        bubble.addEventListener('click', () => {
+            console.log('[MEDIA_VIEWER] Opening attachment:', message.id);
+            this.renderFullscreenMediaViewer([{
+                id: message.id,
+                type: attachmentType,
+                url: mediaUrl,
+                caption: caption
+            }], 0);
+        });
+
+        console.log('[MEDIA_BUBBLE] Single media bubble created');
+        return bubble;
+    }
+
+    /**
+     * Render media group bubble (Telegram-style)
+     * Dedicated media group bubble - NOT reusing text bubbles
+     * @param {Object} message - Media group message object
+     * @returns {HTMLElement} Media group bubble element
+     */
+    renderMediaGroupBubble(message) {
+        console.log('[MEDIA_GROUP] Rendering media group bubble for:', message.id);
+        console.log('[MEDIA_GROUP] Layout selection based on attachment count');
+
+        const attachments = message.attachments || message.metadata?.attachments || [];
+        const globalCaption = message.global_caption || message.metadata?.global_caption || '';
+        const attachmentCount = attachments.length;
+
+        console.log('[MEDIA_GROUP] Attachment count:', attachmentCount);
+        console.log('[MEDIA_GROUP] Layout selected:', this._getTelegramLayoutClass(attachmentCount));
+
+        const bubble = document.createElement('div');
+        bubble.className = `media-bubble media-group ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition}`;
+        bubble.setAttribute('data-message-id', message.id);
+        bubble.setAttribute('data-sender-id', message.senderId);
+        bubble.setAttribute('data-status', message.status);
+        bubble.setAttribute('data-group-position', message.groupPosition);
+
+        // Create media content grid
+        const contentDiv = document.createElement('div');
+        contentDiv.className = `media-content ${this._getTelegramLayoutClass(attachmentCount)}`;
+
+        // Determine visible attachments (max 4 for chat view)
+        const visibleLimit = 4;
+        const visibleAttachments = attachments.slice(0, visibleLimit);
+        const hiddenCount = attachmentCount - visibleLimit;
+
+        console.log('[MEDIA_GROUP] Visible attachments:', visibleAttachments.length);
+        console.log('[MEDIA_GROUP] Remaining count:', hiddenCount);
+
+        // Render each media tile
+        visibleAttachments.forEach((attachment, index) => {
+            const tile = this._renderMediaTile(attachment, index, attachmentCount, hiddenCount);
+            contentDiv.appendChild(tile);
+        });
+
+        bubble.appendChild(contentDiv);
+
+        // Add global caption if present (inside the bubble)
+        if (globalCaption && globalCaption.trim()) {
+            console.log('[MEDIA_CAPTION] Rendering global caption:', globalCaption);
+            const captionDiv = document.createElement('div');
+            captionDiv.className = 'media-caption';
+            captionDiv.textContent = globalCaption;
+            bubble.appendChild(captionDiv);
+        }
+
+        // Add click handler for fullscreen viewer
+        bubble.addEventListener('click', () => {
+            console.log('[MEDIA_VIEWER] Opening media group:', message.id);
+            this.renderFullscreenMediaViewer(attachments, 0);
+        });
+
+        console.log('[MEDIA_GROUP] Media group bubble created');
+        return bubble;
+    }
+
+    /**
+     * Render media tile for group
+     * @param {Object} attachment - Attachment object
+     * @param {number} index - Attachment index
+     * @param {number} total - Total attachments
+     * @param {number} hiddenCount - Number of hidden attachments
+     * @returns {HTMLElement} Media tile element
+     */
+    _renderMediaTile(attachment, index, total, hiddenCount) {
+        console.log('[MEDIA_TILE] Rendering tile', index, 'of', total);
+
+        const tile = document.createElement('div');
+        tile.className = 'media-tile';
+
+        const fileType = attachment.file_type || 'image';
+        const fileUrl = attachment.file_url || '';
+        const caption = attachment.caption || '';
+
+        // Add video class if applicable
+        if (fileType === 'video') {
+            tile.classList.add('video-tile');
+        }
+
+        let tileContent = '';
+
+        switch (fileType) {
+            case 'image':
+                tileContent = `<img src="${escapeHtml(fileUrl)}" alt="Image" loading="lazy">`;
+                break;
+            case 'video':
+                tileContent = `
+                    <div class="tile-play-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5,3 19,12 5,21"></polygon>
+                        </svg>
+                    </div>
+                    <video src="${escapeHtml(fileUrl)}" muted preload="metadata"></video>
+                `;
+                break;
+            default:
+                tileContent = `<div class="tile-placeholder">${fileType.toUpperCase()}</div>`;
+        }
+
+        tile.innerHTML = tileContent;
+
+        // Add overlay count for last visible tile if there are hidden items
+        if (hiddenCount > 0 && index === 3) {
+            console.log('[MEDIA_OVERLAY] Adding overlay count:', hiddenCount);
+            const overlay = document.createElement('div');
+            overlay.className = 'media-overlay';
+            overlay.textContent = `+${hiddenCount}`;
+            tile.appendChild(overlay);
+        }
+
+        return tile;
+    }
+
+    /**
+     * Get Telegram-style layout class based on attachment count
+     * @param {number} count - Number of attachments
+     * @returns {string} Layout class
+     */
+    _getTelegramLayoutClass(count) {
+        if (count === 1) return 'media-group--1';
+        if (count === 2) return 'media-group--2';
+        if (count === 3) return 'media-group--3';
+        if (count === 4) return 'media-group--4';
+        return 'media-group--many';
+    }
+
+    /**
+     * Render fullscreen immersive media viewer
+     * @param {Array} attachments - Array of attachment objects
+     * @param {number} startIndex - Index of attachment to show first
+     */
+    renderFullscreenMediaViewer(attachments, startIndex = 0) {
+        console.log('[MEDIA_VIEWER] Opening fullscreen viewer');
+        console.log('[MEDIA_VIEWER] Total attachments:', attachments.length);
+        console.log('[MEDIA_VIEWER] Starting at index:', startIndex);
+
+        // Remove existing viewer if present
+        const existingViewer = document.querySelector('.media-viewer-overlay');
+        if (existingViewer) {
+            existingViewer.remove();
+        }
+
+        // Create viewer overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'media-viewer-overlay';
+
+        // Create viewer container
+        const container = document.createElement('div');
+        container.className = 'media-viewer-container';
+
+        // Create header with close button
+        const header = document.createElement('div');
+        header.className = 'media-viewer-header';
+
+        const closeButton = document.createElement('button');
+        closeButton.className = 'media-viewer-close';
+        closeButton.innerHTML = `
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        `;
+        closeButton.addEventListener('click', () => {
+            overlay.classList.remove('show');
+            setTimeout(() => overlay.remove(), 300);
+        });
+
+        header.appendChild(closeButton);
+
+        // Create main content area
+        const main = document.createElement('div');
+        main.className = 'media-viewer-main';
+
+        // Create navigation buttons
+        const prevButton = document.createElement('button');
+        prevButton.className = 'media-viewer-nav prev';
+        prevButton.innerHTML = `
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15,18 9,12 15,6"></polyline>
+            </svg>
+        `;
+
+        const nextButton = document.createElement('button');
+        nextButton.className = 'media-viewer-nav next';
+        nextButton.innerHTML = `
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9,18 15,12 9,6"></polyline>
+            </svg>
+        `;
+
+        // Create content element
+        const content = document.createElement('div');
+        content.className = 'media-viewer-content';
+
+        // Create footer with counter and caption
+        const footer = document.createElement('div');
+        footer.className = 'media-viewer-footer';
+
+        const counter = document.createElement('div');
+        counter.className = 'media-viewer-counter';
+        counter.textContent = `${startIndex + 1} / ${attachments.length}`;
+
+        const caption = document.createElement('div');
+        caption.className = 'media-viewer-caption';
+        caption.textContent = attachments[startIndex]?.caption || '';
+
+        footer.appendChild(counter);
+        footer.appendChild(caption);
+
+        // Assemble viewer
+        main.appendChild(prevButton);
+        main.appendChild(content);
+        main.appendChild(nextButton);
+        container.appendChild(header);
+        container.appendChild(main);
+        container.appendChild(footer);
+        overlay.appendChild(container);
+
+        // Add to DOM
+        document.body.appendChild(overlay);
+
+        // Trigger animation
+        requestAnimationFrame(() => {
+            overlay.classList.add('show');
+        });
+
+        // Current index state
+        let currentIndex = startIndex;
+
+        // Function to render current attachment
+        const renderAttachment = (index) => {
+            console.log('[MEDIA_VIEWER] Rendering attachment at index:', index);
+            const attachment = attachments[index];
+            if (!attachment) return;
+
+            const fileType = attachment.file_type || attachment.type || 'image';
+            const fileUrl = attachment.file_url || attachment.url || '';
+
+            if (fileType === 'video') {
+                content.innerHTML = `
+                    <video class="media-viewer-video" controls autoplay>
+                        <source src="${escapeHtml(fileUrl)}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                `;
+            } else {
+                content.innerHTML = `<img src="${escapeHtml(fileUrl)}" alt="Media" class="media-viewer-content">`;
+            }
+
+            // Update counter and caption
+            counter.textContent = `${index + 1} / ${attachments.length}`;
+            caption.textContent = attachment.caption || '';
+
+            // Update navigation buttons visibility
+            prevButton.style.display = index > 0 ? 'flex' : 'none';
+            nextButton.style.display = index < attachments.length - 1 ? 'flex' : 'none';
+        };
+
+        // Navigation handlers
+        prevButton.addEventListener('click', () => {
+            if (currentIndex > 0) {
+                currentIndex--;
+                renderAttachment(currentIndex);
+            }
+        });
+
+        nextButton.addEventListener('click', () => {
+            if (currentIndex < attachments.length - 1) {
+                currentIndex++;
+                renderAttachment(currentIndex);
+            }
+        });
+
+        // Keyboard navigation
+        const handleKeydown = (e) => {
+            if (e.key === 'Escape') {
+                overlay.classList.remove('show');
+                setTimeout(() => overlay.remove(), 300);
+                document.removeEventListener('keydown', handleKeydown);
+            } else if (e.key === 'ArrowLeft' && currentIndex > 0) {
+                currentIndex--;
+                renderAttachment(currentIndex);
+            } else if (e.key === 'ArrowRight' && currentIndex < attachments.length - 1) {
+                currentIndex++;
+                renderAttachment(currentIndex);
+            }
+        };
+
+        document.addEventListener('keydown', handleKeydown);
+
+        // Initial render
+        renderAttachment(currentIndex);
+
+        console.log('[MEDIA_VIEWER] Fullscreen viewer opened successfully');
+    }
+
+    /**
+     * Create media group message element (pure DOM creation)
+     * @param {Object} message - Media group message object
+     * @returns {HTMLElement} Media group message element
+     */
+    _createMediaGroupMessage(message) {
+        console.log('[RENDERER] [MEDIA_GROUP] Creating media group message for:', message.id);
+        console.log('[RENDERER] [MEDIA_GROUP] [DEBUG] FULL MESSAGE:', JSON.stringify(message, null, 2));
+        console.log('[RENDERER] [MEDIA_GROUP] [DEBUG] ATTACHMENTS (top-level):', message.attachments);
+        console.log('[RENDERER] [MEDIA_GROUP] [DEBUG] METADATA:', message.metadata);
+        console.log('[RENDERER] [MEDIA_GROUP] [DEBUG] METADATA ATTACHMENTS:', message.metadata?.attachments);
+
         // Build wrapper containing avatar, bubble and meta (timestamp + read receipt)
         const wrapperDiv = document.createElement('div');
         wrapperDiv.className = `message-wrapper ${message.isOwn ? 'sent-wrapper' : 'received-wrapper'} group-${message.groupPosition}`;
@@ -616,7 +1002,7 @@ export class MessageRenderer {
             const shouldShowAvatar = message.groupPosition === 'single' || message.groupPosition === 'last';
             const avatarContainer = document.createElement('div');
             avatarContainer.className = `message-avatar-container ${shouldShowAvatar ? '' : 'hidden'}`;
-            
+
             if (shouldShowAvatar) {
                 const avatarUrl = this._getSenderAvatar(message.senderId);
                 const avatarImg = document.createElement('img');
@@ -625,7 +1011,98 @@ export class MessageRenderer {
                 avatarImg.alt = 'Avatar';
                 avatarContainer.appendChild(avatarImg);
             }
-            
+
+            wrapperDiv.appendChild(avatarContainer);
+        }
+
+        // Content wrapper for media grid and meta
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'message-content-wrapper';
+
+        // Use new Telegram-style media group bubble
+        const mediaBubble = this.renderMediaGroupBubble(message);
+        contentWrapper.appendChild(mediaBubble);
+
+        console.log('[RENDERER] [MEDIA_GROUP] Message bubble created with Telegram-style architecture');
+
+        // Determine whether to render meta (timestamp + receipt): single messages or last in group
+        const shouldRenderMeta = message.groupPosition === 'single' || message.groupPosition === 'last' || !!message.hasFloatingReadReceipt;
+        if (shouldRenderMeta) {
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'message-meta';
+
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'timestamp';
+            timeSpan.textContent = formatTime(message.timestamp);
+            metaDiv.appendChild(timeSpan);
+
+            // Read receipt / status to appear next to timestamp
+            if (message.isOwn) {
+                const status = message.status || 'sent';
+                if (message.status === 'read' && message.isLastRead) {
+                    const receiverAvatar = document.body.dataset.receiverAvatar;
+                    const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
+                    const receiptSpan = document.createElement('span');
+                    receiptSpan.className = 'message-read-receipt read-avatar-only';
+                    receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
+                    metaDiv.appendChild(receiptSpan);
+                } else if (message.isLastSent && !message.hideReadReceipt) {
+                    const receiptSpan = document.createElement('span');
+                    receiptSpan.className = `message-read-receipt status-${status}`;
+                    receiptSpan.innerHTML = this._getStatusIcon(status, message.id, message);
+                    metaDiv.appendChild(receiptSpan);
+                }
+            } else if (message.hasFloatingReadReceipt) {
+                const receiverAvatar = document.body.dataset.receiverAvatar;
+                const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
+                const receiptSpan = document.createElement('span');
+                receiptSpan.className = 'message-read-receipt floating-read-receipt';
+                receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
+                metaDiv.appendChild(receiptSpan);
+            }
+
+            contentWrapper.appendChild(metaDiv);
+        }
+
+        wrapperDiv.appendChild(contentWrapper);
+        return wrapperDiv;
+    }
+
+    /**
+     * Create media message element (pure DOM creation)
+     * @param {Object} message - Media message object
+     * @returns {HTMLElement} Media message element
+     */
+    _createMediaMessage(message) {
+        console.log('[RENDERER] [MEDIA] Creating media message for:', message.id);
+
+        const metadata = message.metadata || {};
+        const attachmentType = metadata.type || 'file';
+        const isImageOrVideo = attachmentType === 'image' || attachmentType === 'video';
+
+        // Build wrapper containing avatar, bubble and meta (timestamp + read receipt)
+        const wrapperDiv = document.createElement('div');
+        wrapperDiv.className = `message-wrapper ${message.isOwn ? 'sent-wrapper' : 'received-wrapper'} group-${message.groupPosition}`;
+        wrapperDiv.setAttribute('data-message-id', message.id);
+        wrapperDiv.setAttribute('data-sender-id', message.senderId);
+        wrapperDiv.setAttribute('data-status', message.status);
+        wrapperDiv.setAttribute('data-group-position', message.groupPosition);
+
+        // Add avatar for received messages (only on last/single in group)
+        if (!message.isOwn) {
+            const shouldShowAvatar = message.groupPosition === 'single' || message.groupPosition === 'last';
+            const avatarContainer = document.createElement('div');
+            avatarContainer.className = `message-avatar-container ${shouldShowAvatar ? '' : 'hidden'}`;
+
+            if (shouldShowAvatar) {
+                const avatarUrl = this._getSenderAvatar(message.senderId);
+                const avatarImg = document.createElement('img');
+                avatarImg.className = 'message-avatar';
+                avatarImg.src = avatarUrl;
+                avatarImg.alt = 'Avatar';
+                avatarContainer.appendChild(avatarImg);
+            }
+
             wrapperDiv.appendChild(avatarContainer);
         }
 
@@ -633,44 +1110,25 @@ export class MessageRenderer {
         const contentWrapper = document.createElement('div');
         contentWrapper.className = 'message-content-wrapper';
 
-        const metadata = message.metadata || {};
-        const attachmentType = metadata.type || 'file';
-        const isImageOrVideo = attachmentType === 'image' || attachmentType === 'video';
-        
-        // For images/videos, media itself is the bubble - no outer container
+        // For images/videos, use new Telegram-style single media bubble
         // For other types, use traditional bubble
-        let messageDiv;
-        let mediaContent = '';
-        
         if (isImageOrVideo && metadata.url) {
-            // Media acts as the bubble surface directly
-            messageDiv = document.createElement('div');
-            messageDiv.className = `media-bubble-wrapper ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition}`;
-            messageDiv.setAttribute('data-message-id', message.id);
-            messageDiv.setAttribute('data-sender-id', message.senderId);
-            messageDiv.setAttribute('data-status', message.status);
-            messageDiv.setAttribute('data-group-position', message.groupPosition);
-            
-            if (attachmentType === 'image') {
-                mediaContent = `<img src="${escapeHtml(metadata.url)}" alt="Image" class="media-image" loading="lazy">`;
-            } else {
-                mediaContent = `
-                    <video controls class="media-video">
-                        <source src="${escapeHtml(metadata.url)}" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>`;
-            }
-            messageDiv.innerHTML = mediaContent;
+            console.log('[RENDERER] [MEDIA] Using Telegram-style single media bubble');
+            const mediaBubble = this.renderSingleMediaBubble(message);
+            contentWrapper.appendChild(mediaBubble);
         } else {
+            console.log('[RENDERER] [MEDIA] Using traditional bubble for non-image/video');
             // Traditional bubble for audio, files, etc.
-            messageDiv = document.createElement('div');
+            const messageDiv = document.createElement('div');
             messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} media-message group-${message.groupPosition}`;
             messageDiv.setAttribute('data-message-id', message.id);
             messageDiv.setAttribute('data-sender-id', message.senderId);
             messageDiv.setAttribute('data-status', message.status);
             messageDiv.setAttribute('data-group-position', message.groupPosition);
             this._applyBubbleStyle(messageDiv);
-            
+
+            let mediaContent = '';
+
             if (metadata.url) {
                 switch (attachmentType) {
                     case 'audio':
@@ -698,18 +1156,8 @@ export class MessageRenderer {
             } else {
                 mediaContent = `<p class="message-content">${escapeHtml(message.content || '')}</p>`;
             }
-            
+
             messageDiv.innerHTML = mediaContent;
-        }
-        
-        // Add caption if present (for image/video)
-        if (isImageOrVideo && message.content && message.content.trim()) {
-            const captionDiv = document.createElement('div');
-            captionDiv.className = 'media-caption';
-            captionDiv.textContent = message.content;
-            contentWrapper.appendChild(messageDiv);
-            contentWrapper.appendChild(captionDiv);
-        } else {
             contentWrapper.appendChild(messageDiv);
         }
 

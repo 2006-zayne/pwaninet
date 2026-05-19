@@ -5,12 +5,12 @@
 
 /* Base transition for all status indicators */
 .check-circle {
-    transition: opacity 0.2s ease, transform 0.2s ease, background-color 0.3s ease;
+    transition: opacity 0.2s ease, transform 0.2s ease;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
 }
 
@@ -23,22 +23,32 @@
     opacity: 0.9;
 }
 
-/* Sent state - grey checkmark */
-.check-circle.grey {
+/* Sent state - grey circular check */
+.check-circle.sent {
     opacity: 0.8;
 }
 
-.check-circle.grey:hover {
+.check-circle.sent:hover {
     opacity: 1;
     transform: scale(1.05);
 }
 
-/* Delivered state - blue filled circle */
-.check-circle.blue {
+/* Delivered state - blue circular check */
+.check-circle.delivered {
     opacity: 0.9;
 }
 
-.check-circle.blue:hover {
+.check-circle.delivered:hover {
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+/* Failed state - red X circle */
+.check-circle.failed {
+    opacity: 0.9;
+}
+
+.check-circle.failed:hover {
     opacity: 1;
     transform: scale(1.05);
 }
@@ -140,8 +150,8 @@
 .message-read-receipt .check-circle,
 .message-read-receipt svg,
 .message-read-receipt img {
-    width: 18px;
-    height: 18px;
-    min-width: 18px;
-    min-height: 18px;
+    width: 14px;
+    height: 14px;
+    min-width: 14px;
+    min-height: 14px;
 }

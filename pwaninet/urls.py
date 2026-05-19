@@ -20,7 +20,36 @@ from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from django.views.generic import TemplateView
+from django.http import HttpResponse
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from notifications import views as notification_views
+
+# PWA Manifest - served as static file to bypass auth middleware
+@require_http_methods(["GET", "HEAD"])
+@csrf_exempt
+def serve_manifest(request):
+    import os
+    manifest_path = os.path.join(settings.BASE_DIR, 'static', 'manifest.webmanifest')
+    try:
+        with open(manifest_path, 'r') as f:
+            content = f.read()
+        return HttpResponse(content, content_type='application/manifest+json')
+    except FileNotFoundError:
+        return HttpResponse('Manifest not found', status=404)
+
+# Service Worker - served as static file to bypass auth middleware
+@require_http_methods(["GET", "HEAD"])
+@csrf_exempt
+def serve_service_worker(request):
+    import os
+    sw_path = os.path.join(settings.BASE_DIR, 'static', 'service-worker.js')
+    try:
+        with open(sw_path, 'r') as f:
+            content = f.read()
+        return HttpResponse(content, content_type='application/javascript')
+    except FileNotFoundError:
+        return HttpResponse('Service worker not found', status=404)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -29,8 +58,9 @@ urlpatterns = [
     # PWA Offline Page
     path('offline/', TemplateView.as_view(template_name='offline.html'), name='offline'),
     path('test/offline/', TemplateView.as_view(template_name='offline.html'), name='offline_test'),
-    # Service worker served from app root so it controls entire scope (important for offline/splash)
-    path('service-worker.js', TemplateView.as_view(template_name='service-worker.js', content_type='application/javascript'), name='service_worker'),
+    # PWA Manifest and Service Worker - served without auth middleware
+    path('manifest.webmanifest', serve_manifest, name='manifest'),
+    path('service-worker.js', serve_service_worker, name='service_worker'),
     # PWA Test Pages
     path('test/splash/', TemplateView.as_view(template_name='splash_test.html'), name='splash_test'),
     path('test/splash-debug/', TemplateView.as_view(template_name='splash_debug.html'), name='splash_debug'),

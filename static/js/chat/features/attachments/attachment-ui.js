@@ -9,6 +9,7 @@ import { attachmentService } from './attachment.service.js';
 import { cameraService } from '../camera/camera.service.js';
 import { voiceService } from '../voice/voice.service.js';
 import { voiceModalController } from '../voice/voice-modal-controller.js';
+import { mediaComposer } from '../composer/MediaComposer.js';
 
 export class AttachmentUI {
     constructor() {
@@ -36,6 +37,9 @@ export class AttachmentUI {
         
         // Initialize voice modal controller
         voiceModalController.init();
+        
+        // Initialize media composer
+        mediaComposer.init();
 
         this.initialized = true;
         console.log('[ATTACHMENT_UI] Attachment UI initialized');
@@ -49,7 +53,9 @@ export class AttachmentUI {
         this.overlay = document.getElementById('overlay');
         this.fileInput = document.getElementById('fileInput');
         this.cameraInput = document.getElementById('cameraInput');
-        // Voice modal is now handled by voiceModalController
+        this.voiceRecordingPreview = document.getElementById('voiceRecordingPreview');
+        this.inputArea = document.querySelector('.input-area');
+        this.messageInput = document.getElementById('messageInput');
     }
 
     /**
@@ -95,6 +101,7 @@ export class AttachmentUI {
 
         // File input change
         if (this.fileInput) {
+            this.fileInput.setAttribute('multiple', 'true');
             this.fileInput.addEventListener('change', (e) => {
                 this.handleFileSelection(e.target.files);
             });
@@ -105,6 +112,11 @@ export class AttachmentUI {
             this.cameraInput.addEventListener('change', (e) => {
                 this.handleFileSelection(e.target.files);
             });
+        }
+
+        // Drag and drop support for input area
+        if (this.inputArea) {
+            this._setupDragAndDrop();
         }
 
         // Voice recording actions are now handled by voiceModalController
@@ -203,8 +215,6 @@ export class AttachmentUI {
      */
     handleFileSelection(files) {
         if (files && files.length > 0) {
-            const file = files[0];
-            
             // Get conversation ID from the page
             const conversationId = this._getConversationId();
             if (!conversationId) {
@@ -212,14 +222,46 @@ export class AttachmentUI {
                 return;
             }
 
-            // Create form data and upload
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('conversation_id', conversationId);
-
-            // Upload through attachment service
-            attachmentService.handleFileUpload(file, conversationId);
+            // Open media composer with selected files
+            mediaComposer.open(files, conversationId);
         }
+    }
+
+    /**
+     * Setup drag and drop functionality
+     */
+    _setupDragAndDrop() {
+        const inputArea = this.inputArea;
+        
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            inputArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        // Highlight drop zone
+        ['dragenter', 'dragover'].forEach(eventName => {
+            inputArea.addEventListener(eventName, () => {
+                inputArea.classList.add('drag-over');
+            }, false);
+        });
+
+        // Remove highlight
+        ['dragleave', 'drop'].forEach(eventName => {
+            inputArea.addEventListener(eventName, () => {
+                inputArea.classList.remove('drag-over');
+            }, false);
+        });
+
+        // Handle dropped files
+        inputArea.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files && files.length > 0) {
+                this.handleFileSelection(files);
+            }
+        }, false);
     }
 
     /**

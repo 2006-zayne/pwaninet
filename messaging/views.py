@@ -15,7 +15,8 @@ from asgiref.sync import async_to_sync
 import requests
 from urllib.parse import urlparse
 import re
-from .models import Conversation, ConversationMember, Message, MessageReaction, ConversationTheme
+from .models import Conversation, ConversationMember, Message, MessageReaction, ConversationTheme, MessageAttachment
+from .services.link_preview_service import LinkPreviewService
 from .serializers import (
     ConversationSerializer,
     ConversationDetailSerializer,
@@ -205,6 +206,15 @@ class MessageViewSet(viewsets.ModelViewSet):
             serializer.validated_data['conversation'] = Conversation.objects.get(id=conversation_id)
         
         message = serializer.save(sender=self.request.user)
+        
+        # Generate link preview if message contains URLs
+        try:
+            LinkPreviewService.generate_preview_for_message(message)
+        except Exception as e:
+            # Log error but don't block message creation
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"[LINK_PREVIEW] Error generating preview: {str(e)}")
         
         # Update conversation timestamp
         message.conversation.save()
@@ -677,6 +687,122 @@ def attachment_upload(request):
             attachment_type=attachment_type,
             content=''  # Empty content for attachment-only messages
         )
+        
+        # Update conversation timestamp
+        conversation.save()
+        
+        # Broadcast message via WebSocket
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"chat_{conversation.id}",
+            {
+                'type': 'chat_message',
+                'message': MessageSerializer(message).data
+            }
+        )
+        
+        return Response(
+            MessageSerializer(message).data,
+            status=status.HTTP_201_CREATED
+        )
+        
+    except Exception as e:
+        return Response(
+            {'error': str(e), 'error_code': 'SERVER_ERROR'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def batch_attachment_upload(request):
+    """Handle batch file attachment uploads for media group messages."""
+    try:
+        from .serializers import MessageAttachmentCreateSerializer
+        import json
+        
+        conversation_id = request.data.get('conversation_id')
+        global_caption = request.data.get('global_caption', '')
+        attachments_data = request.data.get('attachments_data')
+        
+        if not conversation_id:
+            return Response(
+                {'error': 'conversation_id is required', 'error_code': 'NO_CONVERSATION_ID'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verify user is a member of the conversation
+        conversation = get_object_or_404(Conversation, id=conversation_id)
+        if not conversation.members.filter(user=request.user).exists():
+            return Response(
+                {'error': 'You are not a member of this conversation', 'error_code': 'NOT_MEMBER'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Parse attachments data if provided as JSON string
+        if attachments_data and isinstance(attachments_data, str):
+            try:
+                attachments_data = json.loads(attachments_data)
+            except json.JSONDecodeError:
+                return Response(
+                    {'error': 'Invalid attachments_data format', 'error_code': 'INVALID_DATA'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Get all uploaded files
+        files = request.FILES.getlist('files')
+        if not files:
+            return Response(
+                {'error': 'No files provided', 'error_code': 'NO_FILES'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate all files
+        validated_attachments = []
+        for idx, file in enumerate(files):
+            is_valid, error_code, error_message, attachment_type = FileUploadValidator.validate(file)
+            
+            if not is_valid:
+                return Response(
+                    {'error': f'File {idx + 1}: {error_message}', 'error_code': error_code},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get metadata for this attachment if provided
+            attachment_metadata = {}
+            if attachments_data and idx < len(attachments_data):
+                attachment_metadata = attachments_data[idx]
+            
+            validated_attachments.append({
+                'file': file,
+                'file_type': attachment_type,
+                'caption': attachment_metadata.get('caption', ''),
+                'order': attachment_metadata.get('order', idx),
+                'size': file.size
+            })
+        
+        # Create message with media_group type
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=request.user,
+            global_caption=global_caption,
+            message_type='media_group',
+            content=''  # Empty content for media group messages
+        )
+        
+        # Create all attachments
+        created_attachments = []
+        for attachment_data in validated_attachments:
+            attachment = MessageAttachment.objects.create(
+                message=message,
+                file=attachment_data['file'],
+                file_type=attachment_data['file_type'],
+                caption=attachment_data['caption'],
+                order=attachment_data['order'],
+                size=attachment_data['size']
+            )
+            created_attachments.append(attachment)
         
         # Update conversation timestamp
         conversation.save()

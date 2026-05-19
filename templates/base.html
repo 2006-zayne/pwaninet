@@ -7,7 +7,24 @@
     <title>PwaniNet</title>
     
     <!-- PWA Manifest -->
-    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <script>
+        // Debug manifest loading
+        fetch('/manifest.webmanifest')
+            .then(response => {
+                console.log('[PWA] Manifest fetch status:', response.status);
+                if (!response.ok) {
+                    console.error('[PWA] Manifest fetch failed:', response.status);
+                }
+                return response.json();
+            })
+            .then(manifest => {
+                console.log('[PWA] Manifest loaded successfully:', manifest);
+            })
+            .catch(error => {
+                console.error('[PWA] Manifest fetch error:', error);
+            });
+    </script>
     <meta name="theme-color" content="#2563eb">
 
     <!-- iOS PWA: enable standalone and provide startup images -->
@@ -788,6 +805,7 @@
                 padding-right: 0 !important;
             }
             .col-12, .col-lg-8, .col-md-5 {
+                padding: 8px !important;
                 max-width: 100% !important;
                 flex: 0 0 100% !important;
             }
@@ -1409,13 +1427,16 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
         console.log('[ServiceWorker] Attempting to register service worker...');
 
-        // Try the static path first
-        const swPath = '{% static "service-worker.js" %}';
-        console.log('[ServiceWorker] Service worker path:', swPath);
-
-        navigator.serviceWorker.register(swPath)
+        navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
             .then(function(registration) {
                 console.log('[ServiceWorker] Registration successful with scope: ', registration.scope);
+
+                // Check if service worker is controlling the page
+                if (navigator.serviceWorker.controller) {
+                    console.log('[ServiceWorker] Service worker is controlling the page');
+                } else {
+                    console.log('[ServiceWorker] Service worker is NOT controlling the page yet');
+                }
 
                 // Check for service worker updates
                 registration.addEventListener('updatefound', () => {
@@ -1436,26 +1457,28 @@ if ('serviceWorker' in navigator) {
 
             })
             .catch(function(error) {
-                console.error('[ServiceWorker] Registration failed with static path: ', error);
-                console.log('[ServiceWorker] Trying fallback path /static/service-worker.js');
-
-                // Fallback to direct static path
-                navigator.serviceWorker.register('/static/service-worker.js')
-                    .then(function(registration) {
-                        console.log('[ServiceWorker] Registration successful with fallback path, scope: ', registration.scope);
-                    })
-                    .catch(function(fallbackError) {
-                        console.error('[ServiceWorker] Fallback registration also failed: ', fallbackError);
-                        console.error('[ServiceWorker] Error details:', {
-                            message: fallbackError.message,
-                            name: fallbackError.name
-                        });
-                    });
+                console.error('[ServiceWorker] Registration failed: ', error);
             });
     });
 } else {
     console.log('[ServiceWorker] Service workers are not supported in this browser');
 }
+
+// Listen for beforeinstallprompt event
+window.addEventListener('beforeinstallprompt', (event) => {
+    console.log('[PWA] beforeinstallprompt event fired - install prompt is available');
+    // Prevent the default browser prompt
+    event.preventDefault();
+    // Store the event for later use
+    window.deferredPrompt = event;
+    // Show your custom install button here if needed
+});
+
+// Listen for appinstalled event
+window.addEventListener('appinstalled', (event) => {
+    console.log('[PWA] App was installed');
+    window.deferredPrompt = null;
+});
 
 
 // Handle offline/online events

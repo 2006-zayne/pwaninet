@@ -205,16 +205,80 @@ export class EmojiService {
    * Setup event listeners
    */
   setupEventListeners() {
-    // Listen for emoji picker toggle
     eventBus.on(EVENTS.EMOJI_PICKER_TOGGLE, () => {
-      // UI layer handles this
+      this.togglePicker();
     });
 
-    // Listen for emoji insertion requests
     eventBus.on(EVENTS.EMOJI_INSERT, (emoji) => {
-      // Emit to UI layer for insertion
-      eventBus.emit(EVENTS.EMOJI_INSERT, emoji);
+      this.insertEmoji(emoji);
     });
+  }
+
+  /**
+   * Render emojis to picker
+   */
+  renderEmojis() {
+    const emojiContent = document.getElementById('emojiContent');
+    if (!emojiContent) return;
+
+    emojiContent.innerHTML = '';
+    this.emojis.forEach(emoji => {
+      const el = document.createElement('div');
+      el.className = 'emoji-item';
+      el.textContent = emoji;
+      el.addEventListener('click', () => {
+        this.insertEmoji(emoji);
+        this.closePicker();
+      });
+      emojiContent.appendChild(el);
+    });
+  }
+
+  /**
+   * Insert emoji into input
+   */
+  insertEmoji(emoji) {
+    const input = document.getElementById('messageInput');
+    if (!input) return;
+
+    const pos = input.selectionStart;
+    const val = input.value;
+    input.value = val.slice(0, pos) + emoji + val.slice(pos);
+    input.setSelectionRange(pos + emoji.length, pos + emoji.length);
+    input.focus();
+  }
+
+  /**
+   * Open picker
+   */
+  openPicker() {
+    const picker = document.getElementById('emojiPicker');
+    const overlay = document.getElementById('overlay');
+    if (picker) picker.classList.add('show');
+    if (overlay) overlay.classList.add('show');
+    this.renderEmojis();
+  }
+
+  /**
+   * Close picker
+   */
+  closePicker() {
+    const picker = document.getElementById('emojiPicker');
+    const overlay = document.getElementById('overlay');
+    if (picker) picker.classList.remove('show');
+    if (overlay) overlay.classList.remove('show');
+  }
+
+  /**
+   * Toggle picker
+   */
+  togglePicker() {
+    const picker = document.getElementById('emojiPicker');
+    if (picker && picker.classList.contains('show')) {
+      this.closePicker();
+    } else {
+      this.openPicker();
+    }
   }
 
   /**
@@ -233,14 +297,6 @@ export class EmojiService {
   searchEmojis(query) {
     if (!query) return this.emojis;
     return this.emojis.filter(emoji => emoji.includes(query));
-  }
-
-  /**
-   * Insert emoji
-   * @param {string} emoji - Emoji to insert
-   */
-  insertEmoji(emoji) {
-    eventBus.emit(EVENTS.EMOJI_INSERT, emoji);
   }
 }
 

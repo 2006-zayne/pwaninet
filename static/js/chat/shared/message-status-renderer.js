@@ -143,35 +143,42 @@ export class MessageStatusRenderer {
     // === Private icon helpers ===
 
     static _getClockIcon() {
-        // WhatsApp-style clock icon: outlined circle with two clock hands
-        return `<svg class="check-circle pending" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Waiting">
+        // Thin circular clock icon - clean, minimal, open-feeling
+        return `<svg class="check-circle pending" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Queued">
             <circle cx="12" cy="12" r="10"></circle>
             <polyline points="12 6 12 12 16 14"></polyline>
         </svg>`;
     }
 
     static _getUploadingIcon() {
-        return '<span class="check-circle uploading" aria-label="Uploading"><span class="upload-icon">&#8683;</span></span>';
+        // Use same clock icon for uploading state
+        return this._getClockIcon();
     }
 
     static _getSingleCheckIcon(color) {
-        // Filled blue circle with white checkmark for delivered
-        // Hollow grey circle with grey checkmark for sent
+        // Clean circular check icon - stroke-based, not filled
         if (color === 'blue') {
-            return `<svg class="check-circle blue" width="18" height="18" viewBox="0 0 24 24" fill="#2196F3" aria-label="Delivered">
+            // Delivered: blue circular check
+            return `<svg class="check-circle delivered" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Delivered">
                 <circle cx="12" cy="12" r="10"></circle>
-                <path d="M9 12l2 2 4-4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"></path>
+                <path d="M9 12l2 2 4-4"></path>
             </svg>`;
         } else {
-            return `<svg class="check-circle grey" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9e9e9e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Sent">
+            // Sent: grey circular check
+            return `<svg class="check-circle sent" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Sent">
                 <circle cx="12" cy="12" r="10"></circle>
-                <path d="M9 12l2 2 4-4" stroke="#9e9e9e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"></path>
+                <path d="M9 12l2 2 4-4"></path>
             </svg>`;
         }
     }
 
     static _getErrorIcon(retryButton) {
-        return `<span class="check-circle error" aria-label="Failed">&#10007;</span>${retryButton}`;
+        // Red X inside red circle - clean, minimal
+        return `<svg class="check-circle failed" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Failed">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M15 9l-6 6"></path>
+            <path d="M9 9l6 6"></path>
+        </svg>${retryButton}`;
     }
 
     static _getSpinnerIcon() {

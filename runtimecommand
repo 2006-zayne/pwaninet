@@ -1,0 +1,8 @@
+# Terminal 1: Infrastructure Layer
+docker compose up -d db redis
+
+# Terminal 2: ASGI Server Layer
+./serve.sh
+
+# Terminal 3: Secure Global Uplink
+cloudflared tunnel run pwaninet-tunnel
