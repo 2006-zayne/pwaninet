@@ -752,24 +752,37 @@ export class UIController {
 
         // Check message count
         if (newState.messages.length !== lastState.messagesLength) {
+            console.log('[UI_CONTROLLER] State changed: message count', lastState.messagesLength, '->', newState.messages.length);
             return true;
         }
 
         // Check message statuses (for read receipts)
-        if (newState.messages.length > 0 && lastState.messagesChecksum) {
+        if (newState.messages.length > 0) {
             const newChecksum = this._computeMessagesChecksum(newState.messages);
-            if (newChecksum !== lastState.messagesChecksum) {
+            if (lastState.messagesChecksum && newChecksum !== lastState.messagesChecksum) {
+                console.log('[UI_CONTROLLER] State changed: message checksum', lastState.messagesChecksum, '->', newChecksum);
+                return true;
+            }
+            // If no previous checksum but we have messages now, state changed
+            if (!lastState.messagesChecksum && newState.messages.length > 0) {
+                console.log('[UI_CONTROLLER] State changed: new messages appeared');
                 return true;
             }
         }
 
-        return (
+        const changed = (
             newState.connectionState !== lastState.connectionState ||
             newState.typingUsers.size !== lastState.typingUsersSize ||
             newState.peerOnlineStatus.size !== lastState.peerOnlineStatusSize ||
             newState.uiState !== lastState.uiState ||
             JSON.stringify(newState.currentTheme) !== JSON.stringify(lastState.currentTheme)
         );
+
+        if (changed) {
+            console.log('[UI_CONTROLLER] State changed: other properties');
+        }
+
+        return changed;
     }
 
     /**

@@ -230,7 +230,7 @@ SPECTACULAR_SETTINGS = {
 
 # django-axes configuration for rate limiting
 AXES_FAILURE_LIMIT = 5
-AXES_COOLOFF_TIME = timedelta(minutes=30)
+AXES_COOLOFF_TIME = timedelta(minutes=5)
 AXES_LOCKOUT_TEMPLATE = 'axes/lockout.html'
 AXES_RESET_ON_SUCCESS = True
 # AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True  # Deprecated in django-axes 6.0

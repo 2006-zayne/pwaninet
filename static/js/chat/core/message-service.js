@@ -504,48 +504,71 @@ export class MessageService {
      * @param {Object} messageData - Message data
      */
     async _processChatMessage(messageData) {
+        console.group('[MESSAGE_SERVICE] ========== PROCESS CHAT MESSAGE ==========');
+        console.log('[MESSAGE_SERVICE] Message ID:', messageData.id);
+        console.log('[MESSAGE_SERVICE] Sender ID:', messageData.sender_id);
+        console.log('[MESSAGE_SERVICE] Content:', messageData.content);
         this._log('PROCESS_CHAT_MESSAGE', messageData);
 
-        // DEBUG: Check for link data
-        console.log('[MESSAGE_SERVICE] Processing message:', messageData.id, 'Link URL:', messageData.link_url, 'Link Type:', messageData.link_type);
+        try {
+            // Decrypt message if encrypted
+            let content = messageData.content;
 
-        // Decrypt message if encrypted
-        let content = messageData.content;
-
-        if (messageData.is_encrypted && this.e2eEncryption) {
-            try {
-                content = await this.e2eEncryption.decryptMessage(messageData.encrypted_content);
-                this._log('MESSAGE_DECRYPTED', { messageId: messageData.id });
-            } catch (error) {
-                this._log('DECRYPTION_FAILED', error);
-                console.error('MessageService: Failed to decrypt message:', error);
-                content = '[Encrypted message - unable to decrypt]';
+            if (messageData.is_encrypted && this.e2eEncryption) {
+                try {
+                    content = await this.e2eEncryption.decryptMessage(messageData.encrypted_content);
+                    this._log('MESSAGE_DECRYPTED', { messageId: messageData.id });
+                } catch (error) {
+                    this._log('DECRYPTION_FAILED', error);
+                    console.error('MessageService: Failed to decrypt message:', error);
+                    content = '[Encrypted message - unable to decrypt]';
+                }
             }
-        }
 
-        // Normalize to canonical schema
-        const canonicalMessage = this.normalizeServerMessage({
-            ...messageData,
-            content
-        });
+            // Normalize to canonical schema
+            const canonicalMessage = this.normalizeServerMessage({
+                ...messageData,
+                content
+            });
 
-        // DEBUG: Log canonical message type
-        console.log('[MESSAGE_SERVICE] Canonical message type:', canonicalMessage.type, 'Metadata:', canonicalMessage.metadata);
+            console.log('[MESSAGE_SERVICE] Canonical message type:', canonicalMessage.type, 'Metadata:', canonicalMessage.metadata);
 
-        // Send delivery acknowledgement if this is an incoming message (not from current user)
-        const state = store.getState();
-        if (canonicalMessage.senderId !== state.currentUserId) {
-            this._sendDeliveryAcknowledgement(canonicalMessage.id);
-        }
+            // === PRIMARY FLOW - MUST NEVER FAIL ===
+            // This is the critical path that must always succeed
+            const tempId = messageData.temp_id;
 
-        // Check if this is a confirmation of an optimistic message
+            if (tempId) {
+                console.log('[MESSAGE_SERVICE] Handling message confirmation for temp_id:', tempId);
+                this._handleMessageConfirmation(canonicalMessage, tempId);
+            } else {
+                console.log('[MESSAGE_SERVICE] Adding new message to store:', canonicalMessage.id);
+                store.addMessage(canonicalMessage);
+                console.log('[MESSAGE_SERVICE] Message added to store. Current message count:', store.getMessages().length);
+            }
 
-        const tempId = messageData.temp_id;
+            // Emit event for secondary operations (non-blocking)
+            eventBus.emit('message_received', canonicalMessage);
 
-        if (tempId) {
-            this._handleMessageConfirmation(canonicalMessage, tempId);
-        } else {
-            store.addMessage(canonicalMessage);
+            // === SECONDARY SIDE EFFECTS - NON-BLOCKING, FAULT-ISOLATED ===
+            // These operations run asynchronously and must never fail the primary flow
+            queueMicrotask(() => {
+                this._safeSendDeliveryAck(canonicalMessage);
+            });
+
+            queueMicrotask(() => {
+                this._safeTriggerNotifications(canonicalMessage);
+            });
+
+            queueMicrotask(() => {
+                this._safePlayMessageSound(canonicalMessage);
+            });
+
+        } catch (error) {
+            console.error('[MESSAGE_SERVICE] CRITICAL ERROR in primary message flow:', error);
+            console.error('[MESSAGE_SERVICE] Error stack:', error.stack);
+            // Even if primary flow fails, we must not crash the websocket pipeline
+        } finally {
+            console.groupEnd();
         }
     }
 
@@ -965,6 +988,61 @@ export class MessageService {
      */
     validateConsistency() {
         return store.validateMessageConsistency();
+    }
+
+    /**
+     * Safe wrapper for delivery acknowledgement
+     * @param {Object} message - Message object
+     */
+    _safeSendDeliveryAck(message) {
+        try {
+            const state = store.getState();
+            // Only send ACK for incoming messages (not from current user)
+            if (message.senderId !== state.currentUserId) {
+                // TODO: Implement actual delivery acknowledgement via WebSocket
+                console.log('[MESSAGE_SERVICE] Would send delivery acknowledgement for message:', message.id);
+            }
+        } catch (error) {
+            console.error('[MESSAGE_SERVICE] Delivery ACK failed:', error);
+            // Fail silently - never break primary flow
+        }
+    }
+
+    /**
+     * Safe wrapper for triggering notifications
+     * @param {Object} message - Message object
+     */
+    _safeTriggerNotifications(message) {
+        try {
+            const state = store.getState();
+            // Only trigger notifications for incoming messages (not from current user)
+            if (message.senderId !== state.currentUserId) {
+                // Emit notification event
+                eventBus.emit('notification_received', message);
+            }
+        } catch (error) {
+            console.error('[MESSAGE_SERVICE] Notification trigger failed:', error);
+            // Fail silently - never break primary flow
+        }
+    }
+
+    /**
+     * Safe wrapper for playing message sound
+     * @param {Object} message - Message object
+     */
+    _safePlayMessageSound(message) {
+        try {
+            const state = store.getState();
+            // Only play sound for incoming messages (not from current user)
+            if (message.senderId !== state.currentUserId) {
+                if (messageSoundManager && typeof messageSoundManager.playReceiveSound === 'function') {
+                    messageSoundManager.playReceiveSound(message.id);
+                }
+            }
+        } catch (error) {
+            console.error('[MESSAGE_SERVICE] Message sound playback failed:', error);
+            // Fail silently - never break primary flow
+        }
     }
 
     /**

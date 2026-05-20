@@ -159,28 +159,23 @@ export class Store {
      * @param {Object} message - Message object
      */
     addMessage(message) {
-        console.log('[STORE] [DEBUG] ADD MESSAGE called');
-        console.log('[STORE] [DEBUG] FULL INPUT MESSAGE:', JSON.stringify(message, null, 2));
-        console.log('[STORE] [DEBUG] INPUT ATTACHMENTS (top-level):', message.attachments);
-        console.log('[STORE] [DEBUG] INPUT METADATA:', message.metadata);
-        console.log('[STORE] [DEBUG] INPUT METADATA ATTACHMENTS:', message.metadata?.attachments);
-        
+        console.log('[STORE] ========== ADD MESSAGE ==========');
+        console.log('[STORE] Input message:', JSON.stringify(message, null, 2));
+        console.log('[STORE] Current message count before add:', this._state.messages.size);
+        console.log('[STORE] Processed IDs before add:', Array.from(this._state.processedMessageIds));
+
         this._logMutation('ADD_MESSAGE', message);
 
         // Validate against canonical schema
         const validatedMessage = this._validateCanonicalMessage(message);
         if (!validatedMessage) {
-            console.error('Store: Invalid message rejected - violates canonical schema', message);
+            console.error('[STORE] Invalid message rejected - violates canonical schema', message);
             return;
         }
 
-        console.log('[STORE] [DEBUG] VALIDATED MESSAGE:', JSON.stringify(validatedMessage, null, 2));
-        console.log('[STORE] [DEBUG] VALIDATED ATTACHMENTS (top-level):', validatedMessage.attachments);
-        console.log('[STORE] [DEBUG] VALIDATED METADATA:', validatedMessage.metadata);
-        console.log('[STORE] [DEBUG] VALIDATED METADATA ATTACHMENTS:', validatedMessage.metadata?.attachments);
-
         // Check for duplicates
         if (this._state.processedMessageIds.has(validatedMessage.id)) {
+            console.log('[STORE] Duplicate message ignored:', validatedMessage.id);
             this._logMutation('DUPLICATE_MESSAGE_IGNORED', validatedMessage.id);
             return;
         }
@@ -191,10 +186,15 @@ export class Store {
         // Store message (immutable)
         this._state.messages.set(validatedMessage.id, validatedMessage);
 
+        console.log('[STORE] Message stored successfully:', validatedMessage.id);
+        console.log('[STORE] Current message count after add:', this._state.messages.size);
+
         // Update order array for deterministic sorting
         this._updateMessageOrder(validatedMessage);
 
+        console.log('[STORE] Notifying subscribers...');
         this._notifySubscribers();
+        console.log('[STORE] Subscribers notified');
     }
 
     /**
@@ -420,7 +420,11 @@ export class Store {
      * @returns {Object|null} Validated message or null
      */
     _validateCanonicalMessage(message) {
+        console.log('[STORE] ========== VALIDATING MESSAGE ==========');
+        console.log('[STORE] Input message:', JSON.stringify(message, null, 2));
+
         if (!message || typeof message !== 'object') {
+            console.error('[STORE] Validation failed: message is not an object');
             return null;
         }
 
@@ -428,7 +432,8 @@ export class Store {
         const required = ['id', 'conversationId', 'senderId', 'timestamp', 'status', 'content', 'type'];
         for (const field of required) {
             if (!(field in message)) {
-                console.error(`Store: Missing required field: ${field}`);
+                console.error(`[STORE] Validation failed: Missing required field: ${field}`);
+                console.error('[STORE] Available fields:', Object.keys(message));
                 return null;
             }
         }
@@ -436,7 +441,7 @@ export class Store {
         // Type validation
         const validStates = Object.values(MESSAGE_STATE);
         const validTypes = ['text', 'media', 'system', 'emoji', 'link', 'media_group'];
-        
+
         const validation = {
             id: typeof message.id === 'string',
             conversationId: typeof message.conversationId === 'number',
@@ -449,15 +454,17 @@ export class Store {
             sortOrder: typeof message.sortOrder === 'number'
         };
 
+        console.log('[STORE] Validation results:', validation);
+
         for (const [field, isValid] of Object.entries(validation)) {
             if (!isValid) {
-                console.error(`Store: Invalid field type: ${field}`);
+                console.error(`[STORE] Validation failed: Invalid field type: ${field}`, message[field]);
                 return null;
             }
         }
 
         // Return validated message with defaults
-        return {
+        const validated = {
             id: message.id,
             conversationId: message.conversationId,
             senderId: message.senderId,
@@ -469,6 +476,9 @@ export class Store {
             isOptimistic: message.isOptimistic || false,
             sortOrder: message.sortOrder ?? Date.now()
         };
+
+        console.log('[STORE] Message validated successfully:', validated.id);
+        return validated;
     }
 
     /**

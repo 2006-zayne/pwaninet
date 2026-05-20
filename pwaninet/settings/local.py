@@ -103,3 +103,5 @@ WHITENOISE_MAX_AGE = 0
 
 # Browser/static cache headers
 SEND_FILE_MAX_AGE_DEFAULT = 0
+
+AXES_ENABLED = False

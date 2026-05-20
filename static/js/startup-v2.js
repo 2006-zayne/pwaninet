@@ -15,12 +15,12 @@
         const isIOS = window.navigator.standalone === true;
         const isPWA = isStandalone || isIOS;
         
-        // Only show splash if: PWA mode AND not already launched this session
-        const fresh = isPWA && !alreadyLaunched;
+        // Show splash if: PWA mode OR first page load (not already launched this session)
+        const fresh = !alreadyLaunched;
         
         if (fresh) {
             sessionStorage.setItem(SESSION_KEY, 'true');
-            console.log('🚀 Fresh PWA launch - showing splash');
+            console.log('🚀 Fresh launch - showing splash', { isPWA });
         } else {
             console.log('📱 Not a fresh launch - skipping splash', {
                 isPWA, alreadyLaunched

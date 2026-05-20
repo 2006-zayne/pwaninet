@@ -188,6 +188,9 @@ export class WebSocketManager {
 
             try {
                 const data = JSON.parse(event.data);
+                console.group('[WEBSOCKET] ========== MESSAGE RECEIVED ==========');
+                console.log('[WEBSOCKET] Raw data:', event.data);
+                console.log('[WEBSOCKET] Parsed data:', JSON.stringify(data, null, 2));
 
                 this.lastMessageTime = Date.now();
 
@@ -196,14 +199,30 @@ export class WebSocketManager {
                     this.send({ type: 'pong' });
                     this.lastHeartbeatTime = Date.now();
                     this._log('HEARTBEAT_RECEIVED');
+                    console.groupEnd();
                     return;
                 }
 
+                console.log('[WEBSOCKET] Calling messageCallback:', !!this.messageCallback);
                 if (this.messageCallback) {
-                    this.messageCallback(data);
+                    // Fault tolerance: Wrap callback in try-catch to prevent pipeline crashes
+                    try {
+                        this.messageCallback(data);
+                    } catch (error) {
+                        console.error('[WEBSOCKET] CRITICAL: Message callback failed:', error);
+                        console.error('[WEBSOCKET] Error stack:', error.stack);
+                        console.error('[WEBSOCKET] Message data that caused error:', data);
+                        // WebSocket connection survives - never crash the pipeline
+                    }
+                } else {
+                    console.error('[WEBSOCKET] ERROR: messageCallback is not set!');
                 }
             } catch (err) {
+                console.error('[WEBSOCKET] ERROR parsing message:', err, event.data);
                 this._log('INVALID_JSON_MESSAGE', event.data);
+                // WebSocket connection survives parsing errors
+            } finally {
+                console.groupEnd();
             }
         };
     }
