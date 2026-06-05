@@ -26,6 +26,58 @@
     background-color: #4e4f50 !important;
     border-color: #6366f1 !important;
   }
+  [data-theme="dark"] .password-toggle-btn {
+    color: #9ca3af !important;
+  }
+  [data-theme="dark"] .password-toggle-btn:hover {
+    color: #e4e6eb !important;
+  }
+  [data-theme="dark"] .field-error {
+    color: #f87171 !important;
+  }
+
+  .password-input-wrapper {
+    position: relative;
+  }
+
+  .password-toggle-btn {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    color: #64748b;
+    transition: color 0.2s ease;
+    z-index: 10;
+  }
+
+  .password-toggle-btn:hover {
+    color: #2563eb;
+  }
+
+  .password-toggle-btn:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  .field-error {
+    color: #dc2626;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: none;
+  }
+
+  .field-error.visible {
+    display: block;
+  }
+
+  .btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
 </style>
 <div class="container">
     <div class="row justify-content-center align-items-center" style="min-height: 75vh;">
@@ -34,28 +86,38 @@
                 <div class="row g-0">
                     <div class="card-body p-5">
                         <div class="text-center mb-4">
-                            <h2 class="fw-bold text-dark">Welcome Back, Comrade!</h2>
+                            <h2 class="fw-bold text-dark" id="loginWelcomeTitle">Welcome Back, Comrade!</h2>
                             <p class="text-muted">Identify yourself to access the PwaniNet feed.</p>
                         </div>
 
-                        <form method="POST">
+                        <form method="POST" id="loginForm" novalidate>
                             {% csrf_token %}
                             <input type="hidden" name="device_id" id="device_id_field">
                             
                             {% for field in form %}
                                 <div class="mb-3">
-                                    <label class="form-label fw-semibold small">{{ field.label }}</label>
-                                    {{ field }}
+                                    <label class="form-label fw-semibold small" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    {% if field.name == 'password' %}
+                                        <div class="password-input-wrapper">
+                                            {{ field }}
+                                            <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility" tabindex="-1">
+                                                <i class="bi bi-eye" id="passwordToggleIcon"></i>
+                                            </button>
+                                        </div>
+                                    {% else %}
+                                        {{ field }}
+                                    {% endif %}
                                     {% if field.errors %}
                                         {% for error in field.errors %}
                                             <div class="text-danger x-small">{{ error }}</div>
                                         {% endfor %}
                                     {% endif %}
+                                    <div class="field-error" id="{{ field.name }}-error">This field cannot be empty</div>
                                 </div>
                             {% endfor %}
 
                             <div class="d-grid gap-2 mt-4">
-                                <button class="btn btn-primary btn-lg shadow-sm" type="submit" style="border-radius: 10px;">
+                                <button class="btn btn-primary btn-lg shadow-sm" type="submit" id="loginSubmitBtn" style="border-radius: 10px;">
                                     Authenticate & Enter
                                 </button>
                             </div>
@@ -84,15 +146,142 @@
     let deviceId = localStorage.getItem(DEVICE_ID_KEY);
     
     if (!deviceId) {
-        // Generate device ID if not exists
         const array = new Uint8Array(32);
         crypto.getRandomValues(array);
         deviceId = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
         localStorage.setItem(DEVICE_ID_KEY, deviceId);
     }
     
-    // Set the hidden field value
     document.getElementById('device_id_field').value = deviceId;
+
+    const passwordToggleBtn = document.querySelector('.password-toggle-btn');
+    const passwordField = document.getElementById('id_password');
+    const passwordToggleIcon = document.getElementById('passwordToggleIcon');
+
+    if (passwordToggleBtn && passwordField) {
+        passwordToggleBtn.addEventListener('click', function() {
+            const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordField.setAttribute('type', type);
+            passwordToggleIcon.classList.toggle('bi-eye');
+            passwordToggleIcon.classList.toggle('bi-eye-slash');
+        });
+    }
+
+    const loginForm = document.getElementById('loginForm');
+    const usernameField = document.getElementById('id_username');
+    const passwordFieldForValidation = document.getElementById('id_password');
+    const usernameError = document.getElementById('username-error');
+    const passwordError = document.getElementById('password-error');
+    const loginWelcomeTitle = document.getElementById('loginWelcomeTitle');
+    const loginSubmitBtn = document.getElementById('loginSubmitBtn');
+
+    function validateField(field, errorElement) {
+        if (!field) return false;
+        const isEmpty = field.value.trim() === '';
+        if (errorElement) {
+            errorElement.classList.toggle('visible', isEmpty);
+        }
+        return !isEmpty;
+    }
+
+    if (usernameField) {
+        usernameField.addEventListener('blur', function() {
+            validateField(usernameField, usernameError);
+        });
+    }
+    if (passwordFieldForValidation) {
+        passwordFieldForValidation.addEventListener('blur', function() {
+            validateField(passwordFieldForValidation, passwordError);
+        });
+    }
+
+    function prefillFromRegistration() {
+        const storedUsername = sessionStorage.getItem('pendingLoginUsername');
+        const storedPassword = sessionStorage.getItem('pendingLoginPassword');
+
+        if (storedUsername && usernameField) {
+            usernameField.value = storedUsername;
+            if (loginWelcomeTitle) {
+                loginWelcomeTitle.textContent = 'Welcome Back, ' + storedUsername + '!';
+            }
+        }
+        if (storedPassword && passwordFieldForValidation) {
+            passwordFieldForValidation.value = storedPassword;
+        }
+
+        sessionStorage.removeItem('pendingLoginUsername');
+        sessionStorage.removeItem('pendingLoginPassword');
+
+        if (passwordFieldForValidation) {
+            passwordFieldForValidation.focus();
+        } else if (usernameField) {
+            usernameField.focus();
+        }
+    }
+
+    function runPostRegistrationModal() {
+        if (!window.PwaniNetStatusModal) {
+            prefillFromRegistration();
+            return;
+        }
+        window.PwaniNetStatusModal.runSteps([
+            {
+                icon: 'check',
+                title: 'Account created successfully',
+                subtitle: 'Your PwaniNet account is ready.',
+                durationMs: 1600,
+            },
+            {
+                icon: 'spinner',
+                title: 'Redirecting to login…',
+                subtitle: 'Preparing your sign-in form.',
+                durationMs: 1400,
+            },
+        ], { onComplete: prefillFromRegistration });
+    }
+
+    function initPage() {
+        {% if form.errors %}
+        sessionStorage.removeItem('showLoginWelcome');
+        sessionStorage.removeItem('loginWelcomeName');
+        {% endif %}
+
+        const showRegistrationSuccess = sessionStorage.getItem('showRegistrationSuccess') === 'true';
+        if (showRegistrationSuccess) {
+            sessionStorage.removeItem('showRegistrationSuccess');
+            runPostRegistrationModal();
+        } else if (sessionStorage.getItem('pendingLoginUsername')) {
+            prefillFromRegistration();
+        }
+    }
+
+    loginForm.addEventListener('submit', function(e) {
+        const isUsernameValid = validateField(usernameField, usernameError);
+        const isPasswordValid = validateField(passwordFieldForValidation, passwordError);
+
+        if (!isUsernameValid || !isPasswordValid) {
+            e.preventDefault();
+            return;
+        }
+
+        const welcomeName =
+            sessionStorage.getItem('pendingLoginFirstName') ||
+            usernameField.value.trim();
+        sessionStorage.setItem('showLoginWelcome', 'true');
+        sessionStorage.setItem('loginWelcomeName', welcomeName);
+        sessionStorage.removeItem('pendingLoginUsername');
+        sessionStorage.removeItem('pendingLoginPassword');
+        sessionStorage.removeItem('pendingLoginFirstName');
+
+        loginSubmitBtn.disabled = true;
+        loginSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing you in…';
+    });
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPage);
+    } else {
+        initPage();
+    }
 })();
 </script>
 {% endblock %}

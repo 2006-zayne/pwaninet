@@ -20,38 +20,41 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  const tourModal = new bootstrap.Modal(document.getElementById('onboardingTourModal'));
-  
-  // Check if user should see onboarding
+  const promptEl = document.getElementById('onboardingTourModal');
+  if (!promptEl || typeof bootstrap === 'undefined') return;
+
+  const tourModal = bootstrap.Modal.getOrCreateInstance(promptEl);
   const hasCompletedOnboarding = {{ request.user.has_completed_onboarding|yesno:"true,false" }};
   
   if (!hasCompletedOnboarding) {
-    // Show the modal after a short delay
-    setTimeout(() => {
+    setTimeout(function() {
       tourModal.show();
     }, 1500);
   }
   
-  // Handle skip button
   document.getElementById('skipTourBtn').addEventListener('click', function() {
     tourModal.hide();
-    // Mark onboarding as completed
     if (typeof window.markOnboardingCompleted === 'function') {
       window.markOnboardingCompleted();
     }
-    // Show profile completion prompt (function defined in tour.html)
-    if (typeof window.showProfileCompletionPrompt === 'function') {
-      window.showProfileCompletionPrompt();
-    }
+    promptEl.addEventListener('hidden.bs.modal', function onHidden() {
+      promptEl.removeEventListener('hidden.bs.modal', onHidden);
+      if (typeof window.showProfileCompletionPrompt === 'function') {
+        window.showProfileCompletionPrompt();
+      }
+    }, { once: true });
   });
   
-  // Handle start tour button
   document.getElementById('startTourBtn').addEventListener('click', function() {
     tourModal.hide();
-    // Start the tour (function defined in tour.html)
-    if (typeof window.startOnboardingTour === 'function') {
-      window.startOnboardingTour();
-    }
+    promptEl.addEventListener('hidden.bs.modal', function onHidden() {
+      promptEl.removeEventListener('hidden.bs.modal', onHidden);
+      if (typeof window.startOnboardingTour === 'function') {
+        window.startOnboardingTour();
+      } else {
+        console.error('startOnboardingTour is not defined — ensure tour.html is included after tour_prompt.html');
+      }
+    }, { once: true });
   });
 });
 </script>

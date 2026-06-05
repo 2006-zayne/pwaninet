@@ -65,12 +65,17 @@ def auto_join_course_group(sender, instance, created, **kwargs):
     """
     Automatically enrolls new users in official academic groups based on their course and year.
     
+    TEMPORARILY DISABLED - causing site-wide timeout.
+    
     This function uses the new service-based approach that relies on database flags
     (is_official=True and auto_join_on_signup=True) instead of hardcoded group names.
     
     For backwards compatibility, it falls back to the old naming convention approach
     if no auto-join groups are found.
     """
+    # TEMPORARILY DISABLED - return early to prevent timeout
+    return
+    
     # Only execute for NEW users who have completed their profile intel
     if created and instance.course and instance.year:
         

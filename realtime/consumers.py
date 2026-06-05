@@ -11,7 +11,8 @@ import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
-from messaging.presence import PresenceService
+# Messaging presence - FROZEN FOR MVP
+# from messaging.presence import PresenceService
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -42,23 +43,23 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
 
-        # Register connection
-        from messaging.ws_middleware import WebSocketConnectionTracker
-        WebSocketConnectionTracker.register_connection(
-            self.user.id,
-            self.channel_name
-        )
+        # Register connection - FROZEN FOR MVP
+        # from messaging.ws_middleware import WebSocketConnectionTracker
+        # WebSocketConnectionTracker.register_connection(
+        #     self.user.id,
+        #     self.channel_name
+        # )
 
-        # Record initial heartbeat for presence tracking
-        PresenceService.record_heartbeat(
-            self.user.id,
-            self.connection_id
-        )
+        # Record initial heartbeat for presence tracking - FROZEN FOR MVP
+        # PresenceService.record_heartbeat(
+        #     self.user.id,
+        #     self.connection_id
+        # )
 
-        # Broadcast user online status based on heartbeat freshness
-        is_online = PresenceService.is_user_online(self.user.id)
-        if is_online:
-            print(f'[NOTIFICATIONS] User {self.user.id} is online (heartbeat-based)')
+        # Broadcast user online status based on heartbeat freshness - FROZEN FOR MVP
+        # is_online = PresenceService.is_user_online(self.user.id)
+        # if is_online:
+        #     print(f'[NOTIFICATIONS] User {self.user.id} is online (heartbeat-based)')
 
         print(f'[NOTIFICATIONS] User {self.user.id} accepted connection')
         await self.accept()
@@ -71,24 +72,24 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
 
-        # Remove connection from presence tracking
-        PresenceService.remove_connection(self.user.id, self.channel_name)
+        # Remove connection from presence tracking - FROZEN FOR MVP
+        # PresenceService.remove_connection(self.user.id, self.channel_name)
 
-        # Unregister connection
-        from messaging.ws_middleware import WebSocketConnectionTracker
-        WebSocketConnectionTracker.unregister_connection(self.user.id, self.channel_name)
+        # Unregister connection - FROZEN FOR MVP
+        # from messaging.ws_middleware import WebSocketConnectionTracker
+        # WebSocketConnectionTracker.unregister_connection(self.user.id, self.channel_name)
 
-        # Check if user is still online based on heartbeat freshness
-        connection_count = WebSocketConnectionTracker.get_connection_count(self.user.id)
-        is_online = PresenceService.is_user_online(self.user.id)
+        # Check if user is still online based on heartbeat freshness - FROZEN FOR MVP
+        # connection_count = WebSocketConnectionTracker.get_connection_count(self.user.id)
+        # is_online = PresenceService.is_user_online(self.user.id)
 
-        print(f'[NOTIFICATIONS] User {self.user.id} disconnect - connections: {connection_count}, online: {is_online}')
+        print(f'[NOTIFICATIONS] User {self.user.id} disconnect')
 
-        # If user is truly offline (no heartbeat, no connections), persist to DB
-        if not is_online and connection_count == 0:
-            await PresenceService.persist_last_seen_to_db(self.user.id)
-            PresenceService.cleanup_stale_presence(self.user.id)
-            print(f'[NOTIFICATIONS] User {self.user.id} marked as offline (heartbeat-based)')
+        # If user is truly offline (no heartbeat, no connections), persist to DB - FROZEN FOR MVP
+        # if not is_online and connection_count == 0:
+        #     await PresenceService.persist_last_seen_to_db(self.user.id)
+        #     PresenceService.cleanup_stale_presence(self.user.id)
+        #     print(f'[NOTIFICATIONS] User {self.user.id} marked as offline (heartbeat-based)')
 
     async def receive(self, text_data):
         """Handle incoming WebSocket messages."""
@@ -110,27 +111,31 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         }))
 
     async def conversation_update(self, event):
-        """Send conversation update to client for real-time list updates."""
-        print(f'[NOTIFICATIONS] Sending conversation update to user {self.user.id}: {event}')
-        await self.send(text_data=json.dumps({
-            'type': 'conversation_update',
-            'conversation_id': event['conversation_id'],
-            'message_preview': event['message_preview'],
-            'sender_name': event['sender_name'],
-            'timestamp': event['timestamp'],
-            'unread_count': event['unread_count']
-        }))
+        """Send conversation update to client for real-time list updates - FROZEN FOR MVP"""
+        # Messaging feature - FROZEN FOR MVP
+        # print(f'[NOTIFICATIONS] Sending conversation update to user {self.user.id}: {event}')
+        # await self.send(text_data=json.dumps({
+        #     'type': 'conversation_update',
+        #     'conversation_id': event['conversation_id'],
+        #     'message_preview': event['message_preview'],
+        #     'sender_name': event['sender_name'],
+        #     'timestamp': event['timestamp'],
+        #     'unread_count': event['unread_count']
+        # }))
+        pass
 
     async def typing_indicator(self, event):
-        """Send typing indicator to client for real-time list updates."""
-        print(f'[NOTIFICATIONS] Sending typing indicator to user {self.user.id}: {event}')
-        await self.send(text_data=json.dumps({
-            'type': 'typing_indicator',
-            'conversation_id': event['conversation_id'],
-            'user_id': event['user_id'],
-            'username': event['username'],
-            'is_typing': event['is_typing']
-        }))
+        """Send typing indicator to client for real-time list updates - FROZEN FOR MVP"""
+        # Messaging feature - FROZEN FOR MVP
+        # print(f'[NOTIFICATIONS] Sending typing indicator to user {self.user.id}: {event}')
+        # await self.send(text_data=json.dumps({
+        #     'type': 'typing_indicator',
+        #     'conversation_id': event['conversation_id'],
+        #     'user_id': event['user_id'],
+        #     'username': event['username'],
+        #     'is_typing': event['is_typing']
+        # }))
+        pass
 
     async def user_status(self, event):
         """Send user online status to client for real-time online indicators."""

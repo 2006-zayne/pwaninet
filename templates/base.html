@@ -1157,6 +1157,9 @@
         </div>
     </div>
 
+    {# Status modal must stay outside #app so welcome/login flows stay visible when #app is hidden #}
+    {% include 'partials/status_modal.html' %}
+
     <!-- Main App Container - Hidden initially -->
     <div id="app" style="opacity: 0; /* Hidden until page loads */">
     
@@ -1174,9 +1177,10 @@
                     <i class="bi bi-shield-shaded"></i>
                 </a>
                 {% if request.user.is_authenticated %}
-                <a href="{% url 'messaging:conversation_list' %}" class="nav-chip {% if request.resolver_match.url_name == 'conversation_list' %}active{% endif %}">
+                <!--{# Messaging navigation - FROZEN FOR MVP #}
+                 <a href="#" class="nav-chip">
                     <i class="bi bi-chat-dots-fill"></i>
-                </a>
+                </a> -->
                 <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}">
                     <i class="bi bi-plus-circle-fill"></i>
                 </a>
@@ -1246,14 +1250,10 @@
             <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}"><i class="bi bi-house-door-fill"></i></a>
             <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}"><i class="bi bi-people-fill"></i></a>
             {% if user.is_authenticated %}
-                <a href="{% url 'messaging:conversation_list' %}"
-                    class="nav-chip position-relative {% if request.resolver_match.url_name == 'conversation_list' %}active{% endif %}"
-                    hx-get="{% url 'messaging:unread_message_count' %}"
-                    hx-trigger="every 30s"
-                    hx-swap="innerHTML"
-                    id="message-badge-container">
+                <!--{# Messaging navigation - FROZEN FOR MVP #}
+                {# <a href="#" class="nav-chip position-relative">
                     <i class="bi bi-chat-dots-fill"></i>
-                </a>
+                </a> #}-->
                 <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}"><i class="bi bi-plus-circle-fill"></i></a>
                 <a href="{% url 'notifications:notifications' %}"
                     class="nav-chip position-relative {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
@@ -1276,6 +1276,8 @@
     {% endblock %}
 
     <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'js/status-modal.js' %}"></script>
+    {% block page_scripts %}{% endblock %}
     <script>
         // Theme Management
         function setTheme(theme) {
@@ -1533,9 +1535,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
         })();
     </script>
     
-    <!-- Load startup manager -->
-    <script src="/static/js/startup-v2.js"></script>
-    
     <!-- Load offline skeleton manager (page-aware) -->
     <script src="/static/js/offline-skeleton-v2.js"></script>
     
@@ -1581,6 +1580,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
                     console.log('[GLOBAL] Received notification:', data);
                     
                     // Handle different notification types
+                    // Messaging handlers - FROZEN FOR MVP
+                    /*
                     if (data.type === 'conversation_update') {
                         // Update conversation list if we're on that page
                         if (typeof updateConversationInList === 'function') {
@@ -1593,7 +1594,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         if (typeof updateTypingIndicator === 'function') {
                             updateTypingIndicator(data);
                         }
-                    } else if (data.type === 'notification') {
+                    } else 
+                    */
+                    if (data.type === 'notification') {
                         // Handle general notifications
                         showNotification(data.notification);
                     } else if (data.type === 'user_status') {
@@ -1725,6 +1728,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 pageSkeleton.classList.add('hidden');
                 if (app) {
                     app.classList.add('loaded');
+                    app.style.opacity = '1';
+                    app.style.pointerEvents = 'auto';
                 }
                 console.log('[PageSkeleton] Skeleton hidden, app visible');
             } else {

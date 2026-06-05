@@ -1,0 +1,11 @@
+<a href="{% url 'users:profile' user.username %}" class="connection-user-row text-decoration-none">
+    <img src="{{ user.profile_pic.url }}" alt="{{ user.username }}" class="connection-user-avatar">
+    <div class="connection-user-info flex-grow-1 min-w-0">
+        <div class="connection-user-name text-truncate">{{ user.get_full_name|default:user.username }}</div>
+        <div class="connection-user-meta text-truncate">
+            {% if user.course %}{{ user.course.name }}{% else %}No course{% endif %}
+            {% if user.year %} · Year {{ user.year.level }}{% endif %}
+        </div>
+    </div>
+    <i class="bi bi-chevron-right connection-user-chevron"></i>
+</a>

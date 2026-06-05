@@ -1,0 +1,10 @@
+{% if users %}
+    {% for user in users %}
+        {% include 'users/partials/connection_user_row.html' %}
+    {% endfor %}
+{% else %}
+    <div class="connections-empty text-center py-5">
+        <i class="bi bi-people text-muted display-6"></i>
+        <p class="text-muted small mt-3 mb-0">{{ empty_message }}</p>
+    </div>
+{% endif %}

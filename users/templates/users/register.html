@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 <style>
@@ -27,7 +28,140 @@
   [data-theme="dark"] .form-text {
     color: #d1d5db !important;
   }
+  [data-theme="dark"] .password-toggle-btn {
+    color: #9ca3af !important;
+  }
+  [data-theme="dark"] .password-toggle-btn:hover {
+    color: #e4e6eb !important;
+  }
+  [data-theme="dark"] .field-error {
+    color: #f87171 !important;
+  }
+  [data-theme="dark"] .password-match-success {
+    color: #34d399 !important;
+  }
+  [data-theme="dark"] .password-match-error {
+    color: #f87171 !important;
+  }
+  [data-theme="dark"] .modal-content {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+  }
+  [data-theme="dark"] .modal-title {
+    color: #e4e6eb !important;
+  }
+  [data-theme="dark"] .modal-body {
+    color: #9ca3af !important;
+  }
+
+  .password-input-wrapper {
+    position: relative;
+  }
+
+  .password-toggle-btn {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    color: #64748b;
+    transition: color 0.2s ease;
+    z-index: 10;
+  }
+
+  .password-toggle-btn:hover {
+    color: #2563eb;
+  }
+
+  .password-toggle-btn:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  .field-error {
+    color: #dc2626;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: none;
+  }
+
+  .field-error.visible {
+    display: block;
+  }
+
+  .password-match-feedback {
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: none;
+  }
+
+  .password-match-feedback.visible {
+    display: block;
+  }
+
+  .password-match-success {
+    color: #10b981;
+  }
+
+  .password-match-error {
+    color: #dc2626;
+  }
+
+  .spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+    border-width: 0.15em;
+  }
+
+  .btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  .password-strength-wrap {
+    margin-top: 0.5rem;
+  }
+
+  .password-strength-track {
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  [data-theme="dark"] .password-strength-track {
+    background: #3a3b3c;
+  }
+
+  .password-strength-bar {
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    transition: width 0.25s ease, background-color 0.25s ease;
+  }
+
+  .password-strength-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-top: 0.35rem;
+    display: block;
+  }
+
+  .password-strength-hint {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 0.25rem;
+  }
+
+  .strength-weak { background-color: #dc2626; color: #dc2626; }
+  .strength-fair { background-color: #f59e0b; color: #d97706; }
+  .strength-strong { background-color: #10b981; color: #059669; }
+  .strength-very-strong { background-color: #047857; color: #047857; }
 </style>
+<script src="{% static 'js/password-strength.js' %}"></script>
 <div class="container">
     <div class="row justify-content-center align-items-center" style="min-height: 75vh;">
         <div class="col-md-5">
@@ -39,13 +173,22 @@
                             <p class="text-muted">Create your account to access the PwaniNet feed.</p>
                         </div>
 
-                        <form method="POST">
+                        <form method="POST" id="registerForm" novalidate>
                             {% csrf_token %}
 
                             {% for field in form %}
                                 <div class="mb-3">
-                                    <label class="form-label fw-semibold small">{{ field.label }}</label>
-                                    {{ field }}
+                                    <label class="form-label fw-semibold small" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    {% if field.name == 'password1' or field.name == 'password2' %}
+                                        <div class="password-input-wrapper">
+                                            {{ field }}
+                                            <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility" tabindex="-1" data-field="{{ field.name }}">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                        </div>
+                                    {% else %}
+                                        {{ field }}
+                                    {% endif %}
                                     {% if field.errors %}
                                         {% for error in field.errors %}
                                             <div class="text-danger x-small">{{ error }}</div>
@@ -54,12 +197,26 @@
                                     {% if field.help_text %}
                                         <div class="form-text text-muted small">{{ field.help_text }}</div>
                                     {% endif %}
+                                    <div class="field-error" id="{{ field.name }}-error">This field cannot be empty</div>
+                                    {% if field.name == 'password1' %}
+                                        <div class="password-strength-wrap" id="password-strength-wrap">
+                                            <div class="password-strength-track">
+                                                <div class="password-strength-bar" id="password-strength-bar"></div>
+                                            </div>
+                                            <span class="password-strength-label" id="password-strength-label"></span>
+                                            <div class="password-strength-hint" id="password-strength-hint">Use 8+ characters with letters, numbers, and symbols.</div>
+                                        </div>
+                                    {% endif %}
+                                    {% if field.name == 'password2' %}
+                                        <div class="password-match-feedback" id="password-match-feedback"></div>
+                                    {% endif %}
                                 </div>
                             {% endfor %}
 
                             <div class="d-grid gap-2 mt-4">
-                                <button class="btn btn-primary btn-lg shadow-sm" type="submit" style="border-radius: 10px;">
-                                    Create Account
+                                <button class="btn btn-primary btn-lg shadow-sm" type="submit" id="registerSubmitBtn" style="border-radius: 10px;">
+                                    <span id="registerBtnText">Create Account</span>
+                                    <span id="registerSpinner" class="spinner-border spinner-border-sm ms-2" style="display: none;"></span>
                                 </button>
                             </div>
                         </form>
@@ -80,4 +237,161 @@
         </div>
     </div>
 </div>
+
+<script>
+(function() {
+    // Password visibility toggles
+    const passwordToggleBtns = document.querySelectorAll('.password-toggle-btn');
+    
+    passwordToggleBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const fieldName = this.getAttribute('data-field');
+            const passwordField = document.getElementById('id_' + fieldName);
+            const icon = this.querySelector('i');
+            
+            if (passwordField) {
+                const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordField.setAttribute('type', type);
+                icon.classList.toggle('bi-eye');
+                icon.classList.toggle('bi-eye-slash');
+            }
+        });
+
+        // Keyboard accessibility
+        btn.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.click();
+            }
+        });
+    });
+
+    // Form validation
+    const registerForm = document.getElementById('registerForm');
+    const requiredFields = ['username', 'password1', 'password2', 'first_name', 'last_name', 'course', 'year'];
+    
+    function validateField(field, errorElement) {
+        if (!field) return false;
+        const isEmpty = field.value.trim() === '';
+        if (errorElement) {
+            errorElement.classList.toggle('visible', isEmpty);
+        }
+        return !isEmpty;
+    }
+
+    // Add validation to all required fields
+    requiredFields.forEach(function(fieldName) {
+        const field = document.getElementById('id_' + fieldName);
+        const errorElement = document.getElementById(fieldName + '-error');
+        
+        if (field && errorElement) {
+            field.addEventListener('blur', function() {
+                validateField(field, errorElement);
+            });
+            field.addEventListener('input', function() {
+                if (errorElement.classList.contains('visible')) {
+                    validateField(field, errorElement);
+                }
+            });
+        }
+    });
+
+    // Password match feedback
+    const password1Field = document.getElementById('id_password1');
+    const password2Field = document.getElementById('id_password2');
+    const passwordMatchFeedback = document.getElementById('password-match-feedback');
+
+    function checkPasswordMatch() {
+        if (!password1Field || !password2Field || !passwordMatchFeedback) return;
+        
+        const password1 = password1Field.value;
+        const password2 = password2Field.value;
+        
+        if (password2 === '') {
+            passwordMatchFeedback.classList.remove('visible');
+            return;
+        }
+        
+        passwordMatchFeedback.classList.add('visible');
+        
+        if (password1 === password2) {
+            passwordMatchFeedback.textContent = '✓ Passwords match';
+            passwordMatchFeedback.classList.remove('password-match-error');
+            passwordMatchFeedback.classList.add('password-match-success');
+        } else {
+            passwordMatchFeedback.textContent = '✗ Passwords do not match';
+            passwordMatchFeedback.classList.remove('password-match-success');
+            passwordMatchFeedback.classList.add('password-match-error');
+        }
+    }
+
+    if (password1Field && password2Field) {
+        password1Field.addEventListener('input', checkPasswordMatch);
+        password2Field.addEventListener('input', checkPasswordMatch);
+    }
+
+    const strengthBar = document.getElementById('password-strength-bar');
+    const strengthLabel = document.getElementById('password-strength-label');
+    const strengthHint = document.getElementById('password-strength-hint');
+    if (password1Field && window.PwaniNetPasswordStrength) {
+        PwaniNetPasswordStrength.bindStrengthMeter(
+            password1Field, strengthBar, strengthLabel, strengthHint
+        );
+    }
+
+    const registerSubmitBtn = document.getElementById('registerSubmitBtn');
+
+    registerForm.addEventListener('submit', function(e) {
+        let isValid = true;
+        requiredFields.forEach(function(fieldName) {
+            const field = document.getElementById('id_' + fieldName);
+            const errorElement = document.getElementById(fieldName + '-error');
+            if (!validateField(field, errorElement)) {
+                isValid = false;
+            }
+        });
+
+        if (password1Field && password2Field && password1Field.value !== password2Field.value) {
+            e.preventDefault();
+            passwordMatchFeedback.classList.add('visible');
+            passwordMatchFeedback.textContent = '✗ Passwords do not match';
+            passwordMatchFeedback.classList.add('password-match-error');
+            return;
+        }
+
+        if (password1Field && window.PwaniNetPasswordStrength &&
+            !PwaniNetPasswordStrength.meetsMinimum(password1Field.value)) {
+            e.preventDefault();
+            if (strengthHint) {
+                strengthHint.textContent = 'Password is too weak. Reach at least Fair strength to continue.';
+                strengthHint.style.color = '#dc2626';
+            }
+            return;
+        }
+
+        if (!isValid) {
+            e.preventDefault();
+            return;
+        }
+
+        const usernameField = document.getElementById('id_username');
+        const firstNameField = document.getElementById('id_first_name');
+
+        if (usernameField) {
+            sessionStorage.setItem('pendingLoginUsername', usernameField.value);
+        }
+        if (password1Field) {
+            sessionStorage.setItem('pendingLoginPassword', password1Field.value);
+        }
+        if (firstNameField && firstNameField.value.trim()) {
+            sessionStorage.setItem('pendingLoginFirstName', firstNameField.value.trim());
+        }
+
+        sessionStorage.setItem('showRegistrationSuccess', 'true');
+
+        registerSubmitBtn.disabled = true;
+        registerSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating your account…';
+    });
+})();
+</script>
 {% endblock %}

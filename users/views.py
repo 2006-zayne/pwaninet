@@ -83,6 +83,42 @@ def profile_view(request, username):
 
 
 @login_required
+def profile_connections(request, username, list_type):
+    """Return followers or following list for profile connections sheet."""
+    profile_user = get_object_or_404(User, username=username)
+
+    if list_type == 'followers':
+        follows = (
+            Follow.objects.filter(followed=profile_user)
+            .select_related('follower', 'follower__course', 'follower__year')
+            .order_by('-created_at')
+        )
+        users = [f.follower for f in follows]
+        title = 'Followers'
+        empty_message = 'No followers yet.'
+    elif list_type == 'following':
+        follows = (
+            Follow.objects.filter(follower=profile_user)
+            .select_related('followed', 'followed__course', 'followed__year')
+            .order_by('-created_at')
+        )
+        users = [f.followed for f in follows]
+        title = 'Following'
+        empty_message = 'Not following anyone yet.'
+    else:
+        from django.http import HttpResponse
+        return HttpResponse('Not found', status=404)
+
+    return render(request, 'users/partials/connections_list.html', {
+        'users': users,
+        'title': title,
+        'empty_message': empty_message,
+        'profile_user': profile_user,
+        'list_type': list_type,
+    })
+
+
+@login_required
 def mark_shared_viewed(request, username):
     """Mark all shared posts for the user as viewed"""
     from posts.models import SharedPost
@@ -148,11 +184,12 @@ def update_profile_view(request):
 
 
 @login_required
+@require_http_methods(["POST"])
 @transaction.atomic
 def toggle_follow(request, username):
     target = get_object_or_404(User, username=username)
-    
-    is_ajax = request.headers.get('HX-Request') or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    is_hx = request.headers.get('HX-Request')
+    is_ajax = is_hx or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
     if target == request.user:
         if is_ajax:
@@ -164,18 +201,16 @@ def toggle_follow(request, username):
         follow_qs.delete()
         is_following = False
     else:
-        Follow.objects.create(follower=request.user, followed=target)
+        Follow.objects.get_or_create(follower=request.user, followed=target)
         invalidate_unread_count_cache(target.id)
         is_following = True
 
-    # Invalidate friend suggestions cache
     from users.services.friend_suggestion_service import invalidate_friend_suggestions_cache
     invalidate_friend_suggestions_cache(request.user.id)
 
     follower_count = target.follower_relationships.count()
 
-    if request.headers.get('HX-Request'):
-        # Return HTML partial based on which button triggered the request
+    if is_hx:
         template = 'users/partials/follow_button_profile.html'
         if request.GET.get('source') == 'recruit':
             template = 'users/partials/follow_button_recruit.html'
@@ -186,13 +221,13 @@ def toggle_follow(request, username):
             'profile_user': target,
             'recruit': target,
             'is_following': is_following,
-            'follower_count': follower_count
+            'follower_count': follower_count,
         })
 
     if is_ajax:
         return JsonResponse({'is_following': is_following, 'follower_count': follower_count})
 
-    return redirect('profile', username=username)
+    return redirect('users:profile', username=username)
 
 
 @login_required
@@ -550,18 +585,24 @@ def user_online_status_api(request, user_id):
     """
     API endpoint to check if a user is online.
     Returns JSON with is_online status using heartbeat-based presence tracking.
+    FROZEN FOR MVP - Messaging presence disabled
     """
     try:
-        from messaging.presence import PresenceService
+        # Messaging presence - FROZEN FOR MVP
+        # from messaging.presence import PresenceService
         
-        # Check if user is online based on heartbeat freshness
-        is_online = PresenceService.is_user_online(user_id)
-        last_seen = PresenceService.get_last_seen(user_id)
+        # Check if user is online based on heartbeat freshness - FROZEN FOR MVP
+        # is_online = PresenceService.is_user_online(user_id)
+        # last_seen = PresenceService.get_last_seen(user_id)
+        
+        # Fallback to basic User model is_online field
+        from users.models import User
+        user = User.objects.get(id=user_id)
         
         return JsonResponse({
-            'is_online': is_online,
+            'is_online': user.is_online,
             'user_id': int(user_id),
-            'last_seen': last_seen.isoformat() if last_seen else None
+            'last_seen': None  # Presence tracking disabled
         })
     except Exception as e:
         return JsonResponse({

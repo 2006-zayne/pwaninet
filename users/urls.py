@@ -18,7 +18,12 @@ urlpatterns = [
     # Logout view
     path('logout/', auth_views.LogoutView.as_view(template_name='logout.html', next_page='login'), name='logout'),
     
-    # Profile URLs
+    # Profile URLs (connections before profile — more specific path)
+    path(
+        'user/<str:username>/connections/<str:list_type>/',
+        views.profile_connections,
+        name='profile_connections',
+    ),
     path('user/<str:username>/', views.profile_view, name='profile'),
     path('user/<str:username>/mark-shared-viewed/', views.mark_shared_viewed, name='mark_shared_viewed'),
     path('profile/edit/', views.update_profile_view, name='update_profile'),

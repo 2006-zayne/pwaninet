@@ -1,4 +1,5 @@
 <!-- Onboarding Tour Modals for each step -->
+{# Step IDs skip 3 (messaging frozen for MVP) #}
 
 <!-- Step 1: Home Feed -->
 <div class="modal fade" id="tourStep1" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
@@ -48,38 +49,14 @@
   </div>
 </div>
 
-<!-- Step 3: Messaging -->
-<div class="modal fade" id="tourStep3" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-  <div class="modal-dialog modal-dialog-centered modal-sm">
-    <div class="modal-content">
-      <div class="modal-body p-4">
-        <div class="d-flex align-items-center mb-3">
-          <div class="flex-shrink-0">
-            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: bold;">3</div>
-          </div>
-          <div class="flex-grow-1 ms-3">
-            <h6 class="mb-0 fw-bold">Messaging</h6>
-          </div>
-        </div>
-        <p class="text-muted small mb-3">Message classmates directly for quick questions, study coordination, or collaboration opportunities.</p>
-        <p class="text-muted small mb-4"><strong>Tip:</strong> Use messaging to coordinate study groups or ask quick questions to classmates.</p>
-        <div class="d-flex justify-content-between">
-          <button type="button" class="btn btn-sm btn-link text-muted" id="exitTour3">Exit Tour</button>
-          <button type="button" class="btn btn-sm btn-primary" id="nextStep3">Continue</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Step 4: Create Post -->
+<!-- Step 3: Create Post (was step 4) -->
 <div class="modal fade" id="tourStep4" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
   <div class="modal-dialog modal-dialog-centered modal-sm">
     <div class="modal-content">
       <div class="modal-body p-4">
         <div class="d-flex align-items-center mb-3">
           <div class="flex-shrink-0">
-            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: bold;">4</div>
+            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: bold;">3</div>
           </div>
           <div class="flex-grow-1 ms-3">
             <h6 class="mb-0 fw-bold">Share Updates</h6>
@@ -96,14 +73,14 @@
   </div>
 </div>
 
-<!-- Step 5: Profile -->
+<!-- Step 4: Profile (was step 5) -->
 <div class="modal fade" id="tourStep5" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
   <div class="modal-dialog modal-dialog-centered modal-sm">
     <div class="modal-content">
       <div class="modal-body p-4">
         <div class="d-flex align-items-center mb-3">
           <div class="flex-shrink-0">
-            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: bold;">5</div>
+            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: bold;">4</div>
           </div>
           <div class="flex-grow-1 ms-3">
             <h6 class="mb-0 fw-bold">Your Profile</h6>
@@ -120,145 +97,125 @@
   </div>
 </div>
 
+{# CSRF for tour API calls on pages without a form (e.g. home feed) #}
+<input type="hidden" name="csrfmiddlewaretoken" id="onboarding-csrf-token" value="{{ csrf_token }}">
+
 <script>
-let currentTourStep = 0;
-const totalTourSteps = 5;
+(function () {
+    'use strict';
 
-// Expose to window for cross-template access
-window.startOnboardingTour = function() {
-  currentTourStep = 1;
-  showTourStep(currentTourStep);
-};
+    // Modal element IDs in tour order (step 3 messaging removed)
+    const TOUR_STEP_IDS = [1, 2, 4, 5];
+    let currentTourIndex = 0;
 
-// Expose to window for cross-template access
-window.showTourStep = function(step) {
-  // Hide all tour modals
-  for (let i = 1; i <= totalTourSteps; i++) {
-    const modal = document.getElementById('tourStep' + i);
-    if (modal) {
-      const bsModal = bootstrap.Modal.getInstance(modal);
-      if (bsModal) {
-        bsModal.hide();
-      }
+    function getCsrfToken() {
+        const el = document.querySelector('[name=csrfmiddlewaretoken]');
+        return el ? el.value : '';
     }
-  }
 
-  // Show current step modal
-  const currentModal = document.getElementById('tourStep' + step);
-  if (currentModal) {
-    const bsModal = new bootstrap.Modal(currentModal);
-    bsModal.show();
-  }
-};
-
-// Expose to window for cross-template access
-window.nextTourStep = function() {
-  if (currentTourStep < totalTourSteps) {
-    currentTourStep++;
-    window.showTourStep(currentTourStep);
-  }
-};
-
-// Expose to window for cross-template access
-window.exitTour = function() {
-  // Hide all tour modals
-  for (let i = 1; i <= totalTourSteps; i++) {
-    const modal = document.getElementById('tourStep' + i);
-    if (modal) {
-      const bsModal = bootstrap.Modal.getInstance(modal);
-      if (bsModal) {
-        bsModal.hide();
-      }
+    function hideAllTourModals() {
+        TOUR_STEP_IDS.forEach(function (stepId) {
+            const modal = document.getElementById('tourStep' + stepId);
+            if (!modal) return;
+            const inst = bootstrap.Modal.getInstance(modal);
+            if (inst) {
+                inst.hide();
+            }
+        });
+        document.querySelectorAll('.modal-backdrop').forEach(function (el) {
+            el.remove();
+        });
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
     }
-  }
 
-  // Mark onboarding as completed
-  window.markOnboardingCompleted();
+    function showTourStepByIndex(index) {
+        hideAllTourModals();
 
-  // Show profile completion prompt
-  window.showProfileCompletionPrompt();
-};
+        const stepId = TOUR_STEP_IDS[index];
+        const currentModal = document.getElementById('tourStep' + stepId);
+        if (!currentModal) {
+            console.warn('Tour step modal not found: tourStep' + stepId);
+            return;
+        }
 
-// Expose to window for cross-template access
-window.finishTour = function() {
-  // Hide all tour modals
-  for (let i = 1; i <= totalTourSteps; i++) {
-    const modal = document.getElementById('tourStep' + i);
-    if (modal) {
-      const bsModal = bootstrap.Modal.getInstance(modal);
-      if (bsModal) {
-        bsModal.hide();
-      }
+        setTimeout(function () {
+            bootstrap.Modal.getOrCreateInstance(currentModal, {
+                backdrop: 'static',
+                keyboard: false,
+            }).show();
+        }, 150);
     }
-  }
 
-  // Mark onboarding as completed
-  window.markOnboardingCompleted();
-};
+    window.startOnboardingTour = function () {
+        currentTourIndex = 0;
+        showTourStepByIndex(0);
+    };
 
-// Expose to window for cross-template access
-window.markOnboardingCompleted = function() {
-  // Send request to mark onboarding as completed
-  fetch('/users/mark-onboarding-complete/', {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': getCsrfToken(),
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({}),
-  }).then(response => {
-    if (response.ok) {
-      console.log('Onboarding marked as completed');
-    }
-  }).catch(error => {
-    console.error('Error marking onboarding as completed:', error);
-  });
-};
+    window.nextTourStep = function () {
+        if (currentTourIndex < TOUR_STEP_IDS.length - 1) {
+            currentTourIndex += 1;
+            showTourStepByIndex(currentTourIndex);
+        }
+    };
 
-function getCsrfToken() {
-  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
-  return csrfToken ? csrfToken.value : '';
-}
+    window.exitTour = function () {
+        hideAllTourModals();
+        window.markOnboardingCompleted();
+        if (typeof window.showProfileCompletionPrompt === 'function') {
+            window.showProfileCompletionPrompt();
+        }
+    };
 
-// Expose to window for cross-template access
-window.showProfileCompletionPrompt = function() {
-  const profileModal = document.getElementById('profileCompletionModal');
-  if (profileModal) {
-    const bsModal = new bootstrap.Modal(profileModal);
-    bsModal.show();
-  }
-};
+    window.finishTour = function () {
+        hideAllTourModals();
+        window.markOnboardingCompleted();
+        if (typeof window.showProfileCompletionPrompt === 'function') {
+            window.showProfileCompletionPrompt();
+        }
+    };
 
-// Set up event listeners for tour navigation
-document.addEventListener('DOMContentLoaded', function() {
-  // Step 1
-  const nextStep1 = document.getElementById('nextStep1');
-  const exitTour1 = document.getElementById('exitTour1');
-  if (nextStep1) nextStep1.addEventListener('click', window.nextTourStep);
-  if (exitTour1) exitTour1.addEventListener('click', window.exitTour);
+    window.markOnboardingCompleted = function () {
+        fetch('/users/mark-onboarding-complete/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({}),
+        }).catch(function (error) {
+            console.error('Error marking onboarding as completed:', error);
+        });
+    };
 
-  // Step 2
-  const nextStep2 = document.getElementById('nextStep2');
-  const exitTour2 = document.getElementById('exitTour2');
-  if (nextStep2) nextStep2.addEventListener('click', window.nextTourStep);
-  if (exitTour2) exitTour2.addEventListener('click', window.exitTour);
+    window.showProfileCompletionPrompt = function () {
+        const profileModal = document.getElementById('profileCompletionModal');
+        if (profileModal) {
+            bootstrap.Modal.getOrCreateInstance(profileModal).show();
+        }
+    };
 
-  // Step 3
-  const nextStep3 = document.getElementById('nextStep3');
-  const exitTour3 = document.getElementById('exitTour3');
-  if (nextStep3) nextStep3.addEventListener('click', window.nextTourStep);
-  if (exitTour3) exitTour3.addEventListener('click', window.exitTour);
+    document.addEventListener('DOMContentLoaded', function () {
+        const nextStep1 = document.getElementById('nextStep1');
+        const exitTour1 = document.getElementById('exitTour1');
+        if (nextStep1) nextStep1.addEventListener('click', window.nextTourStep);
+        if (exitTour1) exitTour1.addEventListener('click', window.exitTour);
 
-  // Step 4
-  const nextStep4 = document.getElementById('nextStep4');
-  const exitTour4 = document.getElementById('exitTour4');
-  if (nextStep4) nextStep4.addEventListener('click', window.nextTourStep);
-  if (exitTour4) exitTour4.addEventListener('click', window.exitTour);
+        const nextStep2 = document.getElementById('nextStep2');
+        const exitTour2 = document.getElementById('exitTour2');
+        if (nextStep2) nextStep2.addEventListener('click', window.nextTourStep);
+        if (exitTour2) exitTour2.addEventListener('click', window.exitTour);
 
-  // Step 5
-  const finishTourBtn = document.getElementById('finishTour');
-  const skipTour5 = document.getElementById('skipTour5');
-  if (finishTourBtn) finishTourBtn.addEventListener('click', window.finishTour);
-  if (skipTour5) skipTour5.addEventListener('click', window.exitTour);
-});
+        const nextStep4 = document.getElementById('nextStep4');
+        const exitTour4 = document.getElementById('exitTour4');
+        if (nextStep4) nextStep4.addEventListener('click', window.nextTourStep);
+        if (exitTour4) exitTour4.addEventListener('click', window.exitTour);
+
+        const finishTourBtn = document.getElementById('finishTour');
+        const skipTour5 = document.getElementById('skipTour5');
+        if (finishTourBtn) finishTourBtn.addEventListener('click', window.finishTour);
+        if (skipTour5) skipTour5.addEventListener('click', window.exitTour);
+    });
+})();
 </script>

@@ -20,7 +20,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from django.views.generic import TemplateView
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from notifications import views as notification_views
@@ -51,6 +51,11 @@ def serve_service_worker(request):
     except FileNotFoundError:
         return HttpResponse('Service worker not found', status=404)
 
+# Messaging redirect - FROZEN FOR MVP
+def redirect_messaging(request):
+    """Redirect any messaging URLs to home page since messaging is frozen for MVP"""
+    return HttpResponseRedirect('/')
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     # This maps 'accounts/login/' and 'accounts/logout/' automatically
@@ -73,11 +78,11 @@ urlpatterns = [
     path('startup/', TemplateView.as_view(template_name='startup_base.html'), name='startup_base'),
     path('api/health/', TemplateView.as_view(template_name='health_check.html'), name='health_check'),
     path('debug/startup/', TemplateView.as_view(template_name='debug_startup.html'), name='debug_startup'),
-    # Messaging Test Pages
-    path('test/messaging/', TemplateView.as_view(template_name='test_messaging_architecture.html'), name='test_messaging_architecture'),
-    path('test/messaging-debug/', TemplateView.as_view(template_name='debug_messaging.html'), name='debug_messaging'),
-    path('test/messaging-debug-fixed/', TemplateView.as_view(template_name='debug_messaging_fixed.html'), name='debug_messaging_fixed'),
-    path('test/messaging-offline/', TemplateView.as_view(template_name='messaging_offline_test.html'), name='messaging_offline_test'),
+    # Messaging Test Pages - FROZEN FOR MVP
+    # path('test/messaging/', TemplateView.as_view(template_name='test_messaging_architecture.html'), name='test_messaging_architecture'),
+    # path('test/messaging-debug/', TemplateView.as_view(template_name='debug_messaging.html'), name='debug_messaging'),
+    # path('test/messaging-debug-fixed/', TemplateView.as_view(template_name='debug_messaging_fixed.html'), name='debug_messaging_fixed'),
+    # path('test/messaging-offline/', TemplateView.as_view(template_name='messaging_offline_test.html'), name='messaging_offline_test'),
     # PWA Test Pages
     path('test/pwa/', TemplateView.as_view(template_name='pwa_test.html'), name='pwa_test'),
     path('test/pwa-install/', TemplateView.as_view(template_name='pwa_install_test.html'), name='pwa_install_test'),
@@ -96,7 +101,9 @@ urlpatterns = [
     path('groups/', include(('groups.urls', 'groups'), namespace='groups')),
     path('notifications/', include(('notifications.urls', 'notifications'), namespace='notifications')),
     path('courses/', include('courses.urls')),
-    path('messaging/', include(('messaging.urls', 'messaging'), namespace='messaging')),
+    # Messaging - FROZEN FOR MVP - Redirect to home page
+    path('messaging/', redirect_messaging),
+    # path('messaging/', include(('messaging.urls', 'messaging'), namespace='messaging')),
     # JWT Token endpoints (temporarily disabled due to pkg_resources issue)
     # path('api/token/', include('rest_framework_simplejwt.urls')),
 ]

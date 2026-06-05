@@ -51,7 +51,8 @@ INSTALLED_APPS = [
     'posts',
     'groups',
     'notifications',
-    'messaging',
+    # Messaging - FROZEN FOR MVP
+    # 'messaging',
 ]
 
 MIDDLEWARE = [
@@ -193,10 +194,11 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/hour',
         'user': '1000/hour',
-        'message_send': '60/minute',
-        'message_reaction': '30/minute',
-        'conversation_create': '10/minute',
-        'ws_message': '100/minute',
+        # Messaging throttling - FROZEN FOR MVP
+        # 'message_send': '60/minute',
+        # 'message_reaction': '30/minute',
+        # 'conversation_create': '10/minute',
+        # 'ws_message': '100/minute',
     },
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',

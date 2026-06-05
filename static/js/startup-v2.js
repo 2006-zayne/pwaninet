@@ -7,7 +7,12 @@
     'use strict';
     
     const SESSION_KEY = 'pwaninet_launched';
-    
+
+    function isAuthPage() {
+        const path = window.location.pathname;
+        return path.startsWith('/accounts/') || path.endsWith('/register/');
+    }
+
     // Check if this is a fresh PWA launch
     function isFreshLaunch() {
         const alreadyLaunched = sessionStorage.getItem(SESSION_KEY);
@@ -208,6 +213,16 @@
     
     // Main startup flow
     async function startUp() {
+        if (sessionStorage.getItem('showLoginWelcome') === 'true') {
+            showAppImmediately();
+            return;
+        }
+
+        if (isAuthPage()) {
+            showAppImmediately();
+            return;
+        }
+
         // Step 1: Is this a fresh PWA launch?
         if (!isFreshLaunch()) {
             showAppImmediately();

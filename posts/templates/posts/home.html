@@ -358,4 +358,43 @@
   {% include 'users/onboarding/tour.html' %}
   {% include 'users/onboarding/profile_completion_prompt.html' %}
 {% endif %}
+
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (sessionStorage.getItem('showLoginWelcome') !== 'true') return;
+
+    const name = sessionStorage.getItem('loginWelcomeName') || '';
+    const title = name
+        ? 'Welcome to PwaniNet, ' + name + '!'
+        : 'Welcome to PwaniNet!';
+
+    function clearWelcomeFlags() {
+        sessionStorage.removeItem('showLoginWelcome');
+        sessionStorage.removeItem('loginWelcomeName');
+    }
+
+    if (!window.PwaniNetStatusModal) {
+        clearWelcomeFlags();
+        return;
+    }
+
+    window.PwaniNetStatusModal.runSteps([
+        {
+            icon: 'check',
+            title: title,
+            subtitle: 'Great to have you on the feed.',
+            durationMs: 2800,
+        },
+        {
+            icon: 'spinner',
+            title: 'Loading your feed…',
+            subtitle: 'Almost there…',
+            durationMs: 1800,
+        },
+    ], { onComplete: clearWelcomeFlags });
+});
+</script>
 {% endblock %}

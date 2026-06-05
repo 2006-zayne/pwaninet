@@ -402,7 +402,7 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 </script>
-        <div class="post-card p-4 mb-4 border-0 shadow-sm bg-white rounded-4 friend-suggestions-section">
+       <!-- <div class="post-card p-4 mb-4 border-0 shadow-sm bg-white rounded-4 friend-suggestions-section">
             <div class="d-flex align-items-center justify-content-between mb-4">
                 <h6 class="fw-bold text-muted small text-uppercase mb-0"><i class="bi bi-person-plus-fill me-2 text-primary"></i>Suggested Friends</h6>
                 <button class="btn btn-sm btn-link text-muted p-0" style="font-size: 0.75rem;">
@@ -449,8 +449,8 @@ document.head.appendChild(style);
                 </div>
             </div>
         </div>
-        {% else %}
-        <!-- Friend Suggestions Skeleton Loader -->
+        {% else %}-->
+        <!-- Friend Suggestions Skeleton Loader 
         <div class="post-card p-4 mb-4 border-0 shadow-sm bg-white rounded-4 friend-suggestions-section">
             <div class="d-flex align-items-center justify-content-between mb-4">
                 <h6 class="fw-bold text-muted small text-uppercase mb-0">
@@ -460,7 +460,7 @@ document.head.appendChild(style);
             {% include 'posts/partials/friend_skeleton_loader.html' %}
         </div>
         {% endif %}
-    {% endif %}
+    {% endif %}-->
 
 {% empty %}
     {% if not cursor %}
