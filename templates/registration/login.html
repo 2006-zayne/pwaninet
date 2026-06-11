@@ -100,6 +100,14 @@
                             {% csrf_token %}
                             <input type="hidden" name="device_id" id="device_id_field">
                             
+                            {% if form.non_field_errors %}
+                                <div class="alert alert-danger">
+                                    {% for error in form.non_field_errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+
                             {% for field in form %}
                                 <div class="mb-3">
                                     <label class="form-label fw-semibold small" for="{{ field.id_for_label }}">{{ field.label }}</label>
@@ -109,6 +117,9 @@
                                             <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility" tabindex="-1">
                                                 <i class="bi bi-eye" id="passwordToggleIcon"></i>
                                             </button>
+                                        </div>
+                                        <div class="text-end mt-1">
+                                            <a href="{% url 'users:password_reset' %}" class="text-decoration-none small">Forgot password?</a>
                                         </div>
                                     {% else %}
                                         {{ field }}
@@ -201,33 +212,8 @@
         });
     }
 
-    function prefillFromRegistration() {
-        const storedUsername = sessionStorage.getItem('pendingLoginUsername');
-        const storedPassword = sessionStorage.getItem('pendingLoginPassword');
-
-        if (storedUsername && usernameField) {
-            usernameField.value = storedUsername;
-            if (loginWelcomeTitle) {
-                loginWelcomeTitle.textContent = 'Welcome Back, ' + storedUsername + '!';
-            }
-        }
-        if (storedPassword && passwordFieldForValidation) {
-            passwordFieldForValidation.value = storedPassword;
-        }
-
-        sessionStorage.removeItem('pendingLoginUsername');
-        sessionStorage.removeItem('pendingLoginPassword');
-
-        if (passwordFieldForValidation) {
-            passwordFieldForValidation.focus();
-        } else if (usernameField) {
-            usernameField.focus();
-        }
-    }
-
     function runPostRegistrationModal() {
         if (!window.PwaniNetStatusModal) {
-            prefillFromRegistration();
             return;
         }
         window.PwaniNetStatusModal.runSteps([
@@ -243,21 +229,19 @@
                 subtitle: 'Preparing your sign-in form.',
                 durationMs: 1400,
             },
-        ], { onComplete: prefillFromRegistration });
+        ]);
     }
 
-    function initPage() {
-        {% if form.errors %}
-        sessionStorage.removeItem('showLoginWelcome');
-        sessionStorage.removeItem('loginWelcomeName');
-        {% endif %}
+    {% if form.errors %}
+    sessionStorage.removeItem('showLoginWelcome');
+    sessionStorage.removeItem('loginWelcomeName');
+    {% endif %}
 
+    function initPage() {
         const showRegistrationSuccess = sessionStorage.getItem('showRegistrationSuccess') === 'true';
         if (showRegistrationSuccess) {
             sessionStorage.removeItem('showRegistrationSuccess');
             runPostRegistrationModal();
-        } else if (sessionStorage.getItem('pendingLoginUsername')) {
-            prefillFromRegistration();
         }
     }
 
@@ -269,15 +253,6 @@
             e.preventDefault();
             return;
         }
-
-        const welcomeName =
-            sessionStorage.getItem('pendingLoginFirstName') ||
-            usernameField.value.trim();
-        sessionStorage.setItem('showLoginWelcome', 'true');
-        sessionStorage.setItem('loginWelcomeName', welcomeName);
-        sessionStorage.removeItem('pendingLoginUsername');
-        sessionStorage.removeItem('pendingLoginPassword');
-        sessionStorage.removeItem('pendingLoginFirstName');
 
         loginSubmitBtn.disabled = true;
         loginSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing you in…';

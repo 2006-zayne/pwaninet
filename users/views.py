@@ -9,6 +9,9 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
+from django.contrib.auth.tokens import default_token_generator
 from users.models import User, Follow, DeviceAccount
 from posts.models import Post, Like
 from users.forms import PwaniSignupForm, ProfileUpdateForm, NotificationPreferencesForm
@@ -18,6 +21,7 @@ from django.db import transaction
 from notifications.models import Notifications
 from notifications.services.notification_service import invalidate_unread_count_cache, create_notification
 from users.services.device_service import get_or_create_device_id, hash_device_id
+from users.services.email_verification_service import send_verification_email, verify_email_token
 from .serializers import (
     UserSerializer, UserPublicSerializer, FollowSerializer,
     DeviceAccountSerializer, UserUpdateSerializer, NotificationPreferencesSerializer
@@ -31,12 +35,33 @@ def register_view(request):
     if request.method == 'POST':
         form = PwaniSignupForm(request.POST)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Account created successfully. You can now log in.')
+            user = form.save()
+            # Send verification email (non-blocking)
+            send_verification_email(user)
+            messages.success(request, 'Account created successfully. Please check your email for account verification instructions.')
             return redirect('login')
     else:
         form = PwaniSignupForm()
     return render(request, 'users/register.html', {'form': form})
+
+
+def verify_email_view(request, uidb64, token):
+    """
+    Verify email address using token.
+    This is a non-blocking verification - users can still login without verification.
+    """
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    if user is not None and verify_email_token(user, token):
+        messages.success(request, 'Your email has been verified successfully!')
+        return redirect('login')
+    else:
+        messages.error(request, 'The verification link is invalid or has expired. Please request a new verification email.')
+        return redirect('login')
 
 
 @login_required

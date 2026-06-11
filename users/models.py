@@ -83,6 +83,9 @@ class User(AbstractUser):
     # Onboarding tracking
     has_completed_onboarding = models.BooleanField(default=False, help_text="Whether user has completed the onboarding tour")
 
+    # Email verification
+    email_verified = models.BooleanField(default=False, help_text="Whether the user's email address has been verified")
+
     def clean(self):
         super().clean()
         # Ensure only one president exists (only check when role is being set to PRESIDENT)

@@ -8,7 +8,7 @@ class PwaniSignupForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
         model = User
         fields = UserCreationForm.Meta.fields + \
-            ('first_name', 'second_name', 'last_name', 'course', 'year')
+            ('email', 'first_name', 'second_name', 'last_name', 'course', 'year')
 
         # WE use HTMX into the Signup dropdowns HTMX is a form of Java script
         # which is directly injected into the HTML.
@@ -26,6 +26,9 @@ class PwaniSignupForm(UserCreationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # Make email required
+        self.fields['email'].required = True
+
         # To start with an empty Year list
         self.fields['year'].queryset = Year.objects.none()
 
@@ -39,6 +42,24 @@ class PwaniSignupForm(UserCreationForm):
                 pass
         elif self.instance.pk and self.instance.course:
             self.fields['year'].queryset = self.instance.course.years.all()
+
+    def clean_email(self):
+        """Validate that email is unique across all users."""
+        email = self.cleaned_data.get('email')
+        if not email:
+            return email
+
+        # Normalize email to lowercase for consistency
+        email = email.lower()
+
+        # Check if email already exists
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError(
+                "A user with this email address already exists. "
+                "Please use a different email address or log in to your existing account."
+            )
+
+        return email
 
 
 class ProfileUpdateForm(forms.ModelForm):

@@ -583,10 +583,13 @@
 
         .nav-chip {
             color: var(--text-secondary);
-            padding: 10px 18px;
+            padding: 8px 16px;
             border-radius: 12px;
             transition: all 0.2s ease-in-out;
             text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .nav-chip.active { color: var(--primary); }
@@ -1160,11 +1163,11 @@
             </a>
 
             <div class="d-none d-md-flex gap-2">
-                <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
                     <i class="bi bi-house-door-fill" style="font-size: 1.5rem;"></i>
                     <span style="font-size: 0.65rem; font-weight: 600;">Home</span>
                 </a>
-                <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
                     <i class="bi bi-shield-shaded" style="font-size: 1.5rem;"></i>
                     <span style="font-size: 0.65rem; font-weight: 600;">Groups</span>
                 </a>
@@ -1173,12 +1176,12 @@
                  <a href="#" class="nav-chip">
                     <i class="bi bi-chat-dots-fill"></i>
                 </a> -->
-                <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
                     <i class="bi bi-plus-circle-fill" style="font-size: 1.5rem;"></i>
                     <span style="font-size: 0.65rem; font-weight: 600;">Post</span>
                 </a>
                 {% endif %}
-                <a href="{% url 'notifications:notifications' %}" class="nav-chip {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 60px;">
+                <a href="{% url 'notifications:notifications' %}" class="nav-chip {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 60px;">
                     <span style="position: relative; display: inline-block;">
                         <i class="bi bi-bell-fill" style="font-size: 1.5rem;"></i>
                         {% if unread_notifications_count > 0 %}
@@ -1250,11 +1253,11 @@
 
     {% block mobile_bottom_nav %}
         <div class="mobile-bottom-nav d-md-none">
-            <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+            <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
                 <i class="bi bi-house-door-fill"></i>
                 <span style="font-size: 0.55rem; font-weight: 600;">Home</span>
             </a>
-            <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+            <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
                 <i class="bi bi-people-fill"></i>
                 <span style="font-size: 0.55rem; font-weight: 600;">Groups</span>
             </a>
@@ -1263,7 +1266,7 @@
                 {# <a href="#" class="nav-chip position-relative">
                     <i class="bi bi-chat-dots-fill"></i>
                 </a> #}-->
-                <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
                     <i class="bi bi-plus-circle-fill"></i>
                     <span style="font-size: 0.55rem; font-weight: 600;">Post</span>
                 </a>
@@ -1273,7 +1276,7 @@
                     hx-trigger="every 30s"
                     hx-swap="innerHTML"
                     id="notification-badge-container"
-                    style="display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 50px;">
+                    style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 50px;">
                         <span style="position: relative; display: inline-block;">
                             <i class="bi bi-bell-fill"></i>
                             {% if unread_notifications_count > 0 %}
@@ -1286,7 +1289,7 @@
                         </span>
                         <span style="font-size: 0.55rem; font-weight: 600; white-space: nowrap;">Notifications</span>
                 </a>
-                <a href="{% url 'users:profile' request.user.username %}" class="nav-chip {% if request.resolver_match.url_name == 'profile' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <a href="{% url 'users:profile' request.user.username %}" class="nav-chip {% if request.resolver_match.url_name == 'profile' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
                     <i class="bi bi-person-circle"></i>
                     <span style="font-size: 0.55rem; font-weight: 600;">Profile</span>
                 </a>

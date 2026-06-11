@@ -55,12 +55,6 @@
         background-color: var(--card-bg) !important;
         border-color: var(--border) !important;
       }
-      [data-theme="dark"] a {
-        color: #818cf8 !important;
-      }
-      [data-theme="dark"] a:hover {
-        color: #a5b4fc !important;
-      }
     </style>
     <!-- Automatically restore home feed if q is empty -->
     <div hx-get="{% url 'posts:home' %}" hx-trigger="load delay:100ms" hx-target="#main-content-area" hx-swap="innerHTML"></div>

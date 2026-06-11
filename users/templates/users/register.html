@@ -268,7 +268,7 @@
 
     // Form validation
     const registerForm = document.getElementById('registerForm');
-    const requiredFields = ['username', 'password1', 'password2', 'first_name', 'last_name', 'course', 'year'];
+    const requiredFields = ['username', 'email', 'password1', 'password2', 'first_name', 'last_name', 'course', 'year'];
     
     function validateField(field, errorElement) {
         if (!field) return false;
@@ -372,19 +372,6 @@
         if (!isValid) {
             e.preventDefault();
             return;
-        }
-
-        const usernameField = document.getElementById('id_username');
-        const firstNameField = document.getElementById('id_first_name');
-
-        if (usernameField) {
-            sessionStorage.setItem('pendingLoginUsername', usernameField.value);
-        }
-        if (password1Field) {
-            sessionStorage.setItem('pendingLoginPassword', password1Field.value);
-        }
-        if (firstNameField && firstNameField.value.trim()) {
-            sessionStorage.setItem('pendingLoginFirstName', firstNameField.value.trim());
         }
 
         sessionStorage.setItem('showRegistrationSuccess', 'true');
