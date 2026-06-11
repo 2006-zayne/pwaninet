@@ -50,72 +50,6 @@
     margin: 0 auto;
   }
 
-  /* ── Image Preview ── */
-  .preview-images {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: 8px;
-    margin-top: 12px;
-  }
-  .preview-image {
-    position: relative;
-    width: 100%;
-    height: 80px;
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-  }
-  .preview-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .preview-image .remove-btn {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  /* ── Description Input ── */
-  .description-overlay {
-    position: relative;
-    margin-top: 12px;
-    padding: 16px;
-    background: rgba(0, 0, 0, 0.05);
-    backdrop-filter: blur(10px);
-    border-radius: var(--radius-md);
-  }
-  .description-input {
-    width: 100%;
-    background: rgba(0, 0, 0, 0.8);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    color: var(--text-primary);
-    padding: 12px;
-    font-size: 0.9rem;
-    resize: vertical;
-    min-height: 60px;
-  }
-  .description-input::placeholder {
-    color: var(--text-muted);
-  }
-  .description-input:focus {
-    outline: none;
-    border-color: var(--brand);
-    background: rgba(0, 0, 0, 0.9);
-  }
-
   /* ── Page Header ── */
   .page-header {
     display: flex;
@@ -211,22 +145,25 @@
     font-weight: 400;
   }
 
-  /* ── Preview gradient box ── */
-  .compose-preview {
-    margin-top: 0.75rem;
+  /* ── Preview Area (Unified for gradient, images, videos) ── */
+  .preview-area {
+    margin-top: 1rem;
     border-radius: var(--radius-md);
     overflow: hidden;
     display: none;
     width: 100%;
+    aspect-ratio: 1 / 1;
+    position: relative;
   }
 
-  .compose-preview.active {
+  .preview-area.active {
     display: block;
   }
 
+  /* Gradient Preview */
   .gradient-intel-bg {
     width: 100%;
-    aspect-ratio: 1 / 1;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -251,6 +188,110 @@
   .grad-desert   { background: linear-gradient(135deg, #78350f 0%, #f59e0b 100%) !important; }
   .grad-stealth  { background: linear-gradient(135deg, #020617 0%, #475569 100%) !important; }
 
+  /* Image/Video Preview with Swipe */
+  .media-preview-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .media-preview-swipe {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.3s ease;
+  }
+
+  .media-preview-item {
+    min-width: 100%;
+    height: 100%;
+    position: relative;
+  }
+
+  .media-preview-item img,
+  .media-preview-item video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .media-preview-item video {
+    background: #000;
+  }
+
+  .media-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    z-index: 10;
+    transition: background 0.2s;
+  }
+
+  .media-nav-btn:hover {
+    background: rgba(0, 0, 0, 0.7);
+  }
+
+  .media-nav-prev { left: 10px; }
+  .media-nav-next { right: 10px; }
+
+  .media-indicators {
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 10;
+  }
+
+  .media-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .media-indicator.active {
+    background: white;
+  }
+
+  .media-remove-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    z-index: 10;
+    transition: background 0.2s;
+  }
+
+  .media-remove-btn:hover {
+    background: rgba(0, 0, 0, 0.9);
+  }
+
   /* ── Toolbar strip ── */
   .compose-toolbar {
     display: flex;
@@ -264,23 +305,23 @@
   .toolbar-left {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.5rem;
   }
 
   .toolbar-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
     border: none;
     background: transparent;
     color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    justify-content: center;
     cursor: pointer;
-    font-size: 1.05rem;
+    font-size: 1.4rem;
     transition: background 0.15s var(--ease), color 0.15s var(--ease);
     position: relative;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
   }
 
   .toolbar-btn:hover {
@@ -291,6 +332,12 @@
   .toolbar-btn.active {
     background: var(--brand-light);
     color: var(--brand);
+  }
+
+  .toolbar-btn-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
   }
 
   /* ── Expandable panels ── */
@@ -307,6 +354,20 @@
     display: block;
   }
 
+  /* Always visible style selector */
+  .style-selector-always {
+    display: block;
+    margin-top: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: var(--brand-light);
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border);
+  }
+
+  .style-selector-always.hidden {
+    display: none !important;
+  }
+
   .panel-label {
     font-size: 0.65rem;
     font-weight: 800;
@@ -314,6 +375,25 @@
     text-transform: uppercase;
     color: var(--text-muted);
     margin-bottom: 0.75rem;
+  }
+
+  /* Editable preview */
+  .editable-preview {
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    line-height: 1.5;
+    text-align: center;
+    word-wrap: break-word;
+    max-width: 90%;
+    outline: none;
+    cursor: text;
+    min-height: 1.5em;
+  }
+
+  .editable-preview:empty:before {
+    content: "What's on your mind?";
+    opacity: 0.7;
   }
 
   /* ── Sector select ── */
@@ -383,54 +463,6 @@
     color: var(--brand);
   }
 
-  /* ── Media rows ── */
-  .media-row {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.75rem 0;
-  }
-
-  .media-row + .media-row {
-    border-top: 1px solid var(--border);
-  }
-
-  .media-row label {
-    font-size: 0.82rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    width: 90px;
-    flex-shrink: 0;
-    cursor: pointer;
-    margin: 0;
-    transition: color 0.18s var(--ease);
-  }
-
-  .media-row label:hover {
-    color: var(--brand);
-  }
-
-  .media-row label i {
-    font-size: 1rem;
-    color: var(--text-muted);
-    transition: color 0.18s var(--ease);
-  }
-
-  .media-row label:hover i {
-    color: var(--brand);
-  }
-
-  .media-row input[type="file"] {
-    flex: 1;
-    font-size: 0.82rem;
-    color: var(--text-muted);
-    font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
-    font-weight: 500;
-  }
-
   /* ── Deploy button ── */
   .btn-deploy {
     background: var(--brand);
@@ -475,6 +507,90 @@
   /* ── Hidden gradient input ── */
   #id_gradient_class { display: none; }
 
+  /* ── Attachment Modal ── */
+  .attachment-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+  }
+
+  .attachment-modal.show {
+    display: flex;
+  }
+
+  .attachment-modal-content {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    max-width: 400px;
+    width: 90%;
+    border: 1px solid var(--border);
+  }
+
+  .attachment-modal-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: var(--text-primary);
+  }
+
+  .attachment-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+
+  .attachment-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.5rem;
+    background: var(--brand-light);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s var(--ease);
+  }
+
+  .attachment-option:hover {
+    border-color: var(--brand);
+    transform: translateY(-2px);
+  }
+
+  .attachment-option i {
+    font-size: 2rem;
+    color: var(--brand);
+  }
+
+  .attachment-option span {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .attachment-modal-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+  }
+
+  .attachment-modal-close:hover {
+    color: var(--text-primary);
+  }
+
   /* ── Page load animation ── */
   .page-wrap > * {
     animation: page-rise 0.4s var(--ease) both;
@@ -482,6 +598,35 @@
   @keyframes page-rise {
     from { opacity: 0; transform: translateY(12px); }
     to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .toolbar-btn {
+      font-size: 1.2rem;
+      padding: 6px 8px;
+    }
+    .toolbar-btn-label {
+      font-size: 0.55rem;
+    }
+    .media-nav-btn {
+      width: 32px;
+      height: 32px;
+      font-size: 1rem;
+    }
+    .attachment-options {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+    }
+    .attachment-option {
+      padding: 1rem;
+    }
+    .attachment-option i {
+      font-size: 1.5rem;
+    }
+    .attachment-option span {
+      font-size: 0.65rem;
+    }
   }
 </style>
 
@@ -506,6 +651,11 @@
 
         {{ form.gradient_class }}
 
+        <!-- Hidden file inputs (inside form for submission) -->
+        <input type="file" name="images" id="{{ form.images.id_for_label }}" class="form-control-file" multiple accept="image/*" style="display: none;">
+        <input type="file" name="video" id="{{ form.video.id_for_label }}" class="form-control-file" accept="video/*" style="display: none;">
+        <input type="file" name="docs" id="{{ form.docs.id_for_label }}" class="form-control-file" accept=".pdf" style="display: none;">
+
         <div class="compose-body">
           <img src="{{ request.user.profile_pic.url }}" class="compose-avatar" alt="You">
           <div class="compose-right">
@@ -523,6 +673,31 @@
               maxlength="1000"
               rows="4">{{ form.content.value|default:'' }}</textarea>
 
+            <!-- Unified Preview Area (Gradient, Images, Videos) -->
+            <div class="preview-area" id="previewArea">
+              <!-- Gradient Preview (Editable) -->
+              <div class="gradient-intel-bg" id="gradientPreview" style="display: none;">
+                <div id="gradientText" contenteditable="true" class="editable-preview"></div>
+              </div>
+              
+              <!-- Media Preview (Images/Videos with Swipe) -->
+              <div class="media-preview-container" id="mediaPreviewContainer" style="display: none;">
+                <div class="media-preview-swipe" id="mediaSwipe">
+                  <!-- Media items will be added here dynamically -->
+                </div>
+                <button class="media-nav-btn media-nav-prev" id="mediaPrev" style="display: none;">
+                  <i class="bi bi-chevron-left"></i>
+                </button>
+                <button class="media-nav-btn media-nav-next" id="mediaNext" style="display: none;">
+                  <i class="bi bi-chevron-right"></i>
+                </button>
+                <div class="media-indicators" id="mediaIndicators"></div>
+                <button class="media-remove-btn" id="mediaRemove">
+                  <i class="bi bi-x"></i>
+                </button>
+              </div>
+            </div>
+
             <!-- Sector panel -->
             <div class="compose-panel" id="sectorPanel">
               <div class="panel-label">Target Group</div>
@@ -534,46 +709,17 @@
               <div class="sector-hint">Leave as "General" to broadcast to the full feed.</div>
             </div>
 
-            <!-- Style panel -->
-            <div class="compose-panel" id="stylePanel">
+            <!-- Style selector (always visible) -->
+            <div class="style-selector-always" id="stylePanel">
               <div class="panel-label">Background Style</div>
               <div class="style-grid">
-                <div class="style-swatch swatch-none selected" data-value="none" title="Standard">NONE</div>
-                <div class="style-swatch grad-ocean" data-value="grad-ocean" title="Ocean Blue"></div>
+                <div class="style-swatch grad-ocean selected" data-value="grad-ocean" title="Ocean Blue"></div>
                 <div class="style-swatch grad-forest" data-value="grad-forest" title="Forest Green"></div>
+                <div class="style-swatch swatch-none" data-value="none" title="Standard">NONE</div>
                 <div class="style-swatch grad-magma" data-value="grad-magma" title="Magma Red"></div>
                 <div class="style-swatch grad-midnight" data-value="grad-midnight" title="Midnight Purple"></div>
                 <div class="style-swatch grad-desert" data-value="grad-desert" title="Desert Storm"></div>
                 <div class="style-swatch grad-stealth" data-value="grad-stealth" title="Stealth"></div>
-              </div>
-            </div>
-
-            <!-- Media panel -->
-            <div class="compose-panel" id="mediaPanel">
-              <div class="panel-label">Attach Files</div>
-              <div class="media-row">
-                <label for="{{ form.images.id_for_label }}">
-                  <i class="bi bi-images"></i> Images (Max 15)
-                </label>
-                <input type="file" name="images" id="{{ form.images.id_for_label }}" class="form-control-file" multiple accept="image/*">
-              </div>
-              <div class="media-row">
-                <label for="{{ form.video.id_for_label }}">
-                  <i class="bi bi-play-btn"></i> Video
-                </label>
-                {{ form.video }}
-              </div>
-              <div class="media-row" id="audioUploadRow" style="display: none;">
-                <label for="{{ form.audio.id_for_label }}">
-                  <i class="bi bi-music-note"></i> Music/Audio
-                </label>
-                {{ form.audio }}
-              </div>
-              <div class="media-row">
-                <label for="{{ form.docs.id_for_label }}">
-                  <i class="bi bi-file-earmark-pdf"></i> PDF
-                </label>
-                {{ form.docs }}
               </div>
             </div>
 
@@ -582,12 +728,15 @@
               <div class="toolbar-left">
                 <button type="button" class="toolbar-btn" id="toggleSector" title="Target Group">
                   <i class="bi bi-geo-alt-fill"></i>
+                  <span class="toolbar-btn-label">Group</span>
                 </button>
-                <button type="button" class="toolbar-btn" id="toggleStyle" title="Background Style">
-                  <i class="bi bi-palette-fill"></i>
+                <button type="button" class="toolbar-btn" id="toggleTag" title="Tag People">
+                  <i class="bi bi-tag-fill"></i>
+                  <span class="toolbar-btn-label">Tag</span>
                 </button>
-                <button type="button" class="toolbar-btn" id="toggleMedia" title="Attach File">
+                <button type="button" class="toolbar-btn" id="toggleAttachment" title="Attach File">
                   <i class="bi bi-paperclip"></i>
+                  <span class="toolbar-btn-label">Attach</span>
                 </button>
               </div>
 
@@ -602,94 +751,153 @@
           </div>
         </div>
 
-        <!-- Preview Box -->
-        <div class="preview-box" id="previewBox">
-          <div class="preview-header">Preview</div>
-          <div class="preview-content" id="previewTarget">
-            <div class="preview-text" id="previewContent"></div>
-            <!-- Image Preview -->
-            <div id="imagePreviewContainer" style="display: none;">
-              <div class="preview-images" id="previewImages"></div>
-            </div>
-            <!-- Description Input -->
-            <div id="descriptionContainer" style="display: none;">
-              <div class="description-overlay">
-                <textarea 
-                  id="descriptionInput" 
-                  placeholder="Add a description..." 
-                  class="description-input"
-                  rows="3"
-                ></textarea>
-              </div>
-            </div>
-            <!-- Audio Input -->
-            <div id="audioContainer" style="display: none;">
-              <div class="description-overlay">
-                <div class="d-flex align-items-center gap-3 mb-3">
-                  <i class="bi bi-music-note-fill text-primary fs-4"></i>
-                  <div>
-                    <h6 class="mb-0 fw-bold small">Add Music/Audio</h6>
-                    <small class="text-muted">Attach audio to play with your images</small>
-                  </div>
-                </div>
-                {{ form.audio }}
-              </div>
-            </div>
-          </div>
-        </div>
-
       </form>
+    </div>
+  </div>
+
+  <!-- Attachment Modal -->
+  <div class="attachment-modal" id="attachmentModal">
+    <div class="attachment-modal-content">
+      <button class="attachment-modal-close" id="closeAttachmentModal">
+        <i class="bi bi-x"></i>
+      </button>
+      <h3 class="attachment-modal-title">Add Attachment</h3>
+      <div class="attachment-options">
+        <div class="attachment-option" id="attachImages">
+          <i class="bi bi-images"></i>
+          <span>Images</span>
+        </div>
+        <div class="attachment-option" id="attachVideo">
+          <i class="bi bi-play-btn"></i>
+          <span>Video</span>
+        </div>
+        <div class="attachment-option" id="attachDocs">
+          <i class="bi bi-file-earmark-pdf"></i>
+          <span>PDF</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tag Modal (Preparation for future implementation) -->
+  <div class="attachment-modal" id="tagModal">
+    <div class="attachment-modal-content">
+      <button class="attachment-modal-close" id="closeTagModal">
+        <i class="bi bi-x"></i>
+      </button>
+      <h3 class="attachment-modal-title">Tag People</h3>
+      <div id="tagModalContent">
+        <!-- Search and tag functionality will be implemented later -->
+        <p style="color: var(--text-muted); text-align: center; padding: 2rem;">
+          Tag functionality coming soon...
+        </p>
+      </div>
     </div>
   </div>
 
 </div>
 
+{% block mobile_bottom_nav %}
+{% endblock %}
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const textarea    = document.getElementById('id_content');
     const gradInput   = document.getElementById('id_gradient_class');
-    const previewBox  = document.getElementById('previewBox');
-    const previewTgt  = document.getElementById('previewTarget');
-    const previewTxt  = document.getElementById('previewContent');
+    const previewArea = document.getElementById('previewArea');
+    const gradientPreview = document.getElementById('gradientPreview');
+    const gradientText = document.getElementById('gradientText');
+    const mediaPreviewContainer = document.getElementById('mediaPreviewContainer');
+    const mediaSwipe = document.getElementById('mediaSwipe');
+    const mediaPrev = document.getElementById('mediaPrev');
+    const mediaNext = document.getElementById('mediaNext');
+    const mediaIndicators = document.getElementById('mediaIndicators');
+    const mediaRemove = document.getElementById('mediaRemove');
     const deployBtn   = document.getElementById('deployBtn');
     const charCount   = document.getElementById('charCount');
+    const attachmentModal = document.getElementById('attachmentModal');
+    const closeAttachmentModal = document.getElementById('closeAttachmentModal');
+    const tagModal = document.getElementById('tagModal');
+    const closeTagModal = document.getElementById('closeTagModal');
     
-    // New elements for enhanced functionality
-    const audioUploadRow = document.getElementById('audioUploadRow');
+    // File inputs
     const imageInput = document.getElementById('{{ form.images.id_for_label }}');
-    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
-    const previewImages = document.getElementById('previewImages');
-    const descriptionContainer = document.getElementById('descriptionContainer');
-    const descriptionInput = document.getElementById('descriptionInput');
-    const audioContainer = document.getElementById('audioContainer');
+    const videoInput = document.getElementById('{{ form.video.id_for_label }}');
+    const docsInput = document.getElementById('{{ form.docs.id_for_label }}');
 
     const panels = {
         sector: document.getElementById('sectorPanel'),
-        style:  document.getElementById('stylePanel'),
-        media:  document.getElementById('mediaPanel'),
     };
 
     const btns = {
         sector: document.getElementById('toggleSector'),
-        style:  document.getElementById('toggleStyle'),
-        media:  document.getElementById('toggleMedia'),
+        tag: document.getElementById('toggleTag'),
+        attachment: document.getElementById('toggleAttachment'),
     };
+
+    // State
+    let selectedStyle = 'grad-ocean';
+    let mediaFiles = [];
+    let currentMediaIndex = 0;
 
     function togglePanel(name) {
         Object.keys(panels).forEach(k => {
             const isTarget = k === name;
             const alreadyOpen = panels[k].classList.contains('open');
             panels[k].classList.toggle('open', isTarget && !alreadyOpen);
-            btns[k].classList.toggle('active', isTarget && !alreadyOpen);
+            if (btns[k]) {
+                btns[k].classList.toggle('active', isTarget && !alreadyOpen);
+            }
         });
     }
 
     btns.sector.addEventListener('click', () => togglePanel('sector'));
-    btns.style.addEventListener('click',  () => togglePanel('style'));
-    btns.media.addEventListener('click',  () => togglePanel('media'));
+    btns.tag.addEventListener('click', () => {
+        tagModal.classList.add('show');
+    });
+    btns.attachment.addEventListener('click', () => {
+        attachmentModal.classList.add('show');
+    });
+
+    // Close attachment modal
+    closeAttachmentModal.addEventListener('click', () => {
+        attachmentModal.classList.remove('show');
+    });
+
+    attachmentModal.addEventListener('click', (e) => {
+        if (e.target === attachmentModal) {
+            attachmentModal.classList.remove('show');
+        }
+    });
+
+    // Close tag modal
+    closeTagModal.addEventListener('click', () => {
+        tagModal.classList.remove('show');
+    });
+
+    tagModal.addEventListener('click', (e) => {
+        if (e.target === tagModal) {
+            tagModal.classList.remove('show');
+        }
+    });
+
+    // Attachment options
+    document.getElementById('attachImages').addEventListener('click', () => {
+        imageInput.click();
+        attachmentModal.classList.remove('show');
+    });
+
+    document.getElementById('attachVideo').addEventListener('click', () => {
+        videoInput.click();
+        attachmentModal.classList.remove('show');
+    });
+
+    document.getElementById('attachDocs').addEventListener('click', () => {
+        docsInput.click();
+        attachmentModal.classList.remove('show');
+    });
 
     // Style swatches
-    let selectedStyle = 'none';
     document.querySelectorAll('.style-swatch').forEach(swatch => {
         swatch.addEventListener('click', function () {
             document.querySelectorAll('.style-swatch').forEach(s => s.classList.remove('selected'));
@@ -700,92 +908,290 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Textarea
-    textarea.addEventListener('input', updatePreview);
+    // Sync editable preview with hidden textarea
+    const editablePreview = document.getElementById('gradientText');
+    
+    editablePreview.addEventListener('input', function() {
+        textarea.value = this.innerText;
+        updatePreview();
+    });
 
-    function updatePreview() {
-        const text = textarea.value;
-        const len  = text.length;
-        charCount.textContent = len + ' / 1000';
-        charCount.className   = len > 900 ? 'danger' : len > 750 ? 'warn' : '';
-        deployBtn.disabled    = text.trim() === '';
+    // Textarea input (for when user types in hidden textarea)
+    textarea.addEventListener('input', function() {
+        editablePreview.innerText = this.value;
+        updatePreview();
+    });
 
-        if (selectedStyle !== 'none' && text.trim() !== '') {
-            previewTgt.className = 'gradient-intel-bg rounded-3 ' + selectedStyle;
-            previewTxt.textContent = text;
-            previewBox.classList.add('active');
-        } else {
-            previewBox.classList.remove('active');
-        }
-    }
+    // File input handling
+    imageInput.addEventListener('change', handleImageUpload);
+    videoInput.addEventListener('change', handleVideoUpload);
+    docsInput.addEventListener('change', handleDocsUpload);
 
-    // Post type detection and media handling
-    function detectPostType() {
-        const content = textarea.value.trim();
-        const hasImages = imageInput.files && imageInput.files.length > 0;
-        
-        if (hasImages) {
-            // Show image preview, description, and audio option
-            imagePreviewContainer.style.display = 'block';
-            descriptionContainer.style.display = 'block';
-            audioContainer.style.display = 'block';
-            audioUploadRow.style.display = 'none';
-            handleImagePreview();
-        } else {
-            // Hide image preview, description, and audio option
-            imagePreviewContainer.style.display = 'none';
-            descriptionContainer.style.display = 'none';
-            audioContainer.style.display = 'none';
-            audioUploadRow.style.display = 'block';
-        }
-    }
-
-    // Image preview handling
-    function handleImagePreview() {
-        previewImages.innerHTML = '';
-        const files = Array.from(imageInput.files);
-        
-        files.forEach((file, index) => {
+    function handleImageUpload(e) {
+        const files = Array.from(e.target.files);
+        files.forEach(file => {
             if (file.type.startsWith('image/')) {
                 const reader = new FileReader();
-                reader.onload = function(e) {
-                    const div = document.createElement('div');
-                    div.className = 'preview-image';
-                    div.innerHTML = `
-                        <img src="${e.target.result}" alt="Preview ${index + 1}">
-                        <button class="remove-btn" onclick="removeImagePreview(${index})">
-                            <i class="bi bi-x"></i>
-                        </button>
-                    `;
-                    previewImages.appendChild(div);
+                reader.onload = function(event) {
+                    mediaFiles.push({
+                        type: 'image',
+                        file: file,
+                        url: event.target.result
+                    });
+                    // Set gradient to 'none' when media is attached
+                    gradInput.value = 'none';
+                    selectedStyle = 'none';
+                    updateMediaPreview();
+                    updatePreview();
                 };
                 reader.readAsDataURL(file);
             }
         });
     }
 
-    // Remove image preview
-    function removeImagePreview(index) {
-        const dt = new DataTransfer();
-        const files = Array.from(imageInput.files);
-        files.splice(index, 1);
-        dt.items.add(files);
-        imageInput.files = dt.files;
-        handleImagePreview();
+    function handleVideoUpload(e) {
+        const file = e.target.files[0];
+        console.log('Video upload triggered, file:', file);
+        console.log('File type:', file ? file.type : 'No file');
+        console.log('File size:', file ? (file.size / 1024 / 1024).toFixed(2) + 'MB' : 'No file');
+        
+        if (file && file.type.startsWith('video/')) {
+            // Check file size (150MB limit from validator)
+            const maxSize = 150 * 1024 * 1024; // 150MB
+            if (file.size > maxSize) {
+                alert('Video file too large! Maximum allowed is 150MB.');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                mediaFiles.push({
+                    type: 'video',
+                    file: file,
+                    url: event.target.result
+                });
+                console.log('Video added to mediaFiles:', mediaFiles);
+                // Set gradient to 'none' when media is attached
+                gradInput.value = 'none';
+                selectedStyle = 'none';
+                updateMediaPreview();
+                updatePreview();
+            };
+            reader.readAsDataURL(file);
+        } else if (file) {
+            alert('Please select a valid video file.');
+        }
     }
 
-    // Initialize post type detection
-    imageInput.addEventListener('change', detectPostType);
-    textarea.addEventListener('input', function() {
-        detectPostType();
+    function handleDocsUpload(e) {
+        // For PDF, just show a preview icon
+        const file = e.target.files[0];
+        if (file) {
+            mediaFiles.push({
+                type: 'docs',
+                file: file,
+                url: null
+            });
+            // Set gradient to 'none' when media is attached
+            gradInput.value = 'none';
+            selectedStyle = 'none';
+            updateMediaPreview();
+            updatePreview();
+        }
+    }
+
+    function updateMediaPreview() {
+        if (mediaFiles.length === 0) {
+            mediaPreviewContainer.style.display = 'none';
+            previewArea.classList.remove('active');
+            updatePreview();
+            return;
+        }
+
+        mediaPreviewContainer.style.display = 'block';
+        previewArea.classList.add('active');
+        gradientPreview.style.display = 'none';
         updatePreview();
+        
+        mediaSwipe.innerHTML = '';
+        mediaIndicators.innerHTML = '';
+
+        mediaFiles.forEach((media, index) => {
+            const item = document.createElement('div');
+            item.className = 'media-preview-item';
+            
+            if (media.type === 'image') {
+                item.innerHTML = `<img src="${media.url}" alt="Preview ${index + 1}">`;
+            } else if (media.type === 'video') {
+                item.innerHTML = `<video src="${media.url}" controls></video>`;
+            } else if (media.type === 'docs') {
+                item.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: var(--brand-light);">
+                        <i class="bi bi-file-earmark-pdf" style="font-size: 4rem; color: var(--brand);"></i>
+                    </div>
+                `;
+            }
+            
+            mediaSwipe.appendChild(item);
+
+            // Add indicator
+            const indicator = document.createElement('div');
+            indicator.className = 'media-indicator' + (index === currentMediaIndex ? ' active' : '');
+            indicator.addEventListener('click', () => goToMediaSlide(index));
+            mediaIndicators.appendChild(indicator);
+        });
+
+        // Show/hide navigation buttons
+        if (mediaFiles.length > 1) {
+            mediaPrev.style.display = 'flex';
+            mediaNext.style.display = 'flex';
+        } else {
+            mediaPrev.style.display = 'none';
+            mediaNext.style.display = 'none';
+        }
+
+        updateMediaSlide();
+    }
+
+    function updateMediaSlide() {
+        const offset = -currentMediaIndex * 100;
+        mediaSwipe.style.transform = `translateX(${offset}%)`;
+        
+        // Update indicators
+        const indicators = mediaIndicators.querySelectorAll('.media-indicator');
+        indicators.forEach((ind, index) => {
+            ind.classList.toggle('active', index === currentMediaIndex);
+        });
+    }
+
+    function goToMediaSlide(index) {
+        currentMediaIndex = index;
+        updateMediaSlide();
+    }
+
+    mediaPrev.addEventListener('click', () => {
+        if (currentMediaIndex > 0) {
+            currentMediaIndex--;
+            updateMediaSlide();
+        }
     });
+
+    mediaNext.addEventListener('click', () => {
+        if (currentMediaIndex < mediaFiles.length - 1) {
+            currentMediaIndex++;
+            updateMediaSlide();
+        }
+    });
+
+    mediaRemove.addEventListener('click', () => {
+        mediaFiles.splice(currentMediaIndex, 1);
+        if (currentMediaIndex >= mediaFiles.length && mediaFiles.length > 0) {
+            currentMediaIndex = mediaFiles.length - 1;
+        }
+        updateMediaPreview();
+    });
+
+    function updatePreview() {
+        const text = textarea.value;
+        const len  = text.length;
+        charCount.textContent = len + ' / 1000';
+        charCount.className   = len > 900 ? 'danger' : len > 750 ? 'warn' : '';
+        deployBtn.disabled    = text.trim() === '' && mediaFiles.length === 0;
+
+        const stylePanel = document.getElementById('stylePanel');
+
+        // Show media preview if files are attached
+        if (mediaFiles.length > 0) {
+            mediaPreviewContainer.style.display = 'block';
+            previewArea.classList.add('active');
+            gradientPreview.style.display = 'none';
+            // Show textarea for text input when media is attached
+            textarea.style.display = 'block';
+            // Hide gradient selector when media is attached
+            stylePanel.classList.add('hidden');
+        }
+        // Show gradient preview if style is selected (even without text)
+        else if (selectedStyle !== 'none') {
+            gradientPreview.style.display = 'flex';
+            gradientPreview.className = 'gradient-intel-bg ' + selectedStyle;
+            // Only update text if it's different to avoid cursor jumping
+            if (editablePreview.innerText !== text) {
+                editablePreview.innerText = text;
+            }
+            previewArea.classList.add('active');
+            mediaPreviewContainer.style.display = 'none';
+            // Hide textarea when gradient is selected
+            textarea.style.display = 'none';
+            // Show gradient selector when no media
+            stylePanel.classList.remove('hidden');
+        } else {
+            // None gradient selected - show normal textarea
+            gradientPreview.style.display = 'none';
+            previewArea.classList.remove('active');
+            textarea.style.display = 'block';
+            // Show gradient selector when no media
+            stylePanel.classList.remove('hidden');
+        }
+    }
 
     // Auto-grow textarea
     textarea.addEventListener('input', function () {
         this.style.height = 'auto';
         this.style.height = this.scrollHeight + 'px';
     });
+
+    // Form submit handler - ensure files are attached
+    document.getElementById('postForm').addEventListener('submit', function(e) {
+        console.log('Form submit triggered');
+        console.log('mediaFiles:', mediaFiles);
+        
+        // Create a FormData object and manually attach files from mediaFiles array
+        const formData = new FormData(this);
+        
+        // Clear existing file inputs
+        imageInput.value = '';
+        videoInput.value = '';
+        docsInput.value = '';
+        
+        // Re-attach files from mediaFiles array to appropriate inputs
+        const images = mediaFiles.filter(m => m.type === 'image').map(m => m.file);
+        const videos = mediaFiles.filter(m => m.type === 'video').map(m => m.file);
+        const docs = mediaFiles.filter(m => m.type === 'docs').map(m => m.file);
+        
+        console.log('Images to attach:', images.length);
+        console.log('Videos to attach:', videos.length);
+        console.log('Docs to attach:', docs.length);
+        
+        // Create FileList for images (multiple)
+        if (images.length > 0) {
+            const dataTransfer = new DataTransfer();
+            images.forEach(file => dataTransfer.items.add(file));
+            imageInput.files = dataTransfer.files;
+            console.log('Images attached to input:', imageInput.files.length);
+        }
+        
+        // Attach single video file
+        if (videos.length > 0) {
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(videos[0]);
+            videoInput.files = dataTransfer.files;
+            console.log('Video attached to input:', videoInput.files.length, videoInput.files[0].name);
+        }
+        
+        // Attach single docs file
+        if (docs.length > 0) {
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(docs[0]);
+            docsInput.files = dataTransfer.files;
+            console.log('Docs attached to input:', docsInput.files.length);
+        }
+        
+        console.log('gradient_class value:', gradInput.value);
+    });
+
+    // Initialize preview on page load
+    editablePreview.innerText = textarea.value || '';
+    updatePreview();
 });
 </script>
 {% endblock %}

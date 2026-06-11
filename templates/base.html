@@ -542,7 +542,7 @@
             }
 
             .mobile-bottom-nav .nav-chip i {
-                font-size: 1.3rem;
+                font-size: 1.6rem;
             }
             
             .mobile-bottom-nav .nav-chip {
@@ -589,7 +589,7 @@
             text-decoration: none;
         }
 
-        .nav-chip.active { background: var(--primary-light); color: var(--primary); }
+        .nav-chip.active { color: var(--primary); }
 
         .mobile-bottom-nav {
             background: var(--mobile-nav-bg);
@@ -611,7 +611,7 @@
         }
 
         .mobile-bottom-nav .nav-chip i {
-            font-size: 1.4rem;
+            font-size: 1.8rem;
         }
 
         .mobile-bottom-nav .nav-chip {
@@ -627,16 +627,6 @@
 
         .mobile-bottom-nav .nav-chip.active {
             color: var(--primary);
-            background: var(--primary-light);
-        }
-
-        /* Mobile bottom nav active indicator */
-        [data-theme="dark"] .mobile-bottom-nav .nav-chip.active {
-            color: #9ca3af !important;
-            background: var(--border) !important;
-        }
-        [data-theme="dark"] .mobile-bottom-nav .nav-chip.active:hover {
-            color: #d1d5db !important;
         }
 
         /* Modal Styles - Custom backdrop solution */
@@ -1170,23 +1160,36 @@
             </a>
 
             <div class="d-none d-md-flex gap-2">
-                <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
-                    <i class="bi bi-house-door-fill"></i>
+                <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                    <i class="bi bi-house-door-fill" style="font-size: 1.5rem;"></i>
+                    <span style="font-size: 0.65rem; font-weight: 600;">Home</span>
                 </a>
-                <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}">
-                    <i class="bi bi-shield-shaded"></i>
+                <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                    <i class="bi bi-shield-shaded" style="font-size: 1.5rem;"></i>
+                    <span style="font-size: 0.65rem; font-weight: 600;">Groups</span>
                 </a>
                 {% if request.user.is_authenticated %}
                 <!--{# Messaging navigation - FROZEN FOR MVP #}
                  <a href="#" class="nav-chip">
                     <i class="bi bi-chat-dots-fill"></i>
                 </a> -->
-                <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}">
-                    <i class="bi bi-plus-circle-fill"></i>
+                <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                    <i class="bi bi-plus-circle-fill" style="font-size: 1.5rem;"></i>
+                    <span style="font-size: 0.65rem; font-weight: 600;">Post</span>
                 </a>
                 {% endif %}
-                <a href="{% url 'notifications:notifications' %}" class="nav-chip">
-                    <i class="bi bi-bell-fill"></i>
+                <a href="{% url 'notifications:notifications' %}" class="nav-chip {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 60px;">
+                    <span style="position: relative; display: inline-block;">
+                        <i class="bi bi-bell-fill" style="font-size: 1.5rem;"></i>
+                        {% if unread_notifications_count > 0 %}
+                            <span class="position-absolute badge rounded-pill bg-danger border border-light" 
+                                style="font-size: 0.65rem; padding: 0.3em 0.45em; min-width: 18px; text-align: center; top: -4px; right: -6px; z-index: 10;">
+                                {{ unread_notifications_count }}
+                                <span class="visually-hidden">unread messages</span>
+                            </span>
+                        {% endif %}
+                    </span>
+                    <span style="font-size: 0.65rem; font-weight: 600; white-space: nowrap;">Notifications</span>
                 </a>
             </div>
 
@@ -1247,30 +1250,46 @@
 
     {% block mobile_bottom_nav %}
         <div class="mobile-bottom-nav d-md-none">
-            <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}"><i class="bi bi-house-door-fill"></i></a>
-            <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}"><i class="bi bi-people-fill"></i></a>
+            <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <i class="bi bi-house-door-fill"></i>
+                <span style="font-size: 0.55rem; font-weight: 600;">Home</span>
+            </a>
+            <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <i class="bi bi-people-fill"></i>
+                <span style="font-size: 0.55rem; font-weight: 600;">Groups</span>
+            </a>
             {% if user.is_authenticated %}
                 <!--{# Messaging navigation - FROZEN FOR MVP #}
                 {# <a href="#" class="nav-chip position-relative">
                     <i class="bi bi-chat-dots-fill"></i>
                 </a> #}-->
-                <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}"><i class="bi bi-plus-circle-fill"></i></a>
+                <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                    <i class="bi bi-plus-circle-fill"></i>
+                    <span style="font-size: 0.55rem; font-weight: 600;">Post</span>
+                </a>
                 <a href="{% url 'notifications:notifications' %}"
-                    class="nav-chip position-relative {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
+                    class="nav-chip {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
                     hx-get="{% url 'notifications:unread_notification_count' %}" 
                     hx-trigger="every 30s"
                     hx-swap="innerHTML"
-                    id="notification-badge-container">
-                        <i class="bi bi-bell-fill"></i>
-                        {% if unread_notifications_count > 0 %}
-                            <span class="position-absolute top-0 end-0 translate-middle badge rounded-pill bg-danger border border-light" 
-                                style="font-size: 0.6rem; padding: 0.35em 0.5em; min-width: 18px; text-align: center; margin-top: -2px; margin-right: -2px;">
-                                {{ unread_notifications_count }}
-                                <span class="visually-hidden">unread messages</span>
-                            </span>
-                        {% endif %}
+                    id="notification-badge-container"
+                    style="display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 50px;">
+                        <span style="position: relative; display: inline-block;">
+                            <i class="bi bi-bell-fill"></i>
+                            {% if unread_notifications_count > 0 %}
+                                <span class="position-absolute badge rounded-pill bg-danger border border-light" 
+                                    style="font-size: 0.65rem; padding: 0.3em 0.45em; min-width: 18px; text-align: center; top: -4px; right: -6px; z-index: 10;">
+                                    {{ unread_notifications_count }}
+                                    <span class="visually-hidden">unread messages</span>
+                                </span>
+                            {% endif %}
+                        </span>
+                        <span style="font-size: 0.55rem; font-weight: 600; white-space: nowrap;">Notifications</span>
                 </a>
-                <a href="{% url 'users:profile' request.user.username %}" class="nav-chip {% if request.resolver_match.url_name == 'profile' %}active{% endif %}"><i class="bi bi-person-circle"></i></a>
+                <a href="{% url 'users:profile' request.user.username %}" class="nav-chip {% if request.resolver_match.url_name == 'profile' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                    <i class="bi bi-person-circle"></i>
+                    <span style="font-size: 0.55rem; font-weight: 600;">Profile</span>
+                </a>
             {% endif %}
         </div>
     {% endblock %}

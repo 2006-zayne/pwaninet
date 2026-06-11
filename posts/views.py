@@ -3,10 +3,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from celery.result import AsyncResult
 
 from .models import Post, Comment, Report, Like, Repost, HiddenPost, AuthorPreference, SharedPost
 from .serializers import (
@@ -514,11 +515,27 @@ def home_view(request):
 
 @login_required
 def create_post_view(request):
+    import logging
+    logger = logging.getLogger(__name__)
+    
     group_id = request.GET.get('group_id')
     if request.method == 'POST':
+        logger.info(f"POST request received. FILES keys: {list(request.FILES.keys())}")
+        logger.info(f"POST data keys: {list(request.POST.keys())}")
+        
         form = PostForm(request.POST, request.FILES, user=request.user)
+        logger.info(f"Form is valid: {form.is_valid()}")
+        if not form.is_valid():
+            logger.error(f"Form errors: {form.errors}")
+        
         if form.is_valid():
-            create_post_for_user(form, request.user, request.FILES, group_id=group_id)
+            logger.info(f"Calling create_post_for_user with FILES: {request.FILES}")
+            post = create_post_for_user(form, request.user, request.FILES, group_id=group_id)
+            logger.info(f"Post created with ID: {post.id}")
+            logger.info(f"Post images count: {post.images.count()}")
+            logger.info(f"Post video: {post.video}")
+            logger.info(f"Post docs: {post.docs}")
+            logger.info(f"Post audio: {post.audio}")
             messages.success(request, 'Post created successfully.')
             return redirect('posts:home')
     else:
@@ -803,6 +820,19 @@ def search_user_groups(request):
     if query:
         groups = groups.filter(name__icontains=query)
     
-    groups = groups[:10]
-    
     return render(request, 'posts/partials/share_group_results.html', {'groups': groups})
+
+
+@login_required
+def task_status_view(request, task_id):
+    """API endpoint to check Celery task status for progress tracking"""
+    from .tasks import create_post_with_media
+    
+    task = AsyncResult(task_id, app=create_post_with_media)
+    
+    response_data = {
+        'state': task.state,
+        'meta': task.info if task.state != 'FAILURE' else {'status': str(task.info)}
+    }
+    
+    return JsonResponse(response_data)

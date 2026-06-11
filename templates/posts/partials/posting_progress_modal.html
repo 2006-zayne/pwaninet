@@ -1,0 +1,256 @@
+<!-- Posting Progress Modal -->
+<div id="postingProgressModal" class="posting-progress-modal" style="display: none;">
+    <div class="posting-progress-content">
+        <div class="posting-progress-header">
+            <div class="posting-progress-icon">
+                <i class="bi bi-arrow-repeat" id="postingIcon"></i>
+            </div>
+            <div class="posting-progress-text">
+                <span id="postingStatus">Posting...</span>
+                <span id="postingPercentage" class="posting-percentage">0%</span>
+            </div>
+        </div>
+        <div class="posting-progress-bar-container">
+            <div class="posting-progress-bar" id="postingProgressBar"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+.posting-progress-modal {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    max-width: 400px;
+    width: 90%;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    animation: slideDown 0.3s ease;
+}
+
+[data-theme="dark"] .posting-progress-modal {
+    background: #242526;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.posting-progress-content {
+    padding: 16px;
+}
+
+.posting-progress-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.posting-progress-icon {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
+}
+
+.posting-progress-icon.success {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+.posting-progress-icon.error {
+    background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+}
+
+.posting-progress-icon i {
+    animation: spin 1s linear infinite;
+}
+
+.posting-progress-icon.success i,
+.posting-progress-icon.error i {
+    animation: none;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.posting-progress-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+#postingStatus {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+[data-theme="dark"] #postingStatus {
+    color: #e4e6eb;
+}
+
+.posting-percentage {
+    font-size: 12px;
+    color: #65676b;
+    margin-top: 2px;
+}
+
+[data-theme="dark"] .posting-percentage {
+    color: #b0b3b8;
+}
+
+.posting-progress-bar-container {
+    width: 100%;
+    height: 6px;
+    background: #e4e6eb;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+[data-theme="dark"] .posting-progress-bar-container {
+    background: #3a3b3c;
+}
+
+.posting-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.posting-progress-bar.success {
+    background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%);
+}
+
+.posting-progress-bar.error {
+    background: linear-gradient(90deg, #eb3349 0%, #f45c43 100%);
+}
+</style>
+
+<script>
+// Posting progress management
+class PostingProgressManager {
+    constructor() {
+        this.modal = document.getElementById('postingProgressModal');
+        this.progressBar = document.getElementById('postingProgressBar');
+        this.statusText = document.getElementById('postingStatus');
+        this.percentageText = document.getElementById('postingPercentage');
+        this.icon = document.getElementById('postingIcon');
+        this.taskId = null;
+        this.checkInterval = null;
+    }
+
+    show() {
+        this.modal.style.display = 'block';
+        this.reset();
+    }
+
+    hide() {
+        this.modal.style.display = 'none';
+        this.stopChecking();
+    }
+
+    reset() {
+        this.progressBar.style.width = '0%';
+        this.progressBar.classList.remove('success', 'error');
+        this.icon.classList.remove('success', 'error');
+        this.icon.innerHTML = '<i class="bi bi-arrow-repeat"></i>';
+        this.statusText.textContent = 'Posting...';
+        this.percentageText.textContent = '0%';
+    }
+
+    updateProgress(current, total, status) {
+        const percentage = Math.round((current / total) * 100);
+        this.progressBar.style.width = percentage + '%';
+        this.statusText.textContent = status;
+        this.percentageText.textContent = percentage + '%';
+    }
+
+    setSuccess() {
+        this.progressBar.style.width = '100%';
+        this.progressBar.classList.add('success');
+        this.icon.classList.add('success');
+        this.icon.innerHTML = '<i class="bi bi-check-lg"></i>';
+        this.statusText.textContent = 'Posted!';
+        this.percentageText.textContent = '100%';
+        
+        // Auto-hide after 2 seconds
+        setTimeout(() => this.hide(), 2000);
+    }
+
+    setError(message) {
+        this.progressBar.classList.add('error');
+        this.icon.classList.add('error');
+        this.icon.innerHTML = '<i class="bi bi-x-lg"></i>';
+        this.statusText.textContent = message || 'Failed to post';
+        this.percentageText.textContent = 'Error';
+        
+        // Auto-hide after 3 seconds
+        setTimeout(() => this.hide(), 3000);
+    }
+
+    startChecking(taskId) {
+        this.taskId = taskId;
+        this.checkInterval = setInterval(() => this.checkProgress(), 1000);
+    }
+
+    stopChecking() {
+        if (this.checkInterval) {
+            clearInterval(this.checkInterval);
+            this.checkInterval = null;
+        }
+        this.taskId = null;
+    }
+
+    async checkProgress() {
+        if (!this.taskId) return;
+
+        try {
+            const response = await fetch(`/api/posts/task-status/${this.taskId}/`);
+            const data = await response.json();
+
+            if (data.state === 'SUCCESS') {
+                this.setSuccess();
+                this.stopChecking();
+            } else if (data.state === 'FAILURE') {
+                this.setError(data.meta?.status || 'Failed to post');
+                this.stopChecking();
+            } else if (data.state === 'PROGRESS') {
+                const meta = data.meta || {};
+                this.updateProgress(
+                    meta.current || 0,
+                    meta.total || 100,
+                    meta.status || 'Processing...'
+                );
+            }
+        } catch (error) {
+            console.error('Error checking progress:', error);
+            this.setError('Connection error');
+            this.stopChecking();
+        }
+    }
+}
+
+// Initialize global progress manager
+window.postingProgressManager = new PostingProgressManager();
+</script>

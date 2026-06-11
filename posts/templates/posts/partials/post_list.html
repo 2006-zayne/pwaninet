@@ -1,6 +1,5 @@
 {% for post in posts %}
     {% include 'posts/partials/post_card.html' %}
-
     {% if forloop.counter == suggestion_index %}
         <!-- In-Feed Friend Suggestions -->
         {% if suggested_users %}

@@ -1,6 +1,6 @@
 from django import forms
 from posts.models import Post
-from posts.validators import validate_audio_size
+from posts.validators import validate_audio_size, validate_video_size, validate_document_size
 from courses.models import Unit
 
 
@@ -17,14 +17,18 @@ class PostForm(forms.ModelForm):
     # save video and docs as optional fields
     video = forms.FileField(
         required=False,
+        validators=[validate_video_size],
         widget=forms.ClearableFileInput(
             attrs={
-                'class': 'form-control-file'}))
+                'class': 'form-control-file',
+                'accept': 'video/*'}))
     docs = forms.FileField(
         required=False,
+        validators=[validate_document_size],
         widget=forms.ClearableFileInput(
             attrs={
-                'class': 'form-control-file'}))
+                'class': 'form-control-file',
+                'accept': '.pdf'}))
     audio = forms.FileField(
         required=False,
         validators=[validate_audio_size],
@@ -49,7 +53,6 @@ class PostForm(forms.ModelForm):
             'video',
             'docs',
             'audio',
-            'images',
             'gradient_class']
 
         widgets = {

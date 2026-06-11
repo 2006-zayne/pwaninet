@@ -353,9 +353,10 @@
         </div>
     </div>
 
-    <div class="{% if post.repost_of %}{% if post.repost_of.gradient_class != 'none' %}{{ post.repost_of.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %}{% else %}{% if post.gradient_class != 'none' %}{{ post.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %}{% endif %}">
-        <p class="mb-0 {% if post.repost_of %}{% if post.repost_of.gradient_class != 'none' %}text-white fw-bold fs-3{% else %}text-dark{% endif %}{% else %}{% if post.gradient_class != 'none' %}text-white fw-bold fs-3{% else %}text-dark{% endif %}{% endif %}"
-           style="{% if post.repost_of %}{% if post.repost_of.gradient_class == 'none' %}font-size: 15px;{% endif %}{% else %}{% if post.gradient_class == 'none' %}font-size: 15px;{% endif %}{% endif %} line-height: 1.5;">
+    {% with post_obj=post.repost_of|default:post %}
+        {% if post_obj.gradient_class != 'none' and not post_obj.images.exists and not post_obj.video and not post_obj.docs and not post_obj.audio %}
+    <div class="{{ post_obj.gradient_class }} gradient-intel-bg text-center">
+        <p class="mb-0 text-white fw-bold fs-3" style="line-height: 1.5;">
             {% if post.repost_of %}
                 {% if post.content %}<p class="mb-2 text-dark" style="font-size: 14px;">{{ post.content }}</p>{% endif %}
                 {{ post.repost_of.content }}
@@ -364,6 +365,19 @@
             {% endif %}
         </p>
     </div>
+        {% else %}
+    <div class="px-3 pb-3">
+        <p class="mb-0 text-dark" style="font-size: 15px; line-height: 1.5;">
+            {% if post.repost_of %}
+                {% if post.content %}<p class="mb-2 text-dark" style="font-size: 14px;">{{ post.content }}</p>{% endif %}
+                {{ post.repost_of.content }}
+            {% else %}
+                {{ post.content }}
+            {% endif %}
+        </p>
+    </div>
+        {% endif %}
+    {% endwith %}
 
     {% if post.audio %}
     <div class="post-media border-top border-bottom bg-light" data-media-type="audio" data-post-id="{{ post.id }}">

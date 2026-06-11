@@ -26,7 +26,7 @@ class Post(models.Model):
     video = models.FileField(upload_to='posts/videos', blank=True, null=True)
     docs = models.FileField(upload_to='posts/docs', blank=True, null=True)
     audio = models.FileField(upload_to='posts/audio', blank=True, null=True, help_text='Attach music/audio to post')
-    gradient_class = models.CharField(max_length=50, choices=GRADIENT_CHOICES, default='none', blank=True)
+    gradient_class = models.CharField(max_length=50, choices=GRADIENT_CHOICES, default='grad-ocean', blank=True)
     repost_of = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='repost_children')
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
