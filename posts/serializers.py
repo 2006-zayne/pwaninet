@@ -80,6 +80,13 @@ class PostCreateSerializer(serializers.ModelSerializer):
             'image', 'video', 'docs', 'audio', 'gradient_class'
         ]
 
+    def validate_content(self, value):
+        if value and len(value) > 2500:
+            raise serializers.ValidationError(
+                "Post content cannot exceed 2500 characters."
+            )
+        return value
+
     def validate_group(self, value):
         request = self.context['request']
         if value:

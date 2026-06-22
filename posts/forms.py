@@ -76,3 +76,9 @@ class PostForm(forms.ModelForm):
                 course=user.course,
                 year=user.year
             )
+
+    def clean_content(self):
+        content = self.cleaned_data.get('content')
+        if content and len(content) > 2500:
+            raise forms.ValidationError("Post content cannot exceed 2500 characters.")
+        return content

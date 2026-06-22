@@ -573,7 +573,7 @@
             
             <div class="tab-content" id="profileTabContent">
                 <!-- Posts Tab -->
-                <div class="tab-pane fade show active" id="posts-content" role="tabpanel" data-skeleton="post-feed">
+                <div class="tab-pane fade show active" id="posts-content" role="tabpanel" data-skeleton="profile">
                     <div class="intel-stream">
                         {% for post in posts %}
                             {% include 'posts/partials/post_card.html' %}
@@ -585,9 +585,9 @@
                         {% endfor %}
                     </div>
                 </div>
-                
+
                 <!-- Shared Posts Tab -->
-                <div class="tab-pane fade" id="shared-content" role="tabpanel" data-skeleton="post-feed">
+                <div class="tab-pane fade" id="shared-content" role="tabpanel" data-skeleton="profile">
                     <div class="intel-stream">
                         {% for shared_post in shared_posts %}
                             {% include 'posts/partials/shared_post_card.html' %}

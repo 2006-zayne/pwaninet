@@ -1,63 +1,105 @@
-<!-- Post Detail Skeleton -->
-<div class="skeleton-container">
-    <!-- Post Header -->
-    <div style="background: var(--card-bg, #ffffff); padding: 16px; border-bottom: 1px solid var(--border, #e2e8f0); margin-bottom: 8px;">
-        <div style="display: flex; gap: 12px; margin-bottom: 12px;">
-            <div class="skeleton-avatar"></div>
-            <div style="flex: 1;">
-                <div class="skeleton-line skeleton-name" style="width: 140px; margin-bottom: 6px;"></div>
-                <div class="skeleton-line skeleton-time" style="width: 100px;"></div>
-            </div>
-        </div>
-    </div>
+<!-- Post Detail Skeleton - Desktop + Mobile with Container Queries -->
+<style>
+  :root{
+    --brand:#2f63eb;
+    --brand-light:#eef3ff;
+    --brand-mid:#4f7df0;
+    --ink-accent:#1a1410;
+    --ink:#1a1a1a;
+    --muted:#6b7280;
+    --border:#e8e9ec;
+    --bg:#f7f8fa;
+    --card:#ffffff;
+    --sk-base:#e9eaee;
+    --sk-shine:#f6f7f9;
+    --danger:#dc2626;
+    --radius:14px;
+  }
+  [data-theme="dark"]{
+    --brand:#5b8dff;
+    --brand-light:#1b2540;
+    --brand-mid:#3f5fb0;
+    --ink-accent:#f2f3f5;
+    --ink:#f2f3f5;
+    --muted:#9aa0ab;
+    --border:#2a2d34;
+    --bg:#15161a;
+    --card:#1e2025;
+    --sk-base:#2a2d34;
+    --sk-shine:#363a42;
+    --danger:#f87171;
+  }
 
-    <!-- Post Content -->
-    <div style="background: var(--card-bg, #ffffff); padding: 16px; margin-bottom: 8px; border-bottom: 1px solid var(--border, #e2e8f0);">
-        <div class="skeleton-post-body">
-            <div class="skeleton-line skeleton-text-line"></div>
-            <div class="skeleton-line skeleton-text-line"></div>
-            <div class="skeleton-line skeleton-text-line"></div>
-            <div class="skeleton-line" style="width: 70%; height: 14px;"></div>
-        </div>
-        <div class="skeleton-post-media" style="margin: 12px 0 0;"></div>
-    </div>
+  .post-detail-skeleton-container{
+    container-type: inline-size;
+    container-name: post-detail;
+    width:100%;
+    padding:24px;
+  }
 
-    <!-- Post Stats -->
-    <div style="background: var(--card-bg, #ffffff); padding: 12px 16px; border-bottom: 1px solid var(--border, #e2e8f0); display: flex; justify-content: space-around;">
-        <div class="skeleton-line" style="width: 60px; height: 12px;"></div>
-        <div class="skeleton-line" style="width: 60px; height: 12px;"></div>
-        <div class="skeleton-line" style="width: 60px; height: 12px;"></div>
-    </div>
+  .sk{
+    background:linear-gradient(100deg, var(--sk-base) 30%, var(--sk-shine) 45%, var(--sk-base) 60%);
+    background-size:250% 100%;
+    animation:shimmer 1.5s ease-in-out infinite;
+    border-radius:6px;
+  }
+  @keyframes shimmer{
+    0%{background-position:120% 0;}
+    100%{background-position:-20% 0;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .sk{animation:none; background:var(--sk-base);}
+  }
 
-    <!-- Post Actions -->
-    <div style="background: var(--card-bg, #ffffff); padding: 12px; border-bottom: 1px solid var(--border, #e2e8f0); display: flex; justify-content: space-around;">
-        <div class="skeleton-action"></div>
-        <div class="skeleton-action"></div>
-        <div class="skeleton-action"></div>
-    </div>
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    box-shadow:0 1px 2px rgba(16,24,40,.04);
+    transition:background .2s ease, border-color .2s ease;
+  }
 
-    <!-- Comments Section -->
-    <div style="background: var(--card-bg, #ffffff); padding: 16px;">
-        <div class="skeleton-line" style="width: 100px; height: 14px; margin-bottom: 12px;"></div>
-        
-        <!-- Comment 1 -->
-        <div style="display: flex; gap: 12px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border, #e2e8f0);">
-            <div class="skeleton-avatar-sm"></div>
-            <div style="flex: 1;">
-                <div class="skeleton-line" style="width: 100px; height: 12px; margin-bottom: 6px;"></div>
-                <div class="skeleton-line" style="width: 100%; height: 12px; margin-bottom: 6px;"></div>
-                <div class="skeleton-line" style="width: 80%; height: 12px;"></div>
-            </div>
-        </div>
+  .post-card{padding:18px;}
+  .post-head{display:flex; align-items:center; gap:12px; margin-bottom:14px;}
+  .post-avatar{width:42px; height:42px; border-radius:50%; flex-shrink:0;}
+  .post-meta{flex:1;}
+  .post-name{width:140px; height:13px; margin-bottom:8px;}
+  .post-time{width:90px; height:10px;}
+  .post-kebab{width:18px; height:18px; border-radius:4px; flex-shrink:0;}
+  .post-text{width:40%; height:12px; margin-bottom:14px;}
+  .post-media{width:100%; height:220px; border-radius:10px; margin-bottom:14px;}
+  .post-actions{display:flex; gap:22px; margin-bottom:14px;}
+  .action{height:14px;}
+  .action.w1{width:40px;} .action.w2{width:34px;} .action.w3{width:34px;} .action.w4{width:50px;}
+  .comment-row{display:flex; align-items:center; gap:10px; border-top:1px solid var(--border); padding-top:14px;}
+  .comment-avatar{width:30px; height:30px; border-radius:50%; flex-shrink:0;}
+  .comment-input-wrap{position:relative; flex:1;}
+  .comment-input{height:36px; border-radius:999px;}
+  .comment-send{position:absolute; right:8px; top:50%; transform:translateY(-50%); width:18px; height:18px; border-radius:50%;}
+</style>
 
-        <!-- Comment 2 -->
-        <div style="display: flex; gap: 12px; padding-bottom: 12px;">
-            <div class="skeleton-avatar-sm"></div>
-            <div style="flex: 1;">
-                <div class="skeleton-line" style="width: 120px; height: 12px; margin-bottom: 6px;"></div>
-                <div class="skeleton-line" style="width: 100%; height: 12px; margin-bottom: 6px;"></div>
-                <div class="skeleton-line" style="width: 90%; height: 12px;"></div>
-            </div>
-        </div>
+<div class="post-detail-skeleton-container">
+  <div class="card post-card">
+    <div class="post-head">
+      <div class="post-avatar sk"></div>
+      <div class="post-meta">
+        <div class="post-name sk"></div>
+        <div class="post-time sk"></div>
+      </div>
+      <div class="post-kebab sk"></div>
     </div>
+    <div class="post-text sk"></div>
+    <div class="post-media sk"></div>
+    <div class="post-actions">
+      <div class="action w1 sk"></div><div class="action w2 sk"></div>
+      <div class="action w3 sk"></div><div class="action w4 sk"></div>
+    </div>
+    <div class="comment-row">
+      <div class="comment-avatar sk"></div>
+      <div class="comment-input-wrap">
+        <div class="comment-input sk"></div>
+        <div class="comment-send sk"></div>
+      </div>
+    </div>
+  </div>
 </div>

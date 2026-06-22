@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Skeleton Loader Preview{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="page-wrap" style="max-width: 1200px; margin: 0 auto; padding: 20px;">
+        <h1 class="mb-4">Skeleton Loader Preview</h1>
+        <p class="mb-4">Preview all skeleton loaders individually to verify mobile layout and bottom navigation.</p>
+        
+        <!-- Theme Toggle -->
+        <div class="mb-4">
+            <button class="btn btn-outline-primary" onclick="toggleTheme()">Toggle Dark/Light Mode</button>
+        </div>
+
+        <!-- Skeleton Selection -->
+        <div class="mb-4">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-primary" onclick="showSkeleton('post-feed')">Home Feed</button>
+                <button type="button" class="btn btn-primary" onclick="showSkeleton('profile')">Profile</button>
+                <button type="button" class="btn btn-primary" onclick="showSkeleton('groups-list')">Groups List</button>
+                <button type="button" class="btn btn-primary" onclick="showSkeleton('notifications')">Notifications</button>
+            </div>
+        </div>
+
+        <!-- Skeleton Preview Container -->
+        <div id="skeleton-preview-container" style="border: 2px dashed #e2e8f0; border-radius: 12px; padding: 20px; min-height: 400px;">
+            <p class="text-muted text-center py-5">Select a skeleton above to preview</p>
+        </div>
+
+        <!-- Mobile Size Simulator -->
+        <div class="mt-4">
+            <h5>Mobile Size Simulator</h5>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-secondary" onclick="setMobileSize('375px')">iPhone SE (375px)</button>
+                <button type="button" class="btn btn-outline-secondary" onclick="setMobileSize('414px')">iPhone 12 (414px)</button>
+                <button type="button" class="btn btn-outline-secondary" onclick="setMobileSize('768px')">Tablet (768px)</button>
+                <button type="button" class="btn btn-outline-secondary" onclick="setMobileSize('100%')">Full Width</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+function toggleTheme() {
+    const html = document.documentElement;
+    const currentTheme = html.getAttribute('data-theme');
+    html.setAttribute('data-theme', currentTheme === 'dark' ? 'light' : 'dark');
+}
+
+function showSkeleton(skeletonName) {
+    const container = document.getElementById('skeleton-preview-container');
+    
+    fetch(`/skeleton-preview/${skeletonName}/`)
+        .then(response => response.text())
+        .then(html => {
+            container.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error loading skeleton:', error);
+            container.innerHTML = '<p class="text-danger">Error loading skeleton. Make sure the preview endpoint is configured.</p>';
+        });
+}
+
+function setMobileSize(width) {
+    const container = document.getElementById('skeleton-preview-container');
+    container.style.maxWidth = width;
+    container.style.margin = '0 auto';
+    
+    if (width !== '100%') {
+        container.style.border = '2px solid #2563eb';
+    } else {
+        container.style.border = '2px dashed #e2e8f0';
+    }
+}
+
+// Load default skeleton
+document.addEventListener('DOMContentLoaded', function() {
+    showSkeleton('post-feed');
+});
+</script>
+{% endblock %}

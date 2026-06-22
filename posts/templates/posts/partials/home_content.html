@@ -66,20 +66,12 @@ document.addEventListener('DOMContentLoaded', function() {
     {% include 'posts/partials/post_list.html' %}
 </div>
 
-<!-- Post Skeleton Loader for HTMX -->
+<!-- Post Skeleton Loader for HTMX - for fetching more posts -->
 <div id="feed-skeleton" class="htmx-indicator">
     {% include 'posts/partials/post_skeleton_loader.html' %}
     {% include 'posts/partials/post_skeleton_loader.html' %}
     {% include 'posts/partials/post_skeleton_loader.html' %}
 </div>
-
-<!-- Fallback spinner for non-JS users -->
-<noscript>
-    <div id="feed-spinner" class="text-center py-4">
-        <div class="spinner-border text-primary spinner-border-sm"></div>
-        <span class="ms-2 small text-muted fw-bold">FETCHING MORE PERSONALIZED POSTS...</span>
-    </div>
-</noscript>
 
 <script>
 // Scroll-aware auto-play/pause for videos and audio
@@ -174,12 +166,28 @@ document.addEventListener('DOMContentLoaded', function() {
         const feedSkeleton = document.getElementById('feed-skeleton');
         const feedSpinner = document.getElementById('feed-spinner');
         
+        // Re-enabled for feed skeleton loading when fetching more posts
+        console.log('[HomeContent] HTMX skeleton loading re-enabled for feed');
+        
         // Show skeleton loaders when HTMX requests start
         document.body.addEventListener('htmx:beforeRequest', function(event) {
+            const timestamp = new Date().toISOString();
             const target = event.target;
+            const requestInfo = {
+                timestamp: timestamp,
+                event: 'htmx:beforeRequest',
+                caller: 'home_content.html manageSkeletonLoaders()',
+                reason: 'HTMX request starting - checking if feed or friend request',
+                requestURL: event.detail?.xhr?.responseURL || 'unknown',
+                targetId: target?.id || 'unknown',
+                isFeedRequest: target.id === 'feed-sector' || target.closest('#feed-sector'),
+                isFriendRequest: !!target.querySelector('.friend-suggestions-section')
+            };
+            console.log('[HomeContent] HTMX beforeRequest', requestInfo);
             
             // Check if this is a feed loading request
             if (target.id === 'feed-sector' || target.closest('#feed-sector')) {
+                console.log('[HomeContent] Feed request detected - showing skeleton');
                 if (feedSkeleton) {
                     feedSkeleton.style.display = 'block';
                 }
@@ -191,19 +199,35 @@ document.addEventListener('DOMContentLoaded', function() {
             // Check if this is a friend suggestions loading request
             const friendSection = target.querySelector('.friend-suggestions-section');
             if (friendSection) {
+                console.log('[HomeContent] Friend suggestions request detected - showing skeleton');
                 showFriendSkeleton(friendSection);
             }
         });
         
         // Hide skeleton loaders when HTMX requests complete
         document.body.addEventListener('htmx:afterRequest', function(event) {
+            const timestamp = new Date().toISOString();
             const target = event.target;
+            const requestInfo = {
+                timestamp: timestamp,
+                event: 'htmx:afterRequest',
+                caller: 'home_content.html manageSkeletonLoaders()',
+                reason: 'HTMX request completed - checking if feed request',
+                requestURL: event.detail?.xhr?.responseURL || 'unknown',
+                requestStatus: event.detail?.xhr?.status || 'unknown',
+                targetId: target?.id || 'unknown',
+                isFeedRequest: target.id === 'feed-sector' || target.closest('#feed-sector'),
+                willHideSkeleton: target.id === 'feed-sector' || target.closest('#feed-sector')
+            };
+            console.log('[HomeContent] HTMX afterRequest', requestInfo);
             
             // Check if this is a feed loading request
             if (target.id === 'feed-sector' || target.closest('#feed-sector')) {
+                console.log('[HomeContent] Feed request completed - hiding skeleton after 500ms delay');
                 if (feedSkeleton) {
                     setTimeout(() => {
                         feedSkeleton.style.display = 'none';
+                        console.log('[HomeContent] Feed skeleton hidden after delay');
                     }, 500);
                 }
             }

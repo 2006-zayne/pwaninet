@@ -175,7 +175,6 @@ function checkAllDetection() {
 }
 
 function checkPWADetection() {
-    // Use the same logic as splash-screen.js
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
     const isIOSStandalone = window.navigator.standalone === true;
     const isAndroidApp = document.referrer.includes('android-app://');

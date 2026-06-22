@@ -215,11 +215,13 @@
                                    name="user_search"
                                    hx-get="{% url 'posts:search_following_users' %}"
                                    hx-target="#user-results-{{ shared_post.original_post.id }}"
-                                   hx-trigger="keyup changed delay:300ms"
-                                   hx-indicator="#user-search-indicator-{{ shared_post.original_post.id }}">
+                                   hx-trigger="keyup changed delay:300ms">
+                            <!-- HTMX indicator disabled to prevent continuous loading spinners -->
+                            <!--
                             <span id="user-search-indicator-{{ shared_post.original_post.id }}" class="htmx-indicator">
                                 <span class="spinner-border spinner-border-sm" role="status"></span>
                             </span>
+                            -->
                         </div>
                         <div id="user-results-{{ shared_post.original_post.id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
                             <div class="p-3 text-center text-muted">
@@ -254,11 +256,13 @@
                                    name="group_search"
                                    hx-get="{% url 'posts:search_user_groups' %}"
                                    hx-target="#group-results-{{ shared_post.original_post.id }}"
-                                   hx-trigger="keyup changed delay:300ms"
-                                   hx-indicator="#group-search-indicator-{{ shared_post.original_post.id }}">
+                                   hx-trigger="keyup changed delay:300ms">
+                            <!-- HTMX indicator disabled to prevent continuous loading spinners -->
+                            <!--
                             <span id="group-search-indicator-{{ shared_post.original_post.id }}" class="htmx-indicator">
                                 <span class="spinner-border spinner-border-sm" role="status"></span>
                             </span>
+                            -->
                         </div>
                         <div id="group-results-{{ shared_post.original_post.id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
                             <div class="p-3 text-center text-muted">

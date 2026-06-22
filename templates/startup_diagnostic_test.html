@@ -1,0 +1,497 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWANINET Startup Diagnostics Test</title>
+    
+    <!-- Critical CSS from base.html -->
+    <style>
+        /* Critical: Ensure skeleton renders immediately with highest priority */
+        #page-skeleton {
+            display: block !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background: #f8fafc !important;
+            z-index: 9999999 !important;
+            overflow-y: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        #page-skeleton.hidden {
+            display: none !important;
+        }
+
+        [data-theme="dark"] #page-skeleton {
+            background: #0f172a !important;
+        }
+
+        /* Set initial body background to prevent flash */
+        body {
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 0;
+        }
+
+        [data-theme="dark"] body {
+            background-color: #0f172a;
+        }
+
+        /* Hide app initially */
+        #app {
+            opacity: 0 !important;
+        }
+
+        #app.loaded {
+            opacity: 1 !important;
+        }
+
+        /* Startup Splash Screen CSS */
+        :root {
+            --bs-backdrop-zindex: 1000000;
+            --bs-modal-zindex: 1000001;
+        }
+
+        /* Prevent black screen during initial page load */
+        body {
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 0;
+        }
+
+        [data-theme="dark"] body {
+            background-color: #0f172a;
+        }
+
+        /* Splash hidden by default */
+        #startup-splash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: var(--background);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: opacity;
+        }
+        
+        /* Show splash immediately on fresh launch */
+        html.fresh-launch #startup-splash,
+        #startup-splash.show-splash {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        /* App hidden by default until page loads */
+        #app {
+            opacity: 0;
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: opacity;
+        }
+
+        /* Show app when loaded */
+        #app.loaded {
+            opacity: 1;
+        }
+
+        /* Hide app on fresh launch */
+        html.fresh-launch #app {
+            opacity: 0;
+        }
+        
+        /* JS-controlled classes */
+        #startup-splash.show-splash {
+            opacity: 1;
+        }
+        #app.hide-for-splash {
+            opacity: 0;
+        }
+        
+        #startup-splash.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .splash-logo-container {
+            text-align: center;
+            animation: logoGlow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes logoGlow {
+            0% {
+                filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.3));
+                transform: scale(1);
+            }
+            100% {
+                filter: drop-shadow(0 0 40px rgba(99, 102, 241, 0.6));
+                transform: scale(1.02);
+            }
+        }
+        
+        .splash-logo {
+            width: 80px;
+            height: 80px;
+            background: var(--card-bg);
+            border: 2px solid var(--border);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .splash-brand {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 30px;
+            letter-spacing: -0.5px;
+        }
+        
+        .splash-loading {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        .splash-dot {
+            width: 12px;
+            height: 12px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: bounce 1.4s ease-in-out infinite both;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        
+        .splash-dot:nth-child(1) { animation-delay: -0.32s; }
+        .splash-dot:nth-child(2) { animation-delay: -0.16s; }
+        .splash-dot:nth-child(3) { animation-delay: 0; }
+        
+        @keyframes bounce {
+            0%, 80%, 100% {
+                transform: scale(0.8);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
+        }
+        
+        .splash-text {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+        
+        .splash-progress {
+            width: 200px;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        .splash-progress-bar {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        
+        .splash-progress-bar.filling {
+            width: 70%;
+        }
+        
+        .splash-progress-bar.ready {
+            width: 100%;
+            transition: width 0.3s ease;
+        }
+        
+        #app.show {
+            opacity: 1 !important;
+        }
+
+        /* Theme variables */
+        :root, [data-theme="light"] {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --primary-light: #dbeafe;
+            --text-dark: #0f172a;
+            --text-secondary: #64748b;
+            --text-muted: #64748b;
+            --background: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+            --nav-bg: rgba(255, 255, 255, 0.9);
+            --mobile-nav-bg: #fff;
+        }
+
+        [data-theme="dark"] {
+            --primary: #6366f1;
+            --primary-hover: #818cf8;
+            --primary-light: #312e81;
+            --text-dark: #e4e6eb;
+            --background: #18191f;
+            --card-bg: #242526;
+            --border: #3a3b3c;
+            --nav-bg: rgba(24, 25, 31, 0.9);
+            --mobile-nav-bg: #242526;
+            --text-secondary: #e4e6eb;
+            --text-muted: #e4e6eb;
+        }
+
+        /* Test page specific styles */
+        .test-container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .test-header {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .test-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .test-btn:hover {
+            background: var(--primary-hover);
+        }
+
+        .test-output {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .test-status {
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .test-status.success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .test-status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .test-status.info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+    </style>
+</head>
+<body>
+    <!-- Page Load Skeleton - HIGHEST PRIORITY -->
+    <div id="page-skeleton" style="display: block; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #f8fafc; z-index: 9999999; overflow-y: auto; margin: 0; padding: 0;">
+        <div style="padding: 20px; text-align: center; padding-top: 100px;">
+            <div style="width: 120px; height: 24px; background: #e2e8f0; border-radius: 4px; margin: 0 auto;"></div>
+            <div style="margin-top: 20px; width: 100%; height: 200px; background: #e2e8f0; border-radius: 8px;"></div>
+        </div>
+    </div>
+
+    <!-- Startup Splash Screen -->
+    <div id="startup-splash">
+        <div class="splash-logo-container">
+            <div class="splash-logo">
+                <img src="{% static 'images/web-app-manifest-192x192.png' %}" alt="PwaniNet" style="width: 100%; height: 100%; object-fit: cover; border-radius: 18px;">
+            </div>
+            <div class="splash-brand">PwaniNet</div>
+            <div class="splash-loading">
+                <div class="splash-dot"></div>
+                <div class="splash-dot"></div>
+                <div class="splash-dot"></div>
+            </div>
+            <div class="splash-text">Loading your campus network...</div>
+            <div class="splash-progress">
+                <div class="splash-progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app" style="opacity: 0;">
+        <div class="test-container">
+            <div class="test-header">
+                <h1>PWANINET Startup Diagnostics Test</h1>
+                <p>This page tests the startup sequence and captures diagnostic data.</p>
+            </div>
+
+            <div class="test-controls">
+                <button class="test-btn" onclick="runDiagnosticTest()">Run Diagnostic Test</button>
+                <button class="test-btn" onclick="simulateFreshLaunch()">Simulate Fresh Launch</button>
+                <button class="test-btn" onclick="simulateRefresh()">Simulate Refresh</button>
+                <button class="test-btn" onclick="generateReport()">Generate Report</button>
+                <button class="test-btn" onclick="clearDiagnostics()">Clear Diagnostics</button>
+            </div>
+
+            <div id="testStatus"></div>
+            <div id="testOutput" class="test-output">Ready to run diagnostic tests...</div>
+        </div>
+    </div>
+
+    <script>
+        // Test page functions
+        function log(message) {
+            const output = document.getElementById('testOutput');
+            const timestamp = new Date().toISOString();
+            output.textContent += `[${timestamp}] ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function setStatus(message, type = 'info') {
+            const status = document.getElementById('testStatus');
+            status.className = `test-status ${type}`;
+            status.textContent = message;
+        }
+
+        function runDiagnosticTest() {
+            log('Starting diagnostic test...');
+            setStatus('Running diagnostic test...', 'info');
+            
+            // Clear previous session data
+            sessionStorage.clear();
+            
+            // Simulate fresh launch
+            simulateFreshLaunch();
+            
+            setTimeout(() => {
+                log('Diagnostic test complete. Check console for detailed output.');
+                setStatus('Diagnostic test complete', 'success');
+            }, 12000);
+        }
+
+        function simulateFreshLaunch() {
+            log('Simulating fresh PWA launch...');
+            sessionStorage.removeItem('pwaninet_launched');
+            sessionStorage.removeItem('pwaninet_session_started');
+            document.documentElement.classList.add('fresh-launch');
+            
+            // Reload page to trigger startup sequence
+            setTimeout(() => {
+                log('Reloading page to trigger startup sequence...');
+                window.location.reload();
+            }, 1000);
+        }
+
+        function simulateRefresh() {
+            log('Simulating page refresh...');
+            sessionStorage.setItem('pwaninet_launched', 'true');
+            sessionStorage.setItem('pwaninet_session_started', 'true');
+            document.documentElement.classList.remove('fresh-launch');
+            
+            setTimeout(() => {
+                log('Reloading page...');
+                window.location.reload();
+            }, 1000);
+        }
+
+        function generateReport() {
+            log('Generating diagnostic report...');
+            
+            if (window.PWANINET_DIAGNOSTIC_REPORT) {
+                const report = window.PWANINET_DIAGNOSTIC_REPORT;
+                log('=== DIAGNOSTIC REPORT ===');
+                log(JSON.stringify(report, null, 2));
+                setStatus('Report generated - check output', 'success');
+                
+                // Download as JSON file
+                const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'pwaninet-diagnostic-report.json';
+                a.click();
+                URL.revokeObjectURL(url);
+            } else {
+                log('No diagnostic data available. Run a test first.');
+                setStatus('No diagnostic data available', 'error');
+            }
+        }
+
+        function clearDiagnostics() {
+            log('Clearing diagnostic data...');
+            if (window.PWANINET_DIAGNOSTICS) {
+                window.PWANINET_DIAGNOSTICS.timeline = [];
+                window.PWANINET_DIAGNOSTICS.visibilityStates = [];
+                window.PWANINET_DIAGNOSTICS.visibilityChanges = [];
+                window.PWANINET_DIAGNOSTICS.blankScreenDetected = false;
+                window.PWANINET_DIAGNOSTICS.blankScreenDuration = 0;
+            }
+            log('Diagnostic data cleared.');
+            setStatus('Diagnostic data cleared', 'info');
+        }
+
+        // Auto-run diagnostics on page load
+        window.addEventListener('load', () => {
+            log('Page loaded. Diagnostics script should be running.');
+            log('Click "Run Diagnostic Test" to begin the test sequence.');
+            
+            // Check if diagnostics are running
+            setTimeout(() => {
+                if (window.PWANINET_DIAGNOSTICS) {
+                    log('Diagnostics script is active.');
+                    log(`Timeline events captured: ${window.PWANINET_DIAGNOSTICS.timeline.length}`);
+                    log(`Visibility states captured: ${window.PWANINET_DIAGNOSTICS.visibilityStates.length}`);
+                } else {
+                    log('ERROR: Diagnostics script not loaded!');
+                    setStatus('Diagnostics script not loaded', 'error');
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

@@ -367,14 +367,19 @@
     </div>
         {% else %}
     <div class="px-3 pb-3">
-        <p class="mb-0 text-dark" style="font-size: 15px; line-height: 1.5;">
-            {% if post.repost_of %}
-                {% if post.content %}<p class="mb-2 text-dark" style="font-size: 14px;">{{ post.content }}</p>{% endif %}
-                {{ post.repost_of.content }}
-            {% else %}
-                {{ post.content }}
-            {% endif %}
-        </p>
+        <div class="post-content-wrapper" data-post-id="{{ post.id }}">
+            <p class="mb-0 text-dark post-content-text" style="font-size: 15px; line-height: 1.5;">
+                {% if post.repost_of %}
+                    {% if post.content %}<p class="mb-2 text-dark" style="font-size: 14px;">{{ post.content }}</p>{% endif %}
+                    <span class="post-content-full">{{ post.repost_of.content }}</span>
+                    <span class="post-content-truncated" style="display: none;"></span>
+                {% else %}
+                    <span class="post-content-full">{{ post.content }}</span>
+                    <span class="post-content-truncated" style="display: none;"></span>
+                {% endif %}
+            </p>
+            <button class="btn btn-link p-0 text-primary see-more-btn" style="font-size: 14px; display: none;" data-post-id="{{ post.id }}">See more</button>
+        </div>
     </div>
         {% endif %}
     {% endwith %}
@@ -408,7 +413,7 @@
             <div class="image-grid-{{ post.id }}" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px; max-height: 400px;">
                 {% for post_image in post.images.all|slice:":3" %}
                     <div class="image-grid-item position-relative overflow-hidden" style="{% if forloop.counter == 1 %}grid-column: span 2; grid-row: span 2; aspect-ratio: 2/1;{% elif forloop.counter == 2 %}aspect-ratio: 1/1;{% else %}aspect-ratio: 1/1;{% endif %}">
-                        <img src="{{ post_image.image.url }}" class="w-100 h-100" style="object-fit: cover;">
+                        <img src="{{ post_image.get_thumbnail_url }}" loading="lazy" class="w-100 h-100" style="object-fit: cover;" alt="Post image">
                         {% if forloop.last and post.images.count > 3 %}
                             <div class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background: rgba(0,0,0,0.5);">
                                 <span class="text-white fw-bold fs-4">+{{ post.images.count|add:"-3" }}</span>
@@ -424,11 +429,17 @@
         <div class="post-media border-top border-bottom bg-light">
             {% with f_url=post.get_intel_file.url|lower %}
                 {% if ".jpg" in f_url or ".png" in f_url or ".jpeg" in f_url or ".webp" in f_url %}
-                    <img src="{{ post.get_intel_file.url }}" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;">
+                    <img src="{{ post.get_intel_file.url }}" loading="lazy" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;" alt="Post image">
                 {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
                     <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post-id="{{ post.id }}">
-                        <video id="video-{{ post.id }}" preload="metadata" class="w-100 h-100" muted loop playsinline autoplay data-autoplay="true">
-                            <source src="{{ post.get_intel_file.url }}" type="video/mp4">
+                        <video id="video-{{ post.id }}" 
+                               preload="auto" 
+                               class="w-100 h-100 feed-video" 
+                               muted loop playsinline 
+                               data-post-id="{{ post.id }}"
+                               data-autoplay="true"
+                               poster="{{ post.get_video_poster|default:'' }}">
+                            <source src="{{ post.get_video_for_feed.url }}" type="video/mp4">
                         </video>
                         <button class="btn btn-light rounded-circle position-absolute mute-toggle" data-post-id="{{ post.id }}" style="top: 10px; left: 10px; z-index: 10; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Unmute">
                             <i class="bi bi-volume-mute-fill" style="font-size: 14px;"></i>
@@ -567,11 +578,13 @@
                                        name="user_search"
                                        hx-get="{% url 'posts:search_following_users' %}"
                                        hx-target="#user-results-{{ post.id }}"
-                                       hx-trigger="keyup changed delay:300ms"
-                                       hx-indicator="#user-search-indicator-{{ post.id }}">
+                                       hx-trigger="keyup changed delay:300ms">
+                                <!-- HTMX indicator disabled to prevent continuous loading spinners -->
+                                <!--
                                 <span id="user-search-indicator-{{ post.id }}" class="htmx-indicator">
                                     <span class="spinner-border spinner-border-sm" role="status"></span>
                                 </span>
+                                -->
                             </div>
                             <div id="user-results-{{ post.id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
                                 <div class="p-3 text-center text-muted">
@@ -606,11 +619,13 @@
                                        name="group_search"
                                        hx-get="{% url 'posts:search_user_groups' %}"
                                        hx-target="#group-results-{{ post.id }}"
-                                       hx-trigger="keyup changed delay:300ms"
-                                       hx-indicator="#group-search-indicator-{{ post.id }}">
+                                       hx-trigger="keyup changed delay:300ms">
+                                <!-- HTMX indicator disabled to prevent continuous loading spinners -->
+                                <!--
                                 <span id="group-search-indicator-{{ post.id }}" class="htmx-indicator">
                                     <span class="spinner-border spinner-border-sm" role="status"></span>
                                 </span>
+                                -->
                             </div>
                             <div id="group-results-{{ post.id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
                                 <div class="p-3 text-center text-muted">
@@ -821,11 +836,75 @@ document.addEventListener('DOMContentLoaded', function() {
             media.addEventListener('mouseenter', function() {
                 this.style.transform = 'scale(1.02)';
             });
-            
+
             media.addEventListener('mouseleave', function() {
                 this.style.transform = '';
             });
         });
+
+        // Post content truncation with See more/See less
+        const contentWrapper = postCard.querySelector('.post-content-wrapper');
+        if (contentWrapper) {
+            const postId = contentWrapper.dataset.postId;
+            const fullContent = contentWrapper.querySelector('.post-content-full');
+            const truncatedContent = contentWrapper.querySelector('.post-content-truncated');
+            const seeMoreBtn = contentWrapper.querySelector('.see-more-btn');
+
+            if (fullContent && truncatedContent && seeMoreBtn) {
+                const contentText = fullContent.textContent;
+                const maxLength = 150;
+
+                // Check if content needs truncation
+                if (contentText.length > maxLength) {
+                    // Set truncated text
+                    truncatedContent.textContent = contentText.substring(0, maxLength) + '...';
+                    truncatedContent.style.display = 'inline';
+                    fullContent.style.display = 'none';
+                    seeMoreBtn.style.display = 'inline-block';
+
+                    // Check sessionStorage for expanded state
+                    const storageKey = `post-expanded-${postId}`;
+                    const isExpanded = sessionStorage.getItem(storageKey) === 'true';
+
+                    if (isExpanded) {
+                        fullContent.style.display = 'inline';
+                        truncatedContent.style.display = 'none';
+                        seeMoreBtn.textContent = 'See less';
+                    } else {
+                        fullContent.style.display = 'none';
+                        truncatedContent.style.display = 'inline';
+                        seeMoreBtn.textContent = 'See more';
+                    }
+
+                    // Toggle functionality
+                    seeMoreBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        const isCurrentlyExpanded = fullContent.style.display !== 'none';
+
+                        if (isCurrentlyExpanded) {
+                            // Collapse
+                            fullContent.style.display = 'none';
+                            truncatedContent.style.display = 'inline';
+                            seeMoreBtn.textContent = 'See more';
+                            sessionStorage.setItem(storageKey, 'false');
+                        } else {
+                            // Expand
+                            fullContent.style.display = 'inline';
+                            truncatedContent.style.display = 'none';
+                            seeMoreBtn.textContent = 'See less';
+                            sessionStorage.setItem(storageKey, 'true');
+                        }
+                    });
+                } else {
+                    // Content doesn't need truncation, hide button
+                    seeMoreBtn.style.display = 'none';
+                    truncatedContent.style.display = 'none';
+                    fullContent.style.display = 'inline';
+                }
+            }
+        }
     }
 });
 </script>

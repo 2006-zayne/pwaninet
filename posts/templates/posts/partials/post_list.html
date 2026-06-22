@@ -1,10 +1,10 @@
 {% for post in posts %}
     {% include 'posts/partials/post_card.html' %}
-    {% if forloop.counter == suggestion_index %}
-        <!-- In-Feed Friend Suggestions -->
-        {% if suggested_users %}
-        <style>
-  [data-theme="dark"] .friend-suggestions-section {
+    <!-- Friend suggestions commented out - was causing arrow artifacts -->
+    <!-- {% if forloop.counter == suggestion_index %} -->
+    <!--     {% if suggested_users %} -->
+    <!--     <style> -->
+    <!-- [data-theme="dark"] .friend-suggestions-section {
     background-color: var(--card-bg) !important;
     border-color: var(--border) !important;
   }
@@ -260,7 +260,7 @@
 .friend-suggestion-card:nth-child(3) { animation-delay: 0.3s; }
 .friend-suggestion-card:nth-child(4) { animation-delay: 0.4s; }
 .friend-suggestion-card:nth-child(5) { animation-delay: 0.5s; }
-</style>
+</style> -->
 
 <script>
 // Friend Suggestions Micro-interactions
@@ -397,7 +397,7 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
-</script>
+</script> -->
        <!-- <div class="post-card p-4 mb-4 border-0 shadow-sm bg-white rounded-4 friend-suggestions-section">
             <div class="d-flex align-items-center justify-content-between mb-4">
                 <h6 class="fw-bold text-muted small text-uppercase mb-0"><i class="bi bi-person-plus-fill me-2 text-primary"></i>Suggested Friends</h6>

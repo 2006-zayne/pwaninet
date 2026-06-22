@@ -670,7 +670,7 @@
               class="compose-textarea form-control"
               placeholder="What's on your mind?"
               required
-              maxlength="1000"
+              maxlength="2500"
               rows="4">{{ form.content.value|default:'' }}</textarea>
 
             <!-- Unified Preview Area (Gradient, Images, Videos) -->
@@ -741,7 +741,7 @@
               </div>
 
               <div class="d-flex align-items-center gap-3">
-                <span id="charCount">0 / 1000</span>
+                <span id="charCount">0 / 2500</span>
                 <button type="submit" class="btn-deploy" id="deployBtn" disabled>
                   <i class="bi bi-send-fill"></i> Post
                 </button>
@@ -1094,8 +1094,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function updatePreview() {
         const text = textarea.value;
         const len  = text.length;
-        charCount.textContent = len + ' / 1000';
-        charCount.className   = len > 900 ? 'danger' : len > 750 ? 'warn' : '';
+        charCount.textContent = len + ' / 2500';
+        charCount.className   = len > 2250 ? 'danger' : len > 1875 ? 'warn' : '';
         deployBtn.disabled    = text.trim() === '' && mediaFiles.length === 0;
 
         const stylePanel = document.getElementById('stylePanel');

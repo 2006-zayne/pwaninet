@@ -208,14 +208,8 @@ html.fresh-launch #startup-splash,
     }
 }
 
-/* Main app container */
+/* Main app container - now visible immediately */
 #app {
-    opacity: 0;
-    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    will-change: opacity;
-}
-
-#app.show {
     opacity: 1;
 }
 

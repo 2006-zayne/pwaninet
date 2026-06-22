@@ -70,32 +70,8 @@
         })();
     </script>
 
-    <!-- Critical Skeleton CSS - Loads before all other CSS -->
+    <!-- Set initial body background to prevent flash (will be overridden by theme CSS) -->
     <style>
-        /* Critical: Ensure skeleton renders immediately with highest priority */
-        #page-skeleton {
-            display: block !important;
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            background: #f8fafc !important;
-            z-index: 9999999 !important;
-            overflow-y: auto !important;
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-        #page-skeleton.hidden {
-            display: none !important;
-        }
-
-        [data-theme="dark"] #page-skeleton {
-            background: #0f172a !important;
-        }
-
-        /* Set initial body background to prevent flash (will be overridden by theme CSS) */
         body {
             background-color: #f8fafc;
             margin: 0;
@@ -104,15 +80,6 @@
 
         [data-theme="dark"] body {
             background-color: #0f172a;
-        }
-
-        /* Hide app initially */
-        #app {
-            opacity: 0 !important;
-        }
-
-        #app.loaded {
-            opacity: 1 !important;
         }
     </style>
 
@@ -145,26 +112,15 @@
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
     <script src="{% static 'js/htmx.min.js' %}"></script>
     <script src="{% static 'js/device_manager.js' %}"></script>
-    <script src="{% static 'js/auto_video_play.js' %}"></script>
     
-    <!-- Skeleton Loading System -->
-    <script src="{% static 'js/skeleton-loader.js' %}"></script>
-    <script src="{% static 'js/skeleton-init.js' %}"></script>
+    <!-- Unified Skeleton Manager - replaces skeleton-loader.js, skeleton-init.js, navigation-skeleton.js, offline-skeleton-v2.js, page-skeleton-manager.js -->
+    <script src="{% static 'js/skeleton-manager.js' %}"></script>
+    
+    <!-- Video Manager - replaces auto_video_play.js -->
+    <script src="{% static 'js/video-manager.js' %}"></script>
     
     <!-- Native PWA Install Manager -->
     <script src="{% static 'js/native-pwa-install.js' %}"></script>
-
-    <!-- Critical: Detect fresh PWA launch BEFORE body renders -->
-    <script>
-        (function(){
-            var isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-            var alreadyLaunched = sessionStorage.getItem('pwaninet_launched');
-            if (isPWA && !alreadyLaunched) {
-                document.documentElement.classList.add('fresh-launch');
-                sessionStorage.setItem('pwaninet_launched', 'true');
-            }
-        })();
-    </script>
 
     <!-- Startup Splash Screen CSS -->
     <style>
@@ -471,9 +427,6 @@
             }
         }
     </style>
-    
-    <!-- PWA Splash Screen with Progress Bar -->
-    <script src="{% static 'js/startup-v2.js' %}"></script>
     
     <style>
         :root, [data-theme="light"] {
@@ -812,349 +765,11 @@
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
       data-user-id="{{ request.user.id }}">
 
-    <!-- Page Load Skeleton - HIGHEST PRIORITY - Renders immediately -->
-    <div id="page-skeleton" style="display: block; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #f8fafc; z-index: 9999999; overflow-y: auto; margin: 0; padding: 0;">
-        <style>
-            /* Critical inline skeleton styles - render immediately */
-            #page-skeleton {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            }
-
-            [data-theme="dark"] #page-skeleton {
-                background: #0f172a;
-            }
-
-            .skeleton-nav {
-                height: 60px;
-                background: #ffffff;
-                border-bottom: 1px solid #e2e8f0;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 0 16px;
-                position: sticky;
-                top: 0;
-                z-index: 10;
-            }
-
-            [data-theme="dark"] .skeleton-nav {
-                background: #1e293b;
-                border-bottom: 1px solid #334155;
-            }
-
-            .skeleton-nav-brand {
-                width: 120px;
-                height: 24px;
-                background: #e2e8f0;
-                border-radius: 4px;
-            }
-
-            [data-theme="dark"] .skeleton-nav-brand {
-                background: #334155;
-            }
-
-            .skeleton-nav-items {
-                display: flex;
-                gap: 16px;
-            }
-
-            .skeleton-nav-item {
-                width: 32px;
-                height: 32px;
-                background: #e2e8f0;
-                border-radius: 50%;
-            }
-
-            [data-theme="dark"] .skeleton-nav-item {
-                background: #334155;
-            }
-
-            .skeleton-content {
-                padding: 16px;
-                max-width: 600px;
-                margin: 0 auto;
-            }
-
-            .skeleton-post {
-                background: #ffffff;
-                border-radius: 12px;
-                padding: 16px;
-                margin-bottom: 16px;
-                border: 1px solid #e2e8f0;
-            }
-
-            [data-theme="dark"] .skeleton-post {
-                background: #1e293b;
-                border: 1px solid #334155;
-            }
-
-            .skeleton-post-header {
-                display: flex;
-                gap: 12px;
-                margin-bottom: 12px;
-            }
-
-            .skeleton-avatar {
-                width: 48px;
-                height: 48px;
-                background: #e2e8f0;
-                border-radius: 50%;
-                flex-shrink: 0;
-            }
-
-            [data-theme="dark"] .skeleton-avatar {
-                background: #334155;
-            }
-
-            .skeleton-meta {
-                flex: 1;
-            }
-
-            .skeleton-name {
-                width: 120px;
-                height: 14px;
-                background: #e2e8f0;
-                border-radius: 4px;
-                margin-bottom: 6px;
-            }
-
-            [data-theme="dark"] .skeleton-name {
-                background: #334155;
-            }
-
-            .skeleton-time {
-                width: 80px;
-                height: 12px;
-                background: #e2e8f0;
-                border-radius: 4px;
-            }
-
-            [data-theme="dark"] .skeleton-time {
-                background: #334155;
-            }
-
-            .skeleton-body {
-                margin-bottom: 12px;
-            }
-
-            .skeleton-line {
-                height: 14px;
-                background: #e2e8f0;
-                border-radius: 4px;
-                margin-bottom: 8px;
-            }
-
-            [data-theme="dark"] .skeleton-line {
-                background: #334155;
-            }
-
-            .skeleton-line:nth-child(1) { width: 100%; }
-            .skeleton-line:nth-child(2) { width: 100%; }
-            .skeleton-line:nth-child(3) { width: 60%; }
-
-            .skeleton-media {
-                width: 100%;
-                height: 200px;
-                background: #e2e8f0;
-                border-radius: 8px;
-                margin-bottom: 12px;
-            }
-
-            [data-theme="dark"] .skeleton-media {
-                background: #334155;
-            }
-
-            .skeleton-actions {
-                display: flex;
-                justify-content: space-around;
-                padding-top: 12px;
-                border-top: 1px solid #e2e8f0;
-            }
-
-            [data-theme="dark"] .skeleton-actions {
-                border-top: 1px solid #334155;
-            }
-
-            .skeleton-action {
-                width: 50px;
-                height: 16px;
-                background: #e2e8f0;
-                border-radius: 4px;
-            }
-
-            [data-theme="dark"] .skeleton-action {
-                background: #334155;
-            }
-
-            /* Shimmer animation */
-            @keyframes shimmer {
-                0% { background-position: -200% 0; }
-                100% { background-position: 200% 0; }
-            }
-
-            .skeleton-nav-brand,
-            .skeleton-nav-item,
-            .skeleton-avatar,
-            .skeleton-name,
-            .skeleton-time,
-            .skeleton-line,
-            .skeleton-media,
-            .skeleton-action {
-                background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
-                background-size: 200% 100%;
-                animation: shimmer 1.5s infinite;
-            }
-
-            [data-theme="dark"] .skeleton-nav-brand,
-            [data-theme="dark"] .skeleton-nav-item,
-            [data-theme="dark"] .skeleton-avatar,
-            [data-theme="dark"] .skeleton-name,
-            [data-theme="dark"] .skeleton-time,
-            [data-theme="dark"] .skeleton-line,
-            [data-theme="dark"] .skeleton-media,
-            [data-theme="dark"] .skeleton-action {
-                background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
-            }
-
-            .skeleton-bottom-nav {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                height: 60px;
-                background: #ffffff;
-                border-top: 1px solid #e2e8f0;
-                display: flex;
-                justify-content: space-around;
-                align-items: center;
-                z-index: 10;
-            }
-
-            [data-theme="dark"] .skeleton-bottom-nav {
-                background: #1e293b;
-                border-top: 1px solid #334155;
-            }
-
-            .skeleton-bottom-item {
-                width: 32px;
-                height: 32px;
-                background: #e2e8f0;
-                border-radius: 50%;
-            }
-
-            [data-theme="dark"] .skeleton-bottom-item {
-                background: #334155;
-            }
-
-            @media (min-width: 768px) {
-                .skeleton-bottom-nav {
-                    display: none;
-                }
-            }
-        </style>
-        <nav class="skeleton-nav">
-            <div class="skeleton-nav-brand"></div>
-            <div class="skeleton-nav-items">
-                <div class="skeleton-nav-item"></div>
-                <div class="skeleton-nav-item"></div>
-                <div class="skeleton-nav-item"></div>
-                <div class="skeleton-nav-item"></div>
-            </div>
-        </nav>
-        <div class="skeleton-content">
-            <div class="skeleton-post">
-                <div class="skeleton-post-header">
-                    <div class="skeleton-avatar"></div>
-                    <div class="skeleton-meta">
-                        <div class="skeleton-name"></div>
-                        <div class="skeleton-time"></div>
-                    </div>
-                </div>
-                <div class="skeleton-body">
-                    <div class="skeleton-line"></div>
-                    <div class="skeleton-line"></div>
-                    <div class="skeleton-line"></div>
-                </div>
-                <div class="skeleton-media"></div>
-                <div class="skeleton-actions">
-                    <div class="skeleton-action"></div>
-                    <div class="skeleton-action"></div>
-                    <div class="skeleton-action"></div>
-                </div>
-            </div>
-            <div class="skeleton-post">
-                <div class="skeleton-post-header">
-                    <div class="skeleton-avatar"></div>
-                    <div class="skeleton-meta">
-                        <div class="skeleton-name"></div>
-                        <div class="skeleton-time"></div>
-                    </div>
-                </div>
-                <div class="skeleton-body">
-                    <div class="skeleton-line"></div>
-                    <div class="skeleton-line"></div>
-                </div>
-                <div class="skeleton-actions">
-                    <div class="skeleton-action"></div>
-                    <div class="skeleton-action"></div>
-                    <div class="skeleton-action"></div>
-                </div>
-            </div>
-            <div class="skeleton-post">
-                <div class="skeleton-post-header">
-                    <div class="skeleton-avatar"></div>
-                    <div class="skeleton-meta">
-                        <div class="skeleton-name"></div>
-                        <div class="skeleton-time"></div>
-                    </div>
-                </div>
-                <div class="skeleton-body">
-                    <div class="skeleton-line"></div>
-                    <div class="skeleton-line"></div>
-                    <div class="skeleton-line"></div>
-                </div>
-                <div class="skeleton-media"></div>
-                <div class="skeleton-actions">
-                    <div class="skeleton-action"></div>
-                    <div class="skeleton-action"></div>
-                    <div class="skeleton-action"></div>
-                </div>
-            </div>
-        </div>
-        <nav class="skeleton-bottom-nav">
-            <div class="skeleton-bottom-item"></div>
-            <div class="skeleton-bottom-item"></div>
-            <div class="skeleton-bottom-item"></div>
-            <div class="skeleton-bottom-item"></div>
-            <div class="skeleton-bottom-item"></div>
-        </nav>
-    </div>
-
-    
-    <!-- Startup Splash Screen - ENABLED -->
-    <div id="startup-splash">
-        <div class="splash-logo-container">
-            <div class="splash-logo">
-                <img src="/static/images/web-app-manifest-192x192.png" alt="PwaniNet" style="width: 100%; height: 100%; object-fit: cover; border-radius: 18px;">
-            </div>
-            <div class="splash-brand">PwaniNet</div>
-            <div class="splash-loading">
-                <div class="splash-dot"></div>
-                <div class="splash-dot"></div>
-                <div class="splash-dot"></div>
-            </div>
-            <div class="splash-text">Loading your campus network...</div>
-            <div class="splash-progress">
-                <div class="splash-progress-bar"></div>
-            </div>
-        </div>
-    </div>
-
     {# Status modal must stay outside #app so welcome/login flows stay visible when #app is hidden #}
     {% include 'partials/status_modal.html' %}
 
-    <!-- Main App Container - Hidden initially -->
-    <div id="app" style="opacity: 0; /* Hidden until page loads */">
+    <!-- Main App Container -->
+    <div id="app">
     
     <nav class="navbar navbar-top fixed-top">
         <div class="container d-flex justify-content-between align-items-center">
@@ -1301,6 +916,45 @@
     <script src="{% static 'js/status-modal.js' %}"></script>
     {% block page_scripts %}{% endblock %}
     <script>
+        // Failsafe: Ensure app is visible even if startup fails
+        window.addEventListener('error', function() {
+            const app = document.getElementById('app');
+            if (app) {
+                app.style.opacity = '1';
+                app.style.pointerEvents = 'auto';
+                document.body.classList.add('startup-failed');
+            }
+        });
+
+        // Failsafe timeout: Force app visible after 5 seconds
+        setTimeout(function() {
+            const app = document.getElementById('app');
+            if (app && getComputedStyle(app).opacity === '0') {
+                app.style.opacity = '1';
+                app.style.pointerEvents = 'auto';
+                console.warn('[Failsafe] App forced visible after timeout');
+            }
+        }, 5000);
+
+        // Offline/Online event listeners
+        window.addEventListener('offline', function() {
+            console.log('[Connectivity] Gone offline');
+            document.body.classList.add('offline');
+            // Offline skeleton will handle showing appropriate UI
+            if (window.PwaniNetOfflineSkeleton) {
+                window.PwaniNetOfflineSkeleton.show();
+            }
+        });
+
+        window.addEventListener('online', function() {
+            console.log('[Connectivity] Back online');
+            document.body.classList.remove('offline');
+            // Hide offline skeleton if visible
+            if (window.PwaniNetOfflineSkeleton) {
+                window.PwaniNetOfflineSkeleton.hide();
+            }
+        });
+
         // Theme Management
         function setTheme(theme) {
             const html = document.documentElement;
@@ -1560,6 +1214,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
     <!-- Load offline skeleton manager (page-aware) -->
     <script src="/static/js/offline-skeleton-v2.js"></script>
     
+    <!-- Load navigation skeleton system (shows during page navigation) -->
+    <script src="{% static 'js/navigation-skeleton.js' %}"></script>
+    
     <!-- Load main app styles -->
     <link rel="stylesheet" href="/static/css/splash.css">
 
@@ -1729,77 +1386,27 @@ window.addEventListener('beforeinstallprompt', (e) => {
     {% endverbatim %}
     {% endif %}
 
-    <!-- Page Skeleton Loading Logic -->
+    <!-- Simple Page Skeleton Hide Logic -->
     <script>
     (function() {
         'use strict';
 
-        console.log('[PageSkeleton] Initializing skeleton loader');
-
         const pageSkeleton = document.getElementById('page-skeleton');
-        const app = document.getElementById('app');
-
-        console.log('[PageSkeleton] Elements found:', {
-            pageSkeleton: !!pageSkeleton,
-            app: !!app
-        });
-
-        // Function to hide page skeleton and show app
-        function hidePageSkeleton() {
-            if (pageSkeleton && !pageSkeleton.classList.contains('hidden')) {
-                pageSkeleton.classList.add('hidden');
-                if (app) {
-                    app.classList.add('loaded');
-                    app.style.opacity = '1';
-                    app.style.pointerEvents = 'auto';
-                }
-                console.log('[PageSkeleton] Skeleton hidden, app visible');
-            } else {
-                console.log('[PageSkeleton] Skeleton already hidden or not found');
-            }
-        }
-
-        // Detect if this is a fresh PWA launch
-        const isFreshLaunch = document.documentElement.classList.contains('fresh-launch');
-        console.log('[PageSkeleton] Is fresh PWA launch:', isFreshLaunch);
-
-        // IMMEDIATE ACTION: Hide skeleton for fresh PWA launches (they use startup splash)
-        if (isFreshLaunch && pageSkeleton) {
-            pageSkeleton.classList.add('hidden');
-            console.log('[PageSkeleton] Fresh PWA launch - skeleton hidden immediately');
-        }
-
-        // Hide skeleton when page is fully loaded (for normal navigation)
+        
+        // Hide page skeleton when page is fully loaded
         window.addEventListener('load', function() {
-            console.log('[PageSkeleton] Window load event fired');
-            if (!isFreshLaunch) {
-                hidePageSkeleton();
-            }
-        });
-
-        // Also hide on DOMContentLoaded as fallback for fast-loading pages
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('[PageSkeleton] DOMContentLoaded event fired');
-            if (!isFreshLaunch) {
-                // Small delay to ensure DOM is ready
-                setTimeout(() => {
-                    hidePageSkeleton();
-                }, 100);
-            }
-        });
-
-        // Handle HTMX content loading - hide skeleton when HTMX content loads
-        document.addEventListener('htmx:afterRequest', function(evt) {
-            console.log('[PageSkeleton] HTMX afterRequest event fired');
-            if (!isFreshLaunch) {
-                hidePageSkeleton();
+            if (pageSkeleton) {
+                pageSkeleton.classList.add('hidden');
+                console.log('[PageSkeleton] Skeleton hidden on window.load');
             }
         });
 
         // Failsafe: Ensure skeleton is hidden after maximum timeout
         setTimeout(function() {
-            console.log('[PageSkeleton] Failsafe timeout triggered');
-            hidePageSkeleton();
+            if (pageSkeleton && !pageSkeleton.classList.contains('hidden')) {
+                pageSkeleton.classList.add('hidden');
+                console.warn('[PageSkeleton] Skeleton force-hidden after timeout');
+            }
         }, 3000);
     })();
     </script>

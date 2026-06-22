@@ -24,6 +24,8 @@ class Post(models.Model):
     unit = models.ForeignKey('courses.Unit', on_delete=models.SET_NULL, null=True, blank=True)
     content = models.TextField()
     video = models.FileField(upload_to='posts/videos', blank=True, null=True)
+    video_preview = models.FileField(upload_to='posts/videos/previews', blank=True, null=True)
+    video_poster = models.ImageField(upload_to='posts/videos/posters', blank=True, null=True)
     docs = models.FileField(upload_to='posts/docs', blank=True, null=True)
     audio = models.FileField(upload_to='posts/audio', blank=True, null=True, help_text='Attach music/audio to post')
     gradient_class = models.CharField(max_length=50, choices=GRADIENT_CHOICES, default='grad-ocean', blank=True)
@@ -47,6 +49,23 @@ class Post(models.Model):
             return self.docs
         return None
     
+    @property
+    def get_video_for_feed(self):
+        """Get video preview for feed, fallback to original"""
+        if self.video_preview:
+            return self.video_preview
+        return self.video
+    
+    @property
+    def get_video_poster(self):
+        """Get video poster image"""
+        if self.video_poster:
+            return self.video_poster.url
+        # Generate poster from first frame if video exists
+        if self.video:
+            return self.video.url + '#poster'
+        return None
+    
     def is_liked_by(self, user):
         if user.is_authenticated:
             return self.likes.filter(user=user).exists()
@@ -58,6 +77,7 @@ class Post(models.Model):
         if not hasattr(self, '_like_count'):
             self._like_count = self.likes.count()
         return self._like_count
+
 
     @property
     def repost_count(self):
@@ -77,29 +97,73 @@ class Post(models.Model):
 class PostImage(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='images')
     image = models.ImageField(upload_to='posts/images')
+    thumbnail_400 = models.ImageField(upload_to='posts/images/thumbnails', blank=True, null=True)
+    thumbnail_800 = models.ImageField(upload_to='posts/images/thumbnails', blank=True, null=True)
     order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['order']
 
+    def get_thumbnail_url(self, size='400'):
+        """Get thumbnail URL for feed display"""
+        if size == '400' and self.thumbnail_400:
+            return self.thumbnail_400.url
+        elif size == '800' and self.thumbnail_800:
+            return self.thumbnail_800.url
+        return self.image.url
+
     def save(self, *args, **kwargs):
         if self.image:
             img = Image.open(self.image)
+            original_format = img.format
             if img.mode != 'RGB':
                 img = img.convert('RGB')
 
+            # Resize original if too large
             if img.height > 1080 or img.width > 1080:
                 img.thumbnail((1080, 1080))
 
+            # Save original as WebP if possible, otherwise JPEG
             output = BytesIO()
-            img.save(output, format='JPEG', quality=75)
+            if original_format == 'PNG' and img.mode == 'RGBA':
+                # Keep PNG for transparency
+                img.save(output, format='PNG', optimize=True)
+                file_ext = 'png'
+                mime_type = 'image/png'
+            else:
+                # Use WebP for better compression
+                img.save(output, format='WEBP', quality=80, method=6)
+                file_ext = 'webp'
+                mime_type = 'image/webp'
             output.seek(0)
 
             file_name = self.image.name.split('.')[0]
             self.image = InMemoryUploadedFile(
-                output, 'ImageField', f"{file_name}.jpg",
-                'image/jpeg', sys.getsizeof(output), None
+                output, 'ImageField', f"{file_name}.{file_ext}",
+                mime_type, sys.getsizeof(output), None
+            )
+
+            # Generate 400px thumbnail for feed
+            img_400 = img.copy()
+            img_400.thumbnail((400, 400))
+            output_400 = BytesIO()
+            img_400.save(output_400, format='WEBP', quality=75, method=6)
+            output_400.seek(0)
+            self.thumbnail_400 = InMemoryUploadedFile(
+                output_400, 'ImageField', f"{file_name}_400.webp",
+                'image/webp', sys.getsizeof(output_400), None
+            )
+
+            # Generate 800px thumbnail for larger displays
+            img_800 = img.copy()
+            img_800.thumbnail((800, 800))
+            output_800 = BytesIO()
+            img_800.save(output_800, format='WEBP', quality=80, method=6)
+            output_800.seek(0)
+            self.thumbnail_800 = InMemoryUploadedFile(
+                output_800, 'ImageField', f"{file_name}_800.webp",
+                'image/webp', sys.getsizeof(output_800), None
             )
 
         super(PostImage, self).save(*args, **kwargs)
