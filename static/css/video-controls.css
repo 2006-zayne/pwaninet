@@ -1,0 +1,121 @@
+/* PwaniNet Video Controls Styles */
+
+/* Video Play Button */
+.video-play-toggle {
+    outline: none;
+}
+
+.video-play-toggle:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.video-play-toggle:hover {
+    transform: translate(-50%, -50%) scale(1.1);
+}
+
+/* Mute Toggle */
+.mute-toggle {
+    outline: none;
+    transition: all 0.2s ease-in-out;
+}
+
+.mute-toggle:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.mute-toggle:hover {
+    background-color: var(--primary-light);
+}
+
+/* Loading Spinner */
+.video-loading {
+    pointer-events: none;
+}
+
+/* Control Bar */
+.video-control-bar {
+    outline: none;
+}
+
+.video-control-bar button {
+    outline: none;
+}
+
+.video-control-bar button:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* Progress Bar */
+.video-control-bar input[type="range"] {
+    outline: none;
+}
+
+.video-control-bar input[type="range"]:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* Mobile Touch Targets */
+@media (max-width: 768px) {
+    .video-play-toggle {
+        width: 52px !important;
+        height: 52px !important;
+    }
+    
+    .mute-toggle {
+        width: 36px !important;
+        height: 36px !important;
+    }
+    
+    .video-control-bar button {
+        width: 40px !important;
+        height: 40px !important;
+    }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    .video-play-toggle,
+    .mute-toggle,
+    .video-control-bar {
+        transition: none !important;
+        animation: none !important;
+    }
+    
+    .video-play-toggle:hover {
+        transform: translate(-50%, -50%) !important;
+    }
+}
+
+/* High Contrast Support */
+@media (prefers-contrast: high) {
+    .video-play-toggle {
+        border: 2px solid currentColor;
+    }
+    
+    .mute-toggle {
+        border: 2px solid currentColor;
+    }
+}
+
+/* Dark Mode Adjustments */
+[data-theme="dark"] .video-play-toggle {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .video-play-toggle i {
+    color: var(--text-dark);
+}
+
+[data-theme="dark"] .mute-toggle {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .mute-toggle:hover {
+    background-color: var(--primary-light);
+}

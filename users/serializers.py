@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_serializer
-from .models import User, Follow, DeviceAccount, CollaborationStatus
+from .models import User, Follow, DeviceAccount, CollaborationStatus, Pinch
 from courses.models import Course, Year
 
 
@@ -153,6 +153,43 @@ class FollowSerializer(serializers.ModelSerializer):
             return None
         
         return follow
+
+
+class PinchSerializer(serializers.ModelSerializer):
+    pinch_user = UserPublicSerializer(read_only=True)
+    pinched_user = UserPublicSerializer(read_only=True)
+    pinched_username = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = Pinch
+        fields = ['id', 'pinch_user', 'pinched_user', 'pinched_username', 'created_at']
+        read_only_fields = ['pinch_user', 'created_at']
+
+    def validate_pinched_username(self, value):
+        try:
+            user = User.objects.get(username=value)
+            if user == self.context['request'].user:
+                raise serializers.ValidationError("You cannot pinch yourself.")
+            return user
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found.")
+
+    def create(self, validated_data):
+        pinched = validated_data.pop('pinched_username')
+        pinched_user = User.objects.get(username=pinched)
+        pinch_user = self.context['request'].user
+        
+        # Check if can pinch
+        can_pinch, error_msg = Pinch.can_pinch(pinch_user, pinched_user)
+        if not can_pinch:
+            raise serializers.ValidationError(error_msg)
+        
+        pinch = Pinch.objects.create(
+            pinch_user=pinch_user,
+            pinched_user=pinched_user
+        )
+        
+        return pinch
 
 
 class DeviceAccountSerializer(serializers.ModelSerializer):

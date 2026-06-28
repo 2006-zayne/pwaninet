@@ -1,0 +1,66 @@
+{% load user_extras %}
+<div class="people-user-row d-flex align-items-center gap-3 p-2 rounded-3 hover-bg-light transition-all" data-username="{{ user.username }}">
+    <!-- Avatar -->
+    <a href="{% url 'users:profile' user.username %}" class="text-decoration-none flex-shrink-0">
+        <img src="{{ user.profile_pic.url }}" 
+             alt="{{ user.username }}" 
+             class="people-user-avatar rounded-circle border border-2 border-light shadow-sm"
+             style="width: 48px; height: 48px; object-fit: cover;">
+    </a>
+
+    <!-- User Info -->
+    <div class="people-user-info flex-grow-1 min-w-0" style="max-width: 180px;">
+        <div class="d-flex align-items-center gap-2">
+            <a href="{% url 'users:profile' user.username %}" 
+               class="people-user-name text-decoration-none fw-bold text-dark text-truncate">
+                {{ user.get_full_name|default:user.username }}
+            </a>
+            
+            <!-- Badges -->
+            {% if user.global_role == 'VERIFIED' %}
+                <i class="bi bi-patch-check-fill text-primary small flex-shrink-0" title="Verified"></i>
+            {% endif %}
+            {% if user.global_role == 'PRESIDENT' or user.global_role == 'DELEGATE' %}
+                <i class="bi bi-star-fill text-warning small flex-shrink-0" title="Leadership"></i>
+            {% endif %}
+        </div>
+        
+        <div class="people-user-meta text-muted small text-truncate">
+            @{{ user.username }}
+            {% if user.course %} · {{ user.course.name }}{% endif %}
+            {% if user.year %} · Year {{ user.year.level }}{% endif %}
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="people-user-actions flex-shrink-0 d-flex gap-2 align-items-center">
+        <!-- Follow Button -->
+        {% if user != request.user %}
+            <form class="m-0"
+                  hx-post="{% url 'users:toggle_follow' user.username %}"
+                  hx-target="#follow-btn-{{ user.username }}"
+                  hx-swap="outerHTML">
+                {% csrf_token %}
+                <button type="submit"
+                        id="follow-btn-{{ user.username }}"
+                        class="btn btn-sm {% if user|is_following:request.user %}btn-outline-dark{% else %}btn-primary{% endif %} rounded-pill fw-bold"
+                        style="min-width: 80px;">
+                    {% if user|is_following:request.user %}Following{% else %}Follow{% endif %}
+                </button>
+            </form>
+        {% endif %}
+
+        <!-- Pinch Button (if enabled) -->
+        {% if list_type != 'pinches_sent' and user != request.user %}
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary rounded-circle pinch-btn"
+                    hx-post="{% url 'users:toggle_pinch' user.username %}"
+                    hx-target="#pinch-btn-{{ user.username }}"
+                    hx-swap="outerHTML"
+                    id="pinch-btn-{{ user.username }}"
+                    title="Pinch">
+                <i class="bi bi-hand-index-thumb"></i>
+            </button>
+        {% endif %}
+    </div>
+</div>

@@ -225,9 +225,17 @@
                     <img src="{{ post.get_intel_file.url }}" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;">
                 {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
                     <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post-id="{{ post.id }}">
-                        <video id="video-{{ post.id }}" controls preload="none" class="w-100 h-100 post-detail-video" poster="{{ post.get_video_poster|default:'' }}">
+                        <video id="video-{{ post.id }}" 
+                               preload="metadata" 
+                               class="w-100 h-100 post-detail-video" 
+                               muted loop playsinline 
+                               data-post-id="{{ post.id }}"
+                               poster="{{ post.get_video_poster|default:'' }}">
                             <source src="{{ post.video.url }}" type="video/mp4">
                         </video>
+                        <button class="btn btn-light rounded-circle position-absolute mute-toggle" data-post-id="{{ post.id }}" style="top: 10px; left: 10px; z-index: 10; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Unmute" aria-label="Unmute video">
+                            <i class="bi bi-volume-mute-fill" style="font-size: 14px;"></i>
+                        </button>
                     </div>
                 {% elif ".mp3" in f_url or ".wav" in f_url or ".ogg" in f_url or ".m4a" in f_url %}
                     <div class="p-3 d-flex align-items-center justify-content-between" style="background: transparent;">

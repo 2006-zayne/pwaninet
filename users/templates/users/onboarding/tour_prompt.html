@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if (!promptEl || typeof bootstrap === 'undefined') return;
 
   const tourModal = bootstrap.Modal.getOrCreateInstance(promptEl);
-  const hasCompletedOnboarding = {{ request.user.has_completed_onboarding|yesno:"true,false" }};
+  const hasCompletedOnboarding = {% if request.user.has_completed_onboarding %}true{% else %}false{% endif %};
   
   if (!hasCompletedOnboarding) {
     setTimeout(function() {

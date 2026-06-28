@@ -52,3 +52,22 @@ def has_authority_badge(user, group=None):
             pass
     
     return False
+
+
+@register.filter
+def is_following(user, current_user):
+    """Check if current_user is following user"""
+    if not current_user.is_authenticated:
+        return False
+    from users.models import Follow
+    return Follow.objects.filter(follower=current_user, followed=user).exists()
+
+
+@register.filter
+def can_pinch(user, current_user):
+    """Check if current_user can pinch user"""
+    if not current_user.is_authenticated:
+        return False
+    from users.models import Pinch
+    can_pinch, _ = Pinch.can_pinch(current_user, user)
+    return can_pinch

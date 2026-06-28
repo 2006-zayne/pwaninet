@@ -1,0 +1,23 @@
+{% if users %}
+    <div class="people-list">
+        {% for user in users %}
+            {% include 'users/partials/people_user_row.html' with user=user list_type=list_type %}
+        {% endfor %}
+    </div>
+
+    <!-- Infinite Scroll Trigger -->
+    {% if has_more %}
+        <div hx-get="{{ next_url }}"
+             hx-trigger="revealed"
+             hx-target="#peopleModalList"
+             hx-swap="beforeend"
+             class="text-center py-3">
+            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+        </div>
+    {% endif %}
+{% else %}
+    <div class="people-empty text-center py-5">
+        <i class="bi bi-{{ empty_icon|default:'people' }} text-muted display-6"></i>
+        <p class="text-muted small mt-3 mb-0">{{ empty_message }}</p>
+    </div>
+{% endif %}

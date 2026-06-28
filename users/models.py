@@ -67,6 +67,7 @@ class User(AbstractUser):
     notify_on_invite = models.BooleanField(default=True)
     notify_on_group_request = models.BooleanField(default=True)
     notify_on_group_approved = models.BooleanField(default=True)
+    notify_on_pinch = models.BooleanField(default=True)
     email_notifications = models.BooleanField(default=False)
 
     # Theme preference
@@ -187,6 +188,42 @@ class Follow(models.Model):
 
     def __str__(self):
         return f"{self.follower.username} follows {self.followed.username}"
+
+
+class Pinch(models.Model):
+    """Profile pinch interaction - one pinch per user pair per 24 hours"""
+    pinch_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='pinches_sent', db_index=True)
+    pinched_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='pinches_received', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['pinch_user', 'pinched_user']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['pinched_user', 'created_at']),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.pinch_user.username} pinched {self.pinched_user.username}"
+
+    @classmethod
+    def can_pinch(cls, pinch_user, pinched_user):
+        """Check if pinch_user can pinch pinched_user (not self, not already today)"""
+        if pinch_user == pinched_user:
+            return False, "Cannot pinch yourself"
+        
+        from django.utils import timezone
+        today = timezone.now().date()
+        
+        if cls.objects.filter(
+            pinch_user=pinch_user,
+            pinched_user=pinched_user,
+            created_at__date=today
+        ).exists():
+            return False, "Already pinched today"
+        
+        return True, None
 
 
 class DeviceAccount(models.Model):

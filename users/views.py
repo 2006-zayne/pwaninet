@@ -12,7 +12,7 @@ from django.http import JsonResponse
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
-from users.models import User, Follow, DeviceAccount
+from users.models import User, Follow, DeviceAccount, Pinch
 from posts.models import Post, Like
 from users.forms import PwaniSignupForm, ProfileUpdateForm, NotificationPreferencesForm
 from django.contrib import messages
@@ -23,7 +23,7 @@ from notifications.services.notification_service import invalidate_unread_count_
 from users.services.device_service import get_or_create_device_id, hash_device_id
 from users.services.email_verification_service import send_verification_email, verify_email_token
 from .serializers import (
-    UserSerializer, UserPublicSerializer, FollowSerializer,
+    UserSerializer, UserPublicSerializer, FollowSerializer, PinchSerializer,
     DeviceAccountSerializer, UserUpdateSerializer, NotificationPreferencesSerializer
 )
 from .filters import UserFilter, FollowFilter
@@ -74,9 +74,11 @@ def profile_view(request, username):
     profile_user = User.objects.filter(id=profile_user.id).select_related('course__school', 'year').annotate(
         followers_count=Count('follower_relationships', distinct=True),
         following_count=Count('following_relationships', distinct=True),
-        total_likes=Count('posts__likes', distinct=True)
+        total_likes=Count('posts__likes', distinct=True),
+        pinches_sent_count=Count('pinches_sent', distinct=True),
+        pinches_received_count=Count('pinches_received', distinct=True)
     ).first()
-    posts = Post.objects.filter(author=profile_user).order_by('-created_at')
+    posts = Post.objects.filter(author=profile_user).prefetch_related('likes').order_by('-created_at')
     is_following = Follow.objects.filter(follower=request.user, followed=profile_user).exists()
     
     # Get shared posts for this profile user
@@ -100,6 +102,8 @@ def profile_view(request, username):
         'followers_count': profile_user.followers_count,
         'following_count': profile_user.following_count,
         'total_likes': profile_user.total_likes,
+        'pinches_sent_count': profile_user.pinches_sent_count,
+        'pinches_received_count': profile_user.pinches_received_count,
         'shared_posts': shared_posts,
         'unseen_shared_count': unseen_shared_count,
         'is_own_profile': is_own_profile,
@@ -109,8 +113,12 @@ def profile_view(request, username):
 
 @login_required
 def profile_connections(request, username, list_type):
-    """Return followers or following list for profile connections sheet."""
+    """Return followers, following, pinches sent, or pinches received list for profile connections sheet."""
+    from django.core.paginator import Paginator
+    
     profile_user = get_object_or_404(User, username=username)
+    page = int(request.GET.get('page', 1))
+    page_size = 20
 
     if list_type == 'followers':
         follows = (
@@ -130,16 +138,183 @@ def profile_connections(request, username, list_type):
         users = [f.followed for f in follows]
         title = 'Following'
         empty_message = 'Not following anyone yet.'
+    elif list_type == 'pinches_sent':
+        pinches = (
+            Pinch.objects.filter(pinch_user=profile_user)
+            .select_related('pinched_user', 'pinched_user__course', 'pinched_user__year')
+            .order_by('-created_at')
+        )
+        users = [p.pinched_user for p in pinches]
+        title = 'Pinches Sent'
+        empty_message = 'No pinches sent yet.'
+    elif list_type == 'pinches_received':
+        pinches = (
+            Pinch.objects.filter(pinched_user=profile_user)
+            .select_related('pinch_user', 'pinch_user__course', 'pinch_user__year')
+            .order_by('-created_at')
+        )
+        users = [p.pinch_user for p in pinches]
+        title = 'Pinches Received'
+        empty_message = 'No pinches received yet.'
     else:
         from django.http import HttpResponse
         return HttpResponse('Not found', status=404)
 
+    # Paginate users
+    paginator = Paginator(users, page_size)
+    users_page = paginator.get_page(page)
+    
+    # Build next page URL if there are more pages
+    next_url = None
+    if users_page.has_next():
+        next_url = f"{request.path}?page={users_page.next_page_number()}"
+
     return render(request, 'users/partials/connections_list.html', {
-        'users': users,
+        'users': users_page,
         'title': title,
         'empty_message': empty_message,
         'profile_user': profile_user,
         'list_type': list_type,
+        'has_more': users_page.has_next(),
+        'next_url': next_url,
+    })
+
+
+@login_required
+def people_search(request):
+    """Search for users via HTMX for the people modal"""
+    from django.core.paginator import Paginator
+    from django.db.models import Q
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    search_query = request.GET.get('q', '').strip()
+    connection_type = request.GET.get('connection_type', '')
+    profile_username = request.GET.get('profile_username', '')
+    page = int(request.GET.get('page', 1))
+    page_size = 20
+    
+    logger.info(f"people_search called - q={search_query}, connection_type={connection_type}, profile_username={profile_username}, page={page}")
+    
+    users = User.objects.none()
+    list_type = 'all'
+    empty_message = 'No users found.'
+    empty_icon = 'search'
+    
+    # Get base users based on connection type
+    if connection_type and profile_username:
+        profile_user = get_object_or_404(User, username=profile_username)
+        logger.info(f"Profile user found: {profile_user.username}")
+        
+        if connection_type == 'followers':
+            follows = (
+                Follow.objects.filter(followed=profile_user)
+                .select_related('follower', 'follower__course', 'follower__year')
+                .order_by('-created_at')
+            )
+            users = [f.follower for f in follows]
+            list_type = 'followers'
+            empty_message = 'No followers yet.'
+            logger.info(f"Found {len(users)} followers")
+        elif connection_type == 'following':
+            follows = (
+                Follow.objects.filter(follower=profile_user)
+                .select_related('followed', 'followed__course', 'followed__year')
+                .order_by('-created_at')
+            )
+            users = [f.followed for f in follows]
+            list_type = 'following'
+            empty_message = 'Not following anyone yet.'
+            logger.info(f"Found {len(users)} following")
+        elif connection_type == 'pinches_sent':
+            pinches = (
+                Pinch.objects.filter(pinch_user=profile_user)
+                .select_related('pinched_user', 'pinched_user__course', 'pinched_user__year')
+                .order_by('-created_at')
+            )
+            users = [p.pinched_user for p in pinches]
+            list_type = 'pinches_sent'
+            empty_message = 'No pinches sent yet.'
+            logger.info(f"Found {len(users)} pinches sent")
+        elif connection_type == 'pinches_received':
+            pinches = (
+                Pinch.objects.filter(pinched_user=profile_user)
+                .select_related('pinch_user', 'pinch_user__course', 'pinch_user__year')
+                .order_by('-created_at')
+            )
+            users = [p.pinch_user for p in pinches]
+            list_type = 'pinches_received'
+            empty_message = 'No pinches received yet.'
+            logger.info(f"Found {len(users)} pinches received")
+        
+        # Apply search filter if provided
+        if search_query and users:
+            logger.info(f"Applying search filter '{search_query}' to {len(users)} users")
+            users = [
+                u for u in users
+                if (search_query.lower() in u.username.lower() or
+                    search_query.lower() in (u.first_name or '').lower() or
+                    search_query.lower() in (u.last_name or '').lower())
+            ]
+            empty_message = f'No results for "{search_query}"'
+            logger.info(f"After search filter: {len(users)} users")
+    elif search_query:
+        # Global search when no connection type
+        users = (
+            User.objects.filter(
+                Q(username__icontains=search_query) |
+                Q(first_name__icontains=search_query) |
+                Q(last_name__icontains=search_query)
+            )
+            .select_related('course', 'year')
+            .exclude(id=request.user.id)
+            .order_by('username')
+        )
+        list_type = 'search'
+        empty_message = f'No results for "{search_query}"'
+        logger.info(f"Global search found {len(users)} users")
+    else:
+        # Show suggested users when no search query and no connection type
+        users = (
+            User.objects
+            .select_related('course', 'year')
+            .exclude(id=request.user.id)
+            .order_by('?')[:20]
+        )
+        list_type = 'suggested'
+        empty_message = 'No users available'
+        empty_icon = 'people'
+        logger.info(f"Suggested users: {len(users)}")
+    
+    # Paginate
+    paginator = Paginator(users, page_size)
+    users_page = paginator.get_page(page)
+    
+    logger.info(f"After pagination: {len(users_page)} users on page {page}, has_more={users_page.has_next()}")
+    
+    # Build next page URL
+    next_url = None
+    if users_page.has_next():
+        url_params = []
+        if search_query:
+            url_params.append(f"q={search_query}")
+        if connection_type:
+            url_params.append(f"connection_type={connection_type}")
+        if profile_username:
+            url_params.append(f"profile_username={profile_username}")
+        url_params.append(f"page={users_page.next_page_number()}")
+        next_url = f"?{'&'.join(url_params)}"
+    
+    logger.info(f"Rendering people_list.html with {len(users_page)} users")
+    
+    return render(request, 'users/partials/people_list.html', {
+        'users': users_page,
+        'list_type': list_type,
+        'empty_message': empty_message,
+        'empty_icon': empty_icon,
+        'has_more': users_page.has_next(),
+        'next_url': next_url,
     })
 
 
@@ -252,6 +427,58 @@ def toggle_follow(request, username):
     if is_ajax:
         return JsonResponse({'is_following': is_following, 'follower_count': follower_count})
 
+    return redirect('users:profile', username=username)
+
+
+@login_required
+@require_http_methods(["POST"])
+@transaction.atomic
+def toggle_pinch(request, username):
+    """Toggle pinch on a user's profile"""
+    from users.models import Pinch
+    from django.utils import timezone
+    from django.db.models import Count
+    
+    target = get_object_or_404(User, username=username)
+    is_hx = request.headers.get('HX-Request')
+    is_ajax = is_hx or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    if target == request.user:
+        if is_ajax:
+            return JsonResponse({'error': 'Cannot pinch yourself'}, status=400)
+        return redirect('users:profile', username=username)
+
+    # Check if can pinch
+    can_pinch, error_msg = Pinch.can_pinch(request.user, target)
+    if not can_pinch:
+        if is_ajax:
+            return JsonResponse({'error': error_msg}, status=400)
+        messages.error(request, error_msg)
+        return redirect('users:profile', username=username)
+
+    # Create pinch
+    pinch = Pinch.objects.create(pinch_user=request.user, pinched_user=target)
+    
+    # Invalidate cache
+    invalidate_unread_count_cache(target.id)
+
+    if is_hx:
+        # Calculate updated pinch counts for the current user
+        request_user = User.objects.filter(id=request.user.id).annotate(
+            pinches_sent_count=Count('pinches_sent', distinct=True),
+            pinches_received_count=Count('pinches_received', distinct=True)
+        ).first()
+        
+        return render(request, 'users/partials/pinch_button.html', {
+            'profile_user': target,
+            'pinches_sent_count': request_user.pinches_sent_count,
+            'pinches_received_count': request_user.pinches_received_count,
+        })
+
+    if is_ajax:
+        return JsonResponse({'success': True, 'message': 'Pinched successfully'})
+
+    messages.success(request, f'You pinched {target.username}!')
     return redirect('users:profile', username=username)
 
 
@@ -588,6 +815,24 @@ class FollowViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(follower=self.request.user)
+
+
+class PinchViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for Pinch model.
+    """
+    queryset = Pinch.objects.all().select_related('pinch_user', 'pinched_user')
+    serializer_class = PinchSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        return Pinch.objects.filter(pinch_user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(pinch_user=self.request.user)
 
 
 class DeviceAccountViewSet(viewsets.ModelViewSet):

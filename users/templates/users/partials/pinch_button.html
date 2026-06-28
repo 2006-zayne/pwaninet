@@ -1,0 +1,30 @@
+{% load user_extras %}
+{% if profile_user == request.user %}
+    <!-- Own profile - no pinch button -->
+    <span class="text-muted small">You</span>
+{% else %}
+    {% if profile_user|can_pinch:request.user %}
+        <form class="m-0"
+              hx-post="{% url 'users:toggle_pinch' profile_user.username %}"
+              hx-target="#pinch-btn-container"
+              hx-swap="innerHTML">
+            {% csrf_token %}
+            <button type="submit"
+                    class="btn btn-primary w-100 rounded-pill fw-bold mb-2"
+                    title="Pinch this profile">
+                <i class="bi bi-hand-index-thumb me-1"></i>Pinch
+            </button>
+        </form>
+    {% else %}
+        <button class="btn btn-outline-dark w-100 rounded-pill fw-bold mb-2" disabled>
+            <i class="bi bi-hand-index-thumb-fill me-1"></i>Pinched Today
+        </button>
+    {% endif %}
+{% endif %}
+
+{% if pinches_sent_count is not None %}
+<h6 id="pinches-sent-count" class="fw-bold mb-0" hx-swap-oob="true">{{ pinches_sent_count }}</h6>
+{% endif %}
+{% if pinches_received_count is not None %}
+<h6 id="pinches-received-count" class="fw-bold mb-0" hx-swap-oob="true">{{ pinches_received_count }}</h6>
+{% endif %}

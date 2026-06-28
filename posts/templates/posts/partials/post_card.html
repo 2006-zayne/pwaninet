@@ -367,19 +367,7 @@
     </div>
         {% else %}
     <div class="px-3 pb-3">
-        <div class="post-content-wrapper" data-post-id="{{ post.id }}">
-            <p class="mb-0 text-dark post-content-text" style="font-size: 15px; line-height: 1.5;">
-                {% if post.repost_of %}
-                    {% if post.content %}<p class="mb-2 text-dark" style="font-size: 14px;">{{ post.content }}</p>{% endif %}
-                    <span class="post-content-full">{{ post.repost_of.content }}</span>
-                    <span class="post-content-truncated" style="display: none;"></span>
-                {% else %}
-                    <span class="post-content-full">{{ post.content }}</span>
-                    <span class="post-content-truncated" style="display: none;"></span>
-                {% endif %}
-            </p>
-            <button class="btn btn-link p-0 text-primary see-more-btn" style="font-size: 14px; display: none;" data-post-id="{{ post.id }}">See more</button>
-        </div>
+        {% include "posts/partials/post_content.html" %}
     </div>
         {% endif %}
     {% endwith %}
@@ -433,7 +421,7 @@
                 {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
                     <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post-id="{{ post.id }}">
                         <video id="video-{{ post.id }}" 
-                               preload="auto" 
+                               preload="metadata" 
                                class="w-100 h-100 feed-video" 
                                muted loop playsinline 
                                data-post-id="{{ post.id }}"
@@ -441,7 +429,7 @@
                                poster="{{ post.get_video_poster|default:'' }}">
                             <source src="{{ post.get_video_for_feed.url }}" type="video/mp4">
                         </video>
-                        <button class="btn btn-light rounded-circle position-absolute mute-toggle" data-post-id="{{ post.id }}" style="top: 10px; left: 10px; z-index: 10; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Unmute">
+                        <button class="btn btn-light rounded-circle position-absolute mute-toggle" data-post-id="{{ post.id }}" style="top: 10px; left: 10px; z-index: 10; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Unmute" aria-label="Unmute video">
                             <i class="bi bi-volume-mute-fill" style="font-size: 14px;"></i>
                         </button>
                     </div>
@@ -754,54 +742,24 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 });
 
-// Mute toggle for this post's media
-document.addEventListener('DOMContentLoaded', function() {
-    const muteToggle = document.querySelector(`.mute-toggle[data-post-id="{{ post.id }}"]`);
-    if (muteToggle) {
-        muteToggle.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            const postId = this.dataset.postId;
-            const video = document.getElementById(`video-${postId}`);
-            const audio = document.getElementById(`audio-${postId}`);
-            const icon = this.querySelector('i');
-            
-            if (video) {
-                video.muted = !video.muted;
-                icon.className = video.muted ? 'bi bi-volume-mute-fill' : 'bi bi-volume-up-fill';
-                this.title = video.muted ? 'Unmute' : 'Mute';
-            } else if (audio) {
-                audio.muted = !audio.muted;
-                icon.className = audio.muted ? 'bi bi-volume-mute-fill' : 'bi bi-volume-up-fill';
-                this.title = audio.muted ? 'Unmute' : 'Mute';
-            }
-        });
-    }
+// Video controls are now handled by video-manager.js
+// Mute toggle and video interactions are managed centrally
 
-    // Prevent navigation when clicking on video container
-    const videoContainer = document.querySelector(`[data-media-type="video"][data-post-id="{{ post.id }}"]`);
-    if (videoContainer) {
-        videoContainer.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        });
-    }
+// Enhanced post card interactions
+const postCard = document.getElementById('post-card-{{ post.id }}');
+if (postCard) {
+    // Touch feedback for mobile
+    postCard.addEventListener('touchstart', function() {
+        this.style.transform = 'translateY(-1px)';
+    });
+    
+    postCard.addEventListener('touchend', function() {
+        this.style.transform = '';
+    });
 
-    // Enhanced post card interactions
-    const postCard = document.getElementById('post-card-{{ post.id }}');
-    if (postCard) {
-        // Touch feedback for mobile
-        postCard.addEventListener('touchstart', function() {
-            this.style.transform = 'translateY(-1px)';
-        });
-        
-        postCard.addEventListener('touchend', function() {
-            this.style.transform = '';
-        });
-
-        // Enhanced button interactions
-        const buttons = postCard.querySelectorAll('.btn');
-        buttons.forEach(button => {
+    // Enhanced button interactions
+    const buttons = postCard.querySelectorAll('.btn');
+    buttons.forEach(button => {
             button.addEventListener('click', function() {
                 // Add loading state for async actions
                 if (this.classList.contains('start-conversation') || 

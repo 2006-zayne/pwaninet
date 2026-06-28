@@ -109,6 +109,8 @@
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'css/video-controls.css' %}">
+    <link rel="stylesheet" href="{% static 'css/people-modal.css' %}">
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
     <script src="{% static 'js/htmx.min.js' %}"></script>
     <script src="{% static 'js/device_manager.js' %}"></script>
@@ -914,6 +916,9 @@
 
     <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
     <script src="{% static 'js/status-modal.js' %}"></script>
+    <script src="{% static 'js/reaction-sound.js' %}"></script>
+    <script src="{% static 'js/post-content.js' %}"></script>
+    
     {% block page_scripts %}{% endblock %}
     <script>
         // Failsafe: Ensure app is visible even if startup fails
@@ -1095,6 +1100,31 @@ document.addEventListener('htmx:afterSwap', function(evt) {
         setTimeout(() => {
             refreshPage();
         }, 100);
+    }
+});
+
+// Play like sound on successful HTMX like requests
+document.addEventListener('htmx:afterRequest', async function(evt) {
+    try {
+        // Check if request was successful (HTTP 2xx status)
+        if (!evt.detail.successful) {
+            return;
+        }
+
+        // Check if this is a like toggle request
+        const xhr = evt.detail.xhr;
+        const requestUrl = xhr.responseURL || '';
+
+        // Match like endpoint URLs (both post like and comment like)
+        if (requestUrl.includes('/like/') || requestUrl.includes('/toggle_like')) {
+            // Play like sound (async for mobile context resume)
+            if (window.ReactionSound && window.ReactionSound.playLike) {
+                await window.ReactionSound.playLike();
+            }
+        }
+    } catch (e) {
+        // Silently fail - never break HTMX functionality
+        console.warn('[ReactionSound] Error in HTMX event handler:', e);
     }
 });
 </script>

@@ -1,7 +1,20 @@
 {% if users %}
     {% for user in users %}
-        {% include 'users/partials/connection_user_row.html' %}
+        {% include 'users/partials/connection_user_row.html' with user=user list_type=list_type %}
     {% endfor %}
+
+    <!-- Load More Button -->
+    {% if has_more %}
+        <div class="text-center py-3">
+            <button type="button"
+                    class="btn btn-sm btn-outline-primary rounded-pill px-4"
+                    hx-get="{{ next_url }}"
+                    hx-target="#profileConnectionsModalBody"
+                    hx-swap="innerHTML">
+                Load More
+            </button>
+        </div>
+    {% endif %}
 {% else %}
     <div class="connections-empty text-center py-5">
         <i class="bi bi-people text-muted display-6"></i>

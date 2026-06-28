@@ -349,10 +349,16 @@
                             <div id="follow-btn-container">
                                 {% include 'users/partials/follow_button_profile.html' %}
                             </div>
+                            <div id="pinch-btn-container">
+                                {% include 'users/partials/pinch_button.html' %}
+                            </div>
                         {% else %}
                             <div class="d-grid gap-2 px-2">
                                 <a href="{% url 'users:update_profile' %}" class="btn btn-outline-secondary rounded-pill fw-bold btn-sm">
                                     <i class="bi bi-gear-wide-connected me-1"></i> UPDATE PROFILE
+                                </a>
+                                <a href="{% url 'users:notification_preferences' %}" class="btn btn-outline-info rounded-pill fw-bold btn-sm">
+                                    <i class="bi bi-bell me-1"></i> PREFERENCES
                                 </a>
                                 <button type="button" class="btn btn-outline-primary w-100 rounded-pill btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#accountSwitcherModal">
                                     <i class="bi bi-arrow-repeat me-2"></i>SWITCH ACCOUNT
@@ -369,22 +375,24 @@
 
                     <div class="row g-0 border-top text-center py-3">
                         <div class="col-4 border-end">
-                            <button type="button" class="profile-stat-btn js-connections-trigger"
+                            <button type="button" class="profile-stat-btn js-people-trigger"
                                     data-bs-toggle="modal"
-                                    data-bs-target="#profileConnectionsModal"
-                                    data-connections-url="{% url 'users:profile_connections' profile_user.username 'followers' %}"
+                                    data-bs-target="#peopleModal"
+                                    data-connection-type="followers"
                                     data-connection-title="Followers"
+                                    data-profile-username="{{ profile_user.username }}"
                                     aria-label="View followers">
                                 <h6 id="follower-count" class="fw-bold mb-0">{{ followers_count }}</h6>
                                 <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Followers</small>
                             </button>
                         </div>
                         <div class="col-4 border-end">
-                            <button type="button" class="profile-stat-btn js-connections-trigger"
+                            <button type="button" class="profile-stat-btn js-people-trigger"
                                     data-bs-toggle="modal"
-                                    data-bs-target="#profileConnectionsModal"
-                                    data-connections-url="{% url 'users:profile_connections' profile_user.username 'following' %}"
+                                    data-bs-target="#peopleModal"
+                                    data-connection-type="following"
                                     data-connection-title="Following"
+                                    data-profile-username="{{ profile_user.username }}"
                                     aria-label="View following">
                                 <h6 id="following-count" class="fw-bold mb-0">{{ following_count }}</h6>
                                 <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Following</small>
@@ -395,6 +403,34 @@
                             <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Likes</small>
                         </div>
                     </div>
+                    {% if is_own_profile %}
+                    <div class="row g-0 border-top text-center py-3">
+                        <div class="col-6 border-end">
+                            <button type="button" class="profile-stat-btn js-people-trigger"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#peopleModal"
+                                    data-connection-type="pinches_sent"
+                                    data-connection-title="Pinches Sent"
+                                    data-profile-username="{{ profile_user.username }}"
+                                    aria-label="View pinches sent">
+                                <h6 id="pinches-sent-count" class="fw-bold mb-0">{{ pinches_sent_count|default:"0" }}</h6>
+                                <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Pinches Sent</small>
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <button type="button" class="profile-stat-btn js-people-trigger"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#peopleModal"
+                                    data-connection-type="pinches_received"
+                                    data-connection-title="Pinches Received"
+                                    data-profile-username="{{ profile_user.username }}"
+                                    aria-label="View pinches received">
+                                <h6 id="pinches-received-count" class="fw-bold mb-0">{{ pinches_received_count|default:"0" }}</h6>
+                                <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Pinches Received</small>
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <div class="post-card p-3 shadow-sm border-0 mb-3">
@@ -763,67 +799,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(() => notification.remove(), 3000);
   }
 
-  {# Start conversation functionality - FROZEN FOR MVP #}
-  {# document.querySelectorAll('.start-conversation-profile').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-      e.preventDefault();
-      const userId = this.dataset.userId;
-      if (!userId) return;
-
-      const csrfToken = getCSRFToken();
-      console.log('CSRF Token:', csrfToken);
-      console.log('User ID:', userId);
-      console.log('User authenticated:', {{ request.user.is_authenticated|yesno:"true,false" }});
-      
-      if (!csrfToken) {
-        console.error('No CSRF token found');
-        alert('Security token not found. Please refresh the page and try again.');
-        return;
-      }
-      
-      fetch('/messaging/v1/conversations/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': csrfToken,
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify({
-          type: 'direct',
-          member_ids: [userId]
-        })
-      })
-      .then(response => {
-        console.log('Response status:', response.status);
-        console.log('Response headers:', response.headers);
-        
-        if (!response.ok) {
-          return response.text().then(text => {
-            console.error('Error response:', text);
-            throw new Error(`HTTP ${response.status}: ${text}`);
-          });
-        }
-        return response.json();
-      })
-      .then(data => {
-        if (data.id) {
-          // Show notification if using existing conversation
-          if (data.existing) {
-            showNotification('Existing conversation found. Redirecting...', 'info');
-          }
-          window.location.href = `/messaging/conversation/${data.id}/`;
-        } else {
-          console.error('Invalid response:', data);
-          alert('Failed to create conversation. Please try again.');
-        }
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        alert('Failed to create conversation. Please try again.');
-      });
-    });
-  }); #}
+  // Start conversation functionality - FROZEN FOR MVP
 
   var viewMoreBtn = document.getElementById('profileViewMoreBtn');
   var profileMoreInfo = document.getElementById('profileMoreInfo');
@@ -863,70 +839,78 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  var connectionsModalEl = document.getElementById('profileConnectionsModal');
-  var connectionsBody = document.getElementById('profileConnectionsModalBody');
-  var connectionsTitle = document.getElementById('profileConnectionsModalTitle');
-  var pendingConnectionsUrl = null;
-  var pendingConnectionsTitle = null;
+  // People modal handling
+  var peopleModalEl = document.getElementById('peopleModal');
+  var peopleModalTitle = document.getElementById('peopleModalTitle');
+  var peopleConnectionType = document.getElementById('peopleConnectionType');
+  var peopleProfileUsername = document.getElementById('peopleProfileUsername');
+  var peopleModalList = document.getElementById('peopleModalList');
+  var pendingConnectionType = null;
+  var pendingConnectionTitle = null;
+  var pendingProfileUsername = null;
 
-  document.querySelectorAll('.js-connections-trigger').forEach(function(btn) {
+  console.log("DOMContentLoaded - peopleModalEl:", peopleModalEl);
+
+  document.querySelectorAll('.js-people-trigger').forEach(function(btn) {
     function stashConnectionTarget() {
-      pendingConnectionsUrl = btn.getAttribute('data-connections-url');
-      pendingConnectionsTitle = btn.getAttribute('data-connection-title');
+      pendingConnectionType = btn.getAttribute('data-connection-type');
+      pendingConnectionTitle = btn.getAttribute('data-connection-title');
+      pendingProfileUsername = btn.getAttribute('data-profile-username');
+      console.log("Stashed connection type:", pendingConnectionType, "Title:", pendingConnectionTitle, "Username:", pendingProfileUsername);
     }
     btn.addEventListener('pointerdown', stashConnectionTarget, true);
     btn.addEventListener('click', stashConnectionTarget, true);
   });
 
-  function loadConnectionsList(url) {
-    if (!connectionsBody) return;
-    if (!url) {
-      connectionsBody.innerHTML = '<div class="text-center py-4 text-muted small">Could not load connections.</div>';
-      return;
-    }
-
-    connectionsBody.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary" role="status"></div></div>';
-
-    fetch(url, {
-      method: 'GET',
-      credentials: 'same-origin',
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        'Accept': 'text/html',
-      },
-    })
-      .then(function(response) {
-        if (!response.ok) {
-          throw new Error('Could not load list (' + response.status + ')');
-        }
-        return response.text();
-      })
-      .then(function(html) {
-        connectionsBody.innerHTML = html;
-      })
-      .catch(function(err) {
-        connectionsBody.innerHTML = '<div class="text-center py-4 text-danger small">' +
-          (err.message || 'Failed to load connections.') + '</div>';
-      });
-  }
-
-  if (connectionsModalEl) {
-    connectionsModalEl.addEventListener('show.bs.modal', function(event) {
+  if (peopleModalEl) {
+    peopleModalEl.addEventListener('show.bs.modal', function(event) {
+      console.log("People modal show.bs.modal event fired");
       var trigger = event.relatedTarget;
-      var url = pendingConnectionsUrl;
-      var title = pendingConnectionsTitle || 'Connections';
+      var connectionType = pendingConnectionType;
+      var title = pendingConnectionTitle || 'People';
+      var profileUsername = pendingProfileUsername;
+
+      console.log("Trigger:", trigger);
+      console.log("Pending connection type:", pendingConnectionType);
 
       if (trigger) {
-        url = url || trigger.getAttribute('data-connections-url');
+        connectionType = connectionType || trigger.getAttribute('data-connection-type');
         title = trigger.getAttribute('data-connection-title') || title;
+        profileUsername = profileUsername || trigger.getAttribute('data-profile-username');
+        console.log("Connection type from trigger:", connectionType);
       }
 
-      if (connectionsTitle) {
-        connectionsTitle.textContent = title;
+      if (peopleModalTitle) {
+        peopleModalTitle.textContent = title;
       }
 
-      loadConnectionsList(url);
+      if (peopleConnectionType) {
+        peopleConnectionType.value = connectionType || '';
+      }
+
+      if (peopleProfileUsername) {
+        peopleProfileUsername.value = profileUsername || '';
+      }
+
+      // Load initial list via HTMX
+      if (peopleModalList && connectionType && profileUsername) {
+        var url = "{% url 'users:people_search' %}?connection_type=" + encodeURIComponent(connectionType) + "&profile_username=" + encodeURIComponent(profileUsername);
+        console.log("Loading people list with URL:", url);
+        
+        htmx.ajax('GET', url, {target: '#peopleModalList', swap: 'innerHTML'});
+      }
     });
+
+    // Clear parameters when modal closes
+    peopleModalEl.addEventListener('hidden.bs.modal', function() {
+      if (peopleConnectionType) peopleConnectionType.value = '';
+      if (peopleProfileUsername) peopleProfileUsername.value = '';
+      if (peopleModalList) {
+        peopleModalList.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary" role="status"></div></div>';
+      }
+    });
+  } else {
+    console.error("peopleModalEl not found");
   }
 
   // Profile completion card dismissal
@@ -952,6 +936,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 {% block modals %}
     {{ block.super }}
-    {% include 'users/partials/connections_sheet_modal.html' %}
+    {% include 'users/partials/people_modal.html' %}
     {% include 'users/partials/account_switcher_modal.html' %}
 {% endblock %}

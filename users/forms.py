@@ -240,6 +240,7 @@ class NotificationPreferencesForm(forms.ModelForm):
             'notify_on_invite',
             'notify_on_group_request',
             'notify_on_group_approved',
+            'notify_on_pinch',
             'email_notifications'
         ]
         widgets = {
@@ -248,6 +249,7 @@ class NotificationPreferencesForm(forms.ModelForm):
             'notify_on_invite': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'notify_on_group_request': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'notify_on_group_approved': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notify_on_pinch': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'email_notifications': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         labels = {
@@ -256,5 +258,6 @@ class NotificationPreferencesForm(forms.ModelForm):
             'notify_on_invite': 'Group invite notifications',
             'notify_on_group_request': 'Group join request notifications',
             'notify_on_group_approved': 'Group approval notifications',
+            'notify_on_pinch': 'Pinch notifications',
             'email_notifications': 'Email notifications'
         }

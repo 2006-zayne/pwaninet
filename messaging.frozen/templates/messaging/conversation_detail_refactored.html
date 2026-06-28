@@ -886,7 +886,7 @@
   console.log('=== CONVERSATION DETAIL REFACTORED SCRIPT LOADING ===');
   document.body.dataset.userId = '{{ request.user.id }}';
   document.body.dataset.conversationId = '{{ conversation.id }}';
-  document.body.dataset.isEncrypted = '{{ conversation.is_encrypted|yesno:"true,false" }}';
+  document.body.dataset.isEncrypted = '{% if conversation.is_encrypted %}true{% else %}false{% endif %}';
   document.body.dataset.conversationType = '{{ conversation.type }}';
 </script>
 

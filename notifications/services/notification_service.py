@@ -79,7 +79,9 @@ def create_notification(recipient, sender, notification_type, msg, post=None, gr
         return None
     if notification_type == Notifications.GROUP_APPROVED and not recipient.notify_on_group_approved:
         return None
-    
+    if notification_type == Notifications.PINCH and not recipient.notify_on_pinch:
+        return None
+
     notification = Notifications.objects.create(
         recipient=recipient,
         sender=sender,

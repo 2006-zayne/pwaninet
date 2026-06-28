@@ -177,6 +177,16 @@
 
       <div class="form-check">
         <div>
+          <input type="checkbox" class="form-check-input" id="notify_on_pinch" name="notify_on_pinch" {% if form.notify_on_pinch.value %}checked{% endif %}>
+          <label class="form-check-label" for="notify_on_pinch">
+            Pinch notifications
+            <span class="form-check-description">Get notified when someone pinches your profile</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-check">
+        <div>
           <input type="checkbox" class="form-check-input" id="email_notifications" name="email_notifications" {% if form.email_notifications.value %}checked{% endif %}>
           <label class="form-check-label" for="email_notifications">
             Email notifications

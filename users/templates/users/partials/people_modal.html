@@ -1,0 +1,141 @@
+<div class="modal fade people-modal" id="peopleModal" tabindex="-1" aria-hidden="true" role="dialog" aria-labelledby="peopleModalTitle">
+  <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content">
+      <!-- Sticky Header -->
+      <div class="modal-header people-modal-header border-0 pb-0 sticky-top">
+        <div class="people-modal-handle d-md-none" aria-hidden="true"></div>
+        <h5 class="modal-title fw-bold w-100 text-center pt-2" id="peopleModalTitle">People</h5>
+        <button type="button" class="btn-close people-modal-close" data-bs-dismiss="modal" aria-label="Close" style="position: absolute; right: 16px; top: 12px;"></button>
+      </div>
+
+      <!-- Sticky Search Bar -->
+      <div class="modal-body people-modal-search pt-2 pb-0 sticky-top" id="peopleModalSearchContainer">
+        <div class="search-form position-relative">
+          <i class="bi bi-search search-icon"></i>
+          <input type="text" 
+                 class="form-control search-input" 
+                 id="peopleSearchInput"
+                 name="q"
+                 placeholder="Search people, courses, years..."
+                 hx-get="{% url 'users:people_search' %}"
+                 hx-target="#peopleModalList"
+                 hx-trigger="keyup changed delay:300ms, search"
+                 hx-indicator="#peopleSearchSpinner"
+                 hx-include="#peopleModalParams">
+          <button type="button" class="search-clear" id="peopleSearchClear" style="display: none;">✕</button>
+        </div>
+        <!-- Hidden parameters for HTMX -->
+        <div id="peopleModalParams" style="display: none;">
+          <input type="hidden" name="connection_type" id="peopleConnectionType" value="">
+          <input type="hidden" name="profile_username" id="peopleProfileUsername" value="">
+        </div>
+      </div>
+
+      <!-- Scrollable Content -->
+      <div class="modal-body people-modal-body pt-2" id="peopleModalBody">
+        <div id="peopleModalList">
+          <div class="text-center py-4">
+            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .people-modal .search-input {
+    background: var(--search-bg, #f3f0ec);
+    border: 0;
+    border-radius: 999px;
+    padding: 10px 42px 10px 40px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-main, #0f172a);
+    outline: none;
+    transition: background 0.22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    line-height: 1.4;
+  }
+  
+  .people-modal .search-input::placeholder {
+    color: var(--text-muted, #64748b);
+    font-weight: 400;
+  }
+  
+  .people-modal .search-input:focus {
+    background: var(--search-bg-focus, #fff);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+  
+  .people-modal .search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted, #64748b);
+    font-size: 15px;
+    pointer-events: none;
+    transition: color 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 2;
+  }
+  
+  .people-modal .search-input:focus ~ .search-icon,
+  .people-modal .search-form:focus-within .search-icon {
+    color: var(--primary, #2563eb);
+  }
+  
+  .people-modal .search-clear {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--text-muted, #64748b);
+    border: none;
+    color: #fff;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    font-size: 11px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    z-index: 2;
+    transition: background 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .people-modal .search-clear:hover {
+    background: var(--text-main, #0f172a);
+  }
+  
+  .people-modal .search-input:not(:placeholder-shown) ~ .search-clear {
+    display: flex;
+  }
+  
+  .htmx-indicator {
+    display: none !important;
+  }
+  
+  .htmx-request .htmx-indicator {
+    display: inline-block !important;
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const searchInput = document.getElementById('peopleSearchInput');
+  const searchClear = document.getElementById('peopleSearchClear');
+  
+  if (searchInput && searchClear) {
+    searchClear.addEventListener('click', function() {
+      searchInput.value = '';
+      searchClear.style.display = 'none';
+      searchInput.focus();
+      // Trigger HTMX request with empty query to reset list
+      htmx.trigger(searchInput, 'keyup');
+    });
+  }
+});
+</script>
