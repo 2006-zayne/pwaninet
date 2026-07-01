@@ -370,7 +370,35 @@ class CommentViewSet(viewsets.ModelViewSet):
         return CommentSerializer
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        comment = serializer.save(author=self.request.user)
+        
+        # Broadcast new comment via WebSocket for real-time updates
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        
+        channel_layer = get_channel_layer()
+        
+        # Broadcast to post author's feed
+        if comment.post.author.id != self.request.user.id:
+            async_to_sync(channel_layer.group_send)(
+                f"feed_{comment.post.author.id}",
+                {
+                    'type': 'feed_update',
+                    'post': {
+                        'id': comment.post.id,
+                        'comment': {
+                            'id': comment.id,
+                            'content': comment.content,
+                            'author': {
+                                'id': comment.author.id,
+                                'username': comment.author.username,
+                                'profile_pic': comment.author.profile_pic.url if comment.author.profile_pic else None
+                            },
+                            'created_at': comment.created_at.isoformat()
+                        }
+                    }
+                }
+            )
 
 
 class ReportViewSet(viewsets.ModelViewSet):

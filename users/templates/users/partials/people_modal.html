@@ -1,11 +1,11 @@
-<div class="modal fade people-modal" id="peopleModal" tabindex="-1" aria-hidden="true" role="dialog" aria-labelledby="peopleModalTitle">
+<div class="modal fade people-modal" id="peopleModal" tabindex="-1" aria-hidden="true" role="dialog" aria-labelledby="peopleModalTitle" data-bs-backdrop="true" data-bs-keyboard="true">
   <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
-    <div class="modal-content">
+    <div class="modal-content" style="box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
       <!-- Sticky Header -->
-      <div class="modal-header people-modal-header border-0 pb-0 sticky-top">
+      <div class="modal-header people-modal-header border-0 pb-0 sticky-top" style="position: relative;">
         <div class="people-modal-handle d-md-none" aria-hidden="true"></div>
         <h5 class="modal-title fw-bold w-100 text-center pt-2" id="peopleModalTitle">People</h5>
-        <button type="button" class="btn-close people-modal-close" data-bs-dismiss="modal" aria-label="Close" style="position: absolute; right: 16px; top: 12px;"></button>
+        <button type="button" class="btn-close people-modal-close" data-bs-dismiss="modal" aria-label="Close" style="position: absolute; right: 12px; top: 8px; z-index: 10; font-size: 1.25rem; opacity: 1; background-image: none;">✕</button>
       </div>
 
       <!-- Sticky Search Bar -->
@@ -44,6 +44,31 @@
 </div>
 
 <style>
+  .people-modal .modal-content {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  }
+  
+  .people-modal .btn-close {
+    position: absolute !important;
+    right: 12px !important;
+    top: 8px !important;
+    z-index: 10 !important;
+    font-size: 1.25rem !important;
+    opacity: 1 !important;
+    background: rgba(0, 0, 0, 0.1) !important;
+    border-radius: 50% !important;
+    width: 32px !important;
+    height: 32px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+  
+  .people-modal .btn-close:hover {
+    background: rgba(0, 0, 0, 0.2) !important;
+  }
+  
   .people-modal .search-input {
     background: var(--search-bg, #f3f0ec);
     border: 0;
@@ -92,10 +117,10 @@
     background: var(--text-muted, #64748b);
     border: none;
     color: #fff;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
-    font-size: 11px;
+    font-size: 12px;
     display: none;
     align-items: center;
     justify-content: center;
@@ -111,7 +136,7 @@
   }
   
   .people-modal .search-input:not(:placeholder-shown) ~ .search-clear {
-    display: flex;
+    display: flex !important;
   }
   
   .htmx-indicator {

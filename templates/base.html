@@ -889,8 +889,8 @@
                 </a>
                 <a href="{% url 'notifications:notifications' %}"
                     class="nav-chip {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
-                    hx-get="{% url 'notifications:unread_notification_count' %}" 
-                    hx-trigger="every 30s"
+                    hx-get="{% url 'notifications:unread_notification_count' %}"
+                    hx-trigger="every 5s"
                     hx-swap="innerHTML"
                     id="notification-badge-container"
                     style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 50px;">
@@ -1259,6 +1259,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
     let globalReconnectAttempts = 0;
     const maxReconnectAttempts = 5;
 
+    // Global feed WebSocket connection for real-time comments
+    let globalFeedSocket = null;
+    let feedReconnectAttempts = 0;
+
     function connectGlobalNotificationsWebSocket() {
         if (globalNotificationsSocket && globalNotificationsSocket.readyState === WebSocket.OPEN) {
             return; // Already connected
@@ -1393,10 +1397,83 @@ window.addEventListener('beforeinstallprompt', (e) => {
         errorIndicator.style.display = 'block';
     }
 
+    function connectGlobalFeedWebSocket() {
+        if (globalFeedSocket && globalFeedSocket.readyState === WebSocket.OPEN) {
+            return; // Already connected
+        }
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = protocol + '//' + window.location.host + '/ws/feed/';
+
+        console.log('[GLOBAL] Connecting to feed WebSocket:', wsUrl);
+
+        try {
+            globalFeedSocket = new WebSocket(wsUrl);
+
+            globalFeedSocket.onopen = function(e) {
+                console.log('[GLOBAL] Feed WebSocket connected successfully');
+                feedReconnectAttempts = 0;
+            };
+
+            globalFeedSocket.onmessage = function(e) {
+                try {
+                    const data = JSON.parse(e.data);
+                    console.log('[GLOBAL] Received feed update:', data);
+
+                    if (data.type === 'feed_update') {
+                        handleFeedUpdate(data.post);
+                    }
+                } catch (error) {
+                    console.error('[GLOBAL] Error parsing feed WebSocket message:', error);
+                }
+            };
+
+            globalFeedSocket.onclose = function(e) {
+                console.log('[GLOBAL] Feed WebSocket disconnected:', e.code, e.reason);
+
+                if (feedReconnectAttempts < maxReconnectAttempts) {
+                    const delay = Math.min(1000 * Math.pow(2, feedReconnectAttempts), 30000);
+                    console.log('[GLOBAL] Reconnecting feed in ' + delay + 'ms...');
+
+                    setTimeout(() => {
+                        feedReconnectAttempts++;
+                        connectGlobalFeedWebSocket();
+                    }, delay);
+                }
+            };
+
+            globalFeedSocket.onerror = function(e) {
+                console.error('[GLOBAL] Feed WebSocket error:', e);
+            };
+
+        } catch (error) {
+            console.error('[GLOBAL] Failed to create feed WebSocket connection:', error);
+        }
+    }
+
+    function handleFeedUpdate(postData) {
+        // Handle real-time comment updates
+        if (postData.comment) {
+            console.log('[GLOBAL] New comment received for post:', postData.id);
+            
+            // Refresh the post to show new comment
+            const postElement = document.querySelector(`[data-post-id="${postData.id}"]`);
+            if (postElement) {
+                // Trigger HTMX refresh of the post comments
+                const commentsContainer = postElement.querySelector('.comments-container');
+                if (commentsContainer) {
+                    const refreshUrl = commentsContainer.getAttribute('hx-get') || `/posts/${postData.id}/comments/`;
+                    htmx.ajax('GET', refreshUrl, {target: commentsContainer});
+                }
+            }
+        }
+    }
+
     // Connect when page loads
     document.addEventListener('DOMContentLoaded', function() {
         // User is authenticated if we're in this script block (wrapped in {% if request.user.is_authenticated %})
         connectGlobalNotificationsWebSocket();
+        connectGlobalFeedWebSocket();
     });
 
     // Reconnect when page becomes visible again
