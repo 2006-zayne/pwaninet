@@ -21,9 +21,9 @@ class PostSerializer(serializers.ModelSerializer):
     group = GroupSerializer(read_only=True)
     course = CourseSerializer(read_only=True)
     unit = UnitSerializer(read_only=True)
-    like_count = serializers.ReadOnlyField(source='like_count')
+    like_count = serializers.ReadOnlyField()
     is_liked = serializers.SerializerMethodField()
-    repost_count = serializers.ReadOnlyField(source='repost_count')
+    repost_count = serializers.ReadOnlyField()
     is_reposted = serializers.SerializerMethodField()
     repost_of = serializers.PrimaryKeyRelatedField(read_only=True)
 
@@ -115,10 +115,12 @@ class CommentSerializer(serializers.ModelSerializer):
     author = UserMinimalSerializer(read_only=True)
     like_count = serializers.SerializerMethodField()
     is_liked = serializers.SerializerMethodField()
+    reply_count = serializers.ReadOnlyField()
+    parent_comment_id = serializers.ReadOnlyField(source='parent_comment.id')
 
     class Meta:
         model = Comment
-        fields = ['id', 'author', 'content', 'created_at', 'like_count', 'is_liked']
+        fields = ['id', 'author', 'content', 'created_at', 'like_count', 'is_liked', 'reply_count', 'parent_comment_id']
         read_only_fields = ['author', 'created_at']
 
     def get_like_count(self, obj):

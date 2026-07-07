@@ -382,15 +382,10 @@
                 <h6 class="mb-0 fw-bold small">Music/Audio</h6>
                 <small class="text-muted">Attached audio</small>
             </div>
-            <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-light rounded-circle mute-toggle" data-post-id="{{ post.id }}" title="Unmute" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;">
-                    <i class="bi bi-volume-mute-fill" style="font-size: 14px;"></i>
-                </button>
-                <audio id="audio-{{ post.id }}" class="w-100" style="max-width: 300px;" muted loop>
-                    <source src="{{ post.audio.url }}" type="audio/mpeg">
-                    Your browser does not support the audio element.
-                </audio>
-            </div>
+            <audio id="audio-{{ post.id }}" class="w-100" style="max-width: 300px;" controls muted loop>
+                <source src="{{ post.audio.url }}" type="audio/mpeg">
+                Your browser does not support the audio element.
+            </audio>
         </div>
     </div>
     {% endif %}
@@ -423,15 +418,12 @@
                         <video id="video-{{ post.id }}" 
                                preload="metadata" 
                                class="w-100 h-100 feed-video" 
-                               muted loop playsinline 
+                               muted loop playsinline controls
                                data-post-id="{{ post.id }}"
                                data-autoplay="true"
                                poster="{{ post.get_video_poster|default:'' }}">
                             <source src="{{ post.get_video_for_feed.url }}" type="video/mp4">
                         </video>
-                        <button class="btn btn-light rounded-circle position-absolute mute-toggle" data-post-id="{{ post.id }}" style="top: 10px; left: 10px; z-index: 10; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Unmute" aria-label="Unmute video">
-                            <i class="bi bi-volume-mute-fill" style="font-size: 14px;"></i>
-                        </button>
                     </div>
                 {% elif ".mp3" in f_url or ".wav" in f_url or ".ogg" in f_url or ".m4a" in f_url %}
                     <div class="p-3 d-flex align-items-center justify-content-between" style="background: transparent;" data-media-type="audio" data-post-id="{{ post.id }}">

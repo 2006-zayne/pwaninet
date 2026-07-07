@@ -1,0 +1,158 @@
+<style>
+  .update-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .update-info-item {
+    background: var(--brand-light);
+    border-radius: var(--radius-md);
+    padding: 1.25rem;
+  }
+
+  .update-info-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+  }
+
+  .update-info-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .update-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: var(--brand-light);
+    border-radius: var(--radius-md);
+    margin-bottom: 1.5rem;
+  }
+
+  .update-status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #22c55e;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .update-status-text {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .btn-check-updates {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.75rem 1.5rem;
+    background: var(--brand);
+    color: #fff;
+    border: none;
+    border-radius: 50px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-check-updates:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+  }
+
+  .btn-check-updates:disabled {
+    background: var(--text-secondary);
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .update-links {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .update-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--brand);
+    text-decoration: none;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    transition: color 0.2s ease;
+  }
+
+  .update-link:hover {
+    color: #1d4ed8;
+  }
+
+  .update-link:last-child {
+    margin-bottom: 0;
+  }
+</style>
+
+<div class="update-info">
+  <div class="update-info-item">
+    <div class="update-info-label">Current Version</div>
+    <div class="update-info-value">1.0.0</div>
+  </div>
+  <div class="update-info-item">
+    <div class="update-info-label">Latest Version</div>
+    <div class="update-info-value">1.0.0</div>
+  </div>
+</div>
+
+<div class="update-status">
+  <div class="update-status-dot"></div>
+  <div class="update-status-text">Up to date</div>
+</div>
+
+<button type="button" class="btn-check-updates" id="check-updates-btn">
+  <i class="bi bi-arrow-clockwise"></i> Check for Updates
+</button>
+
+<div class="update-links">
+  <a href="#" class="update-link">
+    <i class="bi bi-file-text"></i> What's New
+  </a>
+  <a href="#" class="update-link">
+    <i class="bi bi-clock-history"></i> Release History
+  </a>
+  <a href="#" class="update-link">
+    <i class="bi bi-info-circle"></i> About this Version
+  </a>
+</div>
+
+<script>
+  document.getElementById('check-updates-btn').addEventListener('click', function() {
+    const btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Checking...';
+    
+    // Simulate update check
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Check for Updates';
+      
+      // Show message (in production, this would be a proper notification)
+      const statusText = document.querySelector('.update-status-text');
+      statusText.textContent = 'No updates available';
+    }, 2000);
+  });
+</script>

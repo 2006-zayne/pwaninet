@@ -7,7 +7,7 @@ Duplicate class names across modules are forbidden.
 """
 
 from django.urls import re_path
-from realtime.consumers import NotificationConsumer, FeedConsumer, OnlineStatusConsumer
+from realtime.consumers import NotificationConsumer, FeedConsumer, OnlineStatusConsumer, CommentConsumer
 # Messaging routing - FROZEN FOR MVP
 # from messaging.routing import websocket_urlpatterns as messaging_websocket_urlpatterns
 
@@ -18,4 +18,6 @@ websocket_urlpatterns = [
     re_path(r'ws/feed/$', FeedConsumer.as_asgi()),
     # Online status consumer
     re_path(r'ws/online/$', OnlineStatusConsumer.as_asgi()),
+    # Comment updates consumer
+    re_path(r'ws/post/(?P<post_id>\d+)/comments/$', CommentConsumer.as_asgi()),
 ] # + messaging_websocket_urlpatterns

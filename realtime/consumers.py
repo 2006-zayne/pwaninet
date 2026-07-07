@@ -148,6 +148,14 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             'last_seen': event.get('last_seen')
         }))
 
+    async def unread_count_update(self, event):
+        """Send unread notification count update to client."""
+        print(f'[NOTIFICATIONS] Sending unread count update to user {self.user.id}: {event}')
+        await self.send(text_data=json.dumps({
+            'type': 'unread_count',
+            'count': event['count']
+        }))
+
 
 
 class FeedConsumer(AsyncWebsocketConsumer):
@@ -167,6 +175,12 @@ class FeedConsumer(AsyncWebsocketConsumer):
             self.user_group_name,
             self.channel_name
         )
+        
+        # Join global feed updates group for post metrics
+        await self.channel_layer.group_add(
+            "feed_updates",
+            self.channel_name
+        )
 
         await self.accept()
 
@@ -175,6 +189,12 @@ class FeedConsumer(AsyncWebsocketConsumer):
         # Leave user's feed group
         await self.channel_layer.group_discard(
             self.user_group_name,
+            self.channel_name
+        )
+        
+        # Leave global feed updates group
+        await self.channel_layer.group_discard(
+            "feed_updates",
             self.channel_name
         )
 
@@ -195,6 +215,101 @@ class FeedConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'feed_update',
             'post': event['post']
+        }))
+
+    async def post_like_update(self, event):
+        """Send post like count update to client."""
+        await self.send(text_data=json.dumps({
+            'type': 'post_like_update',
+            'post_id': event['post_id'],
+            'like_count': event['like_count'],
+            'is_liked': event['is_liked'],
+            'user_id': event['user_id']
+        }))
+
+    async def post_repost_update(self, event):
+        """Send post repost count update to client."""
+        await self.send(text_data=json.dumps({
+            'type': 'post_repost_update',
+            'post_id': event['post_id'],
+            'repost_count': event['repost_count'],
+            'is_reposted': event['is_reposted'],
+            'user_id': event['user_id']
+        }))
+
+    async def post_comment_update(self, event):
+        """Send post comment count update to client."""
+        await self.send(text_data=json.dumps({
+            'type': 'post_comment_update',
+            'post_id': event['post_id'],
+            'comment_count': event['comment_count']
+        }))
+
+
+class CommentConsumer(AsyncWebsocketConsumer):
+    """Consumer for real-time comment updates on posts."""
+
+    async def connect(self):
+        """Handle WebSocket connection."""
+        if self.scope["user"].is_anonymous:
+            await self.close()
+            return
+
+        self.user = self.scope["user"]
+        # Get post_id from URL
+        self.post_id = self.scope['url_route']['kwargs'].get('post_id')
+        
+        if not self.post_id:
+            await self.close()
+            return
+
+        self.post_group_name = f"post_comments_{self.post_id}"
+
+        print(f'[COMMENTS] User {self.user.id} connecting to post {self.post_id} group {self.post_group_name}')
+
+        # Join post's comment group
+        await self.channel_layer.group_add(
+            self.post_group_name,
+            self.channel_name
+        )
+
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        """Handle WebSocket disconnection."""
+        # Leave post's comment group
+        await self.channel_layer.group_discard(
+            self.post_group_name,
+            self.channel_name
+        )
+        print(f'[COMMENTS] User {self.user.id} disconnected from post {self.post_id}')
+
+    async def receive(self, text_data):
+        """Handle incoming WebSocket messages."""
+        try:
+            data = json.loads(text_data)
+            # Echo back for now - can be extended for specific commands
+            await self.send(text_data=json.dumps({
+                'type': 'echo',
+                'data': data
+            }))
+        except json.JSONDecodeError:
+            logger.error(f"Invalid JSON received: {text_data}")
+
+    async def new_comment(self, event):
+        """Send new comment to all users viewing the post."""
+        print(f'[COMMENTS] Sending new comment to user {self.user.id} for post {self.post_id}')
+        await self.send(text_data=json.dumps({
+            'type': 'new_comment',
+            'comment': event['comment']
+        }))
+
+    async def comment_like_update(self, event):
+        """Send comment like update to all users viewing the post."""
+        await self.send(text_data=json.dumps({
+            'type': 'comment_like_update',
+            'comment_id': event['comment_id'],
+            'likes_count': event['likes_count']
         }))
 
 

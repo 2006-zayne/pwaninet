@@ -490,16 +490,23 @@ def get_suggestions(request):
 
 
 @login_required
-def notification_preferences_view(request):
+def settings_view(request):
+    """Main settings page with modular sections"""
     if request.method == 'POST':
         form = NotificationPreferencesForm(request.POST, instance=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, 'Notification preferences updated successfully.')
-            return redirect('users:notification_preferences')
+            return redirect('users:settings')
     else:
         form = NotificationPreferencesForm(instance=request.user)
-    return render(request, 'users/notification_preferences.html', {'form': form})
+    return render(request, 'users/settings.html', {'form': form})
+
+
+@login_required
+def notification_preferences_view(request):
+    """Legacy view - redirects to new settings page"""
+    return redirect('users:settings')
 
 
 @login_required

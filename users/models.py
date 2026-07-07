@@ -68,6 +68,7 @@ class User(AbstractUser):
     notify_on_group_request = models.BooleanField(default=True)
     notify_on_group_approved = models.BooleanField(default=True)
     notify_on_pinch = models.BooleanField(default=True)
+    notify_on_comment_reply = models.BooleanField(default=True)
     email_notifications = models.BooleanField(default=False)
 
     # Theme preference

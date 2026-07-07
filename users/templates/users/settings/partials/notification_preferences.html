@@ -1,0 +1,130 @@
+<div class="form-check">
+  <div>
+    <input type="checkbox" class="form-check-input" id="notify_on_like" name="notify_on_like" {% if form.notify_on_like.value %}checked{% endif %}>
+    <label class="form-check-label" for="notify_on_like">
+      Like notifications
+      <span class="form-check-description">Get notified when someone likes your posts</span>
+    </label>
+  </div>
+</div>
+
+<div class="form-check">
+  <div>
+    <input type="checkbox" class="form-check-input" id="notify_on_follow" name="notify_on_follow" {% if form.notify_on_follow.value %}checked{% endif %}>
+    <label class="form-check-label" for="notify_on_follow">
+      Follow notifications
+      <span class="form-check-description">Get notified when someone follows you</span>
+    </label>
+  </div>
+</div>
+
+<div class="form-check">
+  <div>
+    <input type="checkbox" class="form-check-input" id="notify_on_invite" name="notify_on_invite" {% if form.notify_on_invite.value %}checked{% endif %}>
+    <label class="form-check-label" for="notify_on_invite">
+      Group invite notifications
+      <span class="form-check-description">Get notified when someone invites you to a group</span>
+    </label>
+  </div>
+</div>
+
+<div class="form-check">
+  <div>
+    <input type="checkbox" class="form-check-input" id="notify_on_group_request" name="notify_on_group_request" {% if form.notify_on_group_request.value %}checked{% endif %}>
+    <label class="form-check-label" for="notify_on_group_request">
+      Group join request notifications
+      <span class="form-check-description">Get notified when someone requests to join your groups (for admins)</span>
+    </label>
+  </div>
+</div>
+
+<div class="form-check">
+  <div>
+    <input type="checkbox" class="form-check-input" id="notify_on_group_approved" name="notify_on_group_approved" {% if form.notify_on_group_approved.value %}checked{% endif %}>
+    <label class="form-check-label" for="notify_on_group_approved">
+      Group approval notifications
+      <span class="form-check-description">Get notified when your group join request is approved</span>
+    </label>
+  </div>
+</div>
+
+<div class="form-check">
+  <div>
+    <input type="checkbox" class="form-check-input" id="notify_on_pinch" name="notify_on_pinch" {% if form.notify_on_pinch.value %}checked{% endif %}>
+    <label class="form-check-label" for="notify_on_pinch">
+      Pinch notifications
+      <span class="form-check-description">Get notified when someone pinches your profile</span>
+    </label>
+  </div>
+</div>
+
+<div class="form-check">
+  <div>
+    <input type="checkbox" class="form-check-input" id="email_notifications" name="email_notifications" {% if form.email_notifications.value %}checked{% endif %}>
+    <label class="form-check-label" for="email_notifications">
+      Email notifications
+      <span class="form-check-description">Receive email notifications for important updates</span>
+    </label>
+  </div>
+</div>
+
+<button type="submit" class="btn-save">
+  <i class="bi bi-check-lg"></i> Save
+</button>
+
+<style>
+  .form-check {
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .form-check:last-child {
+    border-bottom: none;
+  }
+
+  .form-check-input {
+    width: 1.25rem;
+    height: 1.25rem;
+    cursor: pointer;
+  }
+
+  .form-check-label {
+    margin-left: 0.75rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    cursor: pointer;
+    flex: 1;
+  }
+
+  .form-check-description {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+    font-weight: 400;
+  }
+
+  .btn-save {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.75rem 2rem;
+    background: var(--brand);
+    color: #fff;
+    border: none;
+    border-radius: 50px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 1.5rem;
+  }
+
+  .btn-save:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+  }
+</style>

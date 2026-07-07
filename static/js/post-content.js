@@ -13,7 +13,7 @@
 (function() {
     'use strict';
 
-    const MAX_CHARS = 300; // Maximum characters before truncation
+    const MAX_CHARS = 100; // Maximum characters before truncation
     const TRUNCATION_SUFFIX = '...';
 
     function initPostContent() {

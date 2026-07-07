@@ -5,9 +5,9 @@
  * - HTMX-safe initialization
  * - No duplicate listeners
  * - No memory leaks
- * - Modern social-media-style controls
- * - Accessibility support
- * - Mobile-first design
+ * - Native HTML5 video controls
+ * - IntersectionObserver autoplay
+ * - Auto pause when videos leave viewport
  */
 
 (function() {
@@ -38,15 +38,7 @@
             isVisible: false,
             isPlaying: false,
             hasStarted: false,
-            listeners: new Set(),
-            controlsVisible: false,
-            controlsTimeout: null,
-            controls: {
-                playButton: null,
-                muteButton: null,
-                loadingSpinner: null,
-                controlBar: null
-            }
+            listeners: new Set()
         };
     }
 
@@ -168,7 +160,10 @@
             if (!state.videos.has(video)) {
                 const videoData = createVideoData(video);
                 state.videos.set(video, videoData);
-                setupVideoControls(video, videoData);
+                
+                // Enable native controls
+                video.controls = true;
+                
                 setupVideoListeners(video, videoData);
                 observeVideo(video);
                 
@@ -182,281 +177,31 @@
         console.log('[VideoManager] Initialized', state.videos.size, 'videos');
     }
 
-    function setupVideoControls(video, videoData) {
-        const container = video.closest('[data-media-type="video"]');
-        if (!container) return;
 
-        // Create play button
-        const playButton = createPlayButton(video, videoData);
-        container.appendChild(playButton);
-        videoData.controls.playButton = playButton;
 
-        // Create duration badge
-        /*const durationBadge = createDurationBadge(video, videoData);
-        container.appendChild(durationBadge);
-        videoData.controls.durationBadge = durationBadge;*/
 
-        // Create loading spinner
-        const loadingSpinner = createLoadingSpinner(video, videoData);
-        container.appendChild(loadingSpinner);
-        videoData.controls.loadingSpinner = loadingSpinner;
 
-        // Setup mute button if exists
-        const existingMuteButton = container.querySelector('.mute-toggle');
-        if (existingMuteButton) {
-            const muteButton = setupMuteButton(existingMuteButton, video, videoData);
-            videoData.controls.muteButton = muteButton;
-            // Update initial state
-            updateMuteButton(video, videoData);
-        }
-
-        // Create control bar for both feed and detail videos
-        const controlBar = createControlBar(video, videoData);
-        container.appendChild(controlBar);
-        videoData.controls.controlBar = controlBar;
-    }
-
-    function createPlayButton(video, videoData) {
-        const button = document.createElement('button');
-        button.className = 'btn btn-light rounded-circle position-absolute video-play-toggle';
-        button.setAttribute('aria-label', 'Play video');
-        button.style.cssText = `
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 5;
-            width: 48px;
-            height: 48px;
-            padding: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: var(--card-bg);
-            border: 1px solid var(--border);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            transition: all 0.2s ease-in-out;
-            opacity: 1;
-            pointer-events: auto;
-        `;
-        
-        const icon = document.createElement('i');
-        icon.className = 'bi bi-play-fill';
-        icon.style.cssText = 'font-size: 20px; color: var(--text-dark);';
-        button.appendChild(icon);
-
-        button.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleVideoPlay(video, videoData);
-        });
-        button.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleVideoPlay(video, videoData);
-        });
-
-        return button;
-    }
-/*
-    function createDurationBadge(video, videoData) {
-        const badge = document.createElement('span');
-        badge.className = 'video-duration position-absolute rounded-pill px-2 py-1';
-        badge.style.cssText = `
-            bottom: 10px;
-            right: 10px;
-            z-index: 5;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            font-size: 12px;
-            font-weight: 600;
-            backdrop-filter: blur(4px);
-            pointer-events: none;
-        `;
-        badge.textContent = '0:00';
-
-        video.addEventListener('loadedmetadata', () => {
-            badge.textContent = formatDuration(video.duration);
-        });
-
-        return badge;
-    }*/
-
-    function createLoadingSpinner(video, videoData) {
-        const spinner = document.createElement('div');
-        spinner.className = 'video-loading position-absolute';
-        spinner.style.cssText = `
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 5;
-            display: none;
-            pointer-events: none;
-        `;
-        
-        const innerSpinner = document.createElement('div');
-        innerSpinner.className = 'spinner-border text-primary';
-        innerSpinner.setAttribute('role', 'status');
-        innerSpinner.style.cssText = 'width: 40px; height: 40px;';
-        spinner.appendChild(innerSpinner);
-
-        return spinner;
-    }
-
-    function createControlBar(video, videoData) {
-        const bar = document.createElement('div');
-        bar.className = 'video-control-bar';
-        bar.style.cssText = `
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            z-index: 5;
-            background: linear-gradient(to top, rgba(0,0,0,0.75), transparent);
-            padding: 12px 16px 24px 16px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            pointer-events: none;
-        `;
-
-        // Progress bar
-        const progress = document.createElement('input');
-        progress.type = 'range';
-        progress.min = 0;
-        progress.max = 100;
-        progress.value = 0;
-        progress.style.cssText = 'flex-grow: 1; accent-color: var(--primary); pointer-events: auto;';
-        progress.addEventListener('input', (e) => {
-            e.stopPropagation();
-            const time = (e.target.value / 100) * video.duration;
-            video.currentTime = time;
-        });
-        progress.addEventListener('touchend', (e) => {
-            e.stopPropagation();
-        });
-        video.addEventListener('timeupdate', () => {
-            progress.value = (video.currentTime / video.duration) * 100;
-        });
-        bar.appendChild(progress);
-
-        // Duration
-        const duration = document.createElement('span');
-        duration.style.cssText = 'color: white; font-size: 12px; min-width: 40px; pointer-events: none;';
-        duration.textContent = '0:00';
-        video.addEventListener('loadedmetadata', () => {
-            duration.textContent = formatDuration(video.duration);
-        });
-        video.addEventListener('timeupdate', () => {
-            duration.textContent = formatDuration(video.currentTime);
-        });
-        bar.appendChild(duration);
-
-        // Fullscreen button
-        const fullscreenBtn = document.createElement('button');
-        fullscreenBtn.className = 'btn btn-link p-0';
-        fullscreenBtn.style.cssText = 'color: white; width: 32px; height: 32px; pointer-events: auto;';
-        fullscreenBtn.innerHTML = '<i class="bi bi-arrows-fullscreen" style="font-size: 18px;"></i>';
-        fullscreenBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleFullscreen(video);
-        });
-        fullscreenBtn.addEventListener('touchend', (e) => {
-            e.stopPropagation();
-            toggleFullscreen(video);
-        });
-        bar.appendChild(fullscreenBtn);
-
-        return bar;
-    }
-
-    function setupMuteButton(button, video, videoData) {
-        // Remove existing listener if any
-        const newButton = button.cloneNode(true);
-        button.parentNode.replaceChild(newButton, button);
-
-        newButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleMute(video, videoData);
-        });
-        newButton.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleMute(video, videoData);
-        });
-        
-        return newButton;
-    }
 
     // ============================================================================
     // VIDEO LISTENERS
     // ============================================================================
 
     function setupVideoListeners(video, videoData) {
-        let touchHandled = false;
-
-        // Video click - toggle controls visibility only
-        video.addEventListener('click', (e) => {
-            e.preventDefault();
-            // Skip if this was triggered by touch
-            if (touchHandled) {
-                touchHandled = false;
-                return;
-            }
-            if (videoData.controlsVisible) {
-                hideControls(videoData);
-            } else {
-                showControls(videoData);
-                if (!video.paused) {
-                    scheduleHide(videoData);
-                }
-            }
-        });
-
-        // Touch support for mobile - same behavior as click
-        video.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            touchHandled = true;
-            if (videoData.controlsVisible) {
-                hideControls(videoData);
-            } else {
-                showControls(videoData);
-                if (!video.paused) {
-                    scheduleHide(videoData);
-                }
-            }
-        });
-
         // Play event
         video.addEventListener('play', () => {
             videoData.isPlaying = true;
             videoData.hasStarted = true;
-            updatePlayButton(video, videoData, true);
-            hideLoadingSpinner(videoData);
-            // Show controls briefly then auto-hide
-            showControls(videoData);
-            scheduleHide(videoData);
         });
 
         // Pause event
         video.addEventListener('pause', () => {
             videoData.isPlaying = false;
-            updatePlayButton(video, videoData, false);
-            // Show controls permanently when paused
-            if (videoData.controlsTimeout) {
-                clearTimeout(videoData.controlsTimeout);
-                videoData.controlsTimeout = null;
-            }
-            showControls(videoData);
         });
 
         // Ended event
         video.addEventListener('ended', () => {
             videoData.isPlaying = false;
             videoData.hasStarted = false;
-            updatePlayButton(video, videoData, false);
             if (video.loop) {
                 // Loop the video
                 setTimeout(() => {
@@ -467,25 +212,9 @@
             }
         });
 
-        // Waiting event (buffering)
-        video.addEventListener('waiting', () => {
-            showLoadingSpinner(videoData);
-        });
-
-        // Canplay event
-        video.addEventListener('canplay', () => {
-            hideLoadingSpinner(videoData);
-        });
-
         // Error event
         video.addEventListener('error', (e) => {
             console.error('[VideoManager] Video error:', e);
-            showErrorMessage(videoData);
-        });
-
-        // Volume change
-        video.addEventListener('volumechange', () => {
-            updateMuteButton(video, videoData);
         });
     }
 
@@ -515,7 +244,6 @@
             if (!video.muted) {
                 video.muted = true;
                 video.play().catch(e => console.log('Muted auto-play also prevented:', e));
-                updateMuteButton(video, videoData);
             }
         });
     }
@@ -532,119 +260,9 @@
         }
     }
 
-    function toggleVideoPlay(video, videoData) {
-        if (video.paused) {
-            playVideo(video, videoData);
-        } else {
-            pauseVideo(video, videoData);
-        }
-    }
 
-    function toggleMute(video, videoData) {
-        video.muted = !video.muted;
-        updateMuteButton(video, videoData);
-    }
 
-    function toggleFullscreen(video) {
-        if (document.fullscreenElement) {
-            document.exitFullscreen();
-        } else {
-            video.requestFullscreen().catch(err => {
-                console.error('[VideoManager] Fullscreen error:', err);
-            });
-        }
-    }
 
-    // ============================================================================
-    // UI UPDATES
-    // ============================================================================
-
-    function updatePlayButton(video, videoData, isPlaying) {
-        const button = videoData.controls.playButton;
-        if (!button) return;
-
-        const icon = button.querySelector('i');
-        if (isPlaying) {
-            icon.className = 'bi bi-pause-fill';
-            button.setAttribute('aria-label', 'Pause video');
-        } else {
-            icon.className = 'bi bi-play-fill';
-            button.setAttribute('aria-label', 'Play video');
-        }
-        
-        // Only show when controls are visible
-        if (videoData.controlsVisible) {
-            button.style.opacity = '1';
-        } else {
-            button.style.opacity = '0';
-        }
-    }
-
-    function updateMuteButton(video, videoData) {
-        const button = videoData.controls.muteButton;
-        if (!button) return;
-
-        const icon = button.querySelector('i');
-        if (video.muted) {
-            icon.className = 'bi bi-volume-mute-fill';
-            button.title = 'Unmute';
-            button.setAttribute('aria-label', 'Unmute video');
-        } else {
-            icon.className = 'bi bi-volume-up-fill';
-            button.title = 'Mute';
-            button.setAttribute('aria-label', 'Mute video');
-        }
-    }
-
-    function showLoadingSpinner(videoData) {
-        if (videoData.controls.loadingSpinner) {
-            videoData.controls.loadingSpinner.style.display = 'flex';
-        }
-    }
-
-    function hideLoadingSpinner(videoData) {
-        if (videoData.controls.loadingSpinner) {
-            videoData.controls.loadingSpinner.style.display = 'none';
-        }
-    }
-
-    function showErrorMessage(videoData) {
-        const container = videoData.element.closest('[data-media-type="video"]');
-        if (!container) return;
-
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'position-absolute text-center';
-        errorDiv.style.cssText = `
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 10;
-            color: var(--text-secondary);
-        `;
-        errorDiv.innerHTML = '<i class="bi bi-exclamation-circle" style="font-size: 32px;"></i><p class="mt-2 small">Video unavailable</p>';
-        container.appendChild(errorDiv);
-    }
-
-    function showControls(videoData) {
-        if (!videoData.controls.controlBar) return;
-        videoData.controlsVisible = true;
-        videoData.controls.controlBar.style.opacity = '1';
-    }
-
-    function hideControls(videoData) {
-        if (!videoData.controls.controlBar) return;
-        videoData.controlsVisible = false;
-        videoData.controls.controlBar.style.opacity = '0';
-    }
-
-    function scheduleHide(videoData) {
-        if (videoData.controlsTimeout) {
-            clearTimeout(videoData.controlsTimeout);
-        }
-        videoData.controlsTimeout = setTimeout(() => {
-            hideControls(videoData);
-        }, 3000);
-    }
 
     // ============================================================================
     // INTERSECTION OBSERVER HANDLER
@@ -728,13 +346,6 @@
         // Unobserve
         unobserveVideo(video);
 
-        // Remove controls
-        Object.values(videoData.controls).forEach(control => {
-            if (control && control.parentNode) {
-                control.parentNode.removeChild(control);
-            }
-        });
-
         // Remove from state
         state.videos.delete(video);
 
@@ -785,22 +396,6 @@
         });
     }
 
-    // ============================================================================
-    // UTILITY FUNCTIONS
-    // ============================================================================
-
-    function formatDuration(seconds) {
-        if (isNaN(seconds)) return '0:00';
-        
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        const secs = Math.floor(seconds % 60);
-        
-        if (hours > 0) {
-            return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-        }
-        return `${minutes}:${String(secs).padStart(2, '0')}`;
-    }
 
     // ============================================================================
     // INITIALIZATION

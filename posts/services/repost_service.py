@@ -69,6 +69,20 @@ def delete_repost(user, post, group=None):
             group=group
         )
         repost.delete()
+        
+        # Broadcast repost update via WebSocket
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            "feed_updates",
+            {
+                'type': 'post_repost_update',
+                'post_id': post.id,
+                'repost_count': post.reposts.count(),
+                'is_reposted': False,
+                'user_id': user.id
+            }
+        )
+        
         return True
     except Repost.DoesNotExist:
         return False

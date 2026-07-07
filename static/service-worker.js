@@ -1,10 +1,19 @@
 /**
  * PwaniNet Service Worker
- * Provides Progressive Web App offline support
+ * Provides Progressive Web App offline support with version management
  */
 
-const CACHE_NAME = 'pwaninet-v3';
-const OFFLINE_CACHE_NAME = 'pwaninet-offline-v3';
+// Dynamic cache versioning - will be updated by release system
+const CACHE_VERSION = 'pwaninet-v4';
+const CACHE_NAME = CACHE_VERSION;
+const OFFLINE_CACHE_NAME = 'pwaninet-offline-v4';
+
+// Service worker version metadata
+const SW_VERSION = {
+    version: CACHE_VERSION,
+    buildDate: new Date().toISOString(),
+    cacheName: CACHE_NAME
+};
 
 // Core assets to cache for offline functionality
 const CORE_ASSETS = [
@@ -480,7 +489,7 @@ function isApiRequest(request) {
            url.pathname.startsWith('/messaging/');
 }
 
-// Message handling for cache management
+    // Message handling for cache management and version detection
 self.addEventListener('message', (event) => {
     const { type, payload } = event.data;
     
@@ -505,6 +514,21 @@ self.addEventListener('message', (event) => {
             cachePage(payload.url).then(success => {
                 event.ports[0].postMessage({ type: 'PAGE_CACHED', payload: { success } });
             });
+            break;
+            
+        case 'GET_VERSION':
+            event.ports[0].postMessage({ type: 'VERSION_INFO', payload: SW_VERSION });
+            break;
+            
+        case 'CHECK_UPDATE_STATUS':
+            event.ports[0].postMessage({ 
+                type: 'UPDATE_STATUS', 
+                payload: { updateAvailable: false } 
+            });
+            break;
+            
+        case 'ACTIVATE_UPDATE':
+            self.skipWaiting();
             break;
     }
 });

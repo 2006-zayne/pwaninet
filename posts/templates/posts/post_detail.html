@@ -225,17 +225,14 @@
                     <img src="{{ post.get_intel_file.url }}" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;">
                 {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
                     <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post-id="{{ post.id }}">
-                        <video id="video-{{ post.id }}" 
-                               preload="metadata" 
-                               class="w-100 h-100 post-detail-video" 
-                               muted loop playsinline 
+                        <video id="video-{{ post.id }}"
+                               preload="metadata"
+                               class="w-100 h-100 post-detail-video"
+                               muted loop playsinline controls
                                data-post-id="{{ post.id }}"
                                poster="{{ post.get_video_poster|default:'' }}">
                             <source src="{{ post.video.url }}" type="video/mp4">
                         </video>
-                        <button class="btn btn-light rounded-circle position-absolute mute-toggle" data-post-id="{{ post.id }}" style="top: 10px; left: 10px; z-index: 10; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Unmute" aria-label="Unmute video">
-                            <i class="bi bi-volume-mute-fill" style="font-size: 14px;"></i>
-                        </button>
                     </div>
                 {% elif ".mp3" in f_url or ".wav" in f_url or ".ogg" in f_url or ".m4a" in f_url %}
                     <div class="p-3 d-flex align-items-center justify-content-between" style="background: transparent;">
@@ -310,21 +307,25 @@
 </div>
 
 <!-- Sticky Comment Input at Bottom -->
-<div class="fixed-bottom bg-white border-top shadow" style="z-index: 1000;">
+<div class="fixed-bottom" style="z-index: 1000; background-color: var(--card-bg); border-top: 1px solid var(--border);">
     <div class="container py-3">
         <div class="row justify-content-center">
             <div class="col-12 col-lg-8">
-                <form method="POST" action="{% url 'posts:add_comment' post.id %}" class="d-flex align-items-center gap-2">
+                <form method="POST" action="{% url 'posts:add_comment' post.id %}" class="main-composer">
                     {% csrf_token %}
-                    <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border flex-shrink-0" style="width: 36px; height: 36px; object-fit: cover;">
-                    <div class="flex-grow-1 position-relative">
-                        <input type="text" name="content"
-                               class="form-control border-0 rounded-pill"
+                    <img src="{{ request.user.profile_pic.url }}" 
+                         alt="{{ request.user.username }}" 
+                         class="main-composer-avatar">
+                    <div class="main-composer-input-wrapper">
+                        <input type="text" 
+                               name="content"
+                               class="main-composer-input"
                                placeholder="Add comment..."
-                               style="font-size: 13px; background-color: #e9ecef; padding-right: 40px; height: 42px;">
-                        <button type="submit" class="btn border-0 rounded-circle position-absolute"
-                                style="width: 32px; height: 32px; right: 4px; top: 50%; transform: translateY(-50%); padding: 0; display: flex; align-items: center; justify-content: center; background: transparent;">
-                            <i class="bi bi-send-fill" style="font-size: 20px; color: #0f172a;"></i>
+                               aria-label="Add a comment">
+                        <button type="submit" 
+                                class="main-composer-send"
+                                aria-label="Send comment">
+                            <i class="bi bi-send-fill"></i>
                         </button>
                     </div>
                 </form>
@@ -538,6 +539,195 @@ document.addEventListener('DOMContentLoaded', function() {
         updateSelectedGroups();
     };
 });
+</script>
+
+<script>
+// Real-time comment updates via WebSocket
+(function() {
+    const postId = {{ post.id }};
+    let commentSocket = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+
+    function connectCommentWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/post/${postId}/comments/`;
+        
+        console.log('[Comments] Connecting to WebSocket:', wsUrl);
+        
+        commentSocket = new WebSocket(wsUrl);
+        
+        commentSocket.onopen = function() {
+            console.log('[Comments] WebSocket connected');
+            reconnectAttempts = 0;
+        };
+        
+        commentSocket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            console.log('[Comments] Received message:', data);
+            
+            if (data.type === 'new_comment') {
+                handleNewComment(data.comment);
+            } else if (data.type === 'comment_like_update') {
+                handleCommentLikeUpdate(data);
+            }
+        };
+        
+        commentSocket.onclose = function() {
+            console.log('[Comments] WebSocket disconnected');
+            reconnectWebSocket();
+        };
+        
+        commentSocket.onerror = function(error) {
+            console.error('[Comments] WebSocket error:', error);
+        };
+    }
+    
+    function reconnectWebSocket() {
+        if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            console.log('[Comments] Reconnecting... Attempt', reconnectAttempts);
+            setTimeout(connectCommentWebSocket, 3000);
+        }
+    }
+    
+    function handleNewComment(commentData) {
+        console.log('[Comments] Handling new comment:', commentData);
+        
+        // Check if comment already exists to avoid duplicates
+        if (document.getElementById(`comment-${commentData.id}`)) {
+            return;
+        }
+        
+        const commentsSection = document.getElementById('comments-section');
+        if (!commentsSection) return;
+        
+        // Create comment HTML
+        const commentHtml = `
+            <div class="d-flex gap-2 p-3 border-bottom" id="comment-${commentData.id}">
+                <a href="/users/${commentData.author.username}/">
+                    <img src="${commentData.author.profile_pic || '/static/images/default_user.jpg'}" class="rounded-circle border flex-shrink-0" style="width: 34px; height: 34px; object-fit: cover;">
+                </a>
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center gap-2">
+                        <a href="/users/${commentData.author.username}/" class="fw-bold small text-dark text-decoration-none">
+                            ${commentData.author.full_name || commentData.author.username}
+                        </a>
+                        <small class="text-muted" style="font-size: 11px;">just now</small>
+                    </div>
+                    <p class="mb-1 small comment-text" style="font-size: 14px; line-height: 1.5;" data-full-text="${commentData.content}" data-truncated-length="100">${commentData.content}</p>
+                    <button class="btn btn-sm border-0 p-0 text-muted"
+                            hx-post="/comment/${commentData.id}/like/"
+                            hx-target="#comment-${commentData.id}"
+                            hx-swap="outerHTML"
+                            style="font-size: 12px;">
+                        <i class="bi bi-heart"></i>
+                        <span class="ms-1">${commentData.likes_count}</span>
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Insert comment at the top of the list
+        const firstComment = commentsSection.querySelector('.d-flex.gap-2');
+        if (firstComment) {
+            firstComment.insertAdjacentHTML('beforebegin', commentHtml);
+        } else {
+            // No comments yet, insert after the header
+            const header = commentsSection.querySelector('.text-center.py-4');
+            if (header) {
+                header.style.display = 'none';
+            }
+            commentsSection.insertAdjacentHTML('afterbegin', commentHtml);
+        }
+        
+        // Apply truncation to new comment
+        const newCommentText = document.querySelector(`#comment-${commentData.id} .comment-text`);
+        if (newCommentText) {
+            truncateSingleComment(newCommentText);
+        }
+        
+        // Update comment count if displayed
+        const viewAllLink = commentsSection.querySelector('a[href*="show_all=1"]');
+        if (viewAllLink) {
+            const currentCount = parseInt(viewAllLink.textContent.match(/\d+/)?.[0] || 0);
+            viewAllLink.innerHTML = `<i class="bi bi-chevron-down me-1"></i>View all ${currentCount + 1} comments`;
+        }
+    }
+    
+    function handleCommentLikeUpdate(data) {
+        console.log('[Comments] Handling like update:', data);
+        
+        const commentElement = document.getElementById(`comment-${data.comment_id}`);
+        if (!commentElement) return;
+        
+        // Update like count
+        const likeButton = commentElement.querySelector('button');
+        const likeCountSpan = likeButton.querySelector('span');
+        if (likeCountSpan) {
+            likeCountSpan.textContent = data.likes_count;
+        }
+    }
+    
+    function truncateSingleComment(textElement) {
+        const fullText = textElement.getAttribute('data-full-text');
+        const maxLength = parseInt(textElement.getAttribute('data-truncated-length')) || 200;
+        
+        if (!fullText || fullText.length <= maxLength) {
+            return;
+        }
+        
+        const truncatedText = fullText.substring(0, maxLength) + '...';
+        textElement.textContent = truncatedText;
+        
+        const seeMoreLink = document.createElement('a');
+        seeMoreLink.href = '#';
+        seeMoreLink.className = 'see-more-link';
+        seeMoreLink.textContent = ' See more';
+        seeMoreLink.style.color = '#2563eb';
+        seeMoreLink.style.fontSize = '14px';
+        seeMoreLink.style.cursor = 'pointer';
+        seeMoreLink.style.textDecoration = 'none';
+        
+        seeMoreLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            textElement.textContent = fullText;
+            
+            const seeLessLink = document.createElement('a');
+            seeLessLink.href = '#';
+            seeLessLink.className = 'see-less-link';
+            seeLessLink.textContent = ' See less';
+            seeLessLink.style.color = '#2563eb';
+            seeLessLink.style.fontSize = '14px';
+            seeLessLink.style.cursor = 'pointer';
+            seeLessLink.style.textDecoration = 'none';
+            
+            seeLessLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                textElement.textContent = truncatedText;
+                textElement.appendChild(seeMoreLink);
+            });
+            
+            textElement.appendChild(seeLessLink);
+        });
+        
+        textElement.appendChild(seeMoreLink);
+    }
+    
+    // Initialize WebSocket connection
+    if (window.WebSocket) {
+        connectCommentWebSocket();
+    } else {
+        console.warn('[Comments] WebSocket not supported');
+    }
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        if (commentSocket) {
+            commentSocket.close();
+        }
+    });
+})();
 </script>
 
 </div>

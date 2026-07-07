@@ -361,8 +361,14 @@ class CommentViewSet(viewsets.ModelViewSet):
     ViewSet for managing comments.
     """
     permission_classes = [IsAuthenticated]
-    queryset = Comment.objects.select_related('author', 'post').all()
     serializer_class = CommentSerializer
+
+    def get_queryset(self):
+        # Only filter for top-level comments on list actions
+        if self.action == 'list':
+            return Comment.objects.select_related('author', 'post').filter(parent_comment__isnull=True)
+        # For detail actions (retrieve, update, delete, custom actions), include all comments
+        return Comment.objects.select_related('author', 'post')
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -399,6 +405,87 @@ class CommentViewSet(viewsets.ModelViewSet):
                     }
                 }
             )
+
+    @action(detail=True, methods=['post'], url_path='reply')
+    def reply(self, request, pk=None):
+        """
+        POST /comments/{id}/reply/
+        Create a reply to a comment.
+        """
+        parent_comment = self.get_object()
+        content = request.data.get('content', '').strip()
+        
+        if not content:
+            return Response(
+                {'detail': 'Reply content cannot be empty.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if user can comment on the post (group membership check)
+        if parent_comment.post.group:
+            from groups.models import Membership, MembershipStatus
+            try:
+                Membership.objects.get(
+                    user=request.user,
+                    group=parent_comment.post.group,
+                    status=MembershipStatus.APPROVED
+                )
+            except Membership.DoesNotExist:
+                return Response(
+                    {'detail': 'You must be an approved member to comment on posts in this group.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
+        # Create the reply using the service
+        from posts.services.comment_service import add_comment_to_post
+        reply = add_comment_to_post(
+            parent_comment.post,
+            request.user,
+            content,
+            parent_comment=parent_comment
+        )
+        
+        serializer = CommentSerializer(reply, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='like')
+    def like(self, request, pk=None):
+        """
+        POST /comments/{id}/like/
+        Toggle like on a comment.
+        """
+        comment = self.get_object()
+        from posts.services.comment_service import toggle_comment_like_for_user
+        result = toggle_comment_like_for_user(comment, request.user)
+        
+        if result['comment'].is_liked_by(request.user):
+            return Response(
+                {'detail': 'Comment liked.', 'likes_count': comment.likes.count()},
+                status=status.HTTP_200_OK
+            )
+        else:
+            return Response(
+                {'detail': 'Comment unliked.', 'likes_count': comment.likes.count()},
+                status=status.HTTP_200_OK
+            )
+
+    @action(detail=True, methods=['get'], url_path='replies')
+    def replies(self, request, pk=None):
+        """
+        GET /comments/{id}/replies/
+        List direct replies to a comment.
+        """
+        parent_comment = self.get_object()
+        replies = parent_comment.replies.select_related('author').order_by('created_at')
+        
+        # Pagination
+        page = self.paginate_queryset(replies)
+        if page is not None:
+            serializer = CommentSerializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = CommentSerializer(replies, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class ReportViewSet(viewsets.ModelViewSet):

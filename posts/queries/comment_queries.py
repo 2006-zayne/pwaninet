@@ -5,7 +5,7 @@ from posts.models import CommentLike
 
 def get_ranked_comments_queryset(post):
     now = timezone.now()
-    return post.comments.select_related('author').annotate(likes_count = Count('likes', distinct = True), recency_bonus = Case(When(created_at__gte = now - timedelta(hours = 1), then = Value(3)), When(created_at__gte = now - timedelta(days = 1), then = Value(2)), When(created_at__gte = now - timedelta(days = 7), then = Value(1)), default = Value(0), output_field = IntegerField())).order_by('-likes_count', '-recency_bonus', '-created_at')
+    return post.comments.filter(parent_comment__isnull=True).select_related('author').annotate(likes_count = Count('likes', distinct = True), recency_bonus = Case(When(created_at__gte = now - timedelta(hours = 1), then = Value(3)), When(created_at__gte = now - timedelta(days = 1), then = Value(2)), When(created_at__gte = now - timedelta(days = 7), then = Value(1)), default = Value(0), output_field = IntegerField())).order_by('-likes_count', '-recency_bonus', '-created_at')
 
 
 def get_liked_comment_ids_for_user(user, post):

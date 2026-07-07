@@ -1,46 +1,74 @@
-<style>
-  [data-theme="dark"] .bg-white {
-    background-color: var(--card-bg) !important;
-  }
-  [data-theme="dark"] .text-dark {
-    color: #ffffff !important;
-  }
-  [data-theme="dark"] .text-muted {
-    color: #d1d5db !important;
-  }
-  [data-theme="dark"] .border-bottom {
-    border-color: var(--border) !important;
-  }
-</style>
-<!-- Comments Section -->
-<div class="bg-white rounded-3 shadow-sm overflow-hidden mb-3" id="comments-section" data-skeleton="post-detail">
+<!-- Modern Threaded Comments Section -->
+<div class="comment-stream" id="comments-section" data-post-id="{{ post.id }}">
     {% for comment in visible_comments %}
-    <div class="d-flex gap-2 p-3 {% if not forloop.last %}border-bottom{% endif %}" id="comment-{{ comment.id }}">
-        <a href="{% url 'users:profile' comment.author.username %}">
-            <img src="{{ comment.author.profile_pic.url }}" class="rounded-circle border flex-shrink-0" style="width: 34px; height: 34px; object-fit: cover;">
+    <div class="comment-item" id="comment-{{ comment.id }}" 
+         data-comment-id="{{ comment.id }}"
+         data-author-id="{{ comment.author.id }}"
+         data-parent-comment-id=""
+         data-reply-count="{{ comment.reply_count }}">
+        
+        <a href="{% url 'users:profile' comment.author.username %}" class="comment-avatar-link">
+            <img src="{{ comment.author.profile_pic.url }}" 
+                 alt="{{ comment.author.get_full_name|default:comment.author.username }}" 
+                 class="comment-avatar"
+                 loading="lazy">
         </a>
-        <div class="flex-grow-1">
-            <div class="d-flex align-items-center gap-2">
-                <a href="{% url 'users:profile' comment.author.username %}" class="fw-bold small text-dark text-decoration-none">
+        
+        <div class="comment-content">
+            <div class="comment-header">
+                <a href="{% url 'users:profile' comment.author.username %}" class="comment-author-link">
                     {{ comment.author.get_full_name|default:comment.author.username }}
                 </a>
-                <small class="text-muted" style="font-size: 11px;">{{ comment.created_at|timesince }} ago</small>
+                <span class="comment-timestamp">{{ comment.created_at|timesince }} ago</span>
             </div>
-            <p class="mb-1 small" style="font-size: 14px; line-height: 1.5;">{{ comment.content }}</p>
-            <button class="btn btn-sm border-0 p-0 {% if comment.id in liked_comment_ids %}text-danger{% else %}text-muted{% endif %}"
-                    hx-post="{% url 'posts:toggle_comment_like' comment.id %}"
-                    hx-target="#comment-{{ comment.id }}"
-                    hx-swap="outerHTML"
-                    style="font-size: 12px;">
-                <i class="bi {% if comment.id in liked_comment_ids %}bi-heart-fill{% else %}bi-heart{% endif %}"></i>
-                <span class="ms-1">{{ comment.likes.count }}</span>
+            
+            <div class="comment-body" id="comment-body-{{ comment.id }}">
+                {{ comment.content }}
+            </div>
+            
+            <div class="comment-actions">
+                <button class="comment-action {% if comment.id in liked_comment_ids %}liked{% endif %}" 
+                        data-action="like"
+                        data-comment-id="{{ comment.id }}"
+                        aria-label="Like comment">
+                    <i class="bi {% if comment.id in liked_comment_ids %}bi-heart-fill{% else %}bi-heart{% endif %}"></i>
+                    <span>{{ comment.likes.count }}</span>
+                </button>
+                
+                <button class="comment-action" 
+                        data-action="reply"
+                        data-comment-id="{{ comment.id }}"
+                        aria-label="Reply to comment">
+                    <i class="bi bi-chat-dots"></i>
+                    Reply
+                </button>
+                
+                <button class="comment-menu-btn" 
+                        data-action="menu"
+                        data-comment-id="{{ comment.id }}"
+                        aria-label="More options"
+                        aria-expanded="false">
+                    <i class="bi bi-three-dots"></i>
+                </button>
+            </div>
+            
+            {% if comment.reply_count > 0 %}
+            <button class="reply-toggle" 
+                    data-action="toggle-replies"
+                    data-comment-id="{{ comment.id }}"
+                    data-reply-count="{{ comment.reply_count }}"
+                    aria-expanded="false"
+                    aria-controls="replies-{{ comment.id }}">
+                <i class="bi bi-chevron-down"></i>
+                <span>View {{ comment.reply_count }} {{ comment.reply_count|pluralize:"reply,replies" }}</span>
             </button>
+            {% endif %}
         </div>
     </div>
     {% empty %}
-    <div class="text-center py-4 text-muted">
-        <i class="bi bi-chat-dots fs-3"></i>
-        <p class="small mt-2 mb-0">No comments yet. Be the first.</p>
+    <div class="comments-empty">
+        <i class="bi bi-chat-dots"></i>
+        <p>No comments yet. Be the first to comment.</p>
     </div>
     {% endfor %}
 
@@ -51,8 +79,85 @@
            hx-target="#comments-section"
            hx-swap="outerHTML"
            class="btn btn-sm btn-outline-secondary rounded-pill px-4 fw-bold" style="font-size: 12px;">
-            <i class="bi bi-chevron-down me-1"></i>View all {{ post.comments.count }} comments
+            <i class="bi bi-chevron-down me-1"></i>View all {{ post.comments.filter|length }} comments
         </a>
     </div>
     {% endif %}
 </div>
+
+<script>
+(function() {
+    // Initialize comment manager when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        const commentsSection = document.getElementById('comments-section');
+        if (commentsSection) {
+            const postId = commentsSection.dataset.postId;
+            const currentUser = {
+                id: {{ request.user.id|default:"null" }},
+                username: '{{ request.user.username|default:"" }}',
+                role: '{{ request.user.global_role|default:"" }}'
+            };
+            
+            if (typeof CommentManager !== 'undefined') {
+                CommentManager.init(postId, currentUser);
+            }
+        }
+    });
+    
+    // Handle long comments with expand/collapse
+    function truncateLongComments() {
+        const commentBodies = document.querySelectorAll('.comment-body');
+        const maxLength = 300;
+        
+        commentBodies.forEach(body => {
+            // Skip if already has toggle button
+            if (body.querySelector('.comment-expand-toggle')) {
+                return;
+            }
+            
+            const text = body.textContent;
+            
+            if (text.length > maxLength) {
+                const truncated = text.substring(0, maxLength);
+                body.textContent = truncated + '...';
+                body.classList.add('collapsed');
+                
+                const toggleBtn = document.createElement('button');
+                toggleBtn.className = 'comment-expand-toggle';
+                toggleBtn.textContent = 'See more';
+                toggleBtn.setAttribute('aria-expanded', 'false');
+                toggleBtn.style.display = 'inline-flex';
+                toggleBtn.style.visibility = 'visible';
+                
+                toggleBtn.addEventListener('click', function() {
+                    const isExpanded = body.classList.contains('collapsed');
+                    
+                    if (isExpanded) {
+                        body.textContent = truncated + '...';
+                        body.classList.add('collapsed');
+                        toggleBtn.textContent = 'See more';
+                        toggleBtn.setAttribute('aria-expanded', 'false');
+                    } else {
+                        body.textContent = text;
+                        body.classList.remove('collapsed');
+                        toggleBtn.textContent = 'See less';
+                        toggleBtn.setAttribute('aria-expanded', 'true');
+                    }
+                });
+                
+                body.appendChild(toggleBtn);
+            }
+        });
+    }
+    
+    // Run on initial load
+    truncateLongComments();
+    
+    // Run after HTMX updates
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        if (event.target.querySelector('.comment-body')) {
+            truncateLongComments();
+        }
+    });
+})();
+</script>

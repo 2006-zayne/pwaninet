@@ -11,6 +11,8 @@ from notifications.queries.notification_queries import (
     get_grouped_notifications,
     get_unread_counts_for_groups
 )
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 def _unread_count_cache_key(user_id):
     return f'''notif:unread_count:user:{user_id}'''
@@ -65,6 +67,16 @@ def mark_single_notification_as_read(user, notif_id):
             'is_read'])
         invalidate_unread_count_cache(user.id)
         invalidate_group_unread_cache(user.id)
+        
+        # Broadcast unread count update via WebSocket
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"notifications_{user.id}",
+            {
+                'type': 'unread_count_update',
+                'count': get_unread_count(user)
+            }
+        )
     return notification
 
 
@@ -82,6 +94,8 @@ def create_notification(recipient, sender, notification_type, msg, post=None, gr
         return None
     if notification_type == Notifications.PINCH and not recipient.notify_on_pinch:
         return None
+    if notification_type == Notifications.COMMENT_REPLY and not recipient.notify_on_comment_reply:
+        return None
 
     notification = Notifications.objects.create(
         recipient=recipient,
@@ -93,6 +107,17 @@ def create_notification(recipient, sender, notification_type, msg, post=None, gr
     )
     invalidate_unread_count_cache(recipient.id)
     invalidate_group_unread_cache(recipient.id)
+    
+    # Broadcast unread count update via WebSocket
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"notifications_{recipient.id}",
+        {
+            'type': 'unread_count_update',
+            'count': get_unread_count(recipient)
+        }
+    )
+    
     return notification
 
 
@@ -108,12 +133,32 @@ def delete_all_user_notifications(user):
     delete_all_notifications(user)
     invalidate_unread_count_cache(user.id)
     invalidate_group_unread_cache(user.id)
+    
+    # Broadcast unread count update via WebSocket
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"notifications_{user.id}",
+        {
+            'type': 'unread_count_update',
+            'count': 0
+        }
+    )
 
 
 def delete_user_read_notifications(user):
     delete_read_notifications(user)
     invalidate_unread_count_cache(user.id)
     invalidate_group_unread_cache(user.id)
+    
+    # Broadcast unread count update via WebSocket
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"notifications_{user.id}",
+        {
+            'type': 'unread_count_update',
+            'count': get_unread_count(user)
+        }
+    )
 
 
 def _group_unread_cache_key(user_id):

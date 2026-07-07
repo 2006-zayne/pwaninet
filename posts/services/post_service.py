@@ -5,6 +5,8 @@ from posts.models import Like, Post, PostImage
 from users.models import User
 from notifications.models import Notifications
 from users.services.feed_service import invalidate_home_feed_context
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 def create_post_for_user(form, user, files, group_id=None):
     import logging
@@ -154,6 +156,19 @@ def toggle_post_like_for_user(post, user):
 
     if post.author_id != user.id:
         invalidate_home_feed_context(post.author_id)
+    
+    # Broadcast like update via WebSocket
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        "feed_updates",
+        {
+            'type': 'post_like_update',
+            'post_id': post.id,
+            'like_count': post.likes.count(),
+            'is_liked': is_liked,
+            'user_id': user.id
+        }
+    )
 
     return {
         "post": post,

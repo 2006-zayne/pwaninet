@@ -52,6 +52,7 @@ urlpatterns = [
     path('profile/edit/', views.update_profile_view, name='update_profile'),
     path('toggle-follow/<str:username>/', views.toggle_follow, name='toggle_follow'),
     path('pinch/<str:username>/', views.toggle_pinch, name='toggle_pinch'),
+    path('settings/', views.settings_view, name='settings'),
     path('notification-preferences/', views.notification_preferences_view, name='notification_preferences'),
     path('mark-onboarding-complete/', views.mark_onboarding_complete, name='mark_onboarding_complete'),
     path('accounts/switch/<int:user_id>/', views.switch_account_view, name='switch_account'),

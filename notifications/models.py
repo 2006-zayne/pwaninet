@@ -40,6 +40,7 @@ class Notifications(models.Model):
     POST_SHARED = 'POST_SHARED'
     POST_SHARED_TO_GROUP = 'POST_SHARED_TO_GROUP'
     PINCH = 'PINCH'
+    COMMENT_REPLY = 'COMMENT_REPLY'
 
     TYPE_CHOICES = [
         (INVITE, 'Group Invite'),
@@ -51,7 +52,8 @@ class Notifications(models.Model):
         (GROUP_REJECTED, 'Group Join Rejected'),
         (POST_SHARED, 'Post Shared to User'),
         (POST_SHARED_TO_GROUP, 'Post Shared to Group'),
-        (PINCH, 'Profile Pinch')
+        (PINCH, 'Profile Pinch'),
+        (COMMENT_REPLY, 'Comment Reply')
     ]
 
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications', db_index=True)

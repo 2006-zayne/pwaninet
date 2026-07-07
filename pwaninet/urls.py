@@ -108,6 +108,7 @@ urlpatterns = [
     path('groups/', include(('groups.urls', 'groups'), namespace='groups')),
     path('notifications/', include(('notifications.urls', 'notifications'), namespace='notifications')),
     path('courses/', include('courses.urls')),
+    path('', include('releases.urls')),
     # Messaging - FROZEN FOR MVP - Redirect to home page
     path('messaging/', redirect_messaging),
     # path('messaging/', include(('messaging.urls', 'messaging'), namespace='messaging')),

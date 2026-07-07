@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'posts',
     'groups',
     'notifications',
+    'releases',
     # Messaging - FROZEN FOR MVP
     # 'messaging',
 ]

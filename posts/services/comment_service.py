@@ -2,6 +2,9 @@ from django.contrib import messages
 from posts.models import Comment, CommentLike
 from posts.queries.comment_queries import get_liked_comment_ids_for_user, get_ranked_comments_queryset
 from users.services.feed_service import invalidate_home_feed_context
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from notifications.services.notification_service import create_notification
 
 DEFAULT_VISIBLE_COMMENTS = 3
 
@@ -12,16 +15,69 @@ def build_comments_context(post, user, show_all_comments = False):
         'post': post,
         'visible_comments': visible_comments,
         'show_all_comments': show_all_comments,
-        'has_more_comments': post.comments.count() > DEFAULT_VISIBLE_COMMENTS,
+        'has_more_comments': post.comments.filter(parent_comment__isnull=True).count() > DEFAULT_VISIBLE_COMMENTS,
         'liked_comment_ids': get_liked_comment_ids_for_user(user, post) }
 
 
-def add_comment_to_post(post, author, content):
+def add_comment_to_post(post, author, content, parent_comment=None):
     content = (content or '').strip()
     if not content:
         return None
-    comment = Comment.objects.create(post = post, author = author, content = content)
+    comment = Comment.objects.create(post = post, author = author, content = content, parent_comment=parent_comment)
+    
+    # Increment parent comment's reply_count if this is a reply
+    if parent_comment:
+        parent_comment.reply_count += 1
+        parent_comment.save(update_fields=['reply_count'])
+        
+        # Create notification for parent comment author (if not replying to own comment)
+        if parent_comment.author != author:
+            from notifications.models import Notifications
+            replier_name = author.get_full_name() or author.username
+            msg = f'{replier_name} replied to your comment'
+            create_notification(
+                recipient=parent_comment.author,
+                sender=author,
+                notification_type=Notifications.COMMENT_REPLY,
+                msg=msg,
+                post=post
+            )
+    
     invalidate_home_feed_context(author.id)
+    
+    # Broadcast new comment via WebSocket to post-specific channel
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"post_comments_{post.id}",
+        {
+            'type': 'new_comment',
+            'comment': {
+                'id': comment.id,
+                'author': {
+                    'id': comment.author.id,
+                    'username': comment.author.username,
+                    'full_name': comment.author.get_full_name(),
+                    'profile_pic': comment.author.profile_pic.url if comment.author.profile_pic else None
+                },
+                'content': comment.content,
+                'created_at': comment.created_at.isoformat(),
+                'likes_count': comment.likes.count(),
+                'parent_comment_id': comment.parent_comment.id if comment.parent_comment else None,
+                'reply_count': comment.reply_count
+            }
+        }
+    )
+    
+    # Broadcast comment count update to global feed channel
+    async_to_sync(channel_layer.group_send)(
+        "feed_updates",
+        {
+            'type': 'post_comment_update',
+            'post_id': post.id,
+            'comment_count': post.comments.filter(parent_comment__isnull=True).count()
+        }
+    )
+    
     return comment
 
 
@@ -40,6 +96,18 @@ def toggle_comment_like_for_user(comment, user):
         like_qs.delete()
     else:
         CommentLike.objects.create(user = user, comment = comment)
+    
+    # Broadcast like update via WebSocket
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"post_comments_{comment.post.id}",
+        {
+            'type': 'comment_like_update',
+            'comment_id': comment.id,
+            'likes_count': comment.likes.count()
+        }
+    )
+    
     if comment.is_liked_by(user):
         return {
             'comment': comment,
