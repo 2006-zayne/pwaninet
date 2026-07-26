@@ -110,17 +110,25 @@
 <div class="update-info">
   <div class="update-info-item">
     <div class="update-info-label">Current Version</div>
-    <div class="update-info-value">1.0.0</div>
+    <div class="update-info-value" id="current-version">{{ app_version }}</div>
+  </div>
+  <div class="update-info-item">
+    <div class="update-info-label">Build</div>
+    <div class="update-info-value">{{ app_build }}</div>
+  </div>
+  <div class="update-info-item">
+    <div class="update-info-label">Channel</div>
+    <div class="update-info-value">{{ app_release_channel|default:"Unknown" }}</div>
   </div>
   <div class="update-info-item">
     <div class="update-info-label">Latest Version</div>
-    <div class="update-info-value">1.0.0</div>
+    <div class="update-info-value" id="latest-version">{{ app_version }}</div>
   </div>
 </div>
 
 <div class="update-status">
-  <div class="update-status-dot"></div>
-  <div class="update-status-text">Up to date</div>
+  <div class="update-status-dot" id="update-status-dot"></div>
+  <div class="update-status-text" id="update-status-text">Up to date</div>
 </div>
 
 <button type="button" class="btn-check-updates" id="check-updates-btn">
@@ -128,31 +136,67 @@
 </button>
 
 <div class="update-links">
-  <a href="#" class="update-link">
-    <i class="bi bi-file-text"></i> What's New
+  <a href="/system/releases/" class="update-link">
+    <i class="bi bi-box-seam"></i> Release Center
   </a>
-  <a href="#" class="update-link">
-    <i class="bi bi-clock-history"></i> Release History
+  {% if current_release %}
+  <a href="/system/releases/{{ current_release.id }}/" class="update-link">
+    <i class="bi bi-info-circle"></i> Current Release Details
   </a>
-  <a href="#" class="update-link">
-    <i class="bi bi-info-circle"></i> About this Version
-  </a>
+  {% endif %}
 </div>
 
 <script>
-  document.getElementById('check-updates-btn').addEventListener('click', function() {
-    const btn = this;
+  // Auto-check for updates on page load
+  document.addEventListener('DOMContentLoaded', async function() {
+    await checkForUpdates();
+  });
+
+  // Check for updates button
+  document.getElementById('check-updates-btn').addEventListener('click', async function() {
+    await checkForUpdates();
+  });
+
+  async function checkForUpdates() {
+    const btn = document.getElementById('check-updates-btn');
     btn.disabled = true;
     btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Checking...';
-    
-    // Simulate update check
-    setTimeout(() => {
+
+    try {
+      const response = await fetch('/api/releases/version_check/');
+      const data = await response.json();
+
+      // Update latest version display
+      document.getElementById('latest-version').textContent = data.latest_version;
+
+      // Update status
+      const statusDot = document.getElementById('update-status-dot');
+      const statusText = document.getElementById('update-status-text');
+
+      if (data.update_available) {
+        statusDot.style.background = '#f59e0b';
+        statusText.textContent = 'Update available';
+        statusText.style.color = '#f59e0b';
+
+        // Show update notification
+        if (data.mandatory_update) {
+          alert(`MANDATORY UPDATE: Version ${data.latest_version} is available. You must update to continue using the app.`);
+          window.location.href = '/system/releases/';
+        } else if (confirm(`New version ${data.latest_version} is available. Would you like to visit the Release Center?`)) {
+          window.location.href = '/system/releases/';
+        }
+      } else {
+        statusDot.style.background = '#22c55e';
+        statusText.textContent = 'Up to date';
+        statusText.style.color = 'var(--text-primary)';
+      }
+    } catch (error) {
+      console.error('Failed to check for updates:', error);
+      const statusText = document.getElementById('update-status-text');
+      statusText.textContent = 'Check failed';
+    } finally {
       btn.disabled = false;
       btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Check for Updates';
-      
-      // Show message (in production, this would be a proper notification)
-      const statusText = document.querySelector('.update-status-text');
-      statusText.textContent = 'No updates available';
-    }, 2000);
-  });
+    }
+  }
 </script>

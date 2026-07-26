@@ -1,0 +1,365 @@
+{% extends 'users/settings/base_settings.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block back_link %}
+<a href="{% url 'users:settings' %}" class="back-link">
+  <i class="bi bi-arrow-left"></i> {% trans "Back to Settings" %}
+</a>
+{% endblock %}
+
+{% block page_title %}{% trans "Storage" %}{% endblock %}
+{% block page_subtitle %}{% trans "Manage your storage and cached data" %}{% endblock %}
+
+{% block settings_content %}
+<div class="settings-list-container">
+  <div class="settings-list-item expandable" data-target="storage-usage">
+    <div class="settings-list-icon">
+      <i class="bi bi-database"></i>
+    </div>
+    <div class="settings-list-content">
+      <div class="settings-list-title">{% trans "Storage Usage" %}</div>
+      <div class="settings-list-subtitle">{% trans "View your storage usage and manage space" %}</div>
+    </div>
+    <div class="settings-list-chevron">
+      <i class="bi bi-chevron-right"></i>
+    </div>
+  </div>
+
+  <div class="settings-expandable-content" id="storage-usage">
+    <div class="settings-expandable-body" id="storage-usage-content">
+      <div class="placeholder-section">
+        <i class="bi bi-database"></i>
+        <p>Loading storage usage...</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-list-item expandable" data-target="downloads">
+    <div class="settings-list-icon">
+      <i class="bi bi-download"></i>
+    </div>
+    <div class="settings-list-content">
+      <div class="settings-list-title">Downloads</div>
+      <div class="settings-list-subtitle">Manage downloaded content and offline data</div>
+    </div>
+    <div class="settings-list-chevron">
+      <i class="bi bi-chevron-right"></i>
+    </div>
+  </div>
+  
+  <div class="settings-expandable-content" id="downloads">
+    <div class="settings-expandable-body" id="downloads-content">
+      <div class="placeholder-section">
+        <i class="bi bi-download"></i>
+        <p>Loading downloads...</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-list-item expandable" data-target="clear-cache">
+    <div class="settings-list-icon">
+      <i class="bi bi-trash"></i>
+    </div>
+    <div class="settings-list-content">
+      <div class="settings-list-title">Clear Cache</div>
+      <div class="settings-list-subtitle">Free up space by clearing cached data</div>
+    </div>
+    <div class="settings-list-chevron">
+      <i class="bi bi-chevron-right"></i>
+    </div>
+  </div>
+  
+  <div class="settings-expandable-content" id="clear-cache">
+    <div class="settings-expandable-body" id="cache-content">
+      <div class="placeholder-section">
+        <i class="bi bi-trash"></i>
+        <p>Loading cache management...</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-list-item expandable" data-target="temporary-data">
+    <div class="settings-list-icon">
+      <i class="bi bi-clock-history"></i>
+    </div>
+    <div class="settings-list-content">
+      <div class="settings-list-title">Temporary Data</div>
+      <div class="settings-list-subtitle">Clear upload queue, drafts, and sync data</div>
+    </div>
+    <div class="settings-list-chevron">
+      <i class="bi bi-chevron-right"></i>
+    </div>
+  </div>
+
+  <div class="settings-expandable-content" id="temporary-data">
+    <div class="settings-expandable-body" id="temporary-content">
+      <div class="placeholder-section">
+        <i class="bi bi-clock-history"></i>
+        <p>Loading temporary data...</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-list-item expandable" data-target="offline-content">
+    <div class="settings-list-icon">
+      <i class="bi bi-wifi-off"></i>
+    </div>
+    <div class="settings-list-content">
+      <div class="settings-list-title">Offline Content</div>
+      <div class="settings-list-subtitle">Manage offline content for access without internet</div>
+    </div>
+    <div class="settings-list-chevron">
+      <i class="bi bi-chevron-right"></i>
+    </div>
+  </div>
+
+  <div class="settings-expandable-content" id="offline-content">
+    <div class="settings-expandable-body" id="offline-content-body">
+      <div class="placeholder-section">
+        <i class="bi bi-wifi-off"></i>
+        <p>No offline content</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .settings-list-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .settings-list-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .settings-list-item:hover {
+    background: var(--brand-light);
+  }
+
+  .settings-list-item:last-child {
+    border-bottom: none;
+  }
+
+  .settings-list-item.expandable .settings-list-chevron i {
+    transition: transform 0.3s ease;
+  }
+
+  .settings-list-item.expandable.expanded .settings-list-chevron i {
+    transform: rotate(90deg);
+  }
+
+  .settings-list-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand-light);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .settings-list-icon i {
+    font-size: 1.25rem;
+    color: var(--brand);
+  }
+
+  .settings-list-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .settings-list-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .settings-list-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+  }
+
+  .settings-list-chevron {
+    flex-shrink: 0;
+    color: var(--text-secondary);
+  }
+
+  .settings-list-chevron i {
+    font-size: 1.1rem;
+  }
+
+  .settings-expandable-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    background: var(--page-bg);
+  }
+
+  .settings-expandable-content.expanded {
+    max-height: 500px;
+  }
+
+  .settings-expandable-body {
+    padding: 1.5rem;
+  }
+
+  .placeholder-section {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text-secondary);
+  }
+
+  .placeholder-section i {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const expandableItems = document.querySelectorAll('.settings-list-item.expandable');
+    
+    expandableItems.forEach(item => {
+      item.addEventListener('click', function() {
+        const targetId = this.getAttribute('data-target');
+        const content = document.getElementById(targetId);
+        
+        // Toggle expanded state
+        this.classList.toggle('expanded');
+        content.classList.toggle('expanded');
+        
+        // Load content when expanding
+        if (this.classList.contains('expanded')) {
+          loadStorageContent(targetId);
+        }
+        
+        // Close other expanded items
+        expandableItems.forEach(otherItem => {
+          if (otherItem !== this) {
+            const otherTargetId = otherItem.getAttribute('data-target');
+            const otherContent = document.getElementById(otherTargetId);
+            otherItem.classList.remove('expanded');
+            otherContent.classList.remove('expanded');
+          }
+        });
+      });
+    });
+
+    // Load storage content dynamically
+    async function loadStorageContent(targetId) {
+      try {
+        console.log('Loading storage content for:', targetId);
+        
+        // Load storage UI script if not already loaded
+        if (!window.storageUI) {
+          console.log('Loading storage_ui.js script...');
+          
+          // Create a promise that resolves when storageUI is available
+          const storageUIPromise = new Promise((resolve, reject) => {
+            // Check if already available
+            if (window.storageUI) {
+              resolve(window.storageUI);
+              return;
+            }
+            
+            // Set up a timeout
+            const timeout = setTimeout(() => {
+              reject(new Error('Timeout waiting for storageUI to load'));
+            }, 5000);
+            
+            // Poll for storageUI availability
+            const checkInterval = setInterval(() => {
+              if (window.storageUI) {
+                clearTimeout(timeout);
+                clearInterval(checkInterval);
+                resolve(window.storageUI);
+              }
+            }, 100);
+            
+            // Load the script
+            const script = document.createElement('script');
+            script.src = '/static/js/storage/storage_ui.js';
+            script.type = 'module';
+            script.onerror = () => {
+              clearTimeout(timeout);
+              clearInterval(checkInterval);
+              reject(new Error('Failed to load storage_ui.js'));
+            };
+            document.head.appendChild(script);
+          });
+          
+          window.storageUI = await storageUIPromise;
+          console.log('storageUI loaded:', window.storageUI);
+        }
+
+        // Load appropriate content based on target
+        switch(targetId) {
+          case 'storage-usage':
+            const usageContainer = document.getElementById('storage-usage-content');
+            if (window.storageUI) {
+              console.log('Rendering storage usage...');
+              await window.storageUI.renderStorageUsage(usageContainer);
+            } else {
+              console.error('storageUI not available');
+              usageContainer.innerHTML = '<div class="placeholder-section"><i class="bi bi-exclamation-triangle"></i><p>Storage UI not loaded</p></div>';
+            }
+            break;
+          case 'downloads':
+            const downloadsContainer = document.getElementById('downloads-content');
+            if (window.storageUI) {
+              console.log('Rendering downloads section...');
+              await window.storageUI.renderDownloadsSection(downloadsContainer);
+            } else {
+              console.error('storageUI not available');
+              downloadsContainer.innerHTML = '<div class="placeholder-section"><i class="bi bi-exclamation-triangle"></i><p>Storage UI not loaded</p></div>';
+            }
+            break;
+          case 'clear-cache':
+            const cacheContainer = document.getElementById('cache-content');
+            if (window.storageUI) {
+              console.log('Rendering cache management...');
+              await window.storageUI.renderCacheManagement(cacheContainer);
+            } else {
+              console.error('storageUI not available');
+              cacheContainer.innerHTML = '<div class="placeholder-section"><i class="bi bi-exclamation-triangle"></i><p>Storage UI not loaded</p></div>';
+            }
+            break;
+          case 'temporary-data':
+            const tempContainer = document.getElementById('temporary-content');
+            if (window.storageUI) {
+              console.log('Rendering temporary data...');
+              await window.storageUI.renderTemporaryData(tempContainer);
+            } else {
+              console.error('storageUI not available');
+              tempContainer.innerHTML = '<div class="placeholder-section"><i class="bi bi-exclamation-triangle"></i><p>Storage UI not loaded</p></div>';
+            }
+            break;
+          case 'offline-content':
+            // Offline content is static for now
+            break;
+        }
+      } catch (error) {
+        console.error('Error loading storage content:', error);
+        const container = document.getElementById(targetId + '-content') || document.getElementById(targetId);
+        if (container) {
+          container.innerHTML = `<div class="placeholder-section"><i class="bi bi-exclamation-triangle"></i><p>Error: ${error.message}</p></div>`;
+        }
+      }
+    }
+  });
+</script>
+{% endblock %}

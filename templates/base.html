@@ -1,6 +1,7 @@
 {% load static %}
+{% load i18n %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{% if LANGUAGE_CODE == 'sw' %}sw{% else %}en{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -68,6 +69,22 @@
                 document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
             }
         })();
+
+        // Set font scale immediately to prevent flash
+        (function() {
+            const userFontSizePreference = '{{ request.user.font_size_preference|default:"medium" }}';
+            const savedFontScale = localStorage.getItem('font_scale');
+            
+            const fontScaleMap = {
+                'tiny': '0.85',
+                'small': '0.95',
+                'medium': '1.00',
+                'large': '1.15'
+            };
+            
+            const scale = fontScaleMap[userFontSizePreference] || savedFontScale || '1.00';
+            document.documentElement.style.setProperty('--font-scale', scale);
+        })();
     </script>
 
     <!-- Set initial body background to prevent flash (will be overridden by theme CSS) -->
@@ -115,14 +132,20 @@
     <script src="{% static 'js/htmx.min.js' %}"></script>
     <script src="{% static 'js/device_manager.js' %}"></script>
     
-    <!-- Unified Skeleton Manager - replaces skeleton-loader.js, skeleton-init.js, navigation-skeleton.js, offline-skeleton-v2.js, page-skeleton-manager.js -->
-    <script src="{% static 'js/skeleton-manager.js' %}"></script>
+    <!-- Optimized Navigation Skeleton with Caching - replaces navigation-skeleton.js -->
+    <script src="{% static 'js/navigation-skeleton-optimized.js' %}"></script>
+    
+    <!-- Lazy Image Loader for performance -->
+    <script src="{% static 'js/lazy-load-images.js' %}"></script>
     
     <!-- Video Manager - replaces auto_video_play.js -->
     <script src="{% static 'js/video-manager.js' %}"></script>
     
     <!-- Native PWA Install Manager -->
     <script src="{% static 'js/native-pwa-install.js' %}"></script>
+    
+    <!-- Update Manager -->
+    <script src="{% static 'js/update-manager.js' %}"></script>
     
     <!-- Comment System - Phase 2 Threaded Comments -->
     <script src="{% static 'js/comments/comment-api.js' %}"></script>
@@ -448,6 +471,7 @@
             --border: #e2e8f0;
             --nav-bg: rgba(255, 255, 255, 0.9);
             --mobile-nav-bg: #fff;
+            --font-scale: 1.00;
         }
 
         /* Dark theme variables */
@@ -463,6 +487,7 @@
             --mobile-nav-bg: #242526;
             --text-secondary: #e4e6eb;
             --text-muted: #e4e6eb;
+            --font-scale: 1.00;
         }
 
         [data-theme="dark"] .text-muted {
@@ -472,12 +497,17 @@
             color: #e4e6eb !important;
         }
 
+        html {
+            font-size: calc(16px * var(--font-scale));
+        }
+
         body {
             background-color: var(--background) !important;
             color: var(--text-dark);
             font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
             padding-top: 75px;
             padding-bottom: 80px;
+            font-size: 1rem;
         }
 
         @media (max-width: 767px) {
@@ -770,7 +800,11 @@
     </style>
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-      data-user-id="{{ request.user.id }}">
+      hx-boost="true" hx-target="#app" hx-select="#app" hx-swap="outerHTML"
+      data-user-id="{{ request.user.id }}"
+      data-app-version="{{ app_version }}"
+      data-app-build="{{ app_build }}"
+      data-app-environment="{{ app_environment }}">
 
     {# Status modal must stay outside #app so welcome/login flows stay visible when #app is hidden #}
     {% include 'partials/status_modal.html' %}
@@ -787,11 +821,11 @@
             <div class="d-none d-md-flex gap-2">
                 <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
                     <i class="bi bi-house-door-fill" style="font-size: 1.5rem;"></i>
-                    <span style="font-size: 0.65rem; font-weight: 600;">Home</span>
+                    <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Home" %}</span>
                 </a>
                 <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
                     <i class="bi bi-shield-shaded" style="font-size: 1.5rem;"></i>
-                    <span style="font-size: 0.65rem; font-weight: 600;">Groups</span>
+                    <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Groups" %}</span>
                 </a>
                 {% if request.user.is_authenticated %}
                 <!--{# Messaging navigation - FROZEN FOR MVP #}
@@ -800,7 +834,7 @@
                 </a> -->
                 <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
                     <i class="bi bi-plus-circle-fill" style="font-size: 1.5rem;"></i>
-                    <span style="font-size: 0.65rem; font-weight: 600;">Post</span>
+                    <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Post" %}</span>
                 </a>
                 {% endif %}
                 <a href="{% url 'notifications:notifications' %}" class="nav-chip {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}" id="notification-badge-container-desktop" style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 60px;">
@@ -820,7 +854,7 @@
                             </span>
                         {% endif %}
                     </span>
-                    <span style="font-size: 0.65rem; font-weight: 600; white-space: nowrap;">Notifications</span>
+                    <span style="font-size: 0.65rem; font-weight: 600; white-space: nowrap;">{% trans "Notifications" %}</span>
                 </a>
             </div>
 
@@ -853,7 +887,7 @@
                         <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 35px; height: 35px; object-fit: cover;">
                     </a>
                 {% else %}
-                    <a href="{% url 'login' %}" class="btn btn-primary btn-sm rounded-pill px-3">Login</a>
+                    <a href="{% url 'login' %}" class="btn btn-primary btn-sm rounded-pill px-3">{% trans "Login" %}</a>
                 {% endif %}
             </div>
         </div>
@@ -883,11 +917,11 @@
         <div class="mobile-bottom-nav d-md-none">
             <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
                 <i class="bi bi-house-door-fill"></i>
-                <span style="font-size: 0.55rem; font-weight: 600;">Home</span>
+                <span style="font-size: 0.55rem; font-weight: 600;">{% trans "Home" %}</span>
             </a>
             <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
                 <i class="bi bi-people-fill"></i>
-                <span style="font-size: 0.55rem; font-weight: 600;">Groups</span>
+                <span style="font-size: 0.55rem; font-weight: 600;">{% trans "Groups" %}</span>
             </a>
             {% if user.is_authenticated %}
                 <!--{# Messaging navigation - FROZEN FOR MVP #}
@@ -896,7 +930,7 @@
                 </a> #}-->
                 <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
                     <i class="bi bi-plus-circle-fill"></i>
-                    <span style="font-size: 0.55rem; font-weight: 600;">Post</span>
+                    <span style="font-size: 0.55rem; font-weight: 600;">{% trans "Post" %}</span>
                 </a>
                 <a href="{% url 'notifications:notifications' %}"
                     class="nav-chip {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
@@ -918,11 +952,11 @@
                                 </span>
                             {% endif %}
                         </span>
-                        <span style="font-size: 0.55rem; font-weight: 600; white-space: nowrap;">Notifications</span>
+                        <span style="font-size: 0.55rem; font-weight: 600; white-space: nowrap;">{% trans "Notifications" %}</span>
                 </a>
                 <a href="{% url 'users:profile' request.user.username %}" class="nav-chip {% if request.resolver_match.url_name == 'profile' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
                     <i class="bi bi-person-circle"></i>
-                    <span style="font-size: 0.55rem; font-weight: 600;">Profile</span>
+                    <span style="font-size: 0.55rem; font-weight: 600;">{% trans "Profile" %}</span>
                 </a>
             {% endif %}
         </div>
@@ -934,6 +968,30 @@
     <script src="{% static 'js/post-content.js' %}"></script>
     
     {% block page_scripts %}{% endblock %}
+    <script type="module">
+        import { uploadManager } from '{% static "js/upload/upload_manager.js" %}';
+        import { uploadUI } from '{% static "js/upload/upload_ui.js" %}';
+        import { draftManager } from '{% static "js/upload/indexeddb_manager.js" %}';
+        import { uploadEvents } from '{% static "js/upload/upload_events.js" %}';
+
+        window.uploadManager = uploadManager;
+        window.uploadUI = uploadUI;
+        window.uploadEvents = uploadEvents;
+
+        const initializeUploadPlatform = () => {
+            uploadManager.initialize();
+            uploadUI.initialize();
+            if (draftManager && typeof draftManager.initialize === 'function') {
+                draftManager.initialize();
+            }
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeUploadPlatform, { once: true });
+        } else {
+            initializeUploadPlatform();
+        }
+    </script>
     <script>
         // Failsafe: Ensure app is visible even if startup fails
         window.addEventListener('error', function() {
@@ -1110,6 +1168,11 @@ function refreshPage() {
 
 // Listen for custom refresh trigger
 document.addEventListener('htmx:afterSwap', function(evt) {
+    // Hide navigation skeleton if it was shown
+    if (window.PwaniNetOptimizedNavigationSkeleton) {
+        window.PwaniNetOptimizedNavigationSkeleton.hideNavigationSkeleton();
+    }
+
     if (evt.detail.trigger === 'refreshPage') {
         setTimeout(() => {
             refreshPage();
@@ -1145,47 +1208,12 @@ document.addEventListener('htmx:afterRequest', async function(evt) {
 
 <!-- Service Worker Registration -->
 <script>
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-        console.log('[ServiceWorker] Attempting to register service worker...');
-
-        navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
-            .then(function(registration) {
-                console.log('[ServiceWorker] Registration successful with scope: ', registration.scope);
-
-                // Check if service worker is controlling the page
-                if (navigator.serviceWorker.controller) {
-                    console.log('[ServiceWorker] Service worker is controlling the page');
-                } else {
-                    console.log('[ServiceWorker] Service worker is NOT controlling the page yet');
-                }
-
-                // Check for service worker updates
-                registration.addEventListener('updatefound', () => {
-                    const newWorker = registration.installing;
-                    console.log('[ServiceWorker] New service worker found');
-
-                    newWorker.addEventListener('statechange', () => {
-                        console.log('[ServiceWorker] Service worker state:', newWorker.state);
-                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            // New service worker is available, show update notification
-                            console.log('[ServiceWorker] New version available');
-                            if (confirm('PwaniNet has been updated. Reload to get the latest version?')) {
-                                window.location.reload();
-                            }
-                        }
-                    });
-                });
-
-            })
-            .catch(function(error) {
-                console.error('[ServiceWorker] Registration failed: ', error);
-            });
-    });
-} else {
-    console.log('[ServiceWorker] Service workers are not supported in this browser');
-}
-
+// Service Worker registration is now handled by update-manager.js
+// The update-manager.js is the single source of truth for service worker lifecycle
+// This script is kept for backward compatibility but does nothing
+console.log('[ServiceWorker] Service worker registration delegated to update-manager.js');
+</script>
+<script>
 // Listen for beforeinstallprompt event
 window.addEventListener('beforeinstallprompt', (event) => {
     console.log('[PWA] beforeinstallprompt event fired - install prompt is available');
@@ -1547,6 +1575,21 @@ window.addEventListener('beforeinstallprompt', (e) => {
         }, 3000);
     })();
     </script>
+
+    <!-- Version Footer -->
+    <footer style="text-align: center; padding: 1rem; background: #f8fafc; border-top: 1px solid #e2e8f0; margin-top: auto; font-size: 0.8rem; color: #64748b;">
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <span style="font-weight: 600;">PwaniNet</span>
+            <span style="margin: 0 0.5rem;">|</span>
+            <span>Version {{ app_version }}</span>
+            <span style="margin: 0 0.5rem;">|</span>
+            <span>Build {{ app_build }}</span>
+            <span style="margin: 0 0.5rem;">|</span>
+            <span>{{ app_release_channel|default:"Unknown" }}</span>
+            <span style="margin: 0 0.5rem;">|</span>
+            <span>{{ app_environment|title }}</span>
+        </div>
+    </footer>
 
 </body>
 </html>

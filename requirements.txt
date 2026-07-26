@@ -107,6 +107,8 @@ txaio==25.12.2
 types-PyYAML==6.0.12.20260510
 typing_extensions==4.15.0
 tzdata==2026.2
+ua-parser==0.18.0
+user-agents==2.2.0
 ujson==5.12.0
 uncompyle6==3.9.3
 uritemplate==4.2.0

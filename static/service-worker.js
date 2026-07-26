@@ -3,17 +3,36 @@
  * Provides Progressive Web App offline support with version management
  */
 
-// Dynamic cache versioning - will be updated by release system
-const CACHE_VERSION = 'pwaninet-v4';
-const CACHE_NAME = CACHE_VERSION;
-const OFFLINE_CACHE_NAME = 'pwaninet-offline-v4';
+// Dynamic cache versioning - will be set during service worker registration
+let CACHE_VERSION = '1.0.0';
+let CACHE_BUILD = '1';
+let CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}`;
+let OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}`;
 
 // Service worker version metadata
 const SW_VERSION = {
     version: CACHE_VERSION,
+    build: CACHE_BUILD,
     buildDate: new Date().toISOString(),
-    cacheName: CACHE_NAME
+    cacheName: CACHE_NAME,
+    environment: 'development'
 };
+
+// Set version from message (called during registration)
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SET_VERSION') {
+        CACHE_VERSION = event.data.version;
+        CACHE_BUILD = event.data.build;
+        CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}`;
+        OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}`;
+        SW_VERSION.version = CACHE_VERSION;
+        SW_VERSION.build = CACHE_BUILD;
+        SW_VERSION.cacheName = CACHE_NAME;
+        SW_VERSION.environment = event.data.environment || 'development';
+        SW_VERSION.buildDate = event.data.buildDate || new Date().toISOString();
+        console.log('Service Worker: Version set to', CACHE_VERSION, 'build', CACHE_BUILD);
+    }
+});
 
 // Core assets to cache for offline functionality
 const CORE_ASSETS = [
@@ -58,7 +77,8 @@ self.addEventListener('install', (event) => {
             })
             .then(() => {
                 console.log('Service Worker: Core assets cached');
-                return self.skipWaiting();
+                // DO NOT call skipWaiting() - wait for user approval
+                // The service worker will remain in 'waiting' state
             })
             .catch((error) => {
                 console.error('Service Worker: Failed to cache core assets:', error);
@@ -84,7 +104,8 @@ self.addEventListener('activate', (event) => {
             })
             .then(() => {
                 console.log('Service Worker: Activated');
-                return self.clients.claim();
+                // DO NOT call clients.claim() - wait for user approval
+                // The service worker will not claim clients until explicitly told
             })
     );
 });
@@ -495,7 +516,18 @@ self.addEventListener('message', (event) => {
     
     switch (type) {
         case 'SKIP_WAITING':
+            // User has approved the update - activate immediately
+            console.log('Service Worker: SKIP_WAITING received, activating...');
             self.skipWaiting();
+            // After skipWaiting, the service worker will activate and we should claim clients
+            self.clients.claim();
+            break;
+
+        case 'ACTIVATE_UPDATE':
+            // Alternative message name for activation
+            console.log('Service Worker: ACTIVATE_UPDATE received, activating...');
+            self.skipWaiting();
+            self.clients.claim();
             break;
             
         case 'GET_CACHE_INFO':

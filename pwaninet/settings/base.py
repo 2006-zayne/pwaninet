@@ -8,6 +8,15 @@ from datetime import timedelta
 from dotenv import load_dotenv
 import os
 
+# Import version information (single source of truth)
+from pwaninet import version
+
+# Expose version metadata to settings
+APP_VERSION = version.__version__
+APP_BUILD_NUMBER = version.__build_number__
+APP_ENVIRONMENT = version.__environment__
+APP_RELEASE_DATE = version.__release_date__
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
 load_dotenv(os.path.join(BASE_DIR, ".env"))
@@ -26,7 +35,7 @@ ALLOWED_HOSTS = [
     host.split(':')[0].strip()
     for host in os.environ.get(
         'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,10.20.152.125,pwaninet.app,192.168.183.245,192.168.53.221,192.168.93.221,192.168.87.159,192.168.14.221,192.168.72.88,192.168.87.159,192.168.72.88,192.168.183.245,172.18.0.1,192.168.183.245,192.168.83.192'
+        'localhost,127.0.0.1,10.20.152.125,pwaninet.app,192.168.43.170,192.168.25.221,192.168.43.170,192.168.183.245,192.168.203.221,192.168.53.221,192.168.93.221,192.168.87.159,192.168.14.221,192.168.72.88,192.168.87.159,192.168.72.88,192.168.183.245,172.18.0.1,192.168.183.245,192.168.83.192'
     ).split(',')
     if host.strip()
 ]
@@ -67,6 +76,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'axes.middleware.AxesMiddleware',
+    'pwaninet.middleware.language_preference.LanguagePreferenceMiddleware',
+    'pwaninet.middleware.cache_headers.CacheHeadersMiddleware',
 ]
 
 ROOT_URLCONF = 'pwaninet.urls'
@@ -82,6 +93,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'notifications.context_processors.notification_count',
+                'pwaninet.context_processors.release_metadata',
             ],
         },
     }
@@ -123,7 +135,12 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
+USE_L10N = True
 USE_TZ = True
+
+LOCALE_PATHS = [
+    BASE_DIR / 'locale',
+]
 
 # Static files
 STATIC_URL = '/static/'
@@ -229,7 +246,7 @@ SIMPLE_JWT = {
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Pwaninet API',
     'DESCRIPTION': 'Social networking platform for students and academic communities',
-    'VERSION': '1.0.0',
+    'VERSION': version.__version__,
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,
     'COMPONENT_NO_READ_ONLY_REQUIRED': True,

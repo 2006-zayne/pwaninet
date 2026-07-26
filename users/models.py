@@ -21,6 +21,25 @@ class ThemePreference(models.TextChoices):
     SYSTEM = 'system', 'System Default'
 
 
+class FontSizePreference(models.TextChoices):
+    TINY = 'tiny', 'Tiny'
+    SMALL = 'small', 'Small'
+    MEDIUM = 'medium', 'Medium'
+    LARGE = 'large', 'Large'
+
+
+class LanguagePreference(models.TextChoices):
+    ENGLISH = 'en', 'English'
+    KISWAHILI = 'sw', 'Kiswahili'
+
+
+class PrivacyLevel(models.TextChoices):
+    PUBLIC = 'PUBLIC', 'Everyone'
+    AUTHENTICATED = 'AUTHENTICATED', 'PwaniNet Users'
+    FOLLOWERS = 'FOLLOWERS', 'Followers Only'
+    PRIVATE = 'PRIVATE', 'Only Me'
+
+
 class CollaborationStatus(models.TextChoices):
     OPEN_TO_PROJECTS = 'open_to_projects', 'Open to Projects'
     OPEN_TO_STUDY_GROUPS = 'open_to_study_groups', 'Open to Study Groups'
@@ -78,6 +97,20 @@ class User(AbstractUser):
         default=ThemePreference.SYSTEM
     )
 
+    # Font size preference
+    font_size_preference = models.CharField(
+        max_length=10,
+        choices=FontSizePreference.choices,
+        default=FontSizePreference.MEDIUM
+    )
+
+    # Language preference
+    language_preference = models.CharField(
+        max_length=5,
+        choices=LanguagePreference.choices,
+        default=LanguagePreference.ENGLISH
+    )
+
     # Online status tracking
     is_online = models.BooleanField(default=False)
     last_seen = models.DateTimeField(auto_now=True)
@@ -87,6 +120,20 @@ class User(AbstractUser):
 
     # Email verification
     email_verified = models.BooleanField(default=False, help_text="Whether the user's email address has been verified")
+
+    # Privacy settings
+    profile_privacy = models.CharField(
+        max_length=20,
+        choices=PrivacyLevel.choices,
+        default=PrivacyLevel.PUBLIC,
+        help_text="Who can view profile information"
+    )
+    post_privacy = models.CharField(
+        max_length=20,
+        choices=PrivacyLevel.choices,
+        default=PrivacyLevel.PUBLIC,
+        help_text="Default visibility for new posts"
+    )
 
     def clean(self):
         super().clean()
@@ -244,3 +291,66 @@ class DeviceAccount(models.Model):
 
     def __str__(self):
         return f"{self.user.username} on device {self.device_id}"
+
+
+class UserSession(models.Model):
+    """Tracks active user sessions for device management"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_sessions', db_index=True)
+    session_key = models.CharField(max_length=255, unique=True, db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    device_name = models.CharField(max_length=255, blank=True)
+    device_type = models.CharField(max_length=20, choices=[('mobile', 'Mobile'), ('tablet', 'Tablet'), ('desktop', 'Desktop')], default='desktop', blank=True)
+    browser = models.CharField(max_length=100, blank=True)
+    operating_system = models.CharField(max_length=100, blank=True)
+    location = models.CharField(max_length=255, blank=True)
+    login_time = models.DateTimeField(auto_now_add=True, db_index=True)
+    last_activity = models.DateTimeField(auto_now=True, db_index=True)
+    is_current = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-last_activity']
+        indexes = [
+            models.Index(fields=['user', '-last_activity']),
+            models.Index(fields=['session_key']),
+            models.Index(fields=['-last_activity']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} session on {self.device_name or 'Unknown Device'}"
+
+
+class Block(models.Model):
+    """Tracks blocked users"""
+    blocker = models.ForeignKey(User, on_delete=models.CASCADE, related_name='blocked_users', db_index=True)
+    blocked = models.ForeignKey(User, on_delete=models.CASCADE, related_name='blocked_by', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        unique_together = ('blocker', 'blocked')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['blocker', '-created_at']),
+            models.Index(fields=['blocked']),
+        ]
+
+    def __str__(self):
+        return f"{self.blocker.username} blocked {self.blocked.username}"
+
+
+class HiddenAuthor(models.Model):
+    """Tracks authors whose posts are hidden from user's feed"""
+    hider = models.ForeignKey(User, on_delete=models.CASCADE, related_name='hidden_authors', db_index=True)
+    hidden_author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='hidden_by', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        unique_together = ('hider', 'hidden_author')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['hider', '-created_at']),
+            models.Index(fields=['hidden_author']),
+        ]
+
+    def __str__(self):
+        return f"{self.hider.username} hid {self.hidden_author.username}"

@@ -1,0 +1,318 @@
+{% extends 'users/settings/base_settings.html' %}
+{% load i18n %}
+
+{% block back_link %}
+<a href="{% url 'users:settings_privacy' %}" class="back-link">
+  <i class="bi bi-arrow-left"></i> {% trans "Back to Privacy & Security" %}
+</a>
+{% endblock %}
+
+{% block page_title %}{% trans "Post Privacy" %}{% endblock %}
+{% block page_subtitle %}{% trans "Control the default audience for your posts" %}{% endblock %}
+
+{% block settings_content %}
+<div class="settings-list-container">
+  <div class="settings-list-header">
+    <div class="settings-list-header-icon">
+      <i class="bi bi-lock"></i>
+    </div>
+    <div class="settings-list-header-content">
+      <div class="settings-list-header-title">{% trans "Default Post Visibility" %}</div>
+      <div class="settings-list-header-subtitle">{% trans "Choose who can see your new posts by default" %}</div>
+    </div>
+  </div>
+
+  <div class="settings-list-body">
+    <form method="post" id="post-privacy-form">
+      {% csrf_token %}
+      
+      <div class="privacy-options">
+        {% for value, label in privacy_levels %}
+        <label class="privacy-option">
+          <input type="radio" 
+                 name="post_privacy" 
+                 value="{{ value }}"
+                 {% if request.user.post_privacy == value %}checked{% endif %}
+                 required>
+          <div class="privacy-option-content">
+            <div class="privacy-option-title">{{ label }}</div>
+            <div class="privacy-option-description">
+              {% if value == 'PUBLIC' %}
+                {% trans "Anyone on the internet can see your new posts" %}
+              {% elif value == 'AUTHENTICATED' %}
+                {% trans "Only PwaniNet users can see your new posts" %}
+              {% elif value == 'FOLLOWERS' %}
+                {% trans "Only your followers can see your new posts" %}
+              {% elif value == 'PRIVATE' %}
+                {% trans "Only you can see your new posts" %}
+              {% endif %}
+            </div>
+          </div>
+          <div class="privacy-option-check">
+            <i class="bi bi-check-circle"></i>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">
+          {% trans "Save Changes" %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="settings-list-container">
+  <div class="settings-list-body">
+    <div class="info-note">
+      <i class="bi bi-info-circle"></i>
+      <p>{% trans "This setting only affects new posts. Existing posts will keep their current visibility unless you change them individually." %}</p>
+    </div>
+  </div>
+</div>
+
+{% if messages %}
+<div class="alert-container">
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{% trans 'Close' %}"></button>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<style>
+  .settings-list-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .settings-list-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--brand-light);
+  }
+
+  .settings-list-header-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .settings-list-header-icon i {
+    font-size: 1.25rem;
+    color: white;
+  }
+
+  .settings-list-header-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .settings-list-header-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .settings-list-header-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+  }
+
+  .settings-list-body {
+    padding: 1.5rem;
+  }
+
+  .privacy-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .privacy-option {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--page-bg);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .privacy-option:hover {
+    background: var(--brand-light);
+    border-color: var(--brand-mid);
+  }
+
+  .privacy-option input[type="radio"] {
+    display: none;
+  }
+
+  .privacy-option input[type="radio"]:checked + .privacy-option-content + .privacy-option-check {
+    opacity: 1;
+  }
+
+  .privacy-option input[type="radio"]:checked ~ .privacy-option-content {
+    color: var(--brand);
+  }
+
+  .privacy-option input[type="radio"]:checked ~ .privacy-option-content .privacy-option-title {
+    font-weight: 700;
+  }
+
+  .privacy-option:has(input[type="radio"]:checked) {
+    border-color: var(--brand);
+    background: var(--brand-light);
+  }
+
+  .privacy-option-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .privacy-option-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .privacy-option-description {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+  }
+
+  .privacy-option-check {
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .privacy-option-check i {
+    font-size: 1.5rem;
+    color: var(--brand);
+  }
+
+  .form-actions {
+    margin-top: 1.5rem;
+  }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .btn-primary {
+    background: var(--brand);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #1d4ed8;
+  }
+
+  .info-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--brand-light);
+    border-radius: var(--radius-md);
+  }
+
+  .info-note i {
+    font-size: 1.25rem;
+    color: var(--brand);
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+  }
+
+  .info-note p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    margin: 0;
+  }
+
+  .alert-container {
+    margin-top: 1rem;
+  }
+
+  .alert {
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+  }
+
+  .alert-success {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #10b981;
+  }
+
+  .alert-error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #ef4444;
+  }
+
+  .btn-close {
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.5;
+    transition: opacity 0.2s ease;
+  }
+
+  .btn-close:hover {
+    opacity: 1;
+  }
+
+  @media (max-width: 768px) {
+    .settings-list-body {
+      padding: 1rem;
+    }
+
+    .privacy-option {
+      padding: 0.875rem;
+    }
+
+    .info-note {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .info-note i {
+      margin-top: 0;
+    }
+  }
+</style>
+{% endblock %}

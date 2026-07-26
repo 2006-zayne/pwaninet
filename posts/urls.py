@@ -5,6 +5,7 @@ urlpatterns = [
     path('', views.home_view, name='home'),
     path('post/new/', views.create_post_view, name='create_post'),
     path('post/<int:post_id>/', views.post_detail_view, name='post_details'),
+    path('storage/', views.storage_manager_view, name='storage_manager'),
     path('like/<int:post_id>/', views.toggle_like, name='toggle_like'),
     path('post/<int:post_id>/comment/', views.add_comment, name='add_comment'),
     path('comment/<int:comment_id>/like/', views.toggle_comment_like, name='toggle_comment_like'),

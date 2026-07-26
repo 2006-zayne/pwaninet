@@ -1,0 +1,721 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block content %}
+<style>
+  .storage-manager {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  .storage-header {
+    margin-bottom: 30px;
+  }
+
+  .storage-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .storage-header p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+  }
+
+  .storage-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .storage-card h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+
+  .storage-progress {
+    margin-bottom: 20px;
+  }
+
+  .storage-progress-bar {
+    height: 12px;
+    background: var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .storage-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 6px;
+    transition: width 0.3s ease;
+  }
+
+  .storage-progress-fill.low {
+    background: #10b981;
+  }
+
+  .storage-progress-fill.medium {
+    background: #f59e0b;
+  }
+
+  .storage-progress-fill.high {
+    background: #ef4444;
+  }
+
+  .storage-progress-fill.critical {
+    background: #dc2626;
+  }
+
+  .storage-progress-text {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .storage-breakdown {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .storage-breakdown-item {
+    background: var(--page-bg);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    text-align: center;
+  }
+
+  .storage-breakdown-item .label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+
+  .storage-breakdown-item .value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .storage-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .storage-btn {
+    padding: 10px 16px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .storage-btn:hover {
+    background: var(--border-hover);
+  }
+
+  .storage-btn.danger {
+    color: #ef4444;
+    border-color: #ef4444;
+  }
+
+  .storage-btn.danger:hover {
+    background: #ef4444;
+    color: white;
+  }
+
+  .storage-section {
+    margin-bottom: 24px;
+  }
+
+  .storage-section h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  .storage-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .storage-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    background: var(--page-bg);
+    border-radius: var(--radius-md);
+    margin-bottom: 8px;
+  }
+
+  .storage-list-item-info {
+    flex: 1;
+  }
+
+  .storage-list-item-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .storage-list-item-meta {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .storage-list-item-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .storage-list-item-btn {
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .storage-list-item-btn:hover {
+    background: var(--border-hover);
+  }
+
+  .storage-list-item-btn.danger {
+    color: #ef4444;
+    border-color: #ef4444;
+  }
+
+  .storage-list-item-btn.danger:hover {
+    background: #ef4444;
+    color: white;
+  }
+
+  .storage-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+  }
+
+  .storage-empty i {
+    font-size: 2rem;
+    margin-bottom: 12px;
+  }
+
+  .storage-search {
+    margin-bottom: 16px;
+  }
+
+  .storage-search input {
+    width: 100%;
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+  }
+
+  .storage-search input:focus {
+    outline: none;
+    border-color: var(--brand);
+  }
+
+  .storage-sort {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .storage-sort select {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+  }
+
+  .storage-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .storage-status.low {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  .storage-status.medium {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .storage-status.high {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  .storage-status.critical {
+    background: #fecaca;
+    color: #7f1d1d;
+  }
+
+  [data-theme="dark"] .storage-status.low {
+    background: #064e3b;
+    color: #d1fae5;
+  }
+
+  [data-theme="dark"] .storage-status.medium {
+    background: #78350f;
+    color: #fef3c7;
+  }
+
+  [data-theme="dark"] .storage-status.high {
+    background: #7f1d1d;
+    color: #fee2e2;
+  }
+
+  [data-theme="dark"] .storage-status.critical {
+    background: #991b1b;
+    color: #fecaca;
+  }
+
+  .storage-loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary);
+  }
+
+  .storage-loading i {
+    animation: spin 1s linear infinite;
+    font-size: 2rem;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+</style>
+
+<div class="storage-manager">
+  <div class="storage-header">
+    <h1>Storage Manager</h1>
+    <p>Manage your browser storage, downloads, and cache</p>
+  </div>
+
+  <!-- Storage Overview -->
+  <div class="storage-card">
+    <h2>Storage Overview</h2>
+    <div id="storage-loading" class="storage-loading">
+      <i class="bi bi-arrow-repeat"></i>
+      <p>Loading storage information...</p>
+    </div>
+    <div id="storage-content" style="display: none;">
+      <div class="storage-progress">
+        <div class="storage-progress-bar">
+          <div id="storage-progress-fill" class="storage-progress-fill" style="width: 0%"></div>
+        </div>
+        <div class="storage-progress-text">
+          <span id="storage-used">0 MB</span>
+          <span id="storage-total">of 0 MB</span>
+        </div>
+      </div>
+      
+      <div class="storage-breakdown">
+        <div class="storage-breakdown-item">
+          <div class="label">Downloads</div>
+          <div class="value" id="storage-downloads">0 MB</div>
+        </div>
+        <div class="storage-breakdown-item">
+          <div class="label">Cache</div>
+          <div class="value" id="storage-cache">0 MB</div>
+        </div>
+        <div class="storage-breakdown-item">
+          <div class="label">Temp Data</div>
+          <div class="value" id="storage-temp">0 MB</div>
+        </div>
+        <div class="storage-breakdown-item">
+          <div class="label">Other</div>
+          <div class="value" id="storage-other">0 MB</div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+        <span class="storage-status" id="storage-status">Low</span>
+        <span style="font-size: 0.875rem; color: var(--text-secondary);" id="storage-percentage">0% used</span>
+      </div>
+
+      <div class="storage-actions">
+        <button class="storage-btn" id="btn-clear-image-cache">Clear Image Cache</button>
+        <button class="storage-btn" id="btn-clear-video-cache">Clear Video Cache</button>
+        <button class="storage-btn" id="btn-clear-api-cache">Clear API Cache</button>
+        <button class="storage-btn danger" id="btn-clear-all-cache">Clear All Cache</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Downloads -->
+  <div class="storage-card">
+    <h2>Downloads</h2>
+    <div class="storage-search">
+      <input type="text" id="downloads-search" placeholder="Search downloads...">
+    </div>
+    <div class="storage-sort">
+      <select id="downloads-sort-by">
+        <option value="createdAt">Date</option>
+        <option value="filename">Name</option>
+        <option value="size">Size</option>
+        <option value="type">Type</option>
+      </select>
+      <select id="downloads-sort-order">
+        <option value="desc">Descending</option>
+        <option value="asc">Ascending</option>
+      </select>
+    </div>
+    <div id="downloads-list" class="storage-list">
+      <div class="storage-empty">
+        <i class="bi bi-download"></i>
+        <p>No downloads yet</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Temporary Data -->
+  <div class="storage-card">
+    <h2>Temporary Data</h2>
+    <div class="storage-section">
+      <h3>Upload Queue</h3>
+      <div id="upload-queue-list" class="storage-list">
+        <div class="storage-empty">
+          <i class="bi bi-inbox"></i>
+          <p>No pending uploads</p>
+        </div>
+      </div>
+    </div>
+    <div class="storage-section">
+      <h3>Drafts</h3>
+      <div id="drafts-list" class="storage-list">
+        <div class="storage-empty">
+          <i class="bi bi-file-text"></i>
+          <p>No saved drafts</p>
+        </div>
+      </div>
+    </div>
+    <div class="storage-actions">
+      <button class="storage-btn" id="btn-clear-temp-data">Clear Temporary Data</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { storageManager } from '{% static "js/upload/storage_manager.js" %}';
+  import { cacheManager } from '{% static "js/upload/cache_manager.js" %}';
+  import { downloadsManager } from '{% static "js/upload/downloads_manager.js" %}';
+  import { draftManager } from '{% static "js/upload/indexeddb_manager.js" %}';
+  import { tempDataManager } from '{% static "js/upload/indexeddb_manager.js" %}';
+  import { uploadManager } from '{% static "js/upload/upload_manager.js" %}';
+
+  // Initialize managers
+  async function initialize() {
+    await storageManager.initialize();
+    await cacheManager.initialize();
+    await downloadsManager.initialize();
+    await draftManager.initialize();
+    await tempDataManager.initialize();
+    
+    await loadStorageInfo();
+    await loadDownloads();
+    await loadDrafts();
+    await loadUploadQueue();
+  }
+
+  // Load storage information
+  async function loadStorageInfo() {
+    const loading = document.getElementById('storage-loading');
+    const content = document.getElementById('storage-content');
+    
+    try {
+      console.log('Loading storage info...');
+      console.log('Storage Manager:', storageManager);
+      console.log('Storage Estimate API supported:', storageManager.constructor.isStorageEstimateSupported());
+      
+      const storageInfo = await storageManager.getStorageInfo();
+      console.log('Storage Info:', storageInfo);
+      
+      const breakdown = await storageManager.getStorageBreakdown();
+      console.log('Storage Breakdown:', breakdown);
+      
+      loading.style.display = 'none';
+      content.style.display = 'block';
+      
+      // Update progress bar
+      const progressFill = document.getElementById('storage-progress-fill');
+      progressFill.style.width = `${storageInfo.percentage}%`;
+      progressFill.className = `storage-progress-fill ${storageManager.getStorageStatus()}`;
+      
+      // Update text
+      document.getElementById('storage-used').textContent = storageManager.formatBytes(storageInfo.usage);
+      document.getElementById('storage-total').textContent = `of ${storageManager.formatBytes(storageInfo.quota)}`;
+      document.getElementById('storage-percentage').textContent = `${storageInfo.percentage.toFixed(1)}% used`;
+      
+      const status = document.getElementById('storage-status');
+      status.textContent = storageManager.getStorageStatus().charAt(0).toUpperCase() + storageManager.getStorageStatus().slice(1);
+      status.className = `storage-status ${storageManager.getStorageStatus()}`;
+      
+      // Update breakdown
+      document.getElementById('storage-downloads').textContent = storageManager.formatBytes(breakdown.downloads);
+      document.getElementById('storage-cache').textContent = storageManager.formatBytes(breakdown.cache);
+      document.getElementById('storage-temp').textContent = storageManager.formatBytes(breakdown.tempData);
+      document.getElementById('storage-other').textContent = storageManager.formatBytes(breakdown.other);
+      
+    } catch (error) {
+      console.error('Failed to load storage information:', error);
+      loading.innerHTML = `
+        <i class="bi bi-exclamation-triangle"></i>
+        <p>Failed to load storage information: ${error.message}</p>
+        <p style="font-size: 0.8rem; margin-top: 0.5rem;">Check browser console for details</p>
+      `;
+    }
+  }
+
+  // Load downloads
+  async function loadDownloads() {
+    const list = document.getElementById('downloads-list');
+    
+    try {
+      console.log('Loading downloads...');
+      console.log('Downloads Manager:', downloadsManager);
+      
+      const downloads = await downloadsManager.getAllDownloads();
+      console.log('Downloads:', downloads);
+      
+      if (downloads.length === 0) {
+        list.innerHTML = `
+          <div class="storage-empty">
+            <i class="bi bi-download"></i>
+            <p>No downloads yet</p>
+          </div>
+        `;
+        return;
+      }
+      
+      list.innerHTML = downloads.map(download => `
+        <li class="storage-list-item" data-id="${download.id}">
+          <div class="storage-list-item-info">
+            <div class="storage-list-item-name">${download.filename}</div>
+            <div class="storage-list-item-meta">
+              ${downloadsManager.formatBytes(download.size)} • ${new Date(download.createdAt).toLocaleDateString()}
+            </div>
+          </div>
+          <div class="storage-list-item-actions">
+            <button class="storage-list-item-btn" data-action="open">Open</button>
+            ${navigator.share ? '<button class="storage-list-item-btn" data-action="share">Share</button>' : ''}
+            <button class="storage-list-item-btn danger" data-action="delete">Delete</button>
+          </div>
+        </li>
+      `).join('');
+      
+      // Add event listeners
+      list.querySelectorAll('.storage-list-item-btn').forEach(btn => {
+        btn.addEventListener('click', handleDownloadAction);
+      });
+      
+    } catch (error) {
+      console.error('Failed to load downloads:', error);
+      list.innerHTML = `
+        <div class="storage-empty">
+          <i class="bi bi-exclamation-triangle"></i>
+          <p>Failed to load downloads: ${error.message}</p>
+        </div>
+      `;
+    }
+  }
+
+  // Handle download actions
+  async function handleDownloadAction(e) {
+    const btn = e.target;
+    const action = btn.dataset.action;
+    const item = btn.closest('.storage-list-item');
+    const downloadId = item.dataset.id;
+    
+    try {
+      if (action === 'open') {
+        await downloadsManager.open(downloadId);
+      } else if (action === 'share') {
+        await downloadsManager.share(downloadId);
+      } else if (action === 'delete') {
+        if (confirm('Are you sure you want to delete this download?')) {
+          await downloadsManager.delete(downloadId);
+          await loadDownloads();
+          await loadStorageInfo();
+        }
+      }
+    } catch (error) {
+      alert(`Failed to ${action}: ${error.message}`);
+    }
+  }
+
+  // Load drafts
+  async function loadDrafts() {
+    const list = document.getElementById('drafts-list');
+    
+    try {
+      const drafts = await draftManager.getAllDrafts();
+      
+      if (drafts.length === 0) {
+        list.innerHTML = `
+          <div class="storage-empty">
+            <i class="bi bi-file-text"></i>
+            <p>No saved drafts</p>
+          </div>
+        `;
+        return;
+      }
+      
+      list.innerHTML = drafts.map(draft => `
+        <li class="storage-list-item" data-id="${draft.id}">
+          <div class="storage-list-item-info">
+            <div class="storage-list-item-name">${draft.caption.substring(0, 50)}${draft.caption.length > 50 ? '...' : ''}</div>
+            <div class="storage-list-item-meta">
+              ${draft.mediaFiles.length} files • ${new Date(draft.updatedAt).toLocaleDateString()}
+            </div>
+          </div>
+          <div class="storage-list-item-actions">
+            <button class="storage-list-item-btn" data-action="restore">Restore</button>
+            <button class="storage-list-item-btn danger" data-action="delete">Delete</button>
+          </div>
+        </li>
+      `).join('');
+      
+    } catch (error) {
+      list.innerHTML = `
+        <div class="storage-empty">
+          <i class="bi bi-exclamation-triangle"></i>
+          <p>Failed to load drafts</p>
+        </div>
+      `;
+    }
+  }
+
+  // Load upload queue
+  async function loadUploadQueue() {
+    const list = document.getElementById('upload-queue-list');
+    const queueStats = uploadManager.getQueueStatistics();
+    
+    if (queueStats.total === 0) {
+      list.innerHTML = `
+        <div class="storage-empty">
+          <i class="bi bi-inbox"></i>
+          <p>No pending uploads</p>
+        </div>
+      `;
+      return;
+    }
+    
+    const uploads = uploadManager.getAllUploads();
+    list.innerHTML = uploads.map(upload => `
+      <li class="storage-list-item" data-id="${upload.id}">
+        <div class="storage-list-item-info">
+          <div class="storage-list-item-name">${upload.data.files.length} files</div>
+          <div class="storage-list-item-meta">
+            ${upload.data.caption?.substring(0, 50) || 'No caption'}
+          </div>
+        </div>
+        <div class="storage-list-item-actions">
+          <button class="storage-list-item-btn danger" data-action="cancel">Cancel</button>
+        </div>
+      </li>
+    `).join('');
+  }
+
+  // Cache clearing buttons
+  document.getElementById('btn-clear-image-cache').addEventListener('click', async () => {
+    const result = await cacheManager.clearImageCache();
+    alert(result.success ? `Cleared ${result.cleared} items` : result.error);
+    await loadStorageInfo();
+  });
+
+  document.getElementById('btn-clear-video-cache').addEventListener('click', async () => {
+    const result = await cacheManager.clearVideoCache();
+    alert(result.success ? `Cleared ${result.cleared} items` : result.error);
+    await loadStorageInfo();
+  });
+
+  document.getElementById('btn-clear-api-cache').addEventListener('click', async () => {
+    const result = await cacheManager.clearAPICache();
+    alert(result.success ? `Cleared ${result.cleared} caches` : result.error);
+    await loadStorageInfo();
+  });
+
+  document.getElementById('btn-clear-all-cache').addEventListener('click', async () => {
+    if (confirm('Are you sure you want to clear all cache? This will not affect downloaded files.')) {
+      const result = await cacheManager.clearAllCache();
+      alert(result.success ? `Cleared ${result.cleared} items` : result.error);
+      await loadStorageInfo();
+    }
+  });
+
+  document.getElementById('btn-clear-temp-data').addEventListener('click', async () => {
+    if (confirm('Are you sure you want to clear all temporary data? This will not affect downloaded files.')) {
+      await tempDataManager.clearTempData();
+      await draftManager.clearDrafts();
+      await loadDrafts();
+      await loadUploadQueue();
+      await loadStorageInfo();
+    }
+  });
+
+  // Search and sort
+  document.getElementById('downloads-search').addEventListener('input', async (e) => {
+    const query = e.target.value;
+    const downloads = query ? await downloadsManager.search(query) : await downloadsManager.getAllDownloads();
+    renderDownloads(downloads);
+  });
+
+  document.getElementById('downloads-sort-by').addEventListener('change', sortDownloads);
+  document.getElementById('downloads-sort-order').addEventListener('change', sortDownloads);
+
+  async function sortDownloads() {
+    const sortBy = document.getElementById('downloads-sort-by').value;
+    const order = document.getElementById('downloads-sort-order').value;
+    const downloads = await downloadsManager.getAllDownloads();
+    const sorted = downloadsManager.sort(downloads, sortBy, order);
+    renderDownloads(sorted);
+  }
+
+  function renderDownloads(downloads) {
+    const list = document.getElementById('downloads-list');
+    // Reuse the rendering logic from loadDownloads
+    // For brevity, just call loadDownloads for now
+    loadDownloads();
+  }
+
+  // Initialize on load
+  initialize();
+</script>
+{% endblock %}

@@ -73,11 +73,17 @@ class PostSerializer(serializers.ModelSerializer):
 
 class PostCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating posts"""
+    images = serializers.ListField(
+        child=serializers.ImageField(),
+        required=False,
+        write_only=True
+    )
+
     class Meta:
         model = Post
         fields = [
             'group', 'course', 'unit', 'content',
-            'image', 'video', 'docs', 'audio', 'gradient_class'
+            'images', 'video', 'docs', 'audio', 'gradient_class'
         ]
 
     def validate_content(self, value):
@@ -92,7 +98,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
         if value:
             from groups.models import Membership, MembershipStatus
             try:
-                membership = Membership.objects.get(
+                Membership.objects.get(
                     user=request.user,
                     group=value,
                     status=MembershipStatus.APPROVED
@@ -102,6 +108,67 @@ class PostCreateSerializer(serializers.ModelSerializer):
                     "You must be an approved member to post in this group."
                 )
         return value
+
+    def create(self, validated_data):
+        images_data = validated_data.pop('images', [])
+        
+        has_media = bool(images_data or validated_data.get('video') or validated_data.get('docs') or validated_data.get('audio'))
+        if has_media:
+            validated_data['gradient_class'] = 'none'
+            
+        request = self.context.get('request')
+        author = validated_data.get('author') or (request.user if request else None)
+        
+        if author:
+            validated_data['course'] = getattr(author, 'course', None)
+            
+        post = Post.objects.create(**validated_data)
+        
+        if post.unit:
+            post.course = post.unit.course
+            post.save(update_fields=['course'])
+            
+        from posts.models import PostImage
+        for idx, image_data in enumerate(images_data[:15]):
+            PostImage.objects.create(post=post, image=image_data, order=idx)
+            
+        if author:
+            try:
+                from users.services.feed_service import invalidate_home_feed_context
+                invalidate_home_feed_context(author.id)
+            except Exception:
+                pass
+                
+            from notifications.models import Notifications
+            from users.models import User
+            from groups.models import MembershipStatus
+            
+            if post.group:
+                recipients = User.objects.filter(
+                    group_memberships__group=post.group,
+                    group_memberships__status=MembershipStatus.APPROVED
+                ).exclude(id=author.id)
+                msg_text = f"posted in the {post.group.name} squad."
+            else:
+                recipients = User.objects.filter(
+                    course=getattr(author, 'course', None),
+                    year=getattr(author, 'year', None)
+                ).exclude(id=author.id)
+                msg_text = "posted a new update in the global feed."
+
+            if recipients.exists():
+                Notifications.objects.bulk_create([
+                    Notifications(
+                        recipient=recipient,
+                        sender=author,
+                        post=post,
+                        notification_type=Notifications.ALERTE,
+                        msg=msg_text,
+                    )
+                    for recipient in recipients
+                ])
+                
+        return post
 
 
 class PostUpdateSerializer(serializers.ModelSerializer):

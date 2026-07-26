@@ -1,0 +1,36 @@
+{% extends 'users/settings/base_settings.html' %}
+{% load i18n %}
+
+{% block back_link %}
+<a href="{% url 'users:settings' %}" class="back-link">
+  <i class="bi bi-arrow-left"></i> {% trans "Back to Settings" %}
+</a>
+{% endblock %}
+
+{% block page_title %}{% trans "Privacy & Security" %}{% endblock %}
+{% block page_subtitle %}{% trans "Protect your account and manage your privacy" %}{% endblock %}
+
+{% block settings_content %}
+<div class="settings-list-container">
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_password_manager' icon_class='bi-shield-lock' title='Password Manager' subtitle='Change your password' %}
+  
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_active_devices' icon_class='bi-laptop' title='Active Devices' subtitle='Manage devices and sessions' %}
+  
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_blocked_users' icon_class='bi-person-x' title='Blocked Users' subtitle='Manage users you\'ve blocked' %}
+  
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_profile_privacy' icon_class='bi-eye-slash' title='Profile Privacy' subtitle='Control who can view your profile' %}
+  
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_post_privacy' icon_class='bi-lock' title='Post Privacy' subtitle='Default audience for your posts' %}
+  
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_hidden_authors' icon_class='bi-eye-slash' title='Hidden Authors' subtitle='Manage authors you\'ve hidden' %}
+</div>
+
+<style>
+  .settings-list-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+</style>
+{% endblock %}

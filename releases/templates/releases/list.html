@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold">All Releases</h2>
+        <a href="{% url 'release_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            {% if releases %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Version</th>
+                            <th>Build</th>
+                            <th>Title</th>
+                            <th>Channel</th>
+                            <th>Status</th>
+                            <th>Published</th>
+                            <th>Current</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for release in releases %}
+                        <tr>
+                            <td><strong>{{ release.version }}</strong></td>
+                            <td>{{ release.build_number }}</td>
+                            <td>{{ release.release_title }}</td>
+                            <td>
+                                <span class="badge {% if release.release_channel == 'STABLE' %}bg-success{% elif release.release_channel == 'BETA' %}bg-warning{% else %}bg-info{% endif %}">
+                                    {{ release.get_release_channel_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge {% if release.status == 'PUBLISHED' %}bg-primary{% elif release.status == 'DRAFT' %}bg-secondary{% elif release.status == 'ARCHIVED' %}bg-dark{% else %}bg-warning{% endif %}">
+                                    {{ release.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if release.published %}
+                                    <i class="bi bi-check-circle-fill text-success"></i> {{ release.published_at|date:"M d, Y" }}
+                                {% else %}
+                                    <span class="text-muted">Not published</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if release.is_current_release %}
+                                    <i class="bi bi-star-fill text-warning"></i> Current
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'release_detail' release.id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-inbox fs-1 text-muted mb-3"></i>
+                <p class="text-muted">No releases found.</p>
+                {% if perms.releases.manage_release %}
+                <a href="{% url 'release_create' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-lg me-2"></i>Create First Release
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

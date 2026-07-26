@@ -1,0 +1,415 @@
+{% extends 'users/settings/base_settings.html' %}
+{% load i18n %}
+
+{% block back_link %}
+<a href="{% url 'users:settings_privacy' %}" class="back-link">
+  <i class="bi bi-arrow-left"></i> {% trans "Back to Privacy & Security" %}
+</a>
+{% endblock %}
+
+{% block page_title %}{% trans "Active Devices" %}{% endblock %}
+{% block page_subtitle %}{% trans "Manage devices and sessions where you're logged in" %}{% endblock %}
+
+{% block settings_content %}
+<div class="settings-list-container">
+  <div class="settings-list-header">
+    <div class="settings-list-header-icon">
+      <i class="bi bi-laptop"></i>
+    </div>
+    <div class="settings-list-header-content">
+      <div class="settings-list-header-title">{% trans "Current Device" %}</div>
+      <div class="settings-list-header-subtitle">{% trans "This device is currently active" %}</div>
+    </div>
+  </div>
+
+  <div class="settings-list-body">
+    {% if current_session %}
+    <div class="device-card current-device">
+      <div class="device-icon">
+        {% if current_session.device_type == 'mobile' %}
+          <i class="bi bi-phone"></i>
+        {% elif current_session.device_type == 'tablet' %}
+          <i class="bi bi-tablet"></i>
+        {% else %}
+          <i class="bi bi-laptop"></i>
+        {% endif %}
+      </div>
+      <div class="device-info">
+        <div class="device-name">{{ current_session.device_model|default:current_session.device_name|default:"Unknown Device" }}</div>
+        <div class="device-details">
+          <span class="device-detail"><i class="bi bi-browser-chrome"></i> {{ current_session.browser|default:"Unknown Browser" }}</span>
+          <span class="device-detail"><i class="bi bi-windows"></i> {{ current_session.os|default:current_session.operating_system|default:"Unknown OS" }}</span>
+        </div>
+        <div class="device-details">
+          <span class="device-detail"><i class="bi bi-geo-alt"></i> {{ current_session.ip_address|default:"Unknown IP" }}</span>
+          <span class="device-detail"><i class="bi bi-geo"></i> {{ current_session.location|default:"Unknown Location" }}</span>
+        </div>
+        <div class="device-details">
+          <span class="device-detail"><i class="bi bi-clock"></i> Login: {{ current_session.login_time|date:"M d, Y H:i" }}</span>
+          <span class="device-detail"><i class="bi bi-activity"></i> Last active: {{ current_session.last_activity|timesince }} ago</span>
+        </div>
+      </div>
+      <div class="device-badge">
+        <span class="badge-current">{% trans "Current Session" %}</span>
+      </div>
+    </div>
+    {% else %}
+    <div class="placeholder-section">
+      <i class="bi bi-laptop"></i>
+      <p>{% trans "No current session information available" %}</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if other_sessions %}
+<div class="settings-list-container">
+  <div class="settings-list-header">
+    <div class="settings-list-header-icon">
+      <i class="bi bi-devices"></i>
+    </div>
+    <div class="settings-list-header-content">
+      <div class="settings-list-header-title">{% trans "Other Active Devices" %}</div>
+      <div class="settings-list-header-subtitle">{% trans "Manage your other logged-in devices" %}</div>
+    </div>
+  </div>
+
+  <div class="settings-list-body">
+    <div class="devices-list">
+      {% for session in other_sessions %}
+      <div class="device-card" data-session-id="{{ session.id }}">
+        <div class="device-icon">
+          {% if session.device_type == 'mobile' %}
+            <i class="bi bi-phone"></i>
+          {% elif session.device_type == 'tablet' %}
+            <i class="bi bi-tablet"></i>
+          {% else %}
+            <i class="bi bi-laptop"></i>
+          {% endif %}
+        </div>
+        <div class="device-info">
+          <div class="device-name">{{ session.device_model|default:session.device_name|default:"Unknown Device" }}</div>
+          <div class="device-details">
+            <span class="device-detail"><i class="bi bi-browser-chrome"></i> {{ session.browser|default:"Unknown Browser" }}</span>
+            <span class="device-detail"><i class="bi bi-windows"></i> {{ session.os|default:session.operating_system|default:"Unknown OS" }}</span>
+          </div>
+          <div class="device-details">
+            <span class="device-detail"><i class="bi bi-geo-alt"></i> {{ session.ip_address|default:"Unknown IP" }}</span>
+            <span class="device-detail"><i class="bi bi-geo"></i> {{ session.location|default:"Unknown Location" }}</span>
+          </div>
+          <div class="device-details">
+            <span class="device-detail"><i class="bi bi-activity"></i> Last active: {{ session.last_activity|timesince }} ago</span>
+          </div>
+        </div>
+        <div class="device-actions">
+          <button class="btn-sign-out" 
+                  hx-post="{% url 'users:api_sign_out_session' session.id %}"
+                  hx-target="closest .device-card"
+                  hx-swap="outerHTML"
+                  aria-label="{% trans 'Sign out this device' %}">
+            <i class="bi bi-box-arrow-right"></i> {% trans "Sign Out" %}
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="settings-list-container">
+  <div class="settings-list-body">
+    <button class="btn btn-danger btn-block" 
+            id="sign-out-all-btn"
+            hx-post="{% url 'users:api_sign_out_all_sessions' %}"
+            hx-confirm="{% trans 'This will sign you out of every other device currently logged into your account.' %}"
+            hx-target="#sign-out-all-btn"
+            hx-swap="outerHTML">
+      <i class="bi bi-box-arrow-right"></i> {% trans "Sign Out All Other Devices" %}
+    </button>
+  </div>
+</div>
+
+{% if messages %}
+<div class="alert-container">
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{% trans 'Close' %}"></button>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<style>
+  .settings-list-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .settings-list-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--brand-light);
+  }
+
+  .settings-list-header-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .settings-list-header-icon i {
+    font-size: 1.25rem;
+    color: white;
+  }
+
+  .settings-list-header-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .settings-list-header-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .settings-list-header-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+  }
+
+  .settings-list-body {
+    padding: 1.5rem;
+  }
+
+  .device-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem;
+    background: var(--page-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+  }
+
+  .device-card:last-child {
+    margin-bottom: 0;
+  }
+
+  .device-card.current-device {
+    background: var(--brand-light);
+    border-color: var(--brand);
+  }
+
+  .device-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand);
+    border-radius: 12px;
+    flex-shrink: 0;
+  }
+
+  .device-icon i {
+    font-size: 1.5rem;
+    color: white;
+  }
+
+  .device-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .device-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+  }
+
+  .device-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .device-detail {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .device-detail i {
+    font-size: 0.9rem;
+  }
+
+  .device-badge {
+    flex-shrink: 0;
+  }
+
+  .badge-current {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: var(--brand);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 20px;
+  }
+
+  .device-actions {
+    flex-shrink: 0;
+  }
+
+  .btn-sign-out {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: white;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-sign-out:hover {
+    background: var(--brand-light);
+    color: var(--brand);
+    border-color: var(--brand);
+  }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .btn-danger {
+    background: #ef4444;
+    color: white;
+  }
+
+  .btn-danger:hover {
+    background: #dc2626;
+  }
+
+  .btn-block {
+    width: 100%;
+  }
+
+  .placeholder-section {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text-secondary);
+  }
+
+  .placeholder-section i {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  .alert-container {
+    margin-top: 1rem;
+  }
+
+  .alert {
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+  }
+
+  .alert-success {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #10b981;
+  }
+
+  .alert-error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #ef4444;
+  }
+
+  .btn-close {
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.5;
+    transition: opacity 0.2s ease;
+  }
+
+  .btn-close:hover {
+    opacity: 1;
+  }
+
+  @media (max-width: 768px) {
+    .settings-list-body {
+      padding: 1rem;
+    }
+
+    .device-card {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .device-icon {
+      width: 40px;
+      height: 40px;
+    }
+
+    .device-icon i {
+      font-size: 1.25rem;
+    }
+
+    .device-details {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .device-actions {
+      width: 100%;
+    }
+
+    .btn-sign-out {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+</style>
+{% endblock %}

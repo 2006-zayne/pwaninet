@@ -1,0 +1,344 @@
+{% extends 'users/settings/base_settings.html' %}
+{% load i18n %}
+
+{% block back_link %}
+<a href="{% url 'users:settings' %}" class="back-link">
+  <i class="bi bi-arrow-left"></i> {% trans "Back to Settings" %}
+</a>
+{% endblock %}
+
+{% block page_title %}{% trans "About PwaniNet" %}{% endblock %}
+{% block page_subtitle %}{% trans "Version information and support resources" %}{% endblock %}
+
+{% block settings_content %}
+<div class="settings-list-container">
+  <div class="settings-list-header">
+    <div class="settings-list-header-icon">
+      <i class="bi bi-info-circle"></i>
+    </div>
+    <div class="settings-list-header-content">
+      <div class="settings-list-header-title">{% trans "App Information" %}</div>
+      <div class="settings-list-header-subtitle">{% trans "Version and build information" %}</div>
+    </div>
+  </div>
+
+  <div class="settings-list-body">
+    <div class="update-info">
+      <div class="update-info-item">
+        <div class="update-info-label">{% trans "Current Version" %}</div>
+        <div class="update-info-value" id="current-version">{{ app_version }}</div>
+      </div>
+      <div class="update-info-item">
+        <div class="update-info-label">{% trans "Build" %}</div>
+        <div class="update-info-value">{{ app_build }}</div>
+      </div>
+      <div class="update-info-item">
+        <div class="update-info-label">{% trans "Channel" %}</div>
+        <div class="update-info-value">{{ app_release_channel|default:"Unknown" }}</div>
+      </div>
+      <div class="update-info-item">
+        <div class="update-info-label">{% trans "Environment" %}</div>
+        <div class="update-info-value">{{ app_environment|title }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="settings-list-container">
+  <div class="settings-list-header">
+    <div class="settings-list-header-icon">
+      <i class="bi bi-box-seam"></i>
+    </div>
+    <div class="settings-list-header-content">
+      <div class="settings-list-header-title">{% trans "Release Center" %}</div>
+      <div class="settings-list-header-subtitle">{% trans "View release notes and update information" %}</div>
+    </div>
+  </div>
+
+  <div class="settings-list-body">
+    <div class="update-links">
+      <a href="/system/releases/" class="update-link">
+        <i class="bi bi-box-seam"></i> {% trans "Release Center" %}
+      </a>
+      {% if current_release %}
+      <a href="/system/releases/{{ current_release.id }}/" class="update-link">
+        <i class="bi bi-info-circle"></i> {% trans "Current Release Details" %}
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="settings-list-container">
+  <div class="settings-list-item expandable" data-target="support">
+    <div class="settings-list-icon">
+      <i class="bi bi-question-circle"></i>
+    </div>
+    <div class="settings-list-content">
+      <div class="settings-list-title">Support</div>
+      <div class="settings-list-subtitle">Get help and support</div>
+    </div>
+    <div class="settings-list-chevron">
+      <i class="bi bi-chevron-right"></i>
+    </div>
+  </div>
+  
+  <div class="settings-expandable-content" id="support">
+    <div class="settings-expandable-body">
+      <div class="placeholder-section">
+        <i class="bi bi-question-circle"></i>
+        <p>Support resources coming soon...</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-list-item expandable" data-target="licenses">
+    <div class="settings-list-icon">
+      <i class="bi bi-file-text"></i>
+    </div>
+    <div class="settings-list-content">
+      <div class="settings-list-title">Licenses</div>
+      <div class="settings-list-subtitle">Open source licenses and attributions</div>
+    </div>
+    <div class="settings-list-chevron">
+      <i class="bi bi-chevron-right"></i>
+    </div>
+  </div>
+  
+  <div class="settings-expandable-content" id="licenses">
+    <div class="settings-expandable-body">
+      <div class="placeholder-section">
+        <i class="bi bi-file-text"></i>
+        <p>License information coming soon...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .settings-list-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .settings-list-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--brand-light);
+  }
+
+  .settings-list-header-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .settings-list-header-icon i {
+    font-size: 1.25rem;
+    color: white;
+  }
+
+  .settings-list-header-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .settings-list-header-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .settings-list-header-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+  }
+
+  .settings-list-body {
+    padding: 1.5rem;
+  }
+
+  .settings-list-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .settings-list-item:hover {
+    background: var(--brand-light);
+  }
+
+  .settings-list-item.expandable .settings-list-chevron i {
+    transition: transform 0.3s ease;
+  }
+
+  .settings-list-item.expandable.expanded .settings-list-chevron i {
+    transform: rotate(90deg);
+  }
+
+  .settings-list-item:last-child {
+    border-bottom: none;
+  }
+
+  .settings-list-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand-light);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .settings-list-icon i {
+    font-size: 1.25rem;
+    color: var(--brand);
+  }
+
+  .settings-list-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .settings-list-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .settings-list-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+  }
+
+  .settings-list-chevron {
+    flex-shrink: 0;
+    color: var(--text-secondary);
+  }
+
+  .settings-list-chevron i {
+    font-size: 1.1rem;
+  }
+
+  .settings-expandable-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    background: var(--page-bg);
+  }
+
+  .settings-expandable-content.expanded {
+    max-height: 500px;
+  }
+
+  .settings-expandable-body {
+    padding: 1.5rem;
+  }
+
+  .placeholder-section {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text-secondary);
+  }
+
+  .placeholder-section i {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  .update-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+
+  .update-info-item {
+    background: var(--brand-light);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+  }
+
+  .update-info-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+  }
+
+  .update-info-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .update-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .update-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--brand);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s ease;
+  }
+
+  .update-link:hover {
+    color: #1d4ed8;
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const expandableItems = document.querySelectorAll('.settings-list-item.expandable');
+    
+    expandableItems.forEach(item => {
+      item.addEventListener('click', function() {
+        const targetId = this.getAttribute('data-target');
+        const content = document.getElementById(targetId);
+        
+        // Toggle expanded state
+        this.classList.toggle('expanded');
+        content.classList.toggle('expanded');
+        
+        // Close other expanded items
+        expandableItems.forEach(otherItem => {
+          if (otherItem !== this) {
+            const otherTargetId = otherItem.getAttribute('data-target');
+            const otherContent = document.getElementById(otherTargetId);
+            otherItem.classList.remove('expanded');
+            otherContent.classList.remove('expanded');
+          }
+        });
+      });
+    });
+  });
+</script>
+{% endblock %}

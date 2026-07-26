@@ -77,6 +77,28 @@
     right: 20px;
   }
 
+  .download-btn {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    transition: background 0.2s;
+  }
+
+  .download-btn:hover {
+    background: #fff;
+  }
+
   .image-counter {
     position: fixed;
     bottom: 80px;
@@ -157,6 +179,10 @@
     <i class="bi bi-x-lg"></i>
   </a>
 
+  <button class="download-btn" data-image-url="{{ post_image.image.url }}" data-filename="{{ post_image.image.name|default:'image.jpg' }}" data-post-id="{{ post.id }}">
+    <i class="bi bi-download"></i>
+  </button>
+
   {% if has_prev %}
   <a href="{% url 'posts:view_image_fullscreen' post.id prev_index %}" class="nav-btn prev" id="prevBtn">
     <i class="bi bi-chevron-left"></i>
@@ -236,6 +262,35 @@ document.addEventListener('DOMContentLoaded', function() {
       window.location.href = "{% url 'posts:post_details' post.id %}";
     }
   });
+
+  // Download button functionality
+  const downloadBtn = document.querySelector('.download-btn');
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', async function(e) {
+      e.preventDefault();
+      
+      const imageUrl = this.getAttribute('data-image-url');
+      const filename = this.getAttribute('data-filename');
+      const postId = this.getAttribute('data-post-id');
+      
+      try {
+        const module = await import('/static/js/storage/downloads_manager.js');
+        const downloadsManager = module.downloadsManager;
+        
+        await downloadsManager.download({
+          url: imageUrl,
+          filename: filename,
+          postId: postId,
+          mediaId: postId,
+          mimeType: 'image/jpeg',
+          category: 'image'
+        });
+      } catch (error) {
+        console.error('Download failed:', error);
+        alert('Download failed: ' + error.message);
+      }
+    });
+  }
 });
 </script>
 {% endblock %}

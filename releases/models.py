@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.core.validators import RegexValidator
 from django.utils import timezone
+import json
 
 
 class Release(models.Model):
@@ -15,6 +16,21 @@ class Release(models.Model):
         ('MINOR', 'Minor'),
         ('PATCH', 'Patch'),
         ('HOTFIX', 'Hotfix'),
+    ]
+    
+    RELEASE_CHANNEL_CHOICES = [
+        ('DEVELOPMENT', 'Development'),
+        ('ALPHA', 'Alpha'),
+        ('BETA', 'Beta'),
+        ('RELEASE_CANDIDATE', 'Release Candidate'),
+        ('STABLE', 'Stable'),
+    ]
+    
+    RELEASE_STATUS_CHOICES = [
+        ('DRAFT', 'Draft'),
+        ('TESTING', 'Testing'),
+        ('PUBLISHED', 'Published'),
+        ('ARCHIVED', 'Archived'),
     ]
     
     # Release identification
@@ -43,6 +59,28 @@ class Release(models.Model):
         help_text="Type of release"
     )
     
+    # Release status workflow
+    status = models.CharField(
+        max_length=20,
+        choices=RELEASE_STATUS_CHOICES,
+        default='DRAFT',
+        help_text="Current status of the release"
+    )
+    
+    # Release channel (for future expansion)
+    release_channel = models.CharField(
+        max_length=20,
+        choices=RELEASE_CHANNEL_CHOICES,
+        default='STABLE',
+        help_text="Release channel for future staged rollouts"
+    )
+    
+    # Current release flag - only one can be true at a time
+    is_current_release = models.BooleanField(
+        default=False,
+        help_text="If True, this is the currently deployed release"
+    )
+    
     # Release flags and constraints
     mandatory_update = models.BooleanField(
         default=False,
@@ -59,18 +97,11 @@ class Release(models.Model):
         help_text="Minimum version required for this update"
     )
     
-    # Release channel (for future expansion)
-    release_channel = models.CharField(
-        max_length=20,
-        default='STABLE',
-        choices=[
-            ('STABLE', 'Stable'),
-            ('BETA', 'Beta'),
-            ('ALPHA', 'Alpha'),
-            ('NIGHTLY', 'Nightly'),
-            ('CANARY', 'Canary'),
-        ],
-        help_text="Release channel for future staged rollouts"
+    # Environment snapshot for future reporting
+    environment_snapshot = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Snapshot of environment configuration at release time"
     )
     
     # Timestamps
@@ -80,6 +111,11 @@ class Release(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    published_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this release was published"
+    )
     
     # Author tracking
     created_by = models.ForeignKey(
@@ -89,6 +125,14 @@ class Release(models.Model):
         blank=True,
         related_name='created_releases',
         help_text="Admin who created this release"
+    )
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='published_releases',
+        help_text="Admin who published this release"
     )
     
     class Meta:
@@ -100,6 +144,15 @@ class Release(models.Model):
             models.Index(fields=['build_number']),
             models.Index(fields=['published']),
             models.Index(fields=['release_channel']),
+            models.Index(fields=['status']),
+            models.Index(fields=['is_current_release']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['is_current_release'],
+                condition=models.Q(is_current_release=True),
+                name='unique_current_release'
+            )
         ]
     
     def __str__(self):
@@ -109,6 +162,13 @@ class Release(models.Model):
         """Check if this is the latest published release"""
         latest = Release.objects.filter(published=True).order_by('-build_number').first()
         return latest == self if latest else False
+    
+    def save(self, *args, **kwargs):
+        """Override save to enforce single current release constraint"""
+        if self.is_current_release:
+            # Ensure only one release is marked as current
+            Release.objects.filter(is_current_release=True).update(is_current_release=False)
+        super().save(*args, **kwargs)
 
 
 class ReleaseItem(models.Model):

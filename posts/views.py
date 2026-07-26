@@ -659,6 +659,12 @@ def create_post_view(request):
 
 
 @login_required
+def storage_manager_view(request):
+    """View for the storage manager page"""
+    return render(request, 'posts/storage/storage_manager.html')
+
+
+@login_required
 def post_detail_view(request, post_id):
     post = get_object_or_404(Post, id=post_id)
     show_all = request.GET.get('show_all') == '1'

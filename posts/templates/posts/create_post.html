@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block content %}
@@ -591,6 +592,31 @@
     color: var(--text-primary);
   }
 
+  /* ── Storage Link ── */
+  .storage-link-container {
+    text-align: center;
+    margin-top: 2rem;
+    padding: 1rem;
+  }
+
+  .storage-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: color 0.2s ease;
+  }
+
+  .storage-link:hover {
+    color: var(--text-secondary);
+  }
+
+  .storage-link i {
+    font-size: 0.9rem;
+  }
+
   /* ── Page load animation ── */
   .page-wrap > * {
     animation: page-rise 0.4s var(--ease) both;
@@ -636,11 +662,11 @@
   <div class="page-header">
     <div>
       <div class="page-eyebrow">
-        <i class="bi bi-plus-circle-fill"></i> New Post
+        <i class="bi bi-plus-circle-fill"></i> {% trans "New Post" %}
       </div>
-      <h1 class="page-title">Create a Post</h1>
+      <h1 class="page-title">{% trans "Create a Post" %}</h1>
     </div>
-    <a href="{% url 'posts:home' %}" class="btn-cancel">Discard</a>
+    <a href="{% url 'posts:home' %}" class="btn-cancel">{% trans "Discard" %}</a>
   </div>
 
   <!-- ── Compose Card ── -->
@@ -668,7 +694,7 @@
               name="content"
               id="id_content"
               class="compose-textarea form-control"
-              placeholder="What's on your mind?"
+              placeholder="{% trans "What's on your mind?" %}"
               required
               maxlength="2500"
               rows="4">{{ form.content.value|default:'' }}</textarea>
@@ -743,7 +769,7 @@
               <div class="d-flex align-items-center gap-3">
                 <span id="charCount">0 / 2500</span>
                 <button type="submit" class="btn-deploy" id="deployBtn" disabled>
-                  <i class="bi bi-send-fill"></i> Post
+                  <i class="bi bi-send-fill"></i> {% trans "Post" %}
                 </button>
               </div>
             </div>
@@ -761,19 +787,19 @@
       <button class="attachment-modal-close" id="closeAttachmentModal">
         <i class="bi bi-x"></i>
       </button>
-      <h3 class="attachment-modal-title">Add Attachment</h3>
+      <h3 class="attachment-modal-title">{% trans "Add Attachment" %}</h3>
       <div class="attachment-options">
         <div class="attachment-option" id="attachImages">
           <i class="bi bi-images"></i>
-          <span>Images</span>
+          <span>{% trans "Images" %}</span>
         </div>
         <div class="attachment-option" id="attachVideo">
           <i class="bi bi-play-btn"></i>
-          <span>Video</span>
+          <span>{% trans "Video" %}</span>
         </div>
         <div class="attachment-option" id="attachDocs">
           <i class="bi bi-file-earmark-pdf"></i>
-          <span>PDF</span>
+          <span>{% trans "PDF" %}</span>
         </div>
       </div>
     </div>
@@ -793,6 +819,12 @@
         </p>
       </div>
     </div>
+  </div>
+
+  <div class="storage-link-container">
+    <a href="{% url 'posts:storage_manager' %}" class="storage-link">
+      <i class="bi bi-database"></i> View Storage Usage
+    </a>
   </div>
 
 </div>
@@ -819,6 +851,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const closeAttachmentModal = document.getElementById('closeAttachmentModal');
     const tagModal = document.getElementById('tagModal');
     const closeTagModal = document.getElementById('closeTagModal');
+    const unitSelect = document.getElementById('id_unit');
+    const draftPreviewId = 'create-post-draft';
     
     // File inputs
     const imageInput = document.getElementById('{{ form.images.id_for_label }}');
@@ -922,82 +956,65 @@ document.addEventListener('DOMContentLoaded', function () {
         updatePreview();
     });
 
-    // File input handling
-    imageInput.addEventListener('change', handleImageUpload);
-    videoInput.addEventListener('change', handleVideoUpload);
-    docsInput.addEventListener('change', handleDocsUpload);
+    // File input handling is delegated to UploadManager + PreviewManager.
+    imageInput.addEventListener('change', () => addFiles(Array.from(imageInput.files || [])));
+    videoInput.addEventListener('change', () => addFiles(Array.from(videoInput.files || [])));
+    docsInput.addEventListener('change', () => addFiles(Array.from(docsInput.files || [])));
 
-    function handleImageUpload(e) {
-        const files = Array.from(e.target.files);
-        files.forEach(file => {
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    mediaFiles.push({
-                        type: 'image',
-                        file: file,
-                        url: event.target.result
-                    });
-                    // Set gradient to 'none' when media is attached
-                    gradInput.value = 'none';
-                    selectedStyle = 'none';
-                    updateMediaPreview();
-                    updatePreview();
-                };
-                reader.readAsDataURL(file);
-            }
-        });
+    async function addFiles(files) {
+      if (!files.length) return;
+
+      mediaFiles = mediaFiles.concat(files.map(file => ({
+        type: inferMediaType(file),
+        file,
+        url: null,
+      })));
+
+      imageInput.value = '';
+      videoInput.value = '';
+      docsInput.value = '';
+
+      gradInput.value = 'none';
+      selectedStyle = 'none';
+
+      await rebuildPreviews();
     }
 
-    function handleVideoUpload(e) {
-        const file = e.target.files[0];
-        console.log('Video upload triggered, file:', file);
-        console.log('File type:', file ? file.type : 'No file');
-        console.log('File size:', file ? (file.size / 1024 / 1024).toFixed(2) + 'MB' : 'No file');
-        
-        if (file && file.type.startsWith('video/')) {
-            // Check file size (150MB limit from validator)
-            const maxSize = 150 * 1024 * 1024; // 150MB
-            if (file.size > maxSize) {
-                alert('Video file too large! Maximum allowed is 150MB.');
-                return;
-            }
-            
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                mediaFiles.push({
-                    type: 'video',
-                    file: file,
-                    url: event.target.result
-                });
-                console.log('Video added to mediaFiles:', mediaFiles);
-                // Set gradient to 'none' when media is attached
-                gradInput.value = 'none';
-                selectedStyle = 'none';
-                updateMediaPreview();
-                updatePreview();
-            };
-            reader.readAsDataURL(file);
-        } else if (file) {
-            alert('Please select a valid video file.');
-        }
+    function inferMediaType(file) {
+      if (file.type.startsWith('image/')) return 'image';
+      if (file.type.startsWith('video/')) return 'video';
+      if (file.type.startsWith('audio/')) return 'audio';
+      if (file.type === 'application/pdf') return 'docs';
+      return 'docs';
     }
 
-    function handleDocsUpload(e) {
-        // For PDF, just show a preview icon
-        const file = e.target.files[0];
-        if (file) {
-            mediaFiles.push({
-                type: 'docs',
-                file: file,
-                url: null
-            });
-            // Set gradient to 'none' when media is attached
-            gradInput.value = 'none';
-            selectedStyle = 'none';
-            updateMediaPreview();
-            updatePreview();
+    async function rebuildPreviews() {
+      const files = mediaFiles.map(item => item.file);
+
+      if (files.length === 0) {
+        if (window.uploadManager?.clearDraftPreviews) {
+          window.uploadManager.clearDraftPreviews(draftPreviewId);
         }
+        updateMediaPreview();
+        updatePreview();
+        return;
+      }
+
+      if (window.uploadManager?.createDraftPreviews) {
+        const previews = await window.uploadManager.createDraftPreviews(draftPreviewId, files);
+        mediaFiles = previews.map((preview) => ({
+          type: preview.type === 'document' ? 'docs' : preview.type,
+          file: preview.file,
+          url: preview.url,
+        }));
+      }
+
+      if (currentMediaIndex >= mediaFiles.length) {
+        currentMediaIndex = Math.max(mediaFiles.length - 1, 0);
+      }
+
+      updateMediaPreview();
+      updatePreview();
     }
 
     function updateMediaPreview() {
@@ -1024,6 +1041,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 item.innerHTML = `<img src="${media.url}" alt="Preview ${index + 1}">`;
             } else if (media.type === 'video') {
                 item.innerHTML = `<video src="${media.url}" controls></video>`;
+            } else if (media.type === 'audio') {
+              item.innerHTML = `<audio src="${media.url}" controls></audio>`;
             } else if (media.type === 'docs') {
                 item.innerHTML = `
                     <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: var(--brand-light);">
@@ -1083,12 +1102,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    mediaRemove.addEventListener('click', () => {
+    mediaRemove.addEventListener('click', async () => {
         mediaFiles.splice(currentMediaIndex, 1);
         if (currentMediaIndex >= mediaFiles.length && mediaFiles.length > 0) {
             currentMediaIndex = mediaFiles.length - 1;
         }
-        updateMediaPreview();
+      await rebuildPreviews();
     });
 
     function updatePreview() {
@@ -1097,6 +1116,7 @@ document.addEventListener('DOMContentLoaded', function () {
         charCount.textContent = len + ' / 2500';
         charCount.className   = len > 2250 ? 'danger' : len > 1875 ? 'warn' : '';
         deployBtn.disabled    = text.trim() === '' && mediaFiles.length === 0;
+      textarea.required = mediaFiles.length === 0;
 
         const stylePanel = document.getElementById('stylePanel');
 
@@ -1140,53 +1160,87 @@ document.addEventListener('DOMContentLoaded', function () {
         this.style.height = this.scrollHeight + 'px';
     });
 
-    // Form submit handler - ensure files are attached
+    function resetComposerState() {
+      mediaFiles = [];
+      currentMediaIndex = 0;
+      textarea.value = '';
+      editablePreview.innerText = '';
+      gradInput.value = 'none';
+      selectedStyle = 'none';
+      document.querySelectorAll('.style-swatch').forEach(s => s.classList.remove('selected'));
+      const noneSwatch = document.querySelector('.style-swatch.swatch-none');
+      if (noneSwatch) {
+        noneSwatch.classList.add('selected');
+      }
+      if (window.uploadManager?.clearDraftPreviews) {
+        window.uploadManager.clearDraftPreviews(draftPreviewId);
+      }
+      updateMediaPreview();
+      updatePreview();
+    }
+
+    // Form submit handler delegates to UploadManager.
     document.getElementById('postForm').addEventListener('submit', function(e) {
-        console.log('Form submit triggered');
-        console.log('mediaFiles:', mediaFiles);
-        
-        // Create a FormData object and manually attach files from mediaFiles array
-        const formData = new FormData(this);
-        
-        // Clear existing file inputs
-        imageInput.value = '';
-        videoInput.value = '';
-        docsInput.value = '';
-        
-        // Re-attach files from mediaFiles array to appropriate inputs
-        const images = mediaFiles.filter(m => m.type === 'image').map(m => m.file);
-        const videos = mediaFiles.filter(m => m.type === 'video').map(m => m.file);
-        const docs = mediaFiles.filter(m => m.type === 'docs').map(m => m.file);
-        
-        console.log('Images to attach:', images.length);
-        console.log('Videos to attach:', videos.length);
-        console.log('Docs to attach:', docs.length);
-        
-        // Create FileList for images (multiple)
-        if (images.length > 0) {
-            const dataTransfer = new DataTransfer();
-            images.forEach(file => dataTransfer.items.add(file));
-            imageInput.files = dataTransfer.files;
-            console.log('Images attached to input:', imageInput.files.length);
+      e.preventDefault();
+
+      const caption = textarea.value.trim();
+      const files = mediaFiles.map(item => item.file);
+
+      if (!caption && files.length === 0) {
+        return;
+      }
+
+      // Disable button and show spinner to prevent multiple submissions
+      const originalBtnHtml = deployBtn.innerHTML;
+      deployBtn.disabled = true;
+      deployBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Posting...';
+
+      let createdUploadId = null;
+      if (window.uploadManager) {
+        createdUploadId = window.uploadManager.createUpload({
+          files,
+          caption,
+          visibility: 'public',
+          metadata: {
+            unit: unitSelect?.value || null,
+            group: new URLSearchParams(window.location.search).get('group') || null,
+            gradient_class: gradInput.value || 'none',
+          },
+        });
+      }
+
+      if (!createdUploadId) {
+        deployBtn.disabled = false;
+        deployBtn.innerHTML = originalBtnHtml;
+        return;
+      }
+
+      // Keep preview and draft visible during upload; clear only after successful publish.
+      const onPublished = (event) => {
+        if (event?.uploadId === createdUploadId) {
+          resetComposerState();
+          deployBtn.disabled = false;
+          deployBtn.innerHTML = originalBtnHtml;
+          unsubscribePublished();
+          unsubscribeFailed();
         }
-        
-        // Attach single video file
-        if (videos.length > 0) {
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(videos[0]);
-            videoInput.files = dataTransfer.files;
-            console.log('Video attached to input:', videoInput.files.length, videoInput.files[0].name);
+      };
+
+      const onFailed = (event) => {
+        if (event?.uploadId === createdUploadId) {
+          deployBtn.disabled = false;
+          deployBtn.innerHTML = originalBtnHtml;
+          unsubscribePublished();
+          unsubscribeFailed();
         }
-        
-        // Attach single docs file
-        if (docs.length > 0) {
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(docs[0]);
-            docsInput.files = dataTransfer.files;
-            console.log('Docs attached to input:', docsInput.files.length);
-        }
-        
-        console.log('gradient_class value:', gradInput.value);
+      };
+
+      const unsubscribePublished = window.uploadEvents?.on
+        ? window.uploadEvents.on('upload:published', onPublished)
+        : () => {};
+      const unsubscribeFailed = window.uploadEvents?.on
+        ? window.uploadEvents.on('upload:failed', onFailed)
+        : () => {};
     });
 
     // Initialize preview on page load

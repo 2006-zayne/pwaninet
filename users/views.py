@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, logout
+from django.http import JsonResponse, HttpResponse
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -8,15 +9,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from django.views.decorators.http import require_http_methods
-from django.http import JsonResponse
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
-from users.models import User, Follow, DeviceAccount, Pinch
+from users.models import User, Follow, DeviceAccount, Pinch, UserSession, Block, HiddenAuthor, PrivacyLevel
 from posts.models import Post, Like
 from users.forms import PwaniSignupForm, ProfileUpdateForm, NotificationPreferencesForm
 from django.contrib import messages
-from django.http import JsonResponse
 from django.db import transaction
 from notifications.models import Notifications
 from notifications.services.notification_service import invalidate_unread_count_cache, create_notification
@@ -491,22 +490,392 @@ def get_suggestions(request):
 
 @login_required
 def settings_view(request):
-    """Main settings page with modular sections"""
+    """Main settings landing page - navigation hub for all settings categories"""
+    return render(request, 'users/settings/index.html')
+
+
+@login_required
+def settings_profile_view(request):
+    """Profile settings page"""
+    return render(request, 'users/settings/profile.html')
+
+
+@login_required
+def settings_appearance_view(request):
+    """Appearance settings page"""
+    return render(request, 'users/settings/appearance.html')
+
+
+@login_required
+def settings_notifications_view(request):
+    """Notification settings page with form handling"""
     if request.method == 'POST':
         form = NotificationPreferencesForm(request.POST, instance=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, 'Notification preferences updated successfully.')
-            return redirect('users:settings')
+            return redirect('users:settings_notifications')
     else:
         form = NotificationPreferencesForm(instance=request.user)
-    return render(request, 'users/settings.html', {'form': form})
+    return render(request, 'users/settings/notifications.html', {'form': form})
+
+
+@login_required
+def settings_privacy_view(request):
+    """Privacy and security settings page"""
+    return render(request, 'users/settings/privacy.html')
+
+
+@login_required
+def settings_storage_view(request):
+    """Storage settings page"""
+    return render(request, 'users/settings/storage.html')
+
+
+@login_required
+def settings_downloads_view(request):
+    """Downloads manager page"""
+    return render(request, 'users/settings/downloads.html')
+
+
+@login_required
+def settings_about_view(request):
+    """About PwaniNet page with version information"""
+    return render(request, 'users/settings/about.html')
+
+
+@login_required
+def settings_password_manager_view(request):
+    """Password manager settings page"""
+    if request.method == 'POST':
+        current_password = request.POST.get('current_password')
+        new_password = request.POST.get('new_password')
+        confirm_password = request.POST.get('confirm_password')
+        
+        if not request.user.check_password(current_password):
+            messages.error(request, 'Current password is incorrect.')
+            return render(request, 'users/settings/password_manager.html')
+        
+        if new_password != confirm_password:
+            messages.error(request, 'New passwords do not match.')
+            return render(request, 'users/settings/password_manager.html')
+        
+        if len(new_password) < 8:
+            messages.error(request, 'Password must be at least 8 characters long.')
+            return render(request, 'users/settings/password_manager.html')
+        
+        request.user.set_password(new_password)
+        request.user.save()
+        
+        # Update session to keep user logged in
+        from django.contrib.auth import update_session_auth_hash
+        update_session_auth_hash(request, request.user)
+        
+        messages.success(request, 'Password changed successfully.')
+        return redirect('users:settings_password_manager')
+    
+    return render(request, 'users/settings/password_manager.html')
+
+
+@login_required
+def settings_active_devices_view(request):
+    """Active devices management page"""
+    from django.contrib.sessions.models import Session
+    from user_agents import parse
+    import re
+    
+    def parse_device_info(user_agent_string):
+        """Parse detailed device information from user agent string"""
+        user_agent = parse(user_agent_string)
+        
+        # Determine device type
+        device_type = 'desktop'
+        if user_agent.is_mobile:
+            device_type = 'mobile'
+        elif user_agent.is_tablet:
+            device_type = 'tablet'
+        
+        # Try to extract device model from user agent string
+        device_model = user_agent.device.family or 'Unknown Device'
+        
+        # Common Android device patterns
+        android_patterns = [
+            r'(SM-[A-Z0-9]+)',  # Samsung
+            r'(Pixel [0-9]+)',  # Google Pixel
+            r'(Redmi [A-Za-z0-9]+)',  # Xiaomi Redmi
+            r'(POCO [A-Za-z0-9]+)',  # Xiaomi POCO
+            r'(Tecno [A-Za-z0-9 ]+)',  # Tecno
+            r'(Infinix [A-Za-z0-9 ]+)',  # Infinix
+            r'(Itel [A-Za-z0-9 ]+)',  # Itel
+            r'(Nokia [A-Za-z0-9]+)',  # Nokia
+            r'(OnePlus [A-Za-z0-9]+)',  # OnePlus
+            r'(OPPO [A-Za-z0-9]+)',  # OPPO
+            r'(vivo [A-Za-z0-9]+)',  # Vivo
+            r'(HUAWEI [A-Za-z0-9]+)',  # Huawei
+            r'(Moto [A-Za-z0-9]+)',  # Motorola
+            r'(LG-[A-Za-z0-9]+)',  # LG
+            r'(Sony [A-Za-z0-9]+)',  # Sony
+        ]
+        
+        for pattern in android_patterns:
+            match = re.search(pattern, user_agent_string, re.IGNORECASE)
+            if match:
+                device_model = match.group(1)
+                break
+        
+        # iPhone/iPad detection
+        if 'iPhone' in user_agent_string:
+            device_model = 'iPhone'
+        elif 'iPad' in user_agent_string:
+            device_model = 'iPad'
+        
+        # OS version formatting
+        os_version = user_agent.os.version_string or ''
+        if user_agent.os.family == 'Android' and os_version:
+            # Clean up Android version (e.g., "12" instead of "12.0.0")
+            os_version = os_version.split('.')[0]
+        
+        # Browser info
+        browser_name = user_agent.browser.family or 'Unknown Browser'
+        browser_version = user_agent.browser.version_string or ''
+        if browser_version:
+            browser_info = f"{browser_name} {browser_version.split('.')[0]}"
+        else:
+            browser_info = browser_name
+        
+        # OS info
+        os_info = f"{user_agent.os.family}"
+        if os_version:
+            os_info += f" {os_version}"
+        
+        return {
+            'device_type': device_type,
+            'device_model': device_model,
+            'browser': browser_info,
+            'os': os_info,
+            'is_mobile': user_agent.is_mobile,
+            'is_tablet': user_agent.is_tablet,
+            'is_pc': user_agent.is_pc,
+        }
+    
+    # Get current session
+    current_session_key = request.session.session_key
+    current_session = None
+    
+    # Try to get or create UserSession for current session
+    try:
+        current_session = UserSession.objects.get(
+            user=request.user,
+            session_key=current_session_key
+        )
+        current_session.is_current = True
+        current_session.last_activity = current_session.last_activity
+    except UserSession.DoesNotExist:
+        # Create session record
+        user_agent_string = request.META.get('HTTP_USER_AGENT', '')
+        device_info = parse_device_info(user_agent_string)
+        
+        ip_address = request.META.get('REMOTE_ADDR')
+        
+        current_session = UserSession.objects.create(
+            user=request.user,
+            session_key=current_session_key,
+            ip_address=ip_address,
+            user_agent=user_agent_string,
+            device_name=device_info['device_model'],
+            browser=device_info['browser'],
+            operating_system=device_info['os'],
+            device_type=device_info['device_type'],
+            is_current=True
+        )
+    
+    # Get other sessions
+    other_sessions = UserSession.objects.filter(
+        user=request.user
+    ).exclude(
+        session_key=current_session_key
+    ).order_by('-last_activity')
+    
+    # Parse device info for other sessions
+    for session in other_sessions:
+        if session.user_agent:
+            device_info = parse_device_info(session.user_agent)
+            session.device_type = device_info['device_type']
+            session.device_model = device_info['device_model']
+            session.browser = device_info['browser']
+            session.os = device_info['os']
+    
+    # Parse device info for current session
+    if current_session and current_session.user_agent:
+        device_info = parse_device_info(current_session.user_agent)
+        current_session.device_type = device_info['device_type']
+        current_session.device_model = device_info['device_model']
+        current_session.browser = device_info['browser']
+        current_session.os = device_info['os']
+    
+    return render(request, 'users/settings/active_devices.html', {
+        'current_session': current_session,
+        'other_sessions': other_sessions
+    })
+
+
+@login_required
+def settings_blocked_users_view(request):
+    """Blocked users management page"""
+    blocked_users = Block.objects.filter(
+        blocker=request.user
+    ).select_related('blocked').order_by('-created_at')
+    
+    return render(request, 'users/settings/blocked_users.html', {
+        'blocked_users': blocked_users
+    })
+
+
+@login_required
+def settings_profile_privacy_view(request):
+    """Profile privacy settings page"""
+    if request.method == 'POST':
+        profile_privacy = request.POST.get('profile_privacy')
+        
+        if profile_privacy not in PrivacyLevel.values:
+            messages.error(request, 'Invalid privacy level.')
+            return redirect('users:settings_profile_privacy')
+        
+        request.user.profile_privacy = profile_privacy
+        request.user.save()
+        
+        messages.success(request, 'Profile privacy updated successfully.')
+        return redirect('users:settings_profile_privacy')
+    
+    privacy_levels = PrivacyLevel.choices
+    return render(request, 'users/settings/profile_privacy.html', {
+        'privacy_levels': privacy_levels
+    })
+
+
+@login_required
+def settings_post_privacy_view(request):
+    """Post privacy settings page"""
+    if request.method == 'POST':
+        post_privacy = request.POST.get('post_privacy')
+        
+        if post_privacy not in PrivacyLevel.values:
+            messages.error(request, 'Invalid privacy level.')
+            return redirect('users:settings_post_privacy')
+        
+        request.user.post_privacy = post_privacy
+        request.user.save()
+        
+        messages.success(request, 'Post privacy updated successfully.')
+        return redirect('users:settings_post_privacy')
+    
+    privacy_levels = PrivacyLevel.choices
+    return render(request, 'users/settings/post_privacy.html', {
+        'privacy_levels': privacy_levels
+    })
+
+
+@login_required
+def settings_hidden_authors_view(request):
+    """Hidden authors management page"""
+    hidden_authors = HiddenAuthor.objects.filter(
+        hider=request.user
+    ).select_related('hidden_author').order_by('-created_at')
+    
+    return render(request, 'users/settings/hidden_authors.html', {
+        'hidden_authors': hidden_authors
+    })
 
 
 @login_required
 def notification_preferences_view(request):
-    """Legacy view - redirects to new settings page"""
-    return redirect('users:settings')
+    """Legacy view - redirects to new notifications settings page"""
+    return redirect('users:settings_notifications')
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_sign_out_session(request, session_id):
+    """Sign out a specific session (API endpoint for HTMX)"""
+    try:
+        session = UserSession.objects.get(id=session_id, user=request.user)
+        
+        # Prevent signing out current session
+        if session.session_key == request.session.session_key:
+            return JsonResponse({'error': 'Cannot sign out current session'}, status=400)
+        
+        # Delete the Django session
+        from django.contrib.sessions.models import Session
+        try:
+            django_session = Session.objects.get(session_key=session.session_key)
+            django_session.delete()
+        except Session.DoesNotExist:
+            pass
+        
+        # Delete our UserSession record
+        session.delete()
+        
+        return HttpResponse('')  # HTMX will remove the element
+    except UserSession.DoesNotExist:
+        return JsonResponse({'error': 'Session not found'}, status=404)
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_sign_out_all_sessions(request):
+    """Sign out all other sessions (API endpoint for HTMX)"""
+    current_session_key = request.session.session_key
+    
+    # Delete all other sessions
+    other_sessions = UserSession.objects.filter(
+        user=request.user
+    ).exclude(
+        session_key=current_session_key
+    )
+    
+    from django.contrib.sessions.models import Session
+    for session in other_sessions:
+        try:
+            django_session = Session.objects.get(session_key=session.session_key)
+            django_session.delete()
+        except Session.DoesNotExist:
+            pass
+        session.delete()
+    
+    messages.success(request, 'All other devices have been signed out.')
+    return redirect('users:settings_active_devices')
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_unblock_user(request, user_id):
+    """Unblock a user (API endpoint for HTMX)"""
+    try:
+        blocked_user = User.objects.get(id=user_id)
+        block = Block.objects.get(blocker=request.user, blocked=blocked_user)
+        block.delete()
+        
+        return HttpResponse('')  # HTMX will remove the element
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    except Block.DoesNotExist:
+        return JsonResponse({'error': 'Block not found'}, status=404)
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_show_hidden_author(request, user_id):
+    """Remove author from hidden list (API endpoint for HTMX)"""
+    try:
+        hidden_author = User.objects.get(id=user_id)
+        hidden = HiddenAuthor.objects.get(hider=request.user, hidden_author=hidden_author)
+        hidden.delete()
+        
+        return HttpResponse('')  # HTMX will remove the element
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    except HiddenAuthor.DoesNotExist:
+        return JsonResponse({'error': 'Hidden author not found'}, status=404)
 
 
 @login_required
@@ -801,6 +1170,53 @@ class UserViewSet(viewsets.ModelViewSet):
         request.user.theme_preference = theme
         request.user.save()
         return Response({'theme_preference': theme})
+
+    @extend_schema(
+        summary="Update appearance preferences",
+        description="Update the authenticated user's appearance preferences (theme, font_size, language)",
+        responses={200: {"theme_preference": "string", "font_size_preference": "string", "language_preference": "string"}, 400: {"error": "message"}}
+    )
+    @action(detail=False, methods=['patch'])
+    def update_preferences(self, request):
+        """Update appearance preferences"""
+        data = request.data
+        updated_fields = {}
+
+        # Update theme preference if provided
+        if 'theme_preference' in data:
+            theme = data['theme_preference']
+            if theme not in ['light', 'dark', 'system']:
+                return Response(
+                    {'error': 'Invalid theme preference. Must be light, dark, or system.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            request.user.theme_preference = theme
+            updated_fields['theme_preference'] = theme
+
+        # Update font size preference if provided
+        if 'font_size_preference' in data:
+            font_size = data['font_size_preference']
+            if font_size not in ['tiny', 'small', 'medium', 'large']:
+                return Response(
+                    {'error': 'Invalid font size preference. Must be tiny, small, medium, or large.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            request.user.font_size_preference = font_size
+            updated_fields['font_size_preference'] = font_size
+
+        # Update language preference if provided
+        if 'language_preference' in data:
+            language = data['language_preference']
+            if language not in ['en', 'sw']:
+                return Response(
+                    {'error': 'Invalid language preference. Must be en or sw.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            request.user.language_preference = language
+            updated_fields['language_preference'] = language
+
+        request.user.save()
+        return Response(updated_fields)
 
 
 class FollowViewSet(viewsets.ModelViewSet):

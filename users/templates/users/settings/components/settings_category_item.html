@@ -1,0 +1,114 @@
+{% load i18n %}
+<a href="{% url url_name %}" class="settings-category-item">
+  <div class="settings-category-icon">
+    <i class="bi {{ icon_class }}"></i>
+  </div>
+  <div class="settings-category-content">
+    <div class="settings-category-title">{% trans title %}</div>
+    <div class="settings-category-subtitle">{% trans subtitle %}</div>
+  </div>
+  <div class="settings-category-chevron">
+    <i class="bi bi-chevron-right"></i>
+  </div>
+</a>
+
+<style>
+  .settings-category-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border);
+    text-decoration: none;
+    transition: background 0.2s ease;
+    cursor: pointer;
+  }
+
+  .settings-category-item:first-child {
+    border-top: 1px solid var(--border);
+    border-top-left-radius: var(--radius-md);
+    border-top-right-radius: var(--radius-md);
+  }
+
+  .settings-category-item:last-child {
+    border-bottom-left-radius: var(--radius-md);
+    border-bottom-right-radius: var(--radius-md);
+  }
+
+  .settings-category-item:hover {
+    background: var(--brand-light);
+  }
+
+  .settings-category-item:focus {
+    outline: 2px solid var(--brand);
+    outline-offset: -2px;
+  }
+
+  .settings-category-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand-light);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .settings-category-icon i {
+    font-size: 1.25rem;
+    color: var(--brand);
+  }
+
+  .settings-category-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .settings-category-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .settings-category-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+  }
+
+  .settings-category-chevron {
+    flex-shrink: 0;
+    color: var(--text-secondary);
+  }
+
+  .settings-category-chevron i {
+    font-size: 1.1rem;
+  }
+
+  @media (max-width: 768px) {
+    .settings-category-item {
+      padding: 0.875rem 1rem;
+      gap: 0.875rem;
+    }
+
+    .settings-category-icon {
+      width: 36px;
+      height: 36px;
+    }
+
+    .settings-category-icon i {
+      font-size: 1.1rem;
+    }
+
+    .settings-category-title {
+      font-size: 0.95rem;
+    }
+
+    .settings-category-subtitle {
+      font-size: 0.8rem;
+    }
+  }
+</style>

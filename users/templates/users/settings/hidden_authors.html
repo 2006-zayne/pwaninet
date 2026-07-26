@@ -1,0 +1,290 @@
+{% extends 'users/settings/base_settings.html' %}
+{% load i18n %}
+
+{% block back_link %}
+<a href="{% url 'users:settings_privacy' %}" class="back-link">
+  <i class="bi bi-arrow-left"></i> {% trans "Back to Privacy & Security" %}
+</a>
+{% endblock %}
+
+{% block page_title %}{% trans "Hidden Authors" %}{% endblock %}
+{% block page_subtitle %}{% trans "Manage authors whose posts are hidden from your feed" %}{% endblock %}
+
+{% block settings_content %}
+<div class="settings-list-container">
+  <div class="settings-list-header">
+    <div class="settings-list-header-icon">
+      <i class="bi bi-eye-slash"></i>
+    </div>
+    <div class="settings-list-header-content">
+      <div class="settings-list-header-title">{% trans "Hidden Authors" %}</div>
+      <div class="settings-list-header-subtitle">{% trans "Authors you've hidden from your feed" %}</div>
+    </div>
+  </div>
+
+  <div class="settings-list-body">
+    {% if hidden_authors %}
+    <div class="hidden-authors-list">
+      {% for hidden in hidden_authors %}
+      <div class="hidden-author-row" data-hidden-id="{{ hidden.id }}">
+        <div class="user-avatar">
+          {% if hidden.hidden_author.profile_pic and hidden.hidden_author.profile_pic.url != '/media/profile_pic/default_pic1.jpg' %}
+          <img src="{{ hidden.hidden_author.profile_pic.url }}" alt="{{ hidden.hidden_author.username }}" class="avatar-img">
+          {% else %}
+          <div class="avatar-placeholder">
+            <i class="bi bi-person"></i>
+          </div>
+          {% endif %}
+        </div>
+        <div class="user-info">
+          <div class="user-name">{{ hidden.hidden_author.get_full_name|default:hidden.hidden_author.username }}</div>
+          <div class="user-username">@{{ hidden.hidden_author.username }}</div>
+        </div>
+        <div class="user-actions">
+          <button class="btn-show-posts"
+                  hx-post="{% url 'users:api_show_hidden_author' hidden.hidden_author.id %}"
+                  hx-target="closest .hidden-author-row"
+                  hx-swap="outerHTML"
+                  aria-label="{% trans 'Show posts from' %} {{ hidden.hidden_author.username }}">
+            <i class="bi bi-eye"></i> {% trans "Show Posts" %}
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="placeholder-section">
+      <i class="bi bi-eye-slash"></i>
+      <p>{% trans "You aren't hiding posts from anyone." %}</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if messages %}
+<div class="alert-container">
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{% trans 'Close' %}"></button>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<style>
+  .settings-list-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .settings-list-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--brand-light);
+  }
+
+  .settings-list-header-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .settings-list-header-icon i {
+    font-size: 1.25rem;
+    color: white;
+  }
+
+  .settings-list-header-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .settings-list-header-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .settings-list-header-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+  }
+
+  .settings-list-body {
+    padding: 1.5rem;
+  }
+
+  .hidden-authors-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .hidden-author-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--page-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    transition: background 0.2s ease;
+  }
+
+  .hidden-author-row:hover {
+    background: var(--brand-light);
+  }
+
+  .user-avatar {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+  }
+
+  .avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+  }
+
+  .avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand-light);
+    border-radius: 50%;
+  }
+
+  .avatar-placeholder i {
+    font-size: 1.5rem;
+    color: var(--brand);
+  }
+
+  .user-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .user-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .user-username {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .user-actions {
+    flex-shrink: 0;
+  }
+
+  .btn-show-posts {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: white;
+    color: var(--brand);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-show-posts:hover {
+    background: var(--brand);
+    color: white;
+    border-color: var(--brand);
+  }
+
+  .placeholder-section {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text-secondary);
+  }
+
+  .placeholder-section i {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  .alert-container {
+    margin-top: 1rem;
+  }
+
+  .alert {
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+  }
+
+  .alert-success {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #10b981;
+  }
+
+  .alert-error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #ef4444;
+  }
+
+  .btn-close {
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.5;
+    transition: opacity 0.2s ease;
+  }
+
+  .btn-close:hover {
+    opacity: 1;
+  }
+
+  @media (max-width: 768px) {
+    .settings-list-body {
+      padding: 1rem;
+    }
+
+    .hidden-author-row {
+      padding: 0.75rem;
+    }
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+    }
+
+    .btn-show-posts {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+    }
+  }
+</style>
+{% endblock %}

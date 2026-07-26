@@ -86,8 +86,34 @@ class UserReleaseViewSerializer(serializers.ModelSerializer):
     """Serializer for UserReleaseView model"""
     release_version = serializers.CharField(source='release.version', read_only=True)
     release_title = serializers.CharField(source='release.release_title', read_only=True)
-    
+
     class Meta:
         model = UserReleaseView
         fields = ['id', 'release', 'release_version', 'release_title', 'viewed_at']
         read_only_fields = ['id', 'viewed_at']
+
+
+class CreateReleaseSerializer(serializers.Serializer):
+    """Serializer for creating releases with automatic version increment"""
+    release_type = serializers.ChoiceField(
+        choices=['MAJOR', 'MINOR', 'PATCH', 'HOTFIX'],
+        help_text="Semantic version increment type"
+    )
+    release_title = serializers.CharField(max_length=200, help_text="User-friendly title for this release")
+    release_summary = serializers.CharField(help_text="Brief summary of this release")
+    mandatory_update = serializers.BooleanField(default=False, help_text="Whether this update is mandatory")
+    release_channel = serializers.ChoiceField(
+        choices=['STABLE', 'BETA', 'ALPHA'],
+        default='STABLE',
+        help_text="Release channel"
+    )
+    items = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        help_text="List of release items with category, title, description"
+    )
+    minimum_supported_version = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text="Minimum supported version for this release"
+    )

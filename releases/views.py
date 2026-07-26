@@ -1,16 +1,19 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from django.conf import settings
 from django.utils import timezone
 from django.core.cache import cache
 from django.shortcuts import get_object_or_404
+from pwaninet import version
 from .models import Release, ReleaseItem, UserReleaseView
 from .serializers import (
     ReleaseSerializer,
     ReleaseListSerializer,
     VersionCheckSerializer,
-    UserReleaseViewSerializer
+    UserReleaseViewSerializer,
+    CreateReleaseSerializer
 )
 
 
@@ -89,20 +92,26 @@ class ReleaseViewSet(viewsets.ReadOnlyModelViewSet):
         """
         Lightweight endpoint for periodic polling to check for updates.
         Returns current version, latest version, and update status.
+        Uses current Release model as source of truth.
         Endpoint: GET /api/releases/version_check/
         """
-        # Get current version from pwaninet/version.py
-        try:
-            from pwaninet import version
-            current_version = version.__version__
-        except ImportError:
-            current_version = '0.0.0'
+        from .services import ReleaseService
         
-        # Extract build number from version (assuming format like 0.99.07)
-        try:
-            current_build_number = int(current_version.replace('.', ''))
-        except (ValueError, AttributeError):
-            current_build_number = 0
+        # Get current release (source of truth)
+        current_release = ReleaseService.get_current_release()
+        
+        if current_release:
+            current_version = current_release.version
+            current_build_number = current_release.build_number
+        else:
+            # Fallback to version.py if no current release
+            try:
+                from pwaninet import version
+                current_version = version.__version__
+                current_build_number = version.__build_number__
+            except ImportError:
+                current_version = '0.0.0'
+                current_build_number = 0
         
         # Get latest published release
         cache_key = 'releases:version_check'
@@ -144,7 +153,8 @@ class ReleaseViewSet(viewsets.ReadOnlyModelViewSet):
             'release_date': latest_release.release_date,
             'release_title': latest_release.release_title,
             'release_summary': latest_release.release_summary,
-            'release_url': f'/api/releases/{latest_release.version}/'
+            'release_url': f'/system/releases/{latest_release.id}/',
+            'is_current': latest_release.is_current_release
         }
         
         # Cache for 1 minute (lightweight polling)
@@ -231,3 +241,197 @@ class UserReleaseViewViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(user_release_view)
         return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class VersionAPIView(APIView):
+    """
+    API endpoint for current application version information.
+    Returns version, build, environment, and release date from current Release model.
+    This is the single source of truth for version information.
+    Endpoint: GET /api/version/
+    """
+    def get(self, request):
+        """Return current version metadata from Release model"""
+        from .services import ReleaseService
+        
+        # Get current release (source of truth)
+        current_release = ReleaseService.get_current_release()
+        
+        if current_release:
+            # Get release notes
+            release_notes = []
+            for item in current_release.items.all().order_by('display_order', 'category'):
+                release_notes.append({
+                    'category': item.get_category_display(),
+                    'title': item.title,
+                    'description': item.description,
+                })
+            
+            data = {
+                'version': current_release.version,
+                'build': current_release.build_number,
+                'environment': version.__environment__,  # Still use version.py for environment
+                'release_date': current_release.release_date,
+                'git_commit': version.__git_commit__,
+                'git_branch': version.__git_branch__,
+                'release_id': current_release.id,
+                'release_title': current_release.release_title,
+                'release_summary': current_release.release_summary,
+                'release_channel': current_release.get_release_channel_display(),
+                'mandatory': current_release.mandatory_update,
+                'minimum_supported_version': current_release.minimum_supported_version,
+                'release_notes': release_notes,
+                'is_current': current_release.is_current_release,
+            }
+        else:
+            # Fallback to version.py if no current release
+            data = {
+                'version': version.__version__,
+                'build': version.__build_number__,
+                'environment': version.__environment__,
+                'release_date': version.__release_date__,
+                'git_commit': version.__git_commit__,
+                'git_branch': version.__git_branch__,
+                'release_id': None,
+                'release_title': None,
+                'release_summary': None,
+                'release_channel': None,
+                'mandatory': False,
+                'minimum_supported_version': None,
+                'release_notes': [],
+                'is_current': False,
+            }
+        
+        return Response(data)
+
+
+class CreateReleaseView(APIView):
+    """
+    API endpoint for creating releases with automatic version increment.
+    Accepts semantic version type and automatically increments version.
+    Also updates pwaninet/version.py with new version.
+    Endpoint: POST /api/releases/create/
+    """
+    def post(self, request):
+        """Create a new release with automatic version increment"""
+        serializer = CreateReleaseSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        release_type = serializer.validated_data['release_type']
+        release_title = serializer.validated_data['release_title']
+        release_summary = serializer.validated_data['release_summary']
+        mandatory_update = serializer.validated_data.get('mandatory_update', False)
+        release_channel = serializer.validated_data.get('release_channel', 'STABLE')
+        items_data = serializer.validated_data.get('items', [])
+        minimum_supported_version = serializer.validated_data.get('minimum_supported_version')
+
+        # Calculate new version
+        new_version = self.increment_version(version.__version__, release_type)
+        new_build_number = version.__build_number__ + 1
+
+        # Update pwaninet/version.py
+        self.update_version_file(new_version, new_build_number)
+
+        # Create release in database
+        release = Release.objects.create(
+            version=new_version,
+            build_number=new_build_number,
+            release_title=release_title,
+            release_summary=release_summary,
+            release_type=release_type,
+            release_date=timezone.now(),
+            mandatory_update=mandatory_update,
+            published=True,
+            release_channel=release_channel,
+            minimum_supported_version=minimum_supported_version,
+            created_by=request.user if request.user.is_authenticated else None
+        )
+
+        # Create release items
+        for item_data in items_data:
+            ReleaseItem.objects.create(
+                release=release,
+                category=item_data.get('category', 'IMPROVEMENT'),
+                title=item_data.get('title', ''),
+                description=item_data.get('description', ''),
+                display_order=item_data.get('display_order', 0)
+            )
+
+        # Clear cache
+        cache.delete('releases:latest')
+        cache.delete('releases:history')
+        cache.delete('releases:version_check')
+
+        return Response({
+            'version': new_version,
+            'build_number': new_build_number,
+            'release_id': release.id,
+            'message': 'Release created successfully'
+        }, status=status.HTTP_201_CREATED)
+
+    def increment_version(self, current_version, release_type):
+        """
+        Increment version based on semantic versioning rules.
+        Supports formats: X.Y.Z, X.Y.Z-beta.N, X.Y.Z-rc.N, X.Y.Z-alpha.N
+        """
+        # Remove pre-release tags for calculation
+        base_version = current_version.split('-')[0]
+        parts = base_version.split('.')
+
+        if len(parts) != 3:
+            raise ValueError(f"Invalid version format: {current_version}")
+
+        major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
+
+        if release_type == 'MAJOR':
+            major += 1
+            minor = 0
+            patch = 0
+        elif release_type == 'MINOR':
+            minor += 1
+            patch = 0
+        elif release_type == 'PATCH':
+            patch += 1
+        elif release_type == 'HOTFIX':
+            patch += 1
+        else:
+            raise ValueError(f"Invalid release type: {release_type}")
+
+        # Preserve pre-release tag if it exists
+        pre_release_tag = ''
+        if '-' in current_version:
+            pre_release_tag = current_version.split('-')[1]
+
+        if pre_release_tag:
+            return f"{major}.{minor}.{patch}-{pre_release_tag}"
+        return f"{major}.{minor}.{patch}"
+
+    def update_version_file(self, new_version, new_build_number):
+        """Update pwaninet/version.py with new version and build number"""
+        version_file_path = '/home/zayne/projects/pwaninet/pwaninet/version.py'
+
+        with open(version_file_path, 'r') as f:
+            content = f.read()
+
+        # Update version
+        content = content.replace(
+            f'__version__ = "{version.__version__}"',
+            f'__version__ = "{new_version}"'
+        )
+
+        # Update build number
+        content = content.replace(
+            f'__build_number__ = {version.__build_number__}',
+            f'__build_number__ = {new_build_number}'
+        )
+
+        # Update release date
+        new_release_date = timezone.now().isoformat() + 'Z'
+        content = content.replace(
+            f'__release_date__ = "{version.__release_date__}"',
+            f'__release_date__ = "{new_release_date}"'
+        )
+
+        with open(version_file_path, 'w') as f:
+            f.write(content)

@@ -847,7 +847,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <form action="{% url 'posts:create_post' %}?group={{ group.id }}" method="POST" enctype="multipart/form-data">
+        <form id="groupCreatePostForm" action="{% url 'posts:create_post' %}?group={{ group.id }}" method="POST" enctype="multipart/form-data">
           {% csrf_token %}
           <input type="hidden" name="group" value="{{ group.id }}">
 
@@ -879,7 +879,7 @@
 
           <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-              <input type="file" name="image" id="postImg" hidden accept="image/*">
+              <input type="file" name="images" id="postImg" hidden accept="image/*" multiple>
               <label for="postImg" class="btn-attach">
                 <i class="bi bi-image"></i> Add Image
               </label>
@@ -1040,6 +1040,52 @@ document.addEventListener('DOMContentLoaded', function () {
   if (postImg) {
     postImg.addEventListener('change', function () {
       imgName.textContent = this.files[0] ? this.files[0].name : '';
+    });
+  }
+
+  const groupCreatePostForm = document.getElementById('groupCreatePostForm');
+  if (groupCreatePostForm) {
+    groupCreatePostForm.addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      const caption = textarea ? textarea.value.trim() : '';
+      const files = Array.from(postImg?.files || []);
+
+      if (!caption && files.length === 0) {
+        return;
+      }
+
+      if (window.uploadManager) {
+        window.uploadManager.createUpload({
+          files,
+          caption,
+          visibility: 'group',
+          metadata: {
+            group: '{{ group.id }}',
+            gradient_class: gradSel?.value || 'none',
+            unit: null,
+          },
+        });
+      }
+
+      if (textarea) {
+        textarea.value = '';
+      }
+      if (postImg) {
+        postImg.value = '';
+      }
+      if (imgName) {
+        imgName.textContent = '';
+      }
+      refreshPreview();
+
+      const modalElement = document.getElementById('createPostModal');
+      if (modalElement && window.bootstrap?.Modal) {
+        const modal = window.bootstrap.Modal.getInstance(modalElement);
+        if (modal) {
+          modal.hide();
+        }
+      }
     });
   }
 

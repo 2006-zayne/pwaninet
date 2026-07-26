@@ -45,6 +45,7 @@ class UserSerializer(serializers.ModelSerializer):
             'headline', 'interests', 'collaboration_status', 'skills', 'projects',
             'github_url', 'linkedin_url', 'portfolio_url', 'twitter_url',
             'profile_completion_percentage', 'school_name',
+            'theme_preference', 'font_size_preference', 'language_preference',
             'date_joined', 'last_login'
         ]
         read_only_fields = ['date_joined', 'last_login', 'is_profile_complete', 'profile_completion_percentage', 'school_name']
@@ -211,7 +212,8 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             'github_url', 'linkedin_url', 'portfolio_url', 'twitter_url',
             'notify_on_like', 'notify_on_follow', 'notify_on_invite',
             'notify_on_group_request', 'notify_on_group_approved',
-            'email_notifications'
+            'email_notifications',
+            'theme_preference', 'font_size_preference', 'language_preference'
         ]
         read_only_fields = ['course', 'year']
 
