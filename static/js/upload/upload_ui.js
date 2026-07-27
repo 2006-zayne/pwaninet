@@ -761,6 +761,15 @@ class UploadUI {
         uploadEvents.on(UploadEventNames.QUEUE_CLEARED, () => {
             this.banner.hide();
         });
+
+        // Warn before leaving if an upload is in progress
+        window.addEventListener('beforeunload', (e) => {
+            if (window.uploadManager && window.uploadManager.getActiveUpload()) {
+                e.preventDefault();
+                e.returnValue = 'You have an active upload in progress. If you leave now, the upload will be cancelled.';
+                return e.returnValue;
+            }
+        });
     }
 
     /**

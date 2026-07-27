@@ -31,7 +31,7 @@ class PostSerializer(serializers.ModelSerializer):
         model = Post
         fields = [
             'id', 'author', 'group', 'course', 'unit', 'content',
-            'video', 'docs', 'audio', 'gradient_class',
+            'video', 'docs', 'audio', 'gradient_class', 'has_signature',
             'created_at', 'updated_at', 'like_count', 'is_liked',
             'repost_count', 'is_reposted', 'repost_of'
         ]
@@ -83,7 +83,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
         model = Post
         fields = [
             'group', 'course', 'unit', 'content',
-            'images', 'video', 'docs', 'audio', 'gradient_class'
+            'images', 'video', 'docs', 'audio', 'gradient_class', 'has_signature'
         ]
 
     def validate_content(self, value):
@@ -115,6 +115,12 @@ class PostCreateSerializer(serializers.ModelSerializer):
         has_media = bool(images_data or validated_data.get('video') or validated_data.get('docs') or validated_data.get('audio'))
         if has_media:
             validated_data['gradient_class'] = 'none'
+        
+        # Validate gradient_class is a valid choice
+        from posts.models import GRADIENT_CHOICES
+        gradient_choices = [choice[0] for choice in GRADIENT_CHOICES]
+        if validated_data.get('gradient_class') not in gradient_choices:
+            validated_data['gradient_class'] = 'grad-ocean'  # Default fallback
             
         request = self.context.get('request')
         author = validated_data.get('author') or (request.user if request else None)
@@ -175,7 +181,7 @@ class PostUpdateSerializer(serializers.ModelSerializer):
     """Serializer for updating posts"""
     class Meta:
         model = Post
-        fields = ['content', 'video', 'docs', 'audio', 'gradient_class']
+        fields = ['content', 'video', 'docs', 'audio', 'gradient_class', 'has_signature']
 
 
 class CommentSerializer(serializers.ModelSerializer):

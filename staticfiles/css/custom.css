@@ -134,6 +134,31 @@
     background: linear-gradient(135deg, #020617 0%, #475569 100%);
 }
 
+/* Premium Gradients */
+.bg-cosmic-stars { background-color: #0f172a; background-image: radial-gradient(2px 2px at 15% 30%, #ffffff 50%, rgba(255,255,255,0) 100%), radial-gradient(2.5px 2.5px at 85% 20%, #ffffff 50%, rgba(255,255,255,0) 100%), radial-gradient(1.5px 1.5px at 50% 60%, #ffffff 50%, rgba(255,255,255,0) 100%), radial-gradient(2px 2px at 70% 80%, #ffffff 50%, rgba(255,255,255,0) 100%), radial-gradient(3px 3px at 25% 75%, #ffffff 50%, rgba(255,255,255,0) 100%), linear-gradient(135deg, #13072E 0%, #3F2182 45%, #902F89 100%); background-repeat: repeat; background-size: 200px 200px, 200px 200px, 200px 200px, 200px 200px, 200px 200px, 100% 100%; }
+.bg-spring-flora { background-color: #ff9a9e; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg fill='%23ffffff' fill-opacity='0.18'%3E%3Cpath d='M32 16c-4-10-14-10-14 0s14 18 14 18 14-8 14-18-10-10-14 0z'/%3E%3Cpath d='M32 48c-4 10-14 10-14 0s14-18 14-18 14 8 14 18-10 10-14 0z'/%3E%3Cpath d='M16 32c-10-4-10-14 0-14s18 14 18 14-8 14-18 14-10-10 0-14z'/%3E%3Cpath d='M48 32c10-4 10-14 0-14s-18 14-18 14 8 14 18 14 10-10 0-14z'/%3E%3Ccircle cx='32' cy='32' r='6'/%3E%3C/g%3E%3C/svg%3E"), linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); }
+.bg-spring-flora, .bg-spring-flora p, .bg-spring-flora p.text-white { color: #333333 !important; }
+.bg-playful-doodles { background-color: #84fab0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' fill='none' stroke-opacity='0.3'%3E%3Cpath d='M10 10 Q 20 0, 30 10 T 50 10'/%3E%3Ccircle cx='70' cy='20' r='3' fill='%23ffffff' fill-opacity='0.3' stroke='none'/%3E%3Cpath d='M 15 55 L 25 45 M 25 55 L 15 45'/%3E%3Cpath d='M40 70 Q 50 80, 60 70 T 80 70'/%3E%3Ccircle cx='10' cy='70' r='4' fill='%23ffffff' fill-opacity='0.3' stroke='none'/%3E%3Cpath d='M 70 50 L 70 60 M 65 55 L 75 55'/%3E%3C/g%3E%3C/svg%3E"), linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%); }
+.bg-playful-doodles, .bg-playful-doodles p, .bg-playful-doodles p.text-white { color: #1a4a5e !important; }
+.bg-magic-sparkles { background-color: #ff758c; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50' viewBox='0 0 50 50'%3E%3Cg fill='%23ffffff' fill-opacity='0.25'%3E%3Cpath d='M25 5 Q 25 25, 45 25 Q 25 25, 25 45 Q 25 25, 5 25 Q 25 25, 25 5 Z'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3Ccircle cx='40' cy='40' r='2.5'/%3E%3C/g%3E%3C/svg%3E"), linear-gradient(to right, #ff758c 0%, #ff7eb3 100%); }
+.bg-username-pattern { background-color: #141E30; background: linear-gradient(135deg, #141E30 0%, #243B55 100%); }
+.bg-username-pattern, .bg-username-pattern p, .bg-username-pattern p.text-white { color: #ffffff !important; }
+
+/* Signature Overlay System */
+.signature-overlay {
+    position: relative;
+    z-index: 1;
+}
+.signature-overlay::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: -1;
+    background-image: var(--signature-svg);
+    background-repeat: repeat;
+}
+
 /* ================================
    INTELLIGENCE BACKGROUND BOX
 ================================ */

@@ -93,8 +93,8 @@
 <div class="container mt-3" style="padding-bottom: 80px;">
     <div class="row justify-content-center">
         <div class="col-12 col-lg-8">
-            <a href="{% url 'posts:home' %}" class="btn btn-sm btn-outline-secondary rounded-pill fw-bold text-uppercase mb-3 px-3">
-                <i class="bi bi-arrow-left me-1"></i> Return to Feed
+            <a href="{% if is_new_post %}{% url 'posts:home' %}{% else %}{{ previous_page }}{% endif %}" class="btn btn-sm btn-outline-secondary rounded-pill fw-bold text-uppercase mb-3 px-3">
+                <i class="bi bi-arrow-left me-1"></i> Back
             </a>
         </div>
     </div>
@@ -187,7 +187,12 @@
             </div>
         </div>
 
-        <div class="{% if post.gradient_class != 'none' %}{{ post.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %}">
+        <div class="{% if post.gradient_class != 'none' %}{{ post.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %} {% if post.has_signature %}signature-overlay{% endif %}"
+             {% if post.gradient_class == 'bg-username-pattern' %}
+                 {% include "posts/partials/username_pattern_style.html" with author_name=post.author.username %}
+             {% elif post.has_signature %}
+                 {% include "posts/partials/signature_overlay_style.html" with author_name=post.author.username %}
+             {% endif %}>
             <p class="mb-0 {% if post.gradient_class != 'none' %}text-white fw-bold fs-3{% else %}text-dark{% endif %}" 
                style="{% if post.gradient_class == 'none' %}font-size: 15px;{% endif %} line-height: 1.5;">
                 {{ post.content }}

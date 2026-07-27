@@ -403,7 +403,12 @@
 
     {% with post_obj=post.repost_of|default:post %}
         {% if post_obj.gradient_class != 'none' and not post_obj.images.exists and not post_obj.video and not post_obj.docs and not post_obj.audio %}
-    <div class="{{ post_obj.gradient_class }} gradient-intel-bg text-center">
+    <div class="{{ post_obj.gradient_class }} gradient-intel-bg text-center {% if post_obj.has_signature %}signature-overlay{% endif %}"
+         {% if post_obj.gradient_class == 'bg-username-pattern' %}
+             {% include "posts/partials/username_pattern_style.html" with author_name=post_obj.author.username %}
+         {% elif post_obj.has_signature %}
+             {% include "posts/partials/signature_overlay_style.html" with author_name=post_obj.author.username %}
+         {% endif %}>
         <p class="mb-0 text-white fw-bold fs-3" style="line-height: 1.5;">
             {% if post.repost_of %}
                 {% if post.content %}<p class="mb-2 text-dark" style="font-size: 14px;">{{ post.content }}</p>{% endif %}
@@ -475,13 +480,14 @@
                         <i class="bi bi-download"></i>
                     </button>
                     <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post-id="{{ post.id }}">
-                        <video id="video-{{ post.id }}" 
-                               preload="metadata" 
-                               class="w-100 h-100 feed-video" 
+                        <video id="video-{{ post.id }}"
+                               preload="metadata"
+                               class="w-100 h-100 feed-video"
                                muted loop playsinline controls
                                data-post-id="{{ post.id }}"
                                data-autoplay="true"
-                               poster="{{ post.get_video_poster|default:'' }}">
+                               poster="{{ post.get_video_poster|default:'' }}"
+                               data-video-url="{{ post.get_video_for_feed.url }}">
                             <source src="{{ post.get_video_for_feed.url }}" type="video/mp4">
                         </video>
                     </div>

@@ -36,6 +36,33 @@
         padding-right: 0 !important;
     }
 }
+
+/* Prevent image loading flash */
+.cover-container {
+    background-color: #f8fafc;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    min-height: 160px;
+}
+
+[data-theme="dark"] .cover-container {
+    background-color: #1e293b;
+}
+
+.avatar {
+    background-color: #e2e8f0;
+    opacity: 0;
+    transition: opacity 0.3s ease-in;
+}
+
+.avatar.loaded {
+    opacity: 1;
+}
+
+[data-theme="dark"] .avatar {
+    background-color: #334155;
+}
 </style>
 {% endblock %}
 
@@ -309,7 +336,8 @@
                          {% if request.user == profile_user or is_following %}
                          onclick="window.location.href='{% url 'users:view_profile_photo_fullscreen' profile_user.username 'cover' %}'"
                          {% endif %}
-                         style="background-image: url('{% if profile_user.cover_photo %}{{ profile_user.cover_photo.url }}{% else %}{% static 'images/default-cover.jpg' %}{% endif %}')">
+                         style="background-image: url('{% if profile_user.cover_photo %}{{ profile_user.cover_photo.url }}{% else %}{% static 'images/default-cover.jpg' %}{% endif %}');"
+                         data-bg-url="{% if profile_user.cover_photo %}{{ profile_user.cover_photo.url }}{% else %}{% static 'images/default-cover.jpg' %}{% endif %}">
                         {% if request.user == profile_user %}
                         <a href="{% url 'users:update_profile' %}" class="photo-edit-icon" onclick="event.stopPropagation()" aria-label="Edit cover photo"><i class="bi bi-camera-fill"></i></a>
                         {% endif %}
@@ -317,9 +345,11 @@
                             <div class="avatar-inner">
                                 {% if request.user == profile_user or is_following %}
                                 <img src="{{ profile_user.profile_pic.url }}" class="avatar shadow clickable-photo"
-                                     onclick="event.stopPropagation(); window.location.href='{% url 'users:view_profile_photo_fullscreen' profile_user.username 'profile' %}'">
+                                     onclick="event.stopPropagation(); window.location.href='{% url 'users:view_profile_photo_fullscreen' profile_user.username 'profile' %}'"
+                                     loading="eager">
                                 {% else %}
-                                <img src="{{ profile_user.profile_pic.url }}" class="avatar shadow">
+                                <img src="{{ profile_user.profile_pic.url }}" class="avatar shadow"
+                                     loading="eager">
                                 {% endif %}
                                 {% if request.user == profile_user %}
                                 <a href="{% url 'users:update_profile' %}" class="photo-edit-icon" onclick="event.stopPropagation()" aria-label="Edit profile photo"><i class="bi bi-camera-fill"></i></a>
@@ -610,7 +640,7 @@
             <div class="tab-content" id="profileTabContent">
                 <!-- Posts Tab -->
                 <div class="tab-pane fade show active" id="posts-content" role="tabpanel" data-skeleton="profile">
-                    <div class="intel-stream">
+                    <div class="intel-stream" id="posts-container">
                         {% for post in posts %}
                             {% include 'posts/partials/post_card.html' %}
                         {% empty %}
@@ -620,6 +650,13 @@
                             </div>
                         {% endfor %}
                     </div>
+                    {% if has_more_posts %}
+                    <div id="load-more-trigger" class="text-center py-4" hx-get="{% url 'users:profile' profile_user.username %}?page={{ posts.next_page_number }}" hx-trigger="revealed" hx-target="#posts-container" hx-swap="beforeend">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <!-- Shared Posts Tab -->
@@ -762,6 +799,36 @@
 {% block page_scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // Preload critical images to prevent flash
+  function preloadCriticalImages() {
+    const coverContainer = document.querySelector('.cover-container');
+    const avatarImages = document.querySelectorAll('.avatar');
+    
+    if (coverContainer) {
+      const bgUrl = coverContainer.getAttribute('data-bg-url');
+      if (bgUrl) {
+        const img = new Image();
+        img.onload = function() {
+          coverContainer.style.backgroundImage = `url('${bgUrl}')`;
+        };
+        img.src = bgUrl;
+      }
+    }
+    
+    avatarImages.forEach(img => {
+      if (img.complete) {
+        img.classList.add('loaded');
+        return;
+      }
+      img.addEventListener('load', function() {
+        img.classList.add('loaded');
+      });
+    });
+  }
+  
+  // Run preloading immediately
+  preloadCriticalImages();
+
   // Helper function to get CSRF token
   function getCSRFToken() {
     // Try multiple ways to get CSRF token

@@ -7,6 +7,7 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.urls import reverse
 from celery.result import AsyncResult
 
 from .models import Post, Comment, Report, Like, Repost, HiddenPost, AuthorPreference, SharedPost
@@ -54,8 +55,12 @@ class PostViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated(), CanEditPost()]
         return super().get_permissions()
 
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        # Mark this as a new post in session for back button logic
+        request.session['is_new_post'] = True
+        request.session['new_post_id'] = response.data['id']
+        return response
 
     @action(detail=True, methods=['post'], url_path='report')
     def report(self, request, pk=None):
@@ -652,7 +657,10 @@ def create_post_view(request):
             logger.info(f"Post docs: {post.docs}")
             logger.info(f"Post audio: {post.audio}")
             messages.success(request, 'Post created successfully.')
-            return redirect('posts:home')
+            # Mark this as a new post in session for back button logic
+            request.session['is_new_post'] = True
+            request.session['new_post_id'] = post.id
+            return redirect('posts:post_details', post_id=post.id)
     else:
         form = PostForm(user=request.user)
     return render(request, 'posts/create_post.html', {'form': form})
@@ -671,6 +679,20 @@ def post_detail_view(request, post_id):
     context = build_comments_context(post, request.user, show_all_comments=show_all)
     context['is_liked'] = post.is_liked_by(request.user)
     context['unread_notifications_count'] = get_cached_unread_count(request.user)
+    
+    # Track previous page for back button logic
+    is_new_post = request.session.pop('is_new_post', False)
+    new_post_id = request.session.pop('new_post_id', None)
+    
+    # If not a new post, save the referring URL for back button
+    if not is_new_post and request.META.get('HTTP_REFERER'):
+        # Only save if it's not already the post detail page
+        referer = request.META.get('HTTP_REFERER')
+        if str(post_id) not in referer:
+            request.session['previous_page'] = referer
+    
+    context['is_new_post'] = is_new_post
+    context['previous_page'] = request.session.get('previous_page', reverse('posts:home'))
     
     # For HTMX requests to show all comments, return only the comments section
     if request.headers.get('HX-Request') and show_all:

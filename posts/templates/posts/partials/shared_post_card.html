@@ -62,7 +62,12 @@
         </div>
     </div>
 
-    <div class="{% if shared_post.original_post.gradient_class != 'none' %}{{ shared_post.original_post.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %}">
+    <div class="{% if shared_post.original_post.gradient_class != 'none' %}{{ shared_post.original_post.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %} {% if shared_post.original_post.has_signature %}signature-overlay{% endif %}"
+         {% if shared_post.original_post.gradient_class == 'bg-username-pattern' %}
+             {% include "posts/partials/username_pattern_style.html" with author_name=shared_post.original_post.author.username %}
+         {% elif shared_post.original_post.has_signature %}
+             {% include "posts/partials/signature_overlay_style.html" with author_name=shared_post.original_post.author.username %}
+         {% endif %}>
         {% if shared_post.original_post.gradient_class != 'none' %}
         <p class="mb-0 text-white fw-bold fs-3" style="line-height: 1.5;">
             {{ shared_post.original_post.content }}
@@ -99,7 +104,7 @@
                     <img src="{{ shared_post.original_post.get_intel_file.url }}" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;">
                 {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
                     <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post-id="{{ shared_post.original_post.id }}">
-                        <video id="video-{{ shared_post.original_post.id }}" preload="metadata" class="w-100 h-100 feed-video" muted loop playsinline controls data-autoplay="true">
+                        <video id="video-{{ shared_post.original_post.id }}" preload="metadata" class="w-100 h-100 feed-video" muted loop playsinline controls data-autoplay="true" data-video-url="{{ shared_post.original_post.get_intel_file.url }}">
                             <source src="{{ shared_post.original_post.get_intel_file.url }}" type="video/mp4">
                         </video>
                     </div>

@@ -65,19 +65,27 @@ def verify_email_view(request, uidb64, token):
 
 @login_required
 def profile_view(request, username):
-    from django.db.models import Count
     profile_user = get_object_or_404(
         User.objects.select_related('course__school', 'year'),
         username=username
     )
-    profile_user = User.objects.filter(id=profile_user.id).select_related('course__school', 'year').annotate(
-        followers_count=Count('follower_relationships', distinct=True),
-        following_count=Count('following_relationships', distinct=True),
-        total_likes=Count('posts__likes', distinct=True),
-        pinches_sent_count=Count('pinches_sent', distinct=True),
-        pinches_received_count=Count('pinches_received', distinct=True)
-    ).first()
-    posts = Post.objects.filter(author=profile_user).prefetch_related('likes').order_by('-created_at')
+    
+    # Fast individual count queries instead of a massive Cartesian product JOIN
+    followers_count = profile_user.follower_relationships.count()
+    following_count = profile_user.following_relationships.count()
+    total_likes = Like.objects.filter(post__author=profile_user).count()
+    pinches_sent_count = profile_user.pinches_sent.count()
+    pinches_received_count = profile_user.pinches_received.count()
+
+    # Pagination for posts - load first 10 posts
+    from django.core.paginator import Paginator
+    page = int(request.GET.get('page', 1))
+    posts_per_page = 10
+    
+    posts_queryset = Post.objects.filter(author=profile_user).select_related('author', 'group', 'course', 'unit', 'repost_of').prefetch_related('likes', 'images', 'comments').order_by('-created_at')
+    paginator = Paginator(posts_queryset, posts_per_page)
+    posts_page = paginator.get_page(page)
+    
     is_following = Follow.objects.filter(follower=request.user, followed=profile_user).exists()
     
     # Get shared posts for this profile user
@@ -94,19 +102,28 @@ def profile_view(request, username):
     # Get profile completion percentage for owner
     profile_completion = profile_user.profile_completion_percentage if is_own_profile else None
     
+    # Check if HTMX request for more posts
+    if request.headers.get('HX-Request'):
+        return render(request, 'posts/partials/post_cards_list.html', {
+            'posts': posts_page,
+            'has_more_posts': posts_page.has_next(),
+            'profile_user': profile_user,
+        })
+    
     return render(request, 'users/profile.html', {
         'profile_user': profile_user,
-        'posts': posts,
+        'posts': posts_page,
         'is_following': is_following,
-        'followers_count': profile_user.followers_count,
-        'following_count': profile_user.following_count,
-        'total_likes': profile_user.total_likes,
-        'pinches_sent_count': profile_user.pinches_sent_count,
-        'pinches_received_count': profile_user.pinches_received_count,
+        'followers_count': followers_count,
+        'following_count': following_count,
+        'total_likes': total_likes,
+        'pinches_sent_count': pinches_sent_count,
+        'pinches_received_count': pinches_received_count,
         'shared_posts': shared_posts,
         'unseen_shared_count': unseen_shared_count,
         'is_own_profile': is_own_profile,
         'profile_completion': profile_completion,
+        'has_more_posts': posts_page.has_next(),
     })
 
 

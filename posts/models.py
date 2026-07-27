@@ -14,6 +14,11 @@ GRADIENT_CHOICES = [
     ('grad-midnight', 'Midnight Purple'),
     ('grad-desert', 'Desert Storm'),
     ('grad-stealth', 'Night Ops (Stealth)'),
+    ('bg-cosmic-stars', 'Cosmic Stars'),
+    ('bg-spring-flora', 'Spring Flora'),
+    ('bg-playful-doodles', 'Playful Doodles'),
+    ('bg-magic-sparkles', 'Magic Sparkles'),
+    ('bg-username-pattern', 'Signature Pattern'),
 ]
 
 
@@ -29,6 +34,7 @@ class Post(models.Model):
     docs = models.FileField(upload_to='posts/docs', blank=True, null=True)
     audio = models.FileField(upload_to='posts/audio', blank=True, null=True, help_text='Attach music/audio to post')
     gradient_class = models.CharField(max_length=50, choices=GRADIENT_CHOICES, default='grad-ocean', blank=True)
+    has_signature = models.BooleanField(default=False)
     repost_of = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='repost_children')
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)

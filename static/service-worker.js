@@ -185,7 +185,61 @@ async function handleNavigationRequest(request) {
 }
 
 async function handleStaticAssetRequest(request) {
-    // Cache first for static assets
+    const url = new URL(request.url);
+    
+    // For CSS files, use network first to ensure latest styles
+    if (url.pathname.includes('.css')) {
+        try {
+            const networkResponse = await fetch(request);
+            if (networkResponse.ok) {
+                const cache = await caches.open(CACHE_NAME);
+                cache.put(request, networkResponse.clone());
+                return networkResponse;
+            }
+        } catch (error) {
+            console.log('Service Worker: Network failed for CSS, trying cache');
+            const cachedResponse = await caches.match(request);
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+        }
+    }
+    
+    // For video files, use network first to ensure latest content
+    if (url.pathname.includes('.mp4') || url.pathname.includes('.webm') || url.pathname.includes('.mov')) {
+        try {
+            const networkResponse = await fetch(request);
+            if (networkResponse.ok) {
+                const cache = await caches.open(CACHE_NAME);
+                cache.put(request, networkResponse.clone());
+                return networkResponse;
+            }
+        } catch (error) {
+            console.log('Service Worker: Network failed for video, trying cache');
+            const cachedResponse = await caches.match(request);
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+        }
+    }
+    
+    // For profile images, use cache first with background refresh
+    if (url.pathname.includes('profile_pics') || url.pathname.includes('profile-pic')) {
+        const cachedResponse = await caches.match(request);
+        if (cachedResponse) {
+            // Return cached version immediately
+            // Then fetch fresh version in background
+            fetch(request).then(networkResponse => {
+                if (networkResponse.ok) {
+                    const cache = caches.open(CACHE_NAME);
+                    cache.then(c => c.put(request, networkResponse));
+                }
+            }).catch(() => {});
+            return cachedResponse;
+        }
+    }
+    
+    // Cache first for other static assets
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
         return cachedResponse;

@@ -1,7 +1,8 @@
 /**
  * PwaniNet Page Skeleton Manager
- * Unified page-aware skeleton system for initial page load and offline mode
- * Ensures consistent skeleton display across loading and offline states
+ * Unified page-aware skeleton system for initial page load
+ * Coordinates with skeleton-loader.js for HTMX content loading
+ * Does NOT interfere with HTMX skeleton loading
  */
 
 (function() {
@@ -9,10 +10,10 @@
 
     const overlayId = 'page-skeleton';
     let isShowing = false;
+    let hasHiddenOnce = false;
 
     /**
      * Detect current page type from URL
-     * Matches the logic in offline-skeleton-v2.js for consistency
      */
     function detectPageType() {
         const p = window.location.pathname;
@@ -75,10 +76,8 @@
 
     /**
      * Fallback skeleton if template loading fails
-     * Uses inline HTML generation as backup
      */
     function getFallbackSkeleton(pageType) {
-        // Simple fallback that shows at least some loading state
         return `
             <div style="padding: 24px; max-width: 600px; margin: 0 auto;">
                 <div style="width: 100%; height: 200px; background: #e2e8f0; border-radius: 12px; margin-bottom: 16px;"></div>
@@ -128,6 +127,7 @@
         }
         
         isShowing = false;
+        hasHiddenOnce = true;
     }
 
     /**
@@ -143,6 +143,17 @@
             hidePageSkeleton();
         });
         
+        // Also hide on DOMContentLoaded as backup
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('[PageSkeletonManager] DOMContentLoaded, hiding skeleton');
+                setTimeout(hidePageSkeleton, 100);
+            });
+        } else {
+            console.log('[PageSkeletonManager] DOM already loaded, hiding skeleton');
+            setTimeout(hidePageSkeleton, 100);
+        }
+        
         // Failsafe: hide skeleton after maximum timeout
         setTimeout(function() {
             if (isShowing) {
@@ -151,20 +162,15 @@
             }
         }, 5000);
         
-        // Sync with offline skeleton system
-        // When offline, ensure the same skeleton is shown
+        // Handle offline state - show simple offline indicator
         window.addEventListener('offline', function() {
-            console.log('[PageSkeletonManager] Offline detected, ensuring skeleton consistency');
-            // The offline-skeleton-v2.js will handle showing the skeleton
-            // We just need to ensure our page type detection matches
+            console.log('[PageSkeletonManager] Offline detected');
+            document.body.classList.add('offline');
         });
         
-        // Ensure skeleton is hidden when coming back online
         window.addEventListener('online', function() {
-            console.log('[PageSkeletonManager] Online detected, hiding skeleton if visible');
-            if (isShowing) {
-                hidePageSkeleton();
-            }
+            console.log('[PageSkeletonManager] Online detected');
+            document.body.classList.remove('offline');
         });
     }
 
@@ -180,7 +186,8 @@
         detectPageType,
         showPageSkeleton,
         hidePageSkeleton,
-        getSkeletonTemplateUrl
+        getSkeletonTemplateUrl,
+        isShowing: () => isShowing
     };
 
 })();

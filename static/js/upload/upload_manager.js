@@ -185,7 +185,7 @@ class UploadManager {
             this.transitionState(uploadId, UploadState.UPLOADING);
             uploadEvents.emit(UploadEventNames.UPLOAD_STARTED, { uploadId, session });
 
-            await uploadAPI.upload(session, (progress) => {
+            const response = await uploadAPI.upload(session, (progress) => {
                 tracker.updateUploadProgress(progress.loaded, progress.total);
             });
 
@@ -202,7 +202,7 @@ class UploadManager {
 
             uploadQueue.uploadCompleted(uploadId);
             uploadEvents.emit(UploadEventNames.UPLOAD_COMPLETED, { uploadId, session });
-            uploadEvents.emit(UploadEventNames.UPLOAD_PUBLISHED, { uploadId, session });
+            uploadEvents.emit(UploadEventNames.UPLOAD_PUBLISHED, { uploadId, session, postId: response?.id });
 
             this.cleanupUpload(uploadId);
         } catch (error) {

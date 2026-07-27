@@ -69,7 +69,12 @@
                         <span class="badge bg-white text-dark border px-2 py-1 small fw-normal">Field Report</span>
                     </div>
 
-                    <div class="{% if post.gradient_class != 'none' %}{{ post.gradient_class }} gradient-intel-bg text-white text-center{% else %}card-body p-4{% endif %}">
+                    <div class="{% if post.gradient_class != 'none' %}{{ post.gradient_class }} gradient-intel-bg text-white text-center{% else %}card-body p-4{% endif %} {% if post.has_signature %}signature-overlay{% endif %}"
+                         {% if post.gradient_class == 'bg-username-pattern' %}
+                             {% include "posts/partials/username_pattern_style.html" with author_name=post.author.username %}
+                         {% elif post.has_signature %}
+                             {% include "posts/partials/signature_overlay_style.html" with author_name=post.author.username %}
+                         {% endif %}>
                         <p class="mb-0 {% if post.gradient_class != 'none' %}fs-3 fw-bold{% else %}fs-5 text-dark{% endif %}">
                             {{ post.content }}
                         </p>

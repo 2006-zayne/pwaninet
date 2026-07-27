@@ -189,6 +189,14 @@
   .grad-desert   { background: linear-gradient(135deg, #78350f 0%, #f59e0b 100%) !important; }
   .grad-stealth  { background: linear-gradient(135deg, #020617 0%, #475569 100%) !important; }
 
+  /* Premium Gradients */
+  .bg-cosmic-stars { background-color: #0f172a !important; background-image: radial-gradient(2px 2px at 15% 30%, #ffffff 50%, rgba(255,255,255,0) 100%), radial-gradient(2.5px 2.5px at 85% 20%, #ffffff 50%, rgba(255,255,255,0) 100%), radial-gradient(1.5px 1.5px at 50% 60%, #ffffff 50%, rgba(255,255,255,0) 100%), radial-gradient(2px 2px at 70% 80%, #ffffff 50%, rgba(255,255,255,0) 100%), radial-gradient(3px 3px at 25% 75%, #ffffff 50%, rgba(255,255,255,0) 100%), linear-gradient(135deg, #13072E 0%, #3F2182 45%, #902F89 100%) !important; background-repeat: repeat !important; background-size: 200px 200px, 200px 200px, 200px 200px, 200px 200px, 200px 200px, 100% 100% !important; }
+  .bg-spring-flora { background-color: #ff9a9e !important; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg fill='%23ffffff' fill-opacity='0.18'%3E%3Cpath d='M32 16c-4-10-14-10-14 0s14 18 14 18 14-8 14-18-10-10-14 0z'/%3E%3Cpath d='M32 48c-4 10-14 10-14 0s14-18 14-18 14 8 14 18-10 10-14 0z'/%3E%3Cpath d='M16 32c-10-4-10-14 0-14s18 14 18 14-8 14-18 14-10-10 0-14z'/%3E%3Cpath d='M48 32c10-4 10-14 0-14s-18 14-18 14 8 14 18 14 10-10 0-14z'/%3E%3Ccircle cx='32' cy='32' r='6'/%3E%3C/g%3E%3C/svg%3E"), linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%) !important; }
+  .bg-spring-flora .editable-preview { color: #333333 !important; }
+  .bg-playful-doodles { background-color: #84fab0 !important; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' fill='none' stroke-opacity='0.3'%3E%3Cpath d='M10 10 Q 20 0, 30 10 T 50 10'/%3E%3Ccircle cx='70' cy='20' r='3' fill='%23ffffff' fill-opacity='0.3' stroke='none'/%3E%3Cpath d='M 15 55 L 25 45 M 25 55 L 15 45'/%3E%3Cpath d='M40 70 Q 50 80, 60 70 T 80 70'/%3E%3Ccircle cx='10' cy='70' r='4' fill='%23ffffff' fill-opacity='0.3' stroke='none'/%3E%3Cpath d='M 70 50 L 70 60 M 65 55 L 75 55'/%3E%3C/g%3E%3C/svg%3E"), linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%) !important; }
+  .bg-playful-doodles .editable-preview { color: #1a4a5e !important; }
+  .bg-magic-sparkles { background-color: #ff758c !important; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50' viewBox='0 0 50 50'%3E%3Cg fill='%23ffffff' fill-opacity='0.25'%3E%3Cpath d='M25 5 Q 25 25, 45 25 Q 25 25, 25 45 Q 25 25, 5 25 Q 25 25, 25 5 Z'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3Ccircle cx='40' cy='40' r='2.5'/%3E%3C/g%3E%3C/svg%3E"), linear-gradient(to right, #ff758c 0%, #ff7eb3 100%) !important; }
+
   /* Image/Video Preview with Swipe */
   .media-preview-container {
     width: 100%;
@@ -654,6 +662,12 @@
       font-size: 0.65rem;
     }
   }
+  
+  .bg-username-pattern {
+    background-color: #141E30 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cg fill='rgba(255,255,255,0.06)' font-family='system-ui, sans-serif' font-weight='900' letter-spacing='2'%3E%3Ctext x='20' y='50' transform='rotate(-15 20 50)' font-size='32'%3E{{ request.user.username }}%3C/text%3E%3Ctext x='160' y='90' transform='rotate(25 160 90)' font-size='24'%3E{{ request.user.username }}%3C/text%3E%3Ctext x='50' y='200' transform='rotate(45 50 200)' font-size='40'%3E{{ request.user.username }}%3C/text%3E%3Ctext x='220' y='240' transform='rotate(-25 220 240)' font-size='28'%3E{{ request.user.username }}%3C/text%3E%3Ctext x='120' y='280' transform='rotate(10 120 280)' font-size='20'%3E{{ request.user.username }}%3C/text%3E%3Ctext x='260' y='50' transform='rotate(-50 260 50)' font-size='26'%3E{{ request.user.username }}%3C/text%3E%3C/g%3E%3C/svg%3E"), linear-gradient(135deg, #141E30 0%, #243B55 100%) !important;
+    background-repeat: repeat !important;
+  }
 </style>
 
 <div class="page-wrap">
@@ -746,12 +760,17 @@
                 <div class="style-swatch grad-midnight" data-value="grad-midnight" title="Midnight Purple"></div>
                 <div class="style-swatch grad-desert" data-value="grad-desert" title="Desert Storm"></div>
                 <div class="style-swatch grad-stealth" data-value="grad-stealth" title="Stealth"></div>
+                <div class="style-swatch bg-cosmic-stars" data-value="bg-cosmic-stars" title="Cosmic Stars"></div>
+                <div class="style-swatch bg-spring-flora" data-value="bg-spring-flora" title="Spring Flora"></div>
+                <div class="style-swatch bg-playful-doodles" data-value="bg-playful-doodles" title="Playful Doodles"></div>
+                <div class="style-swatch bg-magic-sparkles" data-value="bg-magic-sparkles" title="Magic Sparkles"></div>
+                <div class="style-swatch bg-username-pattern" data-value="bg-username-pattern" title="Signature"></div>
               </div>
             </div>
 
             <!-- Toolbar -->
             <div class="compose-toolbar">
-              <div class="toolbar-left">
+              <div class="toolbar-left d-flex align-items-center">
                 <button type="button" class="toolbar-btn" id="toggleSector" title="Target Group">
                   <i class="bi bi-geo-alt-fill"></i>
                   <span class="toolbar-btn-label">Group</span>
@@ -764,11 +783,17 @@
                   <i class="bi bi-paperclip"></i>
                   <span class="toolbar-btn-label">Attach</span>
                 </button>
+                <div class="form-check ms-3 mb-0 d-flex align-items-center d-none" id="signatureToggleContainer">
+                  <input class="form-check-input mt-0 me-2" type="checkbox" id="signatureCheckbox">
+                  <label class="form-check-label text-muted small" for="signatureCheckbox" style="cursor: pointer; white-space: nowrap;">
+                    <i class="bi bi-pen"></i> Add Signature
+                  </label>
+                </div>
               </div>
 
               <div class="d-flex align-items-center gap-3">
                 <span id="charCount">0 / 2500</span>
-                <button type="submit" class="btn-deploy" id="deployBtn" disabled>
+                <button type="button" class="btn-deploy" id="deployBtn" disabled>
                   <i class="bi bi-send-fill"></i> {% trans "Post" %}
                 </button>
               </div>
@@ -1110,6 +1135,37 @@ document.addEventListener('DOMContentLoaded', function () {
       await rebuildPreviews();
     });
 
+    const DRAFT_ID = 'draft_create_post';
+    let saveDraftTimeout = null;
+
+    function autoSaveDraft() {
+        if (!window.draftManager) return;
+        
+        if (saveDraftTimeout) clearTimeout(saveDraftTimeout);
+        
+        saveDraftTimeout = setTimeout(async () => {
+            const caption = textarea.value.trim();
+            const files = mediaFiles.map(item => item.file).filter(Boolean);
+            
+            if (caption || files.length > 0) {
+                try {
+                    await window.draftManager.saveDraft({
+                        id: DRAFT_ID,
+                        caption: caption,
+                        mediaFiles: files,
+                        gradientClass: gradInput.value || 'none',
+                    });
+                } catch (e) {
+                    console.warn('Failed to auto-save draft:', e);
+                }
+            } else {
+                try {
+                    await window.draftManager.deleteDraft(DRAFT_ID);
+                } catch (e) {}
+            }
+        }, 1000);
+    }
+
     function updatePreview() {
         const text = textarea.value;
         const len  = text.length;
@@ -1152,6 +1208,9 @@ document.addEventListener('DOMContentLoaded', function () {
             // Show gradient selector when no media
             stylePanel.classList.remove('hidden');
         }
+        
+        // Auto-save draft
+        autoSaveDraft();
     }
 
     // Auto-grow textarea
@@ -1175,13 +1234,15 @@ document.addEventListener('DOMContentLoaded', function () {
       if (window.uploadManager?.clearDraftPreviews) {
         window.uploadManager.clearDraftPreviews(draftPreviewId);
       }
+      if (window.draftManager) {
+        window.draftManager.deleteDraft(DRAFT_ID).catch(() => {});
+      }
       updateMediaPreview();
       updatePreview();
     }
 
-    // Form submit handler delegates to UploadManager.
-    document.getElementById('postForm').addEventListener('submit', function(e) {
-      e.preventDefault();
+    // Handle post creation via button click instead of form submit to completely bypass native submission
+    document.getElementById('deployBtn').addEventListener('click', function(e) {
 
       const caption = textarea.value.trim();
       const files = mediaFiles.map(item => item.file);
@@ -1223,6 +1284,11 @@ document.addEventListener('DOMContentLoaded', function () {
           deployBtn.innerHTML = originalBtnHtml;
           unsubscribePublished();
           unsubscribeFailed();
+          
+          // Redirect to post detail page if post ID is available
+          if (event?.postId) {
+            window.location.href = `/post/${event.postId}/`;
+          }
         }
       };
 
@@ -1243,9 +1309,44 @@ document.addEventListener('DOMContentLoaded', function () {
         : () => {};
     });
 
-    // Initialize preview on page load
-    editablePreview.innerText = textarea.value || '';
-    updatePreview();
+    // Initialize composer state on page load
+    async function initComposer() {
+      if (window.draftManager) {
+        try {
+          const draft = await window.draftManager.getDraft(DRAFT_ID);
+          if (draft) {
+            textarea.value = draft.caption || '';
+            gradInput.value = draft.gradientClass || 'none';
+            selectedStyle = gradInput.value;
+            
+            document.querySelectorAll('.style-swatch').forEach(s => s.classList.remove('selected'));
+            const swatch = document.querySelector(`.style-swatch.swatch-${selectedStyle}`);
+            if (swatch) {
+              swatch.classList.add('selected');
+            } else {
+              document.querySelector('.style-swatch.swatch-none')?.classList.add('selected');
+            }
+
+            if (draft.mediaFiles && draft.mediaFiles.length > 0 && window.uploadManager) {
+              const previews = await window.uploadManager.createDraftPreviews(draftPreviewId, draft.mediaFiles);
+              mediaFiles = previews.map(preview => ({
+                type: preview.type === 'document' ? 'docs' : preview.type,
+                file: preview.file,
+                url: preview.url,
+              }));
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to restore composer draft:', e);
+        }
+      }
+      
+      editablePreview.innerText = textarea.value || '';
+      updatePreview();
+      updateMediaPreview();
+    }
+    
+    initComposer();
 });
 </script>
 {% endblock %}

@@ -53,7 +53,8 @@ class PostForm(forms.ModelForm):
             'video',
             'docs',
             'audio',
-            'gradient_class']
+            'gradient_class',
+            'has_signature']
 
         widgets = {
             'content': forms.Textarea(attrs={
