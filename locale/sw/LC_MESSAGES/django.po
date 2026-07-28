@@ -344,3 +344,147 @@ msgstr "Vikundi vilivyochaguliwa vitaonekana hapa"
 
 msgid "Share with selected groups"
 msgstr "Shiriki na vikundi vilivyochaguliwa"
+
+msgid "Welcome Back, Comrade!"
+msgstr "Karibu Tena, Rafiki!"
+
+msgid "Identify yourself to access the PwaniNet feed."
+msgstr "Jitambulishe ili kupata PwaniNet feed."
+
+msgid "Forgot password?"
+msgstr "Umesahau nenosiri?"
+
+msgid "This field cannot be empty"
+msgstr "Uga huu hauwezi kuwa wazi"
+
+msgid "Authenticate & Enter"
+msgstr "Tambulisha na Ingia"
+
+msgid "New to the squad?"
+msgstr "Mpya kwenye kundi?"
+
+msgid "Create a New Account"
+msgstr "Unda Akaunti Mpya"
+
+msgid "← Back to Public View"
+msgstr "← Rudi kwenye Mtazamo wa Umma"
+
+msgid "Pwani University Student."
+msgstr "Mwanafunzi wa Chuo Kikuu cha Pwani."
+
+msgid "UPDATE PROFILE"
+msgstr "SASISHA WASILIFU"
+
+msgid "SETTINGS"
+msgstr "MIPANGILIO"
+
+msgid "SWITCH ACCOUNT"
+msgstr "BADILISHA AKAUNTI"
+
+msgid "LOGOUT"
+msgstr "ONDOKA"
+
+msgid "Followers"
+msgstr "Wafuataji"
+
+msgid "Following"
+msgstr "Unafuata"
+
+msgid "Likes"
+msgstr "Mapendeleo"
+
+msgid "Pinches Sent"
+msgstr "Pinches Zilizotumwa"
+
+msgid "Pinches Received"
+msgstr "Pinches Zilizopokelewa"
+
+msgid "Academic Details"
+msgstr "Maelezo ya Kielimu"
+
+msgid "School"
+msgstr "Shule"
+
+msgid "Course"
+msgstr "Kozi"
+
+msgid "Year"
+msgstr "Mwaka"
+
+msgid "Profile Completion"
+msgstr "Ukamilishi wa Wasifu"
+
+msgid "Hide"
+msgstr "Ficha"
+
+msgid "Completion"
+msgstr "Ukamilishi"
+
+msgid "Suggestions to improve your profile:"
+msgstr "Mapendekezo ya kuboresha wasifu wako:"
+
+msgid "Add a headline to introduce yourself better"
+msgstr "Ongeza kichwa cha habari kujitambulisha vizuri zaidi"
+
+msgid "Add skills so classmates can discover your strengths"
+msgstr "Ongeza ujuzi ili wanafunzi wenzako waweze kugundua nguvu zako"
+
+msgid "Add projects to showcase your work"
+msgstr "Ongeza miradi kuonyesha kazi yako"
+
+msgid "Add interests to find like-minded classmates"
+msgstr "Ongeza maslahi kupata wanafunzi wenye mawazo sawa"
+
+msgid "About"
+msgstr "Kuhusu"
+
+msgid "Open to Projects"
+msgstr "Wazi kwa Miradi"
+
+msgid "Open to Study Groups"
+msgstr "Wazi kwa Vikundi vya Masomo"
+
+msgid "Open to Networking"
+msgstr "Wazi kwa Mtandao"
+
+msgid "Not Looking"
+msgstr "Haatafuti"
+
+msgid "Interests"
+msgstr "Maslahi"
+
+msgid "Skills"
+msgstr "Ujuzi"
+
+msgid "Projects"
+msgstr "Miradi"
+
+msgid "View Project"
+msgstr "Angalia Mradi"
+
+msgid "Links"
+msgstr "Viungo"
+
+msgid "View More About"
+msgstr "Angalia Zaidi Kuhusu"
+
+msgid "View Less About"
+msgstr "Angalia Punguzo Kuhusu"
+
+msgid "Posts"
+msgstr "Machapisho"
+
+msgid "Shared with"
+msgstr "Imeshirikiwa na"
+
+msgid "hasn't posted anything yet."
+msgstr "hajachapisha kitu bado."
+
+msgid "Loading..."
+msgstr "Inapakia..."
+
+msgid "No posts have been shared with"
+msgstr "Hakuna machapisho yaliyoshirikiwa na"
+
+msgid "yet."
+msgstr "bado."

@@ -93,8 +93,8 @@
                 <div class="row g-0">
                     <div class="card-body p-5">
                         <div class="text-center mb-4">
-                            <h2 class="fw-bold text-dark" id="loginWelcomeTitle">Welcome Back, Comrade!</h2>
-                            <p class="text-muted">Identify yourself to access the PwaniNet feed.</p>
+                            <h2 class="fw-bold text-dark" id="loginWelcomeTitle">{% trans "Welcome Back, Comrade!" %}</h2>
+                            <p class="text-muted">{% trans "Identify yourself to access the PwaniNet feed." %}</p>
                         </div>
 
                         <form method="POST" id="loginForm" novalidate>
@@ -120,7 +120,7 @@
                                             </button>
                                         </div>
                                         <div class="text-end mt-1">
-                                            <a href="{% url 'users:password_reset' %}" class="text-decoration-none small">Forgot password?</a>
+                                            <a href="{% url 'users:password_reset' %}" class="text-decoration-none small">{% trans "Forgot password?" %}</a>
                                         </div>
                                     {% else %}
                                         {{ field }}
@@ -130,13 +130,13 @@
                                             <div class="text-danger x-small">{{ error }}</div>
                                         {% endfor %}
                                     {% endif %}
-                                    <div class="field-error" id="{{ field.name }}-error">This field cannot be empty</div>
+                                    <div class="field-error" id="{{ field.name }}-error">{% trans "This field cannot be empty" %}</div>
                                 </div>
                             {% endfor %}
 
                             <div class="d-grid gap-2 mt-4">
                                 <button class="btn btn-primary btn-lg shadow-sm" type="submit" id="loginSubmitBtn" style="border-radius: 10px;">
-                                    Authenticate & Enter
+                                    {% trans "Authenticate & Enter" %}
                                 </button>
                             </div>
                         </form>
@@ -144,15 +144,15 @@
                         <hr class="my-4">
 
                         <div class="text-center">
-                            <p class="mb-0 text-muted">New to the squad?</p>
-                            <a href="{% url 'users:register' %}" class="fw-bold text-primary text-decoration-none">Create a New Account</a>
+                            <p class="mb-0 text-muted">{% trans "New to the squad?" %}</p>
+                            <a href="{% url 'users:register' %}" class="fw-bold text-primary text-decoration-none">{% trans "Create a New Account" %}</a>
                         </div>
                     </div>
                 </div>
             </div>
-            
+
             <div class="text-center mt-4">
-                <a href="{% url 'posts:home' %}" class="text-secondary small text-decoration-none">← Back to Public View</a>
+                <a href="{% url 'posts:home' %}" class="text-secondary small text-decoration-none">{% trans "← Back to Public View" %}</a>
             </div>
         </div>
     </div>

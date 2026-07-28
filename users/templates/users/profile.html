@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 {% load user_extras %}
 {% csrf_token %}
@@ -371,7 +372,7 @@
                         <div class="bg-light rounded-3 p-2 mb-3">
                             <p class="small mb-0 text-secondary italic">
                                 <i class="bi bi-shield-lock me-1"></i>
-                                "{{ profile_user.bio|default:"Pwani University Student." }}"
+                                "{{ profile_user.bio|default:_('Pwani University Student.') }}"
                             </p>
                         </div>
 
@@ -385,18 +386,18 @@
                         {% else %}
                             <div class="d-grid gap-2 px-2">
                                 <a href="{% url 'users:update_profile' %}" class="btn btn-outline-secondary rounded-pill fw-bold btn-sm">
-                                    <i class="bi bi-gear-wide-connected me-1"></i> UPDATE PROFILE
+                                    <i class="bi bi-gear-wide-connected me-1"></i> {% trans "UPDATE PROFILE" %}
                                 </a>
                                 <a href="{% url 'users:settings' %}" class="btn btn-outline-info rounded-pill fw-bold btn-sm">
-                                    <i class="bi bi-gear me-1"></i> SETTINGS
+                                    <i class="bi bi-gear me-1"></i> {% trans "SETTINGS" %}
                                 </a>
                                 <button type="button" class="btn btn-outline-primary w-100 rounded-pill btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#accountSwitcherModal">
-                                    <i class="bi bi-arrow-repeat me-2"></i>SWITCH ACCOUNT
+                                    <i class="bi bi-arrow-repeat me-2"></i>{% trans "SWITCH ACCOUNT" %}
                                 </button>
                                 <form action="{% url 'users:logout' %}" method="POST" class="m-0">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-outline-danger w-100 rounded-pill btn-sm fw-bold">
-                                        <i class="bi bi-box-arrow-right me-2"></i>LOGOUT
+                                        <i class="bi bi-box-arrow-right me-2"></i>{% trans "LOGOUT" %}
                                     </button>
                                 </form>
                             </div>
@@ -409,11 +410,11 @@
                                     data-bs-toggle="modal"
                                     data-bs-target="#peopleModal"
                                     data-connection-type="followers"
-                                    data-connection-title="Followers"
+                                    data-connection-title="{% trans 'Followers' %}"
                                     data-profile-username="{{ profile_user.username }}"
                                     aria-label="View followers">
                                 <h6 id="follower-count" class="fw-bold mb-0">{{ followers_count }}</h6>
-                                <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Followers</small>
+                                <small class="text-muted text-uppercase" style="font-size: 0.65rem;">{% trans "Followers" %}</small>
                             </button>
                         </div>
                         <div class="col-4 border-end">
@@ -421,16 +422,16 @@
                                     data-bs-toggle="modal"
                                     data-bs-target="#peopleModal"
                                     data-connection-type="following"
-                                    data-connection-title="Following"
+                                    data-connection-title="{% trans 'Following' %}"
                                     data-profile-username="{{ profile_user.username }}"
                                     aria-label="View following">
                                 <h6 id="following-count" class="fw-bold mb-0">{{ following_count }}</h6>
-                                <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Following</small>
+                                <small class="text-muted text-uppercase" style="font-size: 0.65rem;">{% trans "Following" %}</small>
                             </button>
                         </div>
                         <div class="col-4">
                             <h6 id="total-likes-count" class="fw-bold mb-0 text-primary">{{ total_likes|default:"0" }}</h6>
-                            <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Likes</small>
+                            <small class="text-muted text-uppercase" style="font-size: 0.65rem;">{% trans "Likes" %}</small>
                         </div>
                     </div>
                     {% if is_own_profile %}
@@ -440,11 +441,11 @@
                                     data-bs-toggle="modal"
                                     data-bs-target="#peopleModal"
                                     data-connection-type="pinches_sent"
-                                    data-connection-title="Pinches Sent"
+                                    data-connection-title="{% trans 'Pinches Sent' %}"
                                     data-profile-username="{{ profile_user.username }}"
                                     aria-label="View pinches sent">
                                 <h6 id="pinches-sent-count" class="fw-bold mb-0">{{ pinches_sent_count|default:"0" }}</h6>
-                                <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Pinches Sent</small>
+                                <small class="text-muted text-uppercase" style="font-size: 0.65rem;">{% trans "Pinches Sent" %}</small>
                             </button>
                         </div>
                         <div class="col-6">
@@ -452,11 +453,11 @@
                                     data-bs-toggle="modal"
                                     data-bs-target="#peopleModal"
                                     data-connection-type="pinches_received"
-                                    data-connection-title="Pinches Received"
+                                    data-connection-title="{% trans 'Pinches Received' %}"
                                     data-profile-username="{{ profile_user.username }}"
                                     aria-label="View pinches received">
                                 <h6 id="pinches-received-count" class="fw-bold mb-0">{{ pinches_received_count|default:"0" }}</h6>
-                                <small class="text-muted text-uppercase" style="font-size: 0.65rem;">Pinches Received</small>
+                                <small class="text-muted text-uppercase" style="font-size: 0.65rem;">{% trans "Pinches Received" %}</small>
                             </button>
                         </div>
                     </div>
@@ -464,17 +465,17 @@
                 </div>
 
                 <div class="post-card p-3 shadow-sm border-0 mb-3">
-                    <h6 class="small fw-bold text-uppercase text-muted mb-3"><i class="bi bi-info-circle me-1"></i>Academic Details</h6>
+                    <h6 class="small fw-bold text-uppercase text-muted mb-3"><i class="bi bi-info-circle me-1"></i>{% trans "Academic Details" %}</h6>
                     <div class="mb-2 d-flex justify-content-between">
-                        <small class="text-muted">School</small>
+                        <small class="text-muted">{% trans "School" %}</small>
                         <span class="fw-bold small">{{ profile_user.course.school.name|default:"N/A" }}</span>
                     </div>
                     <div class="mb-2 d-flex justify-content-between">
-                        <small class="text-muted">Course</small>
+                        <small class="text-muted">{% trans "Course" %}</small>
                         <span class="fw-bold small">{{ profile_user.course|default:"N/A" }}</span>
                     </div>
                     <div class="d-flex justify-content-between">
-                        <small class="text-muted">Year</small>
+                        <small class="text-muted">{% trans "Year" %}</small>
                         <span class="fw-bold small">Year {{ profile_user.year.level|default:"N/A" }}</span>
                     </div>
                 </div>
@@ -482,8 +483,8 @@
                 {% if is_own_profile %}
                 <div id="profile-completion-card" class="post-card p-3 shadow-sm border-0 mb-3">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <h6 class="small fw-bold text-uppercase text-muted mb-0"><i class="bi bi-trophy me-1"></i>Profile Completion</h6>
-                        <button id="dismiss-completion-card" class="btn btn-sm btn-link text-muted p-0" style="font-size: 12px;">Hide</button>
+                        <h6 class="small fw-bold text-uppercase text-muted mb-0"><i class="bi bi-trophy me-1"></i>{% trans "Profile Completion" %}</h6>
+                        <button id="dismiss-completion-card" class="btn btn-sm btn-link text-muted p-0" style="font-size: 12px;">{% trans "Hide" %}</button>
                     </div>
                     <div class="progress mb-2" style="height: 8px;">
                         <div class="progress-bar bg-primary" role="progressbar"
@@ -494,23 +495,23 @@
                         </div>
                     </div>
                     <div class="d-flex justify-content-between">
-                        <small class="text-muted">Completion</small>
+                        <small class="text-muted">{% trans "Completion" %}</small>
                         <span class="fw-bold small text-primary">{{ profile_completion }}%</span>
                     </div>
                     {% if profile_completion < 50 %}
                     <div class="mt-2 p-2 bg-light rounded">
-                        <small class="text-muted mb-1 d-block">Suggestions to improve your profile:</small>
+                        <small class="text-muted mb-1 d-block">{% trans "Suggestions to improve your profile:" %}</small>
                         {% if not profile_user.headline %}
-                        <small class="text-secondary d-block"><i class="bi bi-plus-circle me-1"></i>Add a headline to introduce yourself better</small>
+                        <small class="text-secondary d-block"><i class="bi bi-plus-circle me-1"></i>{% trans "Add a headline to introduce yourself better" %}</small>
                         {% endif %}
                         {% if not profile_user.skills %}
-                        <small class="text-secondary d-block"><i class="bi bi-plus-circle me-1"></i>Add skills so classmates can discover your strengths</small>
+                        <small class="text-secondary d-block"><i class="bi bi-plus-circle me-1"></i>{% trans "Add skills so classmates can discover your strengths" %}</small>
                         {% endif %}
                         {% if not profile_user.projects %}
-                        <small class="text-secondary d-block"><i class="bi bi-plus-circle me-1"></i>Add projects to showcase your work</small>
+                        <small class="text-secondary d-block"><i class="bi bi-plus-circle me-1"></i>{% trans "Add projects to showcase your work" %}</small>
                         {% endif %}
                         {% if not profile_user.interests %}
-                        <small class="text-secondary d-block"><i class="bi bi-plus-circle me-1"></i>Add interests to find like-minded classmates</small>
+                        <small class="text-secondary d-block"><i class="bi bi-plus-circle me-1"></i>{% trans "Add interests to find like-minded classmates" %}</small>
                         {% endif %}
                     </div>
                     {% endif %}
@@ -518,7 +519,7 @@
                 {% endif %}
 
                 <div class="post-card p-3 shadow-sm border-0 mt-4">
-                    <h6 class="small fw-bold text-uppercase text-muted mb-3"><i class="bi bi-person me-1"></i>About {{ profile_user.username }}</h6>
+                    <h6 class="small fw-bold text-uppercase text-muted mb-3"><i class="bi bi-person me-1"></i>{% trans "About" %} {{ profile_user.username }}</h6>
                     
                     {% if profile_user.headline %}
                     <p class="small mb-2 fw-bold">{{ profile_user.headline }}</p>
@@ -528,13 +529,13 @@
                     <div class="mb-3">
                         <span class="badge {% if profile_user.collaboration_status == 'not_looking' %}bg-secondary{% else %}bg-success{% endif %} rounded-pill">
                             {% if profile_user.collaboration_status == 'open_to_projects' %}
-                                <i class="bi bi-people-fill me-1"></i>Open to Projects
+                                <i class="bi bi-people-fill me-1"></i>{% trans "Open to Projects" %}
                             {% elif profile_user.collaboration_status == 'open_to_study_groups' %}
-                                <i class="bi bi-collection-fill me-1"></i>Open to Study Groups
+                                <i class="bi bi-collection-fill me-1"></i>{% trans "Open to Study Groups" %}
                             {% elif profile_user.collaboration_status == 'open_to_networking' %}
-                                <i class="bi bi-globe me-1"></i>Open to Networking
+                                <i class="bi bi-globe me-1"></i>{% trans "Open to Networking" %}
                             {% else %}
-                                <i class="bi bi-person-x-fill me-1"></i>Not Looking
+                                <i class="bi bi-person-x-fill me-1"></i>{% trans "Not Looking" %}
                             {% endif %}
                         </span>
                     </div>
@@ -544,14 +545,14 @@
                         <div class="card card-body bg-light border-0">
                             {% if profile_user.interests %}
                             <div class="mb-3">
-                                <small class="text-muted text-uppercase fw-bold mb-1 d-block">Interests</small>
+                                <small class="text-muted text-uppercase fw-bold mb-1 d-block">{% trans "Interests" %}</small>
                                 <p class="small mb-0">{{ profile_user.interests }}</p>
                             </div>
                             {% endif %}
                             
                             {% if profile_user.skills %}
                             <div class="mb-3">
-                                <small class="text-muted text-uppercase fw-bold mb-1 d-block">Skills</small>
+                                <small class="text-muted text-uppercase fw-bold mb-1 d-block">{% trans "Skills" %}</small>
                                 <div class="d-flex flex-wrap gap-1">
                                     {% for skill in profile_user.skills %}
                                     <span class="badge bg-light text-dark border">{{ skill }}</span>
@@ -562,13 +563,13 @@
                             
                             {% if profile_user.projects %}
                             <div class="mb-3">
-                                <small class="text-muted text-uppercase fw-bold mb-1 d-block">Projects</small>
+                                <small class="text-muted text-uppercase fw-bold mb-1 d-block">{% trans "Projects" %}</small>
                                 {% for project in profile_user.projects %}
                                 <div class="mb-2">
                                     <p class="small fw-bold mb-0">{{ project.title }}</p>
                                     <p class="small text-muted mb-1">{{ project.description }}</p>
                                     {% if project.link %}
-                                    <a href="{{ project.link }}" target="_blank" class="small text-primary">View Project <i class="bi bi-box-arrow-up-right"></i></a>
+                                    <a href="{{ project.link }}" target="_blank" class="small text-primary">{% trans "View Project" %} <i class="bi bi-box-arrow-up-right"></i></a>
                                     {% endif %}
                                 </div>
                                 {% endfor %}
@@ -577,7 +578,7 @@
                             
                             {% if profile_user.github_url or profile_user.linkedin_url or profile_user.portfolio_url or profile_user.twitter_url %}
                             <div class="mb-3">
-                                <small class="text-muted text-uppercase fw-bold mb-1 d-block">Links</small>
+                                <small class="text-muted text-uppercase fw-bold mb-1 d-block">{% trans "Links" %}</small>
                                 <div class="d-flex flex-column gap-1">
                                     {% if profile_user.github_url %}
                                     <a href="{{ profile_user.github_url }}" target="_blank" class="small text-decoration-none">
@@ -608,10 +609,10 @@
                     <button class="btn btn-outline-secondary rounded-pill fw-bold btn-sm w-100 view-more-btn mt-3" type="button"
                             id="profileViewMoreBtn"
                             aria-expanded="false" aria-controls="profileMoreInfo"
-                            data-text-more="View More About {{ profile_user.username }}"
-                            data-text-less="View Less About {{ profile_user.username }}">
+                            data-text-more="{% trans 'View More About' %} {{ profile_user.username }}"
+                            data-text-less="{% trans 'View Less About' %} {{ profile_user.username }}">
                         <i class="bi bi-chevron-down me-1 view-more-icon"></i>
-                        <span class="view-more-text">View More About {{ profile_user.username }}</span>
+                        <span class="view-more-text">{% trans "View More About" %} {{ profile_user.username }}</span>
                     </button>
                 </div>
             </div>
@@ -621,7 +622,7 @@
             <ul class="nav nav-tabs mb-3 px-2" id="profileTabs" role="tablist">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="posts-tab" data-bs-toggle="tab" data-bs-target="#posts-content" type="button" role="tab">
-                        Posts
+                        {% trans "Posts" %}
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
@@ -629,7 +630,7 @@
                             hx-post="{% url 'users:mark_shared_viewed' profile_user.username %}"
                             hx-target="#shared-tab"
                             hx-swap="outerHTML">
-                        Shared with {{ profile_user.username }}
+                        {% trans "Shared with" %} {{ profile_user.username }}
                         {% if unseen_shared_count > 0 %}
                         <span class="badge bg-success rounded-pill ms-1">{{ unseen_shared_count }}</span>
                         {% endif %}
@@ -646,14 +647,14 @@
                         {% empty %}
                             <div class="text-center py-5 bg-white rounded-4 shadow-sm border-0">
                                 <i class="bi bi-incognito text-muted display-4"></i>
-                                <p class="text-muted mt-3">{{ profile_user.username }} hasn't posted anything yet.</p>
+                                <p class="text-muted mt-3">{% trans "hasn't posted anything yet." %}</p>
                             </div>
                         {% endfor %}
                     </div>
                     {% if has_more_posts %}
                     <div id="load-more-trigger" class="text-center py-4" hx-get="{% url 'users:profile' profile_user.username %}?page={{ posts.next_page_number }}" hx-trigger="revealed" hx-target="#posts-container" hx-swap="beforeend" hx-on::before-request="this.remove()">
                         <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
+                            <span class="visually-hidden">{% trans "Loading..." %}</span>
                         </div>
                     </div>
                     {% endif %}
@@ -667,7 +668,7 @@
                         {% empty %}
                             <div class="text-center py-5 bg-white rounded-4 shadow-sm border-0">
                                 <i class="bi bi-share text-muted display-4"></i>
-                                <p class="text-muted mt-3">No posts have been shared with {{ profile_user.username }} yet.</p>
+                                <p class="text-muted mt-3">{% trans "No posts have been shared with" %} {{ profile_user.username }} {% trans "yet." %}</p>
                             </div>
                         {% endfor %}
                     </div>
