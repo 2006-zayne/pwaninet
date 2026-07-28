@@ -19,6 +19,11 @@ GRADIENT_CHOICES = [
     ('bg-playful-doodles', 'Playful Doodles'),
     ('bg-magic-sparkles', 'Magic Sparkles'),
     ('bg-username-pattern', 'Signature Pattern'),
+    ('bg-geometric-dots', 'Geometric Dots'),
+    ('bg-diagonal-lines', 'Diagonal Lines'),
+    ('bg-hexagon-mesh', 'Hexagon Mesh'),
+    ('bg-circuit-board', 'Circuit Board'),
+    ('bg-matrix-rain', 'Matrix Rain'),
 ]
 
 
@@ -35,6 +40,10 @@ class Post(models.Model):
     audio = models.FileField(upload_to='posts/audio', blank=True, null=True, help_text='Attach music/audio to post')
     gradient_class = models.CharField(max_length=50, choices=GRADIENT_CHOICES, default='grad-ocean', blank=True)
     has_signature = models.BooleanField(default=False)
+    custom_gradient_text = models.CharField(max_length=100, blank=True, null=True, help_text='Custom text for gradient patterns')
+    custom_gradient_color1 = models.CharField(max_length=7, blank=True, null=True, help_text='Custom gradient color 1 (hex)')
+    custom_gradient_color2 = models.CharField(max_length=7, blank=True, null=True, help_text='Custom gradient color 2 (hex)')
+    custom_gradient_text_color = models.CharField(max_length=7, blank=True, null=True, help_text='Custom text color (hex)')
     repost_of = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='repost_children')
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)

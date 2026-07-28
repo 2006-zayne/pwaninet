@@ -662,10 +662,93 @@
       font-size: 0.65rem;
     }
   }
-  
+
   .bg-username-pattern {
     background-color: #141E30 !important;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cg fill='rgba(255,255,255,0.06)' font-family='system-ui, sans-serif' font-weight='900' letter-spacing='2'%3E%3Ctext x='20' y='50' transform='rotate(-15 20 50)' font-size='32'%3E{{ request.user.username }}%3C/text%3E%3Ctext x='160' y='90' transform='rotate(25 160 90)' font-size='24'%3E{{ request.user.username }}%3C/text%3E%3Ctext x='50' y='200' transform='rotate(45 50 200)' font-size='40'%3E{{ request.user.username }}%3C/text%3E%3Ctext x='220' y='240' transform='rotate(-25 220 240)' font-size='28'%3E{{ request.user.username }}%3C/text%3E%3Ctext x='120' y='280' transform='rotate(10 120 280)' font-size='20'%3E{{ request.user.username }}%3C/text%3E%3Ctext x='260' y='50' transform='rotate(-50 260 50)' font-size='26'%3E{{ request.user.username }}%3C/text%3E%3C/g%3E%3C/svg%3E"), linear-gradient(135deg, #141E30 0%, #243B55 100%) !important;
+    background-repeat: repeat !important;
+  }
+
+  .custom-indicator {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    z-index: 10;
+  }
+
+  .style-swatch {
+    position: relative;
+  }
+
+  .style-swatch[data-value="bg-username-pattern"] {
+    border: 2px dashed #fff;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  }
+
+  .style-swatch[data-value="bg-username-pattern"]::after {
+    content: 'CUSTOM';
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    font-size: 8px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+
+  .bg-geometric-dots {
+    background-color: #1a1a2e !important;
+    background-image: radial-gradient(circle at 25% 25%, rgba(255,255,255,0.1) 2px, transparent 2px),
+                      radial-gradient(circle at 75% 75%, rgba(255,255,255,0.1) 2px, transparent 2px),
+                      radial-gradient(circle at 50% 50%, rgba(255,255,255,0.05) 1px, transparent 1px),
+                      linear-gradient(135deg, #1a1a2e 0%, #16213e 100%) !important;
+    background-size: 40px 40px, 40px 40px, 20px 20px, 100% 100% !important;
+  }
+
+  .bg-diagonal-lines {
+    background-color: #0f0f23 !important;
+    background-image: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 10px,
+      rgba(255,255,255,0.03) 10px,
+      rgba(255,255,255,0.03) 20px
+    ),
+    linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%) !important;
+  }
+
+  .bg-hexagon-mesh {
+    background-color: #1e3a5f !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49'%3E%3Cg fill-rule='evenodd'%3E%3Cg id='hexagons' fill='%23ffffff' fill-opacity='0.05' fill-rule='nonzero'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"),
+    linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%) !important;
+  }
+
+  .bg-circuit-board {
+    background-color: #0a0a0a !important;
+    background-image: 
+      linear-gradient(90deg, rgba(0,255,136,0.1) 1px, transparent 1px),
+      linear-gradient(rgba(0,255,136,0.1) 1px, transparent 1px),
+      linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%) !important;
+    background-size: 50px 50px, 50px 50px, 100% 100% !important;
+  }
+
+  .bg-matrix-rain {
+    background-color: #000000 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Cg fill='%2300ff00' fill-opacity='0.1'%3E%3Crect x='0' y='0' width='1' height='1'/%3E%3Crect x='5' y='3' width='1' height='1'/%3E%3Crect x='10' y='6' width='1' height='1'/%3E%3Crect x='15' y='2' width='1' height='1'/%3E%3Crect x='2' y='10' width='1' height='1'/%3E%3Crect x='7' y='13' width='1' height='1'/%3E%3Crect x='12' y='16' width='1' height='1'/%3E%3Crect x='17' y='11' width='1' height='1'/%3E%3C/g%3E%3C/svg%3E"),
+    linear-gradient(180deg, #000000 0%, #001a00 100%) !important;
     background-repeat: repeat !important;
   }
 </style>
@@ -764,7 +847,38 @@
                 <div class="style-swatch bg-spring-flora" data-value="bg-spring-flora" title="Spring Flora"></div>
                 <div class="style-swatch bg-playful-doodles" data-value="bg-playful-doodles" title="Playful Doodles"></div>
                 <div class="style-swatch bg-magic-sparkles" data-value="bg-magic-sparkles" title="Magic Sparkles"></div>
-                <div class="style-swatch bg-username-pattern" data-value="bg-username-pattern" title="Signature"></div>
+                <div class="style-swatch bg-username-pattern" data-value="bg-username-pattern" title="Signature">
+                  <span class="custom-indicator" id="customIndicator" style="display: none;">
+                    <i class="bi bi-pencil-fill"></i>
+                  </span>
+                </div>
+                <div class="style-swatch bg-geometric-dots" data-value="bg-geometric-dots" title="Geometric Dots"></div>
+                <div class="style-swatch bg-diagonal-lines" data-value="bg-diagonal-lines" title="Diagonal Lines"></div>
+                <div class="style-swatch bg-hexagon-mesh" data-value="bg-hexagon-mesh" title="Hexagon Mesh"></div>
+                <div class="style-swatch bg-circuit-board" data-value="bg-circuit-board" title="Circuit Board"></div>
+                <div class="style-swatch bg-matrix-rain" data-value="bg-matrix-rain" title="Matrix Rain"></div>
+              </div>
+              
+              <!-- Custom gradient options -->
+              <div class="mt-3 pt-3 border-top" id="customGradientOptions" style="display: none;">
+                <div class="panel-label">Custom Options</div>
+                <div class="mb-2">
+                  <input type="text" id="customGradientText" class="form-control form-control-sm" placeholder="Custom text (e.g., your name)" maxlength="100">
+                </div>
+                <div class="d-flex gap-2">
+                  <div class="flex-1">
+                    <label class="small text-muted">Color 1</label>
+                    <input type="color" id="customGradientColor1" class="form-control form-control-color w-100" value="#141E30">
+                  </div>
+                  <div class="flex-1">
+                    <label class="small text-muted">Color 2</label>
+                    <input type="color" id="customGradientColor2" class="form-control form-control-color w-100" value="#243B55">
+                  </div>
+                  <div class="flex-1">
+                    <label class="small text-muted">Text Color</label>
+                    <input type="color" id="customGradientTextColor" class="form-control form-control-color w-100" value="#ffffff">
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -956,6 +1070,14 @@ document.addEventListener('DOMContentLoaded', function () {
         attachmentModal.classList.remove('show');
     });
 
+    // Helper function to convert hex to rgba
+    function hexToRgba(hex, alpha) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
     // Style swatches
     document.querySelectorAll('.style-swatch').forEach(swatch => {
         swatch.addEventListener('click', function () {
@@ -963,13 +1085,33 @@ document.addEventListener('DOMContentLoaded', function () {
             this.classList.add('selected');
             selectedStyle = this.dataset.value;
             gradInput.value = selectedStyle;
+
+            // Show custom options for username pattern
+            const customOptions = document.getElementById('customGradientOptions');
+            const customIndicator = document.getElementById('customIndicator');
+            if (selectedStyle === 'bg-username-pattern') {
+                customOptions.style.display = 'block';
+                // Check if custom values exist and show indicator
+                const customText = document.getElementById('customGradientText')?.value?.trim();
+                const color1 = document.getElementById('customGradientColor1')?.value;
+                const color2 = document.getElementById('customGradientColor2')?.value;
+                const textColor = document.getElementById('customGradientTextColor')?.value;
+                if (customText || color1 !== '#141E30' || color2 !== '#243B55' || textColor !== '#ffffff') {
+                    customIndicator.style.display = 'flex';
+                } else {
+                    customIndicator.style.display = 'none';
+                }
+            } else {
+                customOptions.style.display = 'none';
+            }
+
             updatePreview();
         });
     });
 
     // Sync editable preview with hidden textarea
     const editablePreview = document.getElementById('gradientText');
-    
+
     editablePreview.addEventListener('input', function() {
         textarea.value = this.innerText;
         updatePreview();
@@ -980,6 +1122,55 @@ document.addEventListener('DOMContentLoaded', function () {
         editablePreview.innerText = this.value;
         updatePreview();
     });
+
+    // Custom gradient inputs
+    const customGradientText = document.getElementById('customGradientText');
+    const customGradientColor1 = document.getElementById('customGradientColor1');
+    const customGradientColor2 = document.getElementById('customGradientColor2');
+    const customGradientTextColor = document.getElementById('customGradientTextColor');
+
+    // Function to update custom indicator
+    function updateCustomIndicator() {
+        const customIndicator = document.getElementById('customIndicator');
+        const customText = customGradientText?.value?.trim();
+        const color1 = customGradientColor1?.value;
+        const color2 = customGradientColor2?.value;
+        const textColor = customGradientTextColor?.value;
+        if (customText || color1 !== '#141E30' || color2 !== '#243B55' || textColor !== '#ffffff') {
+            customIndicator.style.display = 'flex';
+        } else {
+            customIndicator.style.display = 'none';
+        }
+    }
+
+    if (customGradientText) {
+        customGradientText.addEventListener('input', function() {
+            console.log('[customGradientText] Input changed:', this.value);
+            updatePreview();
+            updateCustomIndicator();
+        });
+    }
+    if (customGradientColor1) {
+        customGradientColor1.addEventListener('input', function() {
+            console.log('[customGradientColor1] Input changed:', this.value);
+            updatePreview();
+            updateCustomIndicator();
+        });
+    }
+    if (customGradientColor2) {
+        customGradientColor2.addEventListener('input', function() {
+            console.log('[customGradientColor2] Input changed:', this.value);
+            updatePreview();
+            updateCustomIndicator();
+        });
+    }
+    if (customGradientTextColor) {
+        customGradientTextColor.addEventListener('input', function() {
+            console.log('[customGradientTextColor] Input changed:', this.value);
+            updatePreview();
+            updateCustomIndicator();
+        });
+    }
 
     // File input handling is delegated to UploadManager + PreviewManager.
     imageInput.addEventListener('change', () => addFiles(Array.from(imageInput.files || [])));
@@ -1190,6 +1381,35 @@ document.addEventListener('DOMContentLoaded', function () {
         else if (selectedStyle !== 'none') {
             gradientPreview.style.display = 'flex';
             gradientPreview.className = 'gradient-intel-bg ' + selectedStyle;
+
+            // Update custom gradient options
+            if (selectedStyle === 'bg-username-pattern') {
+                const customText = document.getElementById('customGradientText')?.value || '{{ request.user.username }}';
+                const color1 = document.getElementById('customGradientColor1')?.value || '#141E30';
+                const color2 = document.getElementById('customGradientColor2')?.value || '#243B55';
+                const textColor = document.getElementById('customGradientTextColor')?.value || '#ffffff';
+
+                console.log('[updatePreview] Custom gradient values:', { customText, color1, color2, textColor });
+
+                // Update the SVG pattern with custom text and custom text color
+                const encodedText = encodeURIComponent(customText);
+                // Convert hex to rgba with 0.06 opacity
+                const textColorRgba = hexToRgba(textColor, 0.06);
+                console.log('[updatePreview] Text color RGBA:', textColorRgba);
+                gradientPreview.style.setProperty('background-image', `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cg fill='${textColorRgba}' font-family='system-ui, sans-serif' font-weight='900' letter-spacing='2'%3E%3Ctext x='20' y='50' transform='rotate(-15 20 50)' font-size='32'%3E${encodedText}%3C/text%3E%3Ctext x='160' y='90' transform='rotate(25 160 90)' font-size='24'%3E${encodedText}%3C/text%3E%3Ctext x='50' y='200' transform='rotate(45 50 200)' font-size='40'%3E${encodedText}%3C/text%3E%3Ctext x='220' y='240' transform='rotate(-25 220 240)' font-size='28'%3E${encodedText}%3C/text%3E%3Ctext x='120' y='280' transform='rotate(10 120 280)' font-size='20'%3E${encodedText}%3C/text%3E%3Ctext x='260' y='50' transform='rotate(-50 260 50)' font-size='26'%3E${encodedText}%3C/text%3E%3C/g%3E%3C/svg%3E"), linear-gradient(135deg, ${color1} 0%, ${color2} 100%)`, 'important');
+                gradientPreview.style.setProperty('background-repeat', 'repeat', 'important');
+                gradientPreview.style.setProperty('background-color', color1, 'important');
+                gradientPreview.style.setProperty('color', textColor, 'important');
+
+                console.log('[updatePreview] Applied gradient styles with !important');
+            } else {
+                // Reset custom styles for other gradients
+                gradientPreview.style.removeProperty('background-image');
+                gradientPreview.style.removeProperty('background-repeat');
+                gradientPreview.style.removeProperty('background-color');
+                gradientPreview.style.removeProperty('color');
+            }
+
             // Only update text if it's different to avoid cursor jumping
             if (editablePreview.innerText !== text) {
                 editablePreview.innerText = text;
@@ -1266,7 +1486,25 @@ document.addEventListener('DOMContentLoaded', function () {
             unit: unitSelect?.value || null,
             group: new URLSearchParams(window.location.search).get('group') || null,
             gradient_class: gradInput.value || 'none',
+            custom_gradient_text: document.getElementById('customGradientText')?.value?.trim() || null,
+            custom_gradient_color1: document.getElementById('customGradientColor1')?.value || null,
+            custom_gradient_color2: document.getElementById('customGradientColor2')?.value || null,
+            custom_gradient_text_color: document.getElementById('customGradientTextColor')?.value || null,
           },
+        });
+
+        const metadataLog = {
+            gradient_class: gradInput.value || 'none',
+            custom_gradient_text: document.getElementById('customGradientText')?.value?.trim() || null,
+            custom_gradient_color1: document.getElementById('customGradientColor1')?.value || null,
+            custom_gradient_color2: document.getElementById('customGradientColor2')?.value || null,
+            custom_gradient_text_color: document.getElementById('customGradientTextColor')?.value || null,
+          };
+        console.log('[createPost] Metadata being sent:', metadataLog);
+        console.log('[createPost] Upload manager createUpload called with:', {
+            files,
+          caption,
+          metadata: metadataLog
         });
       }
 

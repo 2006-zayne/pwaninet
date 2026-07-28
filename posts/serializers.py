@@ -78,13 +78,18 @@ class PostCreateSerializer(serializers.ModelSerializer):
         required=False,
         write_only=True
     )
+    custom_gradient_text = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=100)
+    custom_gradient_color1 = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=7)
+    custom_gradient_color2 = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=7)
 
     class Meta:
         model = Post
         fields = [
-            'group', 'course', 'unit', 'content',
-            'images', 'video', 'docs', 'audio', 'gradient_class', 'has_signature'
+            'id', 'author', 'group', 'course', 'unit', 'content',
+            'images', 'video', 'docs', 'audio', 'gradient_class', 'has_signature',
+            'custom_gradient_text', 'custom_gradient_color1', 'custom_gradient_color2'
         ]
+        read_only_fields = ['id', 'author']
 
     def validate_content(self, value):
         if value and len(value) > 2500:
@@ -110,34 +115,65 @@ class PostCreateSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info('[PostCreateSerializer] Starting post creation with validated_data: %s', validated_data)
+
         images_data = validated_data.pop('images', [])
-        
+
         has_media = bool(images_data or validated_data.get('video') or validated_data.get('docs') or validated_data.get('audio'))
         if has_media:
             validated_data['gradient_class'] = 'none'
-        
+            logger.info('[PostCreateSerializer] Has media, setting gradient_class to none')
+
         # Validate gradient_class is a valid choice
         from posts.models import GRADIENT_CHOICES
         gradient_choices = [choice[0] for choice in GRADIENT_CHOICES]
         if validated_data.get('gradient_class') not in gradient_choices:
             validated_data['gradient_class'] = 'grad-ocean'  # Default fallback
-            
+            logger.warning('[PostCreateSerializer] Invalid gradient_class, defaulting to grad-ocean')
+
+        # Handle custom gradient fields - keep empty strings as empty strings, only convert to None if not provided
+        if 'custom_gradient_text' in validated_data:
+            validated_data['custom_gradient_text'] = validated_data['custom_gradient_text'] if validated_data['custom_gradient_text'] else None
+        if 'custom_gradient_color1' in validated_data:
+            validated_data['custom_gradient_color1'] = validated_data['custom_gradient_color1'] if validated_data['custom_gradient_color1'] else None
+        if 'custom_gradient_color2' in validated_data:
+            validated_data['custom_gradient_color2'] = validated_data['custom_gradient_color2'] if validated_data['custom_gradient_color2'] else None
+        if 'custom_gradient_text_color' in validated_data:
+            validated_data['custom_gradient_text_color'] = validated_data['custom_gradient_text_color'] if validated_data['custom_gradient_text_color'] else None
+
+        logger.info('[PostCreateSerializer] Custom gradient fields - text: %s, color1: %s, color2: %s, text_color: %s',
+                    validated_data.get('custom_gradient_text'),
+                    validated_data.get('custom_gradient_color1'),
+                    validated_data.get('custom_gradient_color2'),
+                    validated_data.get('custom_gradient_text_color'))
+        logger.info('[PostCreateSerializer] All validated_data keys: %s', list(validated_data.keys()))
+
         request = self.context.get('request')
         author = validated_data.get('author') or (request.user if request else None)
-        
+
         if author:
             validated_data['course'] = getattr(author, 'course', None)
-            
+            validated_data['author'] = author
+        else:
+            logger.error('[PostCreateSerializer] No author found in request or validated_data')
+            raise serializers.ValidationError("Author is required to create a post")
+
+        logger.info('[PostCreateSerializer] Creating post with final validated_data')
         post = Post.objects.create(**validated_data)
-        
+        logger.info('[PostCreateSerializer] Post created successfully with ID: %s', post.id)
+
         if post.unit:
             post.course = post.unit.course
             post.save(update_fields=['course'])
-            
+
         from posts.models import PostImage
         for idx, image_data in enumerate(images_data[:15]):
             PostImage.objects.create(post=post, image=image_data, order=idx)
-            
+
+        logger.info('[PostCreateSerializer] Created %s PostImage objects', len(images_data[:15]))
+
         if author:
             try:
                 from users.services.feed_service import invalidate_home_feed_context

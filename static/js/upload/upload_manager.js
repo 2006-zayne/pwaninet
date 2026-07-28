@@ -44,6 +44,10 @@ class UploadManager {
                     unit: data.unit || data.metadata?.unit || null,
                     group: data.group || data.metadata?.group || null,
                     gradient_class: data.gradient_class || data.metadata?.gradient_class || 'none',
+                    custom_gradient_text: data.custom_gradient_text || data.metadata?.custom_gradient_text || null,
+                    custom_gradient_color1: data.custom_gradient_color1 || data.metadata?.custom_gradient_color1 || null,
+                    custom_gradient_color2: data.custom_gradient_color2 || data.metadata?.custom_gradient_color2 || null,
+                    custom_gradient_text_color: data.custom_gradient_text_color || data.metadata?.custom_gradient_text_color || null,
                 },
             });
 

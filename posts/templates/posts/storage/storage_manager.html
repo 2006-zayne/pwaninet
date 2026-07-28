@@ -612,6 +612,11 @@
         </li>
       `).join('');
       
+      // Add event listeners for draft actions
+      list.querySelectorAll('.storage-list-item-btn').forEach(btn => {
+        btn.addEventListener('click', handleDraftAction);
+      });
+      
     } catch (error) {
       list.innerHTML = `
         <div class="storage-empty">
@@ -619,6 +624,34 @@
           <p>Failed to load drafts</p>
         </div>
       `;
+    }
+  }
+
+  // Handle draft actions
+  async function handleDraftAction(e) {
+    const btn = e.target;
+    const action = btn.dataset.action;
+    const item = btn.closest('.storage-list-item');
+    const draftId = item.dataset.id;
+    
+    try {
+      if (action === 'delete') {
+        if (confirm('Are you sure you want to delete this draft?')) {
+          await draftManager.deleteDraft(draftId);
+          await loadDrafts();
+          await loadStorageInfo();
+        }
+      } else if (action === 'restore') {
+        // Restore draft by redirecting to create post page with draft data
+        const draft = await draftManager.getDraft(draftId);
+        if (draft) {
+          // Store draft data in sessionStorage for restoration
+          sessionStorage.setItem('restore_draft', JSON.stringify(draft));
+          window.location.href = '/posts/new/';
+        }
+      }
+    } catch (error) {
+      alert(`Failed to ${action}: ${error.message}`);
     }
   }
 

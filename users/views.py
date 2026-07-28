@@ -108,6 +108,7 @@ def profile_view(request, username):
             'posts': posts_page,
             'has_more_posts': posts_page.has_next(),
             'profile_user': profile_user,
+            'posts': posts_page,
         })
     
     return render(request, 'users/profile.html', {

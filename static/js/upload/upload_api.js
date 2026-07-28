@@ -62,23 +62,45 @@ class UploadAPI {
      * @returns {FormData}
      */
     createFormData(data) {
+        console.log('[UploadAPI] Creating FormData with data:', data);
         const formData = new FormData();
 
         // Add text fields
         if (data.content) {
             formData.append('content', data.content);
+            console.log('[UploadAPI] Adding content:', data.content);
         }
         if (data.unit) {
             formData.append('unit', data.unit);
+            console.log('[UploadAPI] Adding unit:', data.unit);
         }
         if (data.group) {
             formData.append('group', data.group);
+            console.log('[UploadAPI] Adding group:', data.group);
         }
         if (data.visibility) {
             formData.append('visibility', data.visibility);
+            console.log('[UploadAPI] Adding visibility:', data.visibility);
         }
         if (data.gradient_class) {
             formData.append('gradient_class', data.gradient_class);
+            console.log('[UploadAPI] Adding gradient_class:', data.gradient_class);
+        }
+        if (data.custom_gradient_text && data.custom_gradient_text.trim() !== '') {
+            formData.append('custom_gradient_text', data.custom_gradient_text);
+            console.log('[UploadAPI] Adding custom_gradient_text:', data.custom_gradient_text);
+        }
+        if (data.custom_gradient_color1 && data.custom_gradient_color1.trim() !== '') {
+            formData.append('custom_gradient_color1', data.custom_gradient_color1);
+            console.log('[UploadAPI] Adding custom_gradient_color1:', data.custom_gradient_color1);
+        }
+        if (data.custom_gradient_color2 && data.custom_gradient_color2.trim() !== '') {
+            formData.append('custom_gradient_color2', data.custom_gradient_color2);
+            console.log('[UploadAPI] Adding custom_gradient_color2:', data.custom_gradient_color2);
+        }
+        if (data.custom_gradient_text_color && data.custom_gradient_text_color.trim() !== '') {
+            formData.append('custom_gradient_text_color', data.custom_gradient_text_color);
+            console.log('[UploadAPI] Adding custom_gradient_text_color:', data.custom_gradient_text_color);
         }
 
         // Add media files
@@ -86,17 +108,22 @@ class UploadAPI {
             data.images.forEach((image, index) => {
                 formData.append('images', image);
             });
+            console.log('[UploadAPI] Adding', data.images.length, 'images');
         }
         if (data.video) {
             formData.append('video', data.video);
+            console.log('[UploadAPI] Adding video');
         }
         if (data.docs) {
             formData.append('docs', data.docs);
+            console.log('[UploadAPI] Adding docs');
         }
         if (data.audio) {
             formData.append('audio', data.audio);
+            console.log('[UploadAPI] Adding audio');
         }
 
+        console.log('[UploadAPI] FormData created successfully');
         return formData;
     }
 
@@ -111,6 +138,9 @@ class UploadAPI {
             group: session.metadata?.group || null,
             visibility: session.visibility || null,
             gradient_class: session.metadata?.gradient_class || 'none',
+            custom_gradient_text: session.metadata?.custom_gradient_text || null,
+            custom_gradient_color1: session.metadata?.custom_gradient_color1 || null,
+            custom_gradient_color2: session.metadata?.custom_gradient_color2 || null,
         });
     }
 

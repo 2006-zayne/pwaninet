@@ -405,7 +405,7 @@
         {% if post_obj.gradient_class != 'none' and not post_obj.images.exists and not post_obj.video and not post_obj.docs and not post_obj.audio %}
     <div class="{{ post_obj.gradient_class }} gradient-intel-bg text-center {% if post_obj.has_signature %}signature-overlay{% endif %}"
          {% if post_obj.gradient_class == 'bg-username-pattern' %}
-             {% include "posts/partials/username_pattern_style.html" with author_name=post_obj.author.username %}
+             {% include "posts/partials/username_pattern_style.html" with author_name=post_obj.custom_gradient_text|default:post_obj.author.username color1=post_obj.custom_gradient_color1 color2=post_obj.custom_gradient_color2 text_color=post_obj.custom_gradient_text_color %}
          {% elif post_obj.has_signature %}
              {% include "posts/partials/signature_overlay_style.html" with author_name=post_obj.author.username %}
          {% endif %}>

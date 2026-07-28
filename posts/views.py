@@ -56,11 +56,36 @@ class PostViewSet(viewsets.ModelViewSet):
         return super().get_permissions()
 
     def create(self, request, *args, **kwargs):
-        response = super().create(request, *args, **kwargs)
-        # Mark this as a new post in session for back button logic
-        request.session['is_new_post'] = True
-        request.session['new_post_id'] = response.data['id']
-        return response
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info('[PostViewSet.create] Starting post creation')
+        logger.info('[PostViewSet.create] Request data: %s', request.data)
+        logger.info('[PostViewSet.create] Request files: %s', request.FILES)
+        logger.info('[PostViewSet.create] Custom gradient fields: custom_gradient_text=%s, custom_gradient_color1=%s, custom_gradient_color2=%s, custom_gradient_text_color=%s',
+                    request.data.get('custom_gradient_text'),
+                    request.data.get('custom_gradient_color1'),
+                    request.data.get('custom_gradient_color2'),
+                    request.data.get('custom_gradient_text_color'))
+
+        try:
+            response = super().create(request, *args, **kwargs)
+            logger.info('[PostViewSet.create] Post created successfully')
+            logger.info('[PostViewSet.create] Response data: %s', response.data)
+            # Mark this as a new post in session for back button logic
+            request.session['is_new_post'] = True
+            post_id = response.data.get('id') or response.data.get('pk')
+            if post_id:
+                request.session['new_post_id'] = post_id
+                logger.info('[PostViewSet.create] Session flags set for new post ID: %s', post_id)
+            else:
+                logger.warning('[PostViewSet.create] No post ID found in response data')
+            return response
+        except Exception as e:
+            logger.error('[PostViewSet.create] Error during post creation: %s', str(e))
+            logger.error('[PostViewSet.create] Error type: %s', type(e).__name__)
+            import traceback
+            logger.error('[PostViewSet.create] Traceback: %s', traceback.format_exc())
+            raise
 
     @action(detail=True, methods=['post'], url_path='report')
     def report(self, request, pk=None):

@@ -651,7 +651,7 @@
                         {% endfor %}
                     </div>
                     {% if has_more_posts %}
-                    <div id="load-more-trigger" class="text-center py-4" hx-get="{% url 'users:profile' profile_user.username %}?page={{ posts.next_page_number }}" hx-trigger="revealed" hx-target="#posts-container" hx-swap="beforeend">
+                    <div id="load-more-trigger" class="text-center py-4" hx-get="{% url 'users:profile' profile_user.username %}?page={{ posts.next_page_number }}" hx-trigger="revealed" hx-target="#posts-container" hx-swap="beforeend" hx-on::before-request="this.remove()">
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Loading...</span>
                         </div>
