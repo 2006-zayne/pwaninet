@@ -1,4 +1,32 @@
 <div class="modal fade people-modal" id="peopleModal" tabindex="-1" aria-hidden="true" role="dialog" aria-labelledby="peopleModalTitle" data-bs-backdrop="true" data-bs-keyboard="true">
+  <style>
+    [data-theme="dark"] .people-modal .modal-content {
+      background-color: var(--card-bg) !important;
+      border-color: var(--border) !important;
+    }
+    [data-theme="dark"] .people-modal .modal-title {
+      color: #ffffff !important;
+    }
+    [data-theme="dark"] .people-modal .search-input {
+      background: var(--card-bg) !important;
+      color: #e4e6eb !important;
+    }
+    [data-theme="dark"] .people-modal .search-input::placeholder {
+      color: #b0b3b8 !important;
+    }
+    [data-theme="dark"] .people-modal .search-input:focus {
+      background: #3a3b3c !important;
+    }
+    [data-theme="dark"] .people-modal .search-icon {
+      color: #b0b3b8 !important;
+    }
+    [data-theme="dark"] .people-modal .search-clear {
+      background: #b0b3b8 !important;
+    }
+    [data-theme="dark"] .people-modal .search-clear:hover {
+      background: #e4e6eb !important;
+    }
+  </style>
   <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
     <div class="modal-content" style="box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
       <!-- Sticky Header -->

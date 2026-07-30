@@ -1,0 +1,90 @@
+{% extends 'documents/base.html' %}
+{% load static %}
+
+{% block repository_content %}
+<!-- Back Navigation -->
+<div class="doc-back-nav" style="margin-bottom: 24px;">
+    <a href="{% url 'documents:my_library' %}" 
+       class="doc-back-link"
+       style="display: inline-flex; align-items: center; gap: 8px; 
+              color: var(--text-secondary); text-decoration: none; 
+              font-weight: 500; font-size: 0.9rem;">
+        <i class="bi bi-arrow-left"></i>
+        Back to Library
+    </a>
+</div>
+
+<!-- Header -->
+<div class="doc-library-header" style="padding: 40px 20px;">
+    <h1 class="doc-library-title" 
+        style="font-size: 2rem; font-weight: 700; margin: 0 0 12px 0; 
+               color: var(--text-dark);">
+        My Uploads
+    </h1>
+    <p class="doc-library-subtitle" 
+       style="font-size: 1rem; color: var(--text-secondary); margin: 0;">
+        Documents you've contributed to the repository
+    </p>
+</div>
+
+<!-- Library Navigation Tabs -->
+<div class="doc-library-tabs" 
+     style="display: flex; gap: 8px; margin-bottom: 32px; overflow-x: auto; 
+            padding: 8px 4px;">
+    
+    <a href="{% url 'documents:my_library' %}" 
+       class="doc-library-tab"
+       style="flex-shrink: 0; padding: 12px 24px; border-radius: 12px; 
+              background: var(--card-bg); color: var(--text-secondary); 
+              border: 1px solid var(--border); text-decoration: none; 
+              font-weight: 600; font-size: 0.95rem; transition: all 0.2s ease;">
+        Overview
+    </a>
+    
+    <a href="{% url 'documents:my_uploads' %}" 
+       class="doc-library-tab active"
+       style="flex-shrink: 0; padding: 12px 24px; border-radius: 12px; 
+              background: var(--primary); color: white; text-decoration: none; 
+              font-weight: 600; font-size: 0.95rem; transition: all 0.2s ease;">
+        My Uploads
+    </a>
+    
+    <a href="{% url 'documents:my_bookmarks' %}" 
+       class="doc-library-tab"
+       style="flex-shrink: 0; padding: 12px 24px; border-radius: 12px; 
+              background: var(--card-bg); color: var(--text-secondary); 
+              border: 1px solid var(--border); text-decoration: none; 
+              font-weight: 600; font-size: 0.95rem; transition: all 0.2s ease;">
+        Bookmarks
+    </a>
+    
+    <a href="{% url 'documents:my_downloads' %}" 
+       class="doc-library-tab"
+       style="flex-shrink: 0; padding: 12px 24px; border-radius: 12px; 
+              background: var(--card-bg); color: var(--text-secondary); 
+              border: 1px solid var(--border); text-decoration: none; 
+              font-weight: 600; font-size: 0.95rem; transition: all 0.2s ease;">
+        Downloads
+    </a>
+    
+    <a href="{% url 'documents:my_history' %}" 
+       class="doc-library-tab"
+       style="flex-shrink: 0; padding: 12px 24px; border-radius: 12px; 
+              background: var(--card-bg); color: var(--text-secondary); 
+              border: 1px solid var(--border); text-decoration: none; 
+              font-weight: 600; font-size: 0.95rem; transition: all 0.2s ease;">
+        History
+    </a>
+</div>
+
+<!-- Uploads Grid -->
+<div class="doc-uploads-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+    {% for document in documents %}
+        {% include 'documents/partials/document_card.html' %}
+    {% empty %}
+        {% url 'documents:upload' as upload_url %}
+        {% include 'documents/partials/empty_state.html' with title="No uploads yet" message="Start contributing by uploading your first document." action_url=upload_url action_text="Upload Document" %}
+    {% endfor %}
+</div>
+
+{% endblock %}

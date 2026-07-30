@@ -1,0 +1,82 @@
+{% load static %}
+<div class="doc-search-container" style="max-width: 800px; margin: 0 auto 40px auto;">
+    <form action="{% url 'documents:search' %}" method="get" class="doc-search-wrapper" 
+         style="position: relative;">
+        <input type="text" 
+               name="q"
+               class="doc-search-input form-control"
+               placeholder="Search notes, CATs, slides, books..."
+               value="{{ query|default:'' }}"
+               style="padding: 18px 24px 18px 56px; 
+                      border-radius: 16px; border: 2px solid var(--border);
+                      font-size: 1.1rem; background: var(--card-bg);
+                      color: var(--text-dark); transition: all 0.3s ease;">
+        
+        <i class="bi bi-search" 
+           style="position: absolute; left: 20px; top: 50%; 
+                  transform: translateY(-50%); font-size: 1.3rem; 
+                  color: var(--text-secondary);"></i>
+    </form>
+    
+    <!-- Recent Searches (shown when input is empty) -->
+    {% if show_recent|default:False %}
+    <div class="doc-recent-searches" 
+         style="margin-top: 16px; padding: 0 8px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin: 0;">
+                Recent searches
+            </p>
+            <a href="{% url 'documents:clear_recent_searches' %}" 
+               class="doc-clear-searches"
+               style="font-size: 0.8rem; color: var(--primary); cursor: pointer; text-decoration: none;">
+                Clear
+            </a>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            {% for recent_search in recent_searches %}
+            {% if recent_search.query %}
+            <a href="{% url 'documents:search' %}?q={{ recent_search.query }}"
+               class="doc-recent-tag"
+               style="background: var(--border); padding: 6px 14px; 
+                      border-radius: 20px; font-size: 0.875rem; 
+                      color: var(--text-secondary); cursor: pointer; text-decoration: none;">
+                {{ recent_search.query }}
+            </a>
+            {% else %}
+            <a href="{% url 'documents:search' %}?q={{ recent_search }}"
+               class="doc-recent-tag"
+               style="background: var(--border); padding: 6px 14px; 
+                      border-radius: 20px; font-size: 0.875rem; 
+                      color: var(--text-secondary); cursor: pointer; text-decoration: none;">
+                {{ recent_search }}
+            </a>
+            {% endif %}
+            {% empty %}
+            <span style="font-size: 0.875rem; color: var(--text-secondary);">
+                No recent searches
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.doc-search-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+    background: var(--card-bg);
+}
+
+.doc-recent-tag:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+@media (max-width: 768px) {
+    .doc-search-input {
+        padding: 16px 20px 16px 48px;
+        font-size: 1rem;
+    }
+}
+</style>

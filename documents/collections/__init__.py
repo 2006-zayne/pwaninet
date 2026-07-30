@@ -1,0 +1,1 @@
+"""Document collections models."""

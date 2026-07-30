@@ -37,6 +37,15 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
         print(f'[NOTIFICATIONS] User {self.user.id} connecting to group {self.user_group_name}')
 
+        # Accept connection first before joining groups
+        try:
+            await self.accept()
+            print(f'[NOTIFICATIONS] User {self.user.id} accepted connection')
+        except Exception as e:
+            print(f'[NOTIFICATIONS] Error accepting connection: {e}')
+            await self.close()
+            return
+
         # Join user's notification group
         await self.channel_layer.group_add(
             self.user_group_name,
@@ -60,9 +69,6 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         # is_online = PresenceService.is_user_online(self.user.id)
         # if is_online:
         #     print(f'[NOTIFICATIONS] User {self.user.id} is online (heartbeat-based)')
-
-        print(f'[NOTIFICATIONS] User {self.user.id} accepted connection')
-        await self.accept()
 
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection."""

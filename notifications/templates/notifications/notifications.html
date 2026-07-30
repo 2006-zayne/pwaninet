@@ -368,6 +368,248 @@
   .icon-invite { color: var(--primary); }
   .icon-alert { color: var(--brand); }
 
+  /* Avatar Stack */
+  .avatar-stack {
+    display: flex;
+    align-items: center;
+    margin-right: 1rem;
+    flex-shrink: 0;
+  }
+  .avatar-stack-item {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--card-bg);
+    margin-left: -12px;
+    position: relative;
+    z-index: 1;
+  }
+  .avatar-stack-item:first-child {
+    margin-left: 0;
+    z-index: 3;
+  }
+  .avatar-stack-item:nth-child(2) {
+    z-index: 2;
+  }
+  .avatar-stack-item:nth-child(3) {
+    z-index: 1;
+  }
+  .avatar-placeholder {
+    background: var(--brand-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--brand);
+    font-size: 20px;
+  }
+  .avatar-more {
+    background: var(--brand);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 800;
+    z-index: 0;
+  }
+  [data-theme="dark"] .avatar-stack-item {
+    border-color: var(--card-bg);
+  }
+  [data-theme="dark"] .avatar-placeholder {
+    background: var(--brand-light);
+    color: var(--brand);
+  }
+  [data-theme="dark"] .avatar-more {
+    background: var(--brand);
+    color: #fff;
+  }
+
+  /* Sender Grouped Notifications */
+  .sender-group-item {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.18s var(--ease);
+  }
+  .sender-group-item:last-child {
+    border-bottom: none;
+  }
+  .sender-group-item.unread-group {
+    background: var(--primary-light);
+    border-left: 4px solid var(--primary);
+  }
+  .sender-group-item.unread-group:hover {
+    background: #e0e7ff;
+  }
+  [data-theme="dark"] .sender-group-item.unread-group {
+    background: #37474f;
+    border-left: 4px solid #0084ff;
+  }
+  [data-theme="dark"] .sender-group-item.unread-group:hover {
+    background: #4a5568;
+  }
+
+  .sender-group-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+  }
+  .sender-group-header:hover {
+    background: var(--brand-light);
+  }
+
+  .sender-avatar-wrapper {
+    position: relative;
+    flex-shrink: 0;
+  }
+  .sender-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border);
+  }
+  .unread-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: var(--danger);
+    color: #fff;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 800;
+    border: 2px solid var(--card-bg);
+  }
+
+  .sender-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .sender-name {
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0 0 0.25rem 0;
+  }
+  .sender-summary {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+  .unread-indicator {
+    color: var(--primary);
+    font-weight: 700;
+  }
+
+  .expand-icon {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    transition: transform 0.18s var(--ease);
+  }
+  .sender-time {
+    flex-shrink: 0;
+  }
+
+  .sender-activities {
+    background: var(--page-bg);
+    border-top: 1px solid var(--border);
+  }
+
+  .activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem 1rem 2.5rem;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.18s var(--ease);
+  }
+  .activity-item:last-child {
+    border-bottom: none;
+  }
+  .activity-item.unread-activity {
+    background: var(--card-bg);
+    border-left: 3px solid var(--primary);
+  }
+  .activity-item.read-activity {
+    opacity: 0.7;
+  }
+  .activity-item:hover {
+    background: var(--brand-light);
+  }
+
+  .activity-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    opacity: 0.8;
+  }
+
+  .activity-content {
+    flex: 1;
+    min-width: 0;
+  }
+  .activity-message {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0 0 0.5rem 0;
+    line-height: 1.4;
+  }
+  .activity-link {
+    display: inline-block;
+    font-size: 0.8rem;
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 700;
+    margin-right: 0.75rem;
+  }
+  .activity-link:hover {
+    text-decoration: underline;
+  }
+
+  .activity-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .activity-time {
+    flex-shrink: 0;
+  }
+
+  .mark-all-read-container {
+    padding: 0.75rem 1.5rem;
+    text-align: center;
+    border-top: 1px solid var(--border);
+  }
+  .btn-mark-all-read {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.5rem 1rem;
+    background: var(--brand-light);
+    color: var(--brand);
+    border: 1.5px solid var(--brand-mid);
+    border-radius: var(--radius-pill);
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.18s var(--ease);
+  }
+  .btn-mark-all-read:hover {
+    background: var(--brand-mid);
+    transform: translateY(-1px);
+  }
+
   /* ── Empty State ── */
   .empty-state {
     padding: 4rem 2rem;
@@ -632,6 +874,11 @@
   <div class="filter-dropdown-container">
     <select id="filter-select" class="filter-dropdown" onchange="handleFilterChange()">
       <option value="">All Notifications</option>
+      <optgroup label="Grouping">
+        <option value="hybrid_grouped=true" {% if current_hybrid_grouped == 'true' %}selected{% endif %}>Smart Grouping</option>
+        <option value="sender_grouped=true" {% if current_sender_grouped == 'true' %}selected{% endif %}>By Person</option>
+        <option value="grouped=true" {% if current_grouped == 'true' %}selected{% endif %}>By Activity</option>
+      </optgroup>
       <optgroup label="Read Status">
         <option value="read=false" {% if filter_read == False %}selected{% endif %}>Unread</option>
         <option value="read=true" {% if filter_read == True %}selected{% endif %}>Read</option>
@@ -680,7 +927,15 @@
   <!-- ── Notifications Card ── -->
   <div class="card" id="notification-list" data-skeleton="notifications">
     <div class="card-body" style="padding: 0;">
-      {% include 'notifications/partials/notification_list_time_grouped.html' %}
+      {% if current_hybrid_grouped == 'true' %}
+        {% include 'notifications/partials/notification_list_hybrid.html' %}
+      {% elif current_sender_grouped == 'true' %}
+        {% include 'notifications/partials/notification_list_sender_grouped.html' %}
+      {% elif current_grouped == 'true' %}
+        {% include 'notifications/partials/notification_list_grouped.html' %}
+      {% else %}
+        {% include 'notifications/partials/notification_list_time_grouped.html' %}
+      {% endif %}
     </div>
   </div>
 
@@ -741,6 +996,8 @@ function handleFilterChange() {
     url.searchParams.delete('read');
     url.searchParams.delete('time');
     url.searchParams.delete('grouped');
+    url.searchParams.delete('sender_grouped');
+    url.searchParams.delete('hybrid_grouped');
     
     // Add new parameter
     const [key, val] = value.split('=');

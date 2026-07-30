@@ -1,4 +1,25 @@
 {% if query %}
+    <style>
+      [data-theme="dark"] .bg-white {
+        background-color: var(--card-bg) !important;
+      }
+      [data-theme="dark"] .bg-light {
+        background-color: var(--card-bg) !important;
+      }
+      [data-theme="dark"] .text-dark {
+        color: #ffffff !important;
+      }
+      [data-theme="dark"] .text-muted {
+        color: #d1d5db !important;
+      }
+      [data-theme="dark"] .card {
+        background-color: var(--card-bg) !important;
+        border-color: var(--border) !important;
+      }
+      [data-theme="dark"] .border-bottom {
+        border-color: var(--border) !important;
+      }
+    </style>
     <h6 class="fw-bold text-uppercase text-muted small mb-3 px-2">People</h6>
     <div class="bg-white rounded-4 shadow-sm mb-4 overflow-hidden">
         {% for user in users %}

@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid" style="padding-top: 20px;">
+    {% block repository_content %}
+    {% endblock repository_content %}
+</div>
+
+<style>
+/* Floating Button Base Styles */
+.floating-btn {
+    position: fixed;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50px;
+    width: 56px;
+    height: 56px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    white-space: nowrap;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+}
+
+.floating-btn .btn-icon {
+    font-size: 1.5rem;
+    min-width: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.floating-btn .btn-text {
+    opacity: 0;
+    width: 0;
+    margin-left: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+/* Expanded State */
+.floating-btn.expanded {
+    width: 160px;
+}
+
+.floating-btn.expanded .btn-text {
+    opacity: 1;
+    width: auto;
+    margin-left: 8px;
+}
+
+/* Desktop Hover Effect */
+@media (min-width: 992px) {
+    .floating-btn:hover {
+        width: 160px;
+    }
+
+    .floating-btn:hover .btn-text {
+        opacity: 1;
+        width: auto;
+        margin-left: 8px;
+    }
+}
+
+/* Initial Animation */
+@keyframes expandCollapse {
+    0% {
+        width: 56px;
+    }
+    10% {
+        width: 160px;
+    }
+    90% {
+        width: 160px;
+    }
+    100% {
+        width: 56px;
+    }
+}
+
+.floating-btn.initial-animation {
+    animation: expandCollapse 5s ease-in-out forwards;
+}
+
+.floating-btn.initial-animation .btn-text {
+    animation: textFade 5s ease-in-out forwards;
+}
+
+@keyframes textFade {
+    0% {
+        opacity: 0;
+        width: 0;
+        margin-left: 0;
+    }
+    10% {
+        opacity: 1;
+        width: auto;
+        margin-left: 8px;
+    }
+    90% {
+        opacity: 1;
+        width: auto;
+        margin-left: 8px;
+    }
+    100% {
+        opacity: 0;
+        width: 0;
+        margin-left: 0;
+    }
+}
+</style>
+
+<!-- Floating Library Button -->
+<a href="{% url 'documents:my_library' %}"
+   class="floating-btn btn-secondary initial-animation"
+   id="library-btn"
+   style="bottom: 180px;">
+    <span class="btn-icon"><i class="bi bi-book"></i></span>
+    <span class="btn-text">My Library</span>
+</a>
+
+<!-- Floating Upload Button -->
+{% if show_upload_button|default:True %}
+<a href="{% url 'documents:upload' %}"
+   class="floating-btn btn-primary initial-animation"
+   id="upload-btn"
+   style="bottom: 110px; animation-delay: 0.2s;">
+    <span class="btn-icon"><i class="bi bi-plus-lg"></i></span>
+    <span class="btn-text">Upload</span>
+</a>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const libraryBtn = document.getElementById('library-btn');
+    const uploadBtn = document.getElementById('upload-btn');
+
+    // Remove initial animation class after animation completes
+    setTimeout(() => {
+        if (libraryBtn) {
+            libraryBtn.classList.remove('initial-animation');
+        }
+        if (uploadBtn) {
+            uploadBtn.classList.remove('initial-animation');
+        }
+    }, 5200);
+
+    // Desktop hover delay for collapse
+    if (window.innerWidth >= 992) {
+        const buttons = [libraryBtn, uploadBtn].filter(btn => btn);
+        
+        buttons.forEach(btn => {
+            let hoverTimeout;
+            
+            btn.addEventListener('mouseenter', function() {
+                clearTimeout(hoverTimeout);
+            });
+            
+            btn.addEventListener('mouseleave', function() {
+                hoverTimeout = setTimeout(() => {
+                    // Collapse happens automatically via CSS transition
+                }, 60000);
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

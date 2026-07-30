@@ -1,0 +1,401 @@
+{% for item in notifications %}
+  {% if item.display_mode == 'sender_grouped' %}
+    <!-- Render as sender-grouped -->
+    <div class="sender-group-item {% if item.unread_count > 0 %}unread-group{% endif %}"
+         id="sender-group-{{ item.sender.id }}">
+      
+      <!-- Sender Header (Clickable to expand/collapse) -->
+      <div class="sender-group-header"
+           onclick="toggleSenderGroup({{ item.sender.id }})"
+           style="cursor: pointer;">
+        
+        <!-- Sender Avatar -->
+        <div class="sender-avatar-wrapper">
+          {% if item.sender_avatar.profile_pic %}
+            <img src="{{ item.sender_avatar.profile_pic }}" 
+                 class="sender-avatar" 
+                 alt="{{ item.sender_avatar.username }}">
+          {% else %}
+            <div class="sender-avatar avatar-placeholder">
+              <i class="bi bi-person-fill"></i>
+            </div>
+          {% endif %}
+          
+          <!-- Unread Badge -->
+          {% if item.unread_count > 0 %}
+            <span class="unread-badge">{{ item.unread_count }}</span>
+          {% endif %}
+        </div>
+        
+        <!-- Sender Info -->
+        <div class="sender-info">
+          <h4 class="sender-name">{{ item.sender.username }}</h4>
+          <p class="sender-summary">
+            {% if item.total_count == 1 %}
+              sent you 1 notification
+            {% else %}
+              sent you {{ item.total_count }} notifications
+            {% endif %}
+            {% if item.unread_count > 0 %}
+              <span class="unread-indicator">({{ item.unread_count }} unread)</span>
+            {% endif %}
+          </p>
+        </div>
+        
+        <!-- Expand Icon -->
+        <div class="expand-icon">
+          <i class="bi bi-chevron-down" id="expand-icon-{{ item.sender.id }}"></i>
+        </div>
+        
+        <!-- Time -->
+        <div class="sender-time">
+          <small class="text-muted">{{ item.latest_timestamp|timesince }}</small>
+        </div>
+      </div>
+      
+      <!-- Expandable Activities List -->
+      <div class="sender-activities" id="activities-{{ item.sender.id }}" style="display: none;">
+        {% for notif in item.notifications %}
+          <div class="activity-item {% if not notif.is_read %}read-activity{% else %}unread-activity{% endif %}"
+               id="activity-{{ notif.id }}">
+            
+            <!-- Activity Icon -->
+            <div class="activity-icon {% if notif.notification_type == 'LIKE' %}icon-like{% elif notif.notification_type == 'FOLLOW' %}icon-follow{% elif notif.notification_type == 'INVITE' %}icon-invite{% elif notif.notification_type == 'GROUP_REQUEST' %}icon-alert{% elif notif.notification_type == 'GROUP_APPROVED' %}icon-invite{% else %}icon-alert{% endif %}">
+              {% if notif.notification_type == 'LIKE' %}<i class="bi bi-heart-fill"></i>
+              {% elif notif.notification_type == 'FOLLOW' %}<i class="bi bi-person-plus-fill"></i>
+              {% elif notif.notification_type == 'INVITE' %}<i class="bi bi-envelope-fill"></i>
+              {% elif notif.notification_type == 'GROUP_REQUEST' %}<i class="bi bi-clock-fill"></i>
+              {% elif notif.notification_type == 'GROUP_APPROVED' %}<i class="bi bi-check-circle-fill"></i>
+              {% elif notif.notification_type == 'COMMENT_REPLY' %}<i class="bi bi-chat-fill"></i>
+              {% else %}<i class="bi bi-bell-fill"></i>
+              {% endif %}
+            </div>
+            
+            <!-- Activity Content -->
+            <div class="activity-content">
+              <p class="activity-message">{{ notif.msg }}</p>
+              
+              <!-- Activity Links -->
+              {% if notif.post %}
+                <a href="{% url 'posts:post_details' notif.post.id %}" 
+                   class="activity-link"
+                   onclick="markActivityAsRead({{ notif.id }}, event)">
+                  View post
+                </a>
+              {% endif %}
+              {% if notif.group %}
+                <a href="{% url 'groups:groups_detail' notif.group.id %}" 
+                   class="activity-link"
+                   onclick="markActivityAsRead({{ notif.id }}, event)">
+                  {{ notif.group.name }}
+                </a>
+              {% endif %}
+              {% if notif.notification_type == 'FOLLOW' %}
+                <a href="{% url 'users:profile' notif.sender.username %}" 
+                   class="activity-link"
+                   onclick="markActivityAsRead({{ notif.id }}, event)">
+                  View profile
+                </a>
+              {% endif %}
+              
+              <!-- Action Buttons for Group Requests -->
+              {% if notif.notification_type == 'GROUP_REQUEST' and notif.group %}
+                <div class="activity-actions">
+                  <a href="{% url 'groups:approve_from_notification' notif.group.id notif.sender.id %}" 
+                     class="btn-action btn-accept"
+                     onclick="markActivityAsRead({{ notif.id }}, event)">
+                    <i class="bi bi-check2"></i> Approve
+                  </a>
+                  <a href="{% url 'groups:reject_from_notification' notif.group.id notif.sender.id %}" 
+                     class="btn-action btn-decline"
+                     onclick="markActivityAsRead({{ notif.id }}, event)">
+                    <i class="bi bi-x2"></i> Reject
+                  </a>
+                </div>
+              {% endif %}
+            </div>
+            
+            <!-- Activity Time -->
+            <div class="activity-time">
+              <small class="text-muted">{{ notif.timestamp|timesince }}</small>
+            </div>
+          </div>
+        {% endfor %}
+        
+        <!-- Mark All as Read Button -->
+        {% if item.unread_count > 0 %}
+          <div class="mark-all-read-container">
+            <button class="btn-mark-all-read"
+                    onclick="markSenderGroupAsRead({{ item.sender.id }}, event)">
+              <i class="bi bi-check2-all"></i> Mark all as read
+            </button>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  {% elif item.display_mode == 'activity_grouped' %}
+    <!-- Render as activity-grouped -->
+    {% if item.post %}
+      <a href="{% url 'posts:post_details' item.post.id %}" 
+         class="notif-item {% if not item.is_read %}unread{% endif %}"
+         onclick="markGroupAsRead({{ item.notifications.0.id }}, event)"
+         style="text-decoration: none; display: block;">
+    {% elif item.group %}
+      <a href="{% url 'groups:groups_detail' item.group.id %}" 
+         class="notif-item {% if not item.is_read %}unread{% endif %}"
+         onclick="markGroupAsRead({{ item.notifications.0.id }}, event)"
+         style="text-decoration: none; display: block;">
+    {% elif item.notification_type == 'FOLLOW' %}
+      <a href="{% url 'users:profile' item.notifications.0.sender.username %}" 
+         class="notif-item {% if not item.is_read %}unread{% endif %}"
+         onclick="markGroupAsRead({{ item.notifications.0.id }}, event)"
+         style="text-decoration: none; display: block;">
+    {% else %}
+      <div class="notif-item {% if not item.is_read %}unread{% endif %}">
+    {% endif %}
+      <!-- Avatar Stack -->
+      <div class="avatar-stack">
+        {% for avatar in item.sender_avatars|slice:":3" %}
+          {% if avatar.profile_pic %}
+            <img src="{{ avatar.profile_pic }}" class="avatar-stack-item" alt="{{ avatar.username }}">
+          {% else %}
+            <div class="avatar-stack-item avatar-placeholder">
+              <i class="bi bi-person-fill"></i>
+            </div>
+          {% endif %}
+        {% endfor %}
+        {% if item.sender_avatars|length > 3 %}
+          <div class="avatar-stack-item avatar-more">
+            +{{ item.sender_avatars|length|add:"-3" }}
+          </div>
+        {% endif %}
+      </div>
+      
+      <div class="notif-content">
+        <div class="notif-header">
+          <div>
+            <h3 class="notif-user">
+              {% if item.count > 1 %}
+                {% if item.sender_avatars|length == 1 %}
+                  {{ item.sender_avatars.0.username }}
+                {% elif item.sender_avatars|length == 2 %}
+                  {{ item.sender_avatars.0.username }} and {{ item.sender_avatars.1.username }}
+                {% elif item.sender_avatars|length == 3 %}
+                  {{ item.sender_avatars.0.username }}, {{ item.sender_avatars.1.username }}, and {{ item.sender_avatars.2.username }}
+                {% else %}
+                  {{ item.sender_avatars.0.username }}, {{ item.sender_avatars.1.username }}, and {{ item.sender_avatars|length|add:"-2" }} others
+                {% endif %}
+              {% else %}
+                {{ item.sender_avatars.0.username }}
+              {% endif %}
+              {% if item.notification_type == 'INVITE' %}
+                <span class="notif-badge badge-invite"><i class="bi bi-envelope-fill"></i> Invite</span>
+              {% elif item.notification_type == 'FOLLOW' %}
+                <span class="notif-badge badge-follow"><i class="bi bi-person-plus-fill"></i> Follow</span>
+              {% elif item.notification_type == 'LIKE' %}
+                <span class="notif-badge badge-like"><i class="bi bi-heart-fill"></i> Like</span>
+              {% elif item.notification_type == 'GROUP_REQUEST' %}
+                <span class="notif-badge badge-alert"><i class="bi bi-clock-fill"></i> Request</span>
+              {% elif item.notification_type == 'GROUP_APPROVED' %}
+                <span class="notif-badge badge-invite"><i class="bi bi-check-circle-fill"></i> Approved</span>
+              {% else %}
+                <span class="notif-badge badge-alert"><i class="bi bi-bell-fill"></i> Alert</span>
+              {% endif %}
+            </h3>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="notif-time">
+              <i class="bi bi-clock-history"></i> {{ item.latest_timestamp|timesince }}
+            </span>
+          </div>
+        </div>
+        
+        <p class="notif-message">
+          {% if item.count > 1 %}
+            {% if item.notification_type == 'LIKE' %}
+              {% if item.count == 1 %}liked{% else %}liked{% endif %} your post
+            {% elif item.notification_type == 'FOLLOW' %}
+              {% if item.count == 1 %}followed{% else %}followed{% endif %} you
+            {% elif item.notification_type == 'INVITE' %}
+              {% if item.count == 1 %}invited{% else %}invited{% endif %} you to join
+            {% elif item.notification_type == 'GROUP_REQUEST' %}
+              {% if item.count == 1 %}requested{% else %}requested{% endif %} to join
+            {% elif item.notification_type == 'GROUP_APPROVED' %}
+              {% if item.count == 1 %}approved{% else %}approved{% endif %} your request to join
+            {% else %}
+              {% if item.count == 1 %}sent{% else %}sent{% endif %} you notifications
+            {% endif %}
+          {% else %}
+            {{ item.notifications.0.msg }}
+          {% endif %}
+          {% if item.post %}
+            <span>View post</span>
+          {% endif %}
+          {% if item.group %}
+            <span>{{ item.group.name }}</span>
+          {% endif %}
+        </p>
+
+        {% if item.count > 1 %}
+          <div style="margin-top: 0.75rem;">
+            <button class="btn-action"
+                    style="background: var(--brand-light); color: var(--brand); border: 1.5px solid var(--brand-mid);"
+                    onclick="event.stopPropagation(); this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none';">
+              <i class="bi bi-chevron-down"></i> See all {{ item.count }}
+            </button>
+            <div style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+              {% for notif in item.notifications %}
+                <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; font-size: 0.8rem; color: var(--text-secondary);">
+                  <img src="{{ notif.sender.profile_pic.url }}" style="width: 24px; height: 24px; border-radius: 50%;" alt="">
+                  <span>{{ notif.sender.username }}</span>
+                  <span style="margin-left: auto; font-size: 0.7rem;">{{ notif.timestamp|timesince }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% elif item.notification_type == 'GROUP_REQUEST' and item.group %}
+          <div class="notif-actions">
+            <a href="{% url 'groups:approve_from_notification' item.group.id item.notifications.0.sender.id %}" class="btn-action btn-accept" onclick="event.stopPropagation()">
+              <i class="bi bi-check2"></i> Approve
+            </a>
+            <a href="{% url 'groups:reject_from_notification' item.group.id item.notifications.0.sender.id %}" class="btn-action btn-decline" onclick="event.stopPropagation()">
+              <i class="bi bi-x2"></i> Reject
+            </a>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="notif-icon {% if item.notification_type == 'LIKE' %}icon-like{% elif item.notification_type == 'FOLLOW' %}icon-follow{% elif item.notification_type == 'INVITE' %}icon-invite{% elif item.notification_type == 'GROUP_REQUEST' %}icon-alert{% elif item.notification_type == 'GROUP_APPROVED' %}icon-invite{% else %}icon-alert{% endif %}">
+        {% if item.notification_type == 'LIKE' %}<i class="bi bi-heart-fill"></i>
+        {% elif item.notification_type == 'FOLLOW' %}<i class="bi bi-person-plus-fill"></i>
+        {% elif item.notification_type == 'INVITE' %}<i class="bi bi-envelope-fill"></i>
+        {% elif item.notification_type == 'GROUP_REQUEST' %}<i class="bi bi-clock-fill"></i>
+        {% elif item.notification_type == 'GROUP_APPROVED' %}<i class="bi bi-check-circle-fill"></i>
+        {% else %}<i class="bi bi-bell-fill"></i>
+        {% endif %}
+      </div>
+    {% if item.post or item.group or item.notification_type == 'FOLLOW' %}
+      </a>
+    {% else %}
+      </div>
+    {% endif %}
+  {% endif %}
+{% empty %}
+  <div class="empty-state">
+    <div class="empty-icon"><i class="bi bi-bell-slash"></i></div>
+    <div class="empty-title">No notifications</div>
+    <p class="empty-sub">You're all caught up!</p>
+  </div>
+{% endfor %}
+
+<script>
+/* eslint-disable */
+function toggleSenderGroup(senderId) {
+  const activities = document.getElementById('activities-' + senderId);
+  const expandIcon = document.getElementById('expand-icon-' + senderId);
+  
+  if (activities.style.display === 'none') {
+    activities.style.display = 'block';
+    expandIcon.classList.remove('bi-chevron-down');
+    expandIcon.classList.add('bi-chevron-up');
+  } else {
+    activities.style.display = 'none';
+    expandIcon.classList.remove('bi-chevron-up');
+    expandIcon.classList.add('bi-chevron-down');
+  }
+}
+
+function markActivityAsRead(notifId, event) {
+  if (event) {
+    event.stopPropagation();
+  }
+  
+  fetch('/notifications/read/' + notifId + '/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+      'Content-Type': 'application/json'
+    }
+  }).then(function(response) {
+    if (response.ok) {
+      const activityElement = document.getElementById('activity-' + notifId);
+      if (activityElement) {
+        activityElement.classList.remove('unread-activity');
+        activityElement.classList.add('read-activity');
+      }
+      updateUnreadCounts();
+    }
+  });
+}
+
+function markSenderGroupAsRead(senderId, event) {
+  if (event) {
+    event.stopPropagation();
+  }
+  
+  const activitiesContainer = document.getElementById('activities-' + senderId);
+  const unreadActivities = activitiesContainer.querySelectorAll('.unread-activity');
+  
+  const notifIds = Array.from(unreadActivities).map(function(el) {
+    return el.id.replace('activity-', '');
+  });
+  
+  notifIds.forEach(function(notifId) {
+    fetch('/notifications/read/' + notifId + '/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        'Content-Type': 'application/json'
+      }
+    }).then(function(response) {
+      if (response.ok) {
+        const activityElement = document.getElementById('activity-' + notifId);
+        if (activityElement) {
+          activityElement.classList.remove('unread-activity');
+          activityElement.classList.add('read-activity');
+        }
+      }
+    });
+  });
+  
+  const senderGroup = document.getElementById('sender-group-' + senderId);
+  const unreadBadge = senderGroup.querySelector('.unread-badge');
+  const unreadIndicator = senderGroup.querySelector('.unread-indicator');
+  
+  if (unreadBadge) {
+    unreadBadge.style.display = 'none';
+  }
+  if (unreadIndicator) {
+    unreadIndicator.style.display = 'none';
+  }
+  senderGroup.classList.remove('unread-group');
+  
+  updateUnreadCounts();
+}
+
+function markGroupAsRead(notifId, event) {
+  event.preventDefault();
+  
+  fetch('/notifications/read/' + notifId + '/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+      'Content-Type': 'application/json'
+    }
+  }).then(function(response) {
+    if (response.ok) {
+      window.location.href = event.currentTarget.href;
+    }
+  });
+}
+
+function updateUnreadCounts() {
+  fetch('/notifications/unread-count/')
+    .then(function(r) { return r.text(); })
+    .then(function(html) {
+      const badge = document.getElementById('unread-count-badge');
+      if (badge) badge.outerHTML = html;
+    });
+}
+/* eslint-enable */
+</script>

@@ -36,6 +36,8 @@ def notifications_list(request):
     page = request.GET.get('page', 1)
     grouped_param = request.GET.get('grouped', 'false')
     time_filter = request.GET.get('time', 'all')
+    sender_grouped_param = request.GET.get('sender_grouped', 'false')
+    hybrid_grouped_param = request.GET.get('hybrid_grouped', 'true')
     
     is_read = None
     if is_read_param == 'true':
@@ -44,6 +46,8 @@ def notifications_list(request):
         is_read = False
     
     grouped = grouped_param == 'true'
+    sender_grouped = sender_grouped_param == 'true'
+    hybrid_grouped = hybrid_grouped_param == 'true'
     
     # Use time-based grouping if requested
     if time_filter != 'all':
@@ -61,8 +65,70 @@ def notifications_list(request):
             'current_filter_type': notification_type,
             'current_filter_read': is_read_param,
             'current_grouped': grouped_param,
+            'current_sender_grouped': sender_grouped_param,
+            'current_hybrid_grouped': hybrid_grouped_param,
             'has_pagination': False,
             'unread_notifications_count': get_cached_unread_count(request.user)
+        }
+    elif sender_grouped:
+        from notifications.queries.notification_queries import get_notifications_grouped_by_sender
+        notifications = get_notifications_grouped_by_sender(
+            request.user,
+            notification_type=notification_type,
+            is_read=is_read
+        )
+        context = {
+            'notifications': notifications,
+            'filter_type': notification_type,
+            'filter_read': is_read,
+            'current_filter_type': notification_type,
+            'current_filter_read': is_read_param,
+            'current_grouped': grouped_param,
+            'current_sender_grouped': sender_grouped_param,
+            'current_hybrid_grouped': hybrid_grouped_param,
+            'has_pagination': False,
+            'unread_notifications_count': get_cached_unread_count(request.user),
+            'time_filter': 'all'
+        }
+    elif grouped:
+        from notifications.queries.notification_queries import get_grouped_notifications
+        notifications = get_grouped_notifications(
+            request.user,
+            notification_type=notification_type,
+            is_read=is_read
+        )
+        context = {
+            'notifications': notifications,
+            'filter_type': notification_type,
+            'filter_read': is_read,
+            'current_filter_type': notification_type,
+            'current_filter_read': is_read_param,
+            'current_grouped': grouped_param,
+            'current_sender_grouped': sender_grouped_param,
+            'current_hybrid_grouped': hybrid_grouped_param,
+            'has_pagination': False,
+            'unread_notifications_count': get_cached_unread_count(request.user),
+            'time_filter': 'all'
+        }
+    elif hybrid_grouped:
+        from notifications.queries.notification_queries import get_notifications_hybrid_grouped
+        notifications = get_notifications_hybrid_grouped(
+            request.user,
+            notification_type=notification_type,
+            is_read=is_read
+        )
+        context = {
+            'notifications': notifications,
+            'filter_type': notification_type,
+            'filter_read': is_read,
+            'current_filter_type': notification_type,
+            'current_filter_read': is_read_param,
+            'current_grouped': grouped_param,
+            'current_sender_grouped': sender_grouped_param,
+            'current_hybrid_grouped': hybrid_grouped_param,
+            'has_pagination': False,
+            'unread_notifications_count': get_cached_unread_count(request.user),
+            'time_filter': 'all'
         }
     else:
         context = build_notifications_context(
@@ -86,6 +152,8 @@ def notifications_list(request):
         context['current_filter_type'] = notification_type
         context['current_filter_read'] = is_read_param
         context['current_grouped'] = grouped_param
+        context['current_sender_grouped'] = sender_grouped_param
+        context['current_hybrid_grouped'] = hybrid_grouped_param
         context['time_filter'] = 'all'
     
     return render(request, 'notifications/notifications.html', context)

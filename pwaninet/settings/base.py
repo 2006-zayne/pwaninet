@@ -35,7 +35,7 @@ ALLOWED_HOSTS = [
     host.split(':')[0].strip()
     for host in os.environ.get(
         'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,10.20.152.125,pwaninet.app,192.168.43.170,192.168.25.221,192.168.43.170,192.168.183.245,192.168.203.221,192.168.53.221,192.168.93.221,192.168.87.159,192.168.14.221,192.168.72.88,192.168.87.159,192.168.72.88,192.168.183.245,172.18.0.1,192.168.183.245,192.168.83.192'
+        'localhost,127.0.0.1,10.20.152.125,pwaninet.app,192.168.43.170,192.168.173.221,192.168.43.170,192.168.183.245,192.168.203.221,192.168.53.221,192.168.93.221,192.168.87.159,192.168.14.221,192.168.72.88,192.168.87.159,192.168.72.88,192.168.183.245,172.18.0.1,192.168.183.245,192.168.83.192'
     ).split(',')
     if host.strip()
 ]
@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',
     'channels',
     'rest_framework',
     'corsheaders',
@@ -60,6 +61,7 @@ INSTALLED_APPS = [
     'posts',
     'groups',
     'notifications',
+    'documents',
     'releases',
     # Messaging - FROZEN FOR MVP
     # 'messaging',
@@ -269,6 +271,18 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+# Celery configuration
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://127.0.0.1:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://127.0.0.1:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = os.environ.get('TIME_ZONE', 'UTC')
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')

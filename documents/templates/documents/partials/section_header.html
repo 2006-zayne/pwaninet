@@ -1,0 +1,31 @@
+{% load static %}
+<div class="doc-section-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding: 0 4px;">
+    <h2 class="doc-section-title" 
+        style="font-size: 1.5rem; font-weight: 700; margin: 0; 
+               color: var(--text-dark);">
+        {{ title }}
+    </h2>
+    
+    {% if show_view_all|default:False %}
+    <a href="{{ view_all_url|default:'#' }}" 
+       class="doc-view-all"
+       style="color: var(--primary); text-decoration: none; 
+              font-weight: 600; font-size: 0.9rem; display: flex; 
+              align-items: center; gap: 4px;">
+        View all
+        <i class="bi bi-arrow-right"></i>
+    </a>
+    {% endif %}
+</div>
+
+<style>
+@media (max-width: 768px) {
+    .doc-section-title {
+        font-size: 1.25rem;
+    }
+    
+    .doc-view-all {
+        font-size: 0.85rem;
+    }
+}
+</style>

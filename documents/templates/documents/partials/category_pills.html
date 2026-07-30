@@ -1,0 +1,102 @@
+{% load static %}
+<div class="doc-categories-container" style="margin-bottom: 40px;">
+    <div class="doc-categories-scroll" 
+         style="display: flex; gap: 12px; overflow-x: auto; 
+                padding: 8px 4px; scroll-behavior: smooth;">
+        
+        {% if categories %}
+            {% for category in categories %}
+                <a href="{% url 'documents:search' %}?category={{ category.code }}"
+                   class="doc-category-pill {% if active_category == category.code %}active{% endif %}"
+                   style="flex-shrink: 0; padding: 10px 20px; 
+                          border-radius: 24px; border: 2px solid var(--border);
+                          background: var(--card-bg); color: var(--text-secondary);
+                          font-weight: 600; font-size: 0.9rem; text-decoration: none;
+                          transition: all 0.2s ease; white-space: nowrap;">
+                    {{ category.name }}
+                </a>
+            {% endfor %}
+        {% else %}
+            <!-- Fallback hardcoded categories if no data -->
+            <a href="{% url 'documents:search' %}?category=past_paper"
+               class="doc-category-pill {% if active_category == 'past_paper' %}active{% endif %}"
+               style="flex-shrink: 0; padding: 10px 20px; 
+                      border-radius: 24px; border: 2px solid var(--border);
+                      background: var(--card-bg); color: var(--text-secondary);
+                      font-weight: 600; font-size: 0.9rem; text-decoration: none;
+                      transition: all 0.2s ease; white-space: nowrap;">
+                Past Papers
+            </a>
+            
+            <a href="{% url 'documents:search' %}?category=lecture_notes"
+               class="doc-category-pill {% if active_category == 'lecture_notes' %}active{% endif %}"
+               style="flex-shrink: 0; padding: 10px 20px; 
+                      border-radius: 24px; border: 2px solid var(--border);
+                      background: var(--card-bg); color: var(--text-secondary);
+                      font-weight: 600; font-size: 0.9rem; text-decoration: none;
+                      transition: all 0.2s ease; white-space: nowrap;">
+                Lecture Notes
+            </a>
+            
+            <a href="{% url 'documents:search' %}?category=cat"
+               class="doc-category-pill {% if active_category == 'cat' %}active{% endif %}"
+               style="flex-shrink: 0; padding: 10px 20px; 
+                      border-radius: 24px; border: 2px solid var(--border);
+                      background: var(--card-bg); color: var(--text-secondary);
+                      font-weight: 600; font-size: 0.9rem; text-decoration: none;
+                      transition: all 0.2s ease; white-space: nowrap;">
+                CATs
+            </a>
+            
+            <a href="{% url 'documents:search' %}?category=assignment"
+               class="doc-category-pill {% if active_category == 'assignment' %}active{% endif %}"
+               style="flex-shrink: 0; padding: 10px 20px; 
+                      border-radius: 24px; border: 2px solid var(--border);
+                      background: var(--card-bg); color: var(--text-secondary);
+                      font-weight: 600; font-size: 0.9rem; text-decoration: none;
+                      transition: all 0.2s ease; white-space: nowrap;">
+                Assignments
+            </a>
+            
+            <a href="{% url 'documents:search' %}?category=slides"
+               class="doc-category-pill {% if active_category == 'slides' %}active{% endif %}"
+               style="flex-shrink: 0; padding: 10px 20px; 
+                      border-radius: 24px; border: 2px solid var(--border);
+                      background: var(--card-bg); color: var(--text-secondary);
+                      font-weight: 600; font-size: 0.9rem; text-decoration: none;
+                      transition: all 0.2s ease; white-space: nowrap;">
+                Slides
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.doc-categories-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.doc-categories-scroll {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.doc-category-pill:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.doc-category-pill.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .doc-category-pill {
+        padding: 8px 16px;
+        font-size: 0.85rem;
+    }
+}
+</style>
