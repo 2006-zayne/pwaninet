@@ -824,12 +824,14 @@
             <!-- Sector panel -->
             <div class="compose-panel" id="sectorPanel">
               <div class="panel-label">Target Group</div>
-              <select name="unit" class="sector-select form-select" id="id_unit">
-                {% for value, label in form.unit.field.choices %}
-                  <option value="{{ value }}" {% if form.unit.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+              <select name="group_select" class="sector-select form-select" id="group_select">
+                <option value="">No Group</option>
+                {% for group in user_groups %}
+                  <option value="{{ group.id }}">{{ group.name }}</option>
                 {% endfor %}
               </select>
-              <div class="sector-hint">Leave as "General" to broadcast to the full feed.</div>
+              <input type="hidden" name="group" id="id_group" value="">
+              <div class="sector-hint">Select a group to post in that group's feed, or leave as "No Group" for global feed.</div>
             </div>
 
             <!-- Style selector (always visible) -->
@@ -1025,6 +1027,16 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     btns.sector.addEventListener('click', () => togglePanel('sector'));
+    
+    // Sync group_select with hidden id_group field
+    const groupSelect = document.getElementById('group_select');
+    const groupHidden = document.getElementById('id_group');
+    if (groupSelect && groupHidden) {
+        groupSelect.addEventListener('change', function() {
+            groupHidden.value = this.value;
+        });
+    }
+    
     btns.tag.addEventListener('click', () => {
         tagModal.classList.add('show');
     });
@@ -1484,7 +1496,7 @@ document.addEventListener('DOMContentLoaded', function () {
           visibility: 'public',
           metadata: {
             unit: unitSelect?.value || null,
-            group: new URLSearchParams(window.location.search).get('group') || null,
+            group: document.getElementById('id_group')?.value || null,
             gradient_class: gradInput.value || 'none',
             custom_gradient_text: document.getElementById('customGradientText')?.value?.trim() || null,
             custom_gradient_color1: document.getElementById('customGradientColor1')?.value || null,

@@ -123,6 +123,16 @@
                         <span style="color: var(--text-dark); font-size: 0.9rem; font-weight: 500;">N/A</span>
                     {% endif %}
                 </div>
+                <div class="doc-meta-item" style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">Pages</span>
+                    {% if document.latest_version %}
+                        {% with first_file=document.latest_version.files.first %}
+                            <span style="color: var(--text-dark); font-size: 0.9rem; font-weight: 500;">{{ first_file.page_count|default:"N/A" }}</span>
+                        {% endwith %}
+                    {% else %}
+                        <span style="color: var(--text-dark); font-size: 0.9rem; font-weight: 500;">N/A</span>
+                    {% endif %}
+                </div>
                 <div class="doc-meta-item" style="display: flex; justify-content: space-between; padding: 8px 0;">
                     <span style="color: var(--text-secondary); font-size: 0.9rem;">Language</span>
                     <span style="color: var(--text-dark); font-size: 0.9rem; font-weight: 500;">{{ document.get_language_display|default:"English" }}</span>
@@ -133,11 +143,12 @@
             <div class="doc-actions" style="display: flex; flex-direction: column; gap: 12px;">
                 {% if document.latest_version %}
                     {% with first_file=document.latest_version.files.first %}
-                        <button class="btn btn-primary" 
-                                style="padding: 14px 24px; border-radius: 12px; font-weight: 600; font-size: 1rem;">
+                        <a href="{{ first_file.file.url }}" download="{{ document.title }}.{{ first_file.extension }}" 
+                           class="btn btn-primary" 
+                           style="padding: 14px 24px; border-radius: 12px; font-weight: 600; font-size: 1rem; text-decoration: none; display: inline-block; text-align: center;">
                             <i class="bi bi-download" style="margin-right: 8px;"></i>
                             Download ({{ first_file.size_mb|default:"N/A" }} MB)
-                        </button>
+                        </a>
                     {% endwith %}
                 {% else %}
                     <button class="btn btn-primary" 
@@ -148,18 +159,48 @@
                 {% endif %}
                 
                 <div style="display: flex; gap: 12px;">
-                    <button class="btn btn-outline-secondary" 
-                            style="flex: 1; padding: 12px; border-radius: 12px; font-weight: 500;">
-                        <i class="bi bi-bookmark"></i>
-                    </button>
-                    <button class="btn btn-outline-secondary" 
-                            style="flex: 1; padding: 12px; border-radius: 12px; font-weight: 500;">
+                    {% if request.user.is_authenticated %}
+                        {% with is_bookmarked=document.bookmarks.filter(user=request.user).exists %}
+                            <div id="bookmark-button-{{ document.id }}">
+                                {% include 'documents/partials/bookmark_button.html' with document=document is_bookmarked=is_bookmarked bookmark_count=document.bookmarks.count %}
+                            </div>
+                        {% endwith %}
+                    {% else %}
+                        <button class="btn btn-outline-secondary" 
+                                style="flex: 1; padding: 12px; border-radius: 12px; font-weight: 500;">
+                            <i class="bi bi-bookmark"></i>
+                        </button>
+                    {% endif %}
+                    
+                    <button class="btn btn-outline-secondary share-dropdown-toggle" 
+                            style="flex: 1; padding: 12px; border-radius: 12px; font-weight: 500;"
+                            onclick="toggleShareDropdown()">
                         <i class="bi bi-share"></i>
                     </button>
                     <button class="btn btn-outline-secondary" 
                             style="flex: 1; padding: 12px; border-radius: 12px; font-weight: 500;">
                         <i class="bi bi-flag"></i>
                     </button>
+                </div>
+                
+                <!-- Share Dropdown -->
+                <div id="share-dropdown" class="share-dropdown" style="display: none; position: relative; margin-top: 8px;">
+                    <div style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                        <button onclick="copyLink({{ document.id }})" style="width: 100%; padding: 10px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+                            <i class="bi bi-link-45deg"></i>
+                            <span>Copy Link</span>
+                        </button>
+                        {% if request.user.is_authenticated %}
+                            <button onclick="shareToProfile({{ document.id }})" style="width: 100%; padding: 10px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                                <i class="bi bi-person"></i>
+                                <span>Share to Profile</span>
+                            </button>
+                            <button onclick="shareToGroup({{ document.id }})" style="width: 100%; padding: 10px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                                <i class="bi bi-people"></i>
+                                <span>Share to Group</span>
+                            </button>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
             
@@ -168,25 +209,53 @@
                  style="display: flex; justify-content: space-around; margin-top: 24px; 
                         padding-top: 20px; border-top: 1px solid var(--border);">
                 <div style="text-align: center;">
-                    <p style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0;">{{ document.download_count }}</p>
+                    <p style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0;">{{ document.downloads.count }}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Downloads</p>
                 </div>
                 <div style="text-align: center;">
-                    <p style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0;">{{ document.view_count }}</p>
+                    <p style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0;">{{ document.views.count }}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Views</p>
                 </div>
                 <div style="text-align: center;">
-                    <p style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0;">{{ document.rating_count }}</p>
-                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Ratings</p>
+                    <p style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0;">{{ document.bookmarks.count }}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Bookmarks</p>
                 </div>
             </div>
+            
+            <!-- Rating Buttons -->
+            {% if request.user.is_authenticated %}
+                {% with user_rating=document.ratings.filter(user=request.user).first %}
+                    {% with analytics=document.analytics %}
+                        {% include 'documents/partials/rating_buttons.html' with document=document user_rating=user_rating.rating analytics=analytics %}
+                    {% endwith %}
+                {% endwith %}
+            {% endif %}
             
             <!-- Author -->
             <div class="doc-author" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);">
                 <p style="font-size: 0.875rem; color: var(--text-secondary); margin: 0 0 8px 0;">Uploaded by</p>
-                <p style="font-size: 0.95rem; color: var(--text-dark); font-weight: 500; margin: 0;">
-                    {{ document.uploaded_by.get_full_name|default:document.uploaded_by.username }}
-                </p>
+                <a href="{% url 'users:profile' document.uploaded_by.username %}" 
+                   style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit;">
+                    {% if document.uploaded_by.profile_pic and document.uploaded_by.profile_pic.name != 'profile_pic/default_pic1.jpg' %}
+                        <img src="{{ document.uploaded_by.profile_pic.url }}" 
+                             alt="{{ document.uploaded_by.get_full_name|default:document.uploaded_by.username }}"
+                             style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                    {% else %}
+                        <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 1rem;">
+                            {{ document.uploaded_by.username|first|upper }}
+                        </div>
+                    {% endif %}
+                    <div style="display: flex; flex-direction: column;">
+                        <p style="font-size: 0.95rem; color: var(--text-dark); font-weight: 500; margin: 0;">
+                            {{ document.uploaded_by.get_full_name|default:document.uploaded_by.username }}
+                        </p>
+                        {% if document.uploaded_by.course %}
+                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">
+                                {{ document.uploaded_by.course.name }}
+                            </p>
+                        {% endif %}
+                    </div>
+                </a>
             </div>
         </div>
     </div>
@@ -221,6 +290,146 @@ document.addEventListener('DOMContentLoaded', function() {
         if (fileUrl && fileType) {
             const viewer = new DocumentViewer(viewerContainer, fileUrl, fileType, fileName);
             viewer.initialize();
+        }
+    }
+    
+    // Background fetch for view counts
+    const documentId = "{{ document.id }}";
+    const viewCountElement = document.querySelector('.doc-stats div:nth-child(2) p:first-child');
+    const downloadCountElement = document.querySelector('.doc-stats div:nth-child(1) p:first-child');
+    const bookmarkCountElement = document.querySelector('.doc-stats div:nth-child(3) p:first-child');
+    
+    // Background fetch for updated counts every 30 seconds
+    setInterval(function() {
+        fetch('/documents/document/' + documentId + '/stats/')
+            .then(response => response.json())
+            .then(data => {
+                if (viewCountElement) {
+                    viewCountElement.textContent = data.view_count;
+                }
+                if (downloadCountElement) {
+                    downloadCountElement.textContent = data.download_count;
+                }
+                if (bookmarkCountElement) {
+                    bookmarkCountElement.textContent = data.bookmark_count;
+                }
+            })
+            .catch(error => console.log('Error fetching stats:', error));
+    }, 30000);
+});
+
+function toggleShareDropdown() {
+    const dropdown = document.getElementById('share-dropdown');
+    if (dropdown) {
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+function copyLink(documentId) {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(function() {
+        alert('Link copied to clipboard!');
+    }).catch(function(err) {
+        console.error('Failed to copy: ', err);
+    });
+    
+    // Track the share
+    fetch('/documents/document/' + documentId + '/share/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: 'share_type=copy_link'
+    }).then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              console.log('Share tracked:', data.message);
+          }
+      })
+      .catch(error => console.error('Error tracking share:', error));
+    
+    // Close dropdown
+    document.getElementById('share-dropdown').style.display = 'none';
+}
+
+function shareToProfile(documentId) {
+    fetch('/documents/document/' + documentId + '/share/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: 'share_type=profile'
+    }).then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              alert(data.message);
+          } else {
+              alert('Error: ' + (data.error || 'Failed to share'));
+          }
+      })
+      .catch(error => {
+          console.error('Error sharing to profile:', error);
+          alert('Failed to share to profile');
+      });
+    
+    // Close dropdown
+    document.getElementById('share-dropdown').style.display = 'none';
+}
+
+function shareToGroup(documentId) {
+    // Simple prompt for group selection - in production, this should be a proper modal
+    const groupId = prompt('Enter Group ID:');
+    if (!groupId) return;
+    
+    fetch('/documents/document/' + documentId + '/share/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: 'share_type=group&group_id=' + groupId
+    }).then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              alert(data.message);
+          } else {
+              alert('Error: ' + (data.error || 'Failed to share'));
+          }
+      })
+      .catch(error => {
+          console.error('Error sharing to group:', error);
+          alert('Failed to share to group');
+      });
+    
+    // Close dropdown
+    document.getElementById('share-dropdown').style.display = 'none';
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(event) {
+    const dropdown = document.getElementById('share-dropdown');
+    const toggleButton = document.querySelector('.share-dropdown-toggle');
+    
+    if (dropdown && toggleButton) {
+        if (!dropdown.contains(event.target) && !toggleButton.contains(event.target)) {
+            dropdown.style.display = 'none';
         }
     }
 });

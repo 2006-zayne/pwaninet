@@ -49,14 +49,38 @@
   </div>
 </div>
 
-<!-- Step 3: Create Post (was step 4) -->
-<div class="modal fade" id="tourStep4" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+<!-- Step 3: Document Repository -->
+<div class="modal fade" id="tourStep3" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
   <div class="modal-dialog modal-dialog-centered modal-sm">
     <div class="modal-content">
       <div class="modal-body p-4">
         <div class="d-flex align-items-center mb-3">
           <div class="flex-shrink-0">
             <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: bold;">3</div>
+          </div>
+          <div class="flex-grow-1 ms-3">
+            <h6 class="mb-0 fw-bold">Document Repository</h6>
+          </div>
+        </div>
+        <p class="text-muted small mb-3">Access a comprehensive library of academic resources including lecture notes, past papers, and study materials shared by your peers.</p>
+        <p class="text-muted small mb-4"><strong>Tip:</strong> Upload your own notes to help others and bookmark useful documents for quick access later.</p>
+        <div class="d-flex justify-content-between">
+          <button type="button" class="btn btn-sm btn-link text-muted" id="exitTour3">Exit Tour</button>
+          <button type="button" class="btn btn-sm btn-primary" id="nextStep3">Continue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 4: Create Post (was step 4) -->
+<div class="modal fade" id="tourStep4" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-body p-4">
+        <div class="d-flex align-items-center mb-3">
+          <div class="flex-shrink-0">
+            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: bold;">4</div>
           </div>
           <div class="flex-grow-1 ms-3">
             <h6 class="mb-0 fw-bold">Share Updates</h6>
@@ -73,14 +97,14 @@
   </div>
 </div>
 
-<!-- Step 4: Profile (was step 5) -->
+<!-- Step 5: Profile (was step 5) -->
 <div class="modal fade" id="tourStep5" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
   <div class="modal-dialog modal-dialog-centered modal-sm">
     <div class="modal-content">
       <div class="modal-body p-4">
         <div class="d-flex align-items-center mb-3">
           <div class="flex-shrink-0">
-            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: bold;">4</div>
+            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: bold;">5</div>
           </div>
           <div class="flex-grow-1 ms-3">
             <h6 class="mb-0 fw-bold">Your Profile</h6>
@@ -104,8 +128,8 @@
 (function () {
     'use strict';
 
-    // Modal element IDs in tour order (step 3 messaging removed)
-    const TOUR_STEP_IDS = [1, 2, 4, 5];
+    // Modal element IDs in tour order (step 3 messaging removed, now documents)
+    const TOUR_STEP_IDS = [1, 2, 3, 4, 5];
     let currentTourIndex = 0;
 
     function getCsrfToken() {
@@ -206,6 +230,11 @@
         const exitTour2 = document.getElementById('exitTour2');
         if (nextStep2) nextStep2.addEventListener('click', window.nextTourStep);
         if (exitTour2) exitTour2.addEventListener('click', window.exitTour);
+
+        const nextStep3 = document.getElementById('nextStep3');
+        const exitTour3 = document.getElementById('exitTour3');
+        if (nextStep3) nextStep3.addEventListener('click', window.nextTourStep);
+        if (exitTour3) exitTour3.addEventListener('click', window.exitTour);
 
         const nextStep4 = document.getElementById('nextStep4');
         const exitTour4 = document.getElementById('exitTour4');

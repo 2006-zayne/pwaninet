@@ -2,7 +2,13 @@
 
 These tasks handle asynchronous processing of uploaded documents,
 including thumbnail generation, preview creation, metadata extraction,
-and search indexing. Each stage is independently retryable.
+OCR text extraction, and search indexing. Each stage is independently retryable.
+
+OCR Pipeline Architecture:
+- Extension points are provided for future OCR implementation
+- OCR text will be stored in DocumentSearchIndex.ocr_text
+- OCR text will be indexed with weight D (lower priority)
+- The pipeline supports multiple OCR engines (Tesseract, Google Vision, etc.)
 """
 
 import logging
@@ -18,6 +24,97 @@ from ..services.search_service import SearchService
 logger = logging.getLogger(__name__)
 
 
+# OCR Extension Points
+# These functions provide clear extension points for future OCR implementation
+# without requiring architectural changes
+
+def extract_ocr_text(file: DocumentFile) -> str:
+    """Extract text from document using OCR.
+    
+    This is an extension point for future OCR implementation.
+    Currently returns empty string.
+    
+    Future implementations could use:
+    - Tesseract OCR for PDFs and images
+    - Google Vision API
+    - AWS Textract
+    - Azure Form Recognizer
+    - pdfplumber for text extraction from PDFs
+    
+    Args:
+        file: DocumentFile instance to extract text from
+        
+    Returns:
+        Extracted text as string
+    """
+    # Extension point for OCR implementation
+    # When implementing OCR, uncomment and modify the following:
+    #
+    # if file.extension == 'pdf':
+    #     return _extract_text_from_pdf(file)
+    # elif file.extension in ['jpg', 'jpeg', 'png', 'tiff']:
+    #     return _extract_text_from_image(file)
+    # elif file.extension == 'docx':
+    #     return _extract_text_from_docx(file)
+    #
+    return ""
+
+
+def _extract_text_from_pdf(file: DocumentFile) -> str:
+    """Extract text from PDF file.
+    
+    Extension point for PDF text extraction.
+    Could use pdfplumber, PyPDF2, or OCR for scanned PDFs.
+    """
+    # Future implementation
+    return ""
+
+
+def _extract_text_from_image(file: DocumentFile) -> str:
+    """Extract text from image file using OCR.
+    
+    Extension point for image OCR.
+    Could use Tesseract, Google Vision, etc.
+    """
+    # Future implementation
+    return ""
+
+
+def _extract_text_from_docx(file: DocumentFile) -> str:
+    """Extract text from DOCX file.
+    
+    Extension point for DOCX text extraction.
+    Could use python-docx.
+    """
+    # Future implementation
+    return ""
+
+
+def extract_ocr_text_for_document(document: Document) -> str:
+    """Extract OCR text for all files in a document.
+    
+    This function coordinates OCR extraction across all files
+    in the document's latest version.
+    
+    Args:
+        document: Document instance
+        
+    Returns:
+        Combined OCR text from all files
+    """
+    version = document.latest_version
+    if not version:
+        return ""
+    
+    all_text = []
+    for file in version.files.all():
+        text = extract_ocr_text(file)
+        if text:
+            all_text.append(text)
+    
+    return " ".join(all_text)
+
+
 @shared_task(bind=True, max_retries=3)
 def process_document(self, document_id: int):
     """Main task to process a document after upload.
@@ -26,8 +123,9 @@ def process_document(self, document_id: int):
     1. Generate thumbnails
     2. Generate previews
     3. Extract metadata
-    4. Index for search
-    5. Mark as ready
+    4. Extract OCR text (extension point)
+    5. Index for search
+    6. Mark as ready
     """
     try:
         document = Document.objects.get(id=document_id)
@@ -45,6 +143,11 @@ def process_document(self, document_id: int):
         
         # Wait for all files to be processed (simplified)
         # In production, use group/chord for parallel processing
+        
+        # Extract OCR text (extension point - currently no-op)
+        ocr_text = extract_ocr_text_for_document(document)
+        if ocr_text:
+            logger.info(f"Extracted {len(ocr_text)} characters of OCR text for document {document_id}")
         
         # Index document for search
         search_service = SearchService()
@@ -186,13 +289,16 @@ def _generate_pdf_preview(file):
         pdf_path = file.file.path
         doc = fitz.open(pdf_path)
         if doc.page_count > 0:
+            # Store page count
+            file.page_count = doc.page_count
+            
             page = doc[0]
             pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
             preview_path = preview_dir / f"{file.id}_preview.jpg"
             pix.save(preview_path)
             doc.close()
             file.preview_path = f"previews/{file.id}_preview.jpg"
-            file.save(update_fields=['preview_path'])
+            file.save(update_fields=['preview_path', 'page_count'])
         else:
             doc.close()
 
@@ -443,3 +549,100 @@ def reindex_all_documents():
         
     except Exception as e:
         logger.error(f"Error reindexing documents: {e}")
+
+
+@shared_task
+def update_document_analytics(document_id: int):
+    """Update cached analytics for a document after engagement.
+    
+    This task recalculates engagement statistics asynchronously
+    to avoid blocking user interactions.
+    """
+    try:
+        from ..engagement.models import DocumentAnalytics, DocumentView, DocumentDownload, DocumentBookmark, DocumentRating, DocumentShare
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        document = Document.objects.get(id=document_id)
+        logger.info(f"Updating analytics for document {document_id}")
+        
+        # Get or create analytics record
+        analytics, created = DocumentAnalytics.objects.get_or_create(
+            document=document
+        )
+        
+        # Update engagement counts
+        analytics.view_count = document.views.count()
+        analytics.download_count = document.downloads.count()
+        analytics.bookmark_count = document.bookmarks.count()
+        analytics.share_count = document.shares.count()
+        
+        # Update rating statistics
+        ratings = document.ratings.all()
+        analytics.rating_count = ratings.count()
+        analytics.positive_rating_count = ratings.filter(rating=1).count()
+        analytics.negative_rating_count = ratings.filter(rating=-1).count()
+        
+        # Update rating percentages
+        analytics.update_rating_percentages()
+        
+        # Calculate trending score (based on last 7 days)
+        seven_days_ago = timezone.now() - timedelta(days=7)
+        recent_views = document.views.filter(viewed_at__gte=seven_days_ago).count()
+        recent_downloads = document.downloads.filter(downloaded_at__gte=seven_days_ago).count()
+        recent_bookmarks = document.bookmarks.filter(created_at__gte=seven_days_ago).count()
+        
+        # Simple trending algorithm: weighted recent engagement
+        analytics.trending_score = (
+            recent_views * 1.0 +
+            recent_downloads * 2.0 +
+            recent_bookmarks * 3.0
+        )
+        
+        # Calculate popularity score (long-term engagement)
+        analytics.popularity_score = (
+            analytics.view_count * 1.0 +
+            analytics.download_count * 2.0 +
+            analytics.bookmark_count * 3.0 +
+            analytics.positive_rating_count * 5.0
+        )
+        
+        # Update last activity timestamp
+        all_activities = []
+        if document.views.exists():
+            all_activities.append(document.views.latest('viewed_at').viewed_at)
+        if document.downloads.exists():
+            all_activities.append(document.downloads.latest('downloaded_at').downloaded_at)
+        if document.bookmarks.exists():
+            all_activities.append(document.bookmarks.latest('created_at').created_at)
+        if document.ratings.exists():
+            all_activities.append(document.ratings.latest('created_at').created_at)
+        if document.shares.exists():
+            all_activities.append(document.shares.latest('shared_at').shared_at)
+        
+        if all_activities:
+            analytics.last_activity = max(all_activities)
+        
+        analytics.save()
+        
+        logger.info(f"Updated analytics for document {document_id}")
+        
+    except Document.DoesNotExist:
+        logger.error(f"Document {document_id} not found for analytics update")
+    except Exception as e:
+        logger.error(f"Error updating analytics for document {document_id}: {e}")
+
+
+@shared_task
+def update_analytics_for_all_documents():
+    """Update analytics for all documents (maintenance task)."""
+    try:
+        documents = Document.objects.filter(status='ready')
+        
+        for document in documents:
+            update_document_analytics.delay(document.id)
+        
+        logger.info(f"Scheduled analytics update for {documents.count()} documents")
+        
+    except Exception as e:
+        logger.error(f"Error scheduling analytics updates: {e}")

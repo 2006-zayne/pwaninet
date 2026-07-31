@@ -602,7 +602,7 @@
             <div class="stat-label">Members</div>
           </div>
           <div class="stat-item">
-            <div class="stat-val">{{ posts.count }}</div>
+            <div class="stat-val">{{ total_posts_count }}</div>
             <div class="stat-label">Posts</div>
           </div>
         </div>
@@ -682,7 +682,7 @@
     {% endif %}
 
     <!-- Posts -->
-    <div class="posts-feed">
+    <div class="posts-feed" id="posts-container">
       {% for post in posts %}
         {% include 'posts/partials/post_card.html' with post=post %}
       {% empty %}
@@ -700,6 +700,13 @@
           </div>
         </div>
       {% endfor %}
+      {% if has_next %}
+      <div id="load-more-trigger" class="text-center py-4" hx-get="{% url 'groups:groups_detail' group.id %}?page={{ next_page }}" hx-trigger="revealed" hx-target="#posts-container" hx-swap="beforeend" hx-on::before-request="this.remove()">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+      {% endif %}
     </div>
   </main>
 </div>

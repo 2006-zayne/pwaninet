@@ -106,6 +106,22 @@
     <input type="hidden" name="q" value="{{ query|default:'' }}">
 </form>
 
+<!-- Did You Mean Suggestion -->
+{% if did_you_mean %}
+<div class="doc-did-you-mean" 
+     style="margin-bottom: 20px; padding: 12px 16px; background: var(--primary-light); 
+            border: 1px solid var(--primary); border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+    <i class="bi bi-lightbulb" style="color: var(--primary); font-size: 1.1rem;"></i>
+    <span style="font-size: 0.9rem; color: var(--text-dark);">
+        Did you mean: 
+        <a href="{% url 'documents:search' %}?q={{ did_you_mean|urlencode }}" 
+           style="color: var(--primary); font-weight: 600; text-decoration: none;">
+            {{ did_you_mean }}
+        </a>
+    </span>
+</div>
+{% endif %}
+
 <!-- Results Count -->
 <div class="doc-results-count" 
      style="margin-bottom: 20px; padding: 0 4px;">

@@ -1,0 +1,23 @@
+{% load static %}
+<div class="rating-buttons" id="rating-buttons-{{ document.id }}" style="display: flex; gap: 8px; margin-top: 12px;">
+    <button 
+        class="btn btn-outline-secondary rating-btn thumbs-up"
+        hx-post="{% url 'documents:rate_document' document.id %}"
+        hx-vals='{"rating": 1}'
+        hx-target="#rating-buttons-{{ document.id }}"
+        hx-swap="outerHTML"
+        style="flex: 1; padding: 10px; border-radius: 10px; font-weight: 500; {% if user_rating == 1 %}background-color: #10B981; color: white; border-color: #10B981;{% endif %}">
+        <i class="bi bi-hand-thumbs-up"></i>
+        <span class="rating-percentage">{{ analytics.positive_rating_percentage }}%</span>
+    </button>
+    <button 
+        class="btn btn-outline-secondary rating-btn thumbs-down"
+        hx-post="{% url 'documents:rate_document' document.id %}"
+        hx-vals='{"rating": -1}'
+        hx-target="#rating-buttons-{{ document.id }}"
+        hx-swap="outerHTML"
+        style="flex: 1; padding: 10px; border-radius: 10px; font-weight: 500; {% if user_rating == -1 %}background-color: #EF4444; color: white; border-color: #EF4444;{% endif %}">
+        <i class="bi bi-hand-thumbs-down"></i>
+        <span class="rating-percentage">{{ analytics.negative_rating_percentage }}%</span>
+    </button>
+</div>

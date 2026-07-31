@@ -96,13 +96,29 @@
             <span style="display: flex; align-items: center; gap: 4px; 
                         font-size: 0.8rem; color: var(--text-secondary);">
                 <i class="bi bi-download"></i>
-                {{ document.download_count }}
+                {% if document.analytics %}
+                    {{ document.analytics.download_count }}
+                {% else %}
+                    {{ document.downloads.count }}
+                {% endif %}
             </span>
             <span style="display: flex; align-items: center; gap: 4px; 
                         font-size: 0.8rem; color: var(--text-secondary);">
                 <i class="bi bi-clock"></i>
                 {{ document.created_at|timesince }} ago
             </span>
+            {% if document.analytics %}
+                <span style="display: flex; align-items: center; gap: 4px; 
+                            font-size: 0.8rem; color: var(--text-secondary);">
+                    <i class="bi bi-hand-thumbs-up"></i>
+                    {{ document.analytics.positive_rating_percentage }}%
+                </span>
+                <span style="display: flex; align-items: center; gap: 4px; 
+                            font-size: 0.8rem; color: var(--text-secondary);">
+                    <i class="bi bi-hand-thumbs-down"></i>
+                    {{ document.analytics.negative_rating_percentage }}%
+                </span>
+            {% endif %}
         </div>
     </div>
 </div>

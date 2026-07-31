@@ -663,7 +663,13 @@ def create_post_view(request):
     import logging
     logger = logging.getLogger(__name__)
     
-    group_id = request.GET.get('group_id')
+    # Get user's groups for the dropdown
+    from groups.models import Group, Membership, MembershipStatus
+    user_groups = Group.objects.filter(
+        memberships__user=request.user,
+        memberships__status=MembershipStatus.APPROVED
+    ).distinct()
+    
     if request.method == 'POST':
         logger.info(f"POST request received. FILES keys: {list(request.FILES.keys())}")
         logger.info(f"POST data keys: {list(request.POST.keys())}")
@@ -675,8 +681,11 @@ def create_post_view(request):
         
         if form.is_valid():
             logger.info(f"Calling create_post_for_user with FILES: {request.FILES}")
+            # Get group from POST data (hidden input)
+            group_id = request.POST.get('group')
             post = create_post_for_user(form, request.user, request.FILES, group_id=group_id)
             logger.info(f"Post created with ID: {post.id}")
+            logger.info(f"Post group: {post.group}")
             logger.info(f"Post images count: {post.images.count()}")
             logger.info(f"Post video: {post.video}")
             logger.info(f"Post docs: {post.docs}")
@@ -688,7 +697,7 @@ def create_post_view(request):
             return redirect('posts:post_details', post_id=post.id)
     else:
         form = PostForm(user=request.user)
-    return render(request, 'posts/create_post.html', {'form': form})
+    return render(request, 'posts/create_post.html', {'form': form, 'user_groups': user_groups})
 
 
 @login_required

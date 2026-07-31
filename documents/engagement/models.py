@@ -167,7 +167,12 @@ class DocumentBookmark(models.Model):
 
 
 class DocumentRating(models.Model):
-    """Track user ratings for documents."""
+    """Track user ratings for documents using thumbs up/down system."""
+    
+    RATING_CHOICES = [
+        (1, 'Thumbs Up'),
+        (-1, 'Thumbs Down'),
+    ]
     
     document = models.ForeignKey(
         'documents.Document',
@@ -181,13 +186,9 @@ class DocumentRating(models.Model):
         related_name='document_ratings',
         help_text="User who rated the document"
     )
-    rating = models.PositiveSmallIntegerField(
-        validators=[MinValueValidator(1), MaxValueValidator(5)],
-        help_text="Rating from 1 to 5"
-    )
-    review = models.TextField(
-        blank=True,
-        help_text="Optional review text"
+    rating = models.SmallIntegerField(
+        choices=RATING_CHOICES,
+        help_text="Rating: 1 for thumbs up, -1 for thumbs down"
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -204,7 +205,8 @@ class DocumentRating(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.user.username} rated {self.document.title} {self.rating}/5"
+        rating_text = "👍" if self.rating == 1 else "👎"
+        return f"{self.user.username} {rating_text} {self.document.title}"
 
 
 class DocumentShare(models.Model):
@@ -259,6 +261,114 @@ class DocumentShare(models.Model):
     def __str__(self):
         user_str = self.user.username if self.user else 'Anonymous'
         return f"{self.document.title} shared to {self.get_platform_display()} by {user_str}"
+
+
+class DocumentAnalytics(models.Model):
+    """Cached engagement analytics for documents.
+    
+    This model stores pre-computed engagement statistics to avoid
+    expensive COUNT queries during page rendering. Analytics are
+    updated asynchronously via Celery tasks.
+    """
+    
+    document = models.OneToOneField(
+        'documents.Document',
+        on_delete=models.CASCADE,
+        related_name='analytics',
+        help_text="The document this analytics belongs to"
+    )
+    
+    # Engagement counts
+    view_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Total number of views"
+    )
+    download_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Total number of downloads"
+    )
+    bookmark_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Total number of bookmarks"
+    )
+    share_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Total number of shares"
+    )
+    
+    # Rating statistics
+    rating_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Total number of ratings"
+    )
+    positive_rating_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of thumbs up ratings"
+    )
+    negative_rating_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of thumbs down ratings"
+    )
+    positive_rating_percentage = models.PositiveIntegerField(
+        default=0,
+        help_text="Percentage of positive ratings (0-100)"
+    )
+    negative_rating_percentage = models.PositiveIntegerField(
+        default=0,
+        help_text="Percentage of negative ratings (0-100)"
+    )
+    
+    # Trending score (computed from recent engagement)
+    trending_score = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Trending score for ranking"
+    )
+    
+    # Popularity score (computed from long-term engagement)
+    popularity_score = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Popularity score for ranking"
+    )
+    
+    # Metadata
+    last_updated = models.DateTimeField(
+        auto_now=True,
+        help_text="When analytics were last recalculated"
+    )
+    last_activity = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp of the most recent engagement"
+    )
+    
+    class Meta:
+        verbose_name = "Document Analytics"
+        verbose_name_plural = "Document Analytics"
+        indexes = [
+            models.Index(fields=['-trending_score']),
+            models.Index(fields=['-popularity_score']),
+            models.Index(fields=['-last_updated']),
+        ]
+    
+    def __str__(self):
+        return f"Analytics for {self.document.title}"
+    
+    def update_rating_percentages(self):
+        """Recalculate rating percentages based on counts."""
+        if self.rating_count > 0:
+            self.positive_rating_percentage = int(
+                (self.positive_rating_count / self.rating_count) * 100
+            )
+            self.negative_rating_percentage = int(
+                (self.negative_rating_count / self.rating_count) * 100
+            )
+        else:
+            self.positive_rating_percentage = 0
+            self.negative_rating_percentage = 0
 
 
 class DocumentReport(models.Model):

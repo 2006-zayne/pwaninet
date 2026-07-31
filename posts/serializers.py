@@ -87,7 +87,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'author', 'group', 'course', 'unit', 'content',
             'images', 'video', 'docs', 'audio', 'gradient_class', 'has_signature',
-            'custom_gradient_text', 'custom_gradient_color1', 'custom_gradient_color2'
+            'custom_gradient_text', 'custom_gradient_color1', 'custom_gradient_color2', 'custom_gradient_text_color'
         ]
         read_only_fields = ['id', 'author']
 

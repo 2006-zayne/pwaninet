@@ -526,9 +526,12 @@
       </div>
       <h1 class="page-title">Groups</h1>
     </div>
-    <a href="{% url 'groups:create_group' %}" class="btn-create">
-      <i class="bi bi-plus-lg"></i> New Group
-    </a>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      {% include 'groups/partials/search_bar.html' with show_recent=True value=query %}
+      <a href="{% url 'groups:create_group' %}" class="btn-create">
+        <i class="bi bi-plus-lg"></i> New Group
+      </a>
+    </div>
   </div>
 
   <!-- ── Layout ── -->

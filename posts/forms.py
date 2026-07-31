@@ -2,6 +2,7 @@ from django import forms
 from posts.models import Post
 from posts.validators import validate_audio_size, validate_video_size, validate_document_size
 from courses.models import Unit
+from groups.models import Group, Membership, MembershipStatus
 
 
 class PostForm(forms.ModelForm):
@@ -13,7 +14,7 @@ class PostForm(forms.ModelForm):
         # Standard Issue Styling
         widget=forms.Select(attrs={'class': 'form-control'})
     )
-   # group = Group.objects.all()
+    
     # save video and docs as optional fields
     video = forms.FileField(
         required=False,
@@ -48,7 +49,6 @@ class PostForm(forms.ModelForm):
         model = Post
         fields = [
             'unit',
-            'group',
             'content',
             'video',
             'docs',
@@ -64,7 +64,6 @@ class PostForm(forms.ModelForm):
                 'class': 'form-control'
             }),
             'gradient_class': forms.Select(attrs={'class': 'form-select'}),
-            # 'group' : forms.Select(attrs={'class' : 'form-select'}),
         }
 
     # Filter units based on the user's Course and Year

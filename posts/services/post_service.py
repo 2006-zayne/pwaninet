@@ -12,7 +12,7 @@ def create_post_for_user(form, user, files, group_id=None):
     import logging
     logger = logging.getLogger(__name__)
     
-    logger.info(f"create_post_for_user called. files: {files}")
+    logger.info(f"create_post_for_user called. files: {files}, group_id: {group_id}")
     logger.info(f"files keys: {list(files.keys()) if files else 'None'}")
     
     with transaction.atomic():
@@ -22,10 +22,14 @@ def create_post_for_user(form, user, files, group_id=None):
         post.course = user.course
         post.year = user.year
 
-        # Group handling
+        # Group handling from POST data
         if group_id:
             post.group = get_object_or_404(Group, id=group_id)
-
+            logger.info(f"Group set from group_id: {group_id}")
+        else:
+            post.group = None
+            logger.info("No group selected, post will be global")
+        
         # Unit override
         if post.unit:
             post.course = post.unit.course
@@ -47,7 +51,7 @@ def create_post_for_user(form, user, files, group_id=None):
             logger.info(f"Media detected, setting gradient_class to 'none'")
 
         post.save()
-        logger.info(f"Post saved with ID: {post.id}, gradient_class: {post.gradient_class}")
+        logger.info(f"Post saved with ID: {post.id}, gradient_class: {post.gradient_class}, group: {post.group}")
 
         # Handle multiple image uploads
         if files and 'images' in files:
@@ -106,10 +110,9 @@ def create_post_for_user(form, user, files, group_id=None):
                     logger.error(f"Error saving docs file: {e}")
                     pass
 
-    logger.info(f"Final post state - images: {post.images.count()}, video: {post.video.name if post.video else 'None'}, docs: {post.docs.name if post.docs else 'None'}, audio: {post.audio.name if post.audio else 'None'}, gradient_class: {post.gradient_class}")
+    logger.info(f"Final post state - images: {post.images.count()}, video: {post.video.name if post.video else 'None'}, docs: {post.docs.name if post.docs else 'None'}, audio: {post.audio.name if post.audio else 'None'}, gradient_class: {post.gradient_class}, group: {post.group}")
     logger.info(f"get_intel_file returns: {post.get_intel_file.url if post.get_intel_file else 'None'}")
-    return post
-
+    
     # Invalidate feeds (outside transaction)
     invalidate_home_feed_context(user.id)
 
@@ -137,6 +140,8 @@ def create_post_for_user(form, user, files, group_id=None):
         )
         for recipient in recipients
     ])
+    
+    return post
    
 
 @transaction.atomic

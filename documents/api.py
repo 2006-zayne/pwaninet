@@ -243,6 +243,20 @@ class DocumentViewSet(viewsets.ModelViewSet):
         )
         return Response({'status': 'recorded'}, status=status.HTTP_201_CREATED)
     
+    @action(detail=True, methods=['get'])
+    def stats(self, request, pk=None):
+        """Get document statistics (view count, download count, bookmark count)."""
+        document = self.get_object()
+        
+        from .engagement.models import DocumentView, DocumentDownload, DocumentBookmark
+        
+        return Response({
+            'view_count': document.views.count(),
+            'download_count': document.downloads.count(),
+            'bookmark_count': document.bookmarks.count(),
+            'rating_count': document.ratings.count(),
+        })
+    
     @action(detail=True, methods=['post'])
     def download(self, request, pk=None):
         """Record a document download."""

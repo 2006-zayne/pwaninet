@@ -154,14 +154,21 @@
                     <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; display: block;">
                         Academic Unit
                     </label>
-                    <select name="academic_unit" class="form-select" 
-                            style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); 
-                                   background: var(--card-bg); color: var(--text-dark);">
-                        <option value="">Select Unit</option>
-                        {% for unit in academic_units %}
-                        <option value="{{ unit.id }}">{{ unit.code }} - {{ unit.name }}</option>
-                        {% endfor %}
-                    </select>
+                    <div style="position: relative;">
+                        <input type="text" 
+                               class="form-control academic-unit-search" 
+                               placeholder="Search units..." 
+                               id="academic-unit-search"
+                               style="padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.875rem; margin-bottom: 8px; background: var(--card-bg); color: var(--text-dark);">
+                        <select name="academic_unit" class="form-select" id="academic-unit-select"
+                                style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); 
+                                       background: var(--card-bg); color: var(--text-dark);">
+                            <option value="">Select Unit</option>
+                            {% for unit in academic_units %}
+                            <option value="{{ unit.id }}">{{ unit.code }} - {{ unit.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
                 <div>
                     <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; display: block;">
@@ -780,6 +787,41 @@ document.addEventListener('DOMContentLoaded', function() {
             fileInput.value = '';
             stage2.style.display = 'none';
             stage1.style.display = 'block';
+        });
+    }
+
+    // Academic unit search functionality
+    const academicUnitSearch = document.getElementById('academic-unit-search');
+    const academicUnitSelect = document.getElementById('academic-unit-select');
+
+    if (academicUnitSearch && academicUnitSelect) {
+        academicUnitSearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const options = academicUnitSelect.querySelectorAll('option');
+
+            options.forEach(function(option) {
+                const unitName = option.textContent.toLowerCase();
+                const matches = unitName.includes(searchTerm);
+                
+                if (searchTerm === '') {
+                    // Show all options when search is empty
+                    option.style.display = '';
+                } else {
+                    // Filter based on search term
+                    option.style.display = matches ? '' : 'none';
+                }
+            });
+
+            // If the currently selected option is hidden, select the first visible option
+            if (academicUnitSelect.selectedIndex >= 0) {
+                const selectedOption = academicUnitSelect.options[academicUnitSelect.selectedIndex];
+                if (selectedOption.style.display === 'none') {
+                    const firstVisibleOption = Array.from(options).find(opt => opt.style.display !== 'none');
+                    if (firstVisibleOption) {
+                        academicUnitSelect.value = firstVisibleOption.value;
+                    }
+                }
+            }
         });
     }
     

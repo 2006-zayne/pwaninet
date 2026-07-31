@@ -16,7 +16,9 @@ class PwaniSignupForm(UserCreationForm):
             'course': forms.Select(attrs={
                 'hx-get': '/courses/load-years/',      # The endpoint for filtering
                 'hx-target': '#id_year',       # Targets the 'year' field's HTML ID
-                'class': 'form-control'
+                'class': 'form-control',
+                'id': 'id_course',
+                'data-searchable': 'true'
             }),
             'year': forms.Select(attrs={
                 'class': 'form-control'

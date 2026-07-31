@@ -160,6 +160,35 @@
   .strength-fair { background-color: #f59e0b; color: #d97706; }
   .strength-strong { background-color: #10b981; color: #059669; }
   .strength-very-strong { background-color: #047857; color: #047857; }
+
+  .course-search-wrapper {
+    position: relative;
+  }
+
+  .course-search-input {
+    position: absolute;
+    top: -38px;
+    left: 0;
+    right: 0;
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    z-index: 10;
+    background: white;
+  }
+
+  [data-theme="dark"] .course-search-input {
+    background: var(--card-bg);
+    border-color: var(--border);
+    color: white;
+  }
+
+  .course-search-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
 </style>
 <script src="{% static 'js/password-strength.js' %}"></script>
 <div class="container">
@@ -179,7 +208,12 @@
                             {% for field in form %}
                                 <div class="mb-3">
                                     <label class="form-label fw-semibold small" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                                    {% if field.name == 'password1' or field.name == 'password2' %}
+                                    {% if field.name == 'course' %}
+                                        <div class="course-search-wrapper">
+                                            <input type="text" class="course-search-input" placeholder="Search courses..." id="course-search">
+                                            {{ field }}
+                                        </div>
+                                    {% elif field.name == 'password1' or field.name == 'password2' %}
                                         <div class="password-input-wrapper">
                                             {{ field }}
                                             <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility" tabindex="-1" data-field="{{ field.name }}">
@@ -379,6 +413,43 @@
         registerSubmitBtn.disabled = true;
         registerSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating your account…';
     });
+
+    // Course search functionality
+    const courseSearchInput = document.getElementById('course-search');
+    const courseSelect = document.getElementById('id_course');
+
+    if (courseSearchInput && courseSelect) {
+        courseSearchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const options = courseSelect.querySelectorAll('option');
+
+            options.forEach(function(option) {
+                const courseName = option.textContent.toLowerCase();
+                const matches = courseName.includes(searchTerm);
+                
+                if (searchTerm === '') {
+                    // Show all options when search is empty
+                    option.style.display = '';
+                } else {
+                    // Filter based on search term
+                    option.style.display = matches ? '' : 'none';
+                }
+            });
+
+            // If the currently selected option is hidden, select the first visible option
+            if (courseSelect.selectedIndex >= 0) {
+                const selectedOption = courseSelect.options[courseSelect.selectedIndex];
+                if (selectedOption.style.display === 'none') {
+                    const firstVisibleOption = Array.from(options).find(opt => opt.style.display !== 'none');
+                    if (firstVisibleOption) {
+                        courseSelect.value = firstVisibleOption.value;
+                        // Trigger HTMX to load years for the new course
+                        courseSelect.dispatchEvent(new Event('change'));
+                    }
+                }
+            }
+        });
+    }
 })();
 </script>
 {% endblock %}

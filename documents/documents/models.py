@@ -367,6 +367,11 @@ class DocumentFile(models.Model):
         blank=True,
         help_text="Path to generated preview"
     )
+    page_count = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Number of pages in the document"
+    )
     processing_status = models.CharField(
         max_length=20,
         choices=PROCESSING_STATUS_CHOICES,

@@ -29,3 +29,17 @@ for file in files_without_previews:
 print(f'\nProcessed {files_without_previews.count()} files.')
 print('Note: Previews are generated synchronously in this script.')
 
+files_without_pagecount = all_files.filter(page_count__isnull=True) | all_files.filter(preview_path='')
+print(f'Files without pagecount: {files_without_pagecount.count()}')
+
+for file in files_without_pagecount:
+    print(f"Generating preview for file {file.id} ({file.extension})...")
+    try:
+        from documents.tasks.processing import extract_metadata
+        extract_metadata(file.id)
+        print(f"  ✓ Pagecount generated for file {file.id}")
+    except Exception as e:
+        print(f"  ✗ Error generating pagecount for file {file.id}: {e}")
+
+print(f'\nProcessed {files_without_pagecount.count()} files.')
+print('Note: Page count is generated synchronously in this script.')

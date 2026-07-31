@@ -3,7 +3,6 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from .models import DeviceAccount, User
 from .services.device_service import get_or_create_device_id, hash_device_id
-from groups.models import Group, Membership, MembershipRole, MembershipStatus
 
 
 @receiver(user_logged_in)
@@ -65,56 +64,12 @@ def auto_join_course_group(sender, instance, created, **kwargs):
     """
     Automatically enrolls new users in official academic groups based on their course and year.
     
-    TEMPORARILY DISABLED - causing site-wide timeout.
-    
-    This function uses the new service-based approach that relies on database flags
-    (is_official=True and auto_join_on_signup=True) instead of hardcoded group names.
-    
-    For backwards compatibility, it falls back to the old naming convention approach
-    if no auto-join groups are found.
+    This function now uses an asynchronous Celery task to prevent blocking the main thread
+    and causing timeouts during user signup. The task runs in the background and handles
+    both the service-based approach (database flags) and the fallback naming convention.
     """
-    # TEMPORARILY DISABLED - return early to prevent timeout
-    return
-    
     # Only execute for NEW users who have completed their profile intel
     if created and instance.course and instance.year:
-        
-        # Try the new service-based approach first
-        from groups.services.academic_group_service import enroll_user_in_academic_groups
-        enrolled_groups = enroll_user_in_academic_groups(instance)
-        
-        # Fallback: if no auto-join groups exist, use the old naming convention approach
-        # This ensures backwards compatibility while transitioning to the new system
-        if not enrolled_groups:
-            # Standardize the naming convention for official groups
-            # e.g., "Computer Science - Year 1"
-            target_group_name = f"{instance.course.name} - Year {instance.year.level}"
-            
-            # Logic: Search for the group. If it doesn't exist, create it.
-            # 'get_or_create' returns a tuple: (object, created_bool)
-            group, created_group = Group.objects.get_or_create(
-                name=target_group_name,
-                defaults={
-                    'description': f"Official academic hub for {target_group_name} operatives.",
-                    'is_official': True,
-                    'auto_join_on_signup': True,  # Enable auto-join for backwards compatibility
-                    'course': instance.course,
-                    'year': instance.year
-                }
-            )
-            
-            # Create membership instead of using direct M2M
-            # Use APPROVED status for official academic groups to allow immediate access
-            membership, created_membership = Membership.objects.get_or_create(
-                user=instance,
-                group=group,
-                defaults={
-                    'role': MembershipRole.MEMBER,
-                    'status': MembershipStatus.APPROVED  # Changed from PENDING to APPROVED
-                }
-            )
-            
-            # If membership already existed but was pending, approve it
-            if not created_membership and membership.status == MembershipStatus.PENDING:
-                membership.status = MembershipStatus.APPROVED
-                membership.save()
+        # Dispatch the async task to prevent blocking
+        from groups.tasks import auto_join_course_group_task
+        auto_join_course_group_task.delay(instance.id)

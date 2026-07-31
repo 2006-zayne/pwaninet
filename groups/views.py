@@ -389,6 +389,19 @@ class GroupViewSet(viewsets.ModelViewSet):
 def groups_dashboard(request):
     from groups.queries.group_queries import get_following_ids
     
+    # Get search query
+    query = request.GET.get('q', '').strip()
+    
+    # Save search to session if query exists
+    if query:
+        recent_searches = request.session.get('recent_group_searches', [])
+        # Add query if not already in recent searches
+        if query not in recent_searches:
+            recent_searches.insert(0, query)
+            # Keep only last 5 searches
+            recent_searches = recent_searches[:5]
+            request.session['recent_group_searches'] = recent_searches
+    
     user_groups = Group.objects.filter(memberships__user=request.user, memberships__status=MembershipStatus.APPROVED)
     pending_groups = Group.objects.filter(memberships__user=request.user, memberships__status=MembershipStatus.PENDING)
     
@@ -399,7 +412,17 @@ def groups_dashboard(request):
         memberships__status=MembershipStatus.APPROVED
     ).exclude(memberships__user=request.user).annotate(
         member_count=Count('memberships', filter=Q(memberships__status=MembershipStatus.APPROVED))
-    ).order_by('-member_count')[:20]
+    )
+    
+    # Apply search filter if query exists (before slicing)
+    if query:
+        suggested_groups = suggested_groups.filter(
+            Q(name__icontains=query) | 
+            Q(description__icontains=query)
+        )
+    
+    # Apply ordering and slicing after filtering
+    suggested_groups = suggested_groups.order_by('-member_count')[:20]
     
     user_group_ids = set(user_groups.values_list('id', flat=True))
     pending_group_ids = set(pending_groups.values_list('id', flat=True))
@@ -408,6 +431,9 @@ def groups_dashboard(request):
     suggested_group_ids = list(suggested_groups.values_list('id', flat=True))
     group_unread_counts = get_group_unread_counts(request.user, suggested_group_ids)
     
+    # Get recent searches from session
+    recent_searches = request.session.get('recent_group_searches', [])
+    
     return render(request, 'groups/groups_dashboard.html', {
         'user_groups': user_groups,
         'all_groups': suggested_groups,
@@ -415,6 +441,8 @@ def groups_dashboard(request):
         'pending_group_ids': pending_group_ids,
         'unread_notifications_count': get_cached_unread_count(request.user),
         'group_unread_counts': group_unread_counts,
+        'query': query,
+        'recent_searches': recent_searches,
     })
 
 
@@ -423,10 +451,20 @@ def groups_detail_view(request, group_id):
     from groups.services.group_service import build_group_detail_context
     group = get_object_or_404(Group.objects.annotate(member_count=Count('memberships', filter=Q(memberships__status=MembershipStatus.APPROVED))), id=group_id)
     query = request.GET.get('search_user', '')
-    context = build_group_detail_context(request.user, group, query)
+    page = int(request.GET.get('page', 1))
+    context = build_group_detail_context(request.user, group, query, page)
     liked_post_ids = set(Like.objects.filter(user=request.user, post__in=context['posts']).values_list('post_id', flat=True))
     context['liked_post_ids'] = liked_post_ids
     context['unread_notifications_count'] = get_cached_unread_count(request.user)
+    
+    # Check if HTMX request for more posts
+    if request.headers.get('HX-Request'):
+        return render(request, 'posts/partials/post_cards_list.html', {
+            'posts': context['posts'],
+            'has_more_posts': context['has_next'],
+            'liked_post_ids': liked_post_ids,
+        })
+    
     return render(request, 'groups/groups_detail.html', context)
 
 
@@ -693,6 +731,16 @@ def search_users_view(request):
             user['profile_pic'] = '/static/images/default_user.jpg'
 
     return JsonResponse(user_list, safe=False)
+
+
+@login_required
+def clear_recent_group_searches(request):
+    """
+    Clear recent group searches from session.
+    """
+    request.session['recent_group_searches'] = []
+    from django.http import HttpResponseRedirect
+    return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/groups/dashboard/'))
 
 
 @login_required

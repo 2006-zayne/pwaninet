@@ -2,6 +2,11 @@ from django.shortcuts import render, get_object_or_404
 from django.views.generic import TemplateView
 from django.contrib.auth.decorators import login_required
 from django.db import models
+from django.core.cache import cache
+from django.utils import timezone
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import (
     Category,
@@ -11,6 +16,7 @@ from .models import (
     DocumentDownload,
     DocumentView,
 )
+from .engagement.models import DocumentRating, DocumentShare, DocumentAnalytics
 from .selectors.document_selectors import DocumentSelector
 
 
@@ -23,19 +29,23 @@ def repository_home(request):
     # Get categories
     categories = Category.objects.filter(is_active=True)
     
-    # Get trending documents
-    trending_documents = DocumentSelector.get_trending_documents(limit=10)
+    # Get trending documents with personalization
+    trending_documents = DocumentSelector.get_trending_documents(
+        limit=10,
+        user=request.user if request.user.is_authenticated else None
+    )
     
-    # Get recently added documents
-    recent_documents = DocumentSelector.list_documents_for_home(limit=10)
+    # Get recently added documents with personalization
+    recent_documents = DocumentSelector.list_documents_for_home(
+        limit=10,
+        user=request.user if request.user.is_authenticated else None
+    )
     
-    # Get most downloaded documents
-    most_downloaded = Document.objects.filter(
-        status='ready',
-        visibility='public'
-    ).annotate(
-        download_count=models.Count('downloads')
-    ).order_by('-download_count')[:10]
+    # Get popular documents with personalization
+    popular_documents = DocumentSelector.get_popular_documents(
+        limit=10,
+        user=request.user if request.user.is_authenticated else None
+    )
     
     # Get recent searches from session (simpler approach)
     recent_searches = request.session.get('recent_searches', [])
@@ -45,7 +55,7 @@ def repository_home(request):
         'categories': categories,
         'trending_documents': trending_documents,
         'recent_documents': recent_documents,
-        'most_downloaded': most_downloaded,
+        'popular_documents': popular_documents,
         'recent_searches': recent_searches,
     }
     return render(request, 'documents/home.html', context)
@@ -82,10 +92,16 @@ def search_results(request):
     if file_type:
         filters['file_type'] = file_type
     
+    # Get "Did you mean" suggestion
+    from .services.search_service import SearchService
+    search_service = SearchService()
+    did_you_mean = search_service.get_did_you_mean(query) if query else None
+    
     documents = DocumentSelector.search_documents(
         query=query,
         filters=filters,
-        limit=50
+        limit=50,
+        user=request.user if request.user.is_authenticated else None
     )
     
     # Get categories for filter dropdown
@@ -109,6 +125,7 @@ def search_results(request):
         'categories': categories,
         'academic_units': academic_units,
         'semesters': semesters,
+        'did_you_mean': did_you_mean,
     }
     return render(request, 'documents/search.html', context)
 
@@ -132,21 +149,53 @@ def document_detail(request, document_id):
         from django.http import Http404
         raise Http404("Document not found")
     
-    # Record view
-    if request.user.is_authenticated:
-        DocumentView.objects.create(
-            document=document,
-            user=request.user,
-            ip_address=request.META.get('REMOTE_ADDR'),
-            user_agent=request.META.get('HTTP_USER_AGENT', ''),
-        )
+    # Record view asynchronously with caching
+    cache_key = f'doc_view_{document_id}_{request.session.session_key or request.META.get("REMOTE_ADDR")}'
+    if not cache.get(cache_key):
+        # Create view record
+        if request.user.is_authenticated:
+            DocumentView.objects.create(
+                document=document,
+                user=request.user,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
+        else:
+            DocumentView.objects.create(
+                document=document,
+                session_key=request.session.session_key or 'anon',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
+        # Cache for 5 minutes to prevent duplicate views
+        cache.set(cache_key, True, 300)
     
-    # Get related documents (same category or academic unit)
-    related_documents = Document.objects.filter(
-        status='ready',
-        visibility='public',
-        category=document.category
-    ).exclude(id=document.id)[:6]
+    # Get cached view count or fetch from database
+    view_count_cache_key = f'doc_view_count_{document_id}'
+    cached_view_count = cache.get(view_count_cache_key)
+    if cached_view_count is None:
+        # Cache view count for 10 minutes
+        cached_view_count = document.views.count()
+        cache.set(view_count_cache_key, cached_view_count, 600)
+    
+    # Get cached download count
+    download_count_cache_key = f'doc_download_count_{document_id}'
+    cached_download_count = cache.get(download_count_cache_key)
+    if cached_download_count is None:
+        # Cache download count for 10 minutes
+        cached_download_count = document.downloads.count()
+        cache.set(download_count_cache_key, cached_download_count, 600)
+    
+    # Get cached bookmark count
+    bookmark_count_cache_key = f'doc_bookmark_count_{document_id}'
+    cached_bookmark_count = cache.get(bookmark_count_cache_key)
+    if cached_bookmark_count is None:
+        # Cache bookmark count for 10 minutes
+        cached_bookmark_count = document.bookmarks.count()
+        cache.set(bookmark_count_cache_key, cached_bookmark_count, 600)
+    
+    # Get related documents using improved relevance algorithm
+    related_documents = DocumentSelector.get_related_documents(document, limit=6)
     
     # Get primary academic unit
     primary_unit = None
@@ -456,3 +505,229 @@ def my_history(request):
         'views': views,
     }
     return render(request, 'documents/library_history.html', context)
+
+
+# ============== ENGAGEMENT HTMX ENDPOINTS ==============
+
+@csrf_exempt
+@require_POST
+@login_required
+def toggle_bookmark(request, document_id):
+    """
+    Toggle bookmark status for a document via HTMX.
+    """
+    try:
+        document = Document.objects.get(id=document_id)
+        bookmark, created = DocumentBookmark.objects.get_or_create(
+            document=document,
+            user=request.user
+        )
+        
+        if not created:
+            # Remove bookmark if it already exists
+            bookmark.delete()
+            is_bookmarked = False
+        else:
+            is_bookmarked = True
+        
+        # Trigger analytics update asynchronously
+        from .tasks.processing import update_document_analytics
+        update_document_analytics.delay(document_id)
+        
+        # Return partial HTML response
+        context = {
+            'document': document,
+            'is_bookmarked': is_bookmarked,
+            'bookmark_count': document.bookmarks.count(),
+        }
+        return render(request, 'documents/partials/bookmark_button.html', context)
+        
+    except Document.DoesNotExist:
+        return JsonResponse({'error': 'Document not found'}, status=404)
+
+
+@csrf_exempt
+@require_POST
+@login_required
+def rate_document(request, document_id):
+    """
+    Rate a document with thumbs up/down via HTMX.
+    """
+    try:
+        document = Document.objects.get(id=document_id)
+        rating_value = int(request.POST.get('rating', 0))
+        
+        if rating_value not in [1, -1]:
+            return JsonResponse({'error': 'Invalid rating value'}, status=400)
+        
+        # Get or create rating
+        rating, created = DocumentRating.objects.get_or_create(
+            document=document,
+            user=request.user,
+            defaults={'rating': rating_value}
+        )
+        
+        if not created:
+            # Update existing rating
+            rating.rating = rating_value
+            rating.save()
+        
+        # Trigger analytics update asynchronously
+        from .tasks.processing import update_document_analytics
+        update_document_analytics.delay(document_id)
+        
+        # Get updated analytics
+        analytics, _ = DocumentAnalytics.objects.get_or_create(document=document)
+        
+        # Return partial HTML response
+        context = {
+            'document': document,
+            'user_rating': rating_value,
+            'analytics': analytics,
+        }
+        return render(request, 'documents/partials/rating_buttons.html', context)
+        
+    except Document.DoesNotExist:
+        return JsonResponse({'error': 'Document not found'}, status=404)
+
+
+@csrf_exempt
+@require_POST
+@login_required
+def share_document(request, document_id):
+    """
+    Share a document to profile or group via HTMX.
+    """
+    try:
+        document = Document.objects.get(id=document_id)
+        share_type = request.POST.get('share_type')  # 'profile', 'group', or 'copy_link'
+        
+        if share_type == 'copy_link':
+            # Track the copy link share
+            DocumentShare.objects.create(
+                document=document,
+                user=request.user,
+                platform='copy_link'
+            )
+            
+            # Trigger analytics update asynchronously
+            from .tasks.processing import update_document_analytics
+            update_document_analytics.delay(document_id)
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Link copied to clipboard',
+                'url': request.build_absolute_uri(f"/documents/document/{document_id}/")
+            })
+        
+        elif share_type == 'profile':
+            # Share to user's profile feed
+            from posts.models import Post
+            from posts.services.post_service import PostService
+            
+            post_service = PostService()
+            post = post_service.create_document_share_post(
+                user=request.user,
+                document=document,
+                content=f"Shared a document: {document.title}"
+            )
+            
+            # Track the share
+            DocumentShare.objects.create(
+                document=document,
+                user=request.user,
+                platform='other'  # Internal share
+            )
+            
+            # Trigger analytics update asynchronously
+            from .tasks.processing import update_document_analytics
+            update_document_analytics.delay(document_id)
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Document shared to your profile'
+            })
+        
+        elif share_type == 'group':
+            # Share to a group
+            group_id = request.POST.get('group_id')
+            if not group_id:
+                return JsonResponse({'error': 'Group ID required'}, status=400)
+            
+            from groups.models import Group, GroupPost
+            from posts.models import Post
+            
+            # Check if user is member of the group
+            group = Group.objects.get(id=group_id)
+            if not group.members.filter(id=request.user.id).exists():
+                return JsonResponse({'error': 'Not a member of this group'}, status=403)
+            
+            # Create post in group
+            post = Post.objects.create(
+                user=request.user,
+                content=f"Shared a document: {document.title}",
+                shared_document=document
+            )
+            
+            # Create group post
+            GroupPost.objects.create(
+                group=group,
+                post=post
+            )
+            
+            # Track the share
+            DocumentShare.objects.create(
+                document=document,
+                user=request.user,
+                platform='other'  # Internal share
+            )
+            
+            # Trigger analytics update asynchronously
+            from .tasks.processing import update_document_analytics
+            update_document_analytics.delay(document_id)
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Document shared to {group.name}'
+            })
+        
+        else:
+            return JsonResponse({'error': 'Invalid share type'}, status=400)
+        
+    except Document.DoesNotExist:
+        return JsonResponse({'error': 'Document not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@login_required
+def document_stats(request, document_id):
+    """
+    Get cached document statistics via HTMX.
+    """
+    try:
+        document = Document.objects.get(id=document_id)
+        
+        # Get or create analytics
+        analytics, _ = DocumentAnalytics.objects.get_or_create(document=document)
+        
+        # If analytics are stale (older than 5 minutes), trigger update
+        from django.utils import timezone
+        from datetime import timedelta
+        if analytics.last_updated < timezone.now() - timedelta(minutes=5):
+            from .tasks.processing import update_document_analytics
+            update_document_analytics.delay(document_id)
+        
+        return JsonResponse({
+            'view_count': analytics.view_count,
+            'download_count': analytics.download_count,
+            'bookmark_count': analytics.bookmark_count,
+            'share_count': analytics.share_count,
+            'rating_count': analytics.rating_count,
+            'positive_rating_percentage': analytics.positive_rating_percentage,
+            'negative_rating_percentage': analytics.negative_rating_percentage,
+        })
+        
+    except Document.DoesNotExist:
+        return JsonResponse({'error': 'Document not found'}, status=404)

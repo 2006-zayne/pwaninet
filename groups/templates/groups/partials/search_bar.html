@@ -1,0 +1,72 @@
+{% load static %}
+<div class="group-search-container" style="max-width: 400px; margin: 0;">
+    <form action="{% url 'groups:groups_dashboard' %}" method="get" class="group-search-wrapper" 
+         style="position: relative;">
+        <input type="text" 
+               name="q"
+               class="group-search-input form-control"
+               placeholder="Search groups..."
+               value="{{ query|default:'' }}"
+               style="padding: 12px 20px 12px 44px; 
+                      border-radius: var(--radius-pill); border: 1px solid var(--border);
+                      font-size: 0.9rem; background: var(--card-bg);
+                      color: var(--text-primary); transition: all 0.3s ease; width: 100%;">
+        
+        <i class="bi bi-search" 
+           style="position: absolute; left: 16px; top: 50%; 
+                  transform: translateY(-50%); font-size: 1rem; 
+                  color: var(--text-muted);"></i>
+    </form>
+    
+    <!-- Recent Searches (shown when input is empty) -->
+    {% if show_recent|default:False %}
+    <div class="group-recent-searches" 
+         style="margin-top: 12px; padding: 0 4px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0; font-weight: 600;">
+                Recent searches
+            </p>
+            <a href="{% url 'groups:clear_recent_searches' %}" 
+               class="group-clear-searches"
+               style="font-size: 0.75rem; color: var(--brand); cursor: pointer; text-decoration: none; font-weight: 600;">
+                Clear
+            </a>
+        </div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            {% for recent_search in recent_searches %}
+            <a href="{% url 'groups:groups_dashboard' %}?q={{ recent_search }}"
+               class="group-recent-tag"
+               style="background: var(--border); padding: 4px 12px; 
+                      border-radius: var(--radius-pill); font-size: 0.75rem; 
+                      color: var(--text-secondary); cursor: pointer; text-decoration: none; font-weight: 500;">
+                {{ recent_search }}
+            </a>
+            {% empty %}
+            <span style="font-size: 0.75rem; color: var(--text-muted);">
+                No recent searches
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.group-search-input:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    background: var(--card-bg);
+}
+
+.group-recent-tag:hover {
+    background: var(--brand-light);
+    color: var(--brand);
+}
+
+@media (max-width: 768px) {
+    .group-search-input {
+        padding: 10px 16px 10px 40px;
+        font-size: 0.85rem;
+    }
+}
+</style>
