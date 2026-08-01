@@ -4,11 +4,13 @@
  */
 
 class DocumentViewer {
-    constructor(container, fileUrl, fileType, fileName) {
+    constructor(container, fileUrl, fileType, fileName, documentId, fileId) {
         this.container = container;
         this.fileUrl = fileUrl;
         this.fileType = fileType.toLowerCase();
         this.fileName = fileName;
+        this.documentId = documentId;
+        this.fileId = fileId;
         this.currentPage = 1;
         this.totalPages = null;
         this.viewer = null;
@@ -168,7 +170,7 @@ class DocumentViewer {
 
         const fullscreenButton = this.createButton('bi-arrows-fullscreen', 'Fullscreen', () => this.toggleFullscreen());
         const downloadButton = this.createButton('bi-download', 'Download', () => {
-            window.location.href = this.fileUrl;
+            this.trackAndDownload();
         });
 
         rightControls.appendChild(fullscreenButton);
@@ -402,6 +404,50 @@ class DocumentViewer {
                 }
             }
         }
+    }
+
+    trackAndDownload() {
+        // Track the download via HTMX endpoint (async, don't block the download)
+        if (this.documentId && this.fileId) {
+            fetch('/documents/document/' + this.documentId + '/download/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': this.getCookie('csrftoken')
+                },
+                body: 'file_id=' + this.fileId
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update download count in UI
+                    const downloadCountElement = document.querySelector('.doc-stats div:nth-child(1) p:first-child');
+                    if (downloadCountElement) {
+                        downloadCountElement.textContent = data.download_count;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error tracking download:', error);
+            });
+        }
+        // Open file in new tab
+        window.open(this.fileUrl, '_blank');
+    }
+
+    getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
     }
 
     destroy() {

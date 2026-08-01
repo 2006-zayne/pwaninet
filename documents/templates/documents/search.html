@@ -55,6 +55,21 @@
         </select>
     </div>
     
+    <!-- Academic Level Filter -->
+    <div class="doc-filter-group" style="display: flex; align-items: center; gap: 8px;">
+        <label style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">Level:</label>
+        <select class="form-select" name="academic_level"
+                style="width: auto; padding: 8px 32px 8px 12px; 
+                       border-radius: 8px; border: 1px solid var(--border); 
+                       font-size: 0.875rem; background: var(--card-bg); color: var(--text-dark);"
+                onchange="this.form.submit()">
+            <option value="">All Levels</option>
+            {% for level in academic_levels %}
+                <option value="{{ level.id }}" {% if academic_level == level.id|stringformat:"s" %}selected{% endif %}>{{ level.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
     <!-- Semester Filter -->
     <div class="doc-filter-group" style="display: flex; align-items: center; gap: 8px;">
         <label style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">Semester:</label>
@@ -69,6 +84,55 @@
             {% endfor %}
         </select>
     </div>
+    
+    <!-- Academic Year Filter -->
+    <div class="doc-filter-group" style="display: flex; align-items: center; gap: 8px;">
+        <label style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">Academic Year:</label>
+        <select class="form-select" name="academic_year"
+                style="width: auto; padding: 8px 32px 8px 12px; 
+                       border-radius: 8px; border: 1px solid var(--border); 
+                       font-size: 0.875rem; background: var(--card-bg); color: var(--text-dark);"
+                onchange="this.form.submit()">
+            <option value="">All Years</option>
+            {% for year in academic_years %}
+                <option value="{{ year.id }}" {% if academic_year == year.id|stringformat:"s" %}selected{% endif %}>{{ year.code }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <!-- Programme Filter -->
+    <div class="doc-filter-group" style="display: flex; align-items: center; gap: 8px;">
+        <label style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">Programme:</label>
+        <select class="form-select" name="programme"
+                style="width: auto; padding: 8px 32px 8px 12px; 
+                       border-radius: 8px; border: 1px solid var(--border); 
+                       font-size: 0.875rem; background: var(--card-bg); color: var(--text-dark);"
+                onchange="this.form.submit()">
+            <option value="">All Programmes</option>
+            {% for prog in programmes %}
+                <option value="{{ prog.id }}" {% if programme == prog.id|stringformat:"s" %}selected{% endif %}>{{ prog.code }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <!-- Personalized Filters (for authenticated users) -->
+    {% if user.is_authenticated %}
+    <div class="doc-filter-group" style="display: flex; align-items: center; gap: 8px; border-left: 1px solid var(--border); padding-left: 12px;">
+        <label style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">My:</label>
+        <select class="form-select" name="my_filter"
+                style="width: auto; padding: 8px 32px 8px 12px; 
+                       border-radius: 8px; border: 1px solid var(--border); 
+                       font-size: 0.875rem; background: var(--card-bg); color: var(--text-dark);"
+                onchange="this.form.submit()">
+            <option value="">All</option>
+            <option value="my_programme" {% if my_programme %}selected{% endif %}>My Programme</option>
+            <option value="my_units" {% if my_units %}selected{% endif %}>My Units</option>
+            <option value="my_semester" {% if my_semester %}selected{% endif %}>My Semester</option>
+            <option value="my_level" {% if my_level %}selected{% endif %}>My Level</option>
+            <option value="my_academic_year" {% if my_academic_year %}selected{% endif %}>My Academic Year</option>
+        </select>
+    </div>
+    {% endif %}
     
     <!-- File Type Filter -->
     <div class="doc-filter-group" style="display: flex; align-items: center; gap: 8px;">

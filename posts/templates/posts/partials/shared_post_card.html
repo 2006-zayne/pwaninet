@@ -148,6 +148,16 @@
                 <i class="bi bi-share fs-5"></i>
                 <span class="fw-bold">Share</span>
             </button>
+            {% if shared_post.original_post.shared_document %}
+                <span class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none">
+                    <i class="bi bi-hand-thumbs-up fs-5"></i>
+                    <span class="fw-bold">{% if shared_post.original_post.shared_document.analytics %}{{ shared_post.original_post.shared_document.analytics.positive_rating_percentage }}{% else %}0{% endif %}%</span>
+                </span>
+                <span class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none">
+                    <i class="bi bi-hand-thumbs-down fs-5"></i>
+                    <span class="fw-bold">{% if shared_post.original_post.shared_document.analytics %}{{ shared_post.original_post.shared_document.analytics.negative_rating_percentage }}{% else %}0{% endif %}%</span>
+                </span>
+            {% endif %}
         </div>
     </div>
 

@@ -16,6 +16,11 @@ urlpatterns = [
     # Registration
     path('register/', views.register_view, name='register'),
     
+    # HTMX endpoints for registration form
+    path('academic/load-levels/', views.load_academic_levels, name='load_academic_levels'),
+    path('academic/load-years/', views.load_academic_years, name='load_academic_years'),
+    path('academic/load-semesters/', views.load_semesters, name='load_semesters'),
+    
     # Email verification
     path('verify-email/<uidb64>/<token>/', views.verify_email_view, name='verify_email'),
     

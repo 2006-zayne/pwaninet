@@ -10,7 +10,7 @@ from django.db import models
 
 from ..documents.models import Document, DocumentVersion, DocumentFile
 from ..academic.models import AcademicUnit, Semester
-from ..engagement.models import DocumentView, DocumentDownload, DocumentBookmark
+from ..engagement.models import DocumentView, DocumentDownload, DocumentBookmark, DocumentAnalytics
 
 
 class DocumentSelector:
@@ -23,6 +23,7 @@ class DocumentSelector:
             'category',
             'uploaded_by',
             'moderation__status',
+            'analytics',
         ).prefetch_related(
             Prefetch(
                 'versions',
@@ -30,11 +31,31 @@ class DocumentSelector:
                     Prefetch('files', queryset=DocumentFile.objects.all())
                 )
             ),
-            'academic_units__academic_unit',
-            'academic_units__semester',
-            'academic_units__academic_year',
-            'document_tags__tag',
-            'authors',
+            Prefetch(
+                'academic_units',
+                queryset=DocumentAcademicUnit.objects.select_related(
+                    'academic_unit',
+                    'academic_level',
+                    'semester',
+                    'academic_year'
+                ).only(
+                    'academic_unit__code',
+                    'academic_unit__name',
+                    'academic_level__level',
+                    'academic_level__name',
+                    'semester__number',
+                    'semester__academic_year__code',
+                    'academic_year__code'
+                )
+            ),
+            Prefetch(
+                'document_tags',
+                queryset=DocumentTag.objects.select_related('tag').only('tag__name', 'tag__slug')
+            ),
+            Prefetch(
+                'authors',
+                queryset=DocumentAuthor.objects.only('name', 'author_type')
+            ),
         ).filter(id=document_id).first()
     
     @staticmethod
@@ -51,8 +72,14 @@ class DocumentSelector:
         ).select_related(
             'category',
             'uploaded_by',
+            'analytics',
         ).prefetch_related(
-            'academic_units__academic_unit',
+            Prefetch(
+                'academic_units',
+                queryset=DocumentAcademicUnit.objects.select_related(
+                    'academic_unit'
+                ).only('academic_unit__code', 'academic_unit__name')
+            ),
         )
         
         if category:
@@ -79,7 +106,7 @@ class DocumentSelector:
         queryset = DocumentSearchIndex.objects.filter(
             document__status='ready',
             document__visibility='public',
-        ).select_related('document').order_by('-popularity_score')[:limit]
+        ).select_related('document__analytics').order_by('-popularity_score')[:limit]
         
         documents = [index.document for index in queryset]
         
@@ -145,33 +172,49 @@ class DocumentSelector:
     def _apply_student_relevance_sorting(documents: List[Document], user) -> List[Document]:
         """Sort documents by student's academic relevance."""
         try:
-            from users.models import UserProfile
-            profile = getattr(user, 'profile', None)
-            
-            if not profile or not profile.programme:
+            # Use new User model fields directly
+            if not user or not user.programme:
                 return documents
             
-            # Get user's academic units
+            # Get user's academic units with optimized query
             from ..academic.models import ProgrammeUnit
             programme_units = ProgrammeUnit.objects.filter(
-                programme=profile.programme
-            ).select_related('academic_unit')
+                programme=user.programme
+            ).select_related('academic_unit').only('academic_unit__code')
             user_unit_codes = {pu.academic_unit.code for pu in programme_units}
+            
+            if not user_unit_codes:
+                return documents
             
             # Score documents based on relevance
             def relevance_score(doc):
                 score = 0
                 doc_units = set(
                     au.academic_unit.code 
-                    for au in doc.academic_units.all()
+                    for au in doc.academic_units.all().only('academic_unit__code')
                 )
                 
                 # High boost for matching academic units
                 if doc_units & user_unit_codes:
                     score += 10
                 
-                # Medium boost for matching category
-                # (Could add category relevance logic here)
+                # Medium boost for matching academic level
+                if user.academic_level:
+                    doc_levels = set(
+                        au.academic_level.level 
+                        for au in doc.academic_units.all().only('academic_level__level')
+                    )
+                    if user.academic_level.level in doc_levels:
+                        score += 5
+                
+                # Medium boost for matching semester
+                if user.semester:
+                    doc_semesters = set(
+                        au.semester.id 
+                        for au in doc.academic_units.all().only('semester__id')
+                    )
+                    if user.semester.id in doc_semesters:
+                        score += 3
                 
                 return score
             

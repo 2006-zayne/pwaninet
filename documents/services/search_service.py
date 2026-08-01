@@ -249,11 +249,27 @@ class SearchService:
         if filters.get('academic_unit'):
             queryset = queryset.filter(academic_unit_codes__contains=[filters['academic_unit']])
         
+        if filters.get('academic_level'):
+            queryset = queryset.filter(academic_level_code=filters['academic_level'])
+        
         if filters.get('semester'):
             queryset = queryset.filter(semester_code=filters['semester'])
         
         if filters.get('academic_year'):
             queryset = queryset.filter(academic_year_code=filters['academic_year'])
+        
+        if filters.get('programme'):
+            queryset = queryset.filter(programme_code=filters['programme'])
+        
+        if filters.get('school'):
+            queryset = queryset.filter(school_code=filters['school'])
+        
+        if filters.get('department'):
+            queryset = queryset.filter(department_code=filters['department'])
+        
+        if filters.get('academic_units'):
+            # Filter by multiple academic units (for personalized "my units" filter)
+            queryset = queryset.filter(academic_unit_codes__overlap=filters['academic_units'])
         
         if filters.get('file_type'):
             queryset = queryset.filter(file_types__contains=[filters['file_type']])
@@ -273,9 +289,35 @@ class SearchService:
                 academic_units__academic_unit__code=filters['academic_unit']
             )
         
+        if filters.get('academic_level'):
+            queryset = queryset.filter(
+                academic_units__academic_level__level=filters['academic_level']
+            )
+        
         if filters.get('semester'):
             queryset = queryset.filter(
-                academic_units__semester__code=filters['semester']
+                academic_units__semester__id=filters['semester']
+            )
+        
+        if filters.get('academic_year'):
+            queryset = queryset.filter(
+                academic_units__academic_year__id=filters['academic_year']
+            )
+        
+        if filters.get('programme'):
+            # Filter by programme through curriculum mapping
+            from ..academic.models import ProgrammeUnit
+            programme_units = ProgrammeUnit.objects.filter(
+                programme_id=filters['programme']
+            ).values_list('academic_unit_id', flat=True)
+            queryset = queryset.filter(
+                academic_units__academic_unit_id__in=programme_units
+            )
+        
+        if filters.get('academic_units'):
+            # Filter by multiple academic units
+            queryset = queryset.filter(
+                academic_units__academic_unit_id__in=filters['academic_units']
             )
         
         return queryset

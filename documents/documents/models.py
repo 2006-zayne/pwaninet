@@ -482,7 +482,7 @@ class DocumentAcademicUnit(models.Model):
     """Junction table mapping documents to academic units.
     
     A document can be relevant to multiple academic units (e.g., shared units).
-    This prevents duplicate uploads for shared units.
+    This prevents duplicate uploads for shared units and includes full academic context.
     """
     
     document = models.ForeignKey(
@@ -494,6 +494,14 @@ class DocumentAcademicUnit(models.Model):
         'documents.AcademicUnit',
         on_delete=models.CASCADE,
         related_name='documents'
+    )
+    academic_level = models.ForeignKey(
+        'documents.AcademicLevel',
+        on_delete=models.PROTECT,
+        related_name='documents',
+        null=True,
+        blank=True,
+        help_text="The academic level this document is relevant to"
     )
     semester = models.ForeignKey(
         'documents.Semester',
@@ -514,14 +522,16 @@ class DocumentAcademicUnit(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
-        unique_together = ['document', 'academic_unit', 'semester', 'academic_year']
+        unique_together = ['document', 'academic_unit', 'academic_level', 'semester', 'academic_year']
         verbose_name = "Document Academic Unit"
         verbose_name_plural = "Document Academic Units"
         indexes = [
             models.Index(fields=['document']),
             models.Index(fields=['academic_unit']),
+            models.Index(fields=['academic_level']),
             models.Index(fields=['semester']),
             models.Index(fields=['academic_year']),
+            models.Index(fields=['academic_unit', 'academic_level', 'academic_year', 'semester']),
         ]
     
     def __str__(self):

@@ -23,6 +23,25 @@
     white-space: nowrap;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     z-index: 1000;
+    background-color: var(--btn-secondary-bg, #6c757d);
+    border-color: var(--btn-secondary-border, #6c757d);
+}
+
+/* Light mode transparency fix */
+[data-theme="light"] .floating-btn.btn-secondary {
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+}
+
+[data-theme="light"] .floating-btn.btn-primary {
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+}
+
+/* Scroll Hide Behavior */
+.floating-btn.hidden {
+    transform: translateX(100px);
+    opacity: 0;
 }
 
 .floating-btn .btn-icon {
@@ -148,6 +167,36 @@ document.addEventListener('DOMContentLoaded', function() {
             uploadBtn.classList.remove('initial-animation');
         }
     }, 5200);
+
+    // Scroll hide behavior
+    let lastScrollTop = 0;
+    const scrollThreshold = 100;
+    
+    window.addEventListener('scroll', function() {
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        
+        if (libraryBtn) {
+            if (scrollTop > lastScrollTop && scrollTop > scrollThreshold) {
+                // Scrolling down - hide button
+                libraryBtn.classList.add('hidden');
+            } else if (scrollTop < lastScrollTop - 50) {
+                // Scrolling up - show button
+                libraryBtn.classList.remove('hidden');
+            }
+        }
+        
+        if (uploadBtn) {
+            if (scrollTop > lastScrollTop && scrollTop > scrollThreshold) {
+                // Scrolling down - hide button
+                uploadBtn.classList.add('hidden');
+            } else if (scrollTop < lastScrollTop - 50) {
+                // Scrolling up - show button
+                uploadBtn.classList.remove('hidden');
+            }
+        }
+        
+        lastScrollTop = scrollTop;
+    });
 
     // Desktop hover delay for collapse
     if (window.innerWidth >= 992) {

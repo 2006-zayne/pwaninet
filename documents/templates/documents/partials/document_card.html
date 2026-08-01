@@ -107,18 +107,27 @@
                 <i class="bi bi-clock"></i>
                 {{ document.created_at|timesince }} ago
             </span>
-            {% if document.analytics %}
-                <span style="display: flex; align-items: center; gap: 4px; 
-                            font-size: 0.8rem; color: var(--text-secondary);">
-                    <i class="bi bi-hand-thumbs-up"></i>
-                    {{ document.analytics.positive_rating_percentage }}%
-                </span>
-                <span style="display: flex; align-items: center; gap: 4px; 
-                            font-size: 0.8rem; color: var(--text-secondary);">
-                    <i class="bi bi-hand-thumbs-down"></i>
-                    {{ document.analytics.negative_rating_percentage }}%
-                </span>
+            {% if document.latest_version %}
+                {% with first_file=document.latest_version.files.first %}
+                    {% if first_file and first_file.page_count %}
+                        <span style="display: flex; align-items: center; gap: 4px; 
+                                    font-size: 0.8rem; color: var(--text-secondary);">
+                            <i class="bi bi-file-earmark"></i>
+                            {{ first_file.page_count }} pages
+                        </span>
+                    {% endif %}
+                {% endwith %}
             {% endif %}
+            <span style="display: flex; align-items: center; gap: 4px; 
+                        font-size: 0.8rem; color: var(--text-secondary);">
+                <i class="bi bi-hand-thumbs-up"></i>
+                {% if document.analytics %}{{ document.analytics.positive_rating_percentage }}{% else %}0{% endif %}%
+            </span>
+            <span style="display: flex; align-items: center; gap: 4px; 
+                        font-size: 0.8rem; color: var(--text-secondary);">
+                <i class="bi bi-hand-thumbs-down"></i>
+                {% if document.analytics %}{{ document.analytics.negative_rating_percentage }}{% else %}0{% endif %}%
+            </span>
         </div>
     </div>
 </div>

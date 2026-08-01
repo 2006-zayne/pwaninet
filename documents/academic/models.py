@@ -52,6 +52,58 @@ class AcademicYear(models.Model):
         super().save(*args, **kwargs)
 
 
+class AcademicLevel(models.Model):
+    """Represents a student's academic level (Year 1, Year 2, etc.).
+    
+    This is a reusable entity independent of any specific programme.
+    It represents the progression level in a student's academic journey.
+    """
+    
+    LEVEL_CHOICES = [
+        (1, 'Year 1'),
+        (2, 'Year 2'),
+        (3, 'Year 3'),
+        (4, 'Year 4'),
+        (5, 'Year 5'),
+        (6, 'Year 6'),
+        (7, 'Masters'),
+        (8, 'PhD'),
+    ]
+    
+    level = models.PositiveSmallIntegerField(
+        choices=LEVEL_CHOICES,
+        unique=True,
+        help_text="Academic level number (1-8)"
+    )
+    name = models.CharField(
+        max_length=50,
+        unique=True,
+        help_text="Human-readable level name"
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Description of this academic level"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this level is currently active"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['level']
+        verbose_name = "Academic Level"
+        verbose_name_plural = "Academic Levels"
+        indexes = [
+            models.Index(fields=['level']),
+            models.Index(fields=['is_active']),
+        ]
+    
+    def __str__(self):
+        return self.name
+
+
 class Semester(models.Model):
     """Represents a semester within an academic year."""
     
@@ -365,7 +417,7 @@ class ProgrammeUnit(models.Model):
     """Junction table mapping Programmes to Academic Units.
     
     Many programmes can share the same unit, and one programme can have many units.
-    This junction table prevents duplicate unit creation.
+    This junction table prevents duplicate unit creation and includes curriculum context.
     """
     
     programme = models.ForeignKey(
@@ -377,6 +429,22 @@ class ProgrammeUnit(models.Model):
         AcademicUnit,
         on_delete=models.CASCADE,
         related_name='programme_units'
+    )
+    academic_level = models.ForeignKey(
+        AcademicLevel,
+        on_delete=models.CASCADE,
+        related_name='programme_units',
+        null=True,
+        blank=True,
+        help_text="The academic level this unit is offered at"
+    )
+    academic_year = models.ForeignKey(
+        AcademicYear,
+        on_delete=models.CASCADE,
+        related_name='programme_units',
+        null=True,
+        blank=True,
+        help_text="The academic year this unit is offered"
     )
     semester = models.ForeignKey(
         Semester,
@@ -395,14 +463,17 @@ class ProgrammeUnit(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
-        unique_together = ['programme', 'academic_unit', 'semester']
+        unique_together = ['programme', 'academic_unit', 'academic_level', 'academic_year', 'semester']
         verbose_name = "Programme Unit"
         verbose_name_plural = "Programme Units"
         indexes = [
             models.Index(fields=['programme']),
             models.Index(fields=['academic_unit']),
+            models.Index(fields=['academic_level']),
+            models.Index(fields=['academic_year']),
             models.Index(fields=['semester']),
+            models.Index(fields=['programme', 'academic_level', 'academic_year', 'semester']),
         ]
     
     def __str__(self):
-        return f"{self.programme.code} - {self.academic_unit.code} ({self.semester})"
+        return f"{self.programme.code} - {self.academic_unit.code} ({self.academic_level}, {self.semester})"

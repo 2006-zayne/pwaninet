@@ -1,0 +1,4 @@
+<option value="">Select Semester</option>
+{% for semester in semesters %}
+<option value="{{ semester.id }}">Semester {{ semester.get_number_display }} - {{ semester.academic_year.code }}</option>
+{% endfor %}

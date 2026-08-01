@@ -56,8 +56,45 @@ class User(AbstractUser):
     first_name = models.CharField(max_length=200, null=True, blank=True, db_index=True)
     second_name = models.CharField(max_length=200, null=True, blank=True, db_index=True)
     last_name = models.CharField(max_length=200, null=True, blank=True, db_index=True)
+    
+    # Legacy academic fields (for backward compatibility)
     year = models.ForeignKey('courses.Year', on_delete=models.SET_NULL, null=True, blank=True)
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE, null=True, blank=True)
+    
+    # New academic profile fields
+    programme = models.ForeignKey(
+        'documents.Programme',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students',
+        help_text="Current academic programme"
+    )
+    academic_level = models.ForeignKey(
+        'documents.AcademicLevel',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students',
+        help_text="Current academic level (Year 1, Year 2, etc.)"
+    )
+    academic_year = models.ForeignKey(
+        'documents.AcademicYear',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students',
+        help_text="Current academic year"
+    )
+    semester = models.ForeignKey(
+        'documents.Semester',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students',
+        help_text="Current semester"
+    )
+    
     global_role = models.CharField(max_length=20, choices=GlobalRole.choices, default=GlobalRole.NORMAL, db_index=True)
     profile_pic = models.ImageField(default='profile_pic/default_pic1.jpg', upload_to='profile_pic', null=True, blank=True)
     cover_photo = models.ImageField(upload_to='covers/', blank=True, null=True)
@@ -164,6 +201,10 @@ class User(AbstractUser):
     
     @property
     def is_profile_complete(self):
+        # Check new academic profile first
+        if self.programme and self.academic_level:
+            return True
+        # Fallback to legacy fields for backward compatibility
         return bool(self.course and self.year)
     
     @property

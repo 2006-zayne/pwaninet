@@ -68,9 +68,21 @@ def search_results(request):
     query = request.GET.get('q', '')
     category = request.GET.get('category')
     academic_unit = request.GET.get('unit')
+    academic_level = request.GET.get('academic_level')
     semester = request.GET.get('semester')
+    academic_year = request.GET.get('academic_year')
+    programme = request.GET.get('programme')
+    school = request.GET.get('school')
+    department = request.GET.get('department')
     file_type = request.GET.get('file_type')
     sort_by = request.GET.get('sort', 'relevance')
+    
+    # Personalized filters
+    my_programme = request.GET.get('my_programme')
+    my_units = request.GET.get('my_units')
+    my_semester = request.GET.get('my_semester')
+    my_level = request.GET.get('my_level')
+    my_academic_year = request.GET.get('my_academic_year')
     
     # Save search to session if query exists
     if query:
@@ -87,10 +99,38 @@ def search_results(request):
         filters['category'] = category
     if academic_unit:
         filters['academic_unit'] = academic_unit
+    if academic_level:
+        filters['academic_level'] = academic_level
     if semester:
         filters['semester'] = semester
+    if academic_year:
+        filters['academic_year'] = academic_year
+    if programme:
+        filters['programme'] = programme
+    if school:
+        filters['school'] = school
+    if department:
+        filters['department'] = department
     if file_type:
         filters['file_type'] = file_type
+    
+    # Apply personalized filters if user is authenticated
+    if request.user.is_authenticated:
+        if my_programme and request.user.programme:
+            filters['programme'] = request.user.programme.id
+        if my_units and request.user.programme:
+            from .academic.models import ProgrammeUnit
+            user_units = ProgrammeUnit.objects.filter(
+                programme=request.user.programme
+            ).values_list('academic_unit_id', flat=True)
+            if user_units:
+                filters['academic_units'] = list(user_units)
+        if my_semester and request.user.semester:
+            filters['semester'] = request.user.semester.id
+        if my_level and request.user.academic_level:
+            filters['academic_level'] = request.user.academic_level.id
+        if my_academic_year and request.user.academic_year:
+            filters['academic_year'] = request.user.academic_year.id
     
     # Get "Did you mean" suggestion
     from .services.search_service import SearchService
@@ -108,10 +148,15 @@ def search_results(request):
     from .models import Category
     categories = Category.objects.filter(is_active=True)
     
-    # Get academic units for filter dropdown
-    from .academic.models import AcademicUnit, Semester
+    # Get academic entities for filter dropdown
+    from .academic.models import AcademicUnit, Semester, AcademicYear, AcademicLevel, Programme, School, Department
     academic_units = AcademicUnit.objects.filter(is_active=True)[:50]
     semesters = Semester.objects.all()
+    academic_years = AcademicYear.objects.all()
+    academic_levels = AcademicLevel.objects.filter(is_active=True)
+    programmes = Programme.objects.filter(is_active=True)
+    schools = School.objects.all()
+    departments = Department.objects.all()
     
     context = {
         'page_title': 'Search Results',
@@ -119,12 +164,27 @@ def search_results(request):
         'documents': documents,
         'category': category,
         'academic_unit': academic_unit,
+        'academic_level': academic_level,
         'semester': semester,
+        'academic_year': academic_year,
+        'programme': programme,
+        'school': school,
+        'department': department,
         'file_type': file_type,
         'sort_by': sort_by,
+        'my_programme': my_programme,
+        'my_units': my_units,
+        'my_semester': my_semester,
+        'my_level': my_level,
+        'my_academic_year': my_academic_year,
         'categories': categories,
         'academic_units': academic_units,
         'semesters': semesters,
+        'academic_years': academic_years,
+        'academic_levels': academic_levels,
+        'programmes': programmes,
+        'schools': schools,
+        'departments': departments,
         'did_you_mean': did_you_mean,
     }
     return render(request, 'documents/search.html', context)
@@ -202,11 +262,29 @@ def document_detail(request, document_id):
     if hasattr(document, 'academic_units'):
         primary_unit = document.academic_units.filter(is_primary=True).first()
     
+    # Check if user has bookmarked this document
+    is_bookmarked = False
+    if request.user.is_authenticated:
+        is_bookmarked = document.bookmarks.filter(user=request.user).exists()
+    
+    # Get user's rating
+    user_rating = None
+    if request.user.is_authenticated:
+        rating_obj = document.ratings.filter(user=request.user).first()
+        if rating_obj:
+            user_rating = rating_obj.rating
+    
+    # Get or create analytics
+    analytics, _ = DocumentAnalytics.objects.get_or_create(document=document)
+    
     context = {
         'page_title': document.title,
         'document': document,
         'related_documents': related_documents,
         'primary_unit': primary_unit,
+        'is_bookmarked': is_bookmarked,
+        'user_rating': user_rating,
+        'analytics': analytics,
     }
     return render(request, 'documents/document_detail.html', context)
 
@@ -229,6 +307,7 @@ def upload_document(request):
         category_id = request.POST.get('category')
         academic_year_id = request.POST.get('academic_year')
         semester_id = request.POST.get('semester')
+        academic_level_id = request.POST.get('academic_level')
         tags = request.POST.get('tags', '')
         
         if not files:
@@ -242,7 +321,7 @@ def upload_document(request):
         try:
             # Create documents with status 'processing'
             from .models import Document, DocumentFile, DocumentVersion, DocumentAcademicUnit, DocumentTag, Tag
-            from .academic.models import AcademicUnit, Semester, AcademicYear
+            from .academic.models import AcademicUnit, Semester, AcademicYear, AcademicLevel
             
             created_documents = []
             skipped_documents = []
@@ -295,12 +374,13 @@ def upload_document(request):
                 )
                 
                 # Create academic unit relationship if provided
-                if academic_unit_id and semester_id and academic_year_id:
+                if academic_unit_id and semester_id and academic_year_id and academic_level_id:
                     DocumentAcademicUnit.objects.create(
                         document=document,
                         academic_unit_id=academic_unit_id,
                         semester_id=semester_id,
                         academic_year_id=academic_year_id,
+                        academic_level_id=academic_level_id,
                         is_primary=True
                     )
                 
@@ -341,10 +421,11 @@ def upload_document(request):
     # Get categories and academic units for the form
     categories = Category.objects.filter(is_active=True)
     
-    from .academic.models import AcademicUnit, Semester, AcademicYear
+    from .academic.models import AcademicUnit, Semester, AcademicYear, AcademicLevel
     academic_units = AcademicUnit.objects.filter(is_active=True)[:50]
     semesters = Semester.objects.all()
     academic_years = AcademicYear.objects.all()
+    academic_levels = AcademicLevel.objects.filter(is_active=True)
     
     context = {
         'page_title': 'Upload Document',
@@ -352,6 +433,7 @@ def upload_document(request):
         'academic_units': academic_units,
         'semesters': semesters,
         'academic_years': academic_years,
+        'academic_levels': academic_levels,
     }
     return render(request, 'documents/upload.html', context)
 
@@ -594,6 +676,50 @@ def rate_document(request, document_id):
 @csrf_exempt
 @require_POST
 @login_required
+def track_download(request, document_id):
+    """
+    HTMX endpoint for tracking document downloads.
+    """
+    try:
+        document = Document.objects.get(id=document_id)
+        file_id = request.POST.get('file_id')
+        
+        from ..engagement.models import DocumentDownload
+        from ..documents.models import DocumentFile
+        
+        document_file = DocumentFile.objects.get(id=file_id) if file_id else document.latest_version.files.first()
+        
+        DocumentDownload.objects.create(
+            document=document,
+            document_file=document_file,
+            user=request.user,
+            ip_address=request.META.get('REMOTE_ADDR'),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')[:500]
+        )
+        
+        # Get or create analytics and update download count immediately
+        analytics, created = DocumentAnalytics.objects.get_or_create(document=document)
+        analytics.download_count = document.downloads.count()
+        analytics.save(update_fields=['download_count'])
+        
+        # Trigger analytics update asynchronously for full recalculation
+        from .tasks.processing import update_document_analytics
+        update_document_analytics.delay(document_id)
+        
+        return JsonResponse({
+            'success': True,
+            'download_count': analytics.download_count
+        })
+        
+    except Document.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Document not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_POST
+@login_required
 def share_document(request, document_id):
     """
     Share a document to profile or group via HTMX.
@@ -623,13 +749,16 @@ def share_document(request, document_id):
         elif share_type == 'profile':
             # Share to user's profile feed
             from posts.models import Post
-            from posts.services.post_service import PostService
+            from posts.services.post_service import create_post_for_user
+            from posts.forms import PostForm
             
-            post_service = PostService()
-            post = post_service.create_document_share_post(
-                user=request.user,
-                document=document,
-                content=f"Shared a document: {document.title}"
+            # Create a simple post with document reference
+            post = Post.objects.create(
+                author=request.user,
+                course=request.user.course,
+                year=request.user.year,
+                content=f"Shared a document: {document.title}",
+                shared_document=document
             )
             
             # Track the share

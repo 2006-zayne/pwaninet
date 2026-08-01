@@ -2,25 +2,36 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from users.models import User, CollaborationStatus
 from courses.models import Year
+from documents.academic.models import Programme, AcademicLevel, AcademicYear, Semester
 
 
 class PwaniSignupForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
         model = User
         fields = UserCreationForm.Meta.fields + \
-            ('email', 'first_name', 'second_name', 'last_name', 'course', 'year')
+            ('email', 'first_name', 'second_name', 'last_name', 
+             'programme', 'academic_level', 'academic_year', 'semester')
 
-        # WE use HTMX into the Signup dropdowns HTMX is a form of Java script
-        # which is directly injected into the HTML.
+        # We use HTMX for dynamic dropdowns
         widgets = {
-            'course': forms.Select(attrs={
-                'hx-get': '/courses/load-years/',      # The endpoint for filtering
-                'hx-target': '#id_year',       # Targets the 'year' field's HTML ID
+            'programme': forms.Select(attrs={
+                'hx-get': '/academic/load-levels/',      # Load academic levels for programme
+                'hx-target': '#id_academic_level',
                 'class': 'form-control',
-                'id': 'id_course',
+                'id': 'id_programme',
                 'data-searchable': 'true'
             }),
-            'year': forms.Select(attrs={
+            'academic_level': forms.Select(attrs={
+                'hx-get': '/academic/load-years/',      # Load academic years for level
+                'hx-target': '#id_academic_year',
+                'class': 'form-control'
+            }),
+            'academic_year': forms.Select(attrs={
+                'hx-get': '/academic/load-semesters/',  # Load semesters for academic year
+                'hx-target': '#id_semester',
+                'class': 'form-control'
+            }),
+            'semester': forms.Select(attrs={
                 'class': 'form-control'
             }),
         }
@@ -31,19 +42,45 @@ class PwaniSignupForm(UserCreationForm):
         # Make email required
         self.fields['email'].required = True
 
-        # To start with an empty Year list
-        self.fields['year'].queryset = Year.objects.none()
+        # Start with empty querysets for cascading dropdowns
+        self.fields['academic_level'].queryset = AcademicLevel.objects.none()
+        self.fields['academic_year'].queryset = AcademicYear.objects.none()
+        self.fields['semester'].queryset = Semester.objects.none()
 
-        # Update queryset if course data is present (for validation and HTMX)
-        if 'course' in self.data:
+        # Update querysets if data is present (for validation and HTMX)
+        if 'programme' in self.data:
             try:
-                course_id = int(self.data.get('course'))
-                self.fields['year'].queryset = Year.objects.filter(
-                    course_id=course_id).order_by('level')
+                programme_id = int(self.data.get('programme'))
+                # For now, show all academic levels (could be filtered by programme duration)
+                self.fields['academic_level'].queryset = AcademicLevel.objects.filter(
+                    is_active=True).order_by('level')
             except (ValueError, TypeError):
                 pass
-        elif self.instance.pk and self.instance.course:
-            self.fields['year'].queryset = self.instance.course.years.all()
+
+        if 'academic_level' in self.data:
+            try:
+                level_id = int(self.data.get('academic_level'))
+                # Show all academic years
+                self.fields['academic_year'].queryset = AcademicYear.objects.all().order_by('-code')
+            except (ValueError, TypeError):
+                pass
+
+        if 'academic_year' in self.data:
+            try:
+                year_id = int(self.data.get('academic_year'))
+                self.fields['semester'].queryset = Semester.objects.filter(
+                    academic_year_id=year_id).order_by('number')
+            except (ValueError, TypeError):
+                pass
+
+        # For existing users, load their current academic context
+        elif self.instance.pk:
+            if self.instance.programme:
+                self.fields['academic_level'].queryset = AcademicLevel.objects.filter(
+                    is_active=True).order_by('level')
+            if self.instance.academic_year:
+                self.fields['semester'].queryset = Semester.objects.filter(
+                    academic_year=self.instance.academic_year).order_by('number')
 
     def clean_email(self):
         """Validate that email is unique across all users."""

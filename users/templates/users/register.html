@@ -208,9 +208,9 @@
                             {% for field in form %}
                                 <div class="mb-3">
                                     <label class="form-label fw-semibold small" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                                    {% if field.name == 'course' %}
+                                    {% if field.name == 'programme' %}
                                         <div class="course-search-wrapper">
-                                            <input type="text" class="course-search-input" placeholder="Search courses..." id="course-search">
+                                            <input type="text" class="course-search-input" placeholder="Search programmes..." id="programme-search">
                                             {{ field }}
                                         </div>
                                     {% elif field.name == 'password1' or field.name == 'password2' %}
@@ -302,7 +302,7 @@
 
     // Form validation
     const registerForm = document.getElementById('registerForm');
-    const requiredFields = ['username', 'email', 'password1', 'password2', 'first_name', 'last_name', 'course', 'year'];
+    const requiredFields = ['username', 'email', 'password1', 'password2', 'first_name', 'last_name', 'programme', 'academic_level', 'academic_year', 'semester'];
     
     function validateField(field, errorElement) {
         if (!field) return false;
@@ -414,18 +414,18 @@
         registerSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating your account…';
     });
 
-    // Course search functionality
-    const courseSearchInput = document.getElementById('course-search');
-    const courseSelect = document.getElementById('id_course');
+    // Programme search functionality
+    const programmeSearchInput = document.getElementById('programme-search');
+    const programmeSelect = document.getElementById('id_programme');
 
-    if (courseSearchInput && courseSelect) {
-        courseSearchInput.addEventListener('input', function() {
+    if (programmeSearchInput && programmeSelect) {
+        programmeSearchInput.addEventListener('input', function() {
             const searchTerm = this.value.toLowerCase();
-            const options = courseSelect.querySelectorAll('option');
+            const options = programmeSelect.querySelectorAll('option');
 
             options.forEach(function(option) {
-                const courseName = option.textContent.toLowerCase();
-                const matches = courseName.includes(searchTerm);
+                const programmeName = option.textContent.toLowerCase();
+                const matches = programmeName.includes(searchTerm);
                 
                 if (searchTerm === '') {
                     // Show all options when search is empty
@@ -437,14 +437,14 @@
             });
 
             // If the currently selected option is hidden, select the first visible option
-            if (courseSelect.selectedIndex >= 0) {
-                const selectedOption = courseSelect.options[courseSelect.selectedIndex];
+            if (programmeSelect.selectedIndex >= 0) {
+                const selectedOption = programmeSelect.options[programmeSelect.selectedIndex];
                 if (selectedOption.style.display === 'none') {
                     const firstVisibleOption = Array.from(options).find(opt => opt.style.display !== 'none');
                     if (firstVisibleOption) {
-                        courseSelect.value = firstVisibleOption.value;
-                        // Trigger HTMX to load years for the new course
-                        courseSelect.dispatchEvent(new Event('change'));
+                        programmeSelect.value = firstVisibleOption.value;
+                        // Trigger HTMX to load academic levels for the new programme
+                        programmeSelect.dispatchEvent(new Event('change'));
                     }
                 }
             }

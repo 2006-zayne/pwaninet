@@ -44,6 +44,32 @@ def register_view(request):
     return render(request, 'users/register.html', {'form': form})
 
 
+def load_academic_levels(request):
+    """HTMX endpoint to load academic levels for a programme."""
+    programme_id = request.GET.get('programme_id')
+    from documents.academic.models import AcademicLevel
+    levels = AcademicLevel.objects.filter(is_active=True).order_by('level')
+    return render(request, 'users/partials/academic_level_options.html', {'levels': levels})
+
+
+def load_academic_years(request):
+    """HTMX endpoint to load academic years."""
+    from documents.academic.models import AcademicYear
+    years = AcademicYear.objects.all().order_by('-code')
+    return render(request, 'users/partials/academic_year_options.html', {'years': years})
+
+
+def load_semesters(request):
+    """HTMX endpoint to load semesters for an academic year."""
+    academic_year_id = request.GET.get('academic_year_id')
+    from documents.academic.models import Semester
+    if academic_year_id:
+        semesters = Semester.objects.filter(academic_year_id=academic_year_id).order_by('number')
+    else:
+        semesters = Semester.objects.none()
+    return render(request, 'users/partials/semester_options.html', {'semesters': semesters})
+
+
 def verify_email_view(request, uidb64, token):
     """
     Verify email address using token.

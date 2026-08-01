@@ -31,6 +31,8 @@
                          data-file-url="{{ first_file.file.url }}" 
                          data-file-type="{{ first_file.extension }}"
                          data-file-name="{{ document.title }}.{{ first_file.extension }}"
+                         data-document-id="{{ document.id }}"
+                         data-file-id="{{ first_file.id }}"
                          style="min-height: 600px;"></div>
                 {% else %}
                     <div class="doc-preview-placeholder" 
@@ -143,7 +145,9 @@
             <div class="doc-actions" style="display: flex; flex-direction: column; gap: 12px;">
                 {% if document.latest_version %}
                     {% with first_file=document.latest_version.files.first %}
-                        <a href="{{ first_file.file.url }}" download="{{ document.title }}.{{ first_file.extension }}" 
+                        <a href="{{ first_file.file.url }}" 
+                           download="{{ document.title }}.{{ first_file.extension }}"
+                           onclick="trackAndDownload(event, {{ document.id }}, {{ first_file.id }})"
                            class="btn btn-primary" 
                            style="padding: 14px 24px; border-radius: 12px; font-weight: 600; font-size: 1rem; text-decoration: none; display: inline-block; text-align: center;">
                             <i class="bi bi-download" style="margin-right: 8px;"></i>
@@ -160,11 +164,9 @@
                 
                 <div style="display: flex; gap: 12px;">
                     {% if request.user.is_authenticated %}
-                        {% with is_bookmarked=document.bookmarks.filter(user=request.user).exists %}
-                            <div id="bookmark-button-{{ document.id }}">
-                                {% include 'documents/partials/bookmark_button.html' with document=document is_bookmarked=is_bookmarked bookmark_count=document.bookmarks.count %}
-                            </div>
-                        {% endwith %}
+                        <div id="bookmark-button-{{ document.id }}">
+                            {% include 'documents/partials/bookmark_button.html' with document=document is_bookmarked=is_bookmarked bookmark_count=document.bookmarks.count %}
+                        </div>
                     {% else %}
                         <button class="btn btn-outline-secondary" 
                                 style="flex: 1; padding: 12px; border-radius: 12px; font-weight: 500;">
@@ -209,25 +211,23 @@
                  style="display: flex; justify-content: space-around; margin-top: 24px; 
                         padding-top: 20px; border-top: 1px solid var(--border);">
                 <div style="text-align: center;">
-                    <p style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0;">{{ document.downloads.count }}</p>
+                    <p style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0;">{% if analytics %}{{ analytics.download_count }}{% else %}{{ document.downloads.count }}{% endif %}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Downloads</p>
                 </div>
                 <div style="text-align: center;">
-                    <p style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0;">{{ document.views.count }}</p>
+                    <p style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0;">{% if analytics %}{{ analytics.view_count }}{% else %}{{ document.views.count }}{% endif %}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Views</p>
                 </div>
                 <div style="text-align: center;">
-                    <p style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0;">{{ document.bookmarks.count }}</p>
+                    <p style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0;">{% if analytics %}{{ analytics.bookmark_count }}{% else %}{{ document.bookmarks.count }}{% endif %}</p>
                     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Bookmarks</p>
                 </div>
             </div>
             
             <!-- Rating Buttons -->
             {% if request.user.is_authenticated %}
-                {% with user_rating=document.ratings.filter(user=request.user).first %}
-                    {% with analytics=document.analytics %}
-                        {% include 'documents/partials/rating_buttons.html' with document=document user_rating=user_rating.rating analytics=analytics %}
-                    {% endwith %}
+                {% with analytics=document.analytics %}
+                    {% include 'documents/partials/rating_buttons.html' with document=document user_rating=user_rating analytics=analytics %}
                 {% endwith %}
             {% endif %}
             
@@ -286,9 +286,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const fileUrl = viewerContainer.dataset.fileUrl;
         const fileType = viewerContainer.dataset.fileType;
         const fileName = viewerContainer.dataset.fileName;
+        const documentId = viewerContainer.dataset.documentId;
+        const fileId = viewerContainer.dataset.fileId;
         
         if (fileUrl && fileType) {
-            const viewer = new DocumentViewer(viewerContainer, fileUrl, fileType, fileName);
+            const viewer = new DocumentViewer(viewerContainer, fileUrl, fileType, fileName, documentId, fileId);
             viewer.initialize();
         }
     }
@@ -323,6 +325,32 @@ function toggleShareDropdown() {
     if (dropdown) {
         dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
     }
+}
+
+function trackAndDownload(event, documentId, fileId) {
+    // Track the download via HTMX endpoint (async, don't block the download)
+    fetch('/documents/document/' + documentId + '/download/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: 'file_id=' + fileId
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update download count in UI
+            const downloadCountElement = document.querySelector('.doc-stats div:nth-child(1) p:first-child');
+            if (downloadCountElement) {
+                downloadCountElement.textContent = data.download_count;
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error tracking download:', error);
+    });
+    // Let the default link behavior proceed (download the file)
 }
 
 function copyLink(documentId) {

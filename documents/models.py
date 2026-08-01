@@ -18,6 +18,7 @@ Domain Organization:
 from .academic.models import (
     AcademicYear,
     Semester,
+    AcademicLevel,
     Faculty,
     School,
     Department,
@@ -84,6 +85,7 @@ __all__ = [
     # Academic Domain
     'AcademicYear',
     'Semester',
+    'AcademicLevel',
     'Faculty',
     'School',
     'Department',

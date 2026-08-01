@@ -188,6 +188,19 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
                 <div>
                     <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; display: block;">
+                        Academic Level
+                    </label>
+                    <select name="academic_level" class="form-select" 
+                            style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); 
+                                   background: var(--card-bg); color: var(--text-dark);">
+                        <option value="">Select Level</option>
+                        {% for level in academic_levels %}
+                        <option value="{{ level.id }}">{{ level.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; display: block;">
                         Academic Year
                     </label>
                     <select name="academic_year" class="form-select" 
@@ -199,6 +212,9 @@
                         {% endfor %}
                     </select>
                 </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
                 <div>
                     <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; display: block;">
                         Semester
@@ -581,12 +597,14 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add shared metadata
             const academicUnit = document.querySelector('select[name="academic_unit"]').value;
             const category = document.querySelector('select[name="category"]').value;
+            const academicLevel = document.querySelector('select[name="academic_level"]').value;
             const academicYear = document.querySelector('select[name="academic_year"]').value;
             const semester = document.querySelector('select[name="semester"]').value;
             const tags = document.querySelector('input[placeholder="e.g., database, SQL, normalization"]').value;
             
             formData.append('academic_unit', academicUnit);
             formData.append('category', category);
+            formData.append('academic_level', academicLevel);
             formData.append('academic_year', academicYear);
             formData.append('semester', semester);
             formData.append('tags', tags);
