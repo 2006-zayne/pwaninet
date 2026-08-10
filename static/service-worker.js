@@ -1,11 +1,12 @@
 /**
  * PwaniNet Service Worker
- * Provides Progressive Web App offline support with version management
+ * Handles offline support, caching, and push notifications
+ * Version: 1.1.0 - Updated with enhanced push notifications
  */
 
-// Dynamic cache versioning - will be set during service worker registration
-let CACHE_VERSION = '1.0.0';
-let CACHE_BUILD = '1';
+'use strict';
+let CACHE_VERSION = '1.1.0';
+let CACHE_BUILD = '2';
 let CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}`;
 let OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}`;
 
@@ -107,6 +108,102 @@ self.addEventListener('activate', (event) => {
                 // DO NOT call clients.claim() - wait for user approval
                 // The service worker will not claim clients until explicitly told
             })
+    );
+});
+
+// Push event - handle incoming push notifications
+self.addEventListener('push', (event) => {
+    console.log('Service Worker: Push event received');
+
+    let pushData = {
+        title: 'PwaniNet Notification',
+        body: 'You have a new notification',
+        icon: '/static/images/web-app-manifest-192x192-rounded.png',
+        badge: '/static/images/favicon-96x96.png',
+        vibrate: [200, 100, 200],
+        requireInteraction: false,
+        actions: [
+            {
+                action: 'view',
+                title: 'View',
+                icon: '/static/images/favicon-96x96.png'
+            },
+            {
+                action: 'dismiss',
+                title: 'Dismiss',
+                icon: '/static/images/favicon-96x96.png'
+            }
+        ],
+        data: {
+            url: '/notifications'
+        }
+    };
+
+    if (event.data) {
+        try {
+            const data = event.data.json();
+            console.log('Service Worker: Received push data:', JSON.stringify(data, null, 2));
+            pushData = {
+                title: data.title || pushData.title,
+                body: data.body || pushData.body,
+                icon: data.icon || pushData.icon,
+                badge: data.badge || pushData.badge,
+                vibrate: data.vibrate || pushData.vibrate,
+                requireInteraction: data.requireInteraction || pushData.requireInteraction,
+                actions: data.actions || pushData.actions,
+                data: {
+                    notification_id: data.data?.notification_id,
+                    url: data.data?.url || pushData.data.url,
+                    notification_type: data.data?.notification_type,
+                    category: data.data?.category
+                }
+            };
+            console.log('Service Worker: Final push data to display:', JSON.stringify(pushData, null, 2));
+        } catch (e) {
+            console.error('Service Worker: Failed to parse push data:', e);
+        }
+    } else {
+        console.log('Service Worker: No data in push event, using default');
+    }
+
+    event.waitUntil(
+        self.registration.showNotification(pushData.title, pushData)
+    );
+});
+
+// Notification click event - handle user interaction with notifications
+self.addEventListener('notificationclick', (event) => {
+    console.log('Service Worker: Notification clicked', event.action, event.notification);
+
+    event.notification.close();
+
+    // Handle action button clicks
+    if (event.action === 'dismiss') {
+        console.log('Service Worker: Dismiss action clicked');
+        return;
+    }
+
+    // Handle view action or default click
+    const urlToOpen = event.notification.data?.url || '/notifications';
+    const notificationId = event.notification.data?.notification_id;
+
+    event.waitUntil(
+        clients.matchAll({
+            type: 'window',
+            includeUncontrolled: true
+        }).then((clientList) => {
+            // Check if there's already a window open
+            for (const client of clientList) {
+                if (client.url === new URL(urlToOpen, self.location.origin).href && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+
+            // If no window is open, open a new one
+            if (clients.openWindow) {
+                return clients.openWindow(urlToOpen);
+            }
+        })
     );
 });
 
@@ -668,25 +765,5 @@ async function syncOfflineMessages() {
         console.error('Service Worker: Sync failed:', error);
     }
 }
-
-// Push notification support (optional)
-self.addEventListener('push', (event) => {
-    if (event.data) {
-        const options = {
-            body: event.data.text(),
-            icon: '/static/images/logo.png',
-            badge: '/static/images/favicon.ico',
-            vibrate: [100, 50, 100],
-            data: {
-                dateOfArrival: Date.now(),
-                primaryKey: 1
-            }
-        };
-        
-        event.waitUntil(
-            self.registration.showNotification('PwaniNet', options)
-        );
-    }
-});
 
 console.log('Service Worker: Loaded');

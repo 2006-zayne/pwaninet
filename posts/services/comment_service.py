@@ -4,7 +4,6 @@ from posts.queries.comment_queries import get_liked_comment_ids_for_user, get_ra
 from users.services.feed_service import invalidate_home_feed_context
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from notifications.services.notification_service import create_notification
 
 DEFAULT_VISIBLE_COMMENTS = 3
 
@@ -30,18 +29,7 @@ def add_comment_to_post(post, author, content, parent_comment=None):
         parent_comment.reply_count += 1
         parent_comment.save(update_fields=['reply_count'])
         
-        # Create notification for parent comment author (if not replying to own comment)
-        if parent_comment.author != author:
-            from notifications.models import Notifications
-            replier_name = author.get_full_name() or author.username
-            msg = f'{replier_name} replied to your comment'
-            create_notification(
-                recipient=parent_comment.author,
-                sender=author,
-                notification_type=Notifications.COMMENT_REPLY,
-                msg=msg,
-                post=post
-            )
+        # Notification is now handled by the event system in signals.py
     
     invalidate_home_feed_context(author.id)
     

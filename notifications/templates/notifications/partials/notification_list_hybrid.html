@@ -117,7 +117,7 @@
             
             <!-- Activity Time -->
             <div class="activity-time">
-              <small class="text-muted">{{ notif.timestamp|timesince }}</small>
+              <small class="text-muted">{{ notif.created_at|timesince }}</small>
             </div>
           </div>
         {% endfor %}
@@ -146,10 +146,14 @@
          onclick="markGroupAsRead({{ item.notifications.0.id }}, event)"
          style="text-decoration: none; display: block;">
     {% elif item.notification_type == 'FOLLOW' %}
+      {% if item.notifications.0.sender.username and item.notifications.0.sender.username != "" %}
       <a href="{% url 'users:profile' item.notifications.0.sender.username %}" 
          class="notif-item {% if not item.is_read %}unread{% endif %}"
          onclick="markGroupAsRead({{ item.notifications.0.id }}, event)"
          style="text-decoration: none; display: block;">
+      {% else %}
+      <div class="notif-item {% if not item.is_read %}unread{% endif %}">
+      {% endif %}
     {% else %}
       <div class="notif-item {% if not item.is_read %}unread{% endif %}">
     {% endif %}
@@ -248,7 +252,7 @@
                 <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; font-size: 0.8rem; color: var(--text-secondary);">
                   <img src="{{ notif.sender.profile_pic.url }}" style="width: 24px; height: 24px; border-radius: 50%;" alt="">
                   <span>{{ notif.sender.username }}</span>
-                  <span style="margin-left: auto; font-size: 0.7rem;">{{ notif.timestamp|timesince }}</span>
+                  <span style="margin-left: auto; font-size: 0.7rem;">{{ notif.created_at|timesince }}</span>
                 </div>
               {% endfor %}
             </div>

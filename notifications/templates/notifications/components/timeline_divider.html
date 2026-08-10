@@ -1,0 +1,11 @@
+{# Timeline Divider Component #}
+{# Displays a time-based divider for grouping notifications #}
+{# Args: label (string: 'Today', 'Yesterday', 'Earlier', etc.) #}
+
+<div class="timeline-divider" style="display: flex; align-items: center; gap: 1rem; margin: 1.5rem 0; padding: 0.5rem 0;">
+  <div style="flex: 1; height: 1px; background: var(--border);"></div>
+  <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0.5rem;">
+    {{ label }}
+  </span>
+  <div style="flex: 1; height: 1px; background: var(--border);"></div>
+</div>

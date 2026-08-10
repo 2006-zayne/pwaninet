@@ -22,9 +22,32 @@
         padding-right: 0 !important;
     }
     
+    .profile-mobile-fullscreen .col-md-6,
+    .profile-mobile-fullscreen .col-lg-5,
+    .profile-mobile-fullscreen .col-xl-4,
+    .profile-mobile-fullscreen .col-lg-7,
+    .profile-mobile-fullscreen .col-xl-6 {
+        padding: 0 !important;
+    }
+    
+    .profile-mobile-fullscreen [class*="col-"] {
+        padding: 0 !important;
+    }
+    
     .profile-mobile-fullscreen .post-card {
         margin-left: 0 !important;
         margin-right: 0 !important;
+        border-left: none !important;
+        border-right: none !important;
+    }
+    
+    .profile-mobile-fullscreen .profile-card {
+        border-left: none !important;
+        border-right: none !important;
+    }
+    
+    .profile-mobile-fullscreen .cover-container {
+        border-radius: 12px 12px 0 0 !important;
     }
     
     .profile-mobile-fullscreen .nav-tabs {
@@ -33,6 +56,16 @@
     }
     
     .profile-mobile-fullscreen .intel-stream {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    
+    .profile-mobile-fullscreen .tab-content {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    
+    .profile-mobile-fullscreen .tab-pane {
         padding-left: 0 !important;
         padding-right: 0 !important;
     }
@@ -466,18 +499,60 @@
 
                 <div class="post-card p-3 shadow-sm border-0 mb-3">
                     <h6 class="small fw-bold text-uppercase text-muted mb-3"><i class="bi bi-info-circle me-1"></i>{% trans "Academic Details" %}</h6>
-                    <div class="mb-2 d-flex justify-content-between">
-                        <small class="text-muted">{% trans "School" %}</small>
-                        <span class="fw-bold small">{{ profile_user.course.school.name|default:"N/A" }}</span>
-                    </div>
-                    <div class="mb-2 d-flex justify-content-between">
-                        <small class="text-muted">{% trans "Course" %}</small>
-                        <span class="fw-bold small">{{ profile_user.course|default:"N/A" }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <small class="text-muted">{% trans "Year" %}</small>
-                        <span class="fw-bold small">Year {{ profile_user.year.level|default:"N/A" }}</span>
-                    </div>
+                    {% if profile_user.programme %}
+                        <div class="mb-2 d-flex justify-content-between">
+                            <small class="text-muted">{% trans "Programme" %}</small>
+                            <span class="fw-bold small">{{ profile_user.programme.name }}</span>
+                        </div>
+                        {% if profile_user.programme.department %}
+                            <div class="mb-2 d-flex justify-content-between">
+                                <small class="text-muted">{% trans "Department" %}</small>
+                                <span class="fw-bold small">{{ profile_user.programme.department.name }}</span>
+                            </div>
+                            {% if profile_user.programme.department.school %}
+                                <div class="mb-2 d-flex justify-content-between">
+                                    <small class="text-muted">{% trans "School" %}</small>
+                                    <span class="fw-bold small">{{ profile_user.programme.department.school.name }}</span>
+                                </div>
+                            {% endif %}
+                        {% endif %}
+                        {% if profile_user.academic_level %}
+                            <div class="mb-2 d-flex justify-content-between">
+                                <small class="text-muted">{% trans "Academic Level" %}</small>
+                                <span class="fw-bold small">{{ profile_user.academic_level.name }}</span>
+                            </div>
+                        {% endif %}
+                        {% if profile_user.academic_year %}
+                            <div class="mb-2 d-flex justify-content-between">
+                                <small class="text-muted">{% trans "Academic Year" %}</small>
+                                <span class="fw-bold small">{{ profile_user.academic_year.code }}</span>
+                            </div>
+                        {% endif %}
+                        {% if profile_user.semester %}
+                            <div class="d-flex justify-content-between">
+                                <small class="text-muted">{% trans "Semester" %}</small>
+                                <span class="fw-bold small">Semester {{ profile_user.semester.get_number_display }}</span>
+                            </div>
+                        {% endif %}
+                    {% elif profile_user.course %}
+                        {# Fallback to legacy fields for backward compatibility #}
+                        <div class="mb-2 d-flex justify-content-between">
+                            <small class="text-muted">{% trans "School" %}</small>
+                            <span class="fw-bold small">{{ profile_user.course.school.name|default:"N/A" }}</span>
+                        </div>
+                        <div class="mb-2 d-flex justify-content-between">
+                            <small class="text-muted">{% trans "Course" %}</small>
+                            <span class="fw-bold small">{{ profile_user.course|default:"N/A" }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted">{% trans "Year" %}</small>
+                            <span class="fw-bold small">Year {{ profile_user.year.level|default:"N/A" }}</span>
+                        </div>
+                    {% else %}
+                        <div class="text-muted small">
+                            {% trans "No academic information available" %}
+                        </div>
+                    {% endif %}
                 </div>
 
                 {% if is_own_profile %}

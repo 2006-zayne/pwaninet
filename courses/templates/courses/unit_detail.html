@@ -71,11 +71,14 @@
 
                     <div class="{% if post.gradient_class != 'none' %}{{ post.gradient_class }} gradient-intel-bg text-white text-center{% else %}card-body p-4{% endif %} {% if post.has_signature %}signature-overlay{% endif %}"
                          {% if post.gradient_class == 'bg-username-pattern' %}
-                             {% include "posts/partials/username_pattern_style.html" with author_name=post.author.username %}
-                         {% elif post.has_signature %}
-                             {% include "posts/partials/signature_overlay_style.html" with author_name=post.author.username %}
+                             style="background: linear-gradient(135deg, {{ post.custom_gradient_color1|default:'#141E30' }} 0%, {{ post.custom_gradient_color2|default:'#243B55' }} 100%); color: {{ post.custom_gradient_text_color|default:'#ffffff' }};"
                          {% endif %}>
-                        <p class="mb-0 {% if post.gradient_class != 'none' %}fs-3 fw-bold{% else %}fs-5 text-dark{% endif %}">
+                        {% if post.gradient_class == 'bg-username-pattern' %}
+                            {% include "posts/partials/username_pattern_svg.html" with author_name=post.custom_gradient_text|default:post.author.username color1=post.custom_gradient_color1 color2=post.custom_gradient_color2 text_color=post.custom_gradient_text_color %}
+                        {% elif post.has_signature %}
+                            {% include "posts/partials/signature_svg.html" with author_name=post.author.username %}
+                        {% endif %}
+                        <p class="mb-0 {% if post.gradient_class != 'none' %}fs-3 fw-bold{% else %}fs-5 text-dark{% endif %}" style="position: relative; z-index: 1;">
                             {{ post.content }}
                         </p>
                     </div>

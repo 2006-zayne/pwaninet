@@ -405,11 +405,14 @@
         {% if post_obj.gradient_class != 'none' and not post_obj.images.exists and not post_obj.video and not post_obj.docs and not post_obj.audio %}
     <div class="{{ post_obj.gradient_class }} gradient-intel-bg text-center {% if post_obj.has_signature %}signature-overlay{% endif %}"
          {% if post_obj.gradient_class == 'bg-username-pattern' %}
-             {% include "posts/partials/username_pattern_style.html" with author_name=post_obj.custom_gradient_text|default:post_obj.author.username color1=post_obj.custom_gradient_color1 color2=post_obj.custom_gradient_color2 text_color=post_obj.custom_gradient_text_color %}
-         {% elif post_obj.has_signature %}
-             {% include "posts/partials/signature_overlay_style.html" with author_name=post_obj.author.username %}
+             style="background: linear-gradient(135deg, {{ post_obj.custom_gradient_color1|default:'#141E30' }} 0%, {{ post_obj.custom_gradient_color2|default:'#243B55' }} 100%); color: {{ post_obj.custom_gradient_text_color|default:'#ffffff' }};"
          {% endif %}>
-        <p class="mb-0 text-white fw-bold fs-3" style="line-height: 1.5;">
+        {% if post_obj.gradient_class == 'bg-username-pattern' %}
+            {% include "posts/partials/username_pattern_svg.html" with author_name=post_obj.custom_gradient_text|default:post_obj.author.username color1=post_obj.custom_gradient_color1 color2=post_obj.custom_gradient_color2 text_color=post_obj.custom_gradient_text_color %}
+        {% elif post_obj.has_signature %}
+            {% include "posts/partials/signature_svg.html" with author_name=post_obj.author.username %}
+        {% endif %}
+        <p class="mb-0 text-white fw-bold fs-3" style="line-height: 1.5; position: relative; z-index: 1;">
             {% if post.repost_of %}
                 {% if post.content %}<p class="mb-2 text-dark" style="font-size: 14px;">{{ post.content }}</p>{% endif %}
                 {{ post.repost_of.content }}
@@ -466,7 +469,7 @@
             </div>
         </div>
     </a>
-    {% elif post.get_intel_file %}
+    {% elif post.get_intel_file and not post.shared_document %}
     <a href="{% url 'posts:post_details' post.id %}">
         <div class="post-media border-top border-bottom bg-light">
             {% with f_url=post.get_intel_file.url|lower %}
@@ -530,6 +533,14 @@
                     </a>
                 {% endif %}
             {% endwith %}
+        </div>
+    </a>
+    {% endif %}
+
+    {% if post.shared_document %}
+    <a href="{% url 'documents:document_detail' post.shared_document.id %}" class="text-decoration-none">
+        <div class="post-media border-top border-bottom bg-light position-relative" style="padding: 0;">
+            {% include "documents/partials/document_preview_full.html" with document=post.shared_document %}
         </div>
     </a>
     {% endif %}

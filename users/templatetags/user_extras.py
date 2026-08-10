@@ -71,3 +71,19 @@ def can_pinch(user, current_user):
     from users.models import Pinch
     can_pinch, _ = Pinch.can_pinch(current_user, user)
     return can_pinch
+
+
+@register.filter
+def get_nested_dict(dictionary, key):
+    """Get value from nested dictionary using string key"""
+    if not dictionary:
+        return {}
+    return dictionary.get(key, {})
+
+
+@register.filter
+def get_dict_value(dictionary, key):
+    """Get value from dictionary using string key"""
+    if not dictionary:
+        return None
+    return dictionary.get(key)

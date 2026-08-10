@@ -19,7 +19,6 @@ from .permissions import (
 )
 from posts.models import Post, Like
 from users.models import User
-from notifications.models import Notifications
 from groups.forms import GroupForm
 from groups.services.group_notification_service import (
     send_group_join_request_notification,
@@ -782,3 +781,290 @@ def view_group_photo_fullscreen(request, group_id, photo_type):
         'photo_type': photo_type,
         'photo_title': photo_title,
     })
+
+
+@login_required
+def group_members_search(request, group_id):
+    """Search for group members via HTMX for the members modal"""
+    from django.core.paginator import Paginator
+    from django.db.models import Q
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    search_query = request.GET.get('q', '').strip()
+    page = int(request.GET.get('page', 1))
+    page_size = 20
+    
+    logger.info(f"group_members_search called - group_id={group_id}, q={search_query}, page={page}")
+    
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check if user is a member
+    try:
+        membership = Membership.objects.get(
+            user=request.user,
+            group=group,
+            status=MembershipStatus.APPROVED
+        )
+    except Membership.DoesNotExist:
+        return JsonResponse({'error': 'You must be a member to view group members'}, status=403)
+    
+    # Get approved memberships with search filter
+    memberships_queryset = group.memberships.filter(status=MembershipStatus.APPROVED).select_related('user', 'user__course', 'user__year').order_by('-id')
+    
+    if search_query:
+        memberships_queryset = memberships_queryset.filter(
+            Q(user__username__icontains=search_query) |
+            Q(user__first_name__icontains=search_query) |
+            Q(user__last_name__icontains=search_query)
+        )
+    
+    paginator = Paginator(memberships_queryset, page_size)
+    memberships_page = paginator.get_page(page)
+    
+    # Get following IDs for display
+    def get_following_ids(user):
+        from users.models import Follow
+        return Follow.objects.filter(follower=user).values_list('followed_id', flat=True)
+    
+    following_ids = list(get_following_ids(request.user))
+    
+    # Build next page URL
+    next_url = None
+    if memberships_page.has_next():
+        url_params = []
+        if search_query:
+            url_params.append(f"q={search_query}")
+        url_params.append(f"page={memberships_page.next_page_number()}")
+        next_url = f"?{'&'.join(url_params)}"
+    
+    logger.info(f"Rendering group_members_list.html with {len(memberships_page)} memberships")
+    
+    return render(request, 'groups/partials/group_members_list.html', {
+        'memberships': memberships_page,
+        'group': group,
+        'following_ids': following_ids,
+        'has_more': memberships_page.has_next(),
+        'next_url': next_url,
+        'search_query': search_query,
+    })
+
+
+@login_required
+def group_announcements_view(request, group_id):
+    """View group announcements page"""
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check if user is a member
+    try:
+        membership = Membership.objects.get(
+            user=request.user,
+            group=group,
+            status=MembershipStatus.APPROVED
+        )
+    except Membership.DoesNotExist:
+        messages.error(request, 'You must be a member to view group announcements.')
+        return redirect('groups:groups_detail', group_id=group.id)
+    
+    # Check if user is admin
+    is_admin = membership.role == MembershipRole.ADMIN
+    
+    # Placeholder for announcements
+    announcements = []
+    
+    context = {
+        'group': group,
+        'announcements': announcements,
+        'is_admin': is_admin,
+    }
+    
+    return render(request, 'groups/group_announcements.html', context)
+
+
+@login_required
+def group_settings_view(request, group_id):
+    """View group settings page"""
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check if user is a member
+    try:
+        membership = Membership.objects.get(
+            user=request.user,
+            group=group,
+            status=MembershipStatus.APPROVED
+        )
+    except Membership.DoesNotExist:
+        messages.error(request, 'You must be a member to view group settings.')
+        return redirect('groups:groups_detail', group_id=group.id)
+    
+    # Check if user is admin
+    is_admin = membership.role == MembershipRole.ADMIN
+    
+    context = {
+        'group': group,
+        'is_admin': is_admin,
+    }
+    
+    return render(request, 'groups/group_settings.html', context)
+
+
+@login_required
+def group_chat_view(request, group_id):
+    """View group chat page"""
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check if user is a member
+    try:
+        membership = Membership.objects.get(
+            user=request.user,
+            group=group,
+            status=MembershipStatus.APPROVED
+        )
+    except Membership.DoesNotExist:
+        messages.error(request, 'You must be a member to access group chat.')
+        return redirect('groups:groups_detail', group_id=group.id)
+    
+    context = {
+        'group': group,
+    }
+    
+    return render(request, 'groups/group_chat.html', context)
+
+
+@login_required
+def group_settings_details_view(request, group_id):
+    """View group settings details page"""
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check if user is a member
+    try:
+        membership = Membership.objects.get(
+            user=request.user,
+            group=group,
+            status=MembershipStatus.APPROVED
+        )
+    except Membership.DoesNotExist:
+        messages.error(request, 'You must be a member to view group settings.')
+        return redirect('groups:groups_detail', group_id=group.id)
+    
+    context = {
+        'group': group,
+    }
+    
+    return render(request, 'groups/settings/group_settings_details.html', context)
+
+
+@login_required
+def group_settings_members_view(request, group_id):
+    """View group settings members page"""
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check if user is a member
+    try:
+        membership = Membership.objects.get(
+            user=request.user,
+            group=group,
+            status=MembershipStatus.APPROVED
+        )
+    except Membership.DoesNotExist:
+        messages.error(request, 'You must be a member to view group settings.')
+        return redirect('groups:groups_detail', group_id=group.id)
+    
+    context = {
+        'group': group,
+    }
+    
+    return render(request, 'groups/settings/group_settings_members.html', context)
+
+
+@login_required
+def group_settings_privacy_view(request, group_id):
+    """View group settings privacy page"""
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check if user is a member
+    try:
+        membership = Membership.objects.get(
+            user=request.user,
+            group=group,
+            status=MembershipStatus.APPROVED
+        )
+    except Membership.DoesNotExist:
+        messages.error(request, 'You must be a member to view group settings.')
+        return redirect('groups:groups_detail', group_id=group.id)
+    
+    context = {
+        'group': group,
+    }
+    
+    return render(request, 'groups/settings/group_settings_privacy.html', context)
+
+
+@login_required
+def group_settings_announcements_view(request, group_id):
+    """View group settings announcements page"""
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check if user is a member
+    try:
+        membership = Membership.objects.get(
+            user=request.user,
+            group=group,
+            status=MembershipStatus.APPROVED
+        )
+    except Membership.DoesNotExist:
+        messages.error(request, 'You must be a member to view group settings.')
+        return redirect('groups:groups_detail', group_id=group.id)
+    
+    context = {
+        'group': group,
+    }
+    
+    return render(request, 'groups/settings/group_settings_announcements.html', context)
+
+
+@login_required
+def group_settings_documents_view(request, group_id):
+    """View group settings documents page"""
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check if user is a member
+    try:
+        membership = Membership.objects.get(
+            user=request.user,
+            group=group,
+            status=MembershipStatus.APPROVED
+        )
+    except Membership.DoesNotExist:
+        messages.error(request, 'You must be a member to view group settings.')
+        return redirect('groups:groups_detail', group_id=group.id)
+    
+    context = {
+        'group': group,
+    }
+    
+    return render(request, 'groups/settings/group_settings_documents.html', context)
+
+
+@login_required
+def group_settings_about_view(request, group_id):
+    """View group settings about page"""
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check if user is a member
+    try:
+        membership = Membership.objects.get(
+            user=request.user,
+            group=group,
+            status=MembershipStatus.APPROVED
+        )
+    except Membership.DoesNotExist:
+        messages.error(request, 'You must be a member to view group settings.')
+        return redirect('groups:groups_detail', group_id=group.id)
+    
+    context = {
+        'group': group,
+    }
+    
+    return render(request, 'groups/settings/group_settings_about.html', context)

@@ -1,6 +1,9 @@
 #!/bin/bash
 
 # Start Redis server
+cd projects 
+source venv/bin/activate
+cd pwaninet
 redis-server --daemonize yes
 
 # Wait for Redis to be ready

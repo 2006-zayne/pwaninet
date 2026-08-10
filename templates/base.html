@@ -74,16 +74,60 @@
         (function() {
             const userFontSizePreference = '{{ request.user.font_size_preference|default:"medium" }}';
             const savedFontScale = localStorage.getItem('font_scale');
-            
+
             const fontScaleMap = {
                 'tiny': '0.85',
                 'small': '0.95',
                 'medium': '1.00',
                 'large': '1.15'
             };
-            
+
             const scale = fontScaleMap[userFontSizePreference] || savedFontScale || '1.00';
             document.documentElement.style.setProperty('--font-scale', scale);
+        })();
+
+        // Set font family immediately to prevent flash
+        (function() {
+            const userFontFamilyPreference = '{{ request.user.font_family_preference|default:"default" }}';
+            const savedFontFamily = localStorage.getItem('font_family');
+
+            const fontFamilyMap = {
+                'default': '',
+                'inter': "'Inter', sans-serif",
+                'roboto': "'Roboto', sans-serif",
+                'ibm_plex_serif': "'IBM Plex Serif', serif",
+                'manrope': "'Manrope', sans-serif",
+                'playfair_display': "'Playfair Display', serif",
+                'romanesco': "'Romanesco', cursive",
+                'story_script': "'Story Script', cursive",
+                'poppins': "'Poppins', sans-serif",
+                'lora': "'Lora', serif",
+                'merriweather': "'Merriweather', serif",
+                'dancing_script': "'Dancing Script', cursive",
+                'great_vibes': "'Great Vibes', cursive",
+                'parisienne': "'Parisienne', cursive",
+                'satisfy': "'Satisfy', cursive",
+                'cookie': "'Cookie', cursive",
+                'italianno': "'Italianno', cursive",
+                'tangerine': "'Tangerine', cursive"
+            };
+
+            const family = fontFamilyMap[userFontFamilyPreference] || savedFontFamily || '';
+            document.documentElement.style.setProperty('--font-family', family);
+        })();
+
+        // Set font style immediately to prevent flash
+        (function() {
+            const userFontStylePreference = '{{ request.user.font_style_preference|default:"normal" }}';
+            const savedFontStyle = localStorage.getItem('font_style');
+
+            const fontStyleMap = {
+                'normal': 'normal',
+                'italic': 'italic'
+            };
+
+            const style = fontStyleMap[userFontStylePreference] || savedFontStyle || 'normal';
+            document.documentElement.style.setProperty('--font-style', style);
         })();
     </script>
 
@@ -126,19 +170,19 @@
         }
         .bg-spring-flora {
             background-color: #ff9a9e;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg fill='%23ffffff' fill-opacity='0.18'%3E%3Cpath d='M32 16c-4-10-14-10-14 0s14 18 14 18 14-8 14-18-10-10-14 0z'/%3E%3Cpath d='M32 48c-4 10-14 10-14 0s14-18 14-18 14 8 14 18-10 10-14 0z'/%3E%3Cpath d='M16 32c-10-4-10-14 0-14s18 14 18 14-8 14-18 14-10-10 0-14z'/%3E%3Cpath d='M48 32c10-4 10-14 0-14s-18 14-18 14 8 14 18 14 10-10 0-14z'/%3E%3Ccircle cx='32' cy='32' r='6'/%3E%3C/g%3E%3C/svg%3E"), linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+            background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2264%22 height=%2264%22 viewBox=%220 0 64 64%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.18%22%3E%3Cpath d=%22M32 16c-4-10-14-10-14 0s14 18 14 18 14-8 14-18-10-10-14 0z%22/%3E%3Cpath d=%22M32 48c-4 10-14 10-14 0s14-18 14-18 14 8 14 18-10 10-14 0z%22/%3E%3Cpath d=%22M16 32c-10-4-10-14 0-14s18 14 18 14-8 14-18 14-10-10 0-14z%22/%3E%3Cpath d=%22M48 32c10-4 10-14 0-14s-18 14-18 14 8 14 18 14 10-10 0-14z%22/%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%226%22/%3E%3C/g%3E%3C/svg%3E'), linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
         }
         .bg-playful-doodles {
             background-color: #84fab0;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' fill='none' stroke-opacity='0.3'%3E%3Cpath d='M10 10 Q 20 0, 30 10 T 50 10'/%3E%3Ccircle cx='70' cy='20' r='3' fill='%23ffffff' fill-opacity='0.3' stroke='none'/%3E%3Cpath d='M 15 55 L 25 45 M 25 55 L 15 45'/%3E%3Cpath d='M40 70 Q 50 80, 60 70 T 80 70'/%3E%3Ccircle cx='10' cy='70' r='4' fill='%23ffffff' fill-opacity='0.3' stroke='none'/%3E%3Cpath d='M 70 50 L 70 60 M 65 55 L 75 55'/%3E%3C/g%3E%3C/svg%3E"), linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
+            background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22 viewBox=%220 0 80 80%22%3E%3Cg stroke=%22%23ffffff%22 stroke-width=%222.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 fill=%22none%22 stroke-opacity=%220.3%22%3E%3Cpath d=%22M10 10 Q 20 0, 30 10 T 50 10%22/%3E%3Ccircle cx=%2270%22 cy=%2220%22 r=%223%22 fill=%22%23ffffff%22 fill-opacity=%220.3%22 stroke=%22none%22/%3E%3Cpath d=%22M 15 55 L 25 45 M 25 55 L 15 45%22/%3E%3Cpath d=%22M40 70 Q 50 80, 60 70 T 80 70%22/%3E%3Ccircle cx=%2210%22 cy=%2270%22 r=%224%22 fill=%22%23ffffff%22 fill-opacity=%220.3%22 stroke=%22none%22/%3E%3Cpath d=%22M 70 50 L 70 60 M 65 55 L 75 55%22/%3E%3C/g%3E%3C/svg%3E'), linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
         }
         .bg-magic-sparkles {
             background-color: #ff758c;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50' viewBox='0 0 50 50'%3E%3Cg fill='%23ffffff' fill-opacity='0.25'%3E%3Cpath d='M25 5 Q 25 25, 45 25 Q 25 25, 25 45 Q 25 25, 5 25 Q 25 25, 25 5 Z'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3Ccircle cx='40' cy='40' r='2.5'/%3E%3C/g%3E%3C/svg%3E"), linear-gradient(to right, #ff758c 0%, #ff7eb3 100%);
+            background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22 viewBox=%220 0 50 50%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.25%22%3E%3Cpath d=%22M25 5 Q 25 25, 45 25 Q 25 25, 25 45 Q 25 25, 5 25 Q 25 25, 25 5 Z%22/%3E%3Ccircle cx=%2210%22 cy=%2210%22 r=%222%22/%3E%3Ccircle cx=%2240%22 cy=%2240%22 r=%222.5%22/%3E%3C/g%3E%3C/svg%3E'), linear-gradient(to right, #ff758c 0%, #ff7eb3 100%);
         }
         .bg-username-pattern {
-            background-color: #141E30;
-            background: linear-gradient(135deg, #141E30 0%, #243B55 100%);
+            /* Default fallback - will be overridden by inline styles */
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
         .gradient-intel-bg {
             width: 100%;
@@ -176,6 +220,58 @@
     <link rel="preload" href="{% static 'css/custom.css' %}" as="style">
     <link rel="preload" href="{% static 'css/bootstrap.min.css' %}" as="style">
     <link rel="preload" href="{% static 'css/bootstrap-icons.css' %}" as="style">
+
+    <!-- Preload custom fonts based on user preference -->
+    {% if request.user.font_family_preference == 'inter' %}
+        <link rel="preload" href="{% static 'fonts/inter/Inter-Regular.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+    {% elif request.user.font_family_preference == 'roboto' %}
+        <link rel="preload" href="{% static 'fonts/roboto/Roboto-Regular.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+    {% elif request.user.font_family_preference == 'ibm_plex_serif' %}
+        <link rel="preload" href="{% static 'fonts/custom/IBMPlexSerif-Regular.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+        {% if request.user.font_style_preference == 'italic' %}
+            <link rel="preload" href="{% static 'fonts/custom/IBMPlexSerif-Italic.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+        {% endif %}
+    {% elif request.user.font_family_preference == 'manrope' %}
+        <link rel="preload" href="{% static 'fonts/custom/Manrope-Regular.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+    {% elif request.user.font_family_preference == 'playfair_display' %}
+        <link rel="preload" href="{% static 'fonts/custom/PlayfairDisplay-VariableFont_wght.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+        {% if request.user.font_style_preference == 'italic' %}
+            <link rel="preload" href="{% static 'fonts/custom/PlayfairDisplay-Italic-VariableFont_wght.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+        {% endif %}
+    {% elif request.user.font_family_preference == 'romanesco' %}
+        <link rel="preload" href="{% static 'fonts/custom/Romanesco-Regular.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+    {% elif request.user.font_family_preference == 'story_script' %}
+        <link rel="preload" href="{% static 'fonts/custom/StoryScript-Regular.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+    {% elif request.user.font_family_preference == 'poppins' %}
+        <link rel="preload" href="{% static 'fonts/custom/Poppins-Regular.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+        {% if request.user.font_style_preference == 'italic' %}
+            <link rel="preload" href="{% static 'fonts/custom/Poppins-Italic.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+        {% endif %}
+    {% elif request.user.font_family_preference == 'lora' %}
+        <link rel="preload" href="{% static 'fonts/custom/Lora[wght].woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+        {% if request.user.font_style_preference == 'italic' %}
+            <link rel="preload" href="{% static 'fonts/custom/Lora-Italic[wght].woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+        {% endif %}
+    {% elif request.user.font_family_preference == 'merriweather' %}
+        <link rel="preload" href="{% static 'fonts/custom/Merriweather-VariableFont_opsz,wdth,wght.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+        {% if request.user.font_style_preference == 'italic' %}
+            <link rel="preload" href="{% static 'fonts/custom/Merriweather-Italic-VariableFont_opsz,wdth,wght.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+        {% endif %}
+    {% elif request.user.font_family_preference == 'dancing_script' %}
+        <link rel="preload" href="{% static 'fonts/custom/DancingScript-VariableFont_wght.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+    {% elif request.user.font_family_preference == 'great_vibes' %}
+        <link rel="preload" href="{% static 'fonts/custom/GreatVibes-Regular.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+    {% elif request.user.font_family_preference == 'parisienne' %}
+        <link rel="preload" href="{% static 'fonts/custom/Parisienne-Regular.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+    {% elif request.user.font_family_preference == 'satisfy' %}
+        <link rel="preload" href="{% static 'fonts/custom/Satisfy-Regular.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+    {% elif request.user.font_family_preference == 'cookie' %}
+        <link rel="preload" href="{% static 'fonts/custom/Cookie-Regular.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+    {% elif request.user.font_family_preference == 'italianno' %}
+        <link rel="preload" href="{% static 'fonts/custom/Italianno-Regular.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+    {% elif request.user.font_family_preference == 'tangerine' %}
+        <link rel="preload" href="{% static 'fonts/custom/Tangerine-Regular.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
+    {% endif %}
     
     <!-- Load CSS files -->
     <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
@@ -556,7 +652,8 @@
         body {
             background-color: var(--background) !important;
             color: var(--text-dark);
-            font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+            font-family: var(--font-family, 'Inter', 'Roboto', system-ui, -apple-system, sans-serif);
+            font-style: var(--font-style, normal);
             padding-top: 75px;
             padding-bottom: 80px;
             font-size: 1rem;
@@ -604,7 +701,7 @@
         }
 
         .nav-brand-tactical {
-            font-family: 'Nunito', sans-serif;
+            font-family: var(--font-family, 'Nunito', sans-serif);
             font-weight: 700;
             font-style: italic;
             letter-spacing: 2px;
@@ -615,6 +712,12 @@
         }
 
         .brand-net { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .nav-brand-tactical {
+                margin-left: 0.5rem;
+            }
+        }
 
         .navbar-top {
             background: var(--nav-bg) !important;

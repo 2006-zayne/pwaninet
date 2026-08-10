@@ -1,6 +1,12 @@
 {% extends 'users/settings/base_settings.html' %}
 {% load i18n %}
 
+{% block back_link %}
+<a href="{% url 'users:profile' request.user.username %}" class="back-link">
+  <i class="bi bi-arrow-left"></i> Back to Profile
+</a>
+{% endblock %}
+
 {% block page_title %}{% trans "Settings" %}{% endblock %}
 
 {% block settings_content %}

@@ -71,7 +71,6 @@ urlpatterns = [
     path('settings/storage/', views.settings_storage_view, name='settings_storage'),
     path('settings/storage/downloads/', views.settings_downloads_view, name='settings_downloads'),
     path('settings/about/', views.settings_about_view, name='settings_about'),
-    path('notification-preferences/', views.notification_preferences_view, name='notification_preferences'),
     path('mark-onboarding-complete/', views.mark_onboarding_complete, name='mark_onboarding_complete'),
     path('accounts/switch/<int:user_id>/', views.switch_account_view, name='switch_account'),
     path('accounts/device-accounts/', views.get_device_accounts_view, name='device_accounts'),

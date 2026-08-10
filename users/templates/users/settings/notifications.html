@@ -1,5 +1,5 @@
-{% extends 'users/settings/base_settings.html' %}]
-{% load i18n %}
+{% extends 'users/settings/base_settings.html' %}
+{% load i18n user_extras %}
 
 {% block back_link %}
 <a href="{% url 'users:settings' %}" class="back-link">
@@ -24,10 +24,12 @@
 
   <form method="post">
     {% csrf_token %}
-    {% include 'users/settings/partials/notification_preferences.html' %}
+    <div class="settings-list-body">
+      {% include 'users/settings/partials/notification_preferences.html' %}
+    </div>
   </form>
 </div>
-
+<!--
 <div class="settings-list-container">
   <div class="settings-list-header">
     <div class="settings-list-header-icon">
@@ -42,7 +44,7 @@
   <div class="settings-list-body">
     {% include 'users/settings/partials/updates.html' %}
   </div>
-</div>
+</div>-->
 
 <style>
   .settings-list-container {

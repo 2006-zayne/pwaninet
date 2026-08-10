@@ -1,0 +1,201 @@
+{% load user_extras %}
+{% if memberships %}
+    <div class="people-list">
+        <!-- Officials Section -->
+        {% for membership in memberships %}
+            {% if membership.role == 'ADMIN' or membership.role == 'MODERATOR' or membership.role == 'DELEGATE' %}
+                {% if forloop.first %}
+                    <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.09em; padding: 0.5rem 0.75rem 0.25rem;">
+                        <i class="bi bi-shield-fill me-1"></i> Officials
+                    </div>
+                {% endif %}
+                <div class="people-user-row">
+                    <!-- Avatar -->
+                    <a href="{% url 'users:profile' membership.user.username %}" class="text-decoration-none flex-shrink-0">
+                        <img src="{{ membership.user.profile_pic.url|default:'/static/images/default_user.jpg' }}" 
+                             alt="{{ membership.user.username }}" 
+                             class="people-user-avatar rounded-circle border border-2 border-light shadow-sm"
+                             style="width: 48px; height: 48px; object-fit: cover;">
+                    </a>
+
+                    <!-- User Info -->
+                    <div class="people-user-info flex-grow-1 min-w-0" style="max-width: 180px;">
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="{% url 'users:profile' membership.user.username %}" 
+                               class="people-user-name text-decoration-none fw-bold text-dark text-truncate">
+                                {{ membership.user.get_full_name|default:membership.user.username }}
+                            </a>
+                            
+                            <!-- Badges -->
+                            {% if membership.user.global_role == 'VERIFIED' %}
+                                <i class="bi bi-patch-check-fill text-primary small flex-shrink-0" title="Verified"></i>
+                            {% endif %}
+                            {% if membership.user.global_role == 'PRESIDENT' or membership.user.global_role == 'DELEGATE' %}
+                                <i class="bi bi-star-fill text-warning small flex-shrink-0" title="Leadership"></i>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="people-user-meta text-muted small text-truncate">
+                            @{{ membership.user.username }}
+                            {% if membership.user.course %} · {{ membership.user.course.name }}{% endif %}
+                            {% if membership.user.year %} · Year {{ membership.user.year.level }}{% endif %}
+                        </div>
+                        
+                        <!-- Role Badge -->
+                        <div class="mt-1">
+                            {% if membership.role == 'ADMIN' %}
+                                <span class="role-badge role-admin">Admin</span>
+                            {% elif membership.role == 'MODERATOR' %}
+                                <span class="role-badge role-moderator">Moderator</span>
+                            {% elif membership.role == 'DELEGATE' %}
+                                <span class="role-badge role-delegate">Delegate</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="people-user-actions flex-shrink-0 d-flex gap-2 align-items-center">
+                        <!-- Follow Button -->
+                        {% if membership.user != request.user %}
+                            <form class="m-0"
+                                  hx-post="{% url 'users:toggle_follow' membership.user.username %}"
+                                  hx-target="#follow-btn-{{ membership.user.username }}"
+                                  hx-swap="outerHTML">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        id="follow-btn-{{ membership.user.username }}"
+                                        class="btn btn-sm {% if membership.user.id in following_ids %}btn-outline-dark{% else %}btn-primary{% endif %} rounded-pill fw-bold"
+                                        style="min-width: 80px;">
+                                    {% if membership.user.id in following_ids %}Following{% else %}Follow{% endif %}
+                                </button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        <!-- Members Section -->
+        {% for membership in memberships %}
+            {% if membership.role == 'MEMBER' %}
+                {% if forloop.first %}
+                    <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.09em; padding: 0.75rem 0.75rem 0.25rem; margin-top: 0.5rem; border-top: 1px solid var(--border);">
+                        <i class="bi bi-people-fill me-1"></i> Members
+                    </div>
+                {% endif %}
+                <div class="people-user-row">
+                    <!-- Avatar -->
+                    <a href="{% url 'users:profile' membership.user.username %}" class="text-decoration-none flex-shrink-0">
+                        <img src="{{ membership.user.profile_pic.url|default:'/static/images/default_user.jpg' }}" 
+                             alt="{{ membership.user.username }}" 
+                             class="people-user-avatar rounded-circle border border-2 border-light shadow-sm"
+                             style="width: 48px; height: 48px; object-fit: cover;">
+                    </a>
+
+                    <!-- User Info -->
+                    <div class="people-user-info flex-grow-1 min-w-0" style="max-width: 180px;">
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="{% url 'users:profile' membership.user.username %}" 
+                               class="people-user-name text-decoration-none fw-bold text-dark text-truncate">
+                                {{ membership.user.get_full_name|default:membership.user.username }}
+                            </a>
+                            
+                            <!-- Badges -->
+                            {% if membership.user.global_role == 'VERIFIED' %}
+                                <i class="bi bi-patch-check-fill text-primary small flex-shrink-0" title="Verified"></i>
+                            {% endif %}
+                            {% if membership.user.global_role == 'PRESIDENT' or membership.user.global_role == 'DELEGATE' %}
+                                <i class="bi bi-star-fill text-warning small flex-shrink-0" title="Leadership"></i>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="people-user-meta text-muted small text-truncate">
+                            @{{ membership.user.username }}
+                            {% if membership.user.course %} · {{ membership.user.course.name }}{% endif %}
+                            {% if membership.user.year %} · Year {{ membership.user.year.level }}{% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="people-user-actions flex-shrink-0 d-flex gap-2 align-items-center">
+                        <!-- Follow Button -->
+                        {% if membership.user != request.user %}
+                            <form class="m-0"
+                                  hx-post="{% url 'users:toggle_follow' membership.user.username %}"
+                                  hx-target="#follow-btn-{{ membership.user.username }}"
+                                  hx-swap="outerHTML">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        id="follow-btn-{{ membership.user.username }}"
+                                        class="btn btn-sm {% if membership.user.id in following_ids %}btn-outline-dark{% else %}btn-primary{% endif %} rounded-pill fw-bold"
+                                        style="min-width: 80px;">
+                                    {% if membership.user.id in following_ids %}Following{% else %}Follow{% endif %}
+                                </button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- Infinite Scroll Trigger -->
+    {% if has_more %}
+        <div id="group-load-more-trigger"
+             hx-get="{{ next_url }}"
+             hx-target="#personnelModalList"
+             hx-swap="beforeend"
+             class="text-center py-3"
+             style="min-height: 100px; margin-top: 20px;">
+            <div class="spinner-border spinner-border-sm text-primary htmx-indicator" role="status"></div>
+        </div>
+    {% endif %}
+{% else %}
+    <div class="people-empty text-center py-5">
+        <i class="bi bi-people text-muted display-6"></i>
+        <p class="text-muted small mt-3 mb-0">
+            {% if search_query %}No results for "{{ search_query }}"{% else %}No members yet{% endif %}
+        </p>
+    </div>
+{% endif %}
+
+<style>
+  .role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.6rem;
+    font-weight: 800;
+    border-radius: 999px;
+    padding: 2px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+  .role-admin {
+    background: var(--brand, #2563eb);
+    color: #fff;
+  }
+  .role-moderator {
+    background: var(--primary, #0d6efd);
+    color: #fff;
+  }
+  .role-delegate {
+    background: var(--info, #0dcaf0);
+    color: #fff;
+  }
+  .role-member {
+    background: var(--brand-light, #dbeafe);
+    color: var(--text-secondary, #64748b);
+    border: 1px solid var(--border, #e2e8f0);
+  }
+  
+  [data-theme="dark"] .role-member {
+    background: #3a3b3c;
+    color: #e4e6eb;
+    border-color: #4e4f50;
+  }
+  
+  [data-theme="dark"] .people-user-name {
+    color: #e4e6eb !important;
+  }
+</style>

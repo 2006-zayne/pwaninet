@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from posts.models import Post, Comment, Like, SharedPost
 from users.models import Follow
-from courses.models import Course, Year, School
+from documents.academic.models import Programme, AcademicLevel, AcademicYear, Semester, Faculty, School, Department
 from groups.models import Group, Membership, MembershipRole, MembershipStatus
 from messaging.models import Conversation, Message, ConversationMember
 
@@ -44,27 +44,32 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS('Starting complete seed data generation...'))
 
-        # Create educational structure
-        schools = self.create_schools()
-        self.stdout.write(self.style.SUCCESS(f'Created {len(schools)} schools'))
+        # First, ensure academic data exists
+        self.stdout.write('Checking academic data...')
+        if not AcademicYear.objects.exists():
+            self.stdout.write(self.style.WARNING('No academic data found. Run seed_enhanced_academic_data first.'))
+            return
 
-        courses = self.create_courses(schools)
-        self.stdout.write(self.style.SUCCESS(f'Created {len(courses)} courses'))
-
-        years = self.create_years(courses)
-        self.stdout.write(self.style.SUCCESS(f'Created {len(years)} years'))
+        # Get academic entities
+        programmes = list(Programme.objects.filter(is_active=True))
+        academic_levels = list(AcademicLevel.objects.filter(is_active=True))
+        academic_years = list(AcademicYear.objects.all())
+        semesters = list(Semester.objects.all())
+        schools = list(School.objects.all())
+        
+        self.stdout.write(self.style.SUCCESS(f'Found {len(programmes)} programmes, {len(academic_levels)} levels, {len(academic_years)} years'))
 
         # Create groups
-        groups = self.create_groups(courses, years, schools)
+        groups = self.create_groups(programmes, academic_levels, schools)
         self.stdout.write(self.style.SUCCESS(f'Created {len(groups)} groups'))
 
         # Create users (admin + test users + regular users)
-        admin_user, test_users, regular_users = self.create_users(num_users, courses, years)
+        admin_user, test_users, regular_users = self.create_users(num_users, programmes, academic_levels, academic_years, semesters)
         all_users = [admin_user] + test_users + regular_users
         self.stdout.write(self.style.SUCCESS(f'Created {len(all_users)} users (1 admin + 2 test + {len(regular_users)} regular)'))
 
         # Create posts
-        posts = self.create_posts(all_users, posts_per_user, courses)
+        posts = self.create_posts(all_users, posts_per_user, programmes)
         self.stdout.write(self.style.SUCCESS(f'Created {len(posts)} posts'))
 
         # Create interactions
@@ -108,16 +113,15 @@ class Command(BaseCommand):
         Like.objects.all().delete()
         Comment.objects.all().delete()
         Post.objects.all().delete()
-        Year.objects.all().delete()
-        Course.objects.all().delete()
-        School.objects.all().delete()
+        # Don't delete academic data - it should be seeded separately
+        # Don't delete legacy Course/Year - keep for compatibility
         
         # Delete seed users (exclude superuser)
         User.objects.filter(is_superuser=False).delete()
         
         self.stdout.write(self.style.SUCCESS('Seed data cleaned'))
 
-    def create_schools(self):
+    def create_groups(self, programmes, academic_levels, schools):
         """Create educational schools"""
         school_data = [
             {

@@ -552,7 +552,7 @@ class ReportViewSet(viewsets.ModelViewSet):
         # Send notification to group admins/moderators
         if report.post.group:
             from groups.models import Membership, MembershipRole, MembershipStatus
-            from notifications.models import Notifications
+            from notifications.models import NotificationObject
 
             # Get all admins and moderators of the group
             officials = Membership.objects.filter(

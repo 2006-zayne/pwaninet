@@ -3,6 +3,42 @@
 
 {% block content %}
 <style>
+@media (max-width: 767px) {
+    .page-mobile-fullscreen .container-fluid {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    
+    .page-mobile-fullscreen .row {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    
+    .page-mobile-fullscreen .col-12 {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    
+    .page-mobile-fullscreen .post-card {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    
+    .page-mobile-fullscreen .card {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        border-radius: 12px !important;
+    }
+    
+    .page-mobile-fullscreen .group-card {
+        border-radius: 12px !important;
+    }
+    
+    .page-mobile-fullscreen .group-banner {
+        border-radius: 12px 12px 0 0 !important;
+    }
+}
+
   /* ── Design Tokens ── */
   :root, [data-theme="light"] {
     --brand:          #2563eb;
@@ -49,7 +85,7 @@
     --shadow-hover:   0 4px 12px rgba(0,0,0,0.4), 0 16px 40px rgba(0,0,0,0.3);
   }
 
-  *, *::before, *::after { font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif; box-sizing: border-box; }
+  *, *::before, *::after { font-family: var(--font-family, 'Inter', 'Roboto', system-ui, -apple-system, sans-serif); font-style: var(--font-style, normal); box-sizing: border-box; }
   body { background: var(--page-bg); color: var(--text-primary); }
 
   /* ── Modal Styles ── */
@@ -76,24 +112,6 @@
   }
   [data-theme="dark"] .form-field::placeholder {
     color: var(--text-secondary) !important;
-  }
-
-  /* ── Layout ── */
-  .page-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 1rem 4rem;
-    align-items: start;
-  }
-  @media (min-width: 992px) {
-    .page-grid { grid-template-columns: 380px 1fr; }
-  }
-  .sticky-panel { position: sticky; top: 88px; }
-  @media (max-width: 991px) {
-    .sticky-panel { position: static !important; }
   }
 
   /* ── Card ── */
@@ -280,6 +298,25 @@
     border-color: #f87171;
   }
 
+  /* ── Profile Action Buttons (matching user profile card) ── */
+  .profile-action-btn {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .profile-action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .profile-action-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  [data-theme="dark"].profile-action-btn:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
   /* ── About Card ── */
   .about-label {
     font-size: 0.65rem; font-weight: 800;
@@ -462,7 +499,7 @@
     border: none !important;
     border-radius: var(--radius-lg) !important;
     box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
-    font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-family, 'Inter', 'Roboto', system-ui, -apple-system, sans-serif);
     background: var(--card-bg) !important;
   }
   .modal-header {
@@ -490,7 +527,7 @@
     color: var(--text-primary);
     outline: none; background: var(--card-bg);
     transition: border-color 0.18s, box-shadow 0.18s;
-    font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-family, 'Inter', 'Roboto', system-ui, -apple-system, sans-serif);
   }
   .form-field:focus {
     border-color: var(--brand);
@@ -510,7 +547,7 @@
     border: none; border-radius: var(--radius-pill);
     font-size: 0.8rem; font-weight: 800;
     cursor: pointer; transition: all 0.18s var(--ease);
-    font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-family, 'Inter', 'Roboto', system-ui, -apple-system, sans-serif);
   }
   .btn-modal-submit:hover {
     background: var(--brand);
@@ -562,11 +599,12 @@
   }
 </style>
 
-<div class="container-fluid py-3 px-2 px-md-4">
-  <div class="page-grid">
+<div class="container-fluid p-0 page-mobile-fullscreen">
+  <div class="row g-3 g-md-4 justify-content-center">
 
   <!-- ══ SIDEBAR ══ -->
-  <aside class="sticky-panel">
+  <div class="col-12 col-md-6 col-lg-5 col-xl-4">
+    <div class="sticky-top" style="top: 85px; z-index: 10;">
 
     <!-- Group Card -->
     <div class="card group-card" style="position: relative; overflow: visible;">
@@ -596,6 +634,44 @@
         <h1 class="group-name">{{ group.name }}</h1>
         <p class="group-handle">@group_{{ group.id }}</p>
 
+        {% if is_member %}
+          <div class="d-grid gap-2 px-2">
+            <a href="{% url 'groups:group_announcements' group.id %}" class="btn btn-outline-secondary rounded-pill fw-bold btn-sm profile-action-btn">
+              <i class="bi bi-megaphone-fill me-1"></i> Announcements
+            </a>
+            <a href="{% url 'groups:group_chat' group.id %}" class="btn btn-outline-info rounded-pill fw-bold btn-sm profile-action-btn">
+              <i class="bi bi-chat-dots-fill me-1"></i> Group Chat
+            </a>
+            <a href="{% url 'groups:group_settings' group.id %}" class="btn btn-outline-primary rounded-pill fw-bold btn-sm profile-action-btn">
+              <i class="bi bi-gear me-1"></i> Settings
+            </a>
+            <button id="leaveGroupBtn" class="btn btn-outline-danger rounded-pill fw-bold btn-sm profile-action-btn" onclick="handleLeaveGroup()">
+              <i class="bi bi-box-arrow-left me-1"></i> Leave Group
+            </button>
+          </div>
+        {% elif is_pending %}
+          <div class="d-grid gap-2 px-2">
+            <button class="btn btn-outline-secondary rounded-pill fw-bold btn-sm profile-action-btn" disabled style="opacity: 0.7; cursor: not-allowed;">
+              <i class="bi bi-clock-fill me-1"></i> Request Sent ⏳
+            </button>
+            <a href="{% url 'groups:toggle_membership' group.id %}" class="btn btn-outline-danger rounded-pill fw-bold btn-sm profile-action-btn">
+              <i class="bi bi-x-circle-fill me-1"></i> Cancel Request
+            </a>
+          </div>
+        {% elif is_rejected %}
+          <div class="d-grid gap-2 px-2">
+            <a href="{% url 'groups:toggle_membership' group.id %}" class="btn btn-outline-primary rounded-pill fw-bold btn-sm profile-action-btn">
+              <i class="bi bi-arrow-clockwise me-1"></i> Request Again
+            </a>
+          </div>
+        {% else %}
+          <div class="d-grid gap-2 px-2">
+            <a href="{% url 'groups:toggle_membership' group.id %}" class="btn btn-outline-primary rounded-pill fw-bold btn-sm profile-action-btn">
+              <i class="bi bi-plus-circle-fill me-1"></i> Join Group
+            </a>
+          </div>
+        {% endif %}
+
         <div class="stats-row" data-bs-toggle="modal" data-bs-target="#personnelModal" title="View members">
           <div class="stat-item">
             <div class="stat-val">{{ group.member_count }}</div>
@@ -606,38 +682,6 @@
             <div class="stat-label">Posts</div>
           </div>
         </div>
-
-        {% if is_member %}
-          {% if is_admin %}
-            <button class="btn-base btn-secondary-brand" data-bs-toggle="modal" data-bs-target="#editGroupModal">
-              <i class="bi bi-pencil-fill me-1"></i> Edit Group
-            </button>
-            <button class="btn-base btn-secondary-brand" data-bs-toggle="modal" data-bs-target="#assignRoleModal">
-              <i class="bi bi-shield-fill me-1"></i> Manage Roles
-            </button>
-          {% endif %}
-          <button class="btn-base btn-primary-brand" data-bs-toggle="modal" data-bs-target="#inviteModal">
-            <i class="bi bi-person-plus-fill me-1"></i> Invite Friends
-          </button>
-          <button id="leaveGroupBtn" class="btn-base btn-ghost-danger" onclick="handleLeaveGroup()">
-            <i class="bi bi-box-arrow-left me-1"></i> Leave Group
-          </button>
-        {% elif is_pending %}
-          <button class="btn-base btn-secondary-brand" disabled style="opacity: 0.7; cursor: not-allowed;">
-            <i class="bi bi-clock-fill me-1"></i> Request Sent ⏳
-          </button>
-          <a href="{% url 'groups:toggle_membership' group.id %}" class="btn-base btn-ghost-danger">
-            <i class="bi bi-x-circle-fill me-1"></i> Cancel Request
-          </a>
-        {% elif is_rejected %}
-          <a href="{% url 'groups:toggle_membership' group.id %}" class="btn-base btn-primary-brand">
-            <i class="bi bi-arrow-clockwise me-1"></i> Request Again
-          </a>
-        {% else %}
-          <a href="{% url 'groups:toggle_membership' group.id %}" class="btn-base btn-primary-brand">
-            <i class="bi bi-plus-circle-fill me-1"></i> Join Group
-          </a>
-        {% endif %}
       </div>
     </div>
 
@@ -661,9 +705,11 @@
       </div>
     </div>
 
-  </aside>
+    </div>
+  </div>
 
   <!-- ══ MAIN FEED ══ -->
+  <div class="col-12 col-md-6 col-lg-7 col-xl-6">
   <main>
     <div class="feed-header">
       <h2 class="feed-title">Group Posts</h2>
@@ -709,6 +755,8 @@
       {% endif %}
     </div>
   </main>
+  </div>
+  </div>
 </div>
 
 
@@ -760,89 +808,308 @@
 
 
 <!-- ══ MODAL: Members ══ -->
-<div class="modal fade" id="personnelModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-sm">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Members · {{ group.member_count }}</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<div class="modal fade people-modal" id="personnelModal" tabindex="-1" aria-hidden="true" role="dialog" aria-labelledby="personnelModalTitle" data-bs-backdrop="true" data-bs-keyboard="true">
+  <style>
+    [data-theme="dark"] .people-modal .modal-content {
+      background-color: var(--card-bg) !important;
+      border-color: var(--border) !important;
+    }
+    [data-theme="dark"] .people-modal .modal-title {
+      color: #ffffff !important;
+    }
+    [data-theme="dark"] .people-modal .search-input {
+      background: var(--card-bg) !important;
+      color: #e4e6eb !important;
+    }
+    [data-theme="dark"] .people-modal .search-input::placeholder {
+      color: #b0b3b8 !important;
+    }
+    [data-theme="dark"] .people-modal .search-input:focus {
+      background: #3a3b3c !important;
+    }
+    [data-theme="dark"] .people-modal .search-icon {
+      color: #b0b3b8 !important;
+    }
+    [data-theme="dark"] .people-modal .search-clear {
+      background: #b0b3b8 !important;
+    }
+    [data-theme="dark"] .people-modal .search-clear:hover {
+      background: #e4e6eb !important;
+    }
+  </style>
+  <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content" style="box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+      <!-- Sticky Header -->
+      <div class="modal-header people-modal-header border-0 pb-0 sticky-top" style="position: relative;">
+        <div class="people-modal-handle d-md-none" aria-hidden="true"></div>
+        <h5 class="modal-title fw-bold w-100 text-center pt-2" id="personnelModalTitle">Members · {{ group.member_count }}</h5>
+        <button type="button" class="btn-close people-modal-close" data-bs-dismiss="modal" aria-label="Close" style="position: absolute; right: 12px; top: 8px; z-index: 10; font-size: 1.25rem; opacity: 1; background-image: none;">✕</button>
       </div>
-      <div class="modal-body">
-        <div class="members-scroll">
-          <!-- Officials Section -->
-          {% for membership in memberships %}
-            {% if membership.role == 'ADMIN' or membership.role == 'MODERATOR' or membership.role == 'DELEGATE' %}
-              {% if forloop.first %}
-                <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.09em; padding: 0.5rem 0.75rem 0.25rem;">
-                  <i class="bi bi-shield-fill me-1"></i> Officials
-                </div>
-              {% endif %}
-              <div class="member-row">
-                <div class="member-meta">
-                  <img src="{{ membership.user.profile_pic.url|default:'/static/images/default_user.jpg' }}"
-                       class="member-avatar" alt="">
-                  <div>
-                    <div class="member-name">
-                      {{ membership.user.first_name }} {{ membership.user.second_name }} @{{ membership.user.username }}
-                    </div>
-                    <div class="member-sub">
-                      {% if membership.role == 'ADMIN' %}
-                        <span class="role-badge role-admin">Admin</span>
-                      {% elif membership.role == 'MODERATOR' %}
-                        <span class="role-badge role-moderator">Moderator</span>
-                      {% elif membership.role == 'DELEGATE' %}
-                        <span class="role-badge role-delegate">Delegate</span>
-                      {% endif %}
-                    </div>
-                  </div>
-                </div>
-                {% if membership.user != request.user %}
-                <button class="btn-follow btn-follow-manifest {% if membership.user.id in following_ids %}following{% endif %}"
-                        data-username="{{ membership.user.username }}"
-                        data-user-id="{{ membership.user.id }}">
-                  {% if membership.user.id in following_ids %}Following{% else %}Follow{% endif %}
-                </button>
-                {% endif %}
-              </div>
-            {% endif %}
-          {% endfor %}
 
-          <!-- Members Section -->
-          {% for membership in memberships %}
-            {% if membership.role == 'MEMBER' %}
-              {% if forloop.first %}
-                <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.09em; padding: 0.75rem 0.75rem 0.25rem; margin-top: 0.5rem; border-top: 1px solid var(--border);">
-                  <i class="bi bi-people-fill me-1"></i> Members
-                </div>
-              {% endif %}
-              <div class="member-row">
-                <div class="member-meta">
-                  <img src="{{ membership.user.profile_pic.url|default:'/static/images/default_user.jpg' }}"
-                       class="member-avatar" alt="">
-                  <div>
-                    <div class="member-name">
-                      {{ membership.user.first_name }} {{ membership.user.second_name }} @{{ membership.user.username }}
-                    </div>
-                    <div class="member-sub">
-                      <span class="role-badge role-member">Member</span>
-                    </div>
-                  </div>
-                </div>
-                {% if membership.user != request.user %}
-                <button class="btn-follow btn-follow-manifest {% if membership.user.id in following_ids %}following{% endif %}"
-                        data-username="{{ membership.user.username }}"
-                        data-user-id="{{ membership.user.id }}">
-                  {% if membership.user.id in following_ids %}Following{% else %}Follow{% endif %}
-                </button>
-                {% endif %}
-              </div>
-            {% endif %}
-          {% endfor %}
+      <!-- Sticky Search Bar -->
+      <div class="modal-body people-modal-search pt-2 pb-0 sticky-top" id="personnelModalSearchContainer">
+        <div class="search-form position-relative">
+          <i class="bi bi-search search-icon"></i>
+          <input type="text" 
+                 class="form-control search-input" 
+                 id="personnelSearchInput"
+                 name="q"
+                 placeholder="Search members..."
+                 hx-get="{% url 'groups:group_members_search' group.id %}"
+                 hx-target="#personnelModalList"
+                 hx-trigger="keyup changed delay:300ms, search"
+                 hx-indicator="#personnelSearchSpinner">
+          <button type="button" class="search-clear" id="personnelSearchClear" style="display: none;">✕</button>
+        </div>
+      </div>
+
+      <!-- Scrollable Content -->
+      <div class="modal-body people-modal-body pt-2" id="personnelModalBody">
+        <div id="personnelModalList">
+          <div class="text-center py-4">
+            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<style>
+  .people-modal .modal-content {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  }
+  
+  .people-modal .btn-close {
+    position: absolute !important;
+    right: 12px !important;
+    top: 8px !important;
+    z-index: 10 !important;
+    font-size: 1.25rem !important;
+    opacity: 1 !important;
+    background: rgba(0, 0, 0, 0.1) !important;
+    border-radius: 50% !important;
+    width: 32px !important;
+    height: 32px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+  
+  .people-modal .btn-close:hover {
+    background: rgba(0, 0, 0, 0.2) !important;
+  }
+  
+  .people-modal .search-input {
+    background: var(--search-bg, #f3f0ec);
+    border: 0;
+    border-radius: 999px;
+    padding: 10px 42px 10px 40px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-main, #0f172a);
+    outline: none;
+    transition: background 0.22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    line-height: 1.4;
+  }
+  
+  .people-modal .search-input::placeholder {
+    color: var(--text-muted, #64748b);
+    font-weight: 400;
+  }
+  
+  .people-modal .search-input:focus {
+    background: var(--search-bg-focus, #fff);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+  
+  .people-modal .search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted, #64748b);
+    font-size: 15px;
+    pointer-events: none;
+    transition: color 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 2;
+  }
+  
+  .people-modal .search-input:focus ~ .search-icon,
+  .people-modal .search-form:focus-within .search-icon {
+    color: var(--primary, #2563eb);
+  }
+  
+  .people-modal .search-clear {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--text-muted, #64748b);
+    border: none;
+    color: #fff;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 12px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    z-index: 2;
+    transition: background 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .people-modal .search-clear:hover {
+    background: var(--text-main, #0f172a);
+  }
+  
+  .people-modal .search-input:not(:placeholder-shown) ~ .search-clear {
+    display: flex !important;
+  }
+  
+  .htmx-indicator {
+    display: none !important;
+  }
+  
+  .htmx-request .htmx-indicator {
+    display: inline-block !important;
+  }
+  
+  .people-user-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0.75rem 0.85rem;
+    border-radius: 12px;
+    color: inherit;
+    transition: background 0.15s ease;
+  }
+  
+  .people-user-row:hover {
+    background: rgba(37, 99, 235, 0.08);
+  }
+  
+  .people-user-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 2px solid var(--border, #e2e8f0);
+  }
+  
+  .people-user-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-main, #0f172a);
+  }
+  
+  .people-user-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted, #64748b);
+  }
+  
+  [data-theme="dark"] .people-user-name {
+    color: #e4e6eb;
+  }
+  
+  [data-theme="dark"] .people-user-row:hover {
+    background: rgba(99, 102, 241, 0.15);
+  }
+  
+  @media (max-width: 767.98px) {
+    .people-modal .modal-dialog {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      margin: 0;
+      max-width: 100%;
+      width: 100%;
+      align-items: flex-end;
+    }
+
+    .people-modal .modal-content {
+      border-radius: 20px 20px 0 0;
+      max-height: 75vh;
+      min-height: 200px;
+    }
+
+    .people-modal-body {
+      max-height: calc(75vh - 72px);
+    }
+
+    .people-modal .modal-dialog-scrollable {
+      max-height: 75vh;
+    }
+    
+    .people-modal-handle {
+      width: 40px;
+      height: 4px;
+      background: #cbd5e1;
+      border-radius: 999px;
+      margin: 0 auto 0.75rem;
+    }
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const searchInput = document.getElementById('personnelSearchInput');
+  const searchClear = document.getElementById('personnelSearchClear');
+  
+  if (searchInput && searchClear) {
+    searchClear.addEventListener('click', function() {
+      searchInput.value = '';
+      searchClear.style.display = 'none';
+      searchInput.focus();
+      // Trigger HTMX request with empty query to reset list
+      htmx.trigger(searchInput, 'keyup');
+    });
+  }
+  
+  // Initialize group members modal on open
+  const personnelModalEl = document.getElementById('personnelModal');
+  if (personnelModalEl) {
+    personnelModalEl.addEventListener('show.bs.modal', function() {
+      const personnelModalList = document.getElementById('personnelModalList');
+      if (personnelModalList) {
+        // Load initial members list via HTMX
+        const url = "{% url 'groups:group_members_search' group.id %}";
+        htmx.ajax('GET', url, {target: '#personnelModalList', swap: 'innerHTML'});
+      }
+    });
+    
+    // Intersection Observer for infinite scroll in group members modal
+    personnelModalEl.addEventListener('shown.bs.modal', function() {
+      const modalBody = document.querySelector('#personnelModal .people-modal-body');
+      const trigger = document.getElementById('group-load-more-trigger');
+      
+      if (modalBody && trigger) {
+        const observer = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+              // Trigger is visible, remove observer and trigger HTMX
+              observer.unobserve(trigger);
+              htmx.trigger(trigger, 'load');
+            }
+          });
+        }, {
+          root: modalBody,
+          rootMargin: '100px',
+          threshold: 0.1
+        });
+        
+        observer.observe(trigger);
+      }
+    });
+  }
+});
+</script>
 
 
 <!-- ══ MODAL: Create Post ══ -->
@@ -954,6 +1221,69 @@
         <div id="searchResults" class="members-scroll">
           <p style="text-align:center; font-size:0.78rem; color:var(--text-muted); padding:1rem 0; font-weight:600;">
             Search for a user to assign a role
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL: Announcements ══ -->
+<div class="modal fade" id="announcementsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Announcements</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div style="text-align: center; padding: 2rem;">
+          <i class="bi bi-megaphone-fill" style="font-size: 3rem; color: var(--brand); margin-bottom: 1rem;"></i>
+          <p style="font-size: 0.9rem; color: var(--text-secondary);">
+            Announcements feature coming soon!
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL: Group Chat ══ -->
+<div class="modal fade" id="groupChatModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Group Chat</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div style="text-align: center; padding: 2rem;">
+          <i class="bi bi-chat-dots-fill" style="font-size: 3rem; color: var(--brand); margin-bottom: 1rem;"></i>
+          <p style="font-size: 0.9rem; color: var(--text-secondary);">
+            Group chat feature coming soon!
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL: Group Settings ══ -->
+<div class="modal fade" id="groupSettingsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Group Settings</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div style="text-align: center; padding: 2rem;">
+          <i class="bi bi-gear" style="font-size: 3rem; color: var(--brand); margin-bottom: 1rem;"></i>
+          <p style="font-size: 0.9rem; color: var(--text-secondary);">
+            Group settings feature coming soon!
           </p>
         </div>
       </div>

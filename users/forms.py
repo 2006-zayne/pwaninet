@@ -15,19 +15,19 @@ class PwaniSignupForm(UserCreationForm):
         # We use HTMX for dynamic dropdowns
         widgets = {
             'programme': forms.Select(attrs={
-                'hx-get': '/academic/load-levels/',      # Load academic levels for programme
+                'hx-get': '/documents/academic/load-levels/',      # Load academic levels for programme
                 'hx-target': '#id_academic_level',
                 'class': 'form-control',
                 'id': 'id_programme',
                 'data-searchable': 'true'
             }),
             'academic_level': forms.Select(attrs={
-                'hx-get': '/academic/load-years/',      # Load academic years for level
+                'hx-get': '/documents/academic/load-years/',      # Load academic years for level
                 'hx-target': '#id_academic_year',
                 'class': 'form-control'
             }),
             'academic_year': forms.Select(attrs={
-                'hx-get': '/academic/load-semesters/',  # Load semesters for academic year
+                'hx-get': '/documents/academic/load-semesters/',  # Load semesters for academic year
                 'hx-target': '#id_semester',
                 'class': 'form-control'
             }),
@@ -157,33 +157,70 @@ class ProfileUpdateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super(ProfileUpdateForm, self).__init__(*args, **kwargs)
-        # THis ensure the file input is visible
+        # This ensures the file input is visible
         self.fields['profile_pic'].widget.attrs.update(
             {'class': 'form-control-file'})
         self.fields['cover_photo'].widget.attrs.update(
             {'class': 'form-control-file'})
         
-        # Display school, course, and year as read-only for information
-        if self.instance and self.instance.course:
-            self.fields['course'] = forms.CharField(
-                initial=self.instance.course.name,
+        # Display new academic profile details as read-only for information
+        if self.instance and self.instance.programme:
+            self.fields['programme'] = forms.CharField(
+                initial=self.instance.programme.name,
                 widget=forms.TextInput(attrs={'readonly': True, 'class': 'form-control'}),
                 required=False,
-                label='Course'
+                label='Programme'
             )
-        if self.instance and self.instance.course and self.instance.course.school:
+        if self.instance and self.instance.programme and self.instance.programme.department:
+            self.fields['department'] = forms.CharField(
+                initial=self.instance.programme.department.name,
+                widget=forms.TextInput(attrs={'readonly': True, 'class': 'form-control'}),
+                required=False,
+                label='Department'
+            )
+        if self.instance and self.instance.programme and self.instance.programme.department and self.instance.programme.department.school:
             self.fields['school'] = forms.CharField(
-                initial=self.instance.course.school.name,
+                initial=self.instance.programme.department.school.name,
                 widget=forms.TextInput(attrs={'readonly': True, 'class': 'form-control'}),
                 required=False,
                 label='School'
             )
+        if self.instance and self.instance.academic_level:
+            self.fields['academic_level'] = forms.CharField(
+                initial=self.instance.academic_level.name,
+                widget=forms.TextInput(attrs={'readonly': True, 'class': 'form-control'}),
+                required=False,
+                label='Academic Level'
+            )
+        if self.instance and self.instance.academic_year:
+            self.fields['academic_year'] = forms.CharField(
+                initial=self.instance.academic_year.code,
+                widget=forms.TextInput(attrs={'readonly': True, 'class': 'form-control'}),
+                required=False,
+                label='Academic Year'
+            )
+        if self.instance and self.instance.semester:
+            self.fields['semester'] = forms.CharField(
+                initial=f"Semester {self.instance.semester.get_number_display()}",
+                widget=forms.TextInput(attrs={'readonly': True, 'class': 'form-control'}),
+                required=False,
+                label='Semester'
+            )
+        
+        # Display legacy fields for backward compatibility (if they exist)
+        if self.instance and self.instance.course:
+            self.fields['legacy_course'] = forms.CharField(
+                initial=self.instance.course.name,
+                widget=forms.TextInput(attrs={'readonly': True, 'class': 'form-control'}),
+                required=False,
+                label='Legacy Course (Deprecated)'
+            )
         if self.instance and self.instance.year:
-            self.fields['year'] = forms.CharField(
+            self.fields['legacy_year'] = forms.CharField(
                 initial=f"Year {self.instance.year.level}",
                 widget=forms.TextInput(attrs={'readonly': True, 'class': 'form-control'}),
                 required=False,
-                label='Year'
+                label='Legacy Year (Deprecated)'
             )
         
         # Format skills for display (list to newline-separated)

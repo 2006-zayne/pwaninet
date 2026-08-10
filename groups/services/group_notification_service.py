@@ -1,77 +1,110 @@
-from notifications.models import Notifications
-from notifications.services.notification_service import create_notification, invalidate_unread_count_cache
-from groups.models import Membership, MembershipRole, MembershipStatus
+from notifications.events import publish_event, EventTypes, EventSources, EventActions
 
 
 def send_group_join_request_notification(requesting_user, group):
     """
     Send GROUP_REQUEST notifications to all admins when a user requests to join.
+    Notifications are now handled by the event system in signals.py.
     """
-    for admin_membership in group.memberships.filter(
-        role=MembershipRole.ADMIN,
-        status=MembershipStatus.APPROVED
-    ):
-        create_notification(
-            recipient=admin_membership.user,
-            sender=requesting_user,
-            notification_type=Notifications.GROUP_REQUEST,
-            msg=f'{requesting_user.username} requested to join {group.name}',
-            group=group
-        )
-        invalidate_unread_count_cache(admin_membership.user.id)
+    # Emit event for new notification engine
+    publish_event(
+        event_type=EventTypes.GROUPS_MEMBER_REQUESTED.value,
+        source=EventSources.GROUPS.value,
+        action=EventActions.REQUESTED.value,
+        actor=requesting_user,
+        target_type='Group',
+        target_id=str(group.id),
+        metadata={
+            'group_name': group.name,
+            'user_username': requesting_user.username
+        }
+    )
 
 
 def send_group_approved_notification(approved_user, group, admin_user):
     """
     Send GROUP_APPROVED notification to a user when their join request is approved.
+    Notifications are now handled by the event system in signals.py.
     """
-    create_notification(
-        recipient=approved_user,
-        sender=admin_user,
-        notification_type=Notifications.GROUP_APPROVED,
-        msg=f'Welcome to {group.name}! You can now contribute to the group.',
-        group=group
+    # Emit event for new notification engine
+    publish_event(
+        event_type=EventTypes.GROUPS_MEMBER_APPROVED.value,
+        source=EventSources.GROUPS.value,
+        action=EventActions.APPROVED.value,
+        target_type='Group',
+        target_id=str(group.id),
+        actor=admin_user,
+        context_type='User',
+        context_id=str(approved_user.id),
+        metadata={
+            'group_name': group.name,
+            'user_username': approved_user.username
+        }
     )
-    invalidate_unread_count_cache(approved_user.id)
 
 
 def send_group_rejected_notification(rejected_user, group, admin_user):
     """
     Send GROUP_REJECTED notification to a user when their join request is rejected.
+    Notifications are now handled by the event system in signals.py.
     """
-    create_notification(
-        recipient=rejected_user,
-        sender=admin_user,
-        notification_type=Notifications.GROUP_REJECTED,
-        msg=f'Your request to join {group.name} was not approved',
-        group=group
+    # Emit event for new notification engine
+    publish_event(
+        event_type=EventTypes.GROUPS_MEMBER_REJECTED.value,
+        source=EventSources.GROUPS.value,
+        action=EventActions.REJECTED.value,
+        target_type='Group',
+        target_id=str(group.id),
+        actor=admin_user,
+        context_type='User',
+        context_id=str(rejected_user.id),
+        metadata={
+            'group_name': group.name,
+            'user_username': rejected_user.username
+        }
     )
-    invalidate_unread_count_cache(rejected_user.id)
 
 
 def send_group_welcome_notification(user, group):
     """
     Send GROUP_APPROVED notification when a user joins an open group.
+    Notifications are now handled by the event system in signals.py.
     """
-    create_notification(
-        recipient=user,
-        sender=user,
-        notification_type=Notifications.GROUP_APPROVED,
-        msg=f'Welcome to {group.name}! You can now contribute to the group.',
-        group=group
+    # Emit event for new notification engine
+    publish_event(
+        event_type=EventTypes.GROUPS_MEMBER_APPROVED.value,
+        source=EventSources.GROUPS.value,
+        action=EventActions.APPROVED.value,
+        target_type='Group',
+        target_id=str(group.id),
+        actor=user,
+        context_type='User',
+        context_id=str(user.id),
+        metadata={
+            'group_name': group.name,
+            'user_username': user.username
+        }
     )
-    invalidate_unread_count_cache(user.id)
 
 
 def send_group_invite_notification(recipient_user, sender_user, group):
     """
     Send INVITE notification when a user is invited to a group.
+    Notifications are now handled by the event system.
     """
-    create_notification(
-        recipient=recipient_user,
-        sender=sender_user,
-        notification_type=Notifications.INVITE,
-        msg=f'invited you to join {group.name}.',
-        group=group
+    # Emit event for new notification engine
+    publish_event(
+        event_type=EventTypes.GROUPS_MEMBER_INVITED.value,
+        source=EventSources.GROUPS.value,
+        action=EventActions.INVITED.value,
+        actor=sender_user,
+        target_type='Group',
+        target_id=str(group.id),
+        context_type='USER',
+        context_id=str(recipient_user.id),
+        metadata={
+            'group_name': group.name,
+            'inviter_username': sender_user.username,
+            'recipient_username': recipient_user.username
+        }
     )
-    invalidate_unread_count_cache(recipient_user.id)

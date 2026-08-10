@@ -220,12 +220,23 @@ def generate_thumbnail(self, file_id: int):
             logger.info(f"Skipping thumbnail for {file.extension} file")
             return
         
-        storage_service = StorageService()
+        from pathlib import Path
+        from django.conf import settings
         
-        # This would use libraries like Pillow, pdf2image, etc.
-        # For now, we'll just set a placeholder path
-        file.thumbnail_path = f"thumbnails/{file.id}.jpg"
-        file.save(update_fields=['thumbnail_path'])
+        # Create thumbnails directory
+        thumbnail_dir = Path(settings.MEDIA_ROOT) / 'thumbnails'
+        thumbnail_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate thumbnail based on file type
+        if file.extension == 'pdf':
+            _generate_pdf_thumbnail(file, thumbnail_dir)
+        elif file.extension in ['docx', 'doc']:
+            _generate_docx_thumbnail(file, thumbnail_dir)
+        elif file.extension in ['pptx', 'ppt']:
+            _generate_pptx_thumbnail(file, thumbnail_dir)
+        else:
+            logger.info(f"Thumbnail generation not supported for {file.extension} file")
+            return
         
         logger.info(f"Generated thumbnail for file {file_id}")
         
@@ -430,6 +441,91 @@ def _generate_text_preview(file):
         logger.error(f"Error generating text preview: {e}")
 
 
+def _generate_pdf_thumbnail(file, thumbnail_dir):
+    """Generate thumbnail for PDF files using PyMuPDF."""
+    try:
+        import fitz  # PyMuPDF
+        
+        if file.file and hasattr(file.file, 'path'):
+            pdf_path = file.file.path
+            doc = fitz.open(pdf_path)
+            if doc.page_count > 0:
+                page = doc[0]
+                # Create thumbnail with smaller dimensions
+                pix = page.get_pixmap(matrix=fitz.Matrix(1, 1))  # Lower resolution for thumbnail
+                thumbnail_path = thumbnail_dir / f"{file.id}_thumbnail.jpg"
+                pix.save(thumbnail_path)
+                doc.close()
+                file.thumbnail_path = f"thumbnails/{file.id}_thumbnail.jpg"
+                file.save(update_fields=['thumbnail_path'])
+            else:
+                doc.close()
+    except ImportError:
+        logger.error("PyMuPDF not installed for PDF thumbnail generation")
+        # Fallback: use preview as thumbnail
+        if file.preview_path:
+            file.thumbnail_path = file.preview_path
+            file.save(update_fields=['thumbnail_path'])
+    except Exception as e:
+        logger.error(f"Error generating PDF thumbnail: {e}")
+
+
+def _generate_docx_thumbnail(file, thumbnail_dir):
+    """Generate thumbnail for DOCX files."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        
+        # Create a simple thumbnail with document icon
+        img = Image.new('RGB', (200, 150), color='#2563EB')
+        draw = ImageDraw.Draw(img)
+        
+        try:
+            title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+        except:
+            title_font = ImageFont.load_default()
+        
+        draw.text((20, 20), "DOCX", fill='white', font=title_font)
+        
+        thumbnail_path = thumbnail_dir / f"{file.id}_thumbnail.jpg"
+        img.save(thumbnail_path)
+        file.thumbnail_path = f"thumbnails/{file.id}_thumbnail.jpg"
+        file.save(update_fields=['thumbnail_path'])
+    except Exception as e:
+        logger.error(f"Error generating DOCX thumbnail: {e}")
+        # Fallback: use preview as thumbnail
+        if file.preview_path:
+            file.thumbnail_path = file.preview_path
+            file.save(update_fields=['thumbnail_path'])
+
+
+def _generate_pptx_thumbnail(file, thumbnail_dir):
+    """Generate thumbnail for PPTX files."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        
+        # Create a simple thumbnail with presentation icon
+        img = Image.new('RGB', (200, 150), color='#DC2626')
+        draw = ImageDraw.Draw(img)
+        
+        try:
+            title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+        except:
+            title_font = ImageFont.load_default()
+        
+        draw.text((20, 20), "PPTX", fill='white', font=title_font)
+        
+        thumbnail_path = thumbnail_dir / f"{file.id}_thumbnail.jpg"
+        img.save(thumbnail_path)
+        file.thumbnail_path = f"thumbnails/{file.id}_thumbnail.jpg"
+        file.save(update_fields=['thumbnail_path'])
+    except Exception as e:
+        logger.error(f"Error generating PPTX thumbnail: {e}")
+        # Fallback: use preview as thumbnail
+        if file.preview_path:
+            file.thumbnail_path = file.preview_path
+            file.save(update_fields=['thumbnail_path'])
+
+
 @shared_task(bind=True, max_retries=2)
 def extract_metadata(self, file_id: int):
     """Extract metadata from a document file."""
@@ -559,7 +655,7 @@ def update_document_analytics(document_id: int):
     to avoid blocking user interactions.
     """
     try:
-        from ..engagement.models import DocumentAnalytics, DocumentView, DocumentDownload, DocumentBookmark, DocumentRating, DocumentShare
+        from documents.engagement.models import DocumentAnalytics, DocumentView, DocumentDownload, DocumentBookmark, DocumentRating, DocumentShare
         from django.utils import timezone
         from datetime import timedelta
         

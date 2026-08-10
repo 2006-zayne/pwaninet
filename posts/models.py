@@ -38,6 +38,7 @@ class Post(models.Model):
     video_poster = models.ImageField(upload_to='posts/videos/posters', blank=True, null=True)
     docs = models.FileField(upload_to='posts/docs', blank=True, null=True)
     audio = models.FileField(upload_to='posts/audio', blank=True, null=True, help_text='Attach music/audio to post')
+    thumbnail = models.ImageField(upload_to='posts/thumbnails', blank=True, null=True, help_text='Thumbnail for gradient/text posts')
     gradient_class = models.CharField(max_length=50, choices=GRADIENT_CHOICES, default='grad-ocean', blank=True)
     has_signature = models.BooleanField(default=False)
     custom_gradient_text = models.CharField(max_length=100, blank=True, null=True, help_text='Custom text for gradient patterns')

@@ -81,7 +81,7 @@
             <!-- Title -->
             <h1 class="doc-info-title" 
                 style="font-size: 1.5rem; font-weight: 700; margin: 0 0 12px 0; 
-                       color: var(--text-dark); line-height: 1.3;">
+                       color: var(--text-dark); line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word; hyphens: auto;">
                 {{ document.title }}
             </h1>
             
@@ -514,14 +514,55 @@ document.addEventListener('click', function(event) {
             "sidebar"
             "related";
         gap: 20px !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        overflow-x: hidden !important;
     }
     
     .doc-pdf-viewer {
         margin-bottom: 20px !important;
+        overflow: hidden !important;
+        max-width: 100% !important;
+        width: 100% !important;
     }
     
     #document-viewer {
         height: 400px !important;
+        overflow: hidden !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+    
+    .image-viewer-container,
+    .pdf-viewer-container,
+    .docx-viewer-container,
+    .text-viewer-container {
+        overflow: hidden !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        overflow-x: hidden !important;
+    }
+    
+    .image-viewer-container img,
+    .pdf-viewer-container canvas,
+    .pdf-viewer-container > div,
+    .docx-viewer-container > div,
+    .text-viewer-container > div {
+        max-width: 100% !important;
+        height: auto !important;
+        overflow: hidden !important;
+        overflow-x: hidden !important;
+    }
+    
+    /* Prevent horizontal scroll on the entire page */
+    body, html {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+    }
+    
+    .doc-detail-container {
+        overflow-x: hidden !important;
+        max-width: 100% !important;
     }
     
     .doc-info-title {
@@ -534,6 +575,68 @@ document.addEventListener('click', function(event) {
     
     .doc-related-grid {
         grid-template-columns: 1fr !important;
+    }
+    
+    .viewer-toolbar {
+        padding: 8px 12px !important;
+        gap: 6px !important;
+    }
+    
+    .viewer-btn {
+        width: 32px !important;
+        height: 32px !important;
+        min-width: 32px !important;
+    }
+    
+    .viewer-btn i {
+        font-size: 0.9rem !important;
+    }
+    
+    .viewer-page-indicator,
+    #viewer-zoom-indicator {
+        font-size: 0.8rem !important;
+    }
+}
+
+@media (max-width: 375px) {
+    .doc-detail-container {
+        padding: 0 8px !important;
+        gap: 16px !important;
+    }
+    
+    .doc-info-card {
+        padding: 16px !important;
+    }
+    
+    .doc-info-title {
+        font-size: 1.1rem !important;
+    }
+    
+    .doc-meta-item {
+        font-size: 0.85rem !important;
+    }
+    
+    .doc-actions .btn {
+        padding: 12px 16px !important;
+        font-size: 0.9rem !important;
+    }
+    
+    #document-viewer {
+        height: 350px !important;
+    }
+    
+    .viewer-toolbar {
+        padding: 6px 8px !important;
+    }
+    
+    .viewer-btn {
+        width: 28px !important;
+        height: 28px !important;
+        min-width: 28px !important;
+    }
+    
+    .viewer-btn i {
+        font-size: 0.8rem !important;
     }
 }
 </style>

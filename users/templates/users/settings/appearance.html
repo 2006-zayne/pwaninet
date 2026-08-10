@@ -149,6 +149,210 @@
       </form>
     </div>
   </div>
+
+  <div class="settings-list-item expandable" data-target="font-family">
+    <div class="settings-list-icon">
+      <i class="bi bi-fonts"></i>
+    </div>
+    <div class="settings-list-content">
+      <div class="settings-list-title">{% trans "Font Family" %}</div>
+      <div class="settings-list-subtitle">{% trans "Choose your preferred font style" %}</div>
+    </div>
+    <div class="settings-list-chevron">
+      <i class="bi bi-chevron-right"></i>
+    </div>
+  </div>
+  
+  <div class="settings-expandable-content" id="font-family">
+    <div class="settings-expandable-body">
+      <form id="font-family-form" class="preference-form">
+        <div class="radio-group">
+          <div class="radio-option">
+            <input type="radio" id="font-default" name="font_family_preference" value="default"
+                   {% if request.user.font_family_preference == 'default' or request.user.font_family_preference == None %}checked{% endif %}>
+            <label for="font-default">
+              <span class="radio-label">{% trans "Default" %}</span>
+              <span class="radio-description">{% trans "System default font" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-inter" name="font_family_preference" value="inter"
+                   {% if request.user.font_family_preference == 'inter' %}checked{% endif %}>
+            <label for="font-inter">
+              <span class="radio-label" style="font-family: 'Inter', sans-serif;">{% trans "Inter" %}</span>
+              <span class="radio-description">{% trans "Clean UI font" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-roboto" name="font_family_preference" value="roboto"
+                   {% if request.user.font_family_preference == 'roboto' %}checked{% endif %}>
+            <label for="font-roboto">
+              <span class="radio-label" style="font-family: 'Roboto', sans-serif;">{% trans "Roboto" %}</span>
+              <span class="radio-description">{% trans "Material Design font" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-ibm-plex" name="font_family_preference" value="ibm_plex_serif"
+                   {% if request.user.font_family_preference == 'ibm_plex_serif' %}checked{% endif %}>
+            <label for="font-ibm-plex">
+              <span class="radio-label" style="font-family: 'IBM Plex Serif', serif;">{% trans "IBM Plex Serif" %}</span>
+              <span class="radio-description">{% trans "Elegant serif font" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-manrope" name="font_family_preference" value="manrope"
+                   {% if request.user.font_family_preference == 'manrope' %}checked{% endif %}>
+            <label for="font-manrope">
+              <span class="radio-label" style="font-family: 'Manrope', sans-serif;">{% trans "Manrope" %}</span>
+              <span class="radio-description">{% trans "Modern sans-serif font" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-playfair" name="font_family_preference" value="playfair_display"
+                   {% if request.user.font_family_preference == 'playfair_display' %}checked{% endif %}>
+            <label for="font-playfair">
+              <span class="radio-label" style="font-family: 'Playfair Display', serif;">{% trans "Playfair Display" %}</span>
+              <span class="radio-description">{% trans "Classic display serif font" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-romanesco" name="font_family_preference" value="romanesco"
+                   {% if request.user.font_family_preference == 'romanesco' %}checked{% endif %}>
+            <label for="font-romanesco">
+              <span class="radio-label" style="font-family: 'Romanesco', cursive;">{% trans "Romanesco" %}</span>
+              <span class="radio-description">{% trans "Decorative cursive font" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-story" name="font_family_preference" value="story_script"
+                   {% if request.user.font_family_preference == 'story_script' %}checked{% endif %}>
+            <label for="font-story">
+              <span class="radio-label" style="font-family: 'Story Script', cursive;">{% trans "Story Script" %}</span>
+              <span class="radio-description">{% trans "Handwritten script font" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-poppins" name="font_family_preference" value="poppins"
+                   {% if request.user.font_family_preference == 'poppins' %}checked{% endif %}>
+            <label for="font-poppins">
+              <span class="radio-label" style="font-family: 'Poppins', sans-serif;">{% trans "Poppins" %}</span>
+              <span class="radio-description">{% trans "Modern geometric sans-serif" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-lora" name="font_family_preference" value="lora"
+                   {% if request.user.font_family_preference == 'lora' %}checked{% endif %}>
+            <label for="font-lora">
+              <span class="radio-label" style="font-family: 'Lora', serif;">{% trans "Lora" %}</span>
+              <span class="radio-description">{% trans "Elegant serif for reading" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-merriweather" name="font_family_preference" value="merriweather"
+                   {% if request.user.font_family_preference == 'merriweather' %}checked{% endif %}>
+            <label for="font-merriweather">
+              <span class="radio-label" style="font-family: 'Merriweather', serif;">{% trans "Merriweather" %}</span>
+              <span class="radio-description">{% trans "Screen-optimized serif" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-dancing-script" name="font_family_preference" value="dancing_script"
+                   {% if request.user.font_family_preference == 'dancing_script' %}checked{% endif %}>
+            <label for="font-dancing-script">
+              <span class="radio-label" style="font-family: 'Dancing Script', cursive;">{% trans "Dancing Script" %}</span>
+              <span class="radio-description">{% trans "Playful script font" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-great-vibes" name="font_family_preference" value="great_vibes"
+                   {% if request.user.font_family_preference == 'great_vibes' %}checked{% endif %}>
+            <label for="font-great-vibes">
+              <span class="radio-label" style="font-family: 'Great Vibes', cursive;">{% trans "Great Vibes" %}</span>
+              <span class="radio-description">{% trans "Elegant calligraphy font" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-parisienne" name="font_family_preference" value="parisienne"
+                   {% if request.user.font_family_preference == 'parisienne' %}checked{% endif %}>
+            <label for="font-parisienne">
+              <span class="radio-label" style="font-family: 'Parisienne', cursive;">{% trans "Parisienne" %}</span>
+              <span class="radio-description">{% trans "French cursive font" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-satisfy" name="font_family_preference" value="satisfy"
+                   {% if request.user.font_family_preference == 'satisfy' %}checked{% endif %}>
+            <label for="font-satisfy">
+              <span class="radio-label" style="font-family: 'Satisfy', cursive;">{% trans "Satisfy" %}</span>
+              <span class="radio-description">{% trans "Handwriting style font" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-cookie" name="font_family_preference" value="cookie"
+                   {% if request.user.font_family_preference == 'cookie' %}checked{% endif %}>
+            <label for="font-cookie">
+              <span class="radio-label" style="font-family: 'Cookie', cursive;">{% trans "Cookie" %}</span>
+              <span class="radio-description">{% trans "Playful handwritten font" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-italianno" name="font_family_preference" value="italianno"
+                   {% if request.user.font_family_preference == 'italianno' %}checked{% endif %}>
+            <label for="font-italianno">
+              <span class="radio-label" style="font-family: 'Italianno', cursive;">{% trans "Italianno" %}</span>
+              <span class="radio-description">{% trans "Elegant Italian script" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="font-tangerine" name="font_family_preference" value="tangerine"
+                   {% if request.user.font_family_preference == 'tangerine' %}checked{% endif %}>
+            <label for="font-tangerine">
+              <span class="radio-label" style="font-family: 'Tangerine', cursive;">{% trans "Tangerine" %}</span>
+              <span class="radio-description">{% trans "Calligraphic font" %}</span>
+            </label>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="settings-list-item expandable" data-target="font-style">
+    <div class="settings-list-icon">
+      <i class="bi bi-text-italic"></i>
+    </div>
+    <div class="settings-list-content">
+      <div class="settings-list-title">{% trans "Font Style" %}</div>
+      <div class="settings-list-subtitle">{% trans "Normal or italic text style" %}</div>
+    </div>
+    <div class="settings-list-chevron">
+      <i class="bi bi-chevron-right"></i>
+    </div>
+  </div>
+  
+  <div class="settings-expandable-content" id="font-style">
+    <div class="settings-expandable-body">
+      <form id="font-style-form" class="preference-form">
+        <div class="radio-group">
+          <div class="radio-option">
+            <input type="radio" id="style-normal" name="font_style_preference" value="normal"
+                   {% if request.user.font_style_preference == 'normal' or request.user.font_style_preference == None %}checked{% endif %}>
+            <label for="style-normal">
+              <span class="radio-label">{% trans "Normal" %}</span>
+              <span class="radio-description">{% trans "Standard upright text" %}</span>
+            </label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="style-italic" name="font_style_preference" value="italic"
+                   {% if request.user.font_style_preference == 'italic' %}checked{% endif %}>
+            <label for="style-italic">
+              <span class="radio-label" style="font-style: italic;">{% trans "Italic" %}</span>
+              <span class="radio-description">{% trans "Slanted italic text (when available)" %}</span>
+            </label>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 <style>
@@ -236,7 +440,7 @@
   }
 
   .settings-expandable-content.expanded {
-    max-height: 500px;
+    max-height: none;
   }
 
   .settings-expandable-body {
@@ -407,6 +611,38 @@
       });
     }
 
+    // Font family preference handling
+    const fontFamilyForm = document.getElementById('font-family-form');
+    if (fontFamilyForm) {
+      fontFamilyForm.addEventListener('change', function(e) {
+        if (e.target.name === 'font_family_preference') {
+          const fontFamily = e.target.value;
+          setFontFamily(fontFamily);
+          savePreference('font_family_preference', fontFamily);
+        }
+      });
+      
+      // Initialize font family on page load
+      const currentFontFamily = '{{ request.user.font_family_preference|default:"default" }}';
+      setFontFamily(currentFontFamily);
+    }
+
+    // Font style preference handling
+    const fontStyleForm = document.getElementById('font-style-form');
+    if (fontStyleForm) {
+      fontStyleForm.addEventListener('change', function(e) {
+        if (e.target.name === 'font_style_preference') {
+          const fontStyle = e.target.value;
+          setFontStyle(fontStyle);
+          savePreference('font_style_preference', fontStyle);
+        }
+      });
+      
+      // Initialize font style on page load
+      const currentFontStyle = '{{ request.user.font_style_preference|default:"normal" }}';
+      setFontStyle(currentFontStyle);
+    }
+
     // Save preference to server
     function savePreference(preferenceType, value) {
       fetch('/users/api/users/update_preferences/', {
@@ -453,6 +689,46 @@
       const scale = fontScaleMap[size] || '1.00';
       document.documentElement.style.setProperty('--font-scale', scale);
       localStorage.setItem('font_scale', scale);
+    }
+
+    // Set font family using CSS custom property
+    function setFontFamily(fontFamily) {
+      const fontFamilyMap = {
+        'default': '',
+        'inter': "'Inter', sans-serif",
+        'roboto': "'Roboto', sans-serif",
+        'ibm_plex_serif': "'IBM Plex Serif', serif",
+        'manrope': "'Manrope', sans-serif",
+        'playfair_display': "'Playfair Display', serif",
+        'romanesco': "'Romanesco', cursive",
+        'story_script': "'Story Script', cursive",
+        'poppins': "'Poppins', sans-serif",
+        'lora': "'Lora', serif",
+        'merriweather': "'Merriweather', serif",
+        'dancing_script': "'Dancing Script', cursive",
+        'great_vibes': "'Great Vibes', cursive",
+        'parisienne': "'Parisienne', cursive",
+        'satisfy': "'Satisfy', cursive",
+        'cookie': "'Cookie', cursive",
+        'italianno': "'Italianno', cursive",
+        'tangerine': "'Tangerine', cursive"
+      };
+
+      const family = fontFamilyMap[fontFamily] || '';
+      document.documentElement.style.setProperty('--font-family', family);
+      localStorage.setItem('font_family', fontFamily);
+    }
+
+    // Set font style using CSS custom property
+    function setFontStyle(fontStyle) {
+      const fontStyleMap = {
+        'normal': 'normal',
+        'italic': 'italic'
+      };
+      
+      const style = fontStyleMap[fontStyle] || 'normal';
+      document.documentElement.style.setProperty('--font-style', style);
+      localStorage.setItem('font_style', fontStyle);
     }
 
     // Get CSRF token

@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+  :root {
+    --brand: #2563eb;
+    --brand-light: #dbeafe;
+    --brand-mid: #bfdbfe;
+    --page-bg: #f8fafc;
+    --card-bg: #ffffff;
+    --border: #e2e8f0;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
+    --radius-md: 14px;
+    --radius-lg: 20px;
+    --radius-pill: 999px;
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
+  }
+
+  [data-theme="dark"] {
+    --brand: #6366f1;
+    --brand-light: #312e81;
+    --brand-mid: #4338ca;
+    --page-bg: #18191f;
+    --card-bg: #242526;
+    --border: #3a3b3c;
+    --text-primary: #e4e6eb;
+    --text-secondary: #b0b3b8;
+    --text-muted: #e4e6eb;
+  }
+
+  body { background: var(--page-bg); }
+
+  .page-wrap {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 5rem;
+  }
+
+  .page-header {
+    margin-bottom: 2rem;
+  }
+
+  .page-eyebrow {
+    font-size: 0.62rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .page-title {
+    font-size: 1.75rem;
+    font-weight: 900;
+    color: var(--text-primary);
+    letter-spacing: -1px;
+    margin: 0 0 0.5rem;
+  }
+
+  .page-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--brand);
+    text-decoration: none;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    transition: color 0.2s ease;
+  }
+
+  .back-link:hover {
+    color: #1d4ed8;
+  }
+
+  .settings-section {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .settings-section-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .settings-section-body {
+    padding: 1.5rem;
+  }
+
+  .settings-section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .settings-section-title i {
+    color: var(--brand);
+    font-size: 1.1rem;
+  }
+
+  .settings-section-description {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+  }
+
+  .subsection-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .field-label {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .form-field {
+    width: 100%;
+    padding: 0.75rem 1.1rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-pill);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    outline: none;
+    background: var(--card-bg);
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .form-field:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  textarea.form-field {
+    border-radius: var(--radius-md);
+    resize: none;
+    line-height: 1.6;
+  }
+
+  .btn-base {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.85rem;
+    font-weight: 800;
+    text-align: center;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    letter-spacing: 0.02em;
+  }
+
+  .btn-primary-brand {
+    background: var(--brand);
+    color: #fff;
+  }
+
+  .btn-primary-brand:hover {
+    background: #1d4ed8;
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.3);
+  }
+
+  .btn-secondary-brand {
+    background: var(--brand-light);
+    color: var(--brand);
+    border: 1.5px solid var(--brand-mid);
+  }
+
+  .btn-secondary-brand:hover {
+    background: var(--brand-mid);
+    color: #0f172a;
+    transform: translateY(-2px);
+  }
+
+  @media (max-width: 768px) {
+    .page-wrap {
+      padding: 1.5rem 0 4rem;
+    }
+
+    .settings-section {
+      border-left: none;
+      border-right: none;
+    }
+  }
+</style>
+
+<div class="page-wrap">
+  <div class="page-header">
+    <a href="{% url 'groups:group_settings' group.id %}" class="back-link">
+      <i class="bi bi-arrow-left"></i> Back to Settings
+    </a>
+    <h1 class="page-title">Edit Group Details</h1>
+    <p class="page-subtitle">Update group profile information</p>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-section-body">
+      <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <!-- Group Profile Picture -->
+        <h3 class="subsection-title">Group Profile Picture</h3>
+        <div class="mb-4">
+          <label class="field-label">Profile Picture</label>
+          <input type="file" class="form-field" name="profile_pic" accept="image/*">
+        </div>
+
+        <!-- Cover Photo -->
+        <h3 class="subsection-title">Cover Photo</h3>
+        <div class="mb-4">
+          <label class="field-label">Cover Photo</label>
+          <input type="file" class="form-field" name="cover_photo" accept="image/*">
+        </div>
+
+        <!-- Group Name -->
+        <h3 class="subsection-title">Group Name</h3>
+        <div class="mb-4">
+          <label class="field-label">Group Name</label>
+          <input type="text" class="form-field" name="name" value="{{ group.name }}" required>
+        </div>
+
+        <!-- Bio/About -->
+        <h3 class="subsection-title">Bio/About</h3>
+        <div class="mb-4">
+          <label class="field-label">Group Description</label>
+          <textarea class="form-field" name="description" rows="4" placeholder="Tell people about your group...">{{ group.description }}</textarea>
+        </div>
+
+        <div class="d-grid gap-2">
+          <button type="submit" class="btn-base btn-primary-brand">
+            <i class="bi bi-check-circle-fill"></i> Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

@@ -14,11 +14,11 @@ from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
 from users.models import User, Follow, DeviceAccount, Pinch, UserSession, Block, HiddenAuthor, PrivacyLevel
 from posts.models import Post, Like
-from users.forms import PwaniSignupForm, ProfileUpdateForm, NotificationPreferencesForm
+from users.forms import PwaniSignupForm, ProfileUpdateForm
 from django.contrib import messages
 from django.db import transaction
-from notifications.models import Notifications
-from notifications.services.notification_service import invalidate_unread_count_cache, create_notification
+from notifications.models import NotificationObject
+from notifications.services.notification_service import invalidate_unread_count_cache
 from users.services.device_service import get_or_create_device_id, hash_device_id
 from users.services.email_verification_service import send_verification_email, verify_email_token
 from .serializers import (
@@ -92,7 +92,14 @@ def verify_email_view(request, uidb64, token):
 @login_required
 def profile_view(request, username):
     profile_user = get_object_or_404(
-        User.objects.select_related('course__school', 'year'),
+        User.objects.select_related(
+            'programme__department__school',
+            'academic_level',
+            'academic_year',
+            'semester',
+            'course__school',
+            'year'
+        ),
         username=username
     )
     
@@ -251,57 +258,58 @@ def people_search(request):
         logger.info(f"Profile user found: {profile_user.username}")
         
         if connection_type == 'followers':
-            follows = (
-                Follow.objects.filter(followed=profile_user)
-                .select_related('follower', 'follower__course', 'follower__year')
-                .order_by('-created_at')
+            # Use values_list to get user IDs, then filter User queryset
+            follower_ids = Follow.objects.filter(followed=profile_user).values_list('follower_id', flat=True)
+            users = (
+                User.objects.filter(id__in=follower_ids)
+                .select_related('course', 'year')
+                .order_by('-id')
             )
-            users = [f.follower for f in follows]
             list_type = 'followers'
             empty_message = 'No followers yet.'
-            logger.info(f"Found {len(users)} followers")
+            logger.info(f"Found {follower_ids.count()} followers")
         elif connection_type == 'following':
-            follows = (
-                Follow.objects.filter(follower=profile_user)
-                .select_related('followed', 'followed__course', 'followed__year')
-                .order_by('-created_at')
+            # Use values_list to get user IDs, then filter User queryset
+            following_ids = Follow.objects.filter(follower=profile_user).values_list('followed_id', flat=True)
+            users = (
+                User.objects.filter(id__in=following_ids)
+                .select_related('course', 'year')
+                .order_by('-id')
             )
-            users = [f.followed for f in follows]
             list_type = 'following'
             empty_message = 'Not following anyone yet.'
-            logger.info(f"Found {len(users)} following")
+            logger.info(f"Found {following_ids.count()} following")
         elif connection_type == 'pinches_sent':
-            pinches = (
-                Pinch.objects.filter(pinch_user=profile_user)
-                .select_related('pinched_user', 'pinched_user__course', 'pinched_user__year')
-                .order_by('-created_at')
+            pinch_ids = Pinch.objects.filter(pinch_user=profile_user).values_list('pinched_user_id', flat=True)
+            users = (
+                User.objects.filter(id__in=pinch_ids)
+                .select_related('course', 'year')
+                .order_by('-id')
             )
-            users = [p.pinched_user for p in pinches]
             list_type = 'pinches_sent'
             empty_message = 'No pinches sent yet.'
-            logger.info(f"Found {len(users)} pinches sent")
+            logger.info(f"Found {pinch_ids.count()} pinches sent")
         elif connection_type == 'pinches_received':
-            pinches = (
-                Pinch.objects.filter(pinched_user=profile_user)
-                .select_related('pinch_user', 'pinch_user__course', 'pinch_user__year')
-                .order_by('-created_at')
+            pinch_ids = Pinch.objects.filter(pinched_user=profile_user).values_list('pinch_user_id', flat=True)
+            users = (
+                User.objects.filter(id__in=pinch_ids)
+                .select_related('course', 'year')
+                .order_by('-id')
             )
-            users = [p.pinch_user for p in pinches]
             list_type = 'pinches_received'
             empty_message = 'No pinches received yet.'
-            logger.info(f"Found {len(users)} pinches received")
+            logger.info(f"Found {pinch_ids.count()} pinches received")
         
         # Apply search filter if provided
-        if search_query and users:
-            logger.info(f"Applying search filter '{search_query}' to {len(users)} users")
-            users = [
-                u for u in users
-                if (search_query.lower() in u.username.lower() or
-                    search_query.lower() in (u.first_name or '').lower() or
-                    search_query.lower() in (u.last_name or '').lower())
-            ]
+        if search_query:
+            logger.info(f"Applying search filter '{search_query}' to users queryset")
+            users = users.filter(
+                Q(username__icontains=search_query) |
+                Q(first_name__icontains=search_query) |
+                Q(last_name__icontains=search_query)
+            )
             empty_message = f'No results for "{search_query}"'
-            logger.info(f"After search filter: {len(users)} users")
+            logger.info(f"After search filter: {users.count()} users")
     elif search_query:
         # Global search when no connection type
         users = (
@@ -548,20 +556,6 @@ def settings_profile_view(request):
 def settings_appearance_view(request):
     """Appearance settings page"""
     return render(request, 'users/settings/appearance.html')
-
-
-@login_required
-def settings_notifications_view(request):
-    """Notification settings page with form handling"""
-    if request.method == 'POST':
-        form = NotificationPreferencesForm(request.POST, instance=request.user)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Notification preferences updated successfully.')
-            return redirect('users:settings_notifications')
-    else:
-        form = NotificationPreferencesForm(instance=request.user)
-    return render(request, 'users/settings/notifications.html', {'form': form})
 
 
 @login_required
@@ -832,9 +826,122 @@ def settings_hidden_authors_view(request):
 
 
 @login_required
-def notification_preferences_view(request):
-    """Legacy view - redirects to new notifications settings page"""
-    return redirect('users:settings_notifications')
+def settings_notifications_view(request):
+    """Notification preferences settings page"""
+    from notifications.services.preference_service import NotificationPreferenceService
+    from notifications.events import EventTypes
+    
+    # Handle form submission
+    if request.method == 'POST':
+        # Update global preferences
+        email_enabled = request.POST.get('email_enabled') == 'on'
+        email_digest = request.POST.get('email_digest') == 'on'
+        push_enabled = request.POST.get('push_enabled') == 'on'
+        push_sound = request.POST.get('push_sound') == 'on'
+        in_app_enabled = request.POST.get('in_app_enabled') == 'on'
+        
+        NotificationPreferenceService.update_global_preferences(
+            request.user,
+            email_enabled=email_enabled,
+            email_digest=email_digest,
+            push_enabled=push_enabled,
+            push_sound=push_sound,
+            in_app_enabled=in_app_enabled
+        )
+        
+        # Update quiet hours
+        quiet_hours_enabled = request.POST.get('quiet_hours_enabled') == 'on'
+        quiet_hours_start = request.POST.get('quiet_hours_start')
+        quiet_hours_end = request.POST.get('quiet_hours_end')
+        
+        from datetime import time
+        NotificationPreferenceService.update_quiet_hours(
+            request.user,
+            enabled=quiet_hours_enabled,
+            start=time.fromisoformat(quiet_hours_start) if quiet_hours_start else None,
+            end=time.fromisoformat(quiet_hours_end) if quiet_hours_end else None
+        )
+        
+        # Update type preferences
+        type_preferences = {}
+        event_type_mapping = {
+            'POSTS_POST_LIKED': EventTypes.POSTS_POST_LIKED.value,
+            'POSTS_COMMENT_CREATED': EventTypes.POSTS_COMMENT_CREATED.value,
+            'POSTS_COMMENT_REPLY_CREATED': EventTypes.POSTS_COMMENT_REPLY_CREATED.value,
+            'POSTS_COMMENT_REPLIED': EventTypes.POSTS_COMMENT_REPLIED.value,
+            'POSTS_POST_SHARED': EventTypes.POSTS_POST_SHARED.value,
+            'POSTS_POST_REPOSTED': EventTypes.POSTS_POST_REPOSTED.value,
+            'POSTS_POST_SHARED_TO_GROUP': EventTypes.POSTS_POST_SHARED_TO_GROUP.value,
+            'USERS_USER_FOLLOWED': EventTypes.USERS_USER_FOLLOWED.value,
+            'USERS_USER_PINCHED': EventTypes.USERS_USER_PINCHED.value,
+            'GROUPS_MEMBER_INVITED': EventTypes.GROUPS_MEMBER_INVITED.value,
+            'GROUPS_MEMBER_REQUESTED': EventTypes.GROUPS_MEMBER_REQUESTED.value,
+            'GROUPS_MEMBER_APPROVED': EventTypes.GROUPS_MEMBER_APPROVED.value,
+            'GROUPS_MEMBER_REJECTED': EventTypes.GROUPS_MEMBER_REJECTED.value,
+            'DOCUMENTS_DOCUMENT_UPLOADED': EventTypes.DOCUMENTS_DOCUMENT_UPLOADED.value,
+            'DOCUMENTS_DOCUMENT_DOWNLOADED': EventTypes.DOCUMENTS_DOCUMENT_DOWNLOADED.value,
+            'DOCUMENTS_DOCUMENT_BOOKMARKED': EventTypes.DOCUMENTS_DOCUMENT_BOOKMARKED.value,
+            'DOCUMENTS_DOCUMENT_RATED': EventTypes.DOCUMENTS_DOCUMENT_RATED.value,
+            'MESSAGING_MESSAGE_SENT': EventTypes.MESSAGING_MESSAGE_SENT.value,
+            'MESSAGING_CONVERSATION_CREATED': EventTypes.MESSAGING_CONVERSATION_CREATED.value,
+            'MESSAGING_CONVERSATION_MEMBER_ADDED': EventTypes.MESSAGING_CONVERSATION_MEMBER_ADDED.value,
+            'COURSES_ASSIGNMENT_PUBLISHED': EventTypes.COURSES_ASSIGNMENT_PUBLISHED.value,
+        }
+        
+        for field_name, event_type in event_type_mapping.items():
+            type_preferences[event_type] = {
+                'email': request.POST.get(f'type_{field_name}_email') == 'on',
+                'push': request.POST.get(f'type_{field_name}_push') == 'on',
+                'in_app': request.POST.get(f'type_{field_name}_in_app') == 'on',
+            }
+        
+        NotificationPreferenceService.update_type_preferences(request.user, type_preferences)
+        
+        return redirect('users:settings_notifications')
+    
+    # Get or create user preferences for GET request
+    preferences = NotificationPreferenceService.get_or_create_preferences(request.user)
+    
+    # Initialize type preferences if empty only - don't merge with defaults
+    if not preferences.type_preferences:
+        preferences.type_preferences = NotificationPreferenceService.get_default_type_preferences()
+        preferences.save()
+    
+    # Create a mapping for template access (dot keys -> underscore keys)
+    event_type_mapping = {
+        'POSTS_POST_LIKED': EventTypes.POSTS_POST_LIKED.value,
+        'POSTS_COMMENT_CREATED': EventTypes.POSTS_COMMENT_CREATED.value,
+        'POSTS_COMMENT_REPLY_CREATED': EventTypes.POSTS_COMMENT_REPLY_CREATED.value,
+        'POSTS_COMMENT_REPLIED': EventTypes.POSTS_COMMENT_REPLIED.value,
+        'POSTS_POST_SHARED': EventTypes.POSTS_POST_SHARED.value,
+        'POSTS_POST_REPOSTED': EventTypes.POSTS_POST_REPOSTED.value,
+        'POSTS_POST_SHARED_TO_GROUP': EventTypes.POSTS_POST_SHARED_TO_GROUP.value,
+        'USERS_USER_FOLLOWED': EventTypes.USERS_USER_FOLLOWED.value,
+        'USERS_USER_PINCHED': EventTypes.USERS_USER_PINCHED.value,
+        'GROUPS_MEMBER_INVITED': EventTypes.GROUPS_MEMBER_INVITED.value,
+        'GROUPS_MEMBER_REQUESTED': EventTypes.GROUPS_MEMBER_REQUESTED.value,
+        'GROUPS_MEMBER_APPROVED': EventTypes.GROUPS_MEMBER_APPROVED.value,
+        'GROUPS_MEMBER_REJECTED': EventTypes.GROUPS_MEMBER_REJECTED.value,
+        'DOCUMENTS_DOCUMENT_UPLOADED': EventTypes.DOCUMENTS_DOCUMENT_UPLOADED.value,
+        'DOCUMENTS_DOCUMENT_DOWNLOADED': EventTypes.DOCUMENTS_DOCUMENT_DOWNLOADED.value,
+        'DOCUMENTS_DOCUMENT_BOOKMARKED': EventTypes.DOCUMENTS_DOCUMENT_BOOKMARKED.value,
+        'DOCUMENTS_DOCUMENT_RATED': EventTypes.DOCUMENTS_DOCUMENT_RATED.value,
+        'MESSAGING_MESSAGE_SENT': EventTypes.MESSAGING_MESSAGE_SENT.value,
+        'MESSAGING_CONVERSATION_CREATED': EventTypes.MESSAGING_CONVERSATION_CREATED.value,
+        'MESSAGING_CONVERSATION_MEMBER_ADDED': EventTypes.MESSAGING_CONVERSATION_MEMBER_ADDED.value,
+        'COURSES_ASSIGNMENT_PUBLISHED': EventTypes.COURSES_ASSIGNMENT_PUBLISHED.value,
+    }
+    
+    # Create a copy of preferences with underscore keys for template
+    template_preferences = preferences
+    template_preferences.type_preferences_template = {}
+    for underscore_key, dot_key in event_type_mapping.items():
+        if dot_key in preferences.type_preferences:
+            template_preferences.type_preferences_template[underscore_key] = preferences.type_preferences[dot_key]
+    
+    return render(request, 'users/settings/notifications.html', {
+        'preferences': template_preferences
+    })
 
 
 @login_required
@@ -1217,8 +1324,8 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @extend_schema(
         summary="Update appearance preferences",
-        description="Update the authenticated user's appearance preferences (theme, font_size, language)",
-        responses={200: {"theme_preference": "string", "font_size_preference": "string", "language_preference": "string"}, 400: {"error": "message"}}
+        description="Update the authenticated user's appearance preferences (theme, font_size, language, font_family, font_style)",
+        responses={200: {"theme_preference": "string", "font_size_preference": "string", "language_preference": "string", "font_family_preference": "string", "font_style_preference": "string"}, 400: {"error": "message"}}
     )
     @action(detail=False, methods=['patch'])
     def update_preferences(self, request):
@@ -1258,6 +1365,29 @@ class UserViewSet(viewsets.ModelViewSet):
                 )
             request.user.language_preference = language
             updated_fields['language_preference'] = language
+
+        # Update font family preference if provided
+        if 'font_family_preference' in data:
+            font_family = data['font_family_preference']
+            valid_font_families = ['default', 'inter', 'roboto', 'ibm_plex_serif', 'manrope', 'playfair_display', 'romanesco', 'story_script', 'poppins', 'lora', 'merriweather', 'dancing_script', 'great_vibes', 'parisienne', 'satisfy', 'cookie', 'italianno', 'tangerine']
+            if font_family not in valid_font_families:
+                return Response(
+                    {'error': 'Invalid font family preference. Must be one of: ' + ', '.join(valid_font_families)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            request.user.font_family_preference = font_family
+            updated_fields['font_family_preference'] = font_family
+
+        # Update font style preference if provided
+        if 'font_style_preference' in data:
+            font_style = data['font_style_preference']
+            if font_style not in ['normal', 'italic']:
+                return Response(
+                    {'error': 'Invalid font style preference. Must be normal or italic.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            request.user.font_style_preference = font_style
+            updated_fields['font_style_preference'] = font_style
 
         request.user.save()
         return Response(updated_fields)

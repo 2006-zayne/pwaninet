@@ -1,104 +1,512 @@
-<div class="form-check">
-  <div>
-    <input type="checkbox" class="form-check-input" id="notify_on_like" name="notify_on_like" {% if form.notify_on_like.value %}checked{% endif %}>
-    <label class="form-check-label" for="notify_on_like">
-      Like notifications
-      <span class="form-check-description">Get notified when someone likes your posts</span>
-    </label>
+{% load user_extras %}
+<!-- Global Delivery Preferences -->
+<div class="pref-section">
+  <div class="pref-section-title">Delivery Channels</div>
+  <div class="pref-section-description">Choose how you want to receive notifications</div>
+  
+  <div class="form-check">
+    <div>
+      <input type="checkbox" class="form-check-input" id="email_enabled" name="email_enabled" {% if preferences.email_enabled %}checked{% endif %}>
+      <label class="form-check-label" for="email_enabled">
+        Email notifications
+        <span class="form-check-description">Receive notifications via email</span>
+      </label>
+    </div>
+  </div>
+  
+  <div class="form-check">
+    <div>
+      <input type="checkbox" class="form-check-input" id="email_digest" name="email_digest" {% if preferences.email_digest %}checked{% endif %}>
+      <label class="form-check-label" for="email_digest">
+        Daily digest
+        <span class="form-check-description">Send daily digest instead of immediate emails</span>
+      </label>
+    </div>
+  </div>
+  
+  <div class="form-check">
+    <div>
+      <input type="checkbox" class="form-check-input" id="push_enabled" name="push_enabled" {% if preferences.push_enabled %}checked{% endif %}>
+      <label class="form-check-label" for="push_enabled">
+        Push notifications
+        <span class="form-check-description">Receive push notifications in browser</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Push Subscription Status -->
+  <div class="push-subscription-status" style="margin-top: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+    <div id="push-status-loading" style="display: none;">
+      <span class="spinner-border spinner-border-sm" role="status"></span>
+      <span style="margin-left: 0.5rem;">Checking push subscription status...</span>
+    </div>
+    <div id="push-status-not-supported" style="display: none;">
+      <i class="bi bi-exclamation-triangle" style="color: var(--warning);"></i>
+      <span style="margin-left: 0.5rem;">Push notifications are not supported in your browser.</span>
+    </div>
+    <div id="push-status-denied" style="display: none;">
+      <i class="bi bi-x-circle" style="color: var(--danger);"></i>
+      <span style="margin-left: 0.5rem;">Notification permission denied. Please enable it in browser settings.</span>
+    </div>
+    <div id="push-status-unsubscribed" style="display: none;">
+      <i class="bi bi-bell-slash" style="color: var(--muted);"></i>
+      <span style="margin-left: 0.5rem;">Not subscribed to push notifications</span>
+      <button type="button" id="btn-push-subscribe" class="btn btn-primary btn-sm" style="margin-left: 1rem;">
+        <i class="bi bi-bell"></i> Enable Push Notifications
+      </button>
+    </div>
+    <div id="push-status-subscribed" style="display: none;">
+      <i class="bi bi-bell-fill" style="color: var(--success);"></i>
+      <span style="margin-left: 0.5rem;">Push notifications enabled</span>
+      <button type="button" id="btn-push-unsubscribe" class="btn btn-outline-danger btn-sm" style="margin-left: 1rem;">
+        <i class="bi bi-bell-slash"></i> Disable
+      </button>
+    </div>
+  </div>
+  
+  <div class="form-check">
+    <div>
+      <input type="checkbox" class="form-check-input" id="push_sound" name="push_sound" {% if preferences.push_sound %}checked{% endif %}>
+      <label class="form-check-label" for="push_sound">
+        Push notification sounds
+        <span class="form-check-description">Play sound for push notifications</span>
+      </label>
+    </div>
+  </div>
+  
+  <div class="form-check">
+    <div>
+      <input type="checkbox" class="form-check-input" id="in_app_enabled" name="in_app_enabled" {% if preferences.in_app_enabled %}checked{% endif %}>
+      <label class="form-check-label" for="in_app_enabled">
+        In-app notifications
+        <span class="form-check-description">Show notifications in the app</span>
+      </label>
+    </div>
   </div>
 </div>
 
-<div class="form-check">
-  <div>
-    <input type="checkbox" class="form-check-input" id="notify_on_follow" name="notify_on_follow" {% if form.notify_on_follow.value %}checked{% endif %}>
-    <label class="form-check-label" for="notify_on_follow">
-      Follow notifications
-      <span class="form-check-description">Get notified when someone follows you</span>
-    </label>
+<!-- Notification Type Preferences -->
+<div class="pref-section">
+  <div class="pref-section-title">Notification Types</div>
+  <div class="pref-section-description">Customize which notifications you receive</div>
+  
+  <div class="pref-type-grid">
+    <!-- Social Notifications -->
+    <div class="pref-type-group">
+      <div class="pref-type-group-title">
+        <i class="bi bi-people"></i> Social
+      </div>
+      
+      <div class="pref-type-item">
+        <div class="pref-type-name">Post Likes</div>
+        <div class="pref-type-channels">
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_POSTS_POST_LIKED_email" {% if preferences.type_preferences_template.POSTS_POST_LIKED.email %}checked{% endif %}>
+            <span>Email</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_POSTS_POST_LIKED_push" {% if preferences.type_preferences_template.POSTS_POST_LIKED.push %}checked{% endif %}>
+            <span>Push</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_POSTS_POST_LIKED_in_app" {% if preferences.type_preferences_template.POSTS_POST_LIKED.in_app %}checked{% endif %}>
+            <span>In-App</span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="pref-type-item">
+        <div class="pref-type-name">Comments</div>
+        <div class="pref-type-channels">
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_POSTS_COMMENT_CREATED_email" {% if preferences.type_preferences_template.POSTS_COMMENT_CREATED.email %}checked{% endif %}>
+            <span>Email</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_POSTS_COMMENT_CREATED_push" {% if preferences.type_preferences_template.POSTS_COMMENT_CREATED.push %}checked{% endif %}>
+            <span>Push</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_POSTS_COMMENT_CREATED_in_app" {% if preferences.type_preferences_template.POSTS_COMMENT_CREATED.in_app %}checked{% endif %}>
+            <span>In-App</span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="pref-type-item">
+        <div class="pref-type-name">Follows</div>
+        <div class="pref-type-channels">
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_USERS_USER_FOLLOWED_email" {% if preferences.type_preferences_template.USERS_USER_FOLLOWED.email %}checked{% endif %}>
+            <span>Email</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_USERS_USER_FOLLOWED_push" {% if preferences.type_preferences_template.USERS_USER_FOLLOWED.push %}checked{% endif %}>
+            <span>Push</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_USERS_USER_FOLLOWED_in_app" {% if preferences.type_preferences_template.USERS_USER_FOLLOWED.in_app %}checked{% endif %}>
+            <span>In-App</span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="pref-type-item">
+        <div class="pref-type-name">Comment Replies</div>
+        <div class="pref-type-channels">
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_POSTS_COMMENT_REPLY_CREATED_email" {% if preferences.type_preferences_template.POSTS_COMMENT_REPLY_CREATED.email %}checked{% endif %}>
+            <span>Email</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_POSTS_COMMENT_REPLY_CREATED_push" {% if preferences.type_preferences_template.POSTS_COMMENT_REPLY_CREATED.push %}checked{% endif %}>
+            <span>Push</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_POSTS_COMMENT_REPLY_CREATED_in_app" {% if preferences.type_preferences_template.POSTS_COMMENT_REPLY_CREATED.in_app %}checked{% endif %}>
+            <span>In-App</span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="pref-type-item">
+        <div class="pref-type-name">Post Shares</div>
+        <div class="pref-type-channels">
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_POSTS_POST_SHARED_email" {% if preferences.type_preferences_template.POSTS_POST_SHARED.email %}checked{% endif %}>
+            <span>Email</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_POSTS_POST_SHARED_push" {% if preferences.type_preferences_template.POSTS_POST_SHARED.push %}checked{% endif %}>
+            <span>Push</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_POSTS_POST_SHARED_in_app" {% if preferences.type_preferences_template.POSTS_POST_SHARED.in_app %}checked{% endif %}>
+            <span>In-App</span>
+          </label>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Group Notifications -->
+    <div class="pref-type-group">
+      <div class="pref-type-group-title">
+        <i class="bi bi-people-fill"></i> Groups
+      </div>
+      
+      <div class="pref-type-item">
+        <div class="pref-type-name">Group Invites</div>
+        <div class="pref-type-channels">
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_GROUPS_MEMBER_INVITED_email" {% if preferences.type_preferences_template.GROUPS_MEMBER_INVITED.email %}checked{% endif %}>
+            <span>Email</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_GROUPS_MEMBER_INVITED_push" {% if preferences.type_preferences_template.GROUPS_MEMBER_INVITED.push %}checked{% endif %}>
+            <span>Push</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_GROUPS_MEMBER_INVITED_in_app" {% if preferences.type_preferences_template.GROUPS_MEMBER_INVITED.in_app %}checked{% endif %}>
+            <span>In-App</span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="pref-type-item">
+        <div class="pref-type-name">Group Requests</div>
+        <div class="pref-type-channels">
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_GROUPS_MEMBER_REQUESTED_email" {% if preferences.type_preferences_template.GROUPS_MEMBER_REQUESTED.email %}checked{% endif %}>
+            <span>Email</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_GROUPS_MEMBER_REQUESTED_push" {% if preferences.type_preferences_template.GROUPS_MEMBER_REQUESTED.push %}checked{% endif %}>
+            <span>Push</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_GROUPS_MEMBER_REQUESTED_in_app" {% if preferences.type_preferences_template.GROUPS_MEMBER_REQUESTED.in_app %}checked{% endif %}>
+            <span>In-App</span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="pref-type-item">
+        <div class="pref-type-name">Group Approvals</div>
+        <div class="pref-type-channels">
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_GROUPS_MEMBER_APPROVED_email" {% if preferences.type_preferences_template.GROUPS_MEMBER_APPROVED.email %}checked{% endif %}>
+            <span>Email</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_GROUPS_MEMBER_APPROVED_push" {% if preferences.type_preferences_template.GROUPS_MEMBER_APPROVED.push %}checked{% endif %}>
+            <span>Push</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_GROUPS_MEMBER_APPROVED_in_app" {% if preferences.type_preferences_template.GROUPS_MEMBER_APPROVED.in_app %}checked{% endif %}>
+            <span>In-App</span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="pref-type-item">
+        <div class="pref-type-name">Group Rejections</div>
+        <div class="pref-type-channels">
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_GROUPS_MEMBER_REJECTED_email" {% if preferences.type_preferences_template.GROUPS_MEMBER_REJECTED.email %}checked{% endif %}>
+            <span>Email</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_GROUPS_MEMBER_REJECTED_push" {% if preferences.type_preferences_template.GROUPS_MEMBER_REJECTED.push %}checked{% endif %}>
+            <span>Push</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_GROUPS_MEMBER_REJECTED_in_app" {% if preferences.type_preferences_template.GROUPS_MEMBER_REJECTED.in_app %}checked{% endif %}>
+            <span>In-App</span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="pref-type-item">
+        <div class="pref-type-name">Post Shared to Group</div>
+        <div class="pref-type-channels">
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_POSTS_POST_SHARED_TO_GROUP_email" {% if preferences.type_preferences_template.POSTS_POST_SHARED_TO_GROUP.email %}checked{% endif %}>
+            <span>Email</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_POSTS_POST_SHARED_TO_GROUP_push" {% if preferences.type_preferences_template.POSTS_POST_SHARED_TO_GROUP.push %}checked{% endif %}>
+            <span>Push</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_POSTS_POST_SHARED_TO_GROUP_in_app" {% if preferences.type_preferences_template.POSTS_POST_SHARED_TO_GROUP.in_app %}checked{% endif %}>
+            <span>In-App</span>
+          </label>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Document Notifications -->
+    <div class="pref-type-group">
+      <div class="pref-type-group-title">
+        <i class="bi bi-file-earmark-text"></i> Documents
+      </div>
+      
+      <div class="pref-type-item">
+        <div class="pref-type-name">Document Uploads</div>
+        <div class="pref-type-channels">
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_DOCUMENTS_DOCUMENT_UPLOADED_email" {% if preferences.type_preferences_template.DOCUMENTS_DOCUMENT_UPLOADED.email %}checked{% endif %}>
+            <span>Email</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_DOCUMENTS_DOCUMENT_UPLOADED_push" {% if preferences.type_preferences_template.DOCUMENTS_DOCUMENT_UPLOADED.push %}checked{% endif %}>
+            <span>Push</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_DOCUMENTS_DOCUMENT_UPLOADED_in_app" {% if preferences.type_preferences_template.DOCUMENTS_DOCUMENT_UPLOADED.in_app %}checked{% endif %}>
+            <span>In-App</span>
+          </label>
+        </div>
+      </div>
+      
+      
+      <div class="pref-type-item">
+        <div class="pref-type-name">Document Downloads</div>
+        <div class="pref-type-channels">
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_DOCUMENTS_DOCUMENT_DOWNLOADED_email" {% if preferences.type_preferences_template.DOCUMENTS_DOCUMENT_DOWNLOADED.email %}checked{% endif %}>
+            <span>Email</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_DOCUMENTS_DOCUMENT_DOWNLOADED_push" {% if preferences.type_preferences_template.DOCUMENTS_DOCUMENT_DOWNLOADED.push %}checked{% endif %}>
+            <span>Push</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_DOCUMENTS_DOCUMENT_DOWNLOADED_in_app" {% if preferences.type_preferences_template.DOCUMENTS_DOCUMENT_DOWNLOADED.in_app %}checked{% endif %}>
+            <span>In-App</span>
+          </label>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Messaging Notifications -->
+    <div class="pref-type-group">
+      <div class="pref-type-group-title">
+        <i class="bi bi-chat-dots"></i> Messaging
+      </div>
+      
+      <div class="pref-type-item">
+        <div class="pref-type-name">New Messages</div>
+        <div class="pref-type-channels">
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_MESSAGING_MESSAGE_SENT_email" {% if preferences.type_preferences_template.MESSAGING_MESSAGE_SENT.email %}checked{% endif %}>
+            <span>Email</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_MESSAGING_MESSAGE_SENT_push" {% if preferences.type_preferences_template.MESSAGING_MESSAGE_SENT.push %}checked{% endif %}>
+            <span>Push</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_MESSAGING_MESSAGE_SENT_in_app" {% if preferences.type_preferences_template.MESSAGING_MESSAGE_SENT.in_app %}checked{% endif %}>
+            <span>In-App</span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="pref-type-item">
+        <div class="pref-type-name">Conversation Created</div>
+        <div class="pref-type-channels">
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_MESSAGING_CONVERSATION_CREATED_email" {% if preferences.type_preferences_template.MESSAGING_CONVERSATION_CREATED.email %}checked{% endif %}>
+            <span>Email</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_MESSAGING_CONVERSATION_CREATED_push" {% if preferences.type_preferences_template.MESSAGING_CONVERSATION_CREATED.push %}checked{% endif %}>
+            <span>Push</span>
+          </label>
+          <label class="channel-toggle">
+            <input type="checkbox" name="type_MESSAGING_CONVERSATION_CREATED_in_app" {% if preferences.type_preferences_template.MESSAGING_CONVERSATION_CREATED.in_app %}checked{% endif %}>
+            <span>In-App</span>
+          </label>
+        </div>
+      </div>
+    </div>
+    
   </div>
 </div>
 
-<div class="form-check">
-  <div>
-    <input type="checkbox" class="form-check-input" id="notify_on_invite" name="notify_on_invite" {% if form.notify_on_invite.value %}checked{% endif %}>
-    <label class="form-check-label" for="notify_on_invite">
-      Group invite notifications
-      <span class="form-check-description">Get notified when someone invites you to a group</span>
-    </label>
+<!-- Quiet Hours -->
+<div class="pref-section">
+  <div class="pref-section-title">Quiet Hours</div>
+  <div class="pref-section-description">Pause notifications during specific hours</div>
+  
+  <div class="form-check">
+    <div>
+      <input type="checkbox" class="form-check-input" id="quiet_hours_enabled" name="quiet_hours_enabled" {% if preferences.quiet_hours_enabled %}checked{% endif %}>
+      <label class="form-check-label" for="quiet_hours_enabled">
+        Enable quiet hours
+        <span class="form-check-description">Pause push and in-app notifications during quiet hours</span>
+      </label>
+    </div>
+  </div>
+  
+  <div class="quiet-hours-inputs">
+    <div class="time-input-group">
+      <label for="quiet_hours_start">From</label>
+      <input type="time" id="quiet_hours_start" name="quiet_hours_start" value="{% if preferences.quiet_hours_start %}{{ preferences.quiet_hours_start|time:'H:i' }}{% endif %}">
+    </div>
+    <div class="time-input-group">
+      <label for="quiet_hours_end">To</label>
+      <input type="time" id="quiet_hours_end" name="quiet_hours_end" value="{% if preferences.quiet_hours_end %}{{ preferences.quiet_hours_end|time:'H:i' }}{% endif %}">
+    </div>
   </div>
 </div>
 
-<div class="form-check">
-  <div>
-    <input type="checkbox" class="form-check-input" id="notify_on_group_request" name="notify_on_group_request" {% if form.notify_on_group_request.value %}checked{% endif %}>
-    <label class="form-check-label" for="notify_on_group_request">
-      Group join request notifications
-      <span class="form-check-description">Get notified when someone requests to join your groups (for admins)</span>
-    </label>
+<!-- Do Not Disturb -->
+<div class="pref-section">
+  <div class="pref-section-title">Do Not Disturb</div>
+  <div class="pref-section-description">Temporarily pause all notifications</div>
+  
+  <div class="dnd-buttons">
+    <button type="button" class="btn-dnd" onclick="setDnd(1)">1 hour</button>
+    <button type="button" class="btn-dnd" onclick="setDnd(8)">8 hours</button>
+    <button type="button" class="btn-dnd" onclick="setDnd(24)">24 hours</button>
+    <button type="button" class="btn-dnd btn-dnd-clear" onclick="clearDnd()">Clear</button>
   </div>
-</div>
-
-<div class="form-check">
-  <div>
-    <input type="checkbox" class="form-check-input" id="notify_on_group_approved" name="notify_on_group_approved" {% if form.notify_on_group_approved.value %}checked{% endif %}>
-    <label class="form-check-label" for="notify_on_group_approved">
-      Group approval notifications
-      <span class="form-check-description">Get notified when your group join request is approved</span>
-    </label>
-  </div>
-</div>
-
-<div class="form-check">
-  <div>
-    <input type="checkbox" class="form-check-input" id="notify_on_pinch" name="notify_on_pinch" {% if form.notify_on_pinch.value %}checked{% endif %}>
-    <label class="form-check-label" for="notify_on_pinch">
-      Pinch notifications
-      <span class="form-check-description">Get notified when someone pinches your profile</span>
-    </label>
-  </div>
-</div>
-
-<div class="form-check">
-  <div>
-    <input type="checkbox" class="form-check-input" id="email_notifications" name="email_notifications" {% if form.email_notifications.value %}checked{% endif %}>
-    <label class="form-check-label" for="email_notifications">
-      Email notifications
-      <span class="form-check-description">Receive email notifications for important updates</span>
-    </label>
-  </div>
+  
+  {% if preferences.do_not_disturb_until %}
+    <div class="dnd-status">
+      <i class="bi bi-info-circle"></i>
+      Do not disturb active until {{ preferences.do_not_disturb_until|date:'H:i' }}
+    </div>
+  {% endif %}
 </div>
 
 <button type="submit" class="btn-save">
-  <i class="bi bi-check-lg"></i> Save
+  <i class="bi bi-check-lg"></i> Save Preferences
 </button>
 
-<style>
-  .form-check {
-    padding: 1rem 0;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
+<script>
+function setDnd(hours) {
+  fetch('/notifications/set-dnd/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCsrfToken()
+    },
+    body: JSON.stringify({ hours: hours })
+  }).then(() => location.reload());
+}
 
-  .form-check:last-child {
+function clearDnd() {
+  fetch('/notifications/clear-dnd/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCsrfToken()
+    }
+  }).then(() => location.reload());
+}
+
+function getCsrfToken() {
+  const cookies = document.cookie.split(';');
+  for (let cookie of cookies) {
+    const [name, value] = cookie.trim().split('=');
+    if (name === 'csrftoken') {
+      return decodeURIComponent(value);
+    }
+  }
+  return '';
+}
+</script>
+
+<style>
+  .pref-section {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  
+  .pref-section:last-child {
     border-bottom: none;
   }
-
+  
+  .pref-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+  }
+  
+  .pref-section-description {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+  }
+  
+  .form-check {
+    padding: 0.75rem 0;
+    display: flex;
+    align-items: center;
+  }
+  
   .form-check-input {
     width: 1.25rem;
     height: 1.25rem;
     cursor: pointer;
+    flex-shrink: 0;
+    accent-color: var(--brand);
+    border: 2px solid var(--border);
+    border-radius: 4px;
   }
-
+  
   .form-check-label {
     margin-left: 0.75rem;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--text-primary);
     cursor: pointer;
     flex: 1;
   }
-
+  
   .form-check-description {
     display: block;
     font-size: 0.85rem;
@@ -106,7 +514,262 @@
     margin-top: 0.25rem;
     font-weight: 400;
   }
+  
+  .pref-type-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+  }
+  
+  .pref-type-group {
+    background: var(--page-bg);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+  }
+  
+  .pref-type-group-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--brand);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .pref-type-item {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  
+  .pref-type-item:last-child {
+    border-bottom: none;
+  }
+  
+  .pref-type-name {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+  }
+  
+  .pref-type-channels {
+    display: flex;
+    gap: 1rem;
+  }
+  
+  .channel-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  
+  .channel-toggle input {
+    cursor: pointer;
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--brand);
+    border: 2px solid var(--border);
+    border-radius: 3px;
+  }
+  
+  .quiet-hours-inputs {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  
+  .time-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  
+  .time-input-group label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+  
+  .time-input-group input {
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+  
+  .dnd-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+  
+  .btn-dnd {
+    padding: 0.5rem 1rem;
+    background: var(--brand-light);
+    color: var(--brand);
+    border: 1px solid var(--brand);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-dnd:hover {
+    background: var(--brand);
+    color: #fff;
+  }
+  
+  .btn-dnd-clear {
+    background: var(--danger-light);
+    color: var(--danger);
+    border-color: #fecaca;
+  }
+  
+  .btn-dnd-clear:hover {
+    background: var(--danger);
+    color: #fff;
+  }
+  
+  .dnd-status {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: var(--brand-light);
+    color: var(--brand);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+</style>
 
+<script src="/static/js/notifications/push-subscription.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async function() {
+  const pushManager = new PushSubscriptionManager();
+  
+  // UI elements
+  const loadingEl = document.getElementById('push-status-loading');
+  const notSupportedEl = document.getElementById('push-status-not-supported');
+  const deniedEl = document.getElementById('push-status-denied');
+  const unsubscribedEl = document.getElementById('push-status-unsubscribed');
+  const subscribedEl = document.getElementById('push-status-subscribed');
+  const subscribeBtn = document.getElementById('btn-push-subscribe');
+  const unsubscribeBtn = document.getElementById('btn-push-unsubscribe');
+  
+  // Hide all status elements
+  function hideAllStatus() {
+    loadingEl.style.display = 'none';
+    notSupportedEl.style.display = 'none';
+    deniedEl.style.display = 'none';
+    unsubscribedEl.style.display = 'none';
+    subscribedEl.style.display = 'none';
+  }
+  
+  // Update UI based on status
+  function updateStatusUI(status) {
+    hideAllStatus();
+    
+    if (!status.supported) {
+      notSupportedEl.style.display = 'flex';
+      return;
+    }
+    
+    if (status.permission === 'denied') {
+      deniedEl.style.display = 'flex';
+      return;
+    }
+    
+    if (status.subscribed) {
+      subscribedEl.style.display = 'flex';
+    } else {
+      unsubscribedEl.style.display = 'flex';
+    }
+  }
+  
+  // Check subscription status on load
+  async function checkStatus() {
+    hideAllStatus();
+    loadingEl.style.display = 'flex';
+    
+    try {
+      const status = await pushManager.getSubscriptionStatus();
+      updateStatusUI(status);
+    } catch (error) {
+      console.error('Error checking push status:', error);
+      notSupportedEl.style.display = 'flex';
+    }
+  }
+  
+  // Subscribe button click handler
+  subscribeBtn.addEventListener('click', async function() {
+    try {
+      subscribeBtn.disabled = true;
+      subscribeBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Subscribing...';
+      
+      await pushManager.subscribe();
+      
+      // Update UI
+      const status = await pushManager.getSubscriptionStatus();
+      updateStatusUI(status);
+      
+      // Also enable the push_enabled checkbox
+      const pushEnabledCheckbox = document.getElementById('push_enabled');
+      if (pushEnabledCheckbox) {
+        pushEnabledCheckbox.checked = true;
+      }
+    } catch (error) {
+      console.error('Subscription failed:', error);
+      alert('Failed to enable push notifications: ' + error.message);
+    } finally {
+      subscribeBtn.disabled = false;
+      subscribeBtn.innerHTML = '<i class="bi bi-bell"></i> Enable Push Notifications';
+    }
+  });
+  
+  // Unsubscribe button click handler
+  unsubscribeBtn.addEventListener('click', async function() {
+    if (!confirm('Are you sure you want to disable push notifications?')) {
+      return;
+    }
+    
+    try {
+      unsubscribeBtn.disabled = true;
+      unsubscribeBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Disabling...';
+      
+      await pushManager.unsubscribe();
+      
+      // Update UI
+      const status = await pushManager.getSubscriptionStatus();
+      updateStatusUI(status);
+      
+      // Also disable the push_enabled checkbox
+      const pushEnabledCheckbox = document.getElementById('push_enabled');
+      if (pushEnabledCheckbox) {
+        pushEnabledCheckbox.checked = false;
+      }
+    } catch (error) {
+      console.error('Unsubscription failed:', error);
+      alert('Failed to disable push notifications: ' + error.message);
+    } finally {
+      unsubscribeBtn.disabled = false;
+      unsubscribeBtn.innerHTML = '<i class="bi bi-bell-slash"></i> Disable';
+    }
+  });
+  
+  // Initial status check
+  checkStatus();
+});
+</script>
+
+<style>
   .btn-save {
     display: inline-flex;
     align-items: center;
@@ -122,9 +785,15 @@
     transition: all 0.2s ease;
     margin-top: 1.5rem;
   }
-
+  
   .btn-save:hover {
     background: #1d4ed8;
     transform: translateY(-1px);
+  }
+  
+  @media (max-width: 768px) {
+    .pref-type-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

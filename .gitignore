@@ -72,3 +72,4 @@ dist/
 # NODE / FRONTEND (if ever added)
 # =========================
 node_modules/
+dump.rdb

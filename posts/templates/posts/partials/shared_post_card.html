@@ -64,12 +64,15 @@
 
     <div class="{% if shared_post.original_post.gradient_class != 'none' %}{{ shared_post.original_post.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %} {% if shared_post.original_post.has_signature %}signature-overlay{% endif %}"
          {% if shared_post.original_post.gradient_class == 'bg-username-pattern' %}
-             {% include "posts/partials/username_pattern_style.html" with author_name=shared_post.original_post.author.username %}
-         {% elif shared_post.original_post.has_signature %}
-             {% include "posts/partials/signature_overlay_style.html" with author_name=shared_post.original_post.author.username %}
+             style="background: linear-gradient(135deg, {{ shared_post.original_post.custom_gradient_color1|default:'#141E30' }} 0%, {{ shared_post.original_post.custom_gradient_color2|default:'#243B55' }} 100%); color: {{ shared_post.original_post.custom_gradient_text_color|default:'#ffffff' }};"
          {% endif %}>
+        {% if shared_post.original_post.gradient_class == 'bg-username-pattern' %}
+            {% include "posts/partials/username_pattern_svg.html" with author_name=shared_post.original_post.custom_gradient_text|default:shared_post.original_post.author.username color1=shared_post.original_post.custom_gradient_color1 color2=shared_post.original_post.custom_gradient_color2 text_color=shared_post.original_post.custom_gradient_text_color %}
+        {% elif shared_post.original_post.has_signature %}
+            {% include "posts/partials/signature_svg.html" with author_name=shared_post.original_post.author.username %}
+        {% endif %}
         {% if shared_post.original_post.gradient_class != 'none' %}
-        <p class="mb-0 text-white fw-bold fs-3" style="line-height: 1.5;">
+        <p class="mb-0 text-white fw-bold fs-3" style="line-height: 1.5; position: relative; z-index: 1;">
             {{ shared_post.original_post.content }}
         </p>
         {% else %}
@@ -151,11 +154,11 @@
             {% if shared_post.original_post.shared_document %}
                 <span class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none">
                     <i class="bi bi-hand-thumbs-up fs-5"></i>
-                    <span class="fw-bold">{% if shared_post.original_post.shared_document.analytics %}{{ shared_post.original_post.shared_document.analytics.positive_rating_percentage }}{% else %}0{% endif %}%</span>
+                    <span class="fw-bold">{% if shared_post.original_post.shared_document.analytics %}{{ shared_post.original_post.shared_document.analytics.positive_rating_count }}{% else %}0{% endif %}</span>
                 </span>
                 <span class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none">
                     <i class="bi bi-hand-thumbs-down fs-5"></i>
-                    <span class="fw-bold">{% if shared_post.original_post.shared_document.analytics %}{{ shared_post.original_post.shared_document.analytics.negative_rating_percentage }}{% else %}0{% endif %}%</span>
+                    <span class="fw-bold">{% if shared_post.original_post.shared_document.analytics %}{{ shared_post.original_post.shared_document.analytics.negative_rating_count }}{% else %}0{% endif %}</span>
                 </span>
             {% endif %}
         </div>

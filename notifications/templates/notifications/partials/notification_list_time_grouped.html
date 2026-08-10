@@ -1,23 +1,23 @@
-{% comment %}Group notifications by smart time periods{% endcomment %}
+{% comment %}Group notifications by smart time periods per specification{% endcomment %}
 
 {% if time_grouped %}
-  <!-- Just Now Section -->
-  {% if time_grouped.just_now %}
+  <!-- Now Section -->
+  {% if time_grouped.now %}
     <div class="time-section">
       <div class="time-section-header">
-        <h6 class="fw-bold text-uppercase text-muted small mb-2 px-2">Just now</h6>
+        <h6 class="fw-bold text-uppercase text-muted small mb-2 px-2">Now</h6>
       </div>
-      {% include 'notifications/partials/notification_list_items.html' with notifications=time_grouped.just_now %}
+      {% include 'notifications/partials/notification_list_items.html' with notifications=time_grouped.now %}
     </div>
   {% endif %}
 
-  <!-- Today Section -->
-  {% if time_grouped.today %}
+  <!-- Earlier Today Section -->
+  {% if time_grouped.earlier_today %}
     <div class="time-section">
       <div class="time-section-header">
-        <h6 class="fw-bold text-uppercase text-muted small mb-2 px-2">Today</h6>
+        <h6 class="fw-bold text-uppercase text-muted small mb-2 px-2 mt-3">Earlier Today</h6>
       </div>
-      {% include 'notifications/partials/notification_list_items.html' with notifications=time_grouped.today %}
+      {% include 'notifications/partials/notification_list_items.html' with notifications=time_grouped.earlier_today %}
     </div>
   {% endif %}
 
@@ -28,6 +28,26 @@
         <h6 class="fw-bold text-uppercase text-muted small mb-2 px-2 mt-3">Yesterday</h6>
       </div>
       {% include 'notifications/partials/notification_list_items.html' with notifications=time_grouped.yesterday %}
+    </div>
+  {% endif %}
+
+  <!-- This Week Section -->
+  {% if time_grouped.this_week %}
+    <div class="time-section">
+      <div class="time-section-header">
+        <h6 class="fw-bold text-uppercase text-muted small mb-2 px-2 mt-3">This Week</h6>
+      </div>
+      {% include 'notifications/partials/notification_list_items.html' with notifications=time_grouped.this_week %}
+    </div>
+  {% endif %}
+
+  <!-- Last Week Section -->
+  {% if time_grouped.last_week %}
+    <div class="time-section">
+      <div class="time-section-header">
+        <h6 class="fw-bold text-uppercase text-muted small mb-2 px-2 mt-3">Last Week</h6>
+      </div>
+      {% include 'notifications/partials/notification_list_items.html' with notifications=time_grouped.last_week %}
     </div>
   {% endif %}
 
@@ -42,14 +62,13 @@
   {% endif %}
 {% else %}
   <!-- Fallback to date-based grouping for non-time-filtered views -->
-  {% regroup notifications by n.timestamp|date:"Y-m-d" as date_groups %}
+  {% regroup notifications by n.created_at|date:"Y-m-d" as date_groups %}
 
   {% for date_group in date_groups %}
     {% with current_date=date_group.grouper %}
       {% now "Y-m-d" as today %}
-      {% now "Y-m-d"|date:"Y-m-d" as today_date %}
       
-      {% if current_date == today_date %}
+      {% if current_date == today %}
         <div class="time-section">
           <div class="time-section-header">
             <h6 class="fw-bold text-uppercase text-muted small mb-2 px-2">Today</h6>

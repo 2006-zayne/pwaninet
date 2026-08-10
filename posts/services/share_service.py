@@ -1,7 +1,7 @@
 from posts.models import SharedPost, Post, PostImage
 from django.core.exceptions import ValidationError
 from django.db import models
-from notifications.services.notification_service import create_notification
+from notifications.events import publish_event, EventTypes, EventSources, EventActions
 
 
 def share_post(user, post, shared_to_user=None, shared_to_group=None, message=None):
@@ -59,15 +59,24 @@ def share_post(user, post, shared_to_user=None, shared_to_group=None, message=No
             message=message
         )
         
-        # Create notification for the recipient
-        from notifications.models import Notifications
-        create_notification(
-            recipient=shared_to_user,
-            sender=user,
-            notification_type=Notifications.POST_SHARED,
-            msg=message or f"{user.username} shared a post with you",
-            post=post
+        # Emit event for new notification engine
+        publish_event(
+            event_type=EventTypes.POSTS_POST_SHARED.value,
+            source=EventSources.POSTS.value,
+            action=EventActions.SHARED.value,
+            actor=user,
+            target_type='Post',
+            target_id=str(post.id),
+            context_type='USER',
+            context_id=str(shared_to_user.id),
+            metadata={
+                'message': message[:100] if message else '',
+                'sharer_username': user.username,
+                'recipient_username': shared_to_user.username
+            }
         )
+        
+        # Notification is now handled by the event system
     
     # Group sharing logic
     elif shared_to_group:
@@ -112,6 +121,23 @@ def share_post(user, post, shared_to_user=None, shared_to_group=None, message=No
             message=message
         )
 
+        # Emit event for new notification engine
+        publish_event(
+            event_type=EventTypes.POSTS_POST_SHARED_TO_GROUP.value,
+            source=EventSources.POSTS.value,
+            action=EventActions.SHARED.value,
+            actor=user,
+            target_type='Post',
+            target_id=str(repost.id),
+            context_type='GROUP',
+            context_id=str(shared_to_group.id),
+            metadata={
+                'message': message[:100] if message else '',
+                'sharer_username': user.username,
+                'group_name': shared_to_group.name
+            }
+        )
+
         # Create notification for group members
         # Notify admins and moderators of the group
         from groups.models import MembershipRole
@@ -123,15 +149,8 @@ def share_post(user, post, shared_to_user=None, shared_to_group=None, message=No
 
         for membership in group_members:
             if membership.user != user:  # Don't notify yourself
-                from notifications.models import Notifications
-                create_notification(
-                    recipient=membership.user,
-                    sender=user,
-                    notification_type=Notifications.POST_SHARED_TO_GROUP,
-                    msg=message or f"{user.username} shared a post to {shared_to_group.name}",
-                    post=repost,
-                    group=shared_to_group
-                )
+                # Notification is now handled by the event system
+                pass
     
     return shared_post
 

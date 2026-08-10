@@ -65,6 +65,15 @@ def document_download_post_save(sender, instance, created, **kwargs):
         )
         event_dispatcher.emit(event)
         logger.info(f"Emitted DocumentDownloadedEvent for document {instance.document.id}")
+        
+        # Update analytics immediately
+        from ..engagement.models import DocumentAnalytics
+        analytics, created = DocumentAnalytics.objects.get_or_create(
+            document=instance.document
+        )
+        analytics.download_count = instance.document.downloads.count()
+        analytics.save(update_fields=['download_count'])
+        logger.info(f"Updated download_count to {analytics.download_count} for document {instance.document.id}")
 
 
 @receiver(post_save, sender='documents.DocumentReport')

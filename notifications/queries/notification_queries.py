@@ -1,106 +1,124 @@
 from django.db.models import Count, Q
 from django.utils import timezone
 from datetime import timedelta
-from notifications.models import Notifications
+from notifications.models import NotificationObject
+from notifications.notifications.registry import NotificationStatuses
 
-def get_notifications_for_user(user, notification_type=None, is_read=None):
-    queryset = user.notifications.all()
+def get_notifications_for_user(user, notification_type=None, is_read=None, search_query=None):
+    queryset = NotificationObject.objects.filter(recipient=user)
     
     if notification_type:
         queryset = queryset.filter(notification_type=notification_type)
     
     if is_read is not None:
-        queryset = queryset.filter(is_read=is_read)
+        # Map is_read to status: True -> READ, False -> CREATED
+        status = NotificationStatuses.READ.value if is_read else NotificationStatuses.CREATED.value
+        queryset = queryset.filter(status=status)
     
-    return queryset.order_by('-timestamp')
+    if search_query:
+        queryset = queryset.filter(title__icontains=search_query) | queryset.filter(summary__icontains=search_query)
+    
+    return queryset.order_by('-created_at')
 
 
-def get_notifications_by_time_periods(user, notification_type=None, is_read=None):
+def get_notifications_by_time_periods(user, notification_type=None, is_read=None, search_query=None):
     """
-    Group notifications by smart time periods: Just now, Today, Yesterday, Earlier
+    Group notifications by smart time periods: Now, Earlier Today, Yesterday, This Week, Last Week, Earlier
+    Per specification: Section 3.4
     """
-    queryset = user.notifications.select_related('sender', 'post', 'group').all()
+    queryset = NotificationObject.objects.filter(recipient=user)
     
     if notification_type:
         queryset = queryset.filter(notification_type=notification_type)
     
     if is_read is not None:
-        queryset = queryset.filter(is_read=is_read)
+        status = NotificationStatuses.READ.value if is_read else NotificationStatuses.CREATED.value
+        queryset = queryset.filter(status=status)
+    
+    if search_query:
+        queryset = queryset.filter(title__icontains=search_query) | queryset.filter(summary__icontains=search_query)
     
     now = timezone.now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     yesterday_start = today_start - timedelta(days=1)
-    one_hour_ago = now - timedelta(hours=1)
+    week_start = today_start - timedelta(days=now.weekday())  # Monday
+    last_week_start = week_start - timedelta(weeks=1)
     
-    notifications = queryset.order_by('-timestamp')
+    notifications = queryset.order_by('-created_at')
     
     grouped = {
-        'just_now': [],
-        'today': [],
+        'now': [],
+        'earlier_today': [],
         'yesterday': [],
+        'this_week': [],
+        'last_week': [],
         'earlier': []
     }
     
     for notif in notifications:
-        if notif.timestamp >= one_hour_ago:
-            grouped['just_now'].append(notif)
-        elif notif.timestamp >= today_start:
-            grouped['today'].append(notif)
-        elif notif.timestamp >= yesterday_start:
+        # Now: within the last hour
+        if notif.created_at >= now - timedelta(hours=1):
+            grouped['now'].append(notif)
+        # Earlier Today: today but more than 1 hour ago
+        elif notif.created_at >= today_start:
+            grouped['earlier_today'].append(notif)
+        # Yesterday
+        elif notif.created_at >= yesterday_start:
             grouped['yesterday'].append(notif)
+        # This Week: this week but before yesterday
+        elif notif.created_at >= week_start:
+            grouped['this_week'].append(notif)
+        # Last Week: last week
+        elif notif.created_at >= last_week_start:
+            grouped['last_week'].append(notif)
+        # Earlier: everything else
         else:
             grouped['earlier'].append(notif)
     
     return grouped
 
 
-def get_grouped_notifications(user, notification_type=None, is_read=None):
+def get_grouped_notifications(user, notification_type=None, is_read=None, search_query=None):
     """
     Group notifications by type and related object (post/group).
     Returns a list of grouped notification data with avatar information.
     """
-    queryset = user.notifications.select_related('sender', 'post', 'group').all()
+    queryset = NotificationObject.objects.filter(recipient=user)
     
     if notification_type:
         queryset = queryset.filter(notification_type=notification_type)
     
     if is_read is not None:
-        queryset = queryset.filter(is_read=is_read)
+        status = NotificationStatuses.READ.value if is_read else NotificationStatuses.CREATED.value
+        queryset = queryset.filter(status=status)
     
-    # Group by notification_type, post, and group
+    if search_query:
+        queryset = queryset.filter(title__icontains=search_query) | queryset.filter(summary__icontains=search_query)
+    
+    # Group by notification_type and context
     grouped = {}
     
-    for notif in queryset.order_by('-timestamp'):
+    for notif in queryset.order_by('-created_at'):
         # Create a grouping key
-        group_key = (notif.notification_type, notif.post_id, notif.group_id)
+        group_key = (notif.notification_type, notif.context_type, notif.context_id)
         
         if group_key not in grouped:
             grouped[group_key] = {
                 'notification_type': notif.notification_type,
-                'post': notif.post,
-                'group': notif.group,
+                'context_type': notif.context_type,
+                'context_id': notif.context_id,
                 'notifications': [],
-                'senders': [],
-                'sender_avatars': [],
                 'count': 0,
-                'is_read': notif.is_read,
-                'latest_timestamp': notif.timestamp
+                'status': notif.status,
+                'latest_timestamp': notif.created_at
             }
         
         grouped[group_key]['notifications'].append(notif)
         grouped[group_key]['count'] += 1
         
-        # Track unique senders and their avatars
-        if notif.sender.id not in [s.id for s in grouped[group_key]['senders']]:
-            grouped[group_key]['senders'].append(notif.sender)
-            grouped[group_key]['sender_avatars'].append({
-                'username': notif.sender.username,
-                'profile_pic': notif.sender.profile_pic.url if notif.sender.profile_pic else None
-            })
-        
-        if notif.timestamp > grouped[group_key]['latest_timestamp']:
-            grouped[group_key]['latest_timestamp'] = notif.timestamp
-        if not notif.is_read:
+        if notif.created_at > grouped[group_key]['latest_timestamp']:
+            grouped[group_key]['latest_timestamp'] = notif.created_at
+        if notif.status == NotificationStatuses.CREATED.value:
             grouped[group_key]['is_read'] = False
     
     # Convert to list and sort by latest timestamp
@@ -111,19 +129,32 @@ def get_grouped_notifications(user, notification_type=None, is_read=None):
 
 
 def mark_user_notifications_as_read(user):
-    return Notifications.objects.filter(recipient = user, is_read = False).update(is_read = True)
+    return NotificationObject.objects.filter(
+        recipient=user,
+        status=NotificationStatuses.CREATED.value
+    ).update(status=NotificationStatuses.READ.value)
 
 
 def get_unread_count(user):
-    return user.notifications.filter(is_read = False).count()
+    return NotificationObject.objects.filter(
+        recipient=user,
+        status=NotificationStatuses.CREATED.value
+    ).count()
 
 
 def get_notification_for_user(user, notif_id):
-    return Notifications.objects.filter(id = notif_id, recipient = user).first()
+    return NotificationObject.objects.filter(
+        notification_id=notif_id,
+        recipient=user
+    ).first()
 
 
 def get_unread_count_by_type(user, notification_type):
-    return user.notifications.filter(is_read=False, notification_type=notification_type).count()
+    return NotificationObject.objects.filter(
+        recipient=user,
+        status=NotificationStatuses.CREATED.value,
+        notification_type=notification_type
+    ).count()
 
 
 def delete_notification(user, notif_id):
@@ -134,15 +165,23 @@ def delete_notification(user, notif_id):
 
 
 def delete_all_notifications(user):
-    return user.notifications.all().delete()
+    return NotificationObject.objects.filter(recipient=user).delete()
 
 
 def delete_read_notifications(user):
-    return user.notifications.filter(is_read=True).delete()
+    return NotificationObject.objects.filter(
+        recipient=user,
+        status=NotificationStatuses.READ.value
+    ).delete()
 
 
 def get_unread_count_by_group(user, group_id):
-    return user.notifications.filter(is_read=False, group_id=group_id).count()
+    return NotificationObject.objects.filter(
+        recipient=user,
+        status=NotificationStatuses.CREATED.value,
+        context_type='GROUP',
+        context_id=group_id
+    ).count()
 
 
 def get_unread_counts_for_groups(user, group_ids):
@@ -154,54 +193,65 @@ def get_unread_counts_for_groups(user, group_ids):
     if not group_ids:
         return {}
     
-    counts = user.notifications.filter(
-        is_read=False,
-        group_id__in=group_ids
-    ).values('group_id').annotate(
-        count=Count('id')
+    counts = NotificationObject.objects.filter(
+        recipient=user,
+        status=NotificationStatuses.CREATED.value,
+        context_type='GROUP',
+        context_id__in=group_ids
+    ).values('context_id').annotate(
+        count=Count('notification_id')
     )
     
-    return {item['group_id']: item['count'] for item in counts}
+    return {item['context_id']: item['count'] for item in counts}
 
 
-def get_notifications_grouped_by_sender(user, notification_type=None, is_read=None):
+def get_notifications_grouped_by_sender(user, notification_type=None, is_read=None, search_query=None):
     """
     Group notifications by sender (person).
     Returns a list of sender groups with their activities.
     """
-    queryset = user.notifications.select_related('sender', 'post', 'group').all()
+    queryset = NotificationObject.objects.filter(recipient=user)
     
     if notification_type:
         queryset = queryset.filter(notification_type=notification_type)
     
     if is_read is not None:
-        queryset = queryset.filter(is_read=is_read)
+        status = NotificationStatuses.READ.value if is_read else NotificationStatuses.CREATED.value
+        queryset = queryset.filter(status=status)
     
-    # Group by sender
+    if search_query:
+        queryset = queryset.filter(title__icontains=search_query) | queryset.filter(summary__icontains=search_query)
+    
+    # Group by sender (extracted from metadata)
     grouped = {}
     
-    for notif in queryset.order_by('-timestamp'):
-        sender_id = notif.sender.id
+    for notif in queryset.order_by('-created_at'):
+        # Extract actor from metadata
+        actor_id = notif.metadata.get('actor_id') if notif.metadata else None
+        if not actor_id:
+            continue
+        
+        sender_id = actor_id
         
         if sender_id not in grouped:
+            # Extract sender info from metadata
+            actor_username = notif.metadata.get('actor_username') if notif.metadata else 'Unknown'
+            
             grouped[sender_id] = {
-                'sender': notif.sender,
-                'sender_avatar': {
-                    'username': notif.sender.username,
-                    'profile_pic': notif.sender.profile_pic.url if notif.sender.profile_pic else None
-                },
+                'sender_id': sender_id,
+                'sender_username': actor_username,
                 'notifications': [],
                 'unread_count': 0,
                 'total_count': 0,
-                'latest_timestamp': notif.timestamp
+                'latest_timestamp': notif.created_at
             }
         
         grouped[sender_id]['notifications'].append(notif)
         grouped[sender_id]['total_count'] += 1
-        if not notif.is_read:
+        if notif.status == NotificationStatuses.CREATED.value:
             grouped[sender_id]['unread_count'] += 1
-        if notif.timestamp > grouped[sender_id]['latest_timestamp']:
-            grouped[sender_id]['latest_timestamp'] = notif.timestamp
+        if notif.created_at > grouped[sender_id]['latest_timestamp']:
+            grouped[sender_id]['latest_timestamp'] = notif.created_at
     
     # Convert to list and sort by latest timestamp
     grouped_list = list(grouped.values())
@@ -210,71 +260,69 @@ def get_notifications_grouped_by_sender(user, notification_type=None, is_read=No
     return grouped_list
 
 
-def get_notifications_hybrid_grouped(user, notification_type=None, is_read=None):
+def get_notifications_hybrid_grouped(user, notification_type=None, is_read=None, search_query=None):
     """
     Hybrid grouping: Group by activity type/object, but if a single sender has multiple
     activities in that group, display as sender-grouped. Otherwise show activity-grouped
     with overlapping avatars.
     """
-    queryset = user.notifications.select_related('sender', 'post', 'group').all()
+    queryset = NotificationObject.objects.filter(recipient=user)
     
     if notification_type:
         queryset = queryset.filter(notification_type=notification_type)
     
     if is_read is not None:
-        queryset = queryset.filter(is_read=is_read)
+        status = NotificationStatuses.READ.value if is_read else NotificationStatuses.CREATED.value
+        queryset = queryset.filter(status=status)
     
-    # First group by activity (type + post + group)
+    if search_query:
+        queryset = queryset.filter(title__icontains=search_query) | queryset.filter(summary__icontains=search_query)
+    
+    # First group by activity (type + context)
     activity_groups = {}
     
-    for notif in queryset.order_by('-timestamp'):
-        group_key = (notif.notification_type, notif.post_id, notif.group_id)
+    for notif in queryset.order_by('-created_at'):
+        group_key = (notif.notification_type, notif.context_type, notif.context_id)
         
         if group_key not in activity_groups:
             activity_groups[group_key] = {
                 'notification_type': notif.notification_type,
-                'post': notif.post,
-                'group': notif.group,
+                'context_type': notif.context_type,
+                'context_id': notif.context_id,
                 'notifications': [],
-                'senders': [],
-                'sender_avatars': [],
+                'actors': [],  # Changed from senders to actors
                 'count': 0,
-                'is_read': notif.is_read,
-                'latest_timestamp': notif.timestamp
+                'is_read': notif.status == NotificationStatuses.READ.value,
+                'latest_timestamp': notif.created_at
             }
         
         activity_groups[group_key]['notifications'].append(notif)
         activity_groups[group_key]['count'] += 1
         
-        # Track unique senders
-        if notif.sender.id not in [s.id for s in activity_groups[group_key]['senders']]:
-            activity_groups[group_key]['senders'].append(notif.sender)
-            activity_groups[group_key]['sender_avatars'].append({
-                'username': notif.sender.username,
-                'profile_pic': notif.sender.profile_pic.url if notif.sender.profile_pic else None
-            })
+        # Track unique actors (from metadata)
+        actor_id = notif.metadata.get('actor_id') if notif.metadata else None
+        if actor_id and actor_id not in activity_groups[group_key]['actors']:
+            activity_groups[group_key]['actors'].append(actor_id)
         
-        if notif.timestamp > activity_groups[group_key]['latest_timestamp']:
-            activity_groups[group_key]['latest_timestamp'] = notif.timestamp
-        if not notif.is_read:
+        if notif.created_at > activity_groups[group_key]['latest_timestamp']:
+            activity_groups[group_key]['latest_timestamp'] = notif.created_at
+        if notif.status == NotificationStatuses.CREATED.value:
             activity_groups[group_key]['is_read'] = False
     
     # Convert to list and determine display mode for each group
     result = []
     for group in activity_groups.values():
-        # If only 1 sender with multiple notifications, convert to sender-grouped format
-        if len(group['senders']) == 1 and group['count'] > 1:
-            sender = group['senders'][0]
-            sender_group = {
-                'sender': sender,
-                'sender_avatar': group['sender_avatars'][0],
+        # If only 1 actor with multiple notifications, convert to actor-grouped format
+        if len(group['actors']) == 1 and group['count'] > 1:
+            actor_group = {
+                'actor_id': group['actors'][0],
                 'notifications': group['notifications'],
-                'unread_count': sum(1 for n in group['notifications'] if not n.is_read),
+                'unread_count': sum(1 for n in group['notifications'] if n.status == NotificationStatuses.CREATED.value),
                 'total_count': group['count'],
                 'latest_timestamp': group['latest_timestamp'],
-                'display_mode': 'sender_grouped'
+                'display_mode': 'actor_grouped'
             }
-            result.append(sender_group)
+            result.append(actor_group)
         else:
             # Use activity-grouped format
             group['display_mode'] = 'activity_grouped'

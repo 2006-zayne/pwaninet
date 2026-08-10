@@ -24,6 +24,17 @@ class DocumentViewer {
         this.touchEndX = 0;
         this.touchEndY = 0;
         this.minSwipeDistance = 50;
+        
+        // Pinch-to-zoom support
+        this.initialPinchDistance = 0;
+        this.currentScale = 1.0;
+        this.isPinching = false;
+        this.pinchCenterX = 0;
+        this.pinchCenterY = 0;
+        this.translateX = 0;
+        this.translateY = 0;
+        this.lastTranslateX = 0;
+        this.lastTranslateY = 0;
     }
 
     async initialize() {
@@ -93,10 +104,12 @@ class DocumentViewer {
             border: 1px solid var(--border);
             border-bottom: none;
             border-radius: 12px 12px 0 0;
+            flex-wrap: wrap;
+            gap: 8px;
         `;
 
         const leftControls = document.createElement('div');
-        leftControls.style.cssText = 'display: flex; align-items: center; gap: 12px;';
+        leftControls.style.cssText = 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;';
 
         // Add page navigation only if viewer supports it
         if (this.viewer.needsPageNavigation()) {
@@ -114,6 +127,7 @@ class DocumentViewer {
                 gap: 8px;
                 font-size: 0.9rem;
                 color: var(--text-secondary);
+                white-space: nowrap;
             `;
             pageIndicator.innerHTML = `
                 <span id="viewer-current-page">${this.currentPage}</span>
@@ -131,13 +145,14 @@ class DocumentViewer {
                 font-size: 0.9rem;
                 color: var(--text-secondary);
                 font-weight: 500;
+                white-space: nowrap;
             `;
             docTypeIndicator.textContent = this.fileType.toUpperCase() + ' Document';
             leftControls.appendChild(docTypeIndicator);
         }
 
         const rightControls = document.createElement('div');
-        rightControls.style.cssText = 'display: flex; align-items: center; gap: 12px;';
+        rightControls.style.cssText = 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;';
 
         // Add zoom controls only if viewer supports them
         if (this.viewer.needsZoom()) {
@@ -152,6 +167,7 @@ class DocumentViewer {
                 font-weight: 500;
                 min-width: 50px;
                 text-align: center;
+                white-space: nowrap;
             `;
             zoomIndicator.textContent = '100%';
             
@@ -294,6 +310,13 @@ class DocumentViewer {
         const viewerContainer = this.container.querySelector('.pdf-viewer-container, .docx-viewer-container, .text-viewer-container, .image-viewer-container, .pptx-viewer-container, .unsupported-viewer-container');
         if (viewerContainer) {
             viewerContainer.style.height = 'calc(100vh - 60px)';
+            
+            // Remove width constraints in fullscreen mode
+            const content = viewerContainer.querySelector('img, canvas, .pdf-viewer-container > div, .docx-viewer-container > div, .text-viewer-container > div');
+            if (content) {
+                content.style.maxWidth = 'none';
+                content.style.maxHeight = 'none';
+            }
         }
         
         // Update fullscreen button icon
@@ -338,6 +361,20 @@ class DocumentViewer {
         const viewerContainer = this.container.querySelector('.pdf-viewer-container, .docx-viewer-container, .text-viewer-container, .image-viewer-container, .pptx-viewer-container, .unsupported-viewer-container');
         if (viewerContainer) {
             viewerContainer.style.height = '600px';
+            
+            // Restore width constraints when exiting fullscreen
+            const content = viewerContainer.querySelector('img, canvas, .pdf-viewer-container > div, .docx-viewer-container > div, .text-viewer-container > div');
+            if (content) {
+                if (content.tagName === 'IMG') {
+                    content.style.maxWidth = '100%';
+                    content.style.maxHeight = '100%';
+                } else if (content.tagName === 'CANVAS') {
+                    content.style.maxWidth = '100%';
+                    content.style.maxHeight = '100%';
+                } else {
+                    content.style.maxWidth = '800px';
+                }
+            }
         }
         
         // Update fullscreen button icon
@@ -356,16 +393,87 @@ class DocumentViewer {
     addTouchGestures() {
         // Touch start
         this.container.addEventListener('touchstart', (e) => {
-            this.touchStartX = e.changedTouches[0].screenX;
-            this.touchStartY = e.changedTouches[0].screenY;
+            if (e.touches.length === 2) {
+                // Pinch start
+                this.isPinching = true;
+                this.initialPinchDistance = this.getPinchDistance(e.touches);
+                this.pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                this.pinchCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                this.lastTranslateX = this.translateX;
+                this.lastTranslateY = this.translateY;
+            } else if (e.touches.length === 1) {
+                // Single touch - for swipe and pan
+                this.touchStartX = e.changedTouches[0].screenX;
+                this.touchStartY = e.changedTouches[0].screenY;
+            }
         }, { passive: true });
+
+        // Touch move
+        this.container.addEventListener('touchmove', (e) => {
+            if (this.isPinching && e.touches.length === 2) {
+                // Pinch zoom
+                e.preventDefault();
+                const currentDistance = this.getPinchDistance(e.touches);
+                const scale = currentDistance / this.initialPinchDistance;
+                this.currentScale = Math.min(Math.max(scale, 0.5), 3.0);
+                this.applyTransform();
+            } else if (e.touches.length === 1 && this.currentScale > 1) {
+                // Pan when zoomed
+                e.preventDefault();
+                const touch = e.touches[0];
+                const deltaX = touch.clientX - this.touchStartX;
+                const deltaY = touch.clientY - this.touchStartY;
+                this.translateX = this.lastTranslateX + deltaX;
+                this.translateY = this.lastTranslateY + deltaY;
+                this.applyTransform();
+            }
+        }, { passive: false });
 
         // Touch end
         this.container.addEventListener('touchend', (e) => {
-            this.touchEndX = e.changedTouches[0].screenX;
-            this.touchEndY = e.changedTouches[0].screenY;
-            this.handleSwipe();
+            if (e.touches.length === 0) {
+                if (this.isPinching) {
+                    this.isPinching = false;
+                    this.lastTranslateX = this.translateX;
+                    this.lastTranslateY = this.translateY;
+                } else {
+                    // Handle swipe
+                    this.touchEndX = e.changedTouches[0].screenX;
+                    this.touchEndY = e.changedTouches[0].screenY;
+                    this.handleSwipe();
+                }
+            }
         }, { passive: true });
+    }
+
+    getPinchDistance(touches) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    applyTransform() {
+        const viewerContainer = this.container.querySelector('.image-viewer-container, .pdf-viewer-container, .docx-viewer-container, .text-viewer-container');
+        if (viewerContainer) {
+            const content = viewerContainer.querySelector('img, canvas, .pdf-viewer-container > div, .docx-viewer-container > div, .text-viewer-container > div');
+            if (content) {
+                content.style.transform = `translate(${this.translateX}px, ${this.translateY}px) scale(${this.currentScale})`;
+                content.style.transformOrigin = 'center center';
+                content.style.transition = this.isPinching ? 'none' : 'transform 0.3s ease';
+                
+                // Remove max-width constraint when zoomed to allow proper scaling
+                if (this.currentScale > 1) {
+                    content.style.maxWidth = 'none';
+                    content.style.maxHeight = 'none';
+                } else {
+                    // Restore original constraints when zoomed out
+                    if (content.tagName === 'IMG') {
+                        content.style.maxWidth = '100%';
+                        content.style.maxHeight = '100%';
+                    }
+                }
+            }
+        }
     }
 
     handleSwipe() {
@@ -533,13 +641,13 @@ class PDFViewer {
 
     createCanvas() {
         this.canvas = document.createElement('canvas');
-        this.canvas.style.cssText = 'width: 100%; height: auto; display: block;';
+        this.canvas.style.cssText = 'width: 100%; height: auto; display: block; max-width: 100%;';
         
         const viewerContainer = document.createElement('div');
         viewerContainer.className = 'pdf-viewer-container';
         viewerContainer.style.cssText = `
             height: 600px;
-            overflow: auto;
+            overflow: hidden;
             background: #525659;
             display: flex;
             justify-content: center;
@@ -547,7 +655,7 @@ class PDFViewer {
         `;
         
         const pageWrapper = document.createElement('div');
-        pageWrapper.style.cssText = 'box-shadow: 0 2px 8px rgba(0,0,0,0.3);';
+        pageWrapper.style.cssText = 'box-shadow: 0 2px 8px rgba(0,0,0,0.3); max-width: 100%; overflow: hidden;';
         pageWrapper.appendChild(this.canvas);
         
         viewerContainer.appendChild(pageWrapper);
@@ -601,12 +709,32 @@ class PDFViewer {
         this.scale = Math.min(this.scale + 0.25, 3.0);
         await this.renderPage(this.currentPage);
         this.updateZoomIndicator();
+        
+        // Remove max-width constraint when zoomed
+        const canvas = this.container.querySelector('canvas');
+        if (canvas && this.scale > 1) {
+            canvas.style.maxWidth = 'none';
+            canvas.style.maxHeight = 'none';
+        } else if (canvas) {
+            canvas.style.maxWidth = '100%';
+            canvas.style.maxHeight = '100%';
+        }
     }
 
     async zoomOut() {
         this.scale = Math.max(this.scale - 0.25, 0.5);
         await this.renderPage(this.currentPage);
         this.updateZoomIndicator();
+        
+        // Remove max-width constraint when zoomed
+        const canvas = this.container.querySelector('canvas');
+        if (canvas && this.scale > 1) {
+            canvas.style.maxWidth = 'none';
+            canvas.style.maxHeight = 'none';
+        } else if (canvas) {
+            canvas.style.maxWidth = '100%';
+            canvas.style.maxHeight = '100%';
+        }
     }
 
     updateZoomIndicator() {
@@ -660,14 +788,14 @@ class DOCXViewer {
         viewerContainer.className = 'docx-viewer-container';
         viewerContainer.style.cssText = `
             height: 600px;
-            overflow: auto;
+            overflow: hidden;
             background: white;
             padding: 40px;
             border-radius: 0 0 12px 12px;
         `;
         
         viewerContainer.innerHTML = `
-            <div style="max-width: 800px; margin: 0 auto; font-family: 'Times New Roman', serif; line-height: 1.6;">
+            <div style="max-width: 800px; margin: 0 auto; font-family: 'Times New Roman', serif; line-height: 1.6; overflow: hidden;">
                 ${html}
             </div>
         `;
@@ -692,7 +820,7 @@ class DOCXViewer {
     }
 
     needsZoom() {
-        return false;
+        return true;
     }
 
     needsScroll() {
@@ -713,8 +841,41 @@ class DOCXViewer {
         }
     }
 
-    zoomIn() {}
-    zoomOut() {}
+    async zoomIn() {
+        const viewer = this.container.querySelector('.docx-viewer-container > div');
+        if (viewer) {
+            const currentTransform = viewer.style.transform || '';
+            const scaleMatch = currentTransform.match(/scale\(([\d.]+)\)/);
+            let currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1.0;
+            currentScale = Math.min(currentScale + 0.25, 3.0);
+            viewer.style.transform = `scale(${currentScale})`;
+            
+            // Remove max-width constraint when zoomed
+            if (currentScale > 1) {
+                viewer.style.maxWidth = 'none';
+            } else {
+                viewer.style.maxWidth = '800px';
+            }
+        }
+    }
+    
+    async zoomOut() {
+        const viewer = this.container.querySelector('.docx-viewer-container > div');
+        if (viewer) {
+            const currentTransform = viewer.style.transform || '';
+            const scaleMatch = currentTransform.match(/scale\(([\d.]+)\)/);
+            let currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1.0;
+            currentScale = Math.max(currentScale - 0.25, 0.5);
+            viewer.style.transform = `scale(${currentScale})`;
+            
+            // Remove max-width constraint when zoomed
+            if (currentScale > 1) {
+                viewer.style.maxWidth = 'none';
+            } else {
+                viewer.style.maxWidth = '800px';
+            }
+        }
+    }
 
     destroy() {}
 }
@@ -811,14 +972,14 @@ class TextViewer {
         viewerContainer.className = 'text-viewer-container';
         viewerContainer.style.cssText = `
             height: 600px;
-            overflow: auto;
+            overflow: hidden;
             background: white;
             padding: 40px;
             border-radius: 0 0 12px 12px;
         `;
         
         viewerContainer.innerHTML = `
-            <div style="max-width: 800px; margin: 0 auto; font-family: 'Courier New', monospace; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word;">
+            <div style="max-width: 800px; margin: 0 auto; font-family: 'Courier New', monospace; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; overflow: hidden;">
                 ${this.isMarkdown ? content : this.escapeHtml(content)}
             </div>
         `;
@@ -844,7 +1005,7 @@ class TextViewer {
     }
 
     needsZoom() {
-        return false;
+        return true;
     }
 
     needsScroll() {
@@ -865,8 +1026,42 @@ class TextViewer {
         }
     }
 
-    zoomIn() {}
-    zoomOut() {}
+    async zoomIn() {
+        const viewer = this.container.querySelector('.text-viewer-container > div');
+        if (viewer) {
+            const currentTransform = viewer.style.transform || '';
+            const scaleMatch = currentTransform.match(/scale\(([\d.]+)\)/);
+            let currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1.0;
+            currentScale = Math.min(currentScale + 0.25, 3.0);
+            viewer.style.transform = `scale(${currentScale})`;
+            
+            // Remove max-width constraint when zoomed
+            if (currentScale > 1) {
+                viewer.style.maxWidth = 'none';
+            } else {
+                viewer.style.maxWidth = '800px';
+            }
+        }
+    }
+    
+    async zoomOut() {
+        const viewer = this.container.querySelector('.text-viewer-container > div');
+        if (viewer) {
+            const currentTransform = viewer.style.transform || '';
+            const scaleMatch = currentTransform.match(/scale\(([\d.]+)\)/);
+            let currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1.0;
+            currentScale = Math.max(currentScale - 0.25, 0.5);
+            viewer.style.transform = `scale(${currentScale})`;
+            
+            // Remove max-width constraint when zoomed
+            if (currentScale > 1) {
+                viewer.style.maxWidth = 'none';
+            } else {
+                viewer.style.maxWidth = '800px';
+            }
+        }
+    }
+    
     destroy() {}
 }
 
@@ -889,18 +1084,19 @@ class ImageViewer {
         viewerContainer.className = 'image-viewer-container';
         viewerContainer.style.cssText = `
             height: 600px;
-            overflow: auto;
+            overflow: hidden;
             background: #f5f5f5;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
             border-radius: 0 0 12px 12px;
+            position: relative;
         `;
         
         const img = document.createElement('img');
         img.src = this.fileUrl;
-        img.style.cssText = 'max-width: 100%; max-height: 100%; object-fit: contain;';
+        img.style.cssText = 'max-width: 100%; max-height: 100%; object-fit: contain; display: block;';
         img.alt = 'Document preview';
         
         viewerContainer.appendChild(img);
@@ -919,7 +1115,7 @@ class ImageViewer {
     }
 
     needsZoom() {
-        return false;
+        return true;
     }
 
     needsScroll() {
@@ -928,8 +1124,47 @@ class ImageViewer {
 
     scrollUp() {}
     scrollDown() {}
-    zoomIn() {}
-    zoomOut() {}
+    
+    async zoomIn() {
+        const viewer = this.container.querySelector('.image-viewer-container img');
+        if (viewer) {
+            const currentTransform = viewer.style.transform || '';
+            const scaleMatch = currentTransform.match(/scale\(([\d.]+)\)/);
+            let currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1.0;
+            currentScale = Math.min(currentScale + 0.25, 3.0);
+            viewer.style.transform = `scale(${currentScale})`;
+            
+            // Remove max-width constraint when zoomed
+            if (currentScale > 1) {
+                viewer.style.maxWidth = 'none';
+                viewer.style.maxHeight = 'none';
+            } else {
+                viewer.style.maxWidth = '100%';
+                viewer.style.maxHeight = '100%';
+            }
+        }
+    }
+    
+    async zoomOut() {
+        const viewer = this.container.querySelector('.image-viewer-container img');
+        if (viewer) {
+            const currentTransform = viewer.style.transform || '';
+            const scaleMatch = currentTransform.match(/scale\(([\d.]+)\)/);
+            let currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1.0;
+            currentScale = Math.max(currentScale - 0.25, 0.5);
+            viewer.style.transform = `scale(${currentScale})`;
+            
+            // Remove max-width constraint when zoomed
+            if (currentScale > 1) {
+                viewer.style.maxWidth = 'none';
+                viewer.style.maxHeight = 'none';
+            } else {
+                viewer.style.maxWidth = '100%';
+                viewer.style.maxHeight = '100%';
+            }
+        }
+    }
+    
     destroy() {}
 }
 

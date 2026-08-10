@@ -136,17 +136,17 @@
 
 /* Premium Gradients */
 .bg-cosmic-stars { background-color: #0f172a; background-image: radial-gradient(2px 2px at 15% 30%, #ffffff 50%, rgba(255,255,255,0) 100%), radial-gradient(2.5px 2.5px at 85% 20%, #ffffff 50%, rgba(255,255,255,0) 100%), radial-gradient(1.5px 1.5px at 50% 60%, #ffffff 50%, rgba(255,255,255,0) 100%), radial-gradient(2px 2px at 70% 80%, #ffffff 50%, rgba(255,255,255,0) 100%), radial-gradient(3px 3px at 25% 75%, #ffffff 50%, rgba(255,255,255,0) 100%), linear-gradient(135deg, #13072E 0%, #3F2182 45%, #902F89 100%); background-repeat: repeat; background-size: 200px 200px, 200px 200px, 200px 200px, 200px 200px, 200px 200px, 100% 100%; }
-.bg-spring-flora { background-color: #ff9a9e; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg fill='%23ffffff' fill-opacity='0.18'%3E%3Cpath d='M32 16c-4-10-14-10-14 0s14 18 14 18 14-8 14-18-10-10-14 0z'/%3E%3Cpath d='M32 48c-4 10-14 10-14 0s14-18 14-18 14 8 14 18-10 10-14 0z'/%3E%3Cpath d='M16 32c-10-4-10-14 0-14s18 14 18 14-8 14-18 14-10-10 0-14z'/%3E%3Cpath d='M48 32c10-4 10-14 0-14s-18 14-18 14 8 14 18 14 10-10 0-14z'/%3E%3Ccircle cx='32' cy='32' r='6'/%3E%3C/g%3E%3C/svg%3E"), linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); }
+.bg-spring-flora { background-color: #ff9a9e; background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2264%22 height=%2264%22 viewBox=%220 0 64 64%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.18%22%3E%3Cpath d=%22M32 16c-4-10-14-10-14 0s14 18 14 18 14-8 14-18-10-10-14 0z%22/%3E%3Cpath d=%22M32 48c-4 10-14 10-14 0s14-18 14-18 14 8 14 18-10 10-14 0z%22/%3E%3Cpath d=%22M16 32c-10-4-10-14 0-14s18 14 18 14-8 14-18 14-10-10 0-14z%22/%3E%3Cpath d=%22M48 32c10-4 10-14 0-14s-18 14-18 14 8 14 18 14 10-10 0-14z%22/%3E%3Ccircle cx=%2232%22 cy=%2232%22 r=%226%22/%3E%3C/g%3E%3C/svg%3E'), linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); }
 .bg-spring-flora, .bg-spring-flora p, .bg-spring-flora p.text-white { color: #333333 !important; }
-.bg-playful-doodles { background-color: #84fab0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' fill='none' stroke-opacity='0.3'%3E%3Cpath d='M10 10 Q 20 0, 30 10 T 50 10'/%3E%3Ccircle cx='70' cy='20' r='3' fill='%23ffffff' fill-opacity='0.3' stroke='none'/%3E%3Cpath d='M 15 55 L 25 45 M 25 55 L 15 45'/%3E%3Cpath d='M40 70 Q 50 80, 60 70 T 80 70'/%3E%3Ccircle cx='10' cy='70' r='4' fill='%23ffffff' fill-opacity='0.3' stroke='none'/%3E%3Cpath d='M 70 50 L 70 60 M 65 55 L 75 55'/%3E%3C/g%3E%3C/svg%3E"), linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%); }
+.bg-playful-doodles { background-color: #84fab0; background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22 viewBox=%220 0 80 80%22%3E%3Cg stroke=%22%23ffffff%22 stroke-width=%222.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 fill=%22none%22 stroke-opacity=%220.3%22%3E%3Cpath d=%22M10 10 Q 20 0, 30 10 T 50 10%22/%3E%3Ccircle cx=%2270%22 cy=%2220%22 r=%223%22 fill=%22%23ffffff%22 fill-opacity=%220.3%22 stroke=%22none%22/%3E%3Cpath d=%22M 15 55 L 25 45 M 25 55 L 15 45%22/%3E%3Cpath d=%22M40 70 Q 50 80, 60 70 T 80 70%22/%3E%3Ccircle cx=%2210%22 cy=%2270%22 r=%224%22 fill=%22%23ffffff%22 fill-opacity=%220.3%22 stroke=%22none%22/%3E%3Cpath d=%22M 70 50 L 70 60 M 65 55 L 75 55%22/%3E%3C/g%3E%3C/svg%3E'), linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%); }
 .bg-playful-doodles, .bg-playful-doodles p, .bg-playful-doodles p.text-white { color: #1a4a5e !important; }
-.bg-magic-sparkles { background-color: #ff758c; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50' viewBox='0 0 50 50'%3E%3Cg fill='%23ffffff' fill-opacity='0.25'%3E%3Cpath d='M25 5 Q 25 25, 45 25 Q 25 25, 25 45 Q 25 25, 5 25 Q 25 25, 25 5 Z'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3Ccircle cx='40' cy='40' r='2.5'/%3E%3C/g%3E%3C/svg%3E"), linear-gradient(to right, #ff758c 0%, #ff7eb3 100%); }
+.bg-magic-sparkles { background-color: #ff758c; background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22 viewBox=%220 0 50 50%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.25%22%3E%3Cpath d=%22M25 5 Q 25 25, 45 25 Q 25 25, 25 45 Q 25 25, 5 25 Q 25 25, 25 5 Z%22/%3E%3Ccircle cx=%2210%22 cy=%2210%22 r=%222%22/%3E%3Ccircle cx=%2240%22 cy=%2240%22 r=%222.5%22/%3E%3C/g%3E%3C/svg%3E'), linear-gradient(to right, #ff758c 0%, #ff7eb3 100%); }
 
 /* Username Pattern - Custom gradient with SVG text pattern */
 .bg-username-pattern {
   /* Default fallback - will be overridden by inline styles */
   background-color: #141E30;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cg fill='rgba(255,255,255,0.06)' font-family='system-ui, sans-serif' font-weight='900' letter-spacing='2'%3E%3Ctext x='20' y='50' transform='rotate(-15 20 50)' font-size='32'%3EUSERNAME%3C/text%3E%3Ctext x='160' y='90' transform='rotate(25 160 90)' font-size='24'%3EUSERNAME%3C/text%3E%3Ctext x='50' y='200' transform='rotate(45 50 200)' font-size='40'%3EUSERNAME%3C/text%3E%3Ctext x='220' y='240' transform='rotate(-25 220 240)' font-size='28'%3EUSERNAME%3C/text%3E%3Ctext x='120' y='280' transform='rotate(10 120 280)' font-size='20'%3EUSERNAME%3C/text%3E%3Ctext x='260' y='50' transform='rotate(-50 260 50)' font-size='26'%3EUSERNAME%3C/text%3E%3C/g%3E%3C/svg%3E"), linear-gradient(135deg, #141E30 0%, #243B55 100%);
+  background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22300%22 height=%22300%22%3E%3Cg fill=%22rgba(255,255,255,0.06)%22 font-family=%22system-ui, sans-serif%22 font-weight=%22900%22 letter-spacing=%222%22%3E%3Ctext x=%2220%22 y=%2250%22 transform=%22rotate(-15 20 50)%22 font-size=%2232%22%3EUSERNAME%3C/text%3E%3Ctext x=%22160%22 y=%2290%22 transform=%22rotate(25 160 90)%22 font-size=%2224%22%3EUSERNAME%3C/text%3E%3Ctext x=%2250%22 y=%22200%22 transform=%22rotate(45 50 200)%22 font-size=%2240%22%3EUSERNAME%3C/text%3E%3Ctext x=%22220%22 y=%22240%22 transform=%22rotate(-25 220 240)%22 font-size=%2228%22%3EUSERNAME%3C/text%3E%3Ctext x=%22120%22 y=%22280%22 transform=%22rotate(10 120 280)%22 font-size=%2220%22%3EUSERNAME%3C/text%3E%3Ctext x=%22260%22 y=%2250%22 transform=%22rotate(-50 260 50)%22 font-size=%2226%22%3EUSERNAME%3C/text%3E%3C/g%3E%3C/svg%3E'), linear-gradient(135deg, #141E30 0%, #243B55 100%);
   background-repeat: repeat;
 }
 
@@ -174,7 +174,7 @@
 
 .bg-hexagon-mesh {
   background-color: #1e3a5f;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49'%3E%3Cg fill-rule='evenodd'%3E%3Cg id='hexagons' fill='%23ffffff' fill-opacity='0.05' fill-rule='nonzero'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"),
+  background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2228%22 height=%2249%22%3E%3Cg fill-rule=%22evenodd%22%3E%3Cg id=%22hexagons%22 fill=%22%23ffffff%22 fill-opacity=%220.05%22 fill-rule=%22nonzero%22%3E%3Cpath d=%22M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E'),
   linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
 }
 
@@ -189,7 +189,7 @@
 
 .bg-matrix-rain {
   background-color: #000000;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Cg fill='%2300ff00' fill-opacity='0.1'%3E%3Crect x='0' y='0' width='1' height='1'/%3E%3Crect x='5' y='3' width='1' height='1'/%3E%3Crect x='10' y='6' width='1' height='1'/%3E%3Crect x='15' y='2' width='1' height='1'/%3E%3Crect x='2' y='10' width='1' height='1'/%3E%3Crect x='7' y='13' width='1' height='1'/%3E%3Crect x='12' y='16' width='1' height='1'/%3E%3Crect x='17' y='11' width='1' height='1'/%3E%3C/g%3E%3C/svg%3E"),
+  background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22%3E%3Cg fill=%22%2300ff00%22 fill-opacity=%220.1%22%3E%3Crect x=%220%22 y=%220%22 width=%221%22 height=%221%22/%3E%3Crect x=%225%22 y=%223%22 width=%221%22 height=%221%22/%3E%3Crect x=%2210%22 y=%226%22 width=%221%22 height=%221%22/%3E%3Crect x=%2215%22 y=%222%22 width=%221%22 height=%221%22/%3E%3Crect x=%222%22 y=%2210%22 width=%221%22 height=%221%22/%3E%3Crect x=%227%22 y=%2213%22 width=%221%22 height=%221%22/%3E%3Crect x=%2212%22 y=%2216%22 width=%221%22 height=%221%22/%3E%3Crect x=%2217%22 y=%2211%22 width=%221%22 height=%221%22/%3E%3C/g%3E%3C/svg%3E'),
   linear-gradient(180deg, #000000 0%, #001a00 100%);
   background-repeat: repeat;
 }
@@ -197,16 +197,17 @@
 /* Signature Overlay System */
 .signature-overlay {
     position: relative;
-    z-index: 1;
+    overflow: hidden;
 }
-.signature-overlay::before {
-    content: '';
+
+.post-pattern-svg {
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
-    z-index: -1;
-    background-image: var(--signature-svg);
-    background-repeat: repeat;
+    z-index: 0;
 }
 
 /* ================================
@@ -219,4 +220,13 @@
     align-items: center;
     justify-content: center;
     padding: 2.5rem;
+}
+
+/* Username Pattern Overlay System */
+.bg-username-pattern {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--gradient-color1, #141E30) 0%, var(--gradient-color2, #243B55) 100%);
+    background-color: var(--gradient-color1, #141E30);
+    color: var(--text-color, #ffffff);
 }

@@ -1,13 +1,15 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.core.paginator import Paginator
+from django.views.decorators.http import require_http_methods
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
-from notifications.models import Notifications, PushSubscription
+from notifications.models import PushSubscription, NotificationObject
+from notifications.notifications.registry import NotificationStatuses
 from notifications.services.notification_service import (
     build_notifications_context,
     build_unread_notification_html,
@@ -18,6 +20,7 @@ from notifications.services.notification_service import (
     delete_all_user_notifications,
     delete_user_read_notifications
 )
+from notifications.services.preference_service import NotificationPreferenceService
 from .serializers import (
     NotificationSerializer,
     NotificationUpdateSerializer,
@@ -27,6 +30,28 @@ from .serializers import (
 )
 from .filters import NotificationFilter
 from .services.subscription_service import SubscriptionService
+from .rendering import render_notification
+
+
+@login_required
+def expand_notification(request, notif_id):
+    """Get expanded actor list for aggregated notification."""
+    try:
+        notification = NotificationObject.objects.get(
+            notification_id=notif_id,
+            recipient=request.user
+        )
+        from notifications.rendering.adapters import get_payload_adapter
+        
+        adapter = get_payload_adapter(notification)
+        payload = adapter.to_standard_payload(notification)
+        
+        # Render the expanded actors list
+        return render(request, 'notifications/partials/expanded_actors.html', {
+            'payload': payload
+        })
+    except NotificationObject.DoesNotExist:
+        return HttpResponse('')
 
 
 @login_required
@@ -37,7 +62,8 @@ def notifications_list(request):
     grouped_param = request.GET.get('grouped', 'false')
     time_filter = request.GET.get('time', 'all')
     sender_grouped_param = request.GET.get('sender_grouped', 'false')
-    hybrid_grouped_param = request.GET.get('hybrid_grouped', 'true')
+    hybrid_grouped_param = request.GET.get('hybrid_grouped', 'false')
+    search_query = request.GET.get('search', '')
     
     is_read = None
     if is_read_param == 'true':
@@ -55,7 +81,8 @@ def notifications_list(request):
         time_grouped = get_notifications_by_time_periods(
             request.user,
             notification_type=notification_type,
-            is_read=is_read
+            is_read=is_read,
+            search_query=search_query
         )
         context = {
             'time_grouped': time_grouped,
@@ -68,14 +95,16 @@ def notifications_list(request):
             'current_sender_grouped': sender_grouped_param,
             'current_hybrid_grouped': hybrid_grouped_param,
             'has_pagination': False,
-            'unread_notifications_count': get_cached_unread_count(request.user)
+            'unread_notifications_count': get_cached_unread_count(request.user),
+            'search_query': search_query
         }
     elif sender_grouped:
         from notifications.queries.notification_queries import get_notifications_grouped_by_sender
         notifications = get_notifications_grouped_by_sender(
             request.user,
             notification_type=notification_type,
-            is_read=is_read
+            is_read=is_read,
+            search_query=search_query
         )
         context = {
             'notifications': notifications,
@@ -88,14 +117,16 @@ def notifications_list(request):
             'current_hybrid_grouped': hybrid_grouped_param,
             'has_pagination': False,
             'unread_notifications_count': get_cached_unread_count(request.user),
-            'time_filter': 'all'
+            'time_filter': 'all',
+            'search_query': search_query
         }
     elif grouped:
         from notifications.queries.notification_queries import get_grouped_notifications
         notifications = get_grouped_notifications(
             request.user,
             notification_type=notification_type,
-            is_read=is_read
+            is_read=is_read,
+            search_query=search_query
         )
         context = {
             'notifications': notifications,
@@ -108,14 +139,16 @@ def notifications_list(request):
             'current_hybrid_grouped': hybrid_grouped_param,
             'has_pagination': False,
             'unread_notifications_count': get_cached_unread_count(request.user),
-            'time_filter': 'all'
+            'time_filter': 'all',
+            'search_query': search_query
         }
     elif hybrid_grouped:
         from notifications.queries.notification_queries import get_notifications_hybrid_grouped
         notifications = get_notifications_hybrid_grouped(
             request.user,
             notification_type=notification_type,
-            is_read=is_read
+            is_read=is_read,
+            search_query=search_query
         )
         context = {
             'notifications': notifications,
@@ -128,7 +161,8 @@ def notifications_list(request):
             'current_hybrid_grouped': hybrid_grouped_param,
             'has_pagination': False,
             'unread_notifications_count': get_cached_unread_count(request.user),
-            'time_filter': 'all'
+            'time_filter': 'all',
+            'search_query': search_query
         }
     else:
         context = build_notifications_context(
@@ -166,14 +200,44 @@ def unread_notification_count(request):
 
 
 @login_required
+def resource_preview(request, notif_id):
+    """Get resource preview for a notification."""
+    try:
+        notification = NotificationObject.objects.get(
+            notification_id=notif_id,
+            recipient=request.user
+        )
+        from notifications.rendering.adapters import get_payload_adapter
+        
+        adapter = get_payload_adapter(notification)
+        payload = adapter.to_standard_payload(notification)
+        
+        # Generate preview HTML based on resource type
+        if payload.get('resource'):
+            resource = payload['resource']
+            context = {
+                'resource': resource,
+                'notification': notification
+            }
+            return render(request, 'notifications/partials/resource_preview.html', context)
+        else:
+            return HttpResponse('')
+    except NotificationObject.DoesNotExist:
+        return HttpResponse('')
+
+
+@login_required
 def mark_notification_as_read(request, notif_id):
-    mark_single_notification_as_read(request.user, notif_id)
-    
-    # Get the specific notification that was marked
-    notification = get_notification_for_user(request.user, notif_id)
-    if notification:
-        notification.is_read = True
+    try:
+        notification = NotificationObject.objects.get(
+            notification_id=notif_id,
+            recipient=request.user
+        )
+        notification.status = NotificationStatuses.READ.value
         notification.save()
+        invalidate_unread_count_cache(request.user.id)
+    except NotificationObject.DoesNotExist:
+        pass
     
     # Return updated notification item
     context = {
@@ -188,7 +252,10 @@ def mark_notification_as_read(request, notif_id):
 @login_required
 def mark_all_as_read(request):
     if request.method == 'POST':
-        Notifications.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+        NotificationObject.objects.filter(
+            recipient=request.user,
+            status=NotificationStatuses.CREATED.value
+        ).update(status=NotificationStatuses.READ.value)
         invalidate_unread_count_cache(request.user.id)
     return HttpResponse('')
 
@@ -196,7 +263,16 @@ def mark_all_as_read(request):
 @login_required
 def delete_notification(request, notif_id):
     if request.method == 'POST':
-        delete_single_notification(request.user, notif_id)
+        try:
+            notification = NotificationObject.objects.get(
+                notification_id=notif_id,
+                recipient=request.user
+            )
+            notification.delete()
+            invalidate_unread_count_cache(request.user.id)
+        except NotificationObject.DoesNotExist:
+            pass
+        
         notification_type = request.GET.get('type')
         is_read_param = request.GET.get('read')
         page = request.GET.get('page', 1)
@@ -225,28 +301,61 @@ def delete_notification(request, notif_id):
 @login_required
 def delete_all_notifications(request):
     if request.method == 'POST':
-        delete_all_user_notifications(request.user)
+        NotificationObject.objects.filter(recipient=request.user).delete()
+        invalidate_unread_count_cache(request.user.id)
     return HttpResponse('')
 
 
 @login_required
 def delete_read_notifications(request):
     if request.method == 'POST':
-        delete_user_read_notifications(request.user)
+        NotificationObject.objects.filter(
+            recipient=request.user,
+            status=NotificationStatuses.READ.value
+        ).delete()
+        invalidate_unread_count_cache(request.user.id)
     return HttpResponse('')
+
+
+@login_required
+@require_http_methods(["POST"])
+def set_do_not_disturb(request):
+    """Set do not disturb for a duration"""
+    import json
+    try:
+        data = json.loads(request.body)
+        hours = data.get('hours', 1)
+        
+        NotificationPreferenceService.set_do_not_disturb(request.user, hours)
+        
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@login_required
+@require_http_methods(["POST"])
+def clear_do_not_disturb(request):
+    """Clear do not disturb"""
+    try:
+        NotificationPreferenceService.clear_do_not_disturb(request.user)
+        
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
 # API ViewSets
 class NotificationViewSet(viewsets.ModelViewSet):
     """
-    API ViewSet for Notifications model.
+    API ViewSet for NotificationObject model (new notification engine).
     """
-    queryset = Notifications.objects.all()
+    queryset = NotificationObject.objects.all()
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = NotificationFilter
-    ordering_fields = ['timestamp']
-    ordering = ['-timestamp']
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
 
     def get_serializer_class(self):
         if self.action in ['update', 'partial_update']:
@@ -255,21 +364,23 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Users can only see their own notifications
-        return Notifications.objects.filter(recipient=self.request.user)
+        return NotificationObject.objects.filter(recipient=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(sender=self.request.user)
+        serializer.save(recipient=self.request.user)
 
     @action(detail=False, methods=['get'])
     def unread_count(self, request):
         """Get unread notification count for current user"""
-        count = self.get_queryset().filter(is_read=False).count()
+        count = self.get_queryset().filter(status=NotificationStatuses.CREATED.value).count()
         return Response({'unread_count': count})
 
     @action(detail=False, methods=['post'])
     def mark_all_read(self, request):
         """Mark all notifications as read for current user"""
-        count = self.get_queryset().filter(is_read=False).update(is_read=True)
+        count = self.get_queryset().filter(status=NotificationStatuses.CREATED.value).update(
+            status=NotificationStatuses.READ.value
+        )
         invalidate_unread_count_cache(request.user.id)
         return Response({'marked_read': count})
 
@@ -277,7 +388,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
     def mark_read(self, request, pk=None):
         """Mark a specific notification as read"""
         notification = self.get_object()
-        notification.is_read = True
+        notification.status = NotificationStatuses.READ.value
         notification.save()
         invalidate_unread_count_cache(request.user.id)
         return Response({'status': 'marked as read'})
@@ -286,10 +397,44 @@ class NotificationViewSet(viewsets.ModelViewSet):
     def mark_unread(self, request, pk=None):
         """Mark a specific notification as unread"""
         notification = self.get_object()
-        notification.is_read = False
+        notification.status = NotificationStatuses.CREATED.value
         notification.save()
         invalidate_unread_count_cache(request.user.id)
         return Response({'status': 'marked as unread'})
+
+    @action(detail=True, methods=['get'])
+    def rendered_payload(self, request, pk=None):
+        """Get the rendered payload for a specific notification (for testing)"""
+        notification = self.get_object()
+        from notifications.rendering.adapters import get_payload_adapter
+        
+        adapter = get_payload_adapter(notification)
+        payload = adapter.to_standard_payload(notification)
+        
+        return Response({
+            'notification_id': str(notification.notification_id),
+            'payload': payload
+        })
+
+    @action(detail=False, methods=['get'])
+    def list_rendered(self, request):
+        """Get list of notifications with rendered payloads (for testing)"""
+        notifications = self.get_queryset()
+        from notifications.rendering.adapters import get_payload_adapter
+        
+        rendered = []
+        for notification in notifications[:10]:  # Limit to 10 for testing
+            adapter = get_payload_adapter(notification)
+            payload = adapter.to_standard_payload(notification)
+            rendered.append({
+                'notification_id': str(notification.notification_id),
+                'payload': payload
+            })
+        
+        return Response({
+            'count': len(rendered),
+            'notifications': rendered
+        })
 
     @action(detail=False, methods=['post'])
     def delete_all(self, request):
@@ -302,7 +447,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def delete_read(self, request):
         """Delete all read notifications for current user"""
-        queryset = self.get_queryset().filter(is_read=True)
+        queryset = self.get_queryset().filter(status=NotificationStatuses.READ.value)
         count = queryset.count()
         queryset.delete()
         invalidate_unread_count_cache(request.user.id)
@@ -316,15 +461,15 @@ class NotificationViewSet(viewsets.ModelViewSet):
             notification_ids = serializer.validated_data['notification_ids']
             action_type = serializer.validated_data['action']
             
-            queryset = self.get_queryset().filter(id__in=notification_ids)
+            queryset = self.get_queryset().filter(notification_id__in=notification_ids)
             count = queryset.count()
             
             if action_type == 'mark_read':
-                queryset.update(is_read=True)
+                queryset.update(status=NotificationStatuses.READ.value)
                 invalidate_unread_count_cache(request.user.id)
                 return Response({'marked_read': count})
             elif action_type == 'mark_unread':
-                queryset.update(is_read=False)
+                queryset.update(status=NotificationStatuses.CREATED.value)
                 invalidate_unread_count_cache(request.user.id)
                 return Response({'marked_unread': count})
             elif action_type == 'delete':

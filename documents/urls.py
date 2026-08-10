@@ -45,9 +45,12 @@ urlpatterns = [
     # Engagement HTMX Endpoints
     path('document/<int:document_id>/bookmark/', views.toggle_bookmark, name='toggle_bookmark'),
     path('document/<int:document_id>/rate/', views.rate_document, name='rate_document'),
-    path('document/<int:document_id>/share/', views.share_document, name='share_document'),
     path('document/<int:document_id>/download/', views.track_download, name='track_download'),
+    path('document/<int:document_id>/share/', views.share_document, name='share_document'),
     path('document/<int:document_id>/stats/', views.document_stats, name='document_stats'),
+    
+    # Academic HTMX Endpoints
+    path('academic/', include('documents.academic.urls')),
     
     # API Endpoints
     path('api/', include(router.urls)),

@@ -6,8 +6,9 @@ class GroupsConfig(AppConfig):
     name = 'groups'
 
     def ready(self):
-        """Import tasks when app is ready to register with Celery"""
+        """Import tasks and signals when app is ready"""
         try:
             import groups.tasks
         except ImportError:
             pass
+        import groups.signals

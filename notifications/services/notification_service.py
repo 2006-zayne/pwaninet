@@ -1,5 +1,6 @@
 from django.core.cache import cache
-from notifications.models import Notifications
+from notifications.models import NotificationObject
+from notifications.notifications.registry import NotificationStatuses
 from notifications.queries.notification_queries import (
     get_notification_for_user,
     get_notifications_for_user,
@@ -32,7 +33,7 @@ def invalidate_unread_count_cache(user_id):
     cache.delete(_unread_count_cache_key(user_id))
 
 
-def build_notifications_context(user, mark_read=False, notification_type=None, is_read=None, grouped=False):
+def build_notifications_context(user, mark_read=False, notification_type=None, is_read=None, grouped=False, use_canonical_payload=False):
     if mark_read:
         mark_user_notifications_as_read(user)
         cache.set(_unread_count_cache_key(user.id), 0, timeout=30)
@@ -42,12 +43,15 @@ def build_notifications_context(user, mark_read=False, notification_type=None, i
     else:
         notifications = get_notifications_for_user(user, notification_type=notification_type, is_read=is_read)
     
-    return {
+    context = {
         'notifications': notifications,
         'filter_type': notification_type,
         'filter_read': is_read,
-        'grouped': grouped
+        'grouped': grouped,
+        'use_canonical_payload': use_canonical_payload
     }
+    
+    return context
 
 
 def build_unread_notification_html(user):
@@ -62,9 +66,8 @@ def build_unread_notification_html(user):
 def mark_single_notification_as_read(user, notif_id):
     notification = get_notification_for_user(user, notif_id)
     if notification:
-        notification.is_read = True
-        notification.save(update_fields = [
-            'is_read'])
+        notification.status = NotificationStatuses.READ.value
+        notification.save(update_fields=['status'])
         invalidate_unread_count_cache(user.id)
         invalidate_group_unread_cache(user.id)
         
@@ -77,47 +80,6 @@ def mark_single_notification_as_read(user, notif_id):
                 'count': get_unread_count(user)
             }
         )
-    return notification
-
-
-def create_notification(recipient, sender, notification_type, msg, post=None, group=None):
-    # Check if recipient has disabled this type of notification
-    if notification_type == Notifications.LIKE and not recipient.notify_on_like:
-        return None
-    if notification_type == Notifications.FOLLOW and not recipient.notify_on_follow:
-        return None
-    if notification_type == Notifications.INVITE and not recipient.notify_on_invite:
-        return None
-    if notification_type == Notifications.GROUP_REQUEST and not recipient.notify_on_group_request:
-        return None
-    if notification_type == Notifications.GROUP_APPROVED and not recipient.notify_on_group_approved:
-        return None
-    if notification_type == Notifications.PINCH and not recipient.notify_on_pinch:
-        return None
-    if notification_type == Notifications.COMMENT_REPLY and not recipient.notify_on_comment_reply:
-        return None
-
-    notification = Notifications.objects.create(
-        recipient=recipient,
-        sender=sender,
-        notification_type=notification_type,
-        msg=msg,
-        post=post,
-        group=group
-    )
-    invalidate_unread_count_cache(recipient.id)
-    invalidate_group_unread_cache(recipient.id)
-    
-    # Broadcast unread count update via WebSocket
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        f"notifications_{recipient.id}",
-        {
-            'type': 'unread_count_update',
-            'count': get_unread_count(recipient)
-        }
-    )
-    
     return notification
 
 

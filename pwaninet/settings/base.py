@@ -35,7 +35,7 @@ ALLOWED_HOSTS = [
     host.split(':')[0].strip()
     for host in os.environ.get(
         'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,10.20.152.125,pwaninet.app,192.168.43.170,192.168.226.221,192.168.43.170,192.168.183.245,192.168.203.221,192.168.53.221,192.168.93.221,192.168.87.159,192.168.14.221,192.168.72.88,192.168.87.159,192.168.72.88,192.168.183.245,172.18.0.1,192.168.183.245,192.168.83.192'
+        'localhost,127.0.0.1,10.20.152.125,pwaninet.app,192.168.124.221,192.168.43.170'
     ).split(',')
     if host.strip()
 ]
@@ -150,6 +150,10 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
+
+# Static file caching - Cache fonts for 1 year (fonts rarely change)
+# This improves performance by avoiding repeated font downloads
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # Media files
 MEDIA_URL = '/media/'
@@ -298,6 +302,7 @@ CSRF_TRUSTED_ORIGINS = [
 # VAPID keys for Web Push notifications
 VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
 VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
+VAPID_SUBJECT = os.environ.get('VAPID_SUBJECT', 'mailto:admin@pwaninet.app')
 
 # Email configuration
 EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
@@ -308,3 +313,6 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@pwaninet.app')
 SERVER_EMAIL = os.environ.get('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
+
+# Notification processing configuration
+ENABLE_NOTIFICATION_PROCESSING = True

@@ -1,7 +1,15 @@
 from rest_framework import serializers
-from .models import Post, Comment, Report, Like, Repost, HiddenPost, AuthorPreference, SharedPost
+from .models import Post, PostImage, Like, Comment, CommentLike, Report, Repost, HiddenPost, AuthorPreference, SharedPost
+from django.contrib.auth import get_user_model
+from .tasks import generate_post_thumbnail, generate_video_poster
+import logging
+
+logger = logging.getLogger(__name__)
+
 from groups.serializers import GroupSerializer, UserMinimalSerializer
 from courses.models import Course, Unit
+from notifications.models import NotificationObject
+from notifications.notifications.registry import NotificationTypes, NotificationCategories
 
 
 class CourseSerializer(serializers.ModelSerializer):
@@ -174,6 +182,174 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
         logger.info('[PostCreateSerializer] Created %s PostImage objects', len(images_data[:15]))
 
+        # Handle docs upload - integrate with document repo (aligned with document repo pipeline)
+        docs_file = validated_data.get('docs')
+        if docs_file:
+            logger.info('[PostCreateSerializer] Docs file found: %s', docs_file.name if hasattr(docs_file, 'name') else 'Unknown')
+            try:
+                # Create document in document repo for proper processing
+                # This follows the same pattern as documents/views.py upload_document
+                from documents.models import Document, DocumentFile, DocumentVersion, DocumentAcademicUnit, DocumentTag, Tag, Category
+                from documents.tasks.processing import process_document
+                from documents.academic.models import AcademicUnit, Semester, AcademicYear, AcademicLevel
+                
+                # Get or create default category for post uploads
+                default_category, _ = Category.objects.get_or_create(
+                    code='other',
+                    defaults={'name': 'Other', 'description': 'Documents shared via posts'}
+                )
+                
+                # Generate title from filename (same as document repo)
+                title = docs_file.name.replace('.pdf', '').replace('.docx', '').replace('.pptx', '')
+                description = f"Shared via post by {author.username}"
+                
+                # Check if document with same title already exists for this user (same as document repo)
+                existing_doc = Document.objects.filter(
+                    title=title,
+                    uploaded_by=author
+                ).first()
+                
+                if existing_doc:
+                    logger.info('[PostCreateSerializer] Document with title "%s" already exists, linking to existing document', title)
+                    # Link to existing document instead of creating duplicate (don't set post.docs to avoid duplicate rendering)
+                    post.shared_document = existing_doc
+                    post.save(update_fields=['shared_document'])
+                    
+                    # Trigger processing for existing document if needed
+                    if existing_doc.status == 'draft' or existing_doc.status == 'processing':
+                        logger.info('[PostCreateSerializer] Triggering processing for existing document %s', existing_doc.id)
+                        task = process_document.delay(existing_doc.id)
+                        logger.info('[PostCreateSerializer] Celery task triggered with ID: %s for existing document %s', task.id, existing_doc.id)
+                else:
+                    # Create document record (aligned with document repo pipeline)
+                    document = Document.objects.create(
+                        title=title,
+                        description=description,
+                        uploaded_by=author,
+                        status='processing',  # Start as processing, Celery will update to ready
+                        visibility='public',
+                        category=default_category
+                    )
+                    
+                    # Create document version (same as document repo)
+                    document_version = DocumentVersion.objects.create(
+                        document=document,
+                        version_number=1,
+                        is_latest=True,
+                        created_by=author
+                    )
+                    
+                    # Create document file (same as document repo)
+                    document_file = DocumentFile.objects.create(
+                        document_version=document_version,
+                        file=docs_file,
+                        original_filename=docs_file.name,
+                        size_bytes=docs_file.size,
+                        mime_type=docs_file.content_type,
+                        extension=docs_file.name.split('.')[-1].lower() if '.' in docs_file.name else '',
+                        storage_path=docs_file.name,
+                        uploaded_by=author,
+                        processing_status='pending',
+                        checksum=None  # Will be generated by background processing
+                    )
+                    
+                    # Try to infer academic metadata from user profile and post unit
+                    # This bridges the gap between post uploads and document repo metadata
+                    try:
+                        academic_unit_id = None
+                        semester_id = None
+                        academic_year_id = None
+                        academic_level_id = None
+                        
+                        # If post has a unit, try to get academic unit from it
+                        if post.unit:
+                            try:
+                                academic_unit = AcademicUnit.objects.filter(unit=post.unit).first()
+                                if academic_unit:
+                                    academic_unit_id = academic_unit.id
+                                    logger.info('[PostCreateSerializer] Found academic unit %s from post unit %s', academic_unit_id, post.unit.id)
+                            except Exception as e:
+                                logger.warning('[PostCreateSerializer] Could not find academic unit for post unit: %s', e)
+                        
+                        # Try to infer semester from user's year
+                        if hasattr(author, 'year'):
+                            try:
+                                semester = Semester.objects.filter(name__icontains=str(author.year)).first()
+                                if semester:
+                                    semester_id = semester.id
+                                    logger.info('[PostCreateSerializer] Inferred semester %s from user year %s', semester_id, author.year)
+                            except Exception as e:
+                                logger.warning('[PostCreateSerializer] Could not infer semester from user year: %s', e)
+                        
+                        # Try to infer academic year from user's year
+                        if hasattr(author, 'year'):
+                            try:
+                                academic_year = AcademicYear.objects.filter(name__icontains=str(author.year)).first()
+                                if academic_year:
+                                    academic_year_id = academic_year.id
+                                    logger.info('[PostCreateSerializer] Inferred academic year %s from user year %s', academic_year_id, author.year)
+                            except Exception as e:
+                                logger.warning('[PostCreateSerializer] Could not infer academic year from user year: %s', e)
+                        
+                        # Try to infer academic level from user's course
+                        if hasattr(author, 'course'):
+                            try:
+                                academic_level = AcademicLevel.objects.filter(name__icontains=str(author.course)).first()
+                                if academic_level:
+                                    academic_level_id = academic_level.id
+                                    logger.info('[PostCreateSerializer] Inferred academic level %s from user course %s', academic_level_id, author.course)
+                            except Exception as e:
+                                logger.warning('[PostCreateSerializer] Could not infer academic level from user course: %s', e)
+                        
+                        # Create academic unit relationship if we have enough data
+                        if academic_unit_id and semester_id and academic_year_id and academic_level_id:
+                            DocumentAcademicUnit.objects.create(
+                                document=document,
+                                academic_unit_id=academic_unit_id,
+                                semester_id=semester_id,
+                                academic_year_id=academic_year_id,
+                                academic_level_id=academic_level_id,
+                                is_primary=True
+                            )
+                            logger.info('[PostCreateSerializer] Created DocumentAcademicUnit for document %s', document.id)
+                        else:
+                            logger.info('[PostCreateSerializer] Could not create DocumentAcademicUnit - missing metadata. unit=%s, semester=%s, year=%s, level=%s', 
+                                       academic_unit_id, semester_id, academic_year_id, academic_level_id)
+                    
+                    except Exception as e:
+                        # Don't fail document creation if academic metadata inference fails
+                        logger.warning('[PostCreateSerializer] Could not infer academic metadata: %s', e)
+                    
+                    # Add default tag for post-uploaded documents
+                    try:
+                        post_tag, _ = Tag.objects.get_or_create(
+                            name='Post Share',
+                            defaults={'slug': 'post-share'}
+                        )
+                        DocumentTag.objects.create(document=document, tag=post_tag)
+                        logger.info('[PostCreateSerializer] Added default tag "Post Share" to document %s', document.id)
+                    except Exception as e:
+                        logger.warning('[PostCreateSerializer] Could not add default tag: %s', e)
+                    
+                    # Link post to document (don't set post.docs to avoid duplicate rendering)
+                    post.shared_document = document
+                    post.save(update_fields=['shared_document'])
+                    
+                    # Trigger Celery background processing (same as document repo)
+                    logger.info('[PostCreateSerializer] About to trigger Celery task for document %s', document.id)
+                    task = process_document.delay(document.id)
+                    logger.info('[PostCreateSerializer] Celery task triggered with ID: %s for document %s', task.id, document.id)
+                    
+                    logger.info('[PostCreateSerializer] Document created with ID: %s and linked to post %s', document.id, post.id)
+                
+            except Exception as e:
+                # Log error but don't fail the entire post creation
+                logger.error('[PostCreateSerializer] Error creating document from post upload: %s', e)
+                import traceback
+                logger.error('[PostCreateSerializer] Traceback: %s', traceback.format_exc())
+                # Fallback: keep the file reference on post
+                logger.info('[PostCreateSerializer] Fallback: Keeping docs file reference on post')
+
         if author:
             try:
                 from users.services.feed_service import invalidate_home_feed_context
@@ -181,7 +357,6 @@ class PostCreateSerializer(serializers.ModelSerializer):
             except Exception:
                 pass
                 
-            from notifications.models import Notifications
             from users.models import User
             from groups.models import MembershipStatus
             
@@ -199,16 +374,59 @@ class PostCreateSerializer(serializers.ModelSerializer):
                 msg_text = "posted a new update in the global feed."
 
             if recipients.exists():
-                Notifications.objects.bulk_create([
-                    Notifications(
+                notification_type = NotificationTypes.GROUP.value if post.group else NotificationTypes.SHARE.value
+                
+                # Get thumbnail URL for notification preview
+                thumbnail_url = None
+                if post.thumbnail:
+                    thumbnail_url = post.thumbnail.url
+                elif post.images.exists():
+                    thumbnail_url = post.images.first().get_thumbnail_url('400')
+                elif post.video_poster:
+                    thumbnail_url = post.video_poster.url
+                elif post.shared_document:
+                    # For shared documents, try to get document preview
+                    try:
+                        from documents.models import DocumentFile
+                        if post.shared_document.latest_version:
+                            first_file = post.shared_document.latest_version.files.first()
+                            if first_file and first_file.preview_path:
+                                thumbnail_url = f"/media/{first_file.preview_path}"
+                    except:
+                        pass
+                
+                NotificationObject.objects.bulk_create([
+                    NotificationObject(
                         recipient=recipient,
-                        sender=author,
-                        post=post,
-                        notification_type=Notifications.ALERTE,
-                        msg=msg_text,
+                        notification_type=notification_type,
+                        category=NotificationCategories.SOCIAL.value,
+                        title=msg_text,
+                        summary=f"{author.username} {msg_text}",
+                        context_type='Post',
+                        context_id=str(post.id),
+                        metadata={
+                            'actor_id': str(author.id),
+                            'actor_username': author.username,
+                            'post_id': str(post.id),
+                            'thumbnail_url': thumbnail_url,
+                            'resource_type': 'POST',
+                            'target_type': 'Post',
+                            'target_id': str(post.id),
+                        },
+                        priority='NORMAL',
                     )
                     for recipient in recipients
                 ])
+        
+        # Trigger thumbnail generation for gradient/text posts
+        if not post.images.exists() and not post.video and not post.shared_document:
+            logger.info('[PostCreateSerializer] Triggering thumbnail generation for post %s', post.id)
+            generate_post_thumbnail.delay(post.id)
+        
+        # Trigger video poster generation for video posts
+        if post.video and not post.video_poster:
+            logger.info('[PostCreateSerializer] Triggering video poster generation for post %s', post.id)
+            generate_video_poster.delay(post.id)
                 
         return post
 

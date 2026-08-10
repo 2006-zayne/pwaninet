@@ -33,6 +33,32 @@ class LanguagePreference(models.TextChoices):
     KISWAHILI = 'sw', 'Kiswahili'
 
 
+class FontFamilyPreference(models.TextChoices):
+    DEFAULT = 'default', 'Default (System)'
+    INTER = 'inter', 'Inter'
+    ROBOTO = 'roboto', 'Roboto'
+    IBM_PLEX_SERIF = 'ibm_plex_serif', 'IBM Plex Serif'
+    MANROPE = 'manrope', 'Manrope'
+    PLAYFAIR_DISPLAY = 'playfair_display', 'Playfair Display'
+    ROMANESCO = 'romanesco', 'Romanesco'
+    STORY_SCRIPT = 'story_script', 'Story Script'
+    POPPINS = 'poppins', 'Poppins'
+    LORA = 'lora', 'Lora'
+    MERRIWEATHER = 'merriweather', 'Merriweather'
+    DANCING_SCRIPT = 'dancing_script', 'Dancing Script'
+    GREAT_VIBES = 'great_vibes', 'Great Vibes'
+    PARISIENNE = 'parisienne', 'Parisienne'
+    SATISFY = 'satisfy', 'Satisfy'
+    COOKIE = 'cookie', 'Cookie'
+    ITALIANNO = 'italianno', 'Italianno'
+    TANGERINE = 'tangerine', 'Tangerine'
+
+
+class FontStylePreference(models.TextChoices):
+    NORMAL = 'normal', 'Normal'
+    ITALIC = 'italic', 'Italic'
+
+
 class PrivacyLevel(models.TextChoices):
     PUBLIC = 'PUBLIC', 'Everyone'
     AUTHENTICATED = 'AUTHENTICATED', 'PwaniNet Users'
@@ -146,6 +172,20 @@ class User(AbstractUser):
         max_length=5,
         choices=LanguagePreference.choices,
         default=LanguagePreference.ENGLISH
+    )
+
+    # Font family preference
+    font_family_preference = models.CharField(
+        max_length=30,
+        choices=FontFamilyPreference.choices,
+        default=FontFamilyPreference.DEFAULT
+    )
+
+    # Font style preference
+    font_style_preference = models.CharField(
+        max_length=10,
+        choices=FontStylePreference.choices,
+        default=FontStylePreference.NORMAL
     )
 
     # Online status tracking

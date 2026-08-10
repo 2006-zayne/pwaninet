@@ -1,66 +1,63 @@
 from rest_framework import serializers
-from .models import Notifications
+from .models import NotificationObject
+from notifications.notifications.registry import NotificationStatuses
 from users.serializers import UserPublicSerializer
-from groups.serializers import GroupSerializer
-from posts.serializers import PostSerializer
 
 
 class NotificationSerializer(serializers.ModelSerializer):
-    sender = UserPublicSerializer(read_only=True)
     recipient = UserPublicSerializer(read_only=True)
-    group = GroupSerializer(read_only=True)
-    post = PostSerializer(read_only=True)
     notification_type_display = serializers.CharField(source='get_notification_type_display', read_only=True)
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
 
     class Meta:
-        model = Notifications
+        model = NotificationObject
         fields = [
-            'id', 'recipient', 'sender', 'group', 'post',
+            'notification_id', 'recipient', 'source_events',
             'notification_type', 'notification_type_display',
-            'msg', 'timestamp', 'is_read'
+            'category', 'category_display',
+            'priority', 'priority_display',
+            'title', 'summary',
+            'context_type', 'context_id',
+            'status', 'status_display',
+            'delivery_policy', 'aggregation_key',
+            'event_count', 'first_event_time', 'latest_event_time',
+            'metadata', 'created_at', 'updated_at', 'expires_at'
         ]
-        read_only_fields = ['timestamp']
+        read_only_fields = ['notification_id', 'created_at', 'updated_at']
 
 
 class NotificationCreateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Notifications
+        model = NotificationObject
         fields = [
-            'recipient', 'sender', 'group', 'post',
-            'notification_type', 'msg'
+            'recipient', 'notification_type', 'category', 'priority',
+            'title', 'summary', 'context_type', 'context_id',
+            'delivery_policy', 'metadata'
         ]
 
     def validate(self, data):
         # Ensure notification_type is valid
         notification_type = data.get('notification_type')
-        valid_types = [choice[0] for choice in Notifications.TYPE_CHOICES]
+        valid_types = [choice[0] for choice in NotificationObject.TYPE_CHOICES]
         if notification_type not in valid_types:
             raise serializers.ValidationError(
                 f"Invalid notification_type. Must be one of: {valid_types}"
             )
-        
-        # Ensure required fields are present based on notification type
-        if notification_type == Notifications.INVITE and not data.get('group'):
-            raise serializers.ValidationError("Group is required for INVITE notifications")
-        
-        if notification_type == Notifications.LIKE and not data.get('post'):
-            raise serializers.ValidationError("Post is required for LIKE notifications")
-        
-        if notification_type == Notifications.FOLLOW and not data.get('sender'):
-            raise serializers.ValidationError("Sender is required for FOLLOW notifications")
         
         return data
 
 
 class NotificationUpdateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Notifications
-        fields = ['is_read']
+        model = NotificationObject
+        fields = ['status']
 
 
 class NotificationBulkActionSerializer(serializers.Serializer):
     notification_ids = serializers.ListField(
-        child=serializers.IntegerField(),
+        child=serializers.UUIDField(),
         allow_empty=False
     )
     action = serializers.ChoiceField(

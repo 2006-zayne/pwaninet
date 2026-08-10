@@ -8,7 +8,7 @@
         hx-swap="outerHTML"
         style="flex: 1; padding: 10px; border-radius: 10px; font-weight: 500; {% if user_rating == 1 %}background-color: #10B981; color: white; border-color: #10B981;{% endif %}">
         <i class="bi bi-hand-thumbs-up"></i>
-        <span class="rating-percentage">{{ analytics.positive_rating_percentage }}%</span>
+        <span class="rating-count">{{ analytics.positive_rating_count }}</span>
     </button>
     <button 
         class="btn btn-outline-secondary rating-btn thumbs-down"
@@ -18,6 +18,6 @@
         hx-swap="outerHTML"
         style="flex: 1; padding: 10px; border-radius: 10px; font-weight: 500; {% if user_rating == -1 %}background-color: #EF4444; color: white; border-color: #EF4444;{% endif %}">
         <i class="bi bi-hand-thumbs-down"></i>
-        <span class="rating-percentage">{{ analytics.negative_rating_percentage }}%</span>
+        <span class="rating-count">{{ analytics.negative_rating_count }}</span>
     </button>
 </div>

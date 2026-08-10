@@ -448,16 +448,24 @@ class SearchService:
             index_data['file_count'] = files.count()
         
         # Get engagement metrics
-        from ..engagement.models import DocumentView, DocumentDownload, DocumentBookmark, DocumentRating
-        index_data['view_count'] = document.views.count()
-        index_data['download_count'] = document.downloads.count()
-        index_data['bookmark_count'] = document.bookmarks.count()
-        index_data['share_count'] = document.shares.count()
-        
-        ratings = document.ratings.all()
-        if ratings.exists():
-            index_data['rating_average'] = sum(r.rating for r in ratings) / len(ratings)
-            index_data['rating_count'] = len(ratings)
+        try:
+            from documents.engagement.models import DocumentView, DocumentDownload, DocumentBookmark, DocumentRating
+            index_data['view_count'] = document.views.count()
+            index_data['download_count'] = document.downloads.count()
+            index_data['bookmark_count'] = document.bookmarks.count()
+            index_data['share_count'] = document.shares.count()
+            
+            ratings = document.ratings.all()
+            if ratings.exists():
+                index_data['rating_average'] = sum(r.rating for r in ratings) / len(ratings)
+                index_data['rating_count'] = len(ratings)
+        except Exception as e:
+            # Fallback if engagement models not available
+            logger.warning(f"Engagement models not available, skipping engagement metrics: {e}")
+            index_data['view_count'] = 0
+            index_data['download_count'] = 0
+            index_data['bookmark_count'] = 0
+            index_data['share_count'] = 0
         
         # Create or update index
         index, created = DocumentSearchIndex.objects.update_or_create(

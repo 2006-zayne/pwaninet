@@ -1,0 +1,179 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+  :root {
+    --brand: #2563eb;
+    --brand-light: #dbeafe;
+    --brand-mid: #bfdbfe;
+    --page-bg: #f8fafc;
+    --card-bg: #ffffff;
+    --border: #e2e8f0;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
+    --radius-md: 14px;
+    --radius-lg: 20px;
+    --radius-pill: 999px;
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
+  }
+
+  [data-theme="dark"] {
+    --brand: #6366f1;
+    --brand-light: #312e81;
+    --brand-mid: #4338ca;
+    --page-bg: #18191f;
+    --card-bg: #242526;
+    --border: #3a3b3c;
+    --text-primary: #e4e6eb;
+    --text-secondary: #b0b3b8;
+    --text-muted: #e4e6eb;
+  }
+
+  body { background: var(--page-bg); }
+
+  .page-wrap {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 5rem;
+  }
+
+  .page-header {
+    margin-bottom: 2rem;
+  }
+
+  .page-eyebrow {
+    font-size: 0.62rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .page-title {
+    font-size: 1.75rem;
+    font-weight: 900;
+    color: var(--text-primary);
+    letter-spacing: -1px;
+    margin: 0 0 0.5rem;
+  }
+
+  .page-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--brand);
+    text-decoration: none;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    transition: color 0.2s ease;
+  }
+
+  .back-link:hover {
+    color: #1d4ed8;
+  }
+
+  .settings-section {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .settings-section-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .settings-section-body {
+    padding: 1.5rem;
+  }
+
+  .settings-section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .settings-section-title i {
+    color: var(--brand);
+    font-size: 1.1rem;
+  }
+
+  .settings-section-description {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+  }
+
+  .placeholder-section {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: var(--text-secondary);
+  }
+
+  .placeholder-section i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  @media (max-width: 768px) {
+    .page-wrap {
+      padding: 1.5rem 0 4rem;
+    }
+
+    .settings-section {
+      border-left: none;
+      border-right: none;
+    }
+  }
+</style>
+
+<div class="page-wrap">
+  <div class="page-header">
+    <a href="{% url 'groups:group_settings' group.id %}" class="back-link">
+      <i class="bi bi-arrow-left"></i> Back to Settings
+    </a>
+    <h1 class="page-title">User Management and Role</h1>
+    <p class="page-subtitle">Manage group members, permissions, and roles</p>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-section-header">
+      <h2 class="settings-section-title">
+        <i class="bi bi-people-gear"></i> Member Management
+      </h2>
+      <p class="settings-section-description">Control member access and permissions</p>
+    </div>
+    <div class="settings-section-body">
+      <div class="placeholder-section">
+        <i class="bi bi-person-gear"></i>
+        <p>User management features coming soon:</p>
+        <ul style="text-align: left; display: inline-block; margin-top: 1rem; color: var(--text-muted);">
+          <li>Remove users from group</li>
+          <li>Freeze users (restrict posting)</li>
+          <li>Assign roles (Admin, Moderator, Member)</li>
+          <li>Reassign roles</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

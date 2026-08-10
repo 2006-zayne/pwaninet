@@ -121,12 +121,12 @@
             <span style="display: flex; align-items: center; gap: 4px; 
                         font-size: 0.8rem; color: var(--text-secondary);">
                 <i class="bi bi-hand-thumbs-up"></i>
-                {% if document.analytics %}{{ document.analytics.positive_rating_percentage }}{% else %}0{% endif %}%
+                {% if document.analytics %}{{ document.analytics.positive_rating_count }}{% else %}0{% endif %}
             </span>
             <span style="display: flex; align-items: center; gap: 4px; 
                         font-size: 0.8rem; color: var(--text-secondary);">
                 <i class="bi bi-hand-thumbs-down"></i>
-                {% if document.analytics %}{{ document.analytics.negative_rating_percentage }}{% else %}0{% endif %}%
+                {% if document.analytics %}{{ document.analytics.negative_rating_count }}{% else %}0{% endif %}
             </span>
         </div>
     </div>

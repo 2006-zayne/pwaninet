@@ -16,7 +16,7 @@ from .models import (
     DocumentDownload,
     DocumentView,
 )
-from .engagement.models import DocumentRating, DocumentShare, DocumentAnalytics
+from documents.engagement.models import DocumentRating, DocumentShare, DocumentAnalytics
 from .selectors.document_selectors import DocumentSelector
 
 
@@ -684,11 +684,12 @@ def track_download(request, document_id):
         document = Document.objects.get(id=document_id)
         file_id = request.POST.get('file_id')
         
-        from ..engagement.models import DocumentDownload
-        from ..documents.models import DocumentFile
+        from .engagement.models import DocumentDownload
+        from .models import DocumentFile
         
         document_file = DocumentFile.objects.get(id=file_id) if file_id else document.latest_version.files.first()
         
+        # Create download record - signal handler will update analytics
         DocumentDownload.objects.create(
             document=document,
             document_file=document_file,
@@ -697,10 +698,14 @@ def track_download(request, document_id):
             user_agent=request.META.get('HTTP_USER_AGENT', '')[:500]
         )
         
-        # Get or create analytics and update download count immediately
+        # Invalidate download count cache
+        from django.core.cache import cache
+        download_count_cache_key = f'doc_download_count_{document_id}'
+        cache.delete(download_count_cache_key)
+        
+        # Get updated analytics (signal handler should have updated it)
+        from .engagement.models import DocumentAnalytics
         analytics, created = DocumentAnalytics.objects.get_or_create(document=document)
-        analytics.download_count = document.downloads.count()
-        analytics.save(update_fields=['download_count'])
         
         # Trigger analytics update asynchronously for full recalculation
         from .tasks.processing import update_document_analytics
@@ -854,8 +859,8 @@ def document_stats(request, document_id):
             'bookmark_count': analytics.bookmark_count,
             'share_count': analytics.share_count,
             'rating_count': analytics.rating_count,
-            'positive_rating_percentage': analytics.positive_rating_percentage,
-            'negative_rating_percentage': analytics.negative_rating_percentage,
+            'positive_rating_count': analytics.positive_rating_count,
+            'negative_rating_count': analytics.negative_rating_count,
         })
         
     except Document.DoesNotExist:

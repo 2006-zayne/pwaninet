@@ -8,9 +8,9 @@ from typing import List, Optional
 from django.db.models import Q, Prefetch, Count, Avg
 from django.db import models
 
-from ..documents.models import Document, DocumentVersion, DocumentFile
-from ..academic.models import AcademicUnit, Semester
-from ..engagement.models import DocumentView, DocumentDownload, DocumentBookmark, DocumentAnalytics
+from documents.models import Document, DocumentVersion, DocumentFile, DocumentAcademicUnit, DocumentTag, DocumentAuthor
+from documents.academic.models import AcademicUnit, Semester
+from documents.engagement.models import DocumentView, DocumentDownload, DocumentBookmark, DocumentAnalytics
 
 
 class DocumentSelector:
@@ -302,8 +302,6 @@ class DocumentSelector:
                 'rating_count': analytics.rating_count,
                 'positive_rating_count': analytics.positive_rating_count,
                 'negative_rating_count': analytics.negative_rating_count,
-                'positive_rating_percentage': analytics.positive_rating_percentage,
-                'negative_rating_percentage': analytics.negative_rating_percentage,
                 'trending_score': analytics.trending_score,
                 'popularity_score': analytics.popularity_score,
                 'version_count': document.versions.count(),
@@ -318,8 +316,6 @@ class DocumentSelector:
                 'rating_count': document.ratings.count(),
                 'positive_rating_count': document.ratings.filter(rating=1).count(),
                 'negative_rating_count': document.ratings.filter(rating=-1).count(),
-                'positive_rating_percentage': 0,
-                'negative_rating_percentage': 0,
                 'trending_score': 0,
                 'popularity_score': 0,
                 'version_count': document.versions.count(),
