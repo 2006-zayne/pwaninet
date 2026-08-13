@@ -75,30 +75,8 @@ def notifications_list(request):
     sender_grouped = sender_grouped_param == 'true'
     hybrid_grouped = hybrid_grouped_param == 'true'
     
-    # Use time-based grouping if requested
-    if time_filter != 'all':
-        from notifications.queries.notification_queries import get_notifications_by_time_periods
-        time_grouped = get_notifications_by_time_periods(
-            request.user,
-            notification_type=notification_type,
-            is_read=is_read,
-            search_query=search_query
-        )
-        context = {
-            'time_grouped': time_grouped,
-            'time_filter': time_filter,
-            'filter_type': notification_type,
-            'filter_read': is_read,
-            'current_filter_type': notification_type,
-            'current_filter_read': is_read_param,
-            'current_grouped': grouped_param,
-            'current_sender_grouped': sender_grouped_param,
-            'current_hybrid_grouped': hybrid_grouped_param,
-            'has_pagination': False,
-            'unread_notifications_count': get_cached_unread_count(request.user),
-            'search_query': search_query
-        }
-    elif sender_grouped:
+    # Use time-based grouping by default (unless explicitly overridden)
+    if sender_grouped:
         from notifications.queries.notification_queries import get_notifications_grouped_by_sender
         notifications = get_notifications_grouped_by_sender(
             request.user,
@@ -165,30 +143,28 @@ def notifications_list(request):
             'search_query': search_query
         }
     else:
-        context = build_notifications_context(
+        # Default: use time-based grouping
+        from notifications.queries.notification_queries import get_notifications_by_time_periods
+        time_grouped = get_notifications_by_time_periods(
             request.user,
-            mark_read=False,
             notification_type=notification_type,
             is_read=is_read,
-            grouped=grouped
+            search_query=search_query
         )
-        
-        # Paginate notifications (only if not grouped)
-        if not grouped:
-            paginator = Paginator(context['notifications'], 20)
-            notifications_page = paginator.get_page(page)
-            context['notifications'] = notifications_page
-            context['has_pagination'] = True
-        else:
-            context['has_pagination'] = False
-        
-        context['unread_notifications_count'] = get_cached_unread_count(request.user)
-        context['current_filter_type'] = notification_type
-        context['current_filter_read'] = is_read_param
-        context['current_grouped'] = grouped_param
-        context['current_sender_grouped'] = sender_grouped_param
-        context['current_hybrid_grouped'] = hybrid_grouped_param
-        context['time_filter'] = 'all'
+        context = {
+            'time_grouped': time_grouped,
+            'time_filter': 'all',
+            'filter_type': notification_type,
+            'filter_read': is_read,
+            'current_filter_type': notification_type,
+            'current_filter_read': is_read_param,
+            'current_grouped': grouped_param,
+            'current_sender_grouped': sender_grouped_param,
+            'current_hybrid_grouped': hybrid_grouped_param,
+            'has_pagination': False,
+            'unread_notifications_count': get_cached_unread_count(request.user),
+            'search_query': search_query
+        }
     
     return render(request, 'notifications/notifications.html', context)
 
@@ -234,7 +210,7 @@ def mark_notification_as_read(request, notif_id):
             recipient=request.user
         )
         notification.status = NotificationStatuses.READ.value
-        notification.save()
+        notification.save(update_fields=['status'])
         invalidate_unread_count_cache(request.user.id)
     except NotificationObject.DoesNotExist:
         pass

@@ -15,12 +15,12 @@
      style="cursor: default;"
      {% endif %}>
   
-  <div class="d-flex gap-3">
+  <div class="d-flex gap-2" style="align-items: flex-start;">
     {# Actor Stack - shown based on component visibility #}
     {% if components.actor_stack and payload.actors %}
       {% if payload.actors|length > 1 %}
         {# Aggregated actors #}
-        <div class="actor-stack" style="position: relative; width: 72px; height: 72px;">
+        <div class="actor-stack flex-shrink-0" style="position: relative; width: 72px; height: 72px; margin-left: -16px;">
           {% for actor in payload.actors|slice:":3" %}
             <a href="{% url 'users:profile' actor.username %}"
                class="rounded-circle border position-absolute"
@@ -47,7 +47,7 @@
         {% if payload.context and payload.context.type.value == 'GROUP' %}
           {% if payload.type == 'INVITE' or payload.type == 'GROUP_INVITE' %}
             {# Group invitation: large rounded group avatar with inviter avatar in bottom right #}
-            <div style="position: relative; width: 72px; height: 72px;">
+            <div style="position: relative; width: 72px; height: 72px; margin-left: -16px;">
               {# Group avatar - rounded rectangle #}
               <a href="{% if navigation.primary and navigation.primary.url %}{{ navigation.primary.url }}{% endif %}"
                  class="border d-flex align-items-center justify-content-center"
@@ -79,7 +79,7 @@
             {# Show group avatar for other group-related notifications #}
             <a href="{% if navigation.primary and navigation.primary.url %}{{ navigation.primary.url }}{% endif %}"
                class="rounded-circle border d-flex align-items-center justify-content-center"
-               style="width: 72px; height: 72px; background-color: var(--bg-secondary); text-decoration: none;"
+               style="width: 72px; height: 72px; background-color: var(--bg-secondary); text-decoration: none; margin-left: -16px;"
                onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
               <img src="{{ payload.context.avatar_url }}" alt="{{ payload.context.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;">
             </a>
@@ -88,7 +88,7 @@
             {% with actor=payload.actors.0 %}
             <a href="{% url 'users:profile' actor.username %}"
                class="rounded-circle border d-flex align-items-center justify-content-center"
-               style="width: 72px; height: 72px; background-color: var(--bg-secondary); text-decoration: none;"
+               style="width: 72px; height: 72px; background-color: var(--bg-secondary); text-decoration: none; margin-left: -16px;"
                onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
               {% if actor.avatar %}
                 <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;">
@@ -103,7 +103,7 @@
           {% with actor=payload.actors.0 %}
           <a href="{% url 'users:profile' actor.username %}"
              class="rounded-circle border d-flex align-items-center justify-content-center"
-             style="width: 72px; height: 72px; background-color: var(--bg-secondary); text-decoration: none;"
+             style="width: 72px; height: 72px; background-color: var(--bg-secondary); text-decoration: none; margin-left: -16px;"
              onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
             {% if actor.avatar %}
               <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;">
@@ -116,7 +116,7 @@
       {% endif %}
     {% else %}
       <div class="rounded-circle border d-flex align-items-center justify-content-center"
-           style="width: 72px; height: 72px; background-color: var(--bg-secondary);">
+           style="width: 72px; height: 72px; background-color: var(--bg-secondary); margin-left: -16px;">
         <i class="bi bi-bell" style="font-size: 2.25rem; color: var(--text-secondary);"></i>
       </div>
     {% endif %}
@@ -131,21 +131,19 @@
               {{ summary }}
             </h6>
           {% endif %}
-          
-          {# Timestamp #}
-          <small class="text-muted" style="font-size: 0.75rem; white-space: nowrap;">
-            {% if payload.timestamps %}
-              {% if payload.timestamps.created_at %}
-                {{ payload.timestamps.created_at|timesince }}
-              {% endif %}
-            {% endif %}
-          </small>
         </div>
         
         {# Profile-Driven Message - includes actor names and action #}
         {% if components.content and message %}
           <p class="mb-1" style="font-size: 0.85rem; color: var(--text-secondary);">
             {{ message }}
+          </p>
+        {% endif %}
+        
+        {# Comment Content - shown for comment notifications #}
+        {% if payload.resource.content %}
+          <p class="mb-1" style="font-size: 0.8rem; color: var(--text-muted); font-style: italic;">
+            "{{ payload.resource.content }}"
           </p>
         {% endif %}
         
@@ -196,6 +194,7 @@
                   <a href="{{ action.url }}"
                      class="btn btn-sm"
                      style="background-color: {% if action.style == 'primary' %}var(--brand){% elif action.style == 'danger' %}var(--danger){% elif action.style == 'success' %}var(--success){% else %}var(--bg-secondary){% endif %}; color: {% if action.style in 'primary danger success' %}white{% else %}var(--text-primary){% endif %}; text-decoration: none; border-radius: 20px;"
+                     onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)"
                      {% if not action.enabled %}style="opacity: 0.5; pointer-events: none;"{% endif %}>
                     {% if action.icon %}<i class="bi bi-{{ action.icon }}"></i>{% endif %}
                     {{ action.label }}
@@ -206,15 +205,26 @@
           </div>
         {% endif %}
         
+        {# Timestamp - positioned at bottom right #}
+        <div class="d-flex justify-content-end mt-2" style="margin-right: -16px;">
+          <small class="text-muted" style="font-size: 0.75rem; white-space: nowrap;">
+            {% if payload.timestamps %}
+              {% if payload.timestamps.created_at %}
+                {{ payload.timestamps.created_at|timesince }}
+              {% endif %}
+            {% endif %}
+          </small>
+        </div>
+        
         {# Expandable Actor List - shown when expanded for aggregated notifications #}
         {% if payload.actors|length > 1 %}
           <div id="expanded-actors-{{ payload.identity.notification_id }}" class="expanded-actors mt-3" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out, opacity 0.3s ease-out; opacity: 0;">
             <div class="d-flex flex-column gap-2 py-2">
-              {% for actor in payload.actors %}
+              {% for actor in payload.actors|slice:":5" %}
                 <a href="{% url 'users:profile' actor.username %}"
                    class="d-flex align-items-center gap-2 p-2 rounded"
                    style="text-decoration: none; color: var(--text-primary); background-color: var(--bg-secondary);"
-                   onclick="event.stopPropagation()">
+                   onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
                   <div class="rounded-circle d-flex align-items-center justify-content-center"
                        style="width: 32px; height: 32px; background-color: var(--bg-tertiary); overflow: hidden;">
                     {% if actor.avatar %}
@@ -223,9 +233,20 @@
                       <i class="bi bi-person" style="font-size: 1rem; color: var(--text-secondary);"></i>
                     {% endif %}
                   </div>
-                  <span style="font-size: 0.85rem;">{{ actor.name }}</span>
+                  <div class="d-flex flex-column">
+                    <span style="font-size: 0.85rem;">{{ actor.name }}</span>
+                    {% if actor.timestamp %}
+                      <small class="text-muted" style="font-size: 0.75rem;">{{ actor.timestamp|timesince }}</small>
+                    {% endif %}
+                  </div>
                 </a>
               {% endfor %}
+              {% if payload.actors|length > 5 %}
+                <div class="d-flex align-items-center justify-content-center p-2 rounded"
+                     style="color: var(--text-secondary); background-color: var(--bg-tertiary);">
+                  <span style="font-size: 0.85rem;">and {{ payload.actors|length|add:-5 }} more</span>
+                </div>
+              {% endif %}
             </div>
           </div>
           
@@ -296,8 +317,15 @@
       
       {# Resource Preview - shown on right side as small box #}
       {% if components.preview and preview.enabled and payload.resource %}
+        {% if payload.resource.url %}
+        <a href="{{ payload.resource.url }}"
+           class="resource-preview flex-shrink-0"
+           style="width: 60px; height: 60px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background-color: var(--bg-secondary); text-decoration: none; margin-right: -16px;"
+           onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
+        {% else %}
         <div class="resource-preview flex-shrink-0"
-             style="width: 80px; height: 80px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background-color: var(--bg-secondary);">
+             style="width: 60px; height: 60px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background-color: var(--bg-secondary); margin-right: -16px;">
+        {% endif %}
           {% if payload.resource.type.value == 'POST' %}
             {% if payload.resource.image_url %}
               <img src="{{ payload.resource.image_url }}" 
@@ -337,7 +365,11 @@
               <i class="bi bi-file-earmark" style="color: var(--text-secondary); font-size: 1.5rem;"></i>
             </div>
           {% endif %}
+        {% if payload.resource.url %}
+        </a>
+        {% else %}
         </div>
+        {% endif %}
       {% endif %}
     </div>
   </div>

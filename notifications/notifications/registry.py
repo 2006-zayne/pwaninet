@@ -16,6 +16,8 @@ class NotificationTypes(Enum):
     
     LIKE = "LIKE"
     COMMENT = "COMMENT"
+    COMMENT_REPLY = "COMMENT_REPLY"
+    COMMENT_LIKE = "COMMENT_LIKE"
     MENTION = "MENTION"
     ASSIGNMENT = "ASSIGNMENT"
     MEETING = "MEETING"
@@ -29,6 +31,7 @@ class NotificationTypes(Enum):
     PINCH = "PINCH"
     INVITE = "INVITE"
     SHARE = "SHARE"
+    POST_CREATED = "POST_CREATED"
     
     @classmethod
     def get_all_types(cls):

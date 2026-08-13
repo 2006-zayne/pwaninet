@@ -1,0 +1,179 @@
+{% load static %}
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Post Thumbnail</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: transparent;
+        }
+        
+        .thumbnail-container {
+            width: 800px;
+            height: 600px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        /* Gradient Classes - Exact match with custom.css */
+        .grad-ocean {
+            background: linear-gradient(135deg, #0f172a 0%, #2563eb 100%);
+        }
+        
+        .grad-forest {
+            background: linear-gradient(135deg, #064e3b 0%, #10b981 100%);
+        }
+        
+        .grad-magma {
+            background: linear-gradient(135deg, #450a0a 0%, #ef4444 100%);
+        }
+        
+        .grad-midnight {
+            background: linear-gradient(135deg, #1e1b4b 0%, #8b5cf6 100%);
+        }
+        
+        .grad-desert {
+            background: linear-gradient(135deg, #78350f 0%, #f59e0b 100%);
+        }
+        
+        .grad-stealth {
+            background: linear-gradient(135deg, #020617 0%, #475569 100%);
+        }
+        
+        .bg-cosmic-stars {
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+        }
+        
+        .bg-spring-flora {
+            background: linear-gradient(135deg, #134e5e 0%, #71b280 100%);
+        }
+        
+        .bg-playful-doodles {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .bg-magic-sparkles {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .bg-username-pattern {
+            background: linear-gradient(135deg, var(--gradient-color1, #141E30) 0%, var(--gradient-color2, #243B55) 100%);
+            background-color: var(--gradient-color1, #141E30);
+            color: var(--text-color, #ffffff);
+        }
+        
+        .bg-geometric-dots {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+        
+        .bg-diagonal-lines {
+            background: linear-gradient(135deg, #2d3436 0%, #636e72 100%);
+        }
+        
+        .bg-hexagon-mesh {
+            background: linear-gradient(135deg, #0c0c0c 0%, #434343 100%);
+        }
+        
+        .bg-circuit-board {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+        }
+        
+        .bg-matrix-rain {
+            background: linear-gradient(135deg, #000000 0%, #0f3d0f 100%);
+        }
+        
+        .gradient-intel-bg {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2.5rem;
+            position: relative;
+        }
+        
+        .post-content {
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 1.5rem;
+            line-height: 1.5;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            max-width: 90%;
+            word-wrap: break-word;
+        }
+        
+        /* SVG Pattern Overlay */
+        .post-pattern-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .signature-overlay {
+            position: relative;
+        }
+        
+        .signature-overlay .post-pattern-svg {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="thumbnail-container">
+        <div class="{{ post.gradient_class }} gradient-intel-bg text-center {% if post.has_signature %}signature-overlay{% endif %}"
+             {% if post.gradient_class == 'bg-username-pattern' %}
+                 style="background: linear-gradient(135deg, {{ post.custom_gradient_color1|default:'#141E30' }} 0%, {{ post.custom_gradient_color2|default:'#243B55' }} 100%); color: {{ post.custom_gradient_text_color|default:'#ffffff' }};"
+             {% endif %}>
+            
+            {% if post.gradient_class == 'bg-username-pattern' %}
+                <svg class="post-pattern-svg" width="100%" height="100%" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+                    <defs>
+                        <pattern id="textPattern_{{ post.id }}" x="0" y="0" width="300" height="300" patternUnits="userSpaceOnUse">
+                            <g fill="{{ post.custom_gradient_text_color|default:'#ffffff' }}" fill-opacity="0.06" font-family="system-ui, sans-serif" font-weight="900" letter-spacing="2">
+                                <text x="20" y="50" transform="rotate(-15 20 50)" font-size="32">{{ post.custom_gradient_text|default:post.author.username }}</text>
+                                <text x="160" y="90" transform="rotate(25 160 90)" font-size="24">{{ post.custom_gradient_text|default:post.author.username }}</text>
+                                <text x="50" y="200" transform="rotate(45 50 200)" font-size="40">{{ post.custom_gradient_text|default:post.author.username }}</text>
+                                <text x="220" y="240" transform="rotate(-25 220 240)" font-size="28">{{ post.custom_gradient_text|default:post.author.username }}</text>
+                                <text x="120" y="280" transform="rotate(10 120 280)" font-size="20">{{ post.custom_gradient_text|default:post.author.username }}</text>
+                                <text x="260" y="50" transform="rotate(-50 260 50)" font-size="26">{{ post.custom_gradient_text|default:post.author.username }}</text>
+                            </g>
+                        </pattern>
+                    </defs>
+                    <rect width="100%" height="100%" fill="url(#textPattern_{{ post.id }})" />
+                </svg>
+            {% elif post.has_signature %}
+                <svg class="post-pattern-svg" width="100%" height="100%" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+                    <g fill="rgba(255,255,255,0.08)" font-family="system-ui, sans-serif" font-weight="900" letter-spacing="2">
+                        <text x="20" y="50" transform="rotate(-15 20 50)" font-size="32">{{ post.author.username }}</text>
+                        <text x="160" y="90" transform="rotate(25 160 90)" font-size="24">{{ post.author.username }}</text>
+                        <text x="50" y="200" transform="rotate(45 50 200)" font-size="40">{{ post.author.username }}</text>
+                        <text x="220" y="240" transform="rotate(-25 220 240)" font-size="28">{{ post.author.username }}</text>
+                        <text x="120" y="280" transform="rotate(10 120 280)" font-size="20">{{ post.author.username }}</text>
+                        <text x="260" y="50" transform="rotate(-50 260 50)" font-size="26">{{ post.author.username }}</text>
+                    </g>
+                </svg>
+            {% endif %}
+            
+            <p class="post-content">
+                {{ post.content }}
+            </p>
+        </div>
+    </div>
+</body>
+</html>

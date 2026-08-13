@@ -162,23 +162,28 @@ class NotificationObjectAdapter(PayloadAdapter):
             if notification.source_events:
                 from notifications.models import PlatformEvent
                 
-                # Get all unique actors from source events
+                # Get all unique actors from source events with their timestamps
+                actor_events = []
                 for event_id in notification.source_events:
                     try:
                         event = PlatformEvent.objects.get(event_id=event_id)
                         if event.actor:
-                            # Check if this actor is already in the list to avoid duplicates
                             actor_id = event.actor.id
+                            # Check if this actor is already in the list to avoid duplicates
                             if not any(a.id == actor_id for a in actors):
                                 actors.append(NotificationActor(
                                     id=actor_id,
                                     name=event.actor.get_full_name() or event.actor.username,
                                     username=event.actor.username or '',
                                     avatar=event.actor.profile_pic.url if event.actor.profile_pic else None,
-                                    verified=getattr(event.actor, 'is_verified', False)
+                                    verified=getattr(event.actor, 'is_verified', False),
+                                    timestamp=event.timestamp
                                 ))
                     except PlatformEvent.DoesNotExist:
                         pass
+                
+                # Sort actors by timestamp descending (most recent first)
+                actors.sort(key=lambda a: a.timestamp if a.timestamp else timezone.now(), reverse=True)
             
             return actors
         
@@ -190,12 +195,15 @@ class NotificationObjectAdapter(PayloadAdapter):
             if actor_id:
                 try:
                     user = User.objects.get(id=actor_id)
+                    # Try to get timestamp from notification metadata or use created_at
+                    actor_timestamp = notification.metadata.get('actor_timestamp') or notification.created_at
                     actors.append(NotificationActor(
                         id=user.id,
                         name=user.get_full_name() or user.username,
                         username=user.username or '',
                         avatar=user.profile_pic.url if user.profile_pic else None,
-                        verified=getattr(user, 'is_verified', False)
+                        verified=getattr(user, 'is_verified', False),
+                        timestamp=actor_timestamp
                     ))
                     return actors
                 except User.DoesNotExist:
@@ -205,7 +213,8 @@ class NotificationObjectAdapter(PayloadAdapter):
                         name=actor_username or 'Unknown',
                         username=actor_username or '',
                         avatar=None,
-                        verified=False
+                        verified=False,
+                        timestamp=notification.created_at
                     ))
                     return actors
         
@@ -222,7 +231,8 @@ class NotificationObjectAdapter(PayloadAdapter):
                         name=event.actor.get_full_name() or event.actor.username,
                         username=event.actor.username or '',
                         avatar=event.actor.profile_pic.url if event.actor.profile_pic else None,
-                        verified=getattr(event.actor, 'is_verified', False)
+                        verified=getattr(event.actor, 'is_verified', False),
+                        timestamp=event.timestamp
                     ))
                     return actors
             except PlatformEvent.DoesNotExist:
@@ -315,7 +325,7 @@ class NotificationObjectAdapter(PayloadAdapter):
                 return NotificationResource(
                     type=ResourceType.POST,
                     id=post.id,
-                    url=f'/posts/{post.id}',
+                    url=f'/post/{post.id}',
                     title=post.content[:100] if post.content else 'Post',
                     image_url=image_url
                 )
@@ -332,12 +342,33 @@ class NotificationObjectAdapter(PayloadAdapter):
                 if not image_url:
                     image_url = self._get_post_image_url(post)
                 
+                # For comment notifications, link to the specific comment
+                if notification.notification_type in ['COMMENT', 'COMMENT_REPLY', 'COMMENT_LIKE']:
+                    # Try to get target_id from metadata (for COMMENT and COMMENT_LIKE)
+                    # or from the notification's target_id field (for COMMENT_REPLY)
+                    target_id = notification.metadata.get('target_id') or notification.metadata.get('comment_id')
+                    
+                    # For COMMENT_REPLY, the target_id might be stored differently
+                    if not target_id and notification.notification_type == 'COMMENT_REPLY':
+                        target_id = notification.metadata.get('parent_comment_id')
+                    
+                    if target_id:
+                        url = f'/post/{post.id}/#comment-{target_id}'
+                    else:
+                        url = f'/post/{post.id}'
+                    # Get comment content for display
+                    comment_content = notification.metadata.get('comment_content', '')
+                else:
+                    url = f'/post/{post.id}'
+                    comment_content = None
+                
                 return NotificationResource(
                     type=ResourceType.POST,
                     id=post.id,
-                    url=f'/posts/{post.id}',
+                    url=url,
                     title=post.content[:100] if post.content else 'Post',
-                    image_url=image_url
+                    image_url=image_url,
+                    content=comment_content
                 )
             except Post.DoesNotExist:
                 pass
@@ -493,6 +524,12 @@ class NotificationObjectAdapter(PayloadAdapter):
                 'url_builder': lambda n: f'/post/{n.context_id}/' if n.context_type == 'POST' and n.context_id else None,
                 'method': 'GET'
             },
+            'VIEW_COMMENT': {
+                'label': 'View Comment',
+                'style': 'primary',
+                'url_builder': lambda n: f'/post/{n.context_id}/#comment-{n.metadata.get("target_id")}' if n.context_type == 'POST' and n.context_id and n.metadata.get('target_id') else None,
+                'method': 'GET'
+            },
             'VIEW_ASSIGNMENT': {
                 'label': 'View Assignment',
                 'style': 'primary',
@@ -514,7 +551,7 @@ class NotificationObjectAdapter(PayloadAdapter):
             'VIEW_PROFILE': {
                 'label': 'View Profile',
                 'style': 'secondary',
-                'url_builder': lambda n: f'/users/profile/{n.metadata.get("actor_id")}/' if n.metadata.get('actor_id') else None,
+                'url_builder': lambda n: f'/users/{n.metadata.get("actor_username")}/' if n.metadata.get('actor_username') else None,
                 'method': 'GET'
             },
             'PINCH': {

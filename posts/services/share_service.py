@@ -59,6 +59,24 @@ def share_post(user, post, shared_to_user=None, shared_to_group=None, message=No
             message=message
         )
         
+        # Get thumbnail URL for notification preview
+        thumbnail_url = None
+        if post.thumbnail:
+            thumbnail_url = post.thumbnail.url
+        elif post.images.exists():
+            thumbnail_url = post.images.first().get_thumbnail_url('400')
+        elif post.video_poster:
+            thumbnail_url = post.video_poster.url
+        elif post.shared_document:
+            try:
+                from documents.models import DocumentFile
+                if post.shared_document.latest_version:
+                    first_file = post.shared_document.latest_version.files.first()
+                    if first_file and first_file.preview_path:
+                        thumbnail_url = f"/media/{first_file.preview_path}"
+            except:
+                pass
+        
         # Emit event for new notification engine
         publish_event(
             event_type=EventTypes.POSTS_POST_SHARED.value,
@@ -67,12 +85,18 @@ def share_post(user, post, shared_to_user=None, shared_to_group=None, message=No
             actor=user,
             target_type='Post',
             target_id=str(post.id),
-            context_type='USER',
-            context_id=str(shared_to_user.id),
+            context_type='POST',
+            context_id=str(post.id),
+            audience=str(shared_to_user.id),
             metadata={
                 'message': message[:100] if message else '',
                 'sharer_username': user.username,
-                'recipient_username': shared_to_user.username
+                'recipient_username': shared_to_user.username,
+                'recipient_id': str(shared_to_user.id),
+                'thumbnail_url': thumbnail_url,
+                'resource_type': 'POST',
+                'post_content': post.content[:100] if post.content else '',
+                'actor_username': user.username,  # Add for title template compatibility
             }
         )
         
@@ -121,6 +145,24 @@ def share_post(user, post, shared_to_user=None, shared_to_group=None, message=No
             message=message
         )
 
+        # Get thumbnail URL for notification preview
+        thumbnail_url = None
+        if post.thumbnail:
+            thumbnail_url = post.thumbnail.url
+        elif post.images.exists():
+            thumbnail_url = post.images.first().get_thumbnail_url('400')
+        elif post.video_poster:
+            thumbnail_url = post.video_poster.url
+        elif post.shared_document:
+            try:
+                from documents.models import DocumentFile
+                if post.shared_document.latest_version:
+                    first_file = post.shared_document.latest_version.files.first()
+                    if first_file and first_file.preview_path:
+                        thumbnail_url = f"/media/{first_file.preview_path}"
+            except:
+                pass
+        
         # Emit event for new notification engine
         publish_event(
             event_type=EventTypes.POSTS_POST_SHARED_TO_GROUP.value,
@@ -129,12 +171,17 @@ def share_post(user, post, shared_to_user=None, shared_to_group=None, message=No
             actor=user,
             target_type='Post',
             target_id=str(repost.id),
-            context_type='GROUP',
-            context_id=str(shared_to_group.id),
+            context_type='POST',
+            context_id=str(post.id),
             metadata={
                 'message': message[:100] if message else '',
                 'sharer_username': user.username,
-                'group_name': shared_to_group.name
+                'group_name': shared_to_group.name,
+                'thumbnail_url': thumbnail_url,
+                'resource_type': 'POST',
+                'post_content': post.content[:100] if post.content else '',
+                'group_id': str(shared_to_group.id),
+                'actor_username': user.username,  # Add for title template compatibility
             }
         )
 

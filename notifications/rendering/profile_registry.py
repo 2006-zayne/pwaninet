@@ -91,7 +91,35 @@ class RenderingProfileRegistry:
             message_strategy=MessageStrategy(template="COMMENT", supported_states=["SINGLE", "DUAL", "FEW", "MANY"]),
             component_visibility=ComponentVisibilityConfig(actor_stack=True, preview=True, action_bar=True),
             preview_strategy=PreviewStrategy(enabled=True, preview_type="POST"),
-            action_strategy=ActionStrategy(available_actions=["VIEW_POST"], primary_actions=["VIEW_POST"]),
+            action_strategy=ActionStrategy(available_actions=["VIEW_COMMENT"], primary_actions=["VIEW_COMMENT"]),
+            navigation_strategy=NavigationStrategy(
+                primary=NavigationConfig(target="POST_DETAIL", resource_id_field="resource.id")
+            ),
+            aggregation_strategy=AggregationStrategy(enabled=True, scope="PER_POST"),
+            expansion_strategy=ExpansionStrategy(expandable=True, data_source="actors")
+        )
+        
+        # COMMENT_REPLY
+        self._profiles["COMMENT_REPLY"] = RenderingProfile(
+            id="COMMENT_REPLY", category=ProfileCategory.SOCIAL, intent=ProfileIntent.ACTIVITY,
+            message_strategy=MessageStrategy(template="COMMENT_REPLY", supported_states=["SINGLE", "DUAL", "FEW", "MANY"]),
+            component_visibility=ComponentVisibilityConfig(actor_stack=True, preview=True, action_bar=True),
+            preview_strategy=PreviewStrategy(enabled=True, preview_type="POST"),
+            action_strategy=ActionStrategy(available_actions=["VIEW_COMMENT"], primary_actions=["VIEW_COMMENT"]),
+            navigation_strategy=NavigationStrategy(
+                primary=NavigationConfig(target="POST_DETAIL", resource_id_field="resource.id")
+            ),
+            aggregation_strategy=AggregationStrategy(enabled=True, scope="PER_POST"),
+            expansion_strategy=ExpansionStrategy(expandable=True, data_source="actors")
+        )
+        
+        # COMMENT_LIKE
+        self._profiles["COMMENT_LIKE"] = RenderingProfile(
+            id="COMMENT_LIKE", category=ProfileCategory.SOCIAL, intent=ProfileIntent.ACTIVITY,
+            message_strategy=MessageStrategy(template="COMMENT_LIKE", supported_states=["SINGLE", "DUAL", "FEW", "MANY"]),
+            component_visibility=ComponentVisibilityConfig(actor_stack=True, preview=True, action_bar=True),
+            preview_strategy=PreviewStrategy(enabled=True, preview_type="POST"),
+            action_strategy=ActionStrategy(available_actions=["VIEW_COMMENT"], primary_actions=["VIEW_COMMENT"]),
             navigation_strategy=NavigationStrategy(
                 primary=NavigationConfig(target="POST_DETAIL", resource_id_field="resource.id")
             ),
@@ -116,6 +144,32 @@ class RenderingProfileRegistry:
         self._profiles["SHARE"] = RenderingProfile(
             id="SHARE", category=ProfileCategory.SOCIAL, intent=ProfileIntent.ACTIVITY,
             message_strategy=MessageStrategy(template="SHARE", supported_states=["SINGLE", "DUAL", "FEW", "MANY"]),
+            component_visibility=ComponentVisibilityConfig(actor_stack=True, preview=True),
+            preview_strategy=PreviewStrategy(enabled=True, preview_type="POST"),
+            navigation_strategy=NavigationStrategy(
+                primary=NavigationConfig(target="POST_DETAIL", resource_id_field="resource.id")
+            ),
+            aggregation_strategy=AggregationStrategy(enabled=True, scope="PER_POST"),
+            expansion_strategy=ExpansionStrategy(expandable=True, data_source="actors")
+        )
+        
+        # POST_CREATED
+        self._profiles["POST_CREATED"] = RenderingProfile(
+            id="POST_CREATED", category=ProfileCategory.SOCIAL, intent=ProfileIntent.ACTIVITY,
+            message_strategy=MessageStrategy(template="POST_CREATED", supported_states=["SINGLE", "DUAL", "FEW", "MANY"]),
+            component_visibility=ComponentVisibilityConfig(actor_stack=True, preview=True),
+            preview_strategy=PreviewStrategy(enabled=True, preview_type="POST"),
+            navigation_strategy=NavigationStrategy(
+                primary=NavigationConfig(target="POST_DETAIL", resource_id_field="resource.id")
+            ),
+            aggregation_strategy=AggregationStrategy(enabled=True, scope="PER_POST"),
+            expansion_strategy=ExpansionStrategy(expandable=True, data_source="actors")
+        )
+        
+        # POST_REPOSTED
+        self._profiles["POST_REPOSTED"] = RenderingProfile(
+            id="POST_REPOSTED", category=ProfileCategory.SOCIAL, intent=ProfileIntent.ACTIVITY,
+            message_strategy=MessageStrategy(template="POST_REPOSTED", supported_states=["SINGLE", "DUAL", "FEW", "MANY"]),
             component_visibility=ComponentVisibilityConfig(actor_stack=True, preview=True),
             preview_strategy=PreviewStrategy(enabled=True, preview_type="POST"),
             navigation_strategy=NavigationStrategy(

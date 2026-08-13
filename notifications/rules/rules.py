@@ -62,12 +62,21 @@ def _post_owner_recipient(event_data: Dict[str, Any]) -> List[int]:
     """Recipient: Post owner."""
     from posts.models import Post
     
-    target_id = event_data.get('target_id')
-    if not target_id:
+    # For comment events, the post ID is in context_id, not target_id
+    context_id = event_data.get('context_id')
+    target_type = event_data.get('target_type')
+    
+    post_id = None
+    if target_type == 'Comment' and context_id:
+        post_id = context_id
+    else:
+        post_id = event_data.get('target_id')
+    
+    if not post_id:
         return []
     
     try:
-        post = Post.objects.get(id=target_id)
+        post = Post.objects.get(id=post_id)
         return [post.author.id]
     except Post.DoesNotExist:
         return []
@@ -165,15 +174,27 @@ def _pinched_user_recipient(event_data: Dict[str, Any]) -> List[int]:
 
 def _post_sharer_recipient(event_data: Dict[str, Any]) -> List[int]:
     """Recipient: User who received the shared post."""
-    context_id = event_data.get('context_id')
-    if not context_id:
-        return []
+    # Get recipient from metadata (recipient_id) or audience field
+    metadata = event_data.get('metadata', {})
+    recipient_id = metadata.get('recipient_id')
     
-    try:
-        user = User.objects.get(id=context_id)
-        return [user.id]
-    except User.DoesNotExist:
-        return []
+    if recipient_id:
+        try:
+            user = User.objects.get(id=int(recipient_id))
+            return [user.id]
+        except (User.DoesNotExist, ValueError):
+            return []
+    
+    # Fallback to audience field
+    audience = event_data.get('audience')
+    if audience:
+        try:
+            user = User.objects.get(id=int(audience))
+            return [user.id]
+        except (User.DoesNotExist, ValueError):
+            return []
+    
+    return []
 
 
 def _original_post_author_recipient(event_data: Dict[str, Any]) -> List[int]:
@@ -188,6 +209,52 @@ def _original_post_author_recipient(event_data: Dict[str, Any]) -> List[int]:
         post = Post.objects.get(id=target_id)
         return [post.author.id]
     except Post.DoesNotExist:
+        return []
+
+
+def _parent_comment_author_not_self_condition(event_data: Dict[str, Any]) -> bool:
+    """Condition: Only notify if actor is not the parent comment author."""
+    actor_id = event_data.get('actor_id')
+    parent_comment_id = event_data.get('target_id')
+    
+    if not actor_id or not parent_comment_id:
+        return False
+    
+    try:
+        from posts.models import Comment
+        parent_comment = Comment.objects.get(id=parent_comment_id)
+        return int(actor_id) != parent_comment.author.id
+    except Comment.DoesNotExist:
+        return False
+
+
+def _parent_comment_author_recipient(event_data: Dict[str, Any]) -> List[int]:
+    """Recipient: Parent comment author (for comment replies)."""
+    from posts.models import Comment
+    
+    target_id = event_data.get('target_id')
+    if not target_id:
+        return []
+    
+    try:
+        parent_comment = Comment.objects.get(id=target_id)
+        return [parent_comment.author.id]
+    except Comment.DoesNotExist:
+        return []
+
+
+def _comment_author_recipient(event_data: Dict[str, Any]) -> List[int]:
+    """Recipient: Comment author (for comment likes)."""
+    from posts.models import Comment
+    
+    target_id = event_data.get('target_id')
+    if not target_id:
+        return []
+    
+    try:
+        comment = Comment.objects.get(id=target_id)
+        return [comment.author.id]
+    except Comment.DoesNotExist:
         return []
 
 
@@ -301,9 +368,15 @@ def _conversation_member_recipient(event_data: Dict[str, Any]) -> List[int]:
 # ============================================================================
 
 def _post_author_not_self_condition(event_data: Dict[str, Any]) -> bool:
-    """Condition: Actor is not the post author."""
+    """Condition: Actor is not the post author and it's not a reply."""
     actor_id = event_data.get('actor_id')
     post_author_id = event_data.get('post_author_id')
+    parent_comment_id = event_data.get('parent_comment_id')
+    
+    # Exclude replies (they should be handled by POST_COMMENT_REPLY_RULE)
+    if parent_comment_id:
+        return False
+    
     return actor_id != post_author_id
 
 
@@ -331,7 +404,7 @@ POST_LIKE_RULE = NotificationRule(
         {
             'action_type': 'VIEW',
             'label': 'View Post',
-            'url': f"/posts/{event.get('target_id')}",
+            'url': f"/post/{event.get('target_id')}",
             'method': 'GET',
             'is_primary': True,
             'order': 0,
@@ -357,8 +430,8 @@ POST_COMMENT_RULE = NotificationRule(
 POST_COMMENT_REPLY_RULE = NotificationRule(
     name="post_comment_reply",
     trigger="posts.comment.replied",
-    condition=None,  # Always applies
-    notification_type="COMMENT",
+    condition=_parent_comment_author_not_self_condition,
+    notification_type="COMMENT_REPLY",
     category="SOCIAL",
     priority="NORMAL",
     delivery_policy="IMMEDIATE",
@@ -366,6 +439,20 @@ POST_COMMENT_REPLY_RULE = NotificationRule(
     recipients=_parent_comment_author_recipient,
     title_template="{actor_username} replied to your comment",
     summary_template="Your comment has new replies"
+)
+
+COMMENT_LIKED_RULE = NotificationRule(
+    name="comment_liked",
+    trigger="posts.comment.liked",
+    condition=None,
+    notification_type="COMMENT_LIKE",
+    category="SOCIAL",
+    priority="LOW",
+    delivery_policy="IMMEDIATE",
+    aggregation_policy="ALLOWED",
+    recipients=_comment_author_recipient,
+    title_template="{actor_username} liked your comment",
+    summary_template="Your comment received likes"
 )
 
 POST_SHARED_RULE = NotificationRule(
@@ -396,11 +483,25 @@ POST_SHARED_TO_GROUP_RULE = NotificationRule(
     summary_template="New post shared to group"
 )
 
+POST_REPORTED_RULE = NotificationRule(
+    name="post_reported",
+    trigger="posts.post.reported",
+    condition=None,
+    notification_type="SECURITY",
+    category="SECURITY",
+    priority="HIGH",
+    delivery_policy="IMMEDIATE",
+    aggregation_policy="NEVER",
+    recipients=lambda event_data: [int(event_data.get('audience', 0))] if event_data.get('audience') else [],
+    title_template="Post reported: {report_reason}",
+    summary_template="New post report",
+)
+
 POST_REPOSTED_RULE = NotificationRule(
     name="post_reposted",
     trigger="posts.post.reposted",
     condition=None,
-    notification_type="SHARE",
+    notification_type="POST_REPOSTED",
     category="SOCIAL",
     priority="NORMAL",
     delivery_policy="IMMEDIATE",
@@ -408,6 +509,20 @@ POST_REPOSTED_RULE = NotificationRule(
     recipients=_original_post_author_recipient,
     title_template="{actor_username} reposted your post",
     summary_template="Your post was reposted"
+)
+
+POST_CREATED_RULE = NotificationRule(
+    name="post_created",
+    trigger="posts.post.created",
+    condition=None,
+    notification_type="POST_CREATED",
+    category="SOCIAL",
+    priority="NORMAL",
+    delivery_policy="IMMEDIATE",
+    aggregation_policy="ALLOWED",
+    recipients=lambda event_data: [],  # Recipients handled by post service
+    title_template="{actor_username} posted a new update",
+    summary_template="New post from someone you follow"
 )
 
 # Groups Rules
@@ -683,9 +798,12 @@ RULES_REGISTRY = [
     POST_LIKE_RULE,
     POST_COMMENT_RULE,
     POST_COMMENT_REPLY_RULE,
+    COMMENT_LIKED_RULE,
     POST_SHARED_RULE,
     POST_SHARED_TO_GROUP_RULE,
+    POST_REPORTED_RULE,
     POST_REPOSTED_RULE,
+    POST_CREATED_RULE,
     GROUP_INVITE_RULE,
     GROUP_REQUEST_RULE,
     GROUP_APPROVED_RULE,

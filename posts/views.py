@@ -552,7 +552,7 @@ class ReportViewSet(viewsets.ModelViewSet):
         # Send notification to group admins/moderators
         if report.post.group:
             from groups.models import Membership, MembershipRole, MembershipStatus
-            from notifications.models import NotificationObject
+            from notifications.events import publish_event, EventTypes, EventSources, EventActions
 
             # Get all admins and moderators of the group
             officials = Membership.objects.filter(
@@ -561,15 +561,24 @@ class ReportViewSet(viewsets.ModelViewSet):
                 status=MembershipStatus.APPROVED
             ).exclude(user=report.reporter)
 
-            # Create notification for each official
+            # Emit event for each official - the rules engine will create notifications
             for membership in officials:
-                Notifications.objects.create(
-                    recipient=membership.user,
-                    sender=report.reporter,
-                    post=report.post,
-                    group=report.post.group,
-                    notification_type=Notifications.REPORT,
-                    message=f"Reported: {report.reason}"
+                publish_event(
+                    event_type=EventTypes.POSTS_POST_REPORTED.value,
+                    source=EventSources.POSTS.value,
+                    action=EventActions.REPORTED.value,
+                    actor=report.reporter,
+                    target_type='Post',
+                    target_id=str(report.post.id),
+                    context_type='GROUP',
+                    context_id=str(report.post.group.id),
+                    audience=str(membership.user.id),
+                    metadata={
+                        'report_reason': report.reason,
+                        'reporter_username': report.reporter.username,
+                        'post_content': report.post.content[:100] if report.post.content else '',
+                        'resource_type': 'POST',
+                    }
                 )
 
 

@@ -38,6 +38,8 @@ class AggregationEngine:
     AGGREGATION_WINDOWS = {
         'LIKE': 30,           # 30 minutes
         'COMMENT': 15,        # 15 minutes
+        'COMMENT_REPLY': 15,  # 15 minutes
+        'COMMENT_LIKE': 30,   # 30 minutes
         'MENTION': 15,        # 15 minutes
         'FOLLOW': 24 * 60,    # 24 hours
         'PINCH': 24 * 60,     # 24 hours
@@ -260,13 +262,22 @@ class AggregationEngine:
         # Update summary based on event count
         base.summary = AggregationEngine._generate_aggregated_summary(base)
         
-        # Update timestamp
-        base.updated_at = timezone.now()
+        # Update timestamp to latest event time (not current time)
+        # This ensures the notification moves up based on when the last action occurred
+        if base.latest_event_time:
+            base.updated_at = base.latest_event_time
+        else:
+            base.updated_at = timezone.now()
+        
+        # Mark as unread if it was previously read and new events are being aggregated
+        # This ensures aggregated notifications with new actions appear as unread
+        if base.status == 'READ':
+            base.status = 'DELIVERED'
         
         # Save the changes
         base.save(update_fields=[
             'source_events', 'event_count', 'first_event_time', 
-            'latest_event_time', 'summary', 'updated_at'
+            'latest_event_time', 'summary', 'updated_at', 'status'
         ])
         
         # Delete the merged notifications

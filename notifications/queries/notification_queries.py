@@ -18,7 +18,7 @@ def get_notifications_for_user(user, notification_type=None, is_read=None, searc
     if search_query:
         queryset = queryset.filter(title__icontains=search_query) | queryset.filter(summary__icontains=search_query)
     
-    return queryset.order_by('-created_at')
+    return queryset.order_by('-updated_at')
 
 
 def get_notifications_by_time_periods(user, notification_type=None, is_read=None, search_query=None):
@@ -44,7 +44,7 @@ def get_notifications_by_time_periods(user, notification_type=None, is_read=None
     week_start = today_start - timedelta(days=now.weekday())  # Monday
     last_week_start = week_start - timedelta(weeks=1)
     
-    notifications = queryset.order_by('-created_at')
+    notifications = queryset.order_by('-updated_at')
     
     grouped = {
         'now': [],
@@ -98,7 +98,7 @@ def get_grouped_notifications(user, notification_type=None, is_read=None, search
     # Group by notification_type and context
     grouped = {}
     
-    for notif in queryset.order_by('-created_at'):
+    for notif in queryset.order_by('-updated_at'):
         # Create a grouping key
         group_key = (notif.notification_type, notif.context_type, notif.context_id)
         
@@ -136,9 +136,12 @@ def mark_user_notifications_as_read(user):
 
 
 def get_unread_count(user):
+    # Count all notifications that are not yet read
+    # This includes CREATED, QUEUED, DELIVERED, and SEEN statuses
     return NotificationObject.objects.filter(
-        recipient=user,
-        status=NotificationStatuses.CREATED.value
+        recipient=user
+    ).exclude(
+        status__in=[NotificationStatuses.READ.value, NotificationStatuses.ARCHIVED.value, NotificationStatuses.EXPIRED.value]
     ).count()
 
 
@@ -150,10 +153,12 @@ def get_notification_for_user(user, notif_id):
 
 
 def get_unread_count_by_type(user, notification_type):
+    # Count all notifications that are not yet read for a specific type
     return NotificationObject.objects.filter(
         recipient=user,
-        status=NotificationStatuses.CREATED.value,
         notification_type=notification_type
+    ).exclude(
+        status__in=[NotificationStatuses.READ.value, NotificationStatuses.ARCHIVED.value, NotificationStatuses.EXPIRED.value]
     ).count()
 
 
@@ -176,11 +181,13 @@ def delete_read_notifications(user):
 
 
 def get_unread_count_by_group(user, group_id):
+    # Count all notifications that are not yet read for a specific group
     return NotificationObject.objects.filter(
         recipient=user,
-        status=NotificationStatuses.CREATED.value,
         context_type='GROUP',
         context_id=group_id
+    ).exclude(
+        status__in=[NotificationStatuses.READ.value, NotificationStatuses.ARCHIVED.value, NotificationStatuses.EXPIRED.value]
     ).count()
 
 
@@ -195,9 +202,10 @@ def get_unread_counts_for_groups(user, group_ids):
     
     counts = NotificationObject.objects.filter(
         recipient=user,
-        status=NotificationStatuses.CREATED.value,
         context_type='GROUP',
         context_id__in=group_ids
+    ).exclude(
+        status__in=[NotificationStatuses.READ.value, NotificationStatuses.ARCHIVED.value, NotificationStatuses.EXPIRED.value]
     ).values('context_id').annotate(
         count=Count('notification_id')
     )
@@ -225,7 +233,7 @@ def get_notifications_grouped_by_sender(user, notification_type=None, is_read=No
     # Group by sender (extracted from metadata)
     grouped = {}
     
-    for notif in queryset.order_by('-created_at'):
+    for notif in queryset.order_by('-updated_at'):
         # Extract actor from metadata
         actor_id = notif.metadata.get('actor_id') if notif.metadata else None
         if not actor_id:
@@ -281,7 +289,7 @@ def get_notifications_hybrid_grouped(user, notification_type=None, is_read=None,
     # First group by activity (type + context)
     activity_groups = {}
     
-    for notif in queryset.order_by('-created_at'):
+    for notif in queryset.order_by('-updated_at'):
         group_key = (notif.notification_type, notif.context_type, notif.context_id)
         
         if group_key not in activity_groups:

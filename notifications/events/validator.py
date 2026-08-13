@@ -17,10 +17,94 @@ class EventValidator:
     - Uses valid event types
     - Uses valid sources
     - Uses valid actions
-    - Follows naming conventions
+    - Event type and action are compatible
     """
     
     REQUIRED_FIELDS = ['event_type', 'source', 'action', 'target_type', 'target_id']
+    
+    # Mapping of event types to their valid actions
+    # This allows semantic flexibility while maintaining consistency
+    EVENT_ACTION_COMPATIBILITY = {
+        # Posts events
+        'posts.post.created': ['created'],
+        'posts.post.updated': ['updated'],
+        'posts.post.deleted': ['deleted'],
+        'posts.post.liked': ['liked'],
+        'posts.post.shared': ['shared'],
+        'posts.post.shared_to_group': ['shared'],
+        'posts.comment.created': ['commented', 'created'],
+        'posts.comment.deleted': ['deleted'],
+        'posts.comment.liked': ['liked'],
+        'posts.comment_reply.created': ['replied'],
+        'posts.comment.replied': ['replied'],
+        'posts.post.reposted': ['reposted', 'shared'],
+        'posts.post.reported': ['reported'],
+        
+        # Groups events
+        'groups.group.created': ['created'],
+        'groups.group.updated': ['updated'],
+        'groups.group.deleted': ['deleted'],
+        'groups.member.invited': ['invited'],
+        'groups.member.requested': ['requested'],
+        'groups.member.approved': ['approved'],
+        'groups.member.rejected': ['rejected'],
+        'groups.member.joined': ['joined'],
+        'groups.member.left': ['left'],
+        'groups.member.removed': ['removed'],
+        
+        # Users events
+        'users.user.followed': ['followed'],
+        'users.user.unfollowed': ['unfollowed'],
+        'users.user.pinched': ['pinched'],
+        'users.profile.updated': ['updated', 'changed'],
+        'users.settings.changed': ['changed'],
+        
+        # Documents events
+        'documents.document.uploaded': ['uploaded'],
+        'documents.document.updated': ['updated'],
+        'documents.document.deleted': ['deleted'],
+        'documents.document.downloaded': ['downloaded'],
+        'documents.document.indexed': ['indexed'],
+        'documents.document.published': ['published'],
+        'documents.document.bookmarked': ['bookmarked'],
+        'documents.document.rated': ['rated'],
+        
+        # Courses events
+        'courses.course.created': ['created'],
+        'courses.unit.created': ['created'],
+        'courses.assignment.published': ['published'],
+        'courses.assignment.submitted': ['submitted'],
+        'courses.assignment.graded': ['graded'],
+        'courses.announcement.published': ['published'],
+        
+        # Messaging events
+        'messaging.message.sent': ['sent'],
+        'messaging.message.edited': ['edited'],
+        'messaging.message.deleted': ['deleted'],
+        'messaging.conversation.created': ['created'],
+        'messaging.conversation.member_added': ['added'],
+        
+        # Projects events
+        'projects.project.created': ['created'],
+        'projects.member.invited': ['invited'],
+        'projects.member.joined': ['joined'],
+        'projects.task.completed': ['completed'],
+        
+        # Releases events
+        'releases.release.created': ['created'],
+        'releases.release.published': ['published'],
+        'releases.release.updated': ['updated'],
+        
+        # Core system events
+        'core.semester.changed': ['changed'],
+        'core.academic_year.changed': ['changed'],
+        'core.backup.completed': ['completed'],
+        
+        # Security events
+        'security.login.detected': ['detected'],
+        'security.password.changed': ['changed'],
+        'security.account.locked': ['locked'],
+    }
     
     @classmethod
     def validate_event_data(cls, event_data):
@@ -58,9 +142,14 @@ class EventValidator:
         if not EventActions.is_valid_action(event_data['action']):
             errors['action'] = f"Invalid action: {event_data['action']}"
         
-        # Validate event type matches action (basic check)
-        if not cls._event_type_matches_action(event_data['event_type'], event_data['action']):
-            errors['event_type'] = f"Event type {event_data['event_type']} does not match action {event_data['action']}"
+        # Validate event type and action compatibility
+        if not errors.get('event_type') and not errors.get('action'):
+            if not cls._are_event_and_action_compatible(event_data['event_type'], event_data['action']):
+                errors['event_type'] = (
+                    f"Event type '{event_data['event_type']}' is not compatible "
+                    f"with action '{event_data['action']}'. "
+                    f"Valid actions for this event type: {cls.EVENT_ACTION_COMPATIBILITY.get(event_data['event_type'], [])}"
+                )
         
         # Validate target
         if not event_data['target_type'] or not event_data['target_id']:
@@ -75,6 +164,30 @@ class EventValidator:
             raise ValidationError(errors)
         
         return event_data
+    
+    @classmethod
+    def _are_event_and_action_compatible(cls, event_type, action):
+        """
+        Check if the action is compatible with the event type.
+        
+        Uses the compatibility mapping to allow semantic flexibility
+        while maintaining consistency.
+        
+        Args:
+            event_type: The event type string
+            action: The action string
+            
+        Returns:
+            bool: True if compatible, False otherwise
+        """
+        valid_actions = cls.EVENT_ACTION_COMPATIBILITY.get(event_type, [])
+        
+        # If no specific mapping exists, allow any valid action
+        # (for new event types not yet added to the mapping)
+        if not valid_actions:
+            return True
+        
+        return action in valid_actions
     
     @classmethod
     def _event_type_matches_action(cls, event_type, action):
@@ -131,8 +244,12 @@ class EventValidator:
         
         # Validate consistency
         if event.event_type and event.action:
-            if not cls._event_type_matches_action(event.event_type, event.action):
-                errors['event_type'] = f"Event type {event.event_type} does not match action {event.action}"
+            if not cls._are_event_and_action_compatible(event.event_type, event.action):
+                errors['event_type'] = (
+                    f"Event type '{event.event_type}' is not compatible "
+                    f"with action '{event.action}'. "
+                    f"Valid actions for this event type: {cls.EVENT_ACTION_COMPATIBILITY.get(event.event_type, [])}"
+                )
         
         # Validate context consistency
         if event.context_type and not event.context_id:

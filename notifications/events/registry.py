@@ -41,6 +41,7 @@ class EventTypes(Enum):
     POSTS_COMMENT_REPLY_CREATED = "posts.comment_reply.created"
     POSTS_COMMENT_REPLIED = "posts.comment.replied"
     POSTS_POST_REPOSTED = "posts.post.reposted"
+    POSTS_POST_REPORTED = "posts.post.reported"
     
     # Groups Events
     GROUPS_GROUP_CREATED = "groups.group.created"
@@ -189,6 +190,7 @@ class EventActions(Enum):
     DECLINED = "declined"
     FOLLOWED = "followed"
     UNFOLLOWED = "unfollowed"
+    PINCHED = "pinched"
     CHANGED = "changed"
     INDEXED = "indexed"
     REVIEWED = "reviewed"
@@ -204,6 +206,7 @@ class EventActions(Enum):
     REQUESTED = "requested"
     RATED = "rated"
     REPOSTED = "reposted"
+    REPORTED = "reported"
     
     @classmethod
     def get_all_actions(cls):

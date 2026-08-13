@@ -46,6 +46,14 @@ class NotificationMessageEngine:
                 "HISTORICAL": "{actors} liked your post.",
                 "SUMMARY": "Your post caught someone's eye",
             },
+            "COMMENT_LIKE": {
+                "SINGLE": "{actor} liked your comment.",
+                "DUAL": "{actor1} and {actor2} liked your comment.",
+                "FEW": "{actors} and {others} others liked your comment.",
+                "MANY": "{actors} and {others} others liked your comment.",
+                "HISTORICAL": "{actors} liked your comment.",
+                "SUMMARY": "Your comment received likes",
+            },
             "POST_COMMENT": {
                 "SINGLE": "{actor} commented on your post.",
                 "DUAL": "{actor1} and {actor2} commented on your post.",
@@ -53,6 +61,14 @@ class NotificationMessageEngine:
                 "MANY": "{actors} and {others} others commented on your post.",
                 "HISTORICAL": "{actors} commented on your post.",
                 "SUMMARY": "Someone engaged with your post",
+            },
+            "COMMENT_REPLY": {
+                "SINGLE": "{actor} replied to your comment.",
+                "DUAL": "{actor1} and {actor2} replied to your comment.",
+                "FEW": "{actors} and {others} others replied to your comment.",
+                "MANY": "{actors} and {others} others replied to your comment.",
+                "HISTORICAL": "{actors} replied to your comment.",
+                "SUMMARY": "Your comment has new replies",
             },
             "POST_MENTION": {
                 "SINGLE": "{actor} mentioned you in a post.",
@@ -191,6 +207,22 @@ class NotificationMessageEngine:
                 "FEW": "{actors} shared posts with you.",
                 "MANY": "{actors} shared posts with you.",
                 "HISTORICAL": "{actors} shared posts with you.",
+            },
+            "POST_CREATED": {
+                "SINGLE": "{actor} posted a new update.",
+                "DUAL": "{actor1} and {actor2} posted new updates.",
+                "FEW": "{actors} and {others} others posted new updates.",
+                "MANY": "{actors} and {others} others posted new updates.",
+                "HISTORICAL": "{actors} posted new updates.",
+                "SUMMARY": "New posts from people you follow",
+            },
+            "POST_REPOSTED": {
+                "SINGLE": "{actor} reposted your post.",
+                "DUAL": "{actor1} and {actor2} reposted your post.",
+                "FEW": "{actors} and {others} others reposted your post.",
+                "MANY": "{actors} and {others} others reposted your post.",
+                "HISTORICAL": "{actors} reposted your post.",
+                "SUMMARY": "Your post was reposted",
             },
             "DOCUMENT_UPLOADED": {
                 "SINGLE": "{actor} uploaded {document} to {repository}.",

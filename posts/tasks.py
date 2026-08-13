@@ -10,6 +10,7 @@ import logging
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.template.loader import render_to_string
 import sys
 import os
 
@@ -146,9 +147,122 @@ def process_large_video(post_id, video_file_path):
 
 
 @shared_task
-def generate_post_thumbnail(post_id):
+def generate_post_thumbnail_playwright(post_id):
     """
-    Generate thumbnail for posts with gradients, text, or other non-media content.
+    Generate thumbnail for posts with gradients using Playwright for exact CSS rendering.
+    
+    This approach uses a headless browser to render the actual HTML/CSS exactly as it appears
+    in the feed, capturing gradients, SVG overlays, and text styling with pixel-perfect accuracy.
+    
+    Args:
+        post_id: ID of the post to generate thumbnail for
+    """
+    from posts.models import Post
+    import threading
+    
+    try:
+        post = Post.objects.get(id=post_id)
+        
+        # Skip if post already has a thumbnail or has images/video
+        if post.thumbnail or post.images.exists() or post.video:
+            logger.info(f"Post {post_id} already has media or thumbnail, skipping thumbnail generation")
+            return
+        
+        # Render the thumbnail template with post data
+        html_content = render_to_string('posts/partials/post_thumbnail.html', {'post': post})
+        
+        # Use Playwright to capture screenshot in a separate thread to avoid async context issues
+        try:
+            from playwright.sync_api import sync_playwright
+            
+            screenshot_result = [None]
+            error_result = [None]
+            
+            def run_playwright():
+                try:
+                    with sync_playwright() as p:
+                        # Try to use system Chrome first, fallback to bundled Chromium
+                        try:
+                            browser = p.chromium.launch(
+                                channel='chrome',  # Use system Chrome
+                                args=['--no-sandbox', '--disable-setuid-sandbox'],
+                                headless=True
+                            )
+                        except:
+                            # Fallback to bundled Chromium if system Chrome not found
+                            browser = p.chromium.launch(
+                                args=['--no-sandbox', '--disable-setuid-sandbox'],
+                                headless=True
+                            )
+                        
+                        page = browser.new_page(viewport={'width': 800, 'height': 600})
+                        
+                        # Set the HTML content
+                        page.set_content(html_content, wait_until='networkidle')
+                        
+                        # Take screenshot
+                        screenshot_bytes = page.screenshot(
+                            type='png',
+                            full_page=False,
+                            animations='disabled'
+                        )
+                        
+                        browser.close()
+                        screenshot_result[0] = screenshot_bytes
+                except Exception as e:
+                    error_result[0] = e
+            
+            # Run Playwright in a separate thread
+            thread = threading.Thread(target=run_playwright)
+            thread.start()
+            thread.join(timeout=30)  # 30 second timeout
+            
+            if thread.is_alive():
+                logger.error(f"Playwright thumbnail generation timed out for post {post_id}")
+                generate_post_thumbnail_pil(post_id)
+                return
+            
+            if error_result[0]:
+                raise error_result[0]
+            
+            if not screenshot_result[0]:
+                logger.error(f"Playwright thumbnail generation failed for post {post_id}: No screenshot generated")
+                generate_post_thumbnail_pil(post_id)
+                return
+            
+            # Save screenshot as thumbnail
+            output = BytesIO(screenshot_result[0])
+            output.seek(0)
+            
+            file_name = f"post_{post.id}_thumbnail.png"
+            post.thumbnail = InMemoryUploadedFile(
+                output, 'ImageField', file_name,
+                'image/png', sys.getsizeof(output), None
+            )
+            post.save(update_fields=['thumbnail'])
+            
+            logger.info(f"Generated Playwright thumbnail for post {post_id}")
+                
+        except ImportError:
+            logger.warning("Playwright not installed, falling back to PIL-based thumbnail generation")
+            generate_post_thumbnail_pil(post_id)
+        except Exception as e:
+            logger.error(f"Playwright thumbnail generation failed for post {post_id}: {e}, falling back to PIL")
+            generate_post_thumbnail_pil(post_id)
+        
+    except Post.DoesNotExist:
+        logger.error(f"Post {post_id} not found for thumbnail generation")
+    except Exception as e:
+        logger.error(f"Error generating thumbnail for post {post_id}: {e}")
+
+
+@shared_task
+def generate_post_thumbnail_pil(post_id):
+    """
+    Generate thumbnail for posts with gradients using PIL (fallback method).
+    
+    This is the legacy PIL-based approach that approximates gradients but doesn't
+    capture SVG overlays or exact CSS rendering. Used as fallback when Playwright fails.
     
     Args:
         post_id: ID of the post to generate thumbnail for
@@ -211,12 +325,26 @@ def generate_post_thumbnail(post_id):
         )
         post.save(update_fields=['thumbnail'])
         
-        logger.info(f"Generated thumbnail for post {post_id}")
+        logger.info(f"Generated PIL thumbnail for post {post_id}")
         
     except Post.DoesNotExist:
         logger.error(f"Post {post_id} not found for thumbnail generation")
     except Exception as e:
         logger.error(f"Error generating thumbnail for post {post_id}: {e}")
+
+
+@shared_task
+def generate_post_thumbnail(post_id):
+    """
+    Generate thumbnail for posts with gradients, text, or other non-media content.
+    
+    This is the main entry point that uses Playwright for exact CSS rendering
+    with PIL as fallback.
+    
+    Args:
+        post_id: ID of the post to generate thumbnail for
+    """
+    generate_post_thumbnail_playwright(post_id)
 
 
 @shared_task

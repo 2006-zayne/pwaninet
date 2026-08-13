@@ -104,48 +104,68 @@
         }
     });
     
-    // Handle long comments with expand/collapse
+    // Handle long comments with expand/collapse (like post card)
     function truncateLongComments() {
         const commentBodies = document.querySelectorAll('.comment-body');
-        const maxLength = 300;
+        const maxLength = 100;
         
         commentBodies.forEach(body => {
             // Skip if already has toggle button
-            if (body.querySelector('.comment-expand-toggle')) {
+            if (body.parentElement.querySelector('.comment-see-more-btn')) {
                 return;
             }
             
             const text = body.textContent;
             
             if (text.length > maxLength) {
-                const truncated = text.substring(0, maxLength);
-                body.textContent = truncated + '...';
-                body.classList.add('collapsed');
+                // Create wrapper structure like post card
+                const wrapper = document.createElement('div');
+                wrapper.className = 'comment-content-wrapper';
+                wrapper.style.position = 'relative';
                 
-                const toggleBtn = document.createElement('button');
-                toggleBtn.className = 'comment-expand-toggle';
-                toggleBtn.textContent = 'See more';
-                toggleBtn.setAttribute('aria-expanded', 'false');
-                toggleBtn.style.display = 'inline-flex';
-                toggleBtn.style.visibility = 'visible';
+                const fullContent = document.createElement('span');
+                fullContent.className = 'comment-content-full';
+                fullContent.textContent = text;
+                fullContent.style.display = 'none';
                 
-                toggleBtn.addEventListener('click', function() {
-                    const isExpanded = body.classList.contains('collapsed');
+                const truncatedContent = document.createElement('span');
+                truncatedContent.className = 'comment-content-truncated';
+                truncatedContent.textContent = text.substring(0, maxLength) + '...';
+                truncatedContent.style.display = 'inline';
+                
+                const seeMoreBtn = document.createElement('button');
+                seeMoreBtn.className = 'btn btn-link p-0 text-primary comment-see-more-btn';
+                seeMoreBtn.style.fontSize = '12px';
+                seeMoreBtn.style.display = 'inline-block';
+                seeMoreBtn.style.marginLeft = '4px';
+                seeMoreBtn.textContent = 'See more';
+                
+                // Toggle functionality
+                seeMoreBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
                     
-                    if (isExpanded) {
-                        body.textContent = truncated + '...';
-                        body.classList.add('collapsed');
-                        toggleBtn.textContent = 'See more';
-                        toggleBtn.setAttribute('aria-expanded', 'false');
+                    const isCurrentlyExpanded = fullContent.style.display !== 'none';
+                    
+                    if (isCurrentlyExpanded) {
+                        // Collapse
+                        fullContent.style.display = 'none';
+                        truncatedContent.style.display = 'inline';
+                        seeMoreBtn.textContent = 'See more';
                     } else {
-                        body.textContent = text;
-                        body.classList.remove('collapsed');
-                        toggleBtn.textContent = 'See less';
-                        toggleBtn.setAttribute('aria-expanded', 'true');
+                        // Expand
+                        fullContent.style.display = 'inline';
+                        truncatedContent.style.display = 'none';
+                        seeMoreBtn.textContent = 'See less';
                     }
                 });
                 
-                body.appendChild(toggleBtn);
+                // Replace body content with wrapper
+                body.textContent = '';
+                body.appendChild(wrapper);
+                wrapper.appendChild(fullContent);
+                wrapper.appendChild(truncatedContent);
+                wrapper.appendChild(seeMoreBtn);
             }
         });
     }

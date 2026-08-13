@@ -1453,6 +1453,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
     let globalNotificationsSocket = null;
     let globalReconnectAttempts = 0;
     const maxReconnectAttempts = 5;
+    let notificationCountPollInterval = null;
 
     // Global feed WebSocket connection for real-time comments
     let globalFeedSocket = null;
@@ -1475,6 +1476,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 console.log('[GLOBAL] Notifications WebSocket connected successfully');
                 globalReconnectAttempts = 0;
                 
+                // Stop polling since WebSocket is connected
+                stopNotificationCountPolling();
+                
                 // Hide any connection error indicators
                 const errorIndicator = document.getElementById('websocket-error');
                 if (errorIndicator) {
@@ -1491,24 +1495,19 @@ window.addEventListener('beforeinstallprompt', (e) => {
                     // Messaging handlers - FROZEN FOR MVP
                     /*
                     if (data.type === 'conversation_update') {
-                        // Update conversation list if we're on that page
+                        // Handle conversation updates
                         if (typeof updateConversationInList === 'function') {
                             updateConversationInList(data);
-                        }
-                        // Update unread count in navigation
-                        updateUnreadCount(data.unread_count);
-                    } else if (data.type === 'typing_indicator') {
-                        // Handle typing indicators if we're on conversation list
-                        if (typeof updateTypingIndicator === 'function') {
-                            updateTypingIndicator(data);
                         }
                     } else 
                     */
                     if (data.type === 'notification') {
                         // Handle general notifications
+                        console.log('[GLOBAL] Handling notification type:', data.type);
                         showNotification(data.notification);
                     } else if (data.type === 'unread_count') {
                         // Handle unread notification count update
+                        console.log('[GLOBAL] Handling unread_count update:', data.count);
                         updateNotificationCount(data.count);
                     } else if (data.type === 'user_status') {
                         // Handle user online/offline status updates
@@ -1524,10 +1523,13 @@ window.addEventListener('beforeinstallprompt', (e) => {
             globalNotificationsSocket.onclose = function(e) {
                 console.log('[GLOBAL] Notifications WebSocket disconnected:', e.code, e.reason);
                 
+                // Start polling as fallback when WebSocket disconnects
+                startNotificationCountPolling();
+                
                 // Attempt to reconnect with exponential backoff
                 if (globalReconnectAttempts < maxReconnectAttempts) {
                     const delay = Math.min(1000 * Math.pow(2, globalReconnectAttempts), 30000);
-                    console.log('[GLOBAL] Reconnecting in ' + delay + 'ms...');
+                    console.log('[GLOBAL] Reconnecting notifications in ' + delay + 'ms...');
                     
                     setTimeout(() => {
                         globalReconnectAttempts++;
@@ -1563,16 +1565,63 @@ window.addEventListener('beforeinstallprompt', (e) => {
     }
 
     function updateNotificationCount(count) {
+        console.log('[GLOBAL] updateNotificationCount called with count:', count);
+        
         // Update notification icon badges in navigation (both desktop and mobile)
         const notificationBadges = document.querySelectorAll('.notification-badge');
+        console.log('[GLOBAL] Found notification badges:', notificationBadges.length);
+        
         notificationBadges.forEach(badge => {
             if (count > 0) {
                 badge.textContent = count > 99 ? '99+' : count;
                 badge.style.display = 'flex';
+                console.log('[GLOBAL] Updated badge to show:', count);
             } else {
                 badge.style.display = 'none';
+                console.log('[GLOBAL] Hid badge (count is 0)');
             }
         });
+    }
+
+    function pollNotificationCount() {
+        // Poll notification count every 5 seconds as fallback
+        fetch('/unread-notification-count/')
+            .then(r => r.text())
+            .then(html => {
+                const badge = document.getElementById('unread-count-badge');
+                if (badge) badge.outerHTML = html;
+                
+                // Also update navigation badges
+                const navBadges = document.querySelectorAll('.notification-badge');
+                const countMatch = html.match(/(\d+)/);
+                if (countMatch) {
+                    const count = parseInt(countMatch[1]);
+                    updateNotificationCount(count);
+                }
+            })
+            .catch(error => {
+                console.error('Error polling notification count:', error);
+            });
+    }
+
+    function startNotificationCountPolling() {
+        // Clear existing interval if any
+        if (notificationCountPollInterval) {
+            clearInterval(notificationCountPollInterval);
+        }
+        
+        // Poll every 5 seconds
+        notificationCountPollInterval = setInterval(pollNotificationCount, 5000);
+        
+        // Initial poll
+        pollNotificationCount();
+    }
+
+    function stopNotificationCountPolling() {
+        if (notificationCountPollInterval) {
+            clearInterval(notificationCountPollInterval);
+            notificationCountPollInterval = null;
+        }
     }
 
     function showNotification(notification) {
@@ -1683,6 +1732,11 @@ window.addEventListener('beforeinstallprompt', (e) => {
     // Connect when page loads
     document.addEventListener('DOMContentLoaded', function() {
         // User is authenticated if we're in this script block (wrapped in {% if request.user.is_authenticated %})
+        
+        // Start polling as fallback initially
+        startNotificationCountPolling();
+        
+        // Try to connect WebSocket (will stop polling if successful)
         connectGlobalNotificationsWebSocket();
         connectGlobalFeedWebSocket();
     });

@@ -3,7 +3,7 @@
     <!-- Share Header -->
     <div class="d-flex align-items-center p-2 border-bottom bg-light">
         <a href="{% url 'users:profile' shared_post.sharer.username %}">
-            <img src="{{ shared_post.sharer.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm me-2" style="width: 40px; height: 40px; object-fit: cover;">
+            <img src="{{ shared_post.sharer.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm me-2" style="width: 72px; height: 72px; object-fit: cover;">
         </a>
         <div class="flex-grow-1">
             <small class="fw-bold text-dark">
@@ -30,17 +30,17 @@
 
     <!-- Original Post Content -->
     <div class="d-flex align-items-center p-3">
-        <div class="position-relative me-3" style="width: 50px; height: 50px;">
+        <div class="position-relative me-3" style="width: 72px; height: 72px;">
             {% if shared_post.original_post.group %}
                 <a href="{% url 'groups:groups_detail' shared_post.original_post.group.id %}">
-                    <img src="{{ shared_post.original_post.group.get_photo_url }}" class="rounded-circle border border-2 border-white shadow-sm" style="width: 48px; height: 48px; object-fit: cover;">
+                    <img src="{{ shared_post.original_post.group.get_photo_url }}" class="rounded-circle border border-2 border-white shadow-sm" style="width: 72px; height: 72px; object-fit: cover;">
                 </a>
                 <a href="{% url 'users:profile' shared_post.original_post.author.username %}">
-                    <img src="{{ shared_post.original_post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 24px; height: 24px; object-fit: cover; transform: translate(15%, 15%);">
+                    <img src="{{ shared_post.original_post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 36px; height: 36px; object-fit: cover; transform: translate(15%, 15%);">
                 </a>
             {% else %}
                 <a href="{% url 'users:profile' shared_post.original_post.author.username %}">
-                    <img src="{{ shared_post.original_post.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 48px; height: 48px; object-fit: cover;">
+                    <img src="{{ shared_post.original_post.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 72px; height: 72px; object-fit: cover;">
                 </a>
             {% endif %}
         </div>

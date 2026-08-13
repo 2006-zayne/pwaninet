@@ -367,14 +367,15 @@ class PostCreateSerializer(serializers.ModelSerializer):
                 ).exclude(id=author.id)
                 msg_text = f"posted in the {post.group.name} squad."
             else:
+                # Only send to mutual followers (users who follow the author AND the author follows them back)
                 recipients = User.objects.filter(
-                    course=getattr(author, 'course', None),
-                    year=getattr(author, 'year', None)
+                    follower_relationships__followed=author,
+                    following_relationships__follower=author
                 ).exclude(id=author.id)
                 msg_text = "posted a new update in the global feed."
 
             if recipients.exists():
-                notification_type = NotificationTypes.GROUP.value if post.group else NotificationTypes.SHARE.value
+                notification_type = NotificationTypes.GROUP.value if post.group else NotificationTypes.POST_CREATED.value
                 
                 # Get thumbnail URL for notification preview
                 thumbnail_url = None
@@ -395,12 +396,17 @@ class PostCreateSerializer(serializers.ModelSerializer):
                     except:
                         pass
                 
-                NotificationObject.objects.bulk_create([
+                from django.utils import timezone
+                from notifications.services.notification_service import invalidate_unread_count_cache, get_unread_count
+                from channels.layers import get_channel_layer
+                from asgiref.sync import async_to_sync
+                
+                created_notifications = NotificationObject.objects.bulk_create([
                     NotificationObject(
                         recipient=recipient,
                         notification_type=notification_type,
                         category=NotificationCategories.SOCIAL.value,
-                        title=msg_text,
+                        title=f"{author.username} {msg_text}",
                         summary=f"{author.username} {msg_text}",
                         context_type='Post',
                         context_id=str(post.id),
@@ -412,11 +418,33 @@ class PostCreateSerializer(serializers.ModelSerializer):
                             'resource_type': 'POST',
                             'target_type': 'Post',
                             'target_id': str(post.id),
+                            'post_content': post.content[:100] if post.content else '',
                         },
                         priority='NORMAL',
+                        updated_at=timezone.now(),
                     )
                     for recipient in recipients
                 ])
+                
+                # Invalidate unread count cache for all recipients and broadcast updates
+                channel_layer = get_channel_layer()
+                for notification in created_notifications:
+                    recipient_id = notification.recipient_id
+                    invalidate_unread_count_cache(recipient_id)
+                    
+                    # Get the actual count
+                    count = get_unread_count(recipient_id)
+                    logger.info(f'[PostCreateSerializer] Broadcasting unread count update to user {recipient_id}: count={count}')
+                    
+                    # Broadcast unread count update via WebSocket
+                    async_to_sync(channel_layer.group_send)(
+                        f"notifications_{recipient_id}",
+                        {
+                            'type': 'unread_count_update',
+                            'count': count
+                        }
+                    )
+                    logger.info(f'[PostCreateSerializer] Successfully sent WebSocket broadcast to notifications_{recipient_id}')
         
         # Trigger thumbnail generation for gradient/text posts
         if not post.images.exists() and not post.video and not post.shared_document:
@@ -582,7 +610,59 @@ class RepostCreateSerializer(serializers.ModelSerializer):
         ).exists():
             raise serializers.ValidationError("You have already reposted this post.")
         
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f'[RepostCreateSerializer] Creating repost by {request.user.username} for post {original_post.id}')
+        
         repost = Repost.objects.create(reposter=request.user, **validated_data)
+        
+        logger.info(f'[RepostCreateSerializer] Repost created with ID {repost.id}')
+        
+        # Emit event directly for notification
+        from notifications.events import publish_event, EventTypes, EventSources, EventActions
+        
+        # Get thumbnail URL for notification preview
+        thumbnail_url = None
+        if original_post.thumbnail:
+            thumbnail_url = original_post.thumbnail.url
+        elif original_post.images.exists():
+            thumbnail_url = original_post.images.first().get_thumbnail_url('400')
+        elif original_post.video_poster:
+            thumbnail_url = original_post.video_poster.url
+        elif original_post.shared_document:
+            try:
+                from documents.models import DocumentFile
+                if original_post.shared_document.latest_version:
+                    first_file = original_post.shared_document.latest_version.files.first()
+                    if first_file and first_file.preview_path:
+                        thumbnail_url = f"/media/{first_file.preview_path}"
+            except:
+                pass
+        
+        logger.info(f'[RepostCreateSerializer] Publishing repost notification event')
+        
+        publish_event(
+            event_type=EventTypes.POSTS_POST_REPOSTED.value,
+            source=EventSources.POSTS.value,
+            action=EventActions.SHARED.value,
+            actor=request.user,
+            target_type='Post',
+            target_id=str(original_post.id),
+            context_type='GROUP' if group else None,
+            context_id=str(group.id) if group else None,
+            metadata={
+                'actor_username': request.user.username,
+                'original_post_author_id': original_post.author.id,
+                'original_post_author_username': original_post.author.username,
+                'repost_content': validated_data.get('content', '')[:100] if validated_data.get('content') else None,
+                'thumbnail_url': thumbnail_url,
+                'resource_type': 'POST',
+                'post_content': original_post.content[:100] if original_post.content else '',
+            }
+        )
+        
+        logger.info(f'[RepostCreateSerializer] Repost notification event published')
+        
         return repost
 
 

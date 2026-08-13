@@ -130,3 +130,4 @@ xlsxwriter==3.2.9
 yarl==1.23.0
 zope.event==6.1
 zope.interface==8.3
+playwright==1.48.0

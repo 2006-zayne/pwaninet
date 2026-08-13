@@ -9,14 +9,14 @@ ALLOWED_HOSTS = [
     host.split(':')[0].strip()
     for host in os.environ.get(
         'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,0.0.0.0,pwaninet.app,192.168.124.221,192.168.43.170'
+        'localhost,127.0.0.1,0.0.0.0,pwaninet.app,192.168.80.221,192.168.43.170'
     ).split(',')
     if host.strip()
 ]
 
 # Ensure the specific IP is in ALLOWED_HOSTS
 if 'pwaninet.app' not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append('192.168.124.221')
+    ALLOWED_HOSTS.append('192.168.80.221')
     
 
 # Database - PostgreSQL for local development

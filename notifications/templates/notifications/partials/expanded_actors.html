@@ -1,4 +1,4 @@
-{% for actor in payload.actors %}
+{% for actor in payload.actors|slice:":5" %}
   <a href="{% url 'users:profile' actor.username %}"
      class="d-flex align-items-center gap-2 p-2 rounded"
      style="text-decoration: none; color: var(--text-primary); background-color: var(--bg-secondary);"
@@ -11,6 +11,18 @@
         <i class="bi bi-person" style="font-size: 1rem; color: var(--text-secondary);"></i>
       {% endif %}
     </div>
-    <span style="font-size: 0.85rem;">{{ actor.name }}</span>
+    <div class="d-flex flex-column">
+      <span style="font-size: 0.85rem;">{{ actor.name }}</span>
+      {% if actor.timestamp %}
+        <small class="text-muted" style="font-size: 0.75rem;">{{ actor.timestamp|timesince }}</small>
+      {% endif %}
+    </div>
   </a>
 {% endfor %}
+
+{% if payload.actors|length > 5 %}
+  <div class="d-flex align-items-center justify-content-center p-2 rounded"
+       style="color: var(--text-secondary); background-color: var(--bg-tertiary);">
+    <span style="font-size: 0.85rem;">and {{ payload.actors|length|add:-5 }} more</span>
+  </div>
+{% endif %}

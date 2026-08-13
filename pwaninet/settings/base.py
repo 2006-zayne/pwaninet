@@ -35,7 +35,7 @@ ALLOWED_HOSTS = [
     host.split(':')[0].strip()
     for host in os.environ.get(
         'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,10.20.152.125,pwaninet.app,192.168.124.221,192.168.43.170'
+        'localhost,127.0.0.1,10.20.152.125,pwaninet.app,192.168.114.221,192.168.43.170'
     ).split(',')
     if host.strip()
 ]

@@ -27,7 +27,7 @@ except User.DoesNotExist:
 # Create a test notification
 notification = NotificationObject.objects.create(
     recipient=user1,
-    notification_type='LIKE',
+    notification_type='COMMENTED',
     category='SOCIAL',
     priority='NORMAL',
     title='Test notification',

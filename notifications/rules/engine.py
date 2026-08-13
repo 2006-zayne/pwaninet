@@ -186,8 +186,9 @@ class RulesEngine:
                     # Update summary
                     existing.summary = AggregationEngine._generate_aggregated_summary(existing)
                     
-                    # Update timestamp
-                    existing.updated_at = timezone.now()
+                    # Update timestamp to the event's timestamp (not current time)
+                    # This ensures the notification moves up based on when the last action occurred
+                    existing.updated_at = event.timestamp
                     
                     # Save the changes
                     existing.save(update_fields=[
@@ -238,6 +239,7 @@ class RulesEngine:
             event_count=1,
             first_event_time=event.timestamp,
             latest_event_time=event.timestamp,
+            updated_at=event.timestamp,
             metadata={
                 'event_type': event.event_type,
                 'actor_id': str(event.actor.id) if event.actor else None,

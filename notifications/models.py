@@ -588,8 +588,11 @@ class NotificationObject(models.Model):
         help_text="When the notification was first created (immutable)"
     )
     updated_at = models.DateTimeField(
-        auto_now=True,
-        help_text="Last modification time (aggregation updates this)"
+        auto_now=False,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Last modification time (only updated during aggregation, not on read status changes)"
     )
     
     # Expiration
@@ -601,7 +604,7 @@ class NotificationObject(models.Model):
     )
     
     class Meta:
-        ordering = ['-created_at']
+        ordering = ['-updated_at']
         indexes = [
             models.Index(fields=['recipient']),
             models.Index(fields=['notification_type']),
@@ -610,6 +613,7 @@ class NotificationObject(models.Model):
             models.Index(fields=['status']),
             models.Index(fields=['aggregation_key']),
             models.Index(fields=['created_at']),
+            models.Index(fields=['updated_at']),
             models.Index(fields=['expires_at']),
             models.Index(fields=['context_type', 'context_id']),
         ]

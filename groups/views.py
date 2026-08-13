@@ -28,6 +28,7 @@ from groups.services.group_notification_service import (
     send_group_invite_notification
 )
 from notifications.services.notification_service import get_cached_unread_count, get_group_unread_counts
+from notifications.models import NotificationObject
 from django.http import JsonResponse
 
 
@@ -612,14 +613,15 @@ def approve_from_notification(request, group_id, user_id):
     
     # Delete the request notification
     try:
-        notification = Notifications.objects.get(
+        notification = NotificationObject.objects.filter(
             recipient=request.user,
-            sender_id=user_id,
-            group=group,
-            notification_type=Notifications.GROUP_REQUEST
-        )
-        notification.delete()
-    except Notifications.DoesNotExist:
+            context_type='GROUP',
+            context_id=str(group.id),
+            notification_type='GROUP_REQUEST'
+        ).first()
+        if notification:
+            notification.delete()
+    except Exception:
         pass  # Notification may have already been deleted
     
     messages.success(request, f'{membership.user.username} has been approved to join {group.name}.')
@@ -663,14 +665,15 @@ def reject_from_notification(request, group_id, user_id):
     
     # Delete the request notification
     try:
-        notification = Notifications.objects.get(
+        notification = NotificationObject.objects.filter(
             recipient=request.user,
-            sender_id=user_id,
-            group=group,
-            notification_type=Notifications.GROUP_REQUEST
-        )
-        notification.delete()
-    except Notifications.DoesNotExist:
+            context_type='GROUP',
+            context_id=str(group.id),
+            notification_type='GROUP_REQUEST'
+        ).first()
+        if notification:
+            notification.delete()
+    except Exception:
         pass  # Notification may have already been deleted
     
     messages.info(request, f'{membership.user.username}\'s request to join {group.name} was rejected.')

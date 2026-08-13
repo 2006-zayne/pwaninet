@@ -102,6 +102,7 @@ class NotificationActor:
     username: str
     avatar: Optional[str] = None
     verified: bool = False
+    timestamp: Optional[Any] = None
 
 
 @dataclass
@@ -122,6 +123,7 @@ class NotificationResource:
     url: Optional[str] = None
     title: Optional[str] = None
     image_url: Optional[str] = None
+    content: Optional[str] = None
 
 
 @dataclass

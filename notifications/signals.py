@@ -35,6 +35,7 @@ def create_like_notification(sender, instance, created, **kwargs):
                     pass
             
             # Emit event for new notification engine
+            from django.utils import timezone
             publish_event(
                 event_type=EventTypes.POSTS_POST_LIKED.value,
                 source=EventSources.POSTS.value,
@@ -42,84 +43,15 @@ def create_like_notification(sender, instance, created, **kwargs):
                 actor=liker,
                 target_type='Post',
                 target_id=str(post.id),
-                context_type='GROUP' if post.group else None,
-                context_id=str(post.group.id) if post.group else None,
+                context_type='POST',
+                context_id=str(post.id),
                 metadata={
                     'post_content': post.content[:100],
                     'liker_username': liker.username,
                     'thumbnail_url': thumbnail_url,
                     'resource_type': 'POST',
-                }
-            )
-
-
-@receiver(post_save, sender=Comment)
-def create_comment_notification(sender, instance, created, **kwargs):
-    if created:
-        post = instance.post
-        commenter = instance.author
-        post_author = post.author
-        
-        # Get thumbnail URL for notification preview
-        thumbnail_url = None
-        if post.thumbnail:
-            thumbnail_url = post.thumbnail.url
-        elif post.images.exists():
-            thumbnail_url = post.images.first().get_thumbnail_url('400')
-        elif post.video_poster:
-            thumbnail_url = post.video_poster.url
-        elif post.shared_document:
-            # For shared documents, try to get document preview
-            try:
-                from documents.models import DocumentFile
-                if post.shared_document.latest_version:
-                    first_file = post.shared_document.latest_version.files.first()
-                    if first_file and first_file.preview_path:
-                        thumbnail_url = f"/media/{first_file.preview_path}"
-            except:
-                pass
-        
-        # Check if this is a reply to a comment
-        if instance.parent_comment:
-            parent_author = instance.parent_comment.author
-            
-            if commenter != parent_author:
-                # Emit event for comment reply
-                publish_event(
-                    event_type=EventTypes.POSTS_COMMENT_REPLIED.value,
-                    source=EventSources.POSTS.value,
-                    action=EventActions.REPLIED.value,
-                    actor=commenter,
-                    target_type='Comment',
-                    target_id=str(instance.parent_comment.id),
-                    context_type='POST',
-                    context_id=str(post.id),
-                    metadata={
-                        'reply_content': instance.content[:100],
-                        'commenter_username': commenter.username,
-                        'parent_comment_content': instance.parent_comment.content[:100],
-                        'thumbnail_url': thumbnail_url,
-                        'resource_type': 'POST',
-                    }
-                )
-        
-        # Regular comment on post
-        if commenter != post_author:
-            # Emit event for new notification engine
-            publish_event(
-                event_type=EventTypes.POSTS_COMMENT_CREATED.value,
-                source=EventSources.POSTS.value,
-                action=EventActions.COMMENTED.value,
-                actor=commenter,
-                target_type='Post',
-                target_id=str(post.id),
-                context_type='GROUP' if post.group else None,
-                context_id=str(post.group.id) if post.group else None,
-                metadata={
-                    'comment_content': instance.content[:100],
-                    'commenter_username': commenter.username,
-                    'thumbnail_url': thumbnail_url,
-                    'resource_type': 'POST',
+                    'group_id': str(post.group.id) if post.group else None,
+                    'actor_timestamp': timezone.now().isoformat(),
                 }
             )
 
@@ -143,7 +75,7 @@ def create_comment_like_notification(sender, instance, created, **kwargs):
                 context_type='POST',
                 context_id=str(comment.post.id),
                 metadata={
-                    'comment_content': comment.content[:100],
+                    'comment_content': (comment.content[:50] + '...') if comment.content and len(comment.content) > 50 else (comment.content or ''),
                     'liker_username': liker.username
                 }
             )

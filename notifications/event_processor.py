@@ -14,7 +14,9 @@ from notifications.rules.engine import RulesEngine
 from notifications.preferences.engine import PreferenceEngine
 from notifications.aggregation.engine import AggregationEngine
 from notifications.delivery.engine import DeliveryEngine
-from notifications.services.notification_service import invalidate_unread_count_cache
+from notifications.services.notification_service import invalidate_unread_count_cache, get_unread_count
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 User = get_user_model()
 
@@ -53,9 +55,25 @@ def process_platform_event(sender, instance, created, **kwargs):
         
         logger.info(f"Created {len(notifications)} NotificationObjects for event {instance.event_id}")
         
-        # Invalidate unread count cache for all recipients
+        # Invalidate unread count cache for all recipients and broadcast updates
+        channel_layer = get_channel_layer()
         for notification in notifications:
-            invalidate_unread_count_cache(notification.recipient_id)
+            recipient_id = notification.recipient_id
+            invalidate_unread_count_cache(recipient_id)
+            
+            # Get the actual count
+            count = get_unread_count(recipient_id)
+            logger.info(f"Broadcasting unread count update to user {recipient_id}: count={count}")
+            
+            # Broadcast unread count update via WebSocket
+            async_to_sync(channel_layer.group_send)(
+                f"notifications_{recipient_id}",
+                {
+                    'type': 'unread_count_update',
+                    'count': count
+                }
+            )
+            logger.info(f"Successfully sent WebSocket broadcast to notifications_{recipient_id}")
         
         # Step 2-4: Process each notification through the pipeline
         for notification in notifications:
