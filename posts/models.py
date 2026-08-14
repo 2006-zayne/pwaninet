@@ -228,6 +228,33 @@ class CommentLike(models.Model):
         unique_together = ('user', 'comment')
 
 
+class PostImageLike(models.Model):
+    """Individual likes for post images"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, db_index=True)
+    post_image = models.ForeignKey(PostImage, on_delete=models.CASCADE, related_name='likes', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        unique_together = ('user', 'post_image')
+
+    def __str__(self):
+        return f"{self.user.username} likes image {self.post_image.id}"
+
+
+class PostImageComment(models.Model):
+    """Individual comments for post images"""
+    post_image = models.ForeignKey(PostImage, on_delete=models.CASCADE, related_name='comments', db_index=True)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='image_comments', db_index=True)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Comment by {self.author} on image {self.post_image.id}"
+
+
 class Report(models.Model):
     reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reports')
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='reports')

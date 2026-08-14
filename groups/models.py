@@ -64,3 +64,27 @@ class Membership(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.group.name} ({self.role})"
+
+
+class GroupPhotoLike(models.Model):
+    """Likes for group profile and cover photos"""
+    PHOTO_TYPE_CHOICES = [
+        ('group', 'Group Photo'),
+        ('cover', 'Cover Photo'),
+    ]
+    
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='group_photo_likes', db_index=True)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='photo_likes', db_index=True)
+    photo_type = models.CharField(max_length=10, choices=PHOTO_TYPE_CHOICES, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        unique_together = ('user', 'group', 'photo_type')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['group', 'photo_type', '-created_at']),
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} likes {self.group.name}'s {self.photo_type} photo"

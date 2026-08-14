@@ -1,12 +1,12 @@
 /**
  * PwaniNet Service Worker
  * Handles offline support, caching, and push notifications
- * Version: 1.1.0 - Updated with enhanced push notifications
+ * Version: 1.2.0 - Updated offline page design and caching
  */
 
 'use strict';
-let CACHE_VERSION = '1.1.0';
-let CACHE_BUILD = '2';
+let CACHE_VERSION = '1.2.0';
+let CACHE_BUILD = '1';
 let CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}`;
 let OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}`;
 
@@ -47,6 +47,7 @@ const CORE_ASSETS = [
     '/static/images/favicon.svg',
     '/static/images/apple-touch-icon.png',
     '/static/images/web-app-manifest-192x192.png',
+    '/static/images/web-app-manifest-192x192-rounded.png',
     '/static/images/web-app-manifest-512x512.png',
     '/static/images/browserconfig.xml',
     '/static/js/messaging/offline-cache.js',
@@ -441,12 +442,13 @@ async function getOfflineResponse(request) {
 }
 
 async function getOfflinePage() {
+    // Always try to get the actual offline.html from cache first
     const offlineResponse = await caches.match('/offline.html');
     if (offlineResponse) {
         return offlineResponse;
     }
     
-    // Try to fetch and cache the offline page
+    // Try to fetch and cache the offline page from network
     try {
         const response = await fetch('/offline.html');
         if (response.ok) {
@@ -455,10 +457,10 @@ async function getOfflinePage() {
             return response;
         }
     } catch (error) {
-        console.log('Failed to fetch offline.html, using fallback');
+        console.log('Failed to fetch offline.html from network');
     }
     
-    // Create basic offline page if not cached
+    // Minimal fallback if offline.html is not available
     return new Response(`
         <!DOCTYPE html>
         <html lang="en">
@@ -467,16 +469,11 @@ async function getOfflinePage() {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>PwaniNet - Offline</title>
             <style>
-                * {
-                    margin: 0;
-                    padding: 0;
-                    box-sizing: border-box;
-                }
-                
+                * { margin: 0; padding: 0; box-sizing: border-box; }
                 body {
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
+                    background: #f8fafc;
+                    color: #0f172a;
                     min-height: 100vh;
                     display: flex;
                     align-items: center;
@@ -484,108 +481,36 @@ async function getOfflinePage() {
                     text-align: center;
                     padding: 20px;
                 }
-                
-                .offline-container {
-                    max-width: 400px;
-                    animation: fadeInUp 0.6s ease;
-                }
-                
-                .offline-icon {
-                    font-size: 80px;
-                    margin-bottom: 20px;
-                    opacity: 0.8;
-                }
-                
-                .offline-title {
-                    font-size: 28px;
-                    font-weight: 600;
-                    margin-bottom: 12px;
-                }
-                
-                .offline-message {
-                    font-size: 16px;
-                    opacity: 0.9;
-                    margin-bottom: 24px;
-                    line-height: 1.5;
-                }
-                
-                .offline-status {
-                    font-size: 14px;
-                    opacity: 0.7;
-                    margin-bottom: 32px;
-                }
-                
+                .offline-container { max-width: 400px; animation: fadeInUp 0.8s ease; }
+                .offline-title { font-size: 28px; font-weight: 700; margin-bottom: 16px; }
+                .offline-message { font-size: 16px; color: #64748b; margin-bottom: 32px; line-height: 1.6; }
                 .retry-button {
-                    background: rgba(255, 255, 255, 0.2);
-                    border: 2px solid rgba(255, 255, 255, 0.3);
+                    background: #2563eb;
                     color: white;
-                    padding: 12px 24px;
-                    border-radius: 25px;
-                    font-size: 14px;
-                    font-weight: 500;
+                    padding: 16px 24px;
+                    border-radius: 12px;
+                    font-size: 15px;
+                    font-weight: 600;
                     cursor: pointer;
-                    transition: all 0.3s ease;
+                    border: none;
                     text-decoration: none;
                     display: inline-block;
                 }
-                
-                .retry-button:hover {
-                    background: rgba(255, 255, 255, 0.3);
-                    border-color: rgba(255, 255, 255, 0.5);
-                    transform: translateY(-2px);
-                }
-                
                 @keyframes fadeInUp {
-                    from {
-                        opacity: 0;
-                        transform: translateY(20px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-                
-                @keyframes pulse {
-                    0%, 100% { opacity: 0.8; }
-                    50% { opacity: 0.4; }
-                }
-                
-                .connecting {
-                    animation: pulse 2s ease-in-out infinite;
+                    from { opacity: 0; transform: translateY(30px); }
+                    to { opacity: 1; transform: translateY(0); }
                 }
             </style>
         </head>
         <body>
             <div class="offline-container">
-                <div class="offline-icon connecting">📱</div>
-                <h1 class="offline-title">You're offline</h1>
-                <p class="offline-message">PwaniNet is unavailable right now.</p>
-                <p class="offline-status">We'll reconnect automatically...</p>
-                <button class="retry-button" onclick="window.location.reload()">Try Again</button>
+                <h1 class="offline-title">YOU ARE OFFLINE</h1>
+                <p class="offline-message">WE WILL RECONNECT WHEN YOU HAVE INTERNET ACCESS</p>
+                <button class="retry-button" onclick="window.location.reload()">Retry</button>
             </div>
-            
             <script>
-                // Auto-retry connection
-                let retryCount = 0;
-                const maxRetries = 10;
-                
-                function checkConnection() {
-                    if (navigator.onLine) {
-                        window.location.reload();
-                    } else if (retryCount < maxRetries) {
-                        retryCount++;
-                        setTimeout(checkConnection, 3000);
-                    }
-                }
-                
-                // Start checking after 3 seconds
-                setTimeout(checkConnection, 3000);
-                
-                // Listen for online events
-                window.addEventListener('online', () => {
-                    window.location.reload();
-                });
+                window.addEventListener('online', () => window.location.reload());
+                setInterval(() => { if (navigator.onLine) window.location.reload(); }, 5000);
             </script>
         </body>
         </html>

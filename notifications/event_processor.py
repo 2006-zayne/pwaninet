@@ -14,7 +14,8 @@ from notifications.rules.engine import RulesEngine
 from notifications.preferences.engine import PreferenceEngine
 from notifications.aggregation.engine import AggregationEngine
 from notifications.delivery.engine import DeliveryEngine
-from notifications.services.notification_service import invalidate_unread_count_cache, get_unread_count
+from notifications.services.notification_service import invalidate_unread_count_cache
+from notifications.queries.notification_queries import get_unread_count_by_user_id
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
@@ -62,7 +63,7 @@ def process_platform_event(sender, instance, created, **kwargs):
             invalidate_unread_count_cache(recipient_id)
             
             # Get the actual count
-            count = get_unread_count(recipient_id)
+            count = get_unread_count_by_user_id(recipient_id)
             logger.info(f"Broadcasting unread count update to user {recipient_id}: count={count}")
             
             # Broadcast unread count update via WebSocket

@@ -549,7 +549,25 @@ def settings_view(request):
 @login_required
 def settings_profile_view(request):
     """Profile settings page"""
-    return render(request, 'users/settings/profile.html')
+    if request.method == 'POST':
+        form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user)
+        if form.is_valid():
+            try:
+                form.save()
+                messages.success(request, 'Profile updated successfully.')
+                return redirect('users:settings_profile')
+            except Exception as e:
+                messages.error(request, f'Error saving profile: {str(e)}')
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Profile save error: {str(e)}", exc_info=True)
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
+    else:
+        form = ProfileUpdateForm(instance=request.user)
+    return render(request, 'users/settings/profile.html', {'form': form})
 
 
 @login_required
@@ -1182,12 +1200,27 @@ def view_profile_photo_fullscreen(request, username, photo_type):
         messages.error(request, 'Invalid photo type.')
         return redirect('users:profile', username=username)
     
+    # Get like count and check if current user liked the photo
+    from .models import UserProfilePhotoLike
+    like_count = UserProfilePhotoLike.objects.filter(
+        profile_user=profile_user,
+        photo_type=photo_type
+    ).count()
+    
+    is_liked = UserProfilePhotoLike.objects.filter(
+        user=request.user,
+        profile_user=profile_user,
+        photo_type=photo_type
+    ).exists()
+    
     return render(request, 'users/profile_photo_fullscreen.html', {
         'profile_user': profile_user,
         'photo_url': photo_url,
         'photo_type': photo_type,
         'photo_title': photo_title,
         'is_own_profile': is_own_profile,
+        'like_count': like_count,
+        'is_liked': is_liked,
     })
 
 
@@ -1254,6 +1287,54 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({'status': 'unfollowed'}, status=status.HTTP_200_OK)
 
         return Response({'status': 'followed'}, status=status.HTTP_201_CREATED)
+
+    @extend_schema(
+        summary="Like or unlike user photo",
+        description="Toggle like status for a user's profile or cover photo",
+        responses={200: {"detail": "Photo unliked.", "likes_count": 0}, 201: {"detail": "Photo liked.", "likes_count": 1}}
+    )
+    @action(detail=True, methods=['post'], url_path='photos/(?P<photo_type>[^/.]+)/like')
+    def photo_like(self, request, pk=None, photo_type=None):
+        """Like or unlike a user's profile or cover photo"""
+        profile_user = self.get_object()
+        
+        # Validate photo type
+        if photo_type not in ['profile', 'cover']:
+            return Response(
+                {'detail': 'Invalid photo type. Must be profile or cover.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if photo exists
+        if photo_type == 'cover' and not profile_user.cover_photo:
+            return Response(
+                {'detail': 'This user does not have a cover photo.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        from .models import UserProfilePhotoLike
+        like, created = UserProfilePhotoLike.objects.get_or_create(
+            user=request.user,
+            profile_user=profile_user,
+            photo_type=photo_type
+        )
+        
+        likes_count = UserProfilePhotoLike.objects.filter(
+            profile_user=profile_user,
+            photo_type=photo_type
+        ).count()
+        
+        if created:
+            return Response(
+                {'detail': 'Photo liked.', 'likes_count': likes_count},
+                status=status.HTTP_201_CREATED
+            )
+        else:
+            like.delete()
+            return Response(
+                {'detail': 'Photo unliked.', 'likes_count': likes_count},
+                status=status.HTTP_200_OK
+            )
 
     @extend_schema(
         summary="Get user's followers",

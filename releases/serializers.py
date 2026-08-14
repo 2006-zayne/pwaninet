@@ -1,13 +1,33 @@
 from rest_framework import serializers
-from .models import Release, ReleaseItem, UserReleaseView
+from .models import Release, ReleaseItem, ReleaseItemImage, UserReleaseView
+
+
+class ReleaseItemImageSerializer(serializers.ModelSerializer):
+    """Serializer for ReleaseItemImage model"""
+    image_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ReleaseItemImage
+        fields = ['id', 'image', 'caption', 'image_url', 'display_order']
+        read_only_fields = ['id', 'created_at']
+    
+    def get_image_url(self, obj):
+        """Get full URL for image if it exists"""
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
 
 
 class ReleaseItemSerializer(serializers.ModelSerializer):
     """Serializer for ReleaseItem model"""
+    images = ReleaseItemImageSerializer(many=True, read_only=True)
     
     class Meta:
         model = ReleaseItem
-        fields = ['id', 'category', 'title', 'description', 'display_order']
+        fields = ['id', 'category', 'title', 'description', 'images', 'display_order']
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 

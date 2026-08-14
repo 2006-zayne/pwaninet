@@ -149,13 +149,17 @@ class NotificationObjectAdapter(PayloadAdapter):
             permissions=permissions,
             analytics=analytics,
             timestamps=timestamps,
-            raw_data={},  # Could store original notification data
+            raw_data=notification.metadata or {},  # Store original event metadata
             capabilities=capabilities
         )
     
     def _resolve_actors(self, notification) -> List[NotificationActor]:
         """Resolve actors from metadata or source_events as list of NotificationActor."""
         actors = []
+        
+        # System notifications use PwaniNet icon instead of user avatar
+        is_system_notification = notification.notification_type in ['RELEASE', 'SYSTEM', 'MAINTENANCE', 'ACCOUNT_VERIFIED']
+        system_avatar = '/static/images/favicon.svg'  # PwaniNet system icon
         
         # For aggregated notifications, get all actors from source events
         if notification.event_count and notification.event_count > 1:
@@ -175,7 +179,7 @@ class NotificationObjectAdapter(PayloadAdapter):
                                     id=actor_id,
                                     name=event.actor.get_full_name() or event.actor.username,
                                     username=event.actor.username or '',
-                                    avatar=event.actor.profile_pic.url if event.actor.profile_pic else None,
+                                    avatar=system_avatar if is_system_notification else (event.actor.profile_pic.url if event.actor.profile_pic else None),
                                     verified=getattr(event.actor, 'is_verified', False),
                                     timestamp=event.timestamp
                                 ))
@@ -201,7 +205,7 @@ class NotificationObjectAdapter(PayloadAdapter):
                         id=user.id,
                         name=user.get_full_name() or user.username,
                         username=user.username or '',
-                        avatar=user.profile_pic.url if user.profile_pic else None,
+                        avatar=system_avatar if is_system_notification else (user.profile_pic.url if user.profile_pic else None),
                         verified=getattr(user, 'is_verified', False),
                         timestamp=actor_timestamp
                     ))
@@ -212,7 +216,7 @@ class NotificationObjectAdapter(PayloadAdapter):
                         id=int(actor_id),
                         name=actor_username or 'Unknown',
                         username=actor_username or '',
-                        avatar=None,
+                        avatar=system_avatar if is_system_notification else None,
                         verified=False,
                         timestamp=notification.created_at
                     ))
@@ -230,7 +234,7 @@ class NotificationObjectAdapter(PayloadAdapter):
                         id=event.actor.id,
                         name=event.actor.get_full_name() or event.actor.username,
                         username=event.actor.username or '',
-                        avatar=event.actor.profile_pic.url if event.actor.profile_pic else None,
+                        avatar=system_avatar if is_system_notification else (event.actor.profile_pic.url if event.actor.profile_pic else None),
                         verified=getattr(event.actor, 'is_verified', False),
                         timestamp=event.timestamp
                     ))
@@ -433,7 +437,7 @@ class NotificationObjectAdapter(PayloadAdapter):
                         url = url.replace('/posts/', '/post/')
                     
                     actions.append(PayloadNotificationAction(
-                        id=str(action.id),
+                        id=action.action_type,  # Use action_type instead of database ID
                         label=action.label,
                         style='primary' if action.is_primary else 'secondary',
                         enabled=True,
@@ -559,6 +563,13 @@ class NotificationObjectAdapter(PayloadAdapter):
                 'style': 'secondary',
                 'url_builder': lambda n: f'/users/{n.metadata.get("actor_id")}/pinch/' if n.metadata.get('actor_id') else None,
                 'method': 'POST'
+            },
+            'SEE_WHATS_NEW': {
+                'label': "See What's New",
+                'style': 'primary',
+                'url_builder': lambda n: f'/system/releases/{n.metadata.get("target_id")}/' if n.metadata.get('target_id') else None,
+                'method': 'GET',
+                'data_attrs': {'data-release-id': lambda n: n.metadata.get('target_id')}
             },
         }
         

@@ -1,7 +1,17 @@
 {% extends 'base.html' %}
 
 {% block content %}
+{% csrf_token %}
+<script>
+  var currentUserProfilePic = "{{ current_user_profile_pic|default:'' }}";
+</script>
 <style>
+  /* Hide mobile bottom nav in fullscreen mode */
+  body.modal-open .mobile-bottom-nav,
+  .mobile-bottom-nav {
+    display: none !important;
+  }
+
   .fullscreen-container {
     position: fixed;
     top: 0;
@@ -137,6 +147,128 @@
     text-decoration: underline;
   }
 
+  /* Bottom Action Bar */
+  .bottom-action-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 10000;
+  }
+
+  .action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .action-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #fff;
+    font-size: 20px;
+    position: relative;
+  }
+
+  .action-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+  }
+
+  .action-btn.liked {
+    color: #ff3040;
+  }
+
+  .like-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ff3040;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+  }
+
+  /* Three-dot menu */
+  .three-dot-menu {
+    position: relative;
+  }
+
+  .menu-dropdown {
+    position: absolute;
+    bottom: 60px;
+    right: 0;
+    background: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 8px 0;
+    min-width: 180px;
+    display: none;
+    z-index: 100000;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    overflow: visible;
+  }
+
+  .menu-dropdown.show {
+    display: block;
+    animation: slideUp 0.2s ease;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .menu-item {
+    padding: 12px 16px;
+    color: #fff;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    transition: background 0.2s ease;
+  }
+
+  .menu-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .menu-item i {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+  }
+
+  .menu-item.danger {
+    color: #ff6b6b;
+  }
+
   @media (max-width: 768px) {
     .close-btn {
       top: 15px;
@@ -216,7 +348,39 @@
     {% endif %}
   </div>
   {% endif %}
+
+  <!-- Bottom Action Bar -->
+  <div class="bottom-action-bar">
+    <div class="action-buttons">
+      <button class="action-btn like-btn {% if is_liked %}liked{% endif %}" data-image-id="{{ post_image.id }}" data-post-id="{{ post.id }}">
+        <i class="bi bi-heart{% if is_liked %}-fill{% endif %}"></i>
+        <span class="like-count">{{ total_likes }}</span>
+      </button>
+      <button class="action-btn comment-btn" data-image-id="{{ post_image.id }}" data-post-id="{{ post.id }}">
+        <i class="bi bi-chat"></i>
+      </button>
+    </div>
+    <div class="three-dot-menu">
+      <button class="action-btn menu-btn">
+        <i class="bi bi-three-dots"></i>
+      </button>
+      <div class="menu-dropdown">
+        <a href="#" class="menu-item download-btn" data-image-url="{{ post_image.image.url }}" data-filename="{{ post_image.image.name|default:'image.jpg' }}" data-post-id="{{ post.id }}">
+          <i class="bi bi-download"></i> Download
+        </a>
+        <a href="#" class="menu-item hide-btn">
+          <i class="bi bi-eye-slash"></i> Hide
+        </a>
+        <a href="#" class="menu-item danger report-btn">
+          <i class="bi bi-flag"></i> Report
+        </a>
+      </div>
+    </div>
+  </div>
 </div>
+
+<!-- Comment Modal -->
+{% include 'posts/partials/comment_modal.html' %}
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -288,6 +452,225 @@ document.addEventListener('DOMContentLoaded', function() {
       } catch (error) {
         console.error('Download failed:', error);
         alert('Download failed: ' + error.message);
+      }
+    });
+  }
+
+  // Menu toggle functionality
+  const menuBtn = document.querySelector('.menu-btn');
+  const menuDropdown = document.querySelector('.menu-dropdown');
+  
+  if (menuBtn && menuDropdown) {
+    menuBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      menuDropdown.classList.toggle('show');
+    });
+    
+    // Close menu when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!menuDropdown.contains(e.target) && !menuBtn.contains(e.target)) {
+        menuDropdown.classList.remove('show');
+      }
+    });
+  }
+
+  // Like button functionality
+  const likeBtn = document.querySelector('.like-btn');
+  if (likeBtn) {
+    likeBtn.addEventListener('click', async function(e) {
+      e.preventDefault();
+      
+      const imageId = this.getAttribute('data-image-id');
+      const postId = this.getAttribute('data-post-id');
+      const isLiked = this.classList.contains('liked');
+      
+      try {
+        const response = await fetch(`/api/posts/${postId}/images/${imageId}/like/`, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          this.classList.toggle('liked');
+          const icon = this.querySelector('i');
+          icon.classList.toggle('bi-heart');
+          icon.classList.toggle('bi-heart-fill');
+          const countSpan = this.querySelector('.like-count');
+          countSpan.textContent = data.likes_count;
+        } else if (response.status === 403) {
+          const data = await response.json();
+          alert(data.detail || 'You must be a group member to like this image.');
+        }
+      } catch (error) {
+        console.error('Like failed:', error);
+      }
+    });
+  }
+
+  // Comment button functionality
+  const commentBtn = document.querySelector('.comment-btn');
+  if (commentBtn) {
+    commentBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      const imageId = this.getAttribute('data-image-id');
+      const postId = this.getAttribute('data-post-id');
+      
+      // Open comment modal
+      const commentsModal = document.getElementById('commentsModal');
+      if (commentsModal) {
+        // Initialize Bootstrap modal
+        const modal = new bootstrap.Modal(commentsModal);
+        modal.show();
+        
+        // Load comments for this image
+        loadImageComments(postId, imageId);
+      }
+    });
+  }
+  
+  // Function to load comments for an image
+  async function loadImageComments(postId, imageId) {
+    const commentsList = document.getElementById('commentsModalList');
+    const emptyState = document.getElementById('commentsEmptyState');
+    const footer = document.getElementById('commentsModalFooter');
+    const commentForm = document.getElementById('commentForm');
+    const avatar = document.querySelector('.comment-input-avatar');
+    
+    // Set user avatar
+    if (avatar && typeof currentUserProfilePic !== 'undefined') {
+      avatar.src = currentUserProfilePic;
+      avatar.style.display = 'block';
+    }
+    
+    // Store current image data for comment submission
+    commentForm.dataset.postId = postId;
+    commentForm.dataset.imageId = imageId;
+    
+    try {
+      const response = await fetch(`/api/posts/${postId}/images/${imageId}/comments/`);
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Clear existing comments (except empty state)
+        const existingComments = commentsList.querySelectorAll('.comment-item');
+        existingComments.forEach(el => el.remove());
+        
+        if (data.comments && data.comments.length > 0) {
+          // Show comments
+          emptyState.style.display = 'none';
+          
+          // Show top 3 comments
+          const topComments = data.comments.slice(0, 3);
+          topComments.forEach(comment => {
+            const commentEl = document.createElement('div');
+            commentEl.className = 'comment-item';
+            commentEl.id = `comment-${comment.id}`;
+            commentEl.dataset.commentId = comment.id;
+            commentEl.dataset.authorId = comment.author.id;
+            
+            const authorName = comment.author.full_name || comment.author.username;
+            const profilePic = comment.author.profile_pic || '/static/images/default-avatar.png';
+            
+            commentEl.innerHTML = `
+              <a href="/user/${comment.author.username}/" class="comment-avatar-link">
+                <img src="${profilePic}" 
+                     alt="${authorName}" 
+                     class="comment-avatar"
+                     loading="lazy">
+              </a>
+              
+              <div class="comment-content">
+                <div class="comment-header">
+                  <a href="/user/${comment.author.username}/" class="comment-author-link">
+                    ${authorName}
+                  </a>
+                  <span class="comment-timestamp">${comment.created_at}</span>
+                </div>
+                
+                <div class="comment-body" id="comment-body-${comment.id}">
+                  ${comment.content}
+                </div>
+                
+                <div class="comment-actions">
+                  <button class="comment-action" 
+                          data-action="like"
+                          data-comment-id="${comment.id}"
+                          aria-label="Like comment">
+                    <i class="bi bi-heart"></i>
+                    <span>0</span>
+                  </button>
+                  
+                  <button class="comment-action" 
+                          data-action="reply"
+                          data-comment-id="${comment.id}"
+                          aria-label="Reply to comment">
+                    <i class="bi bi-chat-dots"></i>
+                    Reply
+                  </button>
+                </div>
+              </div>
+            `;
+            commentsList.appendChild(commentEl);
+          });
+          
+          // Show "view all" link if there are more than 3 comments
+          if (data.comments.length > 3) {
+            footer.style.display = 'block';
+            document.getElementById('totalCommentsCount').textContent = data.comments.length - 3;
+          } else {
+            footer.style.display = 'none';
+          }
+        } else {
+          // Show empty state
+          emptyState.style.display = 'block';
+          footer.style.display = 'none';
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load comments:', error);
+      // Show empty state on error
+      emptyState.style.display = 'block';
+      footer.style.display = 'none';
+    }
+  }
+  
+  // Handle comment form submission
+  const commentForm = document.getElementById('commentForm');
+  if (commentForm) {
+    commentForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const postId = this.dataset.postId;
+      const imageId = this.dataset.imageId;
+      const content = this.querySelector('input[name="content"]').value.trim();
+      
+      if (!content) return;
+      
+      try {
+        const response = await fetch(`/api/posts/${postId}/images/${imageId}/comments/`, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ content: content })
+        });
+        
+        if (response.ok) {
+          // Clear input
+          this.querySelector('input[name="content"]').value = '';
+          
+          // Reload comments
+          loadImageComments(postId, imageId);
+        } else {
+          console.error('Failed to post comment');
+        }
+      } catch (error) {
+        console.error('Failed to post comment:', error);
       }
     });
   }

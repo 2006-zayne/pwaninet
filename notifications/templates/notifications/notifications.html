@@ -162,45 +162,8 @@
     </div>
   </div>
 
-  <!-- ── Pagination ── -->
-  {% if has_pagination and notifications.has_other_pages %}
-    <div class="pagination">
-      {% if notifications.has_previous %}
-        <a href="?page=1{% if current_filter_type %}&type={{ current_filter_type }}{% endif %}{% if current_filter_read %}&read={{ current_filter_read }}{% endif %}" class="page-link">
-          <i class="bi bi-chevron-double-left"></i>
-        </a>
-        <a href="?page={{ notifications.previous_page_number }}{% if current_filter_type %}&type={{ current_filter_type }}{% endif %}{% if current_filter_read %}&read={{ current_filter_read }}{% endif %}" class="page-link">
-          <i class="bi bi-chevron-left"></i>
-        </a>
-      {% else %}
-        <span class="page-link disabled"><i class="bi bi-chevron-double-left"></i></span>
-        <span class="page-link disabled"><i class="bi bi-chevron-left"></i></span>
-      {% endif %}
-
-      {% for num in notifications.paginator.page_range %}
-        {% if notifications.number == num %}
-          <span class="page-link active">{{ num }}</span>
-        {% elif num > notifications.number|add:'-3' and num < notifications.number|add:'3' %}
-          <a href="?page={{ num }}{% if current_filter_type %}&type={{ current_filter_type }}{% endif %}{% if current_filter_read %}&read={{ current_filter_read }}{% endif %}" class="page-link">{{ num }}</a>
-        {% endif %}
-      {% endfor %}
-
-      {% if notifications.has_next %}
-        <a href="?page={{ notifications.next_page_number }}{% if current_filter_type %}&type={{ current_filter_type }}{% endif %}{% if current_filter_read %}&read={{ current_filter_read }}{% endif %}" class="page-link">
-          <i class="bi bi-chevron-right"></i>
-        </a>
-        <a href="?page={{ notifications.paginator.num_pages }}{% if current_filter_type %}&type={{ current_filter_type }}{% endif %}{% if current_filter_read %}&read={{ current_filter_read }}{% endif %}" class="page-link">
-          <i class="bi bi-chevron-double-right"></i>
-        </a>
-      {% else %}
-        <span class="page-link disabled"><i class="bi bi-chevron-right"></i></span>
-        <span class="page-link disabled"><i class="bi bi-chevron-double-right"></i></span>
-      {% endif %}
-    </div>
-  {% endif %}
-
-  <!-- Lazy Loading Trigger -->
-  <div id="load-more-trigger" data-page="1" style="height: 20px; margin-top: 2rem;"></div>
+  <!-- Lazy Loading Trigger for Infinite Scroll -->
+  <div id="load-more-trigger" data-cursor="" data-loading="false" style="height: 20px; margin-top: 2rem;"></div>
   
   <!-- Loading Indicator -->
   <div id="loading-indicator" style="display: none; text-align: center; padding: 1rem;">
@@ -210,6 +173,10 @@
 
 </div>
 
-<script type="module" src="{% static 'notifications/js/notifications.js' %}"></script>
+<script type="module">
+  import { initNotificationCenter } from "{% static 'notifications/js/notifications.js' %}";
+  console.log('Loading notifications module...');
+  initNotificationCenter();
+</script>
 
 {% endblock %}

@@ -295,6 +295,13 @@
     <!-- Update Manager -->
     <script src="{% static 'js/update-manager.js' %}"></script>
     
+    <!-- What's New Modal -->
+    <script>
+        // Set authentication status for What's New modal
+        window.isAuthenticated = {{ request.user.is_authenticated|lower }};
+    </script>
+    <script src="{% static 'js/whats-new-modal.js' %}"></script>
+    
     <!-- Comment System - Phase 2 Threaded Comments -->
     <script src="{% static 'js/comments/comment-api.js' %}"></script>
     <script src="{% static 'js/comments/comment-renderer.js' %}"></script>
@@ -1585,7 +1592,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
     function pollNotificationCount() {
         // Poll notification count every 5 seconds as fallback
-        fetch('/unread-notification-count/')
+        fetch('/notifications/unread-count/')
             .then(r => r.text())
             .then(html => {
                 const badge = document.getElementById('unread-count-badge');

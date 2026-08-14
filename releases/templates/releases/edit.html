@@ -102,6 +102,7 @@
                                 <th>Category</th>
                                 <th>Title</th>
                                 <th>Description</th>
+                                <th>Image</th>
                                 <th>Order</th>
                                 <th>Actions</th>
                             </tr>
@@ -112,6 +113,17 @@
                                 <td>{{ item.get_category_display }}</td>
                                 <td>{{ item.title }}</td>
                                 <td>{{ item.description }}</td>
+                                <td>
+                                    {% if item.images.all %}
+                                    <div class="d-flex gap-1">
+                                        {% for image in item.images.all %}
+                                        <img src="{{ image.image.url }}" alt="{{ image.caption|default:item.title }}" class="img-thumbnail" style="max-height: 50px; max-width: 50px;" loading="lazy">
+                                        {% endfor %}
+                                    </div>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ item.display_order }}</td>
                                 <td>
                                     <a href="{% url 'release_delete_item' item.id %}" class="btn btn-sm btn-outline-danger">

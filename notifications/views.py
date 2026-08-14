@@ -58,12 +58,14 @@ def expand_notification(request, notif_id):
 def notifications_list(request):
     notification_type = request.GET.get('type')
     is_read_param = request.GET.get('read')
-    page = request.GET.get('page', 1)
+    cursor = request.GET.get('cursor')
+    limit = int(request.GET.get('limit', 10))
     grouped_param = request.GET.get('grouped', 'false')
     time_filter = request.GET.get('time', 'all')
     sender_grouped_param = request.GET.get('sender_grouped', 'false')
     hybrid_grouped_param = request.GET.get('hybrid_grouped', 'false')
     search_query = request.GET.get('search', '')
+    partial = request.GET.get('partial', 'false')
     
     is_read = None
     if is_read_param == 'true':
@@ -96,7 +98,8 @@ def notifications_list(request):
             'has_pagination': False,
             'unread_notifications_count': get_cached_unread_count(request.user),
             'time_filter': 'all',
-            'search_query': search_query
+            'search_query': search_query,
+            'next_cursor': None
         }
     elif grouped:
         from notifications.queries.notification_queries import get_grouped_notifications
@@ -118,7 +121,8 @@ def notifications_list(request):
             'has_pagination': False,
             'unread_notifications_count': get_cached_unread_count(request.user),
             'time_filter': 'all',
-            'search_query': search_query
+            'search_query': search_query,
+            'next_cursor': None
         }
     elif hybrid_grouped:
         from notifications.queries.notification_queries import get_notifications_hybrid_grouped
@@ -140,16 +144,19 @@ def notifications_list(request):
             'has_pagination': False,
             'unread_notifications_count': get_cached_unread_count(request.user),
             'time_filter': 'all',
-            'search_query': search_query
+            'search_query': search_query,
+            'next_cursor': None
         }
     else:
-        # Default: use time-based grouping
+        # Default: use time-based grouping with cursor pagination
         from notifications.queries.notification_queries import get_notifications_by_time_periods
-        time_grouped = get_notifications_by_time_periods(
+        time_grouped, next_cursor = get_notifications_by_time_periods(
             request.user,
             notification_type=notification_type,
             is_read=is_read,
-            search_query=search_query
+            search_query=search_query,
+            cursor=cursor,
+            limit=limit
         )
         context = {
             'time_grouped': time_grouped,
@@ -163,8 +170,60 @@ def notifications_list(request):
             'current_hybrid_grouped': hybrid_grouped_param,
             'has_pagination': False,
             'unread_notifications_count': get_cached_unread_count(request.user),
-            'search_query': search_query
+            'search_query': search_query,
+            'next_cursor': next_cursor
         }
+    
+    # If partial request, return JSON for infinite scroll
+    if partial == 'true':
+        from notifications.rendering.adapters import get_payload_adapter
+        
+        html_content = ''
+        total_count = 0
+        
+        if 'time_grouped' in context:
+            # Render time-grouped notifications with section headers
+            period_names = {
+                'now': 'Now',
+                'earlier_today': 'Earlier Today',
+                'yesterday': 'Yesterday',
+                'this_week': 'This Week',
+                'last_week': 'Last Week',
+                'earlier': 'Earlier'
+            }
+            
+            for period, notifications in context['time_grouped'].items():
+                if notifications:
+                    total_count += len(notifications)
+                    # Add section header
+                    html_content += f'<div class="time-section"><div class="time-section-header"><h6 class="fw-bold text-uppercase text-muted small mb-2 px-2">{period_names.get(period, period)}</h6></div>'
+                    
+                    # Render notification cards for this period
+                    for notif in notifications:
+                        adapter = get_payload_adapter(notif)
+                        payload = adapter.to_standard_payload(notif)
+                        html_content += render(request, 'notifications/components/notification_card_profile_driven.html', {
+                            'payload': payload,
+                            'summary': notif.title,
+                            'message': notif.summary,
+                            'components': {'actor_stack': True, 'content': True, 'context_header': True, 'status': True, 'action_bar': True, 'preview': True},
+                            'preview': {'enabled': True},
+                            'actions': [],
+                            'status': {},
+                            'interactions': {'context_header': {'behavior': 'OPEN_CONTEXT'}},
+                            'navigation': {},
+                            'expansion': {},
+                            'aggregation': {}
+                        }).content.decode('utf-8')
+                    
+                    html_content += '</div>'
+        
+        return JsonResponse({
+            'html': html_content,
+            'next_cursor': context.get('next_cursor'),
+            'has_more': context.get('next_cursor') is not None,
+            'count': total_count
+        })
     
     return render(request, 'notifications/notifications.html', context)
 

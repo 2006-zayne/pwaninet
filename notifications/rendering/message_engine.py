@@ -5,6 +5,7 @@ The renderer SHALL never construct these strings itself.
 """
 
 from typing import Dict, Any, List
+from dataclasses import is_dataclass, asdict
 from .payload_models import NotificationPayload, MessageState, NotificationActor
 
 
@@ -279,6 +280,10 @@ class NotificationMessageEngine:
             "NEW_FEATURE": {
                 "SINGLE": "New feature available: {feature}.",
             },
+            "RELEASE": {
+                "SINGLE": "New version {version} is now available.",
+                "SUMMARY": "New release available",
+            },
             "MAINTENANCE": {
                 "SINGLE": "Scheduled maintenance: {message}",
             },
@@ -447,6 +452,24 @@ class NotificationMessageEngine:
         
         # Add additional variables from payload
         context.update(variables)
+        
+        # Add raw_data variables (contains event metadata like version for releases)
+        if payload.raw_data:
+            context.update(payload.raw_data)
+        
+        # Add metadata variables for release notifications
+        if payload.metadata:
+            # Convert metadata object to dict if it's not already
+            if hasattr(payload.metadata, 'dict'):
+                context.update(payload.metadata.dict())
+            elif isinstance(payload.metadata, dict):
+                context.update(payload.metadata)
+            elif is_dataclass(payload.metadata):
+                # Convert dataclass to dict
+                context.update(asdict(payload.metadata))
+            else:
+                # Try to get as dict representation
+                context.update(dict(payload.metadata))
         
         return context
     

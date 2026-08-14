@@ -21,10 +21,18 @@ def get_notifications_for_user(user, notification_type=None, is_read=None, searc
     return queryset.order_by('-updated_at')
 
 
-def get_notifications_by_time_periods(user, notification_type=None, is_read=None, search_query=None):
+def get_notifications_by_time_periods(user, notification_type=None, is_read=None, search_query=None, cursor=None, limit=20):
     """
     Group notifications by smart time periods: Now, Earlier Today, Yesterday, This Week, Last Week, Earlier
     Per specification: Section 3.4
+    
+    Args:
+        user: The user to fetch notifications for
+        notification_type: Optional filter by notification type
+        is_read: Optional filter by read status
+        search_query: Optional search query
+        cursor: Optional cursor for pagination (timestamp string)
+        limit: Maximum number of notifications to return per page
     """
     queryset = NotificationObject.objects.filter(recipient=user)
     
@@ -38,13 +46,43 @@ def get_notifications_by_time_periods(user, notification_type=None, is_read=None
     if search_query:
         queryset = queryset.filter(title__icontains=search_query) | queryset.filter(summary__icontains=search_query)
     
+    # Apply cursor-based pagination
+    if cursor:
+        from datetime import datetime
+        try:
+            # Cursor format: "timestamp|notification_id" (ISO timestamp with colons)
+            # Split on pipe to separate timestamp from UUID
+            cursor_parts = cursor.split('|')
+            cursor_time_str = cursor_parts[0]
+            cursor_id = cursor_parts[1] if len(cursor_parts) > 1 else None
+            cursor_time = datetime.fromisoformat(cursor_time_str)
+            
+            if cursor_id:
+                # Filter by timestamp AND exclude notifications with ID <= cursor_id
+                queryset = queryset.filter(
+                    updated_at__lte=cursor_time
+                ).exclude(
+                    notification_id__lte=cursor_id
+                )
+            else:
+                # Fallback to timestamp only
+                queryset = queryset.filter(updated_at__lt=cursor_time)
+        except (ValueError, TypeError):
+            # Invalid cursor, ignore
+            pass
+    
+    # Get one extra notification to determine if there are more results
+    notifications_list = list(queryset.order_by('-updated_at')[:limit + 1])
+    
+    # Determine if there are more results
+    has_more = len(notifications_list) > limit
+    notifications = notifications_list[:limit]
+    
     now = timezone.now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     yesterday_start = today_start - timedelta(days=1)
     week_start = today_start - timedelta(days=now.weekday())  # Monday
     last_week_start = week_start - timedelta(weeks=1)
-    
-    notifications = queryset.order_by('-updated_at')
     
     grouped = {
         'now': [],
@@ -54,6 +92,8 @@ def get_notifications_by_time_periods(user, notification_type=None, is_read=None
         'last_week': [],
         'earlier': []
     }
+    
+    next_cursor = None
     
     for notif in notifications:
         # Now: within the last hour
@@ -75,7 +115,11 @@ def get_notifications_by_time_periods(user, notification_type=None, is_read=None
         else:
             grouped['earlier'].append(notif)
     
-    return grouped
+    # Set next cursor based on the last notification's updated_at and notification_id
+    if notifications and has_more:
+        next_cursor = f"{notifications[-1].updated_at.isoformat()}|{notifications[-1].notification_id}"
+    
+    return grouped, next_cursor
 
 
 def get_grouped_notifications(user, notification_type=None, is_read=None, search_query=None):
@@ -138,11 +182,23 @@ def mark_user_notifications_as_read(user):
 def get_unread_count(user):
     # Count all notifications that are not yet read
     # This includes CREATED, QUEUED, DELIVERED, and SEEN statuses
-    return NotificationObject.objects.filter(
+    count = NotificationObject.objects.filter(
         recipient=user
     ).exclude(
         status__in=[NotificationStatuses.READ.value, NotificationStatuses.ARCHIVED.value, NotificationStatuses.EXPIRED.value]
     ).count()
+    return count
+
+
+def get_unread_count_by_user_id(user_id):
+    # Count all notifications that are not yet read for a user ID
+    # This includes CREATED, QUEUED, DELIVERED, and SEEN statuses
+    count = NotificationObject.objects.filter(
+        recipient_id=user_id
+    ).exclude(
+        status__in=[NotificationStatuses.READ.value, NotificationStatuses.ARCHIVED.value, NotificationStatuses.EXPIRED.value]
+    ).count()
+    return count
 
 
 def get_notification_for_user(user, notif_id):

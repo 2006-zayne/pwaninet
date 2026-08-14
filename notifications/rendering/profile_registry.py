@@ -446,6 +446,15 @@ class RenderingProfileRegistry:
     
     def _register_system_profiles(self):
         """Register system notification profiles"""
+        # RELEASE
+        self._profiles["RELEASE"] = RenderingProfile(
+            id="RELEASE", category=ProfileCategory.SYSTEM, intent=ProfileIntent.ANNOUNCEMENT,
+            message_strategy=MessageStrategy(template="RELEASE", supported_states=["SINGLE"]),
+            component_visibility=ComponentVisibilityConfig(content=True, action_bar=True),
+            action_strategy=ActionStrategy(available_actions=["SEE_WHATS_NEW"], primary_actions=["SEE_WHATS_NEW"]),
+            navigation_strategy=None
+        )
+        
         # SYSTEM
         self._profiles["SYSTEM"] = RenderingProfile(
             id="SYSTEM", category=ProfileCategory.SYSTEM, intent=ProfileIntent.ANNOUNCEMENT,

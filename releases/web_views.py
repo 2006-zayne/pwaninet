@@ -102,13 +102,24 @@ def create_release(request):
                     description = request.POST.get(f'item_description_{item_count}')
                     
                     if title:
-                        ReleaseService.add_release_item(
+                        # Create the release item
+                        item = ReleaseService.add_release_item(
                             release=release,
                             category=category,
                             title=title,
                             description=description,
                             display_order=item_count
                         )
+                        
+                        # Handle multiple image uploads for this item
+                        images = request.FILES.getlist(f'item_images_{item_count}')
+                        for i, image_file in enumerate(images):
+                            from .models import ReleaseItemImage
+                            ReleaseItemImage.objects.create(
+                                release_item=item,
+                                image=image_file,
+                                display_order=i
+                            )
                     item_count += 1
                 
                 # Check if user wants to publish immediately
@@ -135,7 +146,7 @@ def edit_release(request, release_id):
     """
     Edit an existing release.
     """
-    release = get_object_or_404(Release, id=release_id)
+    release = get_object_or_404(Release.objects.prefetch_related('items__images'), id=release_id)
     
     # Check permission
     if not CanManageRelease().has_object_permission(request, None, release):
@@ -161,7 +172,7 @@ def detail_release(request, release_id):
     Tracks that the user has viewed this release.
     Allows viewing archived releases for users with manage permission.
     """
-    release = get_object_or_404(Release, id=release_id)
+    release = get_object_or_404(Release.objects.prefetch_related('items__images'), id=release_id)
     
     # Only show published releases unless user has manage permission
     # Archived releases can only be viewed by users with manage permission
@@ -274,16 +285,31 @@ def add_release_item(request, release_id):
     release = get_object_or_404(Release, id=release_id)
     
     if request.method == 'POST':
-        form = ReleaseItemForm(request.POST)
+        form = ReleaseItemForm(request.POST, request.FILES)
         if form.is_valid():
-            ReleaseService.add_release_item(
+            # Create the release item
+            item = ReleaseService.add_release_item(
                 release=release,
                 category=form.cleaned_data['category'],
                 title=form.cleaned_data['title'],
                 description=form.cleaned_data['description'],
                 display_order=form.cleaned_data['display_order']
             )
-            messages.success(request, 'Release item added successfully.')
+            
+            # Handle multiple image uploads
+            images = request.FILES.getlist('images')
+            print(f"DEBUG: Received {len(images)} images")
+            for i, image_file in enumerate(images):
+                print(f"DEBUG: Processing image {i}: {image_file.name}, size: {image_file.size}")
+                from .models import ReleaseItemImage
+                ReleaseItemImage.objects.create(
+                    release_item=item,
+                    image=image_file,
+                    display_order=i
+                )
+                print(f"DEBUG: Created image {i}")
+            
+            messages.success(request, f'Release item added successfully with {len(images)} image(s).')
             return redirect('release_edit', release_id=release.id)
     else:
         form = ReleaseItemForm()

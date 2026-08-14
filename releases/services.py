@@ -157,10 +157,12 @@ class ReleaseService:
             raise ValueError("Only published releases can be marked as current")
         
         with transaction.atomic():
-            # Unset current flag from all releases
-            Release.objects.filter(is_current_release=True).update(is_current_release=False)
+            # Unset current flag from all releases using save() to trigger signals
+            for current_release in Release.objects.filter(is_current_release=True):
+                current_release.is_current_release = False
+                current_release.save()
             
-            # Set current flag on this release
+            # Set current flag on this release using save() to trigger signals
             release.is_current_release = True
             release.save()
         

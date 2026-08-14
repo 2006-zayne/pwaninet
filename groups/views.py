@@ -324,6 +324,65 @@ class GroupViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
+    @action(detail=True, methods=['post'], url_path='photos/(?P<photo_type>[^/.]+)/like')
+    def photo_like(self, request, pk=None, photo_type=None):
+        """
+        POST /groups/{id}/photos/{photo_type}/like/
+        Like or unlike a group's profile or cover photo.
+        """
+        group = self.get_object()
+        
+        # Check if user is an approved member
+        try:
+            Membership.objects.get(
+                user=request.user,
+                group=group,
+                status=MembershipStatus.APPROVED
+            )
+        except Membership.DoesNotExist:
+            return Response(
+                {'detail': 'You must be an approved member to like group photos.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Validate photo type
+        if photo_type not in ['group', 'cover']:
+            return Response(
+                {'detail': 'Invalid photo type. Must be group or cover.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if photo exists
+        if photo_type == 'cover' and not group.cover_photo:
+            return Response(
+                {'detail': 'This group does not have a cover photo.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        from .models import GroupPhotoLike
+        like, created = GroupPhotoLike.objects.get_or_create(
+            user=request.user,
+            group=group,
+            photo_type=photo_type
+        )
+        
+        likes_count = GroupPhotoLike.objects.filter(
+            group=group,
+            photo_type=photo_type
+        ).count()
+        
+        if created:
+            return Response(
+                {'detail': 'Photo liked.', 'likes_count': likes_count},
+                status=status.HTTP_201_CREATED
+            )
+        else:
+            like.delete()
+            return Response(
+                {'detail': 'Photo unliked.', 'likes_count': likes_count},
+                status=status.HTTP_200_OK
+            )
+
     @action(detail=True, methods=['post'], url_path='assign-and-leave')
     def assign_and_leave(self, request, pk=None):
         """
@@ -778,11 +837,26 @@ def view_group_photo_fullscreen(request, group_id, photo_type):
         messages.error(request, 'Invalid photo type.')
         return redirect('groups:groups_detail', group_id=group_id)
     
+    # Get like count and check if current user liked the photo
+    from .models import GroupPhotoLike
+    like_count = GroupPhotoLike.objects.filter(
+        group=group,
+        photo_type=photo_type
+    ).count()
+    
+    is_liked = GroupPhotoLike.objects.filter(
+        user=request.user,
+        group=group,
+        photo_type=photo_type
+    ).exists()
+    
     return render(request, 'groups/group_photo_fullscreen.html', {
         'group': group,
         'photo_url': photo_url,
         'photo_type': photo_type,
         'photo_title': photo_title,
+        'like_count': like_count,
+        'is_liked': is_liked,
     })
 
 

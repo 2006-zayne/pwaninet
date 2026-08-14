@@ -33,4 +33,5 @@ urlpatterns = [
     path('api/groups/<int:pk>/assign-role/', views.GroupViewSet.as_view({'post': 'assign_role'}), name='group_assign_role'),
     path('api/groups/<int:pk>/leave/', views.GroupViewSet.as_view({'post': 'leave'}), name='group_leave'),
     path('api/groups/<int:pk>/assign-and-leave/', views.GroupViewSet.as_view({'post': 'assign_and_leave'}), name='group_assign_and_leave'),
+    path('api/groups/<int:pk>/photos/<str:photo_type>/like/', views.GroupViewSet.as_view({'post': 'photo_like'}), name='group_photo_like'),
 ]

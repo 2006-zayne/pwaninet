@@ -88,6 +88,18 @@
                     {% if item.description %}
                     - {{ item.description }}
                     {% endif %}
+                    {% if item.images.all %}
+                    <div class="mt-2">
+                        {% for image in item.images.all %}
+                        <div class="mb-2">
+                            <img src="{{ image.image.url }}" alt="{{ image.caption|default:item.title }}" class="img-fluid rounded" style="max-height: 300px;" loading="lazy">
+                            {% if image.caption %}
+                            <p class="text-muted small mb-0 mt-1">{{ image.caption }}</p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </li>
                 {% endfor %}
             </ul>

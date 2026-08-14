@@ -793,6 +793,41 @@ COURSE_ASSIGNMENT_PUBLISHED_RULE = NotificationRule(
     ]
 )
 
+def _all_users_recipient(event_data: Dict[str, Any]) -> List[int]:
+    """Recipient: All users (for system-wide announcements like releases)."""
+    return list(User.objects.filter(is_active=True).values_list('id', flat=True))
+
+
+# ============================================================================
+# Release Rules
+# ============================================================================
+
+RELEASE_PUBLISHED_RULE = NotificationRule(
+    name="release_published",
+    trigger="releases.release.published",
+    condition=None,
+    notification_type="RELEASE",
+    category="SYSTEM",
+    priority="HIGH",
+    delivery_policy="IMMEDIATE",
+    aggregation_policy="NEVER",
+    recipients=_all_users_recipient,
+    title_template="New version {version} is now available",
+    summary_template="New release available",
+    actions=lambda event: [
+        {
+            'action_type': 'SEE_WHATS_NEW',
+            'label': "See What's New",
+            'url': f"/system/releases/{event.get('target_id')}/",
+            'method': 'GET',
+            'is_primary': True,
+            'order': 0,
+            'style': 'primary'
+        }
+    ]
+)
+
+
 # All rules registry
 RULES_REGISTRY = [
     POST_LIKE_RULE,
@@ -820,6 +855,7 @@ RULES_REGISTRY = [
     MESSAGE_SENT_RULE,
     CONVERSATION_MEMBER_ADDED_RULE,
     COURSE_ASSIGNMENT_PUBLISHED_RULE,
+    RELEASE_PUBLISHED_RULE,
 ]
 
 

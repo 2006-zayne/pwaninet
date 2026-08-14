@@ -5,6 +5,7 @@ from notifications.queries.notification_queries import (
     get_notification_for_user,
     get_notifications_for_user,
     get_unread_count,
+    get_unread_count_by_user_id,
     mark_user_notifications_as_read,
     delete_notification,
     delete_all_notifications,

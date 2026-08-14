@@ -419,6 +419,30 @@ class Block(models.Model):
         return f"{self.blocker.username} blocked {self.blocked.username}"
 
 
+class UserProfilePhotoLike(models.Model):
+    """Likes for user profile and cover photos"""
+    PHOTO_TYPE_CHOICES = [
+        ('profile', 'Profile Photo'),
+        ('cover', 'Cover Photo'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='photo_likes', db_index=True)
+    profile_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_photo_likes', db_index=True)
+    photo_type = models.CharField(max_length=10, choices=PHOTO_TYPE_CHOICES, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        unique_together = ('user', 'profile_user', 'photo_type')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['profile_user', 'photo_type', '-created_at']),
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} likes {self.profile_user.username}'s {self.photo_type} photo"
+
+
 class HiddenAuthor(models.Model):
     """Tracks authors whose posts are hidden from user's feed"""
     hider = models.ForeignKey(User, on_delete=models.CASCADE, related_name='hidden_authors', db_index=True)
