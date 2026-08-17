@@ -3,23 +3,27 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import render, get_object_or_404, redirect
+from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q, Count
 from django.db import transaction
+from django.views.decorators.http import require_http_methods
 
-from .models import Group, Membership, MembershipRole, MembershipStatus, JoinPolicy
+from .models import Group, Membership, MembershipRole, MembershipStatus, JoinPolicy, EditPermission, InvitePermission, Announcement
 from .serializers import (
     GroupSerializer, GroupCreateSerializer, MembershipSerializer,
-    MembershipCreateSerializer, MembershipActionSerializer, RoleAssignmentSerializer
+    MembershipCreateSerializer, MembershipActionSerializer, RoleAssignmentSerializer,
+    AnnouncementSerializer, AnnouncementCreateSerializer, AnnouncementUpdateSerializer
 )
 from .permissions import (
     CanManageGroup, CanManageMembership, CanJoinOfficialGroup,
-    IsApprovedMember, IsGroupAdmin
+    IsApprovedMember, IsGroupAdmin, CanViewAnnouncement, CanCreateAnnouncement,
+    CanEditAnnouncement, CanDeleteAnnouncement
 )
 from posts.models import Post, Like
 from users.models import User
-from groups.forms import GroupForm
+from groups.forms import GroupForm, GroupDetailsForm, RoleAssignmentForm, GroupPrivacyForm
 from groups.services.group_notification_service import (
     send_group_join_request_notification,
     send_group_approved_notification,
@@ -30,6 +34,11 @@ from groups.services.group_notification_service import (
 from notifications.services.notification_service import get_cached_unread_count, get_group_unread_counts
 from notifications.models import NotificationObject
 from django.http import JsonResponse
+from django.core.paginator import Paginator
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+import json
+from users.models import Follow
 
 
 class GroupViewSet(viewsets.ModelViewSet):
@@ -324,6 +333,65 @@ class GroupViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
+    @action(detail=True, methods=['post'], url_path='photos/(?P<photo_type>[^/.]+)/like')
+    def photo_like(self, request, pk=None, photo_type=None):
+        """
+        POST /groups/{id}/photos/{photo_type}/like/
+        Like or unlike a group's profile or cover photo.
+        """
+        group = self.get_object()
+        
+        # Check if user is an approved member
+        try:
+            Membership.objects.get(
+                user=request.user,
+                group=group,
+                status=MembershipStatus.APPROVED
+            )
+        except Membership.DoesNotExist:
+            return Response(
+                {'detail': 'You must be an approved member to like group photos.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Validate photo type
+        if photo_type not in ['group', 'cover']:
+            return Response(
+                {'detail': 'Invalid photo type. Must be group or cover.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if photo exists
+        if photo_type == 'cover' and not group.cover_photo:
+            return Response(
+                {'detail': 'This group does not have a cover photo.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        from .models import GroupPhotoLike
+        like, created = GroupPhotoLike.objects.get_or_create(
+            user=request.user,
+            group=group,
+            photo_type=photo_type
+        )
+        
+        likes_count = GroupPhotoLike.objects.filter(
+            group=group,
+            photo_type=photo_type
+        ).count()
+        
+        if created:
+            return Response(
+                {'detail': 'Photo liked.', 'likes_count': likes_count},
+                status=status.HTTP_201_CREATED
+            )
+        else:
+            like.delete()
+            return Response(
+                {'detail': 'Photo unliked.', 'likes_count': likes_count},
+                status=status.HTTP_200_OK
+            )
+
     @action(detail=True, methods=['post'], url_path='assign-and-leave')
     def assign_and_leave(self, request, pk=None):
         """
@@ -377,6 +445,311 @@ class GroupViewSet(viewsets.ModelViewSet):
 
         return Response(
             {'detail': f'Admin role transferred to {successor_membership.user.username}. You have left the group.'},
+            status=status.HTTP_200_OK
+        )
+
+
+class AnnouncementViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing group announcements.
+    """
+    permission_classes = [IsAuthenticated]
+    queryset = Announcement.objects.all()
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return AnnouncementCreateSerializer
+        elif self.action in ['update', 'partial_update']:
+            return AnnouncementUpdateSerializer
+        return AnnouncementSerializer
+
+    def get_permissions(self):
+        if self.action == 'create':
+            return [IsAuthenticated(), CanCreateAnnouncement()]
+        elif self.action in ['update', 'partial_update']:
+            return [IsAuthenticated(), CanEditAnnouncement()]
+        elif self.action == 'destroy':
+            return [IsAuthenticated(), CanDeleteAnnouncement()]
+        elif self.action in ['retrieve', 'list']:
+            return [IsAuthenticated(), CanViewAnnouncement()]
+        return super().get_permissions()
+
+    def get_queryset(self):
+        """
+        Filter announcements by group_id from URL.
+        Use select_related to avoid N+1 queries.
+        """
+        queryset = super().get_queryset()
+        group_id = self.kwargs.get('group_id')
+        
+        if group_id:
+            queryset = queryset.filter(group_id=group_id)
+        
+        # Optimize queries
+        queryset = queryset.select_related('author', 'group')
+        
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        """
+        Create an announcement for a group.
+        """
+        group_id = self.kwargs.get('group_id')
+        if not group_id:
+            return Response(
+                {'detail': 'group_id is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = self.get_serializer(
+            data=request.data,
+            context={'request': request, 'group_id': group_id}
+        )
+        
+        # Handle validation errors
+        if not serializer.is_valid():
+            error_messages = []
+            for field, errors in serializer.errors.items():
+                for error in errors:
+                    if isinstance(error, str):
+                        error_messages.append(f"{field.replace('_', ' ').title()}: {error}")
+                    else:
+                        error_messages.append(f"{field.replace('_', ' ').title()}: {str(error)}")
+            
+            error_detail = '; '.join(error_messages) if error_messages else 'Validation failed'
+            return Response(
+                {'detail': error_detail},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        self.perform_create(serializer)
+        
+        # Return HTML for HTMX requests
+        if request.headers.get('HX-Request'):
+            from django.template.loader import render_to_string
+            group = serializer.instance.group
+            announcements = Announcement.objects.filter(
+                group=group
+            ).select_related('author').prefetch_related('attachments').order_by('-is_pinned', '-created_at')
+            
+            pinned_announcements = [a for a in announcements if a.is_pinned]
+            all_announcements = [a for a in announcements if not a.is_pinned]
+            
+            # Get user membership for role display
+            try:
+                membership = Membership.objects.get(
+                    user=request.user,
+                    group=group,
+                    status=MembershipStatus.APPROVED
+                )
+                is_admin = membership.role == MembershipRole.ADMIN
+            except Membership.DoesNotExist:
+                is_admin = False
+            
+            html = render_to_string('groups/partials/announcement_list.html', {
+                'pinned_announcements': pinned_announcements,
+                'all_announcements': all_announcements,
+                'is_admin': is_admin,
+            })
+            return HttpResponse(html, content_type='text/html')
+        
+        return Response(
+            AnnouncementSerializer(serializer.instance).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    def update(self, request, *args, **kwargs):
+        """
+        Update an announcement.
+        """
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        
+        # Handle validation errors
+        if not serializer.is_valid():
+            error_messages = []
+            for field, errors in serializer.errors.items():
+                for error in errors:
+                    if isinstance(error, str):
+                        error_messages.append(f"{field.replace('_', ' ').title()}: {error}")
+                    else:
+                        error_messages.append(f"{field.replace('_', ' ').title()}: {str(error)}")
+            
+            error_detail = '; '.join(error_messages) if error_messages else 'Validation failed'
+            return Response(
+                {'detail': error_detail},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        self.perform_update(serializer)
+        
+        # Return HTML for HTMX requests
+        if request.headers.get('HX-Request'):
+            from django.template.loader import render_to_string
+            group = instance.group
+            announcements = Announcement.objects.filter(
+                group=group
+            ).select_related('author').prefetch_related('attachments').order_by('-is_pinned', '-created_at')
+            
+            pinned_announcements = [a for a in announcements if a.is_pinned]
+            all_announcements = [a for a in announcements if not a.is_pinned]
+            
+            try:
+                membership = Membership.objects.get(
+                    user=request.user,
+                    group=group,
+                    status=MembershipStatus.APPROVED
+                )
+                is_admin = membership.role == MembershipRole.ADMIN
+            except Membership.DoesNotExist:
+                is_admin = False
+            
+            html = render_to_string('groups/partials/announcement_list.html', {
+                'pinned_announcements': pinned_announcements,
+                'all_announcements': all_announcements,
+                'is_admin': is_admin,
+            })
+            return HttpResponse(html, content_type='text/html')
+        
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Delete an announcement.
+        """
+        instance = self.get_object()
+        group = instance.group
+        self.perform_destroy(instance)
+        
+        # Return HTML for HTMX requests
+        if request.headers.get('HX-Request'):
+            from django.template.loader import render_to_string
+            announcements = Announcement.objects.filter(
+                group=group
+            ).select_related('author').prefetch_related('attachments').order_by('-is_pinned', '-created_at')
+            
+            pinned_announcements = [a for a in announcements if a.is_pinned]
+            all_announcements = [a for a in announcements if not a.is_pinned]
+            
+            try:
+                membership = Membership.objects.get(
+                    user=request.user,
+                    group=group,
+                    status=MembershipStatus.APPROVED
+                )
+                is_admin = membership.role == MembershipRole.ADMIN
+            except Membership.DoesNotExist:
+                is_admin = False
+            
+            html = render_to_string('groups/partials/announcement_list.html', {
+                'pinned_announcements': pinned_announcements,
+                'all_announcements': all_announcements,
+                'is_admin': is_admin,
+            })
+            return HttpResponse(html, content_type='text/html')
+        
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['post'], url_path='pin')
+    def pin(self, request, pk=None, group_id=None):
+        """
+        Pin an announcement (admin only).
+        """
+        announcement = self.get_object()
+        
+        # Check permission
+        permission = CanEditAnnouncement()
+        if not permission.has_object_permission(request, self, announcement):
+            return Response(
+                {'detail': 'Only admins can pin announcements.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        announcement.is_pinned = True
+        announcement.save()
+        
+        # Return HTML for HTMX requests
+        if request.headers.get('HX-Request'):
+            from django.template.loader import render_to_string
+            group = announcement.group
+            announcements = Announcement.objects.filter(
+                group=group
+            ).select_related('author').prefetch_related('attachments').order_by('-is_pinned', '-created_at')
+            
+            pinned_announcements = [a for a in announcements if a.is_pinned]
+            all_announcements = [a for a in announcements if not a.is_pinned]
+            
+            try:
+                membership = Membership.objects.get(
+                    user=request.user,
+                    group=group,
+                    status=MembershipStatus.APPROVED
+                )
+                is_admin = membership.role == MembershipRole.ADMIN
+            except Membership.DoesNotExist:
+                is_admin = False
+            
+            html = render_to_string('groups/partials/announcement_list.html', {
+                'pinned_announcements': pinned_announcements,
+                'all_announcements': all_announcements,
+                'is_admin': is_admin,
+            })
+            return HttpResponse(html, content_type='text/html')
+        
+        return Response(
+            AnnouncementSerializer(announcement).data,
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'], url_path='unpin')
+    def unpin(self, request, pk=None, group_id=None):
+        """
+        Unpin an announcement (admin only).
+        """
+        announcement = self.get_object()
+        
+        # Check permission
+        permission = CanEditAnnouncement()
+        if not permission.has_object_permission(request, self, announcement):
+            return Response(
+                {'detail': 'Only admins can unpin announcements.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        announcement.is_pinned = False
+        announcement.save()
+        
+        # Return HTML for HTMX requests
+        if request.headers.get('HX-Request'):
+            from django.template.loader import render_to_string
+            group = announcement.group
+            announcements = Announcement.objects.filter(
+                group=group
+            ).select_related('author').prefetch_related('attachments').order_by('-is_pinned', '-created_at')
+            
+            pinned_announcements = [a for a in announcements if a.is_pinned]
+            all_announcements = [a for a in announcements if not a.is_pinned]
+            
+            try:
+                membership = Membership.objects.get(
+                    user=request.user,
+                    group=group,
+                    status=MembershipStatus.APPROVED
+                )
+                is_admin = membership.role == MembershipRole.ADMIN
+            except Membership.DoesNotExist:
+                is_admin = False
+            
+            html = render_to_string('groups/partials/announcement_list.html', {
+                'pinned_announcements': pinned_announcements,
+                'all_announcements': all_announcements,
+                'is_admin': is_admin,
+            })
+            return HttpResponse(html, content_type='text/html')
+        
+        return Response(
+            AnnouncementSerializer(announcement).data,
             status=status.HTTP_200_OK
         )
 
@@ -485,6 +858,7 @@ def create_group_view(request):
 
 
 @login_required
+@require_http_methods(["POST"])
 def toggle_group_membership(request, group_id):
     group = get_object_or_404(Group, id=group_id)
     
@@ -568,10 +942,38 @@ def respond_to_invite(request, notif_id, action):
     notif = get_object_or_404(Notifications, id=notif_id, recipient=request.user)
     if notif.group:
         if action == 'accept':
-            Membership.objects.create(group=notif.group, user=request.user, status=MembershipStatus.APPROVED)
-            messages.success(request, f'You joined {notif.group.name}!')
+            # Update existing PENDING membership to APPROVED
+            membership = Membership.objects.filter(
+                group=notif.group,
+                user=request.user,
+                status=MembershipStatus.PENDING
+            ).first()
+            
+            if membership:
+                membership.status = MembershipStatus.APPROVED
+                membership.save()
+                messages.success(request, f'You joined {notif.group.name}!')
+            else:
+                # Fallback: create new membership if PENDING doesn't exist
+                Membership.objects.create(
+                    group=notif.group,
+                    user=request.user,
+                    status=MembershipStatus.APPROVED
+                )
+                messages.success(request, f'You joined {notif.group.name}!')
         else:
-            messages.info(request, 'Invite declined.')
+            # Delete PENDING membership when declined
+            membership = Membership.objects.filter(
+                group=notif.group,
+                user=request.user,
+                status=MembershipStatus.PENDING
+            ).first()
+            
+            if membership:
+                membership.delete()
+                messages.info(request, 'Invite declined.')
+            else:
+                messages.info(request, 'Invite declined.')
     notif.delete()
     return redirect('notifications:notifications')
 
@@ -778,11 +1180,26 @@ def view_group_photo_fullscreen(request, group_id, photo_type):
         messages.error(request, 'Invalid photo type.')
         return redirect('groups:groups_detail', group_id=group_id)
     
+    # Get like count and check if current user liked the photo
+    from .models import GroupPhotoLike
+    like_count = GroupPhotoLike.objects.filter(
+        group=group,
+        photo_type=photo_type
+    ).count()
+    
+    is_liked = GroupPhotoLike.objects.filter(
+        user=request.user,
+        group=group,
+        photo_type=photo_type
+    ).exists()
+    
     return render(request, 'groups/group_photo_fullscreen.html', {
         'group': group,
         'photo_url': photo_url,
         'photo_type': photo_type,
         'photo_title': photo_title,
+        'like_count': like_count,
+        'is_liked': is_liked,
     })
 
 
@@ -873,11 +1290,19 @@ def group_announcements_view(request, group_id):
     # Check if user is admin
     is_admin = membership.role == MembershipRole.ADMIN
     
-    # Placeholder for announcements
-    announcements = []
+    # Fetch announcements with optimized queries
+    announcements = Announcement.objects.filter(
+        group=group
+    ).select_related('author').order_by('-is_pinned', '-created_at')
+    
+    # Separate pinned and unpinned announcements
+    pinned_announcements = [a for a in announcements if a.is_pinned]
+    all_announcements = [a for a in announcements if not a.is_pinned]
     
     context = {
         'group': group,
+        'pinned_announcements': pinned_announcements,
+        'all_announcements': all_announcements,
         'announcements': announcements,
         'is_admin': is_admin,
     }
@@ -951,8 +1376,34 @@ def group_settings_details_view(request, group_id):
         messages.error(request, 'You must be a member to view group settings.')
         return redirect('groups:groups_detail', group_id=group.id)
     
+    # Check if user is admin
+    is_admin = membership.role == MembershipRole.ADMIN
+    
+    # Check if user is moderator
+    is_moderator = membership.role == MembershipRole.MODERATOR
+    
+    # Determine if user can edit based on group's edit_permission setting
+    can_edit = False
+    if group.edit_permission == EditPermission.ADMINS_ONLY:
+        can_edit = is_admin
+    elif group.edit_permission == EditPermission.ADMINS_MODERATORS:
+        can_edit = is_admin or is_moderator
+    
+    if request.method == 'POST' and can_edit:
+        form = GroupDetailsForm(request.POST, request.FILES, instance=group)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Group details updated successfully.')
+            return redirect('groups:group_settings_details', group_id=group.id)
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = GroupDetailsForm(instance=group)
+    
     context = {
         'group': group,
+        'form': form,
+        'can_edit': can_edit,
     }
     
     return render(request, 'groups/settings/group_settings_details.html', context)
@@ -974,11 +1425,255 @@ def group_settings_members_view(request, group_id):
         messages.error(request, 'You must be a member to view group settings.')
         return redirect('groups:groups_detail', group_id=group.id)
     
+    # Check if user is admin (only admins can manage members)
+    is_admin = membership.role == MembershipRole.ADMIN
+    
+    # Check if user can invite based on group's invite_permission setting
+    can_invite = False
+    if group.invite_permission == InvitePermission.ADMINS_ONLY:
+        can_invite = is_admin
+    elif group.invite_permission == InvitePermission.ALL_MEMBERS:
+        can_invite = True
+    
+    # Handle role assignment
+    if request.method == 'POST' and is_admin:
+        action = request.POST.get('action')
+        user_id = request.POST.get('user_id')
+        
+        if action == 'assign_role' and user_id:
+            try:
+                target_membership = Membership.objects.get(
+                    user_id=user_id,
+                    group=group,
+                    status=MembershipStatus.APPROVED
+                )
+                new_role = request.POST.get('role')
+                
+                # Cannot demote yourself from admin
+                if target_membership.user == request.user and target_membership.role == MembershipRole.ADMIN:
+                    messages.error(request, 'You cannot change your own admin role.')
+                else:
+                    # Check max admin constraint
+                    if new_role == MembershipRole.ADMIN:
+                        admin_count = Membership.objects.filter(
+                            group=group,
+                            role=MembershipRole.ADMIN,
+                            status=MembershipStatus.APPROVED
+                        ).count()
+                        if admin_count >= 5:
+                            messages.error(request, 'Maximum of 5 admins allowed per group.')
+                        else:
+                            target_membership.role = new_role
+                            target_membership.save()
+                            messages.success(request, f'Role updated for {target_membership.user.username}.')
+                    else:
+                        target_membership.role = new_role
+                        target_membership.save()
+                        messages.success(request, f'Role updated for {target_membership.user.username}.')
+            except Membership.DoesNotExist:
+                messages.error(request, 'Member not found.')
+        
+        elif action == 'remove_member' and user_id:
+            try:
+                target_membership = Membership.objects.get(
+                    user_id=user_id,
+                    group=group,
+                    status=MembershipStatus.APPROVED
+                )
+                
+                # Cannot remove yourself if you're the last admin
+                if target_membership.user == request.user:
+                    admin_count = Membership.objects.filter(
+                        group=group,
+                        role=MembershipRole.ADMIN,
+                        status=MembershipStatus.APPROVED
+                    ).count()
+                    if admin_count == 1:
+                        messages.error(request, 'You cannot leave as the last admin. Assign a successor first.')
+                    else:
+                        target_membership.delete()
+                        messages.success(request, f'{target_membership.user.username} removed from group.')
+                        return redirect('groups:group_settings_members', group_id=group.id)
+                else:
+                    target_membership.delete()
+                    messages.success(request, f'{target_membership.user.username} removed from group.')
+            except Membership.DoesNotExist:
+                messages.error(request, 'Member not found.')
+    
+    # Get all approved members with their roles
+    members = Membership.objects.filter(
+        group=group,
+        status=MembershipStatus.APPROVED
+    ).select_related('user').order_by(
+        # Custom ordering: ADMIN -> MODERATOR -> DELEGATE -> MEMBER
+        # Django doesn't have a direct way to order by enum values, so we use case statements
+        # For now, we'll use a simple approach and let Python handle the sorting
+    )
+    
+    # Sort members by role priority: ADMIN > MODERATOR > DELEGATE > MEMBER
+    role_priority = {
+        MembershipRole.ADMIN: 0,
+        MembershipRole.MODERATOR: 1,
+        MembershipRole.DELEGATE: 2,
+        MembershipRole.MEMBER: 3,
+    }
+    members = sorted(members, key=lambda m: (role_priority.get(m.role, 99), m.joined_at))
+    
+    # Paginate members (20 per page)
+    paginator = Paginator(members, 20)
+    page_number = request.GET.get('page', 1)
+    members_page = paginator.get_page(page_number)
+    
     context = {
         'group': group,
+        'members': members_page,
+        'is_admin': is_admin,
+        'can_invite': can_invite,
+        'membership_roles': MembershipRole,
     }
     
     return render(request, 'groups/settings/group_settings_members.html', context)
+
+
+@login_required
+def get_mutual_friends_api(request, group_id):
+    """API endpoint to get mutual friends for group invites"""
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check if user is member
+    try:
+        membership = Membership.objects.get(
+            user=request.user,
+            group=group,
+            status=MembershipStatus.APPROVED
+        )
+    except Membership.DoesNotExist:
+        return JsonResponse({'error': 'You must be a member to invite users'}, status=403)
+    
+    # Check invite permission
+    if group.invite_permission == InvitePermission.ADMINS_ONLY:
+        if membership.role != MembershipRole.ADMIN:
+            return JsonResponse({'error': 'Only admins can invite users'}, status=403)
+    
+    # Get mutual friends (users who follow request.user and are followed by request.user)
+    following_ids = Follow.objects.filter(follower=request.user).values_list('followed_id', flat=True)
+    follower_ids = Follow.objects.filter(followed=request.user).values_list('follower_id', flat=True)
+    
+    # Mutual friends are in both lists
+    mutual_friend_ids = set(following_ids) & set(follower_ids)
+    
+    # Exclude existing group members (both APPROVED and PENDING)
+    existing_member_ids = Membership.objects.filter(
+        group=group
+    ).values_list('user_id', flat=True)
+    
+    available_friend_ids = mutual_friend_ids - set(existing_member_ids)
+    
+    # Get user details with profile_pic URL
+    friends = []
+    for user in User.objects.filter(id__in=available_friend_ids):
+        friend_data = {
+            'id': user.id,
+            'username': user.username,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'profile_pic': user.profile_pic.url if user.profile_pic else None
+        }
+        friends.append(friend_data)
+    
+    return JsonResponse({'friends': friends})
+
+
+@login_required
+@require_POST
+def send_group_invites_api(request, group_id):
+    """API endpoint to send group invites"""
+    group = get_object_or_404(Group, id=group_id)
+    
+    # Check if user is member
+    try:
+        membership = Membership.objects.get(
+            user=request.user,
+            group=group,
+            status=MembershipStatus.APPROVED
+        )
+    except Membership.DoesNotExist:
+        return JsonResponse({'error': 'You must be a member to invite users'}, status=403)
+    
+    # Check invite permission
+    if group.invite_permission == InvitePermission.ADMINS_ONLY:
+        if membership.role != MembershipRole.ADMIN:
+            return JsonResponse({'error': 'Only admins can invite users'}, status=403)
+    
+    try:
+        data = json.loads(request.body)
+        user_ids = data.get('user_ids', [])
+        
+        # Debug: Log received user IDs
+        print(f"DEBUG: Received user_ids: {user_ids}")
+        
+        # Validate max 10 invites
+        if len(user_ids) > 10:
+            return JsonResponse({'error': 'Maximum 10 invites at once'}, status=400)
+        
+        sent_count = 0
+        skipped_count = 0
+        not_found_count = 0
+        errors = []
+        
+        for user_id in user_ids:
+            try:
+                user = User.objects.get(id=user_id)
+                
+                # Check if user is already a member (APPROVED) or already invited (PENDING)
+                existing_membership = Membership.objects.filter(user=user, group=group).first()
+                if existing_membership:
+                    if existing_membership.status == MembershipStatus.APPROVED:
+                        print(f"DEBUG: User {user.username} (ID: {user_id}) already a member, skipping")
+                        skipped_count += 1
+                        errors.append(f"{user.username} is already a member")
+                        continue
+                    elif existing_membership.status == MembershipStatus.PENDING:
+                        print(f"DEBUG: User {user.username} (ID: {user_id}) already invited, skipping")
+                        skipped_count += 1
+                        errors.append(f"{user.username} is already invited")
+                        continue
+                
+                # Create pending membership
+                Membership.objects.create(
+                    user=user,
+                    group=group,
+                    status=MembershipStatus.PENDING,
+                    role=MembershipRole.MEMBER
+                )
+                
+                # Send notification
+                send_group_invite_notification(user, request.user, group)
+                sent_count += 1
+                print(f"DEBUG: Successfully invited {user.username} (ID: {user_id})")
+                
+            except User.DoesNotExist:
+                print(f"DEBUG: User with id {user_id} does not exist")
+                not_found_count += 1
+                errors.append(f"User ID {user_id} not found")
+                continue
+            except Exception as e:
+                print(f"DEBUG: Error inviting user {user_id}: {str(e)}")
+                errors.append(f"Error inviting user {user_id}: {str(e)}")
+                continue
+        
+        print(f"DEBUG: Final counts - sent: {sent_count}, skipped: {skipped_count}, not_found: {not_found_count}")
+        
+        return JsonResponse({
+            'success': True,
+            'sent_count': sent_count,
+            'skipped_count': skipped_count,
+            'not_found_count': not_found_count,
+            'errors': errors
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
 
 @login_required
@@ -997,8 +1692,27 @@ def group_settings_privacy_view(request, group_id):
         messages.error(request, 'You must be a member to view group settings.')
         return redirect('groups:groups_detail', group_id=group.id)
     
+    # Check if user is admin (only admins can access privacy settings)
+    is_admin = membership.role == MembershipRole.ADMIN
+    if not is_admin:
+        messages.error(request, 'Only admins can access privacy settings.')
+        return redirect('groups:group_settings', group_id=group.id)
+    
+    if request.method == 'POST':
+        form = GroupPrivacyForm(request.POST, instance=group)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Privacy settings updated successfully.')
+            return redirect('groups:group_settings_privacy', group_id=group.id)
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = GroupPrivacyForm(instance=group)
+    
     context = {
         'group': group,
+        'form': form,
+        'is_admin': is_admin,
     }
     
     return render(request, 'groups/settings/group_settings_privacy.html', context)

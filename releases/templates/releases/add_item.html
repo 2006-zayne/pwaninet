@@ -16,7 +16,7 @@
             <h5 class="mb-0">Add Release Item</h5>
         </div>
         <div class="card-body">
-            <form method="post">
+            <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 
                 <div class="mb-3">
@@ -41,6 +41,12 @@
                     {% if form.description.errors %}
                     <div class="text-danger small">{{ form.description.errors }}</div>
                     {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Images</label>
+                    <input type="file" name="images" class="form-control" multiple accept="image/*">
+                    <div class="form-text">You can upload multiple images for this release item</div>
                 </div>
 
                 <div class="mb-3">

@@ -1,5 +1,5 @@
 from django.contrib import messages
-from posts.models import Comment, CommentLike
+from posts.models import Comment, CommentLike, PostImageComment, PostImageLike
 from posts.queries.comment_queries import get_liked_comment_ids_for_user, get_ranked_comments_queryset
 from users.services.feed_service import invalidate_home_feed_context
 from channels.layers import get_channel_layer
@@ -104,4 +104,51 @@ def toggle_comment_like_for_user(comment, user):
     return {
         'comment': comment,
         'liked_comment_ids': set() }
+
+
+def add_comment_to_image(post_image, author, content):
+    """Add a comment to a post image, mirroring the post comment functionality"""
+    content = (content or '').strip()
+    if not content:
+        return None
+    
+    comment = PostImageComment.objects.create(
+        post_image=post_image,
+        author=author,
+        content=content
+    )
+    
+    invalidate_home_feed_context(author.id)
+    
+    # Broadcast new comment via WebSocket to image-specific channel
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"post_image_comments_{post_image.id}",
+        {
+            'type': 'new_image_comment',
+            'comment': {
+                'id': comment.id,
+                'author': {
+                    'id': comment.author.id,
+                    'username': comment.author.username,
+                    'full_name': comment.author.get_full_name(),
+                    'profile_pic': comment.author.profile_pic.url if comment.author.profile_pic else None
+                },
+                'content': comment.content,
+                'created_at': comment.created_at.isoformat()
+            }
+        }
+    )
+    
+    return comment
+
+
+def handle_add_image_comment_request(request, post_image):
+    """Handle adding a comment to a post image, mirroring the post comment functionality"""
+    comment = add_comment_to_image(post_image, request.user, request.POST.get('content'))
+    if comment:
+        messages.success(request, 'Comment added successfully.')
+    else:
+        messages.error(request, 'Comment cannot be empty.')
+    return comment
 

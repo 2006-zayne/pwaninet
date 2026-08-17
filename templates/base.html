@@ -289,11 +289,30 @@
     <!-- Video Manager - replaces auto_video_play.js -->
     <script src="{% static 'js/video-manager.js' %}"></script>
     
+    <!-- Global Audio Manager -->
+    <script src="{% static 'js/global-audio-manager.js' %}"></script>
+    
     <!-- Native PWA Install Manager -->
     <script src="{% static 'js/native-pwa-install.js' %}"></script>
     
     <!-- Update Manager -->
     <script src="{% static 'js/update-manager.js' %}"></script>
+    
+    <!-- What's New Modal -->
+    <script>
+        // Set authentication status for What's New modal
+        window.isAuthenticated = {{ request.user.is_authenticated|lower }};
+        
+        // Set user-specific data for audio manager
+        {% if request.user.is_authenticated %}
+        window.PwaniNetUsername = '{{ request.user.username }}';
+        window.PwaniNetUserAudioPreference = '{{ request.user.audio_preference|default:"muted" }}';
+        {% else %}
+        window.PwaniNetUsername = '';
+        window.PwaniNetUserAudioPreference = null;
+        {% endif %}
+    </script>
+    <script src="{% static 'js/whats-new-modal.js' %}"></script>
     
     <!-- Comment System - Phase 2 Threaded Comments -->
     <script src="{% static 'js/comments/comment-api.js' %}"></script>
@@ -1585,7 +1604,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
     function pollNotificationCount() {
         // Poll notification count every 5 seconds as fallback
-        fetch('/unread-notification-count/')
+        fetch('/notifications/unread-count/')
             .then(r => r.text())
             .then(html => {
                 const badge = document.getElementById('unread-count-badge');
@@ -1761,11 +1780,11 @@ window.addEventListener('beforeinstallprompt', (e) => {
     <!-- Page skeleton is now managed by page-skeleton-manager.js -->
 
     <!-- Version Footer -->
-    <footer style="text-align: center; padding: 1rem; background: #f8fafc; border-top: 1px solid #e2e8f0; margin-top: auto; font-size: 0.8rem; color: #64748b;">
+    <footer style="text-align: center; padding: 1rem; background: transparent; border-top: none; margin-top: auto; font-size: 0.8rem; color: #64748b;">
         <style>
           [data-theme="dark"] footer {
-            background: var(--card-bg) !important;
-            border-top-color: var(--border) !important;
+            background: transparent !important;
+            border-top: none !important;
             color: #b0b3b8 !important;
           }
         </style>

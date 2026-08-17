@@ -159,6 +159,34 @@ def _followed_user_recipient(event_data: Dict[str, Any]) -> List[int]:
         return []
 
 
+def _followers_of_author_recipient(event_data: Dict[str, Any]) -> List[int]:
+    """Recipient: Users who follow the post author (for new post notifications)."""
+    actor_id = event_data.get('actor_id')
+    group_id = event_data.get('context_id')  # This will be set if post is in a group
+    
+    if not actor_id:
+        return []
+    
+    try:
+        author = User.objects.get(id=actor_id)
+        
+        if group_id:
+            # For group posts, send to group members
+            from groups.models import Membership, MembershipStatus
+            return list(Membership.objects.filter(
+                group_id=group_id,
+                status=MembershipStatus.APPROVED
+            ).exclude(user_id=actor_id).values_list('user_id', flat=True))
+        else:
+            # For global posts, send to users who follow the author
+            # following_relationships are relationships where the user is the follower
+            return list(User.objects.filter(
+                following_relationships__followed=author
+            ).exclude(id=actor_id).values_list('id', flat=True))
+    except User.DoesNotExist:
+        return []
+
+
 def _pinched_user_recipient(event_data: Dict[str, Any]) -> List[int]:
     """Recipient: User who was pinched."""
     target_id = event_data.get('target_id')
@@ -520,7 +548,7 @@ POST_CREATED_RULE = NotificationRule(
     priority="NORMAL",
     delivery_policy="IMMEDIATE",
     aggregation_policy="ALLOWED",
-    recipients=lambda event_data: [],  # Recipients handled by post service
+    recipients=_followers_of_author_recipient,
     title_template="{actor_username} posted a new update",
     summary_template="New post from someone you follow"
 )
@@ -542,7 +570,7 @@ GROUP_INVITE_RULE = NotificationRule(
         {
             'action_type': 'ACCEPT',
             'label': 'Accept',
-            'url': f"/groups/{event.get('group_id')}/accept",
+            'url': f"/groups/invite/respond/{event.get('notification_id')}/accept/",
             'method': 'POST',
             'is_primary': True,
             'order': 0
@@ -550,7 +578,7 @@ GROUP_INVITE_RULE = NotificationRule(
         {
             'action_type': 'DECLINE',
             'label': 'Decline',
-            'url': f"/groups/{event.get('group_id')}/decline",
+            'url': f"/groups/invite/respond/{event.get('notification_id')}/decline/",
             'method': 'POST',
             'is_primary': False,
             'order': 1
@@ -793,6 +821,41 @@ COURSE_ASSIGNMENT_PUBLISHED_RULE = NotificationRule(
     ]
 )
 
+def _all_users_recipient(event_data: Dict[str, Any]) -> List[int]:
+    """Recipient: All users (for system-wide announcements like releases)."""
+    return list(User.objects.filter(is_active=True).values_list('id', flat=True))
+
+
+# ============================================================================
+# Release Rules
+# ============================================================================
+
+RELEASE_PUBLISHED_RULE = NotificationRule(
+    name="release_published",
+    trigger="releases.release.published",
+    condition=None,
+    notification_type="RELEASE",
+    category="SYSTEM",
+    priority="HIGH",
+    delivery_policy="IMMEDIATE",
+    aggregation_policy="NEVER",
+    recipients=_all_users_recipient,
+    title_template="New version {version} is now available",
+    summary_template="New release available",
+    actions=lambda event: [
+        {
+            'action_type': 'SEE_WHATS_NEW',
+            'label': "See What's New",
+            'url': f"/system/releases/{event.get('target_id')}/",
+            'method': 'GET',
+            'is_primary': True,
+            'order': 0,
+            'style': 'primary'
+        }
+    ]
+)
+
+
 # All rules registry
 RULES_REGISTRY = [
     POST_LIKE_RULE,
@@ -820,6 +883,7 @@ RULES_REGISTRY = [
     MESSAGE_SENT_RULE,
     CONVERSATION_MEMBER_ADDED_RULE,
     COURSE_ASSIGNMENT_PUBLISHED_RULE,
+    RELEASE_PUBLISHED_RULE,
 ]
 
 

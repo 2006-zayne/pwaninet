@@ -118,7 +118,7 @@ export function initHtmxListeners() {
   document.body.addEventListener('htmx:afterSwap', function(evt) {
     if (evt.detail.triggerSpec?.trigger === 'updateUnreadCount') {
       // Update unread count badge
-      fetch('/unread-notification-count/')
+      fetch('/notifications/unread-count/')
         .then(r => r.text())
         .then(html => {
           const badge = document.getElementById('unread-count-badge');
@@ -215,12 +215,12 @@ export function initLazyLoading() {
   if (loadMoreTrigger) {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
-        if (entry.isIntersecting) {
+        if (entry.isIntersecting && loadMoreTrigger.dataset.loading !== 'true') {
           loadMoreNotifications();
         }
       });
     }, {
-      rootMargin: '100px',
+      rootMargin: '200px',
       threshold: 0.1
     });
     
@@ -229,12 +229,18 @@ export function initLazyLoading() {
 }
 
 /**
- * Load more notifications via infinite scroll
+ * Load more notifications via infinite scroll with cursor-based pagination
  */
 export function loadMoreNotifications() {
   const loadMoreTrigger = document.getElementById('load-more-trigger');
-  const currentPage = parseInt(loadMoreTrigger.dataset.page || '1');
-  const nextPage = currentPage + 1;
+  const currentCursor = loadMoreTrigger.dataset.cursor || '';
+  
+  // Prevent duplicate requests
+  if (loadMoreTrigger.dataset.loading === 'true') {
+    return;
+  }
+  
+  loadMoreTrigger.dataset.loading = 'true';
   
   // Show loading indicator
   const loadingIndicator = document.getElementById('loading-indicator');
@@ -244,35 +250,74 @@ export function loadMoreNotifications() {
   
   // Get current URL parameters
   const url = new URL(window.location);
-  url.searchParams.set('page', nextPage);
+  if (currentCursor) {
+    url.searchParams.set('cursor', currentCursor);
+  }
   url.searchParams.set('partial', 'true');
+  url.searchParams.set('limit', '10');
   
-  // Fetch next page
+  // Fetch next page with cursor
   fetch(url.toString())
-    .then(response => response.text())
-    .then(html => {
-      if (html.trim()) {
-        // Append new notifications
+    .then(response => response.json())
+    .then(data => {
+      if (data.html && data.html.trim()) {
+        // Append new notifications with time sections
         const notificationList = document.getElementById('notification-list');
         const cardBody = notificationList.querySelector('.card-body');
         
         const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = html;
-        const newItems = tempDiv.querySelectorAll('.notif-item');
+        tempDiv.innerHTML = data.html;
         
-        newItems.forEach((item, index) => {
-          // Add arrival animation
-          item.classList.add('arriving');
-          setTimeout(() => item.classList.remove('arriving'), 400);
-          cardBody.appendChild(item);
+        // Check for duplicate time sections and merge them
+        const newTimeSections = tempDiv.querySelectorAll('.time-section');
+        const existingTimeSections = cardBody.querySelectorAll('.time-section');
+        
+        newTimeSections.forEach(newSection => {
+          const newHeader = newSection.querySelector('.time-section-header h6');
+          if (!newHeader) return;
+          
+          const newHeaderText = newHeader.textContent.trim();
+          let shouldAppend = true;
+          
+          // Check if this time section already exists
+          existingTimeSections.forEach(existingSection => {
+            const existingHeader = existingSection.querySelector('.time-section-header h6');
+            if (existingHeader && existingHeader.textContent.trim() === newHeaderText) {
+              // Append only the notification items, not the section header
+              const newItems = newSection.querySelectorAll('.list-group-item');
+              newItems.forEach(item => {
+                item.classList.add('arriving');
+                setTimeout(() => item.classList.remove('arriving'), 400);
+                existingSection.appendChild(item);
+              });
+              shouldAppend = false;
+            }
+          });
+          
+          // If section doesn't exist, append the whole section
+          if (shouldAppend) {
+            const newItems = newSection.querySelectorAll('.list-group-item');
+            newItems.forEach((item, index) => {
+              item.classList.add('arriving');
+              setTimeout(() => item.classList.remove('arriving'), 400);
+            });
+            cardBody.appendChild(newSection);
+          }
         });
         
-        // Update page number
-        loadMoreTrigger.dataset.page = nextPage;
+        // Clean up tempDiv
+        tempDiv.remove();
         
-        // Check if there are more pages
-        if (newItems.length < 20) {
+        // Update cursor for next request
+        if (data.next_cursor) {
+          loadMoreTrigger.dataset.cursor = data.next_cursor;
+        } else {
           // No more items, hide trigger
+          loadMoreTrigger.style.display = 'none';
+        }
+        
+        // Check if there are more items
+        if (!data.has_more) {
           loadMoreTrigger.style.display = 'none';
         }
       } else {
@@ -284,6 +329,7 @@ export function loadMoreNotifications() {
       console.error('Error loading more notifications:', error);
     })
     .finally(() => {
+      loadMoreTrigger.dataset.loading = 'false';
       if (loadingIndicator) {
         loadingIndicator.style.display = 'none';
       }

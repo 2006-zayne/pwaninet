@@ -8,6 +8,21 @@ class JoinPolicy(models.TextChoices):
     INVITE_ONLY = "invite", "Invite Only"
 
 
+class PostVisibility(models.TextChoices):
+    EVERYONE = "everyone", "Everyone in Pwaninet"
+    MEMBERS_ONLY = "members_only", "Only Members"
+
+
+class EditPermission(models.TextChoices):
+    ADMINS_ONLY = "admins_only", "Admins Only"
+    ADMINS_MODERATORS = "admins_moderators", "Admins and Moderators"
+
+
+class InvitePermission(models.TextChoices):
+    ADMINS_ONLY = "admins_only", "Admins Only"
+    ALL_MEMBERS = "all_members", "All Members"
+
+
 class Group(models.Model):
     name = models.CharField(max_length=200, unique=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='created_groups')
@@ -20,6 +35,24 @@ class Group(models.Model):
         max_length=20,
         choices=JoinPolicy.choices,
         default=JoinPolicy.OPEN
+    )
+    post_visibility = models.CharField(
+        max_length=20,
+        choices=PostVisibility.choices,
+        default=PostVisibility.MEMBERS_ONLY,
+        help_text="Who can view group posts in the main feed"
+    )
+    edit_permission = models.CharField(
+        max_length=30,
+        choices=EditPermission.choices,
+        default=EditPermission.ADMINS_ONLY,
+        help_text="Who can edit group details"
+    )
+    invite_permission = models.CharField(
+        max_length=30,
+        choices=InvitePermission.choices,
+        default=InvitePermission.ADMINS_ONLY,
+        help_text="Who can invite users to the group"
     )
     course = models.ForeignKey('courses.Course', on_delete=models.SET_NULL, null=True, blank=True)
     year = models.ForeignKey('courses.Year', on_delete=models.SET_NULL, null=True, blank=True)
@@ -64,3 +97,89 @@ class Membership(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.group.name} ({self.role})"
+
+
+class AnnouncementPriority(models.TextChoices):
+    NORMAL = 'NORMAL', 'Normal'
+    IMPORTANT = 'IMPORTANT', 'Important'
+    URGENT = 'URGENT', 'Urgent'
+
+
+class Announcement(models.Model):
+    """Group announcements"""
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='announcements', db_index=True)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='created_announcements', db_index=True)
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    priority = models.CharField(max_length=20, choices=AnnouncementPriority.choices, default=AnnouncementPriority.NORMAL, db_index=True)
+    is_pinned = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        ordering = ['-is_pinned', '-created_at']
+        indexes = [
+            models.Index(fields=['group', '-is_pinned', '-created_at']),
+            models.Index(fields=['group', 'priority', '-created_at']),
+            models.Index(fields=['author', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.title} - {self.group.name}"
+
+
+class AnnouncementAttachment(models.Model):
+    """Attachments for announcements"""
+    
+    ATTACHMENT_TYPE_CHOICES = [
+        ('image', 'Image'),
+        ('document', 'Document'),
+    ]
+    
+    announcement = models.ForeignKey(Announcement, on_delete=models.CASCADE, related_name='attachments', db_index=True)
+    attachment_type = models.CharField(max_length=20, choices=ATTACHMENT_TYPE_CHOICES, default='image')
+    
+    # For image attachments
+    file = models.FileField(upload_to='announcements/attachments', blank=True, null=True)
+    thumbnail = models.ImageField(upload_to='announcements/thumbnails', blank=True, null=True)
+    
+    # For document attachments (linked to document repository)
+    document = models.ForeignKey('documents.Document', on_delete=models.CASCADE, related_name='announcement_attachments', blank=True, null=True)
+    
+    uploaded_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+        indexes = [
+            models.Index(fields=['announcement', '-uploaded_at']),
+            models.Index(fields=['attachment_type']),
+        ]
+
+    def __str__(self):
+        if self.attachment_type == 'document' and self.document:
+            return f"{self.document.title} - {self.announcement.title}"
+        return f"{self.file.name} - {self.announcement.title}"
+
+
+class GroupPhotoLike(models.Model):
+    """Likes for group profile and cover photos"""
+    PHOTO_TYPE_CHOICES = [
+        ('group', 'Group Photo'),
+        ('cover', 'Cover Photo'),
+    ]
+    
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='group_photo_likes', db_index=True)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='photo_likes', db_index=True)
+    photo_type = models.CharField(max_length=10, choices=PHOTO_TYPE_CHOICES, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        unique_together = ('user', 'group', 'photo_type')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['group', 'photo_type', '-created_at']),
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} likes {self.group.name}'s {self.photo_type} photo"

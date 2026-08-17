@@ -233,14 +233,20 @@
             }
         }
 
+        // Check global audio preference (user-specific)
+        const username = window.PwaniNetUsername || '';
+        const storageKey = username ? `pwaninet_audio_preference_${username}` : 'pwaninet_audio_preference';
+        const globalAudioPref = localStorage.getItem(storageKey) || window.PwaniNetUserAudioPreference || 'muted';
+        video.muted = globalAudioPref === 'muted';
+
         // Play new video
         video.play().then(() => {
             state.currentPlayingVideo = video;
             videoData.isPlaying = true;
-            console.log('[VideoManager] Playing video:', video.id);
+            console.log('[VideoManager] Playing video:', video.id, 'muted:', video.muted);
         }).catch(err => {
             console.warn('[VideoManager] Failed to play video:', err);
-            // Try muted autoplay
+            // Try muted autoplay if not already muted
             if (!video.muted) {
                 video.muted = true;
                 video.play().catch(e => console.log('Muted auto-play also prevented:', e));

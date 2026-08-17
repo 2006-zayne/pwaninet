@@ -1,0 +1,59 @@
+{% load static %}
+{% load humanize %}
+<div id="announcement-card-{{ announcement.id }}" class="announcement-card shadow-sm mb-3 bg-white rounded-3 overflow-hidden border-0">
+    {% include 'groups/partials/announcement_header.html' %}
+    
+    {% include 'groups/partials/announcement_content.html' %}
+    
+    {% include 'groups/partials/announcement_actions.html' %}
+</div>
+
+<style>
+[data-theme="dark"] .announcement-card {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .announcement-card .text-dark {
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .announcement-card .text-muted {
+    color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .announcement-card .border-top,
+[data-theme="dark"] .announcement-card .border-bottom {
+    border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .announcement-card .dropdown-menu {
+    background-color: var(--card-bg);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .announcement-card .dropdown-item {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .announcement-card .dropdown-item:hover {
+    background-color: var(--border);
+}
+
+.announcement-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.announcement-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 767px) {
+    .announcement-card {
+        width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+}
+</style>

@@ -227,7 +227,47 @@ class ReleaseItem(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.release.version} - {self.category}: {self.title}"
+        return f"{self.release.version} - {self.title}"
+
+
+class ReleaseItemImage(models.Model):
+    """
+    Images associated with a release item.
+    Allows multiple images per release item.
+    """
+    
+    release_item = models.ForeignKey(
+        ReleaseItem,
+        on_delete=models.CASCADE,
+        related_name='images',
+        help_text="The release item this image belongs to"
+    )
+    
+    image = models.ImageField(
+        upload_to='release_images/',
+        help_text="Screenshot or image for this release item"
+    )
+    
+    caption = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Caption for the image"
+    )
+    
+    display_order = models.PositiveIntegerField(
+        default=0,
+        help_text="Order for displaying images within the release item"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['display_order', 'id']
+        verbose_name = 'Release Item Image'
+        verbose_name_plural = 'Release Item Images'
+    
+    def __str__(self):
+        return f"{self.release_item.title} - Image {self.id}"
 
 
 class UserReleaseView(models.Model):

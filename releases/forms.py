@@ -5,7 +5,7 @@ Provides Django forms for release creation and editing.
 """
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import Release, ReleaseItem
+from .models import Release, ReleaseItem, ReleaseItemImage
 from .utils import validate_version
 
 
@@ -147,6 +147,34 @@ class ReleaseItemForm(forms.ModelForm):
                 'class': 'form-control',
                 'rows': 2,
                 'placeholder': 'Enter item description'
+            }),
+            'display_order': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': 0
+            }),
+        }
+
+
+class ReleaseItemImageForm(forms.ModelForm):
+    """
+    Form for creating and editing release item images.
+    """
+    
+    class Meta:
+        model = ReleaseItemImage
+        fields = [
+            'image',
+            'caption',
+            'display_order',
+        ]
+        widgets = {
+            'image': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/*'
+            }),
+            'caption': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Enter image caption (optional)'
             }),
             'display_order': forms.NumberInput(attrs={
                 'class': 'form-control',

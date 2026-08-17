@@ -1,3 +1,4 @@
+{% load static %}
 {# Profile-Driven Notification Card Component #}
 {# Uses the canonical NotificationPayload structure #}
 {# Args: payload (NotificationPayload object), profile, message, components, preview, actions, status, interactions, navigation, expansion, aggregation #}
@@ -27,7 +28,7 @@
                style="{% if forloop.first %}left: 0px;{% elif forloop.counter == 2 %}left: 14px;{% else %}left: 28px;{% endif %} width: 48px; height: 48px; background-color: var(--bg-secondary); z-index: {{ 3|add:forloop.counter0 }}; top: 12px; text-decoration: none;"
                onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
               {% if actor.avatar %}
-                <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;">
+                <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
               {% else %}
                 <div class="d-flex align-items-center justify-content-center h-100">
                   <i class="bi bi-person" style="color: var(--text-secondary);"></i>
@@ -67,7 +68,7 @@
                    style="width: 28px; height: 28px; background-color: var(--bg-secondary); right: -4px; bottom: -4px; z-index: 10; text-decoration: none;"
                    onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
                   {% if actor.avatar %}
-                    <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;">
+                    <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
                   {% else %}
                     <i class="bi bi-person" style="font-size: 1rem; color: var(--text-secondary);"></i>
                   {% endif %}
@@ -81,7 +82,7 @@
                class="rounded-circle border d-flex align-items-center justify-content-center"
                style="width: 72px; height: 72px; background-color: var(--bg-secondary); text-decoration: none; margin-left: -16px;"
                onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
-              <img src="{{ payload.context.avatar_url }}" alt="{{ payload.context.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;">
+              <img src="{{ payload.context.avatar_url }}" alt="{{ payload.context.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
             </a>
           {% else %}
             {# Show actor avatar for group notifications without avatar #}
@@ -91,13 +92,37 @@
                style="width: 72px; height: 72px; background-color: var(--bg-secondary); text-decoration: none; margin-left: -16px;"
                onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
               {% if actor.avatar %}
-                <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;">
+                <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
               {% else %}
                 <i class="bi bi-person" style="font-size: 2.25rem; color: var(--text-secondary);"></i>
               {% endif %}
             </a>
             {% endwith %}
           {% endif %}
+        {% elif payload.type == 'RELEASE' %}
+          {# Release notification: PwaniNet icon with actor avatar in bottom right #}
+          <div style="position: relative; width: 72px; height: 72px; margin-left: -16px;">
+            {# PwaniNet icon - main avatar #}
+            <div class="rounded-circle border d-flex align-items-center justify-content-center overflow-hidden"
+                 style="width: 72px; height: 72px; background-color: var(--bg-secondary);">
+              <img src="{% static 'images/web-app-manifest-192x192.png' %}" alt="PwaniNet" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
+            </div>
+            {# Actor avatar - small circle in bottom right #}
+            {% if payload.actors and payload.actors.0 %}
+              {% with actor=payload.actors.0 %}
+              <a href="{% url 'users:profile' actor.username %}"
+                 class="rounded-circle border position-absolute d-flex align-items-center justify-content-center"
+                 style="width: 28px; height: 28px; background-color: var(--bg-secondary); right: -4px; bottom: -4px; z-index: 10; text-decoration: none;"
+                 onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
+                {% if actor.avatar %}
+                  <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
+                {% else %}
+                  <i class="bi bi-person" style="font-size: 1rem; color: var(--text-secondary);"></i>
+                {% endif %}
+              </a>
+              {% endwith %}
+            {% endif %}
+          </div>
         {% else %}
           {# Show actor avatar for other notifications #}
           {% with actor=payload.actors.0 %}
@@ -106,7 +131,7 @@
              style="width: 72px; height: 72px; background-color: var(--bg-secondary); text-decoration: none; margin-left: -16px;"
              onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
             {% if actor.avatar %}
-              <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;">
+              <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
             {% else %}
               <i class="bi bi-person" style="font-size: 2.25rem; color: var(--text-secondary);"></i>
             {% endif %}
@@ -194,7 +219,7 @@
                   <a href="{{ action.url }}"
                      class="btn btn-sm"
                      style="background-color: {% if action.style == 'primary' %}var(--brand){% elif action.style == 'danger' %}var(--danger){% elif action.style == 'success' %}var(--success){% else %}var(--bg-secondary){% endif %}; color: {% if action.style in 'primary danger success' %}white{% else %}var(--text-primary){% endif %}; text-decoration: none; border-radius: 20px;"
-                     onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)"
+                     onclick="{% if action.id == 'SEE_WHATS_NEW' %}event.preventDefault(); event.stopPropagation(); console.log('Opening modal for release:', '{{ payload.raw_data.target_id }}'); console.log('Function check:', typeof window.openWhatsNewModal); if (typeof window.openWhatsNewModal === 'function') { window.openWhatsNewModal('{{ payload.raw_data.target_id }}', event); } else { console.error('openWhatsNewModal function not found on window object'); console.log('Available window functions:', Object.keys(window).filter(k => k.includes('whats') || k.includes('Whats'))); }{% else %}event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this);{% endif %}"
                      {% if not action.enabled %}style="opacity: 0.5; pointer-events: none;"{% endif %}>
                     {% if action.icon %}<i class="bi bi-{{ action.icon }}"></i>{% endif %}
                     {{ action.label }}
@@ -228,7 +253,7 @@
                   <div class="rounded-circle d-flex align-items-center justify-content-center"
                        style="width: 32px; height: 32px; background-color: var(--bg-tertiary); overflow: hidden;">
                     {% if actor.avatar %}
-                      <img src="{{ actor.avatar }}" alt="{{ actor.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+                      <img src="{{ actor.avatar }}" alt="{{ actor.name }}" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
                     {% else %}
                       <i class="bi bi-person" style="font-size: 1rem; color: var(--text-secondary);"></i>
                     {% endif %}

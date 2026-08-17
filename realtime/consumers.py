@@ -52,6 +52,14 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
 
+        # Send current unread count on connect
+        unread_count = await self.get_unread_count()
+        await self.send(text_data=json.dumps({
+            'type': 'unread_count',
+            'count': unread_count
+        }))
+        print(f'[NOTIFICATIONS] Sent initial unread count: {unread_count}')
+
         # Register connection - FROZEN FOR MVP
         # from messaging.ws_middleware import WebSocketConnectionTracker
         # WebSocketConnectionTracker.register_connection(
@@ -161,6 +169,12 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             'type': 'unread_count',
             'count': event['count']
         }))
+
+    @database_sync_to_async
+    def get_unread_count(self):
+        """Get unread count for current user."""
+        from notifications.services.notification_service import get_cached_unread_count
+        return get_cached_unread_count(self.user)
 
 
 

@@ -16,7 +16,7 @@
             <h5 class="mb-0">New Release</h5>
         </div>
         <div class="card-body">
-            <form method="post">
+            <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 
                 <div class="row mb-3">
@@ -107,6 +107,13 @@
                                 </button>
                             </div>
                         </div>
+                        <div class="row mt-2">
+                            <div class="col-md-12">
+                                <label class="form-label">Images</label>
+                                <input type="file" name="item_images_0" class="form-control" multiple accept="image/*">
+                                <div class="form-text">You can upload multiple images for this item</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -165,6 +172,13 @@ function addReleaseItem() {
                 <button type="button" class="btn btn-outline-danger w-100" onclick="this.closest('.release-item').remove()">
                     <i class="bi bi-trash"></i>
                 </button>
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-md-12">
+                <label class="form-label">Images</label>
+                <input type="file" name="item_images_${itemCount}" class="form-control" multiple accept="image/*">
+                <div class="form-text">You can upload multiple images for this item</div>
             </div>
         </div>
     `;

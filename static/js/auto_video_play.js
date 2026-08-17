@@ -156,6 +156,12 @@ class AutoVideoPlayer {
     startVideo(video, videoData) {
         videoData.isVisible = true;
         
+        // Check global audio preference (user-specific)
+        const username = window.PwaniNetUsername || '';
+        const storageKey = username ? `pwaninet_audio_preference_${username}` : 'pwaninet_audio_preference';
+        const globalAudioPref = localStorage.getItem(storageKey) || window.PwaniNetUserAudioPreference || 'muted';
+        video.muted = globalAudioPref === 'muted';
+        
         // Only play if video hasn't been manually paused by user
         if (!videoData.hasStarted || videoData.isPlaying) {
             const playPromise = video.play();

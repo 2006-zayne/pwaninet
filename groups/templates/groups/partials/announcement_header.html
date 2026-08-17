@@ -1,0 +1,66 @@
+{% load static %}
+<div class="p-3 border-bottom d-flex align-items-start">
+    <div class="position-relative me-3">
+        <a href="{% url 'users:profile' announcement.author.username %}">
+            <img src="{{ announcement.author.profile_pic.url|default:'' }}" 
+                 onerror="this.src='{% static 'images/default_user.jpg' %}'"
+                 alt="{{ announcement.author.get_full_name|default:announcement.author.username }}" 
+                 class="rounded-circle border shadow-sm"
+                 style="width: 72px; height: 72px; object-fit: cover;">
+        </a>
+    </div>
+    
+    <div class="flex-grow-1">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <a href="{% url 'users:profile' announcement.author.username %}" 
+                   class="text-decoration-none">
+                    <span class="fw-bold small text-dark">
+                        {{ announcement.author.get_full_name|default:announcement.author.username }}
+                    </span>
+                </a>
+                <div class="text-muted" style="font-size: 11px;">
+                    {{ announcement.author_role|default:"Member" }} · {{ announcement.created_at|timesince }} ago
+                </div>
+            </div>
+            
+            {% if is_admin %}
+                <div class="dropdown">
+                    <button class="btn btn-sm border-0 text-muted" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-three-dots fs-5"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow">
+                        <li>
+                            <a class="dropdown-item" href="#" 
+                               data-hx-vals='{"title": "{{ announcement.title|escapejs }}", "content": "{{ announcement.content|escapejs }}", "priority": "{{ announcement.priority }}", "is_pinned": {% if announcement.is_pinned %}true{% else %}false{% endif %}}'
+                               data-hx-patch-url="{% url 'groups:group_announcement_detail_api' group_id=announcement.group.id pk=announcement.id %}"
+                               data-bs-toggle="modal" 
+                               data-bs-target="#editAnnouncementModal">
+                                <i class="bi bi-pencil me-2"></i>Edit
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="#" 
+                               data-hx-post="{% if announcement.is_pinned %}{% url 'groups:group_announcement_unpin_api' group_id=announcement.group.id pk=announcement.id %}{% else %}{% url 'groups:group_announcement_pin_api' group_id=announcement.group.id pk=announcement.id %}{% endif %}"
+                               data-hx-target="#announcement-card-{{ announcement.id }}"
+                               data-hx-swap="outerHTML">
+                                <i class="bi bi-pin me-2"></i>{% if announcement.is_pinned %}Unpin{% else %}Pin{% endif %}
+                            </a>
+                        </li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li>
+                            <a class="dropdown-item text-danger" href="#" 
+                               data-hx-delete="{% url 'groups:group_announcement_detail_api' group_id=announcement.group.id pk=announcement.id %}"
+                               data-hx-target="#announcement-card-{{ announcement.id }}"
+                               data-hx-confirm="Are you sure you want to delete this announcement?">
+                                <i class="bi bi-trash me-2"></i>Delete
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>

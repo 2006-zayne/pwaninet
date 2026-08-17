@@ -323,8 +323,8 @@
 </div>
 
 <!-- Sticky Comment Input at Bottom -->
-<div class="fixed-bottom" style="z-index: 1000; background-color: var(--card-bg); border-top: 1px solid var(--border);">
-    <div class="container py-3">
+<div class="fixed-bottom" style="z-index: 1000; background-color: transparent; border-top: none;">
+    <div class="container py-3" style="background-color: transparent;">
         <div class="row justify-content-center">
             <div class="col-12 col-lg-8">
                 <form method="POST" action="{% url 'posts:add_comment' post.id %}" class="main-composer">

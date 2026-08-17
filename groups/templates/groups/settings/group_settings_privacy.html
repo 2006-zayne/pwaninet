@@ -6,6 +6,7 @@
     --brand: #2563eb;
     --brand-light: #dbeafe;
     --brand-mid: #bfdbfe;
+    --brand-glow: rgba(37, 99, 235, 0.15);
     --page-bg: #f8fafc;
     --card-bg: #ffffff;
     --border: #e2e8f0;
@@ -22,6 +23,7 @@
     --brand: #6366f1;
     --brand-light: #312e81;
     --brand-mid: #4338ca;
+    --brand-glow: rgba(99, 102, 241, 0.15);
     --page-bg: #18191f;
     --card-bg: #242526;
     --border: #3a3b3c;
@@ -40,18 +42,6 @@
 
   .page-header {
     margin-bottom: 2rem;
-  }
-
-  .page-eyebrow {
-    font-size: 0.62rem;
-    font-weight: 800;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
   }
 
   .page-title {
@@ -96,7 +86,7 @@
   }
 
   .settings-section-body {
-    padding: 1.5rem;
+    padding: 4px;
   }
 
   .settings-section-title {
@@ -120,16 +110,103 @@
     margin-top: 0.25rem;
   }
 
-  .placeholder-section {
-    text-align: center;
-    padding: 3rem 2rem;
-    color: var(--text-secondary);
+  /* Form styling */
+  .field-label {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    display: block;
+    margin-bottom: 8px;
   }
 
-  .placeholder-section i {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-    opacity: 0.5;
+  .django-form-field {
+    width: 100%;
+    padding: 0.75rem 1.1rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-pill);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    outline: none;
+    background: var(--card-bg);
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .django-form-field:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-glow);
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+    padding: 1rem 1.25rem;
+  }
+
+  .field-help {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+  }
+
+  .field-error {
+    font-size: 0.72rem;
+    color: #dc2626;
+    font-weight: 600;
+    margin-top: 6px;
+  }
+
+  /* Button styling */
+  .btn-base {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.85rem;
+    font-weight: 800;
+    text-align: center;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    letter-spacing: 0.02em;
+    width: 100%;
+  }
+
+  .btn-primary-brand {
+    background: var(--brand);
+    color: #fff;
+  }
+
+  .btn-primary-brand:hover {
+    background: #1d4ed8;
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px var(--brand-glow);
+  }
+
+  /* Security badge */
+  .security-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 1px solid #f59e0b;
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #92400e;
+    margin-bottom: 1.5rem;
+  }
+
+  [data-theme="dark"] .security-badge {
+    background: linear-gradient(135deg, #451a03 0%, #78350f 100%);
+    border-color: #d97706;
+    color: #fbbf24;
   }
 
   @media (max-width: 768px) {
@@ -150,7 +227,7 @@
       <i class="bi bi-arrow-left"></i> Back to Settings
     </a>
     <h1 class="page-title">Group Privacy Settings</h1>
-    <p class="page-subtitle">Control group visibility and access</p>
+    <p class="page-subtitle">Control group visibility and access permissions</p>
   </div>
 
   <div class="settings-section">
@@ -158,21 +235,62 @@
       <h2 class="settings-section-title">
         <i class="bi bi-shield-lock"></i> Privacy Configuration
       </h2>
-      <p class="settings-section-description">Manage who can join and view your group</p>
+      <p class="settings-section-description">Manage who can join, view, and edit your group</p>
     </div>
     <div class="settings-section-body">
-      <div class="placeholder-section">
-        <i class="bi bi-gear"></i>
-        <p>Privacy settings coming soon:</p>
-        <ul style="text-align: left; display: inline-block; margin-top: 1rem; color: var(--text-muted);">
-          <li>Join policy (Open, Request Only, Invite Only)</li>
-          <li>Who can view group posts</li>
-          <li>Who can see member list</li>
-        </ul>
+      <div class="security-badge">
+        <i class="bi bi-shield-check"></i>
+        Admin-Only Access
       </div>
+
+      <form method="POST" class="privacy-form">
+        {% csrf_token %}
+
+        {% if form %}
+          {% for field in form %}
+            <div class="form-group">
+              <label class="field-label">{{ field.label }}</label>
+              {{ field }}
+              
+              {% if field.help_text %}
+                <div class="field-help">{{ field.help_text }}</div>
+              {% endif %}
+              
+              {% for error in field.errors %}
+                <div class="field-error">
+                  <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ error }}
+                </div>
+              {% endfor %}
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="alert alert-danger border-0 shadow-sm rounded-3" style="background: #fff1f1; color: #dc2626; font-size: 0.85rem; font-weight: 600;">
+            <i class="bi bi-shield-slash-fill me-2"></i> SYSTEM ERROR: Interface response timeout.
+          </div>
+        {% endif %}
+
+        <div class="d-grid gap-3 mt-4" style="padding: 0 1.25rem 1.25rem;">
+          <button type="submit" class="btn-base btn-primary-brand">
+            <i class="bi bi-check-circle-fill"></i> Save Privacy Settings
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Apply styling to Django form fields
+    const form = document.querySelector('.privacy-form');
+    if (form) {
+      const inputs = form.querySelectorAll('select');
+      inputs.forEach(input => {
+        input.classList.add('django-form-field');
+      });
+    }
+  });
+</script>
 
 {% endblock %}

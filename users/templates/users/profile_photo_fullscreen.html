@@ -1,7 +1,14 @@
 {% extends 'base.html' %}
 
 {% block content %}
+{% csrf_token %}
 <style>
+  /* Hide mobile bottom nav in fullscreen mode */
+  body.modal-open .mobile-bottom-nav,
+  .mobile-bottom-nav {
+    display: none !important;
+  }
+
   .fullscreen-container {
     position: fixed;
     top: 0;
@@ -71,6 +78,128 @@
     text-decoration: underline;
   }
 
+  /* Bottom Action Bar */
+  .bottom-action-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 10000;
+  }
+
+  .action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .action-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #fff;
+    font-size: 20px;
+    position: relative;
+  }
+
+  .action-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+  }
+
+  .action-btn.liked {
+    color: #ff3040;
+  }
+
+  .like-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ff3040;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+  }
+
+  /* Three-dot menu */
+  .three-dot-menu {
+    position: relative;
+  }
+
+  .menu-dropdown {
+    position: absolute;
+    bottom: 60px;
+    right: 0;
+    background: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 8px 0;
+    min-width: 180px;
+    display: none;
+    z-index: 100000;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    overflow: visible;
+  }
+
+  .menu-dropdown.show {
+    display: block;
+    animation: slideUp 0.2s ease;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .menu-item {
+    padding: 12px 16px;
+    color: #fff;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    transition: background 0.2s ease;
+  }
+
+  .menu-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .menu-item i {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+  }
+
+  .menu-item.danger {
+    color: #ff6b6b;
+  }
+
   @media (max-width: 768px) {
     .close-btn {
       top: 15px;
@@ -99,6 +228,29 @@
     <a href="{% url 'users:profile' profile_user.username %}">{{ profile_user.get_full_name|default:profile_user.username }}</a>
     {% if photo_type == 'profile' %}'s Profile Photo{% else %}'s Cover Photo{% endif %}
   </div>
+
+  <!-- Bottom Action Bar -->
+  <div class="bottom-action-bar">
+    <div class="action-buttons">
+      <button class="action-btn like-btn {% if is_liked %}liked{% endif %}" data-photo-type="{{ photo_type }}" data-username="{{ profile_user.username }}">
+        <i class="bi bi-heart{% if is_liked %}-fill{% endif %}"></i>
+        <span class="like-count">{{ like_count }}</span>
+      </button>
+    </div>
+    <div class="three-dot-menu">
+      <button class="action-btn menu-btn">
+        <i class="bi bi-three-dots"></i>
+      </button>
+      <div class="menu-dropdown">
+        <a href="#" class="menu-item download-btn" data-image-url="{{ photo_url }}" data-filename="{{ profile_user.username }}_{{ photo_type }}.jpg">
+          <i class="bi bi-download"></i> Download
+        </a>
+        <a href="#" class="menu-item danger report-btn">
+          <i class="bi bi-flag"></i> Report
+        </a>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -109,6 +261,84 @@ document.addEventListener('DOMContentLoaded', function() {
       window.location.href = "{% url 'users:profile' profile_user.username %}";
     }
   });
+
+  // Menu toggle functionality
+  const menuBtn = document.querySelector('.menu-btn');
+  const menuDropdown = document.querySelector('.menu-dropdown');
+  
+  if (menuBtn && menuDropdown) {
+    menuBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      menuDropdown.classList.toggle('show');
+    });
+    
+    // Close menu when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!menuDropdown.contains(e.target) && !menuBtn.contains(e.target)) {
+        menuDropdown.classList.remove('show');
+      }
+    });
+  }
+
+  // Download button functionality
+  const downloadBtn = document.querySelector('.download-btn');
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', async function(e) {
+      e.preventDefault();
+      
+      const imageUrl = this.getAttribute('data-image-url');
+      const filename = this.getAttribute('data-filename');
+      
+      try {
+        const module = await import('/static/js/storage/downloads_manager.js');
+        const downloadsManager = module.downloadsManager;
+        
+        await downloadsManager.download({
+          url: imageUrl,
+          filename: filename,
+          mimeType: 'image/jpeg',
+          category: 'image'
+        });
+      } catch (error) {
+        console.error('Download failed:', error);
+        alert('Download failed: ' + error.message);
+      }
+    });
+  }
+
+  // Like button functionality
+  const likeBtn = document.querySelector('.like-btn');
+  if (likeBtn) {
+    likeBtn.addEventListener('click', async function(e) {
+      e.preventDefault();
+      
+      const photoType = this.getAttribute('data-photo-type');
+      const username = this.getAttribute('data-username');
+      const isLiked = this.classList.contains('liked');
+      
+      try {
+        const response = await fetch(`/api/users/${username}/photos/${photoType}/like/`, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          this.classList.toggle('liked');
+          const icon = this.querySelector('i');
+          icon.classList.toggle('bi-heart');
+          icon.classList.toggle('bi-heart-fill');
+          const countSpan = this.querySelector('.like-count');
+          countSpan.textContent = data.likes_count;
+        }
+      } catch (error) {
+        console.error('Like failed:', error);
+      }
+    });
+  }
 });
 </script>
 {% endblock %}

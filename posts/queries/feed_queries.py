@@ -22,7 +22,8 @@ def get_prioritized_feed_queryset(user, following_ids, user_group_ids):
     )
 
     # Build query - always include posts from followed users
-    filters = Q(author_id__in=following_ids)
+    # BUT filter out group posts from groups the user is not a member of
+    filters = Q(author_id__in=following_ids) & (Q(group__isnull=True) | Q(group_id__in=user_group_ids))
 
     # Add optional filters (only if they exist)
     if user_group_ids:

@@ -35,6 +35,8 @@ class DocumentViewer {
         this.translateY = 0;
         this.lastTranslateX = 0;
         this.lastTranslateY = 0;
+        this.lastTouchX = 0;
+        this.lastTouchY = 0;
     }
 
     async initialize() {
@@ -372,7 +374,7 @@ class DocumentViewer {
                     content.style.maxWidth = '100%';
                     content.style.maxHeight = '100%';
                 } else {
-                    content.style.maxWidth = '800px';
+                    content.style.maxWidth = '90%';
                 }
             }
         }
@@ -403,8 +405,10 @@ class DocumentViewer {
                 this.lastTranslateY = this.translateY;
             } else if (e.touches.length === 1) {
                 // Single touch - for swipe and pan
-                this.touchStartX = e.changedTouches[0].screenX;
-                this.touchStartY = e.changedTouches[0].screenY;
+                this.touchStartX = e.touches[0].clientX;
+                this.touchStartY = e.touches[0].clientY;
+                this.lastTouchX = e.touches[0].clientX;
+                this.lastTouchY = e.touches[0].clientY;
             }
         }, { passive: true });
 
@@ -421,10 +425,12 @@ class DocumentViewer {
                 // Pan when zoomed
                 e.preventDefault();
                 const touch = e.touches[0];
-                const deltaX = touch.clientX - this.touchStartX;
-                const deltaY = touch.clientY - this.touchStartY;
-                this.translateX = this.lastTranslateX + deltaX;
-                this.translateY = this.lastTranslateY + deltaY;
+                const deltaX = touch.clientX - this.lastTouchX;
+                const deltaY = touch.clientY - this.lastTouchY;
+                this.translateX += deltaX;
+                this.translateY += deltaY;
+                this.lastTouchX = touch.clientX;
+                this.lastTouchY = touch.clientY;
                 this.applyTransform();
             }
         }, { passive: false });
@@ -438,8 +444,8 @@ class DocumentViewer {
                     this.lastTranslateY = this.translateY;
                 } else {
                     // Handle swipe
-                    this.touchEndX = e.changedTouches[0].screenX;
-                    this.touchEndY = e.changedTouches[0].screenY;
+                    this.touchEndX = e.changedTouches[0].clientX;
+                    this.touchEndY = e.changedTouches[0].clientY;
                     this.handleSwipe();
                 }
             }
@@ -457,15 +463,22 @@ class DocumentViewer {
         if (viewerContainer) {
             const content = viewerContainer.querySelector('img, canvas, .pdf-viewer-container > div, .docx-viewer-container > div, .text-viewer-container > div');
             if (content) {
+                // Use pinch center as transform origin during zoom for better UX
+                const originX = this.isPinching ? `${this.pinchCenterX}px` : 'center';
+                const originY = this.isPinching ? `${this.pinchCenterY}px` : 'center';
+                
                 content.style.transform = `translate(${this.translateX}px, ${this.translateY}px) scale(${this.currentScale})`;
-                content.style.transformOrigin = 'center center';
-                content.style.transition = this.isPinching ? 'none' : 'transform 0.3s ease';
+                content.style.transformOrigin = `${originX} ${originY}`;
+                content.style.transition = this.isPinching ? 'none' : 'transform 0.1s ease-out';
                 
                 // Remove max-width constraint when zoomed to allow proper scaling
                 if (this.currentScale > 1) {
                     content.style.maxWidth = 'none';
                     content.style.maxHeight = 'none';
                 } else {
+                    // Reset transform when zoomed out
+                    this.translateX = 0;
+                    this.translateY = 0;
                     // Restore original constraints when zoomed out
                     if (content.tagName === 'IMG') {
                         content.style.maxWidth = '100%';
@@ -480,34 +493,37 @@ class DocumentViewer {
         const deltaX = this.touchEndX - this.touchStartX;
         const deltaY = this.touchEndY - this.touchStartY;
         
-        // Check if horizontal swipe (more horizontal than vertical)
-        if (Math.abs(deltaX) > Math.abs(deltaY)) {
-            // Horizontal swipe
-            if (Math.abs(deltaX) > this.minSwipeDistance) {
-                if (deltaX > 0) {
-                    // Swipe right - previous page
-                    if (this.viewer.needsPageNavigation()) {
-                        this.previousPage();
-                    }
-                } else {
-                    // Swipe left - next page
-                    if (this.viewer.needsPageNavigation()) {
-                        this.nextPage();
+        // Only handle swipe if not zoomed in (when zoomed, it's panning)
+        if (this.currentScale <= 1) {
+            // Check if horizontal swipe (more horizontal than vertical)
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                // Horizontal swipe
+                if (Math.abs(deltaX) > this.minSwipeDistance) {
+                    if (deltaX > 0) {
+                        // Swipe right - previous page
+                        if (this.viewer.needsPageNavigation()) {
+                            this.previousPage();
+                        }
+                    } else {
+                        // Swipe left - next page
+                        if (this.viewer.needsPageNavigation()) {
+                            this.nextPage();
+                        }
                     }
                 }
-            }
-        } else {
-            // Vertical swipe - scroll
-            if (Math.abs(deltaY) > this.minSwipeDistance) {
-                if (deltaY > 0) {
-                    // Swipe down - scroll up
-                    if (this.viewer.needsScroll()) {
-                        this.viewer.scrollUp();
-                    }
-                } else {
-                    // Swipe up - scroll down
-                    if (this.viewer.needsScroll()) {
-                        this.viewer.scrollDown();
+            } else {
+                // Vertical swipe - scroll
+                if (Math.abs(deltaY) > this.minSwipeDistance) {
+                    if (deltaY > 0) {
+                        // Swipe down - scroll up
+                        if (this.viewer.needsScroll()) {
+                            this.viewer.scrollUp();
+                        }
+                    } else {
+                        // Swipe up - scroll down
+                        if (this.viewer.needsScroll()) {
+                            this.viewer.scrollDown();
+                        }
                     }
                 }
             }
@@ -642,22 +658,35 @@ class PDFViewer {
     createCanvas() {
         this.canvas = document.createElement('canvas');
         this.canvas.style.cssText = 'width: 100%; height: auto; display: block; max-width: 100%;';
-        
+
         const viewerContainer = document.createElement('div');
         viewerContainer.className = 'pdf-viewer-container';
+
+        // Responsive height based on viewport
+        const viewportHeight = window.innerHeight;
+        let minHeight = 280;
+        if (viewportHeight <= 400) {
+            minHeight = 200;
+        } else if (viewportHeight <= 500) {
+            minHeight = 220;
+        } else if (viewportHeight <= 600) {
+            minHeight = 250;
+        }
+
         viewerContainer.style.cssText = `
-            height: 600px;
+            height: 70vh;
+            min-height: ${minHeight}px;
             overflow: hidden;
             background: #525659;
             display: flex;
             justify-content: center;
             padding: 20px;
         `;
-        
+
         const pageWrapper = document.createElement('div');
         pageWrapper.style.cssText = 'box-shadow: 0 2px 8px rgba(0,0,0,0.3); max-width: 100%; overflow: hidden;';
         pageWrapper.appendChild(this.canvas);
-        
+
         viewerContainer.appendChild(pageWrapper);
         this.container.appendChild(viewerContainer);
     }
@@ -786,20 +815,33 @@ class DOCXViewer {
     createContent(html) {
         const viewerContainer = document.createElement('div');
         viewerContainer.className = 'docx-viewer-container';
+
+        // Responsive height based on viewport
+        const viewportHeight = window.innerHeight;
+        let minHeight = 280;
+        if (viewportHeight <= 400) {
+            minHeight = 200;
+        } else if (viewportHeight <= 500) {
+            minHeight = 220;
+        } else if (viewportHeight <= 600) {
+            minHeight = 250;
+        }
+
         viewerContainer.style.cssText = `
-            height: 600px;
+            height: 70vh;
+            min-height: ${minHeight}px;
             overflow: hidden;
             background: white;
             padding: 40px;
             border-radius: 0 0 12px 12px;
         `;
-        
+
         viewerContainer.innerHTML = `
-            <div style="max-width: 800px; margin: 0 auto; font-family: 'Times New Roman', serif; line-height: 1.6; overflow: hidden;">
+            <div style="max-width: 90%; margin: 0 auto; font-family: 'Times New Roman', serif; line-height: 1.6; overflow: hidden;">
                 ${html}
             </div>
         `;
-        
+
         this.container.appendChild(viewerContainer);
     }
 
@@ -849,12 +891,12 @@ class DOCXViewer {
             let currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1.0;
             currentScale = Math.min(currentScale + 0.25, 3.0);
             viewer.style.transform = `scale(${currentScale})`;
-            
+
             // Remove max-width constraint when zoomed
             if (currentScale > 1) {
                 viewer.style.maxWidth = 'none';
             } else {
-                viewer.style.maxWidth = '800px';
+                viewer.style.maxWidth = '90%';
             }
         }
     }
@@ -867,12 +909,12 @@ class DOCXViewer {
             let currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1.0;
             currentScale = Math.max(currentScale - 0.25, 0.5);
             viewer.style.transform = `scale(${currentScale})`;
-            
+
             // Remove max-width constraint when zoomed
             if (currentScale > 1) {
                 viewer.style.maxWidth = 'none';
             } else {
-                viewer.style.maxWidth = '800px';
+                viewer.style.maxWidth = '90%';
             }
         }
     }

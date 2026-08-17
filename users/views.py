@@ -12,6 +12,7 @@ from django.views.decorators.http import require_http_methods
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
+from django.db.models import Q
 from users.models import User, Follow, DeviceAccount, Pinch, UserSession, Block, HiddenAuthor, PrivacyLevel
 from posts.models import Post, Like
 from users.forms import PwaniSignupForm, ProfileUpdateForm
@@ -115,7 +116,18 @@ def profile_view(request, username):
     page = int(request.GET.get('page', 1))
     posts_per_page = 10
     
-    posts_queryset = Post.objects.filter(author=profile_user).select_related('author', 'group', 'course', 'unit', 'repost_of').prefetch_related('likes', 'images', 'comments').order_by('-created_at')
+    # Filter posts: show regular posts and group posts only if viewing user is a member of the group
+    from groups.models import Membership, MembershipStatus
+    viewer_group_ids = list(Membership.objects.filter(
+        user=request.user, 
+        status=MembershipStatus.APPROVED
+    ).values_list('group_id', flat=True))
+    
+    posts_queryset = Post.objects.filter(
+        author=profile_user
+    ).filter(
+        Q(group__isnull=True) | Q(group_id__in=viewer_group_ids)
+    ).select_related('author', 'group', 'course', 'unit', 'repost_of').prefetch_related('likes', 'images', 'comments').order_by('-created_at')
     paginator = Paginator(posts_queryset, posts_per_page)
     posts_page = paginator.get_page(page)
     
@@ -549,7 +561,25 @@ def settings_view(request):
 @login_required
 def settings_profile_view(request):
     """Profile settings page"""
-    return render(request, 'users/settings/profile.html')
+    if request.method == 'POST':
+        form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user)
+        if form.is_valid():
+            try:
+                form.save()
+                messages.success(request, 'Profile updated successfully.')
+                return redirect('users:settings_profile')
+            except Exception as e:
+                messages.error(request, f'Error saving profile: {str(e)}')
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Profile save error: {str(e)}", exc_info=True)
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
+    else:
+        form = ProfileUpdateForm(instance=request.user)
+    return render(request, 'users/settings/profile.html', {'form': form})
 
 
 @login_required
@@ -1182,12 +1212,27 @@ def view_profile_photo_fullscreen(request, username, photo_type):
         messages.error(request, 'Invalid photo type.')
         return redirect('users:profile', username=username)
     
+    # Get like count and check if current user liked the photo
+    from .models import UserProfilePhotoLike
+    like_count = UserProfilePhotoLike.objects.filter(
+        profile_user=profile_user,
+        photo_type=photo_type
+    ).count()
+    
+    is_liked = UserProfilePhotoLike.objects.filter(
+        user=request.user,
+        profile_user=profile_user,
+        photo_type=photo_type
+    ).exists()
+    
     return render(request, 'users/profile_photo_fullscreen.html', {
         'profile_user': profile_user,
         'photo_url': photo_url,
         'photo_type': photo_type,
         'photo_title': photo_title,
         'is_own_profile': is_own_profile,
+        'like_count': like_count,
+        'is_liked': is_liked,
     })
 
 
@@ -1256,6 +1301,54 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response({'status': 'followed'}, status=status.HTTP_201_CREATED)
 
     @extend_schema(
+        summary="Like or unlike user photo",
+        description="Toggle like status for a user's profile or cover photo",
+        responses={200: {"detail": "Photo unliked.", "likes_count": 0}, 201: {"detail": "Photo liked.", "likes_count": 1}}
+    )
+    @action(detail=True, methods=['post'], url_path='photos/(?P<photo_type>[^/.]+)/like')
+    def photo_like(self, request, pk=None, photo_type=None):
+        """Like or unlike a user's profile or cover photo"""
+        profile_user = self.get_object()
+        
+        # Validate photo type
+        if photo_type not in ['profile', 'cover']:
+            return Response(
+                {'detail': 'Invalid photo type. Must be profile or cover.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if photo exists
+        if photo_type == 'cover' and not profile_user.cover_photo:
+            return Response(
+                {'detail': 'This user does not have a cover photo.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        from .models import UserProfilePhotoLike
+        like, created = UserProfilePhotoLike.objects.get_or_create(
+            user=request.user,
+            profile_user=profile_user,
+            photo_type=photo_type
+        )
+        
+        likes_count = UserProfilePhotoLike.objects.filter(
+            profile_user=profile_user,
+            photo_type=photo_type
+        ).count()
+        
+        if created:
+            return Response(
+                {'detail': 'Photo liked.', 'likes_count': likes_count},
+                status=status.HTTP_201_CREATED
+            )
+        else:
+            like.delete()
+            return Response(
+                {'detail': 'Photo unliked.', 'likes_count': likes_count},
+                status=status.HTTP_200_OK
+            )
+
+    @extend_schema(
         summary="Get user's followers",
         description="Returns a paginated list of users following the specified user",
         responses={200: UserPublicSerializer(many=True)}
@@ -1321,6 +1414,24 @@ class UserViewSet(viewsets.ModelViewSet):
         request.user.theme_preference = theme
         request.user.save()
         return Response({'theme_preference': theme})
+
+    @extend_schema(
+        summary="Update audio preference",
+        description="Update the authenticated user's audio preference for video playback (muted or unmuted)",
+        responses={200: {"audio_preference": "string"}, 400: {"error": "message"}}
+    )
+    @action(detail=False, methods=['patch'])
+    def update_audio_preference(self, request):
+        """Update audio preference"""
+        audio_pref = request.data.get('audio_preference')
+        if audio_pref not in ['muted', 'unmuted']:
+            return Response(
+                {'error': 'Invalid audio preference. Must be muted or unmuted.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        request.user.audio_preference = audio_pref
+        request.user.save()
+        return Response({'audio_preference': audio_pref})
 
     @extend_schema(
         summary="Update appearance preferences",

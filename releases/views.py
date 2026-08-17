@@ -24,7 +24,7 @@ class ReleaseViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = Release.objects.all()
     serializer_class = ReleaseSerializer
-    lookup_field = 'version'
+    lookup_field = 'id'
     
     def get_queryset(self):
         """Filter queryset based on published status"""

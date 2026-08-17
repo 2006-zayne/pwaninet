@@ -259,3 +259,86 @@ class IsPostAuthorOrReadOnly(permissions.BasePermission):
         
         # Write permissions - only author
         return obj.author == request.user
+
+
+class CanViewAnnouncement(permissions.BasePermission):
+    """
+    Only approved group members can view announcements.
+    """
+    def has_object_permission(self, request, view, obj):
+        if not request.user.is_authenticated:
+            return False
+        
+        try:
+            membership = Membership.objects.get(
+                user=request.user,
+                group=obj.group,
+                status=MembershipStatus.APPROVED
+            )
+            return True
+        except Membership.DoesNotExist:
+            return False
+
+
+class CanCreateAnnouncement(permissions.BasePermission):
+    """
+    Only group admins can create announcements.
+    """
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        
+        group_id = view.kwargs.get('group_id')
+        if not group_id:
+            return False
+        
+        try:
+            membership = Membership.objects.get(
+                user=request.user,
+                group_id=group_id,
+                role=MembershipRole.ADMIN,
+                status=MembershipStatus.APPROVED
+            )
+            return True
+        except Membership.DoesNotExist:
+            return False
+
+
+class CanEditAnnouncement(permissions.BasePermission):
+    """
+    Only group admins can edit announcements.
+    """
+    def has_object_permission(self, request, view, obj):
+        if not request.user.is_authenticated:
+            return False
+        
+        try:
+            membership = Membership.objects.get(
+                user=request.user,
+                group=obj.group,
+                role=MembershipRole.ADMIN,
+                status=MembershipStatus.APPROVED
+            )
+            return True
+        except Membership.DoesNotExist:
+            return False
+
+
+class CanDeleteAnnouncement(permissions.BasePermission):
+    """
+    Only group admins can delete announcements.
+    """
+    def has_object_permission(self, request, view, obj):
+        if not request.user.is_authenticated:
+            return False
+        
+        try:
+            membership = Membership.objects.get(
+                user=request.user,
+                group=obj.group,
+                role=MembershipRole.ADMIN,
+                status=MembershipStatus.APPROVED
+            )
+            return True
+        except Membership.DoesNotExist:
+            return False

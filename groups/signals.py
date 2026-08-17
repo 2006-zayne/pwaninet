@@ -14,22 +14,12 @@ def membership_status_changed(sender, instance, created, **kwargs):
     if created:
         # New membership created (request or direct join)
         if instance.status == MembershipStatus.PENDING:
-            # User requested to join
-            publish_event(
-                event_type=EventTypes.GROUPS_MEMBER_REQUESTED.value,
-                source=EventSources.GROUPS.value,
-                action=EventActions.REQUESTED.value,
-                actor=instance.user,
-                target_type='Group',
-                target_id=instance.group.id,
-                context_type='Group',
-                context_id=instance.group.id,
-                metadata={
-                    'group_name': instance.group.name,
-                    'user_id': instance.user.id,
-                    'user_username': instance.user.username,
-                }
-            )
+            # Only emit REQUESTED if the user created it themselves (not via invite)
+            # Invites are handled separately by send_group_invite_notification
+            # We can detect invites by checking if the user is the actor in the context
+            # For now, we'll skip this event for PENDING memberships to avoid duplicate notifications
+            # since invites are handled by the explicit invite notification call
+            pass
         elif instance.status == MembershipStatus.APPROVED:
             # Direct approval (e.g., by admin invite)
             publish_event(

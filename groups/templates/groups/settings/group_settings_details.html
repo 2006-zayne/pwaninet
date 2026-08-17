@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 <style>
@@ -6,6 +7,8 @@
     --brand: #2563eb;
     --brand-light: #dbeafe;
     --brand-mid: #bfdbfe;
+    --brand-glow: rgba(37, 99, 235, 0.15);
+    --border-hover: #94a3b8;
     --page-bg: #f8fafc;
     --card-bg: #ffffff;
     --border: #e2e8f0;
@@ -22,6 +25,8 @@
     --brand: #6366f1;
     --brand-light: #312e81;
     --brand-mid: #4338ca;
+    --brand-glow: rgba(99, 102, 241, 0.15);
+    --border-hover: #64748b;
     --page-bg: #18191f;
     --card-bg: #242526;
     --border: #3a3b3c;
@@ -40,18 +45,6 @@
 
   .page-header {
     margin-bottom: 2rem;
-  }
-
-  .page-eyebrow {
-    font-size: 0.62rem;
-    font-weight: 800;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
   }
 
   .page-title {
@@ -90,45 +83,11 @@
     margin-bottom: 1.5rem;
   }
 
-  .settings-section-header {
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--border);
-  }
-
   .settings-section-body {
     padding: 1.5rem;
   }
 
-  .settings-section-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .settings-section-title i {
-    color: var(--brand);
-    font-size: 1.1rem;
-  }
-
-  .settings-section-description {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-    margin-top: 0.25rem;
-  }
-
-  .subsection-title {
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0 0 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border);
-  }
-
+  /* Form field styling */
   .field-label {
     font-size: 0.65rem;
     font-weight: 800;
@@ -139,7 +98,7 @@
     margin-bottom: 8px;
   }
 
-  .form-field {
+  .django-form-field {
     width: 100%;
     padding: 0.75rem 1.1rem;
     border: 1.5px solid var(--border);
@@ -150,19 +109,49 @@
     outline: none;
     background: var(--card-bg);
     transition: border-color 0.18s, box-shadow 0.18s;
+    font-family: var(--font-family, 'Inter', 'Roboto', system-ui, -apple-system, sans-serif);
   }
 
-  .form-field:focus {
+  .django-form-field:focus {
     border-color: var(--brand);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 3px var(--brand-glow);
   }
 
-  textarea.form-field {
+  textarea.django-form-field {
     border-radius: var(--radius-md);
     resize: none;
     line-height: 1.6;
   }
 
+  /* File input styling */
+  .file-upload-wrap {
+    padding: 1.25rem;
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius-md);
+    background: var(--brand-light);
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .file-upload-wrap:hover {
+    border-color: var(--border-hover);
+    background: var(--brand-mid);
+  }
+
+  .file-upload-icon {
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .file-upload-text {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  /* Button styling */
   .btn-base {
     display: inline-flex;
     align-items: center;
@@ -176,8 +165,9 @@
     text-decoration: none;
     border: none;
     cursor: pointer;
-    transition: all 0.18s ease;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
     letter-spacing: 0.02em;
+    width: 100%;
   }
 
   .btn-primary-brand {
@@ -189,19 +179,116 @@
     background: #1d4ed8;
     color: #fff;
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.3);
+    box-shadow: 0 6px 20px var(--brand-glow);
   }
 
-  .btn-secondary-brand {
+  /* Error and help messages */
+  .field-error {
+    font-size: 0.72rem;
+    color: #dc2626;
+    font-weight: 600;
+    margin-top: 6px;
+  }
+
+  .field-help {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  /* Profile photo display styling */
+  .profile-photo-display {
+    margin-bottom: 2rem;
+  }
+
+  .cover-display {
+    width: 100%;
+    height: 160px;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    border-radius: var(--radius-md);
+    position: relative;
+    background-color: var(--brand-light);
+  }
+
+  .avatar-display-wrapper {
+    position: absolute;
+    bottom: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .avatar-display-img {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid var(--card-bg);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+  }
+
+  /* Read-only mode styling */
+  .readonly-banner {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 1px solid #f59e0b;
+    border-radius: var(--radius-md);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  [data-theme="dark"] .readonly-banner {
+    background: linear-gradient(135deg, #451a03 0%, #78350f 100%);
+    border-color: #d97706;
+  }
+
+  .readonly-banner i {
+    font-size: 1.25rem;
+    color: #d97706;
+  }
+
+  .readonly-banner-text {
+    flex: 1;
+  }
+
+  .readonly-banner-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #92400e;
+    margin-bottom: 0.25rem;
+  }
+
+  [data-theme="dark"] .readonly-banner-title {
+    color: #fbbf24;
+  }
+
+  .readonly-banner-desc {
+    font-size: 0.75rem;
+    color: #b45309;
+  }
+
+  [data-theme="dark"] .readonly-banner-desc {
+    color: #d97706;
+  }
+
+  .django-form-field:disabled,
+  .django-form-field[readonly] {
     background: var(--brand-light);
-    color: var(--brand);
-    border: 1.5px solid var(--brand-mid);
+    cursor: not-allowed;
+    opacity: 0.7;
   }
 
-  .btn-secondary-brand:hover {
-    background: var(--brand-mid);
-    color: #0f172a;
-    transform: translateY(-2px);
+  .file-upload-wrap.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
   }
 
   @media (max-width: 768px) {
@@ -227,46 +314,104 @@
 
   <div class="settings-section">
     <div class="settings-section-body">
-      <form method="POST" enctype="multipart/form-data">
+      <!-- Read-only banner for non-editors -->
+      {% if not can_edit %}
+      <div class="readonly-banner">
+        <i class="bi bi-lock-fill"></i>
+        <div class="readonly-banner-text">
+          <div class="readonly-banner-title">Read-Only Mode</div>
+          <div class="readonly-banner-desc">Only users with edit permissions can modify group details. Contact an admin to make changes.</div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Profile Photo Display -->
+      <div class="profile-photo-display">
+        <div class="cover-display" 
+             style="background-image: url('{% if group.cover_photo %}{{ group.cover_photo.url }}{% else %}{% static 'images/default-cover.jpg' %}{% endif %}');">
+          <div class="avatar-display-wrapper">
+            <img src="{% if group.group_pic %}{{ group.group_pic.url }}{% else %}{% static 'images/default_group.jpg' %}{% endif %}" class="avatar-display-img" alt="Group Profile Picture">
+          </div>
+        </div>
+      </div>
+
+      <form method="POST" enctype="multipart/form-data" class="group-details-form" {% if not can_edit %}onsubmit="return false;"{% endif %}>
         {% csrf_token %}
-        
-        <!-- Group Profile Picture -->
-        <h3 class="subsection-title">Group Profile Picture</h3>
-        <div class="mb-4">
-          <label class="field-label">Profile Picture</label>
-          <input type="file" class="form-field" name="profile_pic" accept="image/*">
-        </div>
 
-        <!-- Cover Photo -->
-        <h3 class="subsection-title">Cover Photo</h3>
-        <div class="mb-4">
-          <label class="field-label">Cover Photo</label>
-          <input type="file" class="form-field" name="cover_photo" accept="image/*">
-        </div>
+        {% if form %}
+          {% for field in form %}
+            <div class="form-group">
+              <label class="field-label">{{ field.label }}</label>
+              
+              {% if field.name == 'group_pic' %}
+                <div class="file-upload-wrap {% if not can_edit %}disabled{% endif %}">
+                  <input type="file" name="{{ field.name }}" id="{{ field.auto_id }}" accept="image/*" {% if not can_edit %}disabled{% endif %} style="display: none;">
+                  <label for="{{ field.auto_id }}" {% if not can_edit %}style="cursor: not-allowed;"{% else %}style="cursor: pointer;"{% endif %} display: block;">
+                    <div class="file-upload-icon">
+                      <i class="bi bi-image"></i>
+                    </div>
+                    <div class="file-upload-text">Click to upload new group photo</div>
+                  </label>
+                </div>
+              {% elif field.name == 'cover_photo' %}
+                <div class="file-upload-wrap {% if not can_edit %}disabled{% endif %}">
+                  <input type="file" name="{{ field.name }}" id="{{ field.auto_id }}" accept="image/*" {% if not can_edit %}disabled{% endif %} style="display: none;">
+                  <label for="{{ field.auto_id }}" {% if not can_edit %}style="cursor: not-allowed;"{% else %}style="cursor: pointer;"{% endif %} display: block;">
+                    <div class="file-upload-icon">
+                      <i class="bi bi-image"></i>
+                    </div>
+                    <div class="file-upload-text">Click to upload cover photo</div>
+                  </label>
+                </div>
+              {% else %}
+                {% if not can_edit %}
+                  {{ field.as_widget }}<script>document.getElementById('{{ field.auto_id }}').disabled = true;</script>
+                {% else %}
+                  {{ field }}
+                {% endif %}
+              {% endif %}
 
-        <!-- Group Name -->
-        <h3 class="subsection-title">Group Name</h3>
-        <div class="mb-4">
-          <label class="field-label">Group Name</label>
-          <input type="text" class="form-field" name="name" value="{{ group.name }}" required>
-        </div>
+              {% if field.help_text %}
+                <div class="field-help">{{ field.help_text }}</div>
+              {% endif %}
+              
+              {% for error in field.errors %}
+                <div class="field-error">
+                  <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ error }}
+                </div>
+              {% endfor %}
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="alert alert-danger border-0 shadow-sm rounded-3" style="background: #fff1f1; color: #dc2626; font-size: 0.85rem; font-weight: 600;">
+            <i class="bi bi-shield-slash-fill me-2"></i> SYSTEM ERROR: Interface response timeout.
+          </div>
+        {% endif %}
 
-        <!-- Bio/About -->
-        <h3 class="subsection-title">Bio/About</h3>
-        <div class="mb-4">
-          <label class="field-label">Group Description</label>
-          <textarea class="form-field" name="description" rows="4" placeholder="Tell people about your group...">{{ group.description }}</textarea>
-        </div>
-
-        <div class="d-grid gap-2">
+        {% if can_edit %}
+        <div class="d-grid gap-3 mt-4">
           <button type="submit" class="btn-base btn-primary-brand">
             <i class="bi bi-check-circle-fill"></i> Save Changes
           </button>
         </div>
+        {% endif %}
       </form>
     </div>
   </div>
 
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Apply styling to Django form fields
+    const form = document.querySelector('.group-details-form');
+    if (form) {
+      const inputs = form.querySelectorAll('input:not([type="file"]), textarea, select');
+      inputs.forEach(input => {
+        input.classList.add('django-form-field');
+      });
+    }
+  });
+</script>
 
 {% endblock %}

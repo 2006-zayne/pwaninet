@@ -1,0 +1,32 @@
+{% load static %}
+{% if pinned_announcements %}
+    <div class="mb-4">
+        <div class="d-flex align-items-center mb-3 px-3 py-2" style="background-color: var(--bg-secondary); border-bottom: 1px solid var(--border);">
+            <i class="bi bi-pin-fill me-2 text-primary"></i>
+            <span class="fw-bold text-dark">Pinned Announcements</span>
+            <span class="badge bg-secondary ms-2">{{ pinned_announcements|length }}</span>
+        </div>
+        
+        {% for announcement in pinned_announcements %}
+            {% include 'groups/partials/announcement_card.html' %}
+        {% endfor %}
+    </div>
+{% endif %}
+
+{% if all_announcements %}
+    <div>
+        <div class="d-flex align-items-center mb-3 px-3 py-2" style="background-color: var(--bg-secondary); border-bottom: 1px solid var(--border);">
+            <i class="bi bi-megaphone-fill me-2 text-primary"></i>
+            <span class="fw-bold text-dark">All Announcements</span>
+            <span class="badge bg-secondary ms-2">{{ all_announcements|length }}</span>
+        </div>
+        
+        {% for announcement in all_announcements %}
+            {% include 'groups/partials/announcement_card.html' %}
+        {% endfor %}
+    </div>
+{% endif %}
+
+{% if not pinned_announcements and not all_announcements %}
+    {% include 'groups/partials/announcement_empty_state.html' %}
+{% endif %}

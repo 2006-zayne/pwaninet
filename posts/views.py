@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from django.urls import reverse
 from celery.result import AsyncResult
 
-from .models import Post, Comment, Report, Like, Repost, HiddenPost, AuthorPreference, SharedPost
+from .models import Post, Comment, Report, Like, Repost, HiddenPost, AuthorPreference, SharedPost, PostImage, PostImageLike, PostImageComment
 from .serializers import (
     PostSerializer, PostCreateSerializer, PostUpdateSerializer,
     CommentSerializer, CommentCreateSerializer, ReportCreateSerializer,
@@ -24,7 +24,7 @@ from groups.permissions import IsApprovedMember
 from courses.models import Unit
 from users.models import User
 from posts.forms import PostForm
-from posts.services.comment_service import build_comments_context, handle_add_comment_request, toggle_comment_like_for_user
+from posts.services.comment_service import build_comments_context, handle_add_comment_request, toggle_comment_like_for_user, add_comment_to_image
 from posts.services.feed_service import build_home_feed_context
 from posts.services.post_service import toggle_post_like_for_user, create_post_for_user
 from posts.services.repost_service import create_repost, delete_repost, get_post_reposts
@@ -153,6 +153,142 @@ class PostViewSet(viewsets.ModelViewSet):
                 {'detail': 'Post unliked.'},
                 status=status.HTTP_200_OK
             )
+
+    @action(detail=True, methods=['post'], url_path='images/(?P<image_id>[^/.]+)/like')
+    def image_like(self, request, pk=None, image_id=None):
+        """
+        POST /posts/{id}/images/{image_id}/like/
+        Like or unlike a specific post image.
+        """
+        post = self.get_object()
+        
+        try:
+            post_image = post.images.get(id=image_id)
+        except PostImage.DoesNotExist:
+            return Response(
+                {'detail': 'Image not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if user is approved member of the group
+        if post.group:
+            from groups.models import Membership, MembershipStatus
+            try:
+                Membership.objects.get(
+                    user=request.user,
+                    group=post.group,
+                    status=MembershipStatus.APPROVED
+                )
+            except Membership.DoesNotExist:
+                return Response(
+                    {'detail': 'You must be an approved member to like images in this group.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
+        like, created = PostImageLike.objects.get_or_create(
+            user=request.user,
+            post_image=post_image
+        )
+        
+        likes_count = post_image.likes.count()
+        
+        if created:
+            return Response(
+                {'detail': 'Image liked.', 'likes_count': likes_count},
+                status=status.HTTP_201_CREATED
+            )
+        else:
+            like.delete()
+            return Response(
+                {'detail': 'Image unliked.', 'likes_count': likes_count},
+                status=status.HTTP_200_OK
+            )
+
+    @action(detail=True, methods=['get', 'post'], url_path='images/(?P<image_id>[^/.]+)/comments')
+    def image_comments(self, request, pk=None, image_id=None):
+        """
+        GET /posts/{id}/images/{image_id}/comments/
+        List all comments for a specific post image.
+        
+        POST /posts/{id}/images/{image_id}/comments/
+        Create a new comment for a specific post image.
+        """
+        post = self.get_object()
+        
+        try:
+            post_image = post.images.get(id=image_id)
+        except PostImage.DoesNotExist:
+            return Response(
+                {'detail': 'Image not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        if request.method == 'GET':
+            comments = post_image.comments.select_related('author').all()
+            
+            # Format comments for response
+            comments_data = []
+            for comment in comments:
+                comments_data.append({
+                    'id': comment.id,
+                    'content': comment.content,
+                    'author': {
+                        'id': comment.author.id,
+                        'username': comment.author.username,
+                        'profile_pic': comment.author.profile_pic.url if comment.author.profile_pic else None
+                    },
+                    'created_at': comment.created_at.strftime('%B %d, %Y at %I:%M %p')
+                })
+            
+            return Response({
+                'comments': comments_data,
+                'total_count': len(comments_data)
+            }, status=status.HTTP_200_OK)
+        
+        elif request.method == 'POST':
+            content = request.data.get('content', '').strip()
+            
+            if not content:
+                return Response(
+                    {'detail': 'Comment content is required.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if user is approved member of the group
+            if post.group:
+                from groups.models import Membership, MembershipStatus
+                try:
+                    Membership.objects.get(
+                        user=request.user,
+                        group=post.group,
+                        status=MembershipStatus.APPROVED
+                    )
+                except Membership.DoesNotExist:
+                    return Response(
+                        {'detail': 'You must be an approved member to comment on images in this group.'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            
+            # Use the service function to add comment (mirrors post comment functionality)
+            comment = add_comment_to_image(post_image, request.user, content)
+            
+            if not comment:
+                return Response(
+                    {'detail': 'Failed to add comment.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            return Response({
+                'id': comment.id,
+                'content': comment.content,
+                'author': {
+                    'id': comment.author.id,
+                    'username': comment.author.username,
+                    'full_name': comment.author.get_full_name(),
+                    'profile_pic': comment.author.profile_pic.url if comment.author.profile_pic else None
+                },
+                'created_at': comment.created_at.strftime('%B %d, %Y at %I:%M %p')
+            }, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['get'], url_path='comments')
     def comments(self, request, pk=None):
@@ -716,6 +852,12 @@ def storage_manager_view(request):
 
 
 @login_required
+def offline_media_viewer_view(request):
+    """View for the offline media viewer page"""
+    return render(request, 'posts/offline_media_viewer.html')
+
+
+@login_required
 def post_detail_view(request, post_id):
     post = get_object_or_404(Post, id=post_id)
     show_all = request.GET.get('show_all') == '1'
@@ -833,9 +975,13 @@ def view_image_fullscreen(request, post_id, image_index):
         post_image = get_object_or_404(post.images, id=image_index)
         current_index = all_images.index(post_image)
 
-    # Get likes for the post
-    post_likes = post.likes.select_related('user').all()
-    liked_users = [like.user for like in post_likes]
+    # Get likes for the individual image
+    from .models import PostImageLike
+    image_likes = post_image.likes.select_related('user').all()
+    liked_users = [like.user for like in image_likes]
+
+    # Check if current user liked the image
+    is_liked = post_image.likes.filter(user=request.user).exists()
 
     # Get users that the current user follows
     from users.models import Follow
@@ -857,6 +1003,8 @@ def view_image_fullscreen(request, post_id, image_index):
         'followed_likers': followed_likers,
         'other_likers_count': len(other_likers),
         'total_likes': len(liked_users),
+        'is_liked': is_liked,
+        'current_user_profile_pic': request.user.profile_pic.url if request.user.profile_pic else None,
     }
 
     return render(request, 'posts/image_fullscreen.html', context)
