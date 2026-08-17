@@ -130,6 +130,13 @@ class RulesEngine:
         if event.metadata:
             event_dict.update(event.metadata)
         
+        # Fallback: if actor relationship is None but metadata has actor info, use it
+        if not event_dict['actor_id'] and event.metadata:
+            if 'actor_id' in event.metadata:
+                event_dict['actor_id'] = int(event.metadata['actor_id'])
+            if 'actor_username' in event.metadata:
+                event_dict['actor_username'] = event.metadata['actor_username']
+        
         return event_dict
     
     @staticmethod
@@ -275,6 +282,8 @@ class RulesEngine:
             return
         
         event_dict = RulesEngine._event_to_dict(event)
+        # Add notification_id to event_dict for action builders
+        event_dict['notification_id'] = str(notification.notification_id)
         action_configs = rule.actions(event_dict)
         
         for action_config in action_configs:

@@ -1,7 +1,11 @@
 from celery import shared_task
-from groups.models import Group, Membership, MembershipRole, MembershipStatus
+from groups.models import Group, Membership, MembershipRole, MembershipStatus, AnnouncementAttachment
 from groups.services.academic_group_service import enroll_user_in_academic_groups
+from PIL import Image
+from io import BytesIO
+from django.core.files.uploadedfile import InMemoryUploadedFile
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -84,3 +88,88 @@ def auto_join_course_group_task(self, user_id):
         logger.error(f"Error in auto-group join task for user {user_id}: {e}")
         # Retry the task with exponential backoff
         raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
+
+
+@shared_task
+def generate_attachment_thumbnail(attachment_id):
+    """
+    Generate thumbnail for announcement attachments (images only).
+    
+    This task creates optimized thumbnails for image attachments to improve
+    loading performance and provide consistent sizing in the feed.
+    
+    Args:
+        attachment_id: ID of the AnnouncementAttachment to generate thumbnail for
+    """
+    try:
+        attachment = AnnouncementAttachment.objects.get(id=attachment_id)
+        
+        # Skip if attachment is not an image
+        if not attachment.file or not attachment.file.name.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
+            logger.info(f"Attachment {attachment_id} is not an image, skipping thumbnail generation")
+            return
+        
+        # Open the image
+        img = Image.open(attachment.file.path)
+        
+        # Convert to RGB if necessary
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+        
+        # Resize to thumbnail dimensions (max 800x600)
+        max_width, max_height = 800, 600
+        if img.width > max_width or img.height > max_height:
+            img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+        
+        # Create thumbnail
+        output = BytesIO()
+        img.save(output, format='JPEG', quality=85, optimize=True)
+        output.seek(0)
+        
+        # Generate thumbnail filename
+        original_name = attachment.file.name.split('/')[-1]
+        thumbnail_name = f"thumb_{original_name.rsplit('.', 1)[0]}.jpg"
+        
+        # Save thumbnail to the model
+        attachment.thumbnail.save(
+            thumbnail_name,
+            InMemoryUploadedFile(
+                output, 'ImageField', thumbnail_name, 'image/jpeg',
+                sys.getsizeof(output), None
+            ),
+            save=True
+        )
+        
+        logger.info(f"Generated thumbnail for attachment {attachment_id}: {thumbnail_name}")
+        
+    except AnnouncementAttachment.DoesNotExist:
+        logger.error(f"Attachment {attachment_id} not found for thumbnail generation")
+    except Exception as e:
+        logger.error(f"Error generating thumbnail for attachment {attachment_id}: {e}")
+
+
+@shared_task
+def generate_announcement_attachments_thumbnails(announcement_id):
+    """
+    Generate thumbnails for all attachments of an announcement.
+    
+    This is a convenience task that triggers thumbnail generation for all
+    attachments of a specific announcement.
+    
+    Args:
+        announcement_id: ID of the announcement
+    """
+    from groups.models import Announcement
+    
+    try:
+        announcement = Announcement.objects.get(id=announcement_id)
+        
+        for attachment in announcement.attachments.all():
+            generate_attachment_thumbnail.delay(attachment.id)
+            
+        logger.info(f"Triggered thumbnail generation for {announcement.attachments.count()} attachments of announcement {announcement_id}")
+        
+    except Announcement.DoesNotExist:
+        logger.error(f"Announcement {announcement_id} not found for batch thumbnail generation")
+    except Exception as e:
+        logger.error(f"Error in batch thumbnail generation for announcement {announcement_id}: {e}")

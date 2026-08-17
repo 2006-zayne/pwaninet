@@ -200,21 +200,7 @@ def notifications_list(request):
                     
                     # Render notification cards for this period
                     for notif in notifications:
-                        adapter = get_payload_adapter(notif)
-                        payload = adapter.to_standard_payload(notif)
-                        html_content += render(request, 'notifications/components/notification_card_profile_driven.html', {
-                            'payload': payload,
-                            'summary': notif.title,
-                            'message': notif.summary,
-                            'components': {'actor_stack': True, 'content': True, 'context_header': True, 'status': True, 'action_bar': True, 'preview': True},
-                            'preview': {'enabled': True},
-                            'actions': [],
-                            'status': {},
-                            'interactions': {'context_header': {'behavior': 'OPEN_CONTEXT'}},
-                            'navigation': {},
-                            'expansion': {},
-                            'aggregation': {}
-                        }).content.decode('utf-8')
+                        html_content += render_notification(notif)
                     
                     html_content += '</div>'
         

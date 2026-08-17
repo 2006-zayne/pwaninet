@@ -58,11 +58,11 @@ def get_notifications_by_time_periods(user, notification_type=None, is_read=None
             cursor_time = datetime.fromisoformat(cursor_time_str)
             
             if cursor_id:
-                # Filter by timestamp AND exclude notifications with ID <= cursor_id
+                # Filter: get notifications with updated_at < cursor_time OR (updated_at = cursor_time AND notification_id < cursor_id)
+                # This ensures we get only notifications that come after the cursor position
                 queryset = queryset.filter(
-                    updated_at__lte=cursor_time
-                ).exclude(
-                    notification_id__lte=cursor_id
+                    Q(updated_at__lt=cursor_time) | 
+                    Q(updated_at=cursor_time, notification_id__lt=cursor_id)
                 )
             else:
                 # Fallback to timestamp only

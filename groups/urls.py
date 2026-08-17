@@ -34,4 +34,12 @@ urlpatterns = [
     path('api/groups/<int:pk>/leave/', views.GroupViewSet.as_view({'post': 'leave'}), name='group_leave'),
     path('api/groups/<int:pk>/assign-and-leave/', views.GroupViewSet.as_view({'post': 'assign_and_leave'}), name='group_assign_and_leave'),
     path('api/groups/<int:pk>/photos/<str:photo_type>/like/', views.GroupViewSet.as_view({'post': 'photo_like'}), name='group_photo_like'),
+    # Announcement API endpoints
+    path('api/groups/<int:group_id>/announcements/', views.AnnouncementViewSet.as_view({'get': 'list', 'post': 'create'}), name='group_announcements_api'),
+    path('api/groups/<int:group_id>/announcements/<int:pk>/', views.AnnouncementViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='group_announcement_detail_api'),
+    path('api/groups/<int:group_id>/announcements/<int:pk>/pin/', views.AnnouncementViewSet.as_view({'post': 'pin'}), name='group_announcement_pin_api'),
+    path('api/groups/<int:group_id>/announcements/<int:pk>/unpin/', views.AnnouncementViewSet.as_view({'post': 'unpin'}), name='group_announcement_unpin_api'),
+    # Group invite API endpoints
+    path('api/groups/<int:group_id>/mutual-friends/', views.get_mutual_friends_api, name='get_mutual_friends_api'),
+    path('api/groups/<int:group_id>/send-invites/', views.send_group_invites_api, name='send_group_invites_api'),
 ]

@@ -209,30 +209,30 @@ def create_post_for_user(form, user, files, group_id=None):
         ).exclude(id=user.id)
         msg_text = f"posted in the {post.group.name} squad."
     else:
+        # Send to users who follow the author (people who should see their posts)
+        # following_relationships are relationships where the user is the follower
         recipients = User.objects.filter(
-            course=user.course,
-            year=user.year
+            following_relationships__followed=user
         ).exclude(id=user.id)
-        msg_text = "posted a new update in the global feed."
+        msg_text = "posted a new update."
 
-    # Emit event for each recipient - the rules engine will create notifications
-    for recipient in recipients:
-        publish_event(
-            event_type=EventTypes.POSTS_POST_CREATED.value,
-            source=EventSources.POSTS.value,
-            action=EventActions.CREATED.value,
-            actor=user,
-            target_type='Post',
-            target_id=str(post.id),
-            context_type='GROUP' if post.group else None,
-            context_id=str(post.group.id) if post.group else None,
-            audience=str(recipient.id),
-            metadata={
-                'post_content': post.content[:100] if post.content else '',
-                'author_username': user.username,
-                'resource_type': 'POST',
-            }
-        )
+    # Emit single event - the rules engine will determine recipients
+    publish_event(
+        event_type=EventTypes.POSTS_POST_CREATED.value,
+        source=EventSources.POSTS.value,
+        action=EventActions.CREATED.value,
+        actor=user,
+        target_type='Post',
+        target_id=str(post.id),
+        context_type='GROUP' if post.group else 'Post',
+        context_id=str(post.group.id) if post.group else str(post.id),
+        metadata={
+            'actor_id': str(user.id),
+            'actor_username': user.username,
+            'post_content': post.content[:100] if post.content else '',
+            'resource_type': 'POST',
+        }
+    )
     
     return post
    

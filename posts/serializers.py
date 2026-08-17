@@ -367,12 +367,12 @@ class PostCreateSerializer(serializers.ModelSerializer):
                 ).exclude(id=author.id)
                 msg_text = f"posted in the {post.group.name} squad."
             else:
-                # Only send to mutual followers (users who follow the author AND the author follows them back)
+                # Send to users who follow the author (people who should see their posts)
+                # following_relationships are relationships where the user is the follower
                 recipients = User.objects.filter(
-                    follower_relationships__followed=author,
-                    following_relationships__follower=author
+                    following_relationships__followed=author
                 ).exclude(id=author.id)
-                msg_text = "posted a new update in the global feed."
+                msg_text = "posted a new update."
 
             if recipients.exists():
                 notification_type = NotificationTypes.GROUP.value if post.group else NotificationTypes.POST_CREATED.value

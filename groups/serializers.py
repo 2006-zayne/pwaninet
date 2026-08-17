@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Group, Membership, MembershipRole, MembershipStatus, JoinPolicy
+from .models import Group, Membership, MembershipRole, MembershipStatus, JoinPolicy, Announcement, AnnouncementPriority, AnnouncementAttachment
 from users.models import User
 from courses.models import Course, Year
 
@@ -183,3 +183,273 @@ class RoleAssignmentSerializer(serializers.Serializer):
         
         attrs['membership'] = membership
         return attrs
+
+
+class AnnouncementAttachmentSerializer(serializers.ModelSerializer):
+    """Serializer for announcement attachments"""
+    file_url = serializers.SerializerMethodField()
+    file_name = serializers.SerializerMethodField()
+    file_extension = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
+    document_preview = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AnnouncementAttachment
+        fields = ['id', 'attachment_type', 'file', 'file_url', 'file_name', 'file_extension', 'thumbnail', 'thumbnail_url', 'document', 'document_preview', 'uploaded_at']
+        read_only_fields = ['uploaded_at']
+
+    def get_file_url(self, obj):
+        if obj.attachment_type == 'document' and obj.document and obj.document.latest_version:
+            return obj.document.latest_version.files.first().file.url if obj.document.latest_version.files.exists() else None
+        return obj.file.url if obj.file else None
+
+    def get_file_name(self, obj):
+        if obj.attachment_type == 'document' and obj.document:
+            return obj.document.title
+        return obj.file.name.split('/')[-1] if obj.file else None
+
+    def get_file_extension(self, obj):
+        if obj.attachment_type == 'document' and obj.document and obj.document.latest_version:
+            return obj.document.latest_version.files.first().extension if obj.document.latest_version.files.exists() else None
+        if obj.file and obj.file.name:
+            return obj.file.name.split('.')[-1].lower() if '.' in obj.file.name else None
+        return None
+
+    def get_thumbnail_url(self, obj):
+        if obj.attachment_type == 'document' and obj.document and obj.document.latest_version:
+            first_file = obj.document.latest_version.files.first()
+            if first_file and first_file.thumbnail_path:
+                return f"/media/{first_file.thumbnail_path}"
+        return obj.thumbnail.url if obj.thumbnail else None
+
+    def get_document_preview(self, obj):
+        if obj.attachment_type == 'document' and obj.document:
+            return {
+                'id': obj.document.id,
+                'title': obj.document.title,
+                'category': obj.document.category.name if obj.document.category else None,
+                'preview_path': obj.document.latest_version.files.first().preview_path if obj.document.latest_version and obj.document.latest_version.files.exists() else None,
+            }
+        return None
+
+
+class AnnouncementSerializer(serializers.ModelSerializer):
+    """Serializer for announcement display"""
+    author = UserMinimalSerializer(read_only=True)
+    group = GroupSerializer(read_only=True)
+    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
+    author_role = serializers.SerializerMethodField()
+    attachments = AnnouncementAttachmentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Announcement
+        fields = [
+            'id', 'group', 'author', 'title', 'content', 'priority',
+            'priority_display', 'is_pinned', 'attachments',
+            'created_at', 'updated_at', 'author_role'
+        ]
+        read_only_fields = ['author', 'created_at', 'updated_at']
+
+    def get_author_role(self, obj):
+        """Get the author's role in the group at time of announcement creation"""
+        try:
+            membership = Membership.objects.get(
+                user=obj.author,
+                group=obj.group,
+                status=MembershipStatus.APPROVED
+            )
+            return membership.get_role_display()
+        except Membership.DoesNotExist:
+            return None
+
+
+class AnnouncementCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating announcements"""
+    attachments = serializers.ListField(
+        child=serializers.FileField(),
+        required=False,
+        write_only=True
+    )
+
+    class Meta:
+        model = Announcement
+        fields = ['title', 'content', 'priority', 'is_pinned', 'attachments']
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        group_id = self.context['group_id']
+        
+        # Extract attachments from validated data
+        attachments_files = validated_data.pop('attachments', [])
+        
+        try:
+            group = Group.objects.get(pk=group_id)
+        except Group.DoesNotExist:
+            raise serializers.ValidationError("Group not found.")
+        
+        announcement = Announcement.objects.create(
+            group=group,
+            author=user,
+            **validated_data
+        )
+        
+        # Create attachment objects
+        for attachment_file in attachments_files:
+            # Determine file type
+            file_name = attachment_file.name.lower()
+            if file_name.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
+                # Image attachment - create with file and generate thumbnail
+                attachment = AnnouncementAttachment.objects.create(
+                    announcement=announcement,
+                    attachment_type='image',
+                    file=attachment_file
+                )
+                from .tasks import generate_attachment_thumbnail
+                generate_attachment_thumbnail.delay(attachment.id)
+            else:
+                # Document attachment - create in document repository
+                from documents.models import Document, DocumentVersion, DocumentFile, Category
+                from documents.tasks import process_document_file
+                
+                # Get or create default category (will be updated later)
+                category, _ = Category.objects.get_or_create(
+                    code='other',
+                    defaults={'name': 'Other'}
+                )
+                
+                # Create document
+                document = Document.objects.create(
+                    title=attachment_file.name,
+                    description=f"Attached to announcement: {announcement.title}",
+                    category=category,
+                    uploaded_by=user,
+                    visibility='private',  # Will be updated later
+                    status='processing'
+                )
+                
+                # Create version
+                version = DocumentVersion.objects.create(
+                    document=document,
+                    version_number=1,
+                    created_by=user,
+                    is_latest=True
+                )
+                
+                # Create file
+                document_file = DocumentFile.objects.create(
+                    document_version=version,
+                    file=attachment_file,
+                    original_filename=attachment_file.name,
+                    storage_path=attachment_file.name,
+                    mime_type=attachment_file.content_type,
+                    extension=attachment_file.name.split('.')[-1].lower(),
+                    size_bytes=attachment_file.size,
+                    storage_provider='local',
+                    uploaded_by=user
+                )
+                
+                # Create attachment linking to document
+                attachment = AnnouncementAttachment.objects.create(
+                    announcement=announcement,
+                    attachment_type='document',
+                    document=document
+                )
+                
+                # Trigger document processing
+                # process_document_file.delay(document_file.id)
+        
+        return announcement
+
+
+class AnnouncementUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for updating announcements"""
+    attachments = serializers.ListField(
+        child=serializers.FileField(),
+        required=False,
+        write_only=True
+    )
+
+    class Meta:
+        model = Announcement
+        fields = ['title', 'content', 'priority', 'is_pinned', 'attachments']
+
+    def update(self, instance, validated_data):
+        # Extract attachments from request data (not validated_data since it's write-only)
+        attachments_files = self.context.get('request').FILES.getlist('attachments')
+        
+        # Update announcement fields
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        instance.save()
+        
+        # Handle attachments - if new attachments are provided, replace existing ones
+        if attachments_files:
+            # Delete existing attachments
+            instance.attachments.all().delete()
+            
+            # Create new attachment objects
+            for attachment_file in attachments_files:
+                # Determine file type
+                file_name = attachment_file.name.lower()
+                if file_name.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
+                    # Image attachment - create with file and generate thumbnail
+                    attachment = AnnouncementAttachment.objects.create(
+                        announcement=instance,
+                        attachment_type='image',
+                        file=attachment_file
+                    )
+                    from .tasks import generate_attachment_thumbnail
+                    generate_attachment_thumbnail.delay(attachment.id)
+                else:
+                    # Document attachment - create in document repository
+                    from documents.models import Document, DocumentVersion, DocumentFile, Category
+                    from documents.tasks import process_document_file
+                    
+                    # Get or create default category (will be updated later)
+                    category, _ = Category.objects.get_or_create(
+                        code='other',
+                        defaults={'name': 'Other'}
+                    )
+                    
+                    # Create document
+                    document = Document.objects.create(
+                        title=attachment_file.name,
+                        description=f"Attached to announcement: {instance.title}",
+                        category=category,
+                        uploaded_by=self.context.get('request').user,
+                        visibility='private',  # Will be updated later
+                        status='processing'
+                    )
+                    
+                    # Create version
+                    version = DocumentVersion.objects.create(
+                        document=document,
+                        version_number=1,
+                        created_by=self.context.get('request').user,
+                        is_latest=True
+                    )
+                    
+                    # Create file
+                    document_file = DocumentFile.objects.create(
+                        document_version=version,
+                        file=attachment_file,
+                        original_filename=attachment_file.name,
+                        storage_path=attachment_file.name,
+                        mime_type=attachment_file.content_type,
+                        extension=attachment_file.name.split('.')[-1].lower(),
+                        size_bytes=attachment_file.size,
+                        storage_provider='local',
+                        uploaded_by=self.context.get('request').user
+                    )
+                    
+                    # Create attachment linking to document
+                    attachment = AnnouncementAttachment.objects.create(
+                        announcement=instance,
+                        attachment_type='document',
+                        document=document
+                    )
+                    
+                    # Trigger document processing
+                    # process_document_file.delay(document_file.id)
+        
+        return instance

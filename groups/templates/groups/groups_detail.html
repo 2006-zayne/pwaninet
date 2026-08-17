@@ -654,21 +654,37 @@
             <button class="btn btn-outline-secondary rounded-pill fw-bold btn-sm profile-action-btn" disabled style="opacity: 0.7; cursor: not-allowed;">
               <i class="bi bi-clock-fill me-1"></i> Request Sent ⏳
             </button>
-            <a href="{% url 'groups:toggle_membership' group.id %}" class="btn btn-outline-danger rounded-pill fw-bold btn-sm profile-action-btn">
-              <i class="bi bi-x-circle-fill me-1"></i> Cancel Request
-            </a>
+            <form method="post" action="{% url 'groups:toggle_membership' group.id %}" style="display: inline;">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-danger rounded-pill fw-bold btn-sm profile-action-btn w-100">
+                <i class="bi bi-x-circle-fill me-1"></i> Cancel Request
+              </button>
+            </form>
           </div>
         {% elif is_rejected %}
           <div class="d-grid gap-2 px-2">
-            <a href="{% url 'groups:toggle_membership' group.id %}" class="btn btn-outline-primary rounded-pill fw-bold btn-sm profile-action-btn">
-              <i class="bi bi-arrow-clockwise me-1"></i> Request Again
-            </a>
+            <form method="post" action="{% url 'groups:toggle_membership' group.id %}" style="display: inline;">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-primary rounded-pill fw-bold btn-sm profile-action-btn w-100">
+                <i class="bi bi-arrow-clockwise me-1"></i> Request Again
+              </button>
+            </form>
           </div>
         {% else %}
           <div class="d-grid gap-2 px-2">
-            <a href="{% url 'groups:toggle_membership' group.id %}" class="btn btn-outline-primary rounded-pill fw-bold btn-sm profile-action-btn">
-              <i class="bi bi-plus-circle-fill me-1"></i> Join Group
-            </a>
+            {% if is_invite_only %}
+              <button class="btn btn-outline-secondary rounded-pill fw-bold btn-sm profile-action-btn" disabled style="opacity: 0.7; cursor: not-allowed;">
+                <i class="bi bi-lock-fill me-1"></i> Invite Only
+              </button>
+              <p class="text-center small text-muted mt-1 mb-0">You have to be invited to join this group</p>
+            {% else %}
+              <form method="post" action="{% url 'groups:toggle_membership' group.id %}" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-primary rounded-pill fw-bold btn-sm profile-action-btn w-100">
+                  <i class="bi bi-plus-circle-fill me-1"></i> Join Group
+                </button>
+              </form>
+            {% endif %}
           </div>
         {% endif %}
 
@@ -729,24 +745,28 @@
 
     <!-- Posts -->
     <div class="posts-feed" id="posts-container">
-      {% for post in posts %}
-        {% include 'posts/partials/post_card.html' with post=post %}
-      {% empty %}
+      {% if is_member %}
+        {% for post in posts %}
+          {% include 'posts/partials/post_card.html' with post=post %}
+        {% empty %}
+          <div class="card">
+            <div class="empty-state">
+              <div class="empty-icon"><i class="bi bi-chat-dots"></i></div>
+              <div class="empty-title">No posts yet</div>
+              <p class="empty-sub">Be the first to post something to {{ group.name }}!</p>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
         <div class="card">
           <div class="empty-state">
-            <div class="empty-icon"><i class="bi bi-chat-dots"></i></div>
-            <div class="empty-title">No posts yet</div>
-            <p class="empty-sub">
-              {% if is_member %}
-                Be the first to post something to {{ group.name }}!
-              {% else %}
-                Join this group to see and create posts.
-              {% endif %}
-            </p>
+            <div class="empty-icon"><i class="bi bi-lock-fill"></i></div>
+            <div class="empty-title">Members Only</div>
+            <p class="empty-sub">You have to be a member to view its content.</p>
           </div>
         </div>
-      {% endfor %}
-      {% if has_next %}
+      {% endif %}
+      {% if has_next and is_member %}
       <div id="load-more-trigger" class="text-center py-4" hx-get="{% url 'groups:groups_detail' group.id %}?page={{ next_page }}" hx-trigger="revealed" hx-target="#posts-container" hx-swap="beforeend" hx-on::before-request="this.remove()">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Loading...</span>

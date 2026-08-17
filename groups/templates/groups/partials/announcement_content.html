@@ -1,0 +1,70 @@
+{% load static %}
+<div class="p-3">
+    {% if announcement.priority == 'IMPORTANT' %}
+        <span class="badge bg-warning text-dark mb-2">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>Important
+        </span>
+    {% elif announcement.priority == 'URGENT' %}
+        <span class="badge bg-danger mb-2">
+            <i class="bi bi-exclamation-circle-fill me-1"></i>Urgent
+        </span>
+    {% endif %}
+    
+    {% if announcement.is_pinned %}
+        <span class="badge bg-primary mb-2">
+            <i class="bi bi-pin-fill me-1"></i>Pinned
+        </span>
+    {% endif %}
+    
+    <h5 class="fw-bold mb-2 text-dark">
+        {% if announcement.is_pinned %}<i class="bi bi-pin-fill me-1"></i>{% endif %}
+        {{ announcement.title }}
+    </h5>
+    
+    <div id="announcement-content-{{ announcement.id }}" class="announcement-content">
+        <div class="text-dark" style="font-size: 16px; line-height: 1.5;">
+            {{ announcement.content|linebreaks }}
+        </div>
+        
+        {% if announcement.attachments.exists %}
+            {% include 'groups/partials/announcement_attachments.html' %}
+        {% endif %}
+    </div>
+    
+    <div class="d-flex justify-content-end mt-2">
+        <button 
+            class="btn btn-link text-primary p-0" 
+            id="expand-btn-{{ announcement.id }}"
+            aria-expanded="false"
+            aria-controls="announcement-content-{{ announcement.id }}"
+            aria-label="Expand announcement"
+            onclick="toggleAnnouncementExpand('{{ announcement.id }}', this)">
+            <i class="bi bi-chevron-down"></i>
+        </button>
+    </div>
+</div>
+
+<style>
+.announcement-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+    opacity: 0;
+}
+
+.announcement-content.expanded {
+    max-height: 1000px;
+    opacity: 1;
+}
+
+.announcement-content .text-dark {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.announcement-content.expanded .text-dark {
+    -webkit-line-clamp: unset;
+}
+</style>

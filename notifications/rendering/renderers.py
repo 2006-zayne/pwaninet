@@ -83,23 +83,24 @@ class InviteRenderer(NotificationRenderer):
     def get_actions(self, notification: Any) -> list:
         """Get actions for invite notifications."""
         actions = []
-        if notification.context and notification.context.get('id'):
-            group_id = notification.context['id']
+        # Use notification ID for the respond_to_invite endpoint
+        if hasattr(notification, 'id') and notification.id:
+            notif_id = notification.id
             actions.append({
                 'label': 'Accept',
                 'icon': 'check-lg',
-                'url': f'/groups/{group_id}/accept-invite/',
+                'url': f'/groups/invite/respond/{notif_id}/accept/',
                 'type': 'button',
                 'style': 'accept',
-                'htmx': f'hx-post="/groups/{group_id}/accept-invite/" hx-target="closest .notif-item" hx-swap="outerHTML"'
+                'htmx': f'hx-post="/groups/invite/respond/{notif_id}/accept/" hx-target="closest .notif-item" hx-swap="outerHTML"'
             })
             actions.append({
                 'label': 'Decline',
                 'icon': 'x-lg',
-                'url': f'/groups/{group_id}/decline-invite/',
+                'url': f'/groups/invite/respond/{notif_id}/decline/',
                 'type': 'button',
                 'style': 'decline',
-                'htmx': f'hx-post="/groups/{group_id}/decline-invite/" hx-target="closest .notif-item" hx-swap="outerHTML"'
+                'htmx': f'hx-post="/groups/invite/respond/{notif_id}/decline/" hx-target="closest .notif-item" hx-swap="outerHTML"'
             })
         return actions
 
@@ -151,23 +152,37 @@ class GroupRequestRenderer(NotificationRenderer):
     def get_actions(self, notification: Any) -> list:
         """Get actions for group request notifications."""
         actions = []
-        if notification.context and notification.context.get('id'):
+        # Get group_id from target and user_id from metadata/context
+        group_id = None
+        user_id = None
+        
+        if hasattr(notification, 'target') and notification.target and notification.target.get('id'):
+            group_id = notification.target['id']
+        elif notification.context and notification.context.get('id'):
             group_id = notification.context['id']
+        
+        # Try to get user_id from metadata or context
+        if hasattr(notification, 'metadata') and notification.metadata:
+            user_id = notification.metadata.get('user_id')
+        elif notification.context and notification.context.get('user_id'):
+            user_id = notification.context['user_id']
+        
+        if group_id and user_id:
             actions.append({
                 'label': 'Approve',
                 'icon': 'check-lg',
-                'url': f'/groups/{group_id}/approve-request/',
+                'url': f'/groups/{group_id}/approve/{user_id}/',
                 'type': 'button',
                 'style': 'accept',
-                'htmx': f'hx-post="/groups/{group_id}/approve-request/" hx-target="closest .notif-item" hx-swap="outerHTML"'
+                'htmx': f'hx-post="/groups/{group_id}/approve/{user_id}/" hx-target="closest .notif-item" hx-swap="outerHTML"'
             })
             actions.append({
                 'label': 'Reject',
                 'icon': 'x-lg',
-                'url': f'/groups/{group_id}/reject-request/',
+                'url': f'/groups/{group_id}/reject/{user_id}/',
                 'type': 'button',
                 'style': 'decline',
-                'htmx': f'hx-post="/groups/{group_id}/reject-request/" hx-target="closest .notif-item" hx-swap="outerHTML"'
+                'htmx': f'hx-post="/groups/{group_id}/reject/{user_id}/" hx-target="closest .notif-item" hx-swap="outerHTML"'
             })
         return actions
 
@@ -198,11 +213,18 @@ class GroupApprovedRenderer(NotificationRenderer):
             'style': 'success',
             'disabled': True
         })
-        if notification.context and notification.context.get('url'):
+        # Check target_id for group ID to construct URL
+        group_id = None
+        if hasattr(notification, 'target') and notification.target and notification.target.get('id'):
+            group_id = notification.target['id']
+        elif notification.context and notification.context.get('id'):
+            group_id = notification.context['id']
+        
+        if group_id:
             actions.append({
                 'label': 'View Group',
                 'icon': 'people',
-                'url': notification.context['url'],
+                'url': f'/groups/{group_id}/',
                 'type': 'link',
                 'style': 'primary'
             })

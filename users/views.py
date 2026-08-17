@@ -12,6 +12,7 @@ from django.views.decorators.http import require_http_methods
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
+from django.db.models import Q
 from users.models import User, Follow, DeviceAccount, Pinch, UserSession, Block, HiddenAuthor, PrivacyLevel
 from posts.models import Post, Like
 from users.forms import PwaniSignupForm, ProfileUpdateForm
@@ -115,7 +116,18 @@ def profile_view(request, username):
     page = int(request.GET.get('page', 1))
     posts_per_page = 10
     
-    posts_queryset = Post.objects.filter(author=profile_user).select_related('author', 'group', 'course', 'unit', 'repost_of').prefetch_related('likes', 'images', 'comments').order_by('-created_at')
+    # Filter posts: show regular posts and group posts only if viewing user is a member of the group
+    from groups.models import Membership, MembershipStatus
+    viewer_group_ids = list(Membership.objects.filter(
+        user=request.user, 
+        status=MembershipStatus.APPROVED
+    ).values_list('group_id', flat=True))
+    
+    posts_queryset = Post.objects.filter(
+        author=profile_user
+    ).filter(
+        Q(group__isnull=True) | Q(group_id__in=viewer_group_ids)
+    ).select_related('author', 'group', 'course', 'unit', 'repost_of').prefetch_related('likes', 'images', 'comments').order_by('-created_at')
     paginator = Paginator(posts_queryset, posts_per_page)
     posts_page = paginator.get_page(page)
     
@@ -1402,6 +1414,24 @@ class UserViewSet(viewsets.ModelViewSet):
         request.user.theme_preference = theme
         request.user.save()
         return Response({'theme_preference': theme})
+
+    @extend_schema(
+        summary="Update audio preference",
+        description="Update the authenticated user's audio preference for video playback (muted or unmuted)",
+        responses={200: {"audio_preference": "string"}, 400: {"error": "message"}}
+    )
+    @action(detail=False, methods=['patch'])
+    def update_audio_preference(self, request):
+        """Update audio preference"""
+        audio_pref = request.data.get('audio_preference')
+        if audio_pref not in ['muted', 'unmuted']:
+            return Response(
+                {'error': 'Invalid audio preference. Must be muted or unmuted.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        request.user.audio_preference = audio_pref
+        request.user.save()
+        return Response({'audio_preference': audio_pref})
 
     @extend_schema(
         summary="Update appearance preferences",

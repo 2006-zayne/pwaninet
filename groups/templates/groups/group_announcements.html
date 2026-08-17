@@ -3,6 +3,8 @@
 
 {% block content %}
 <link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/css/lightbox.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/js/lightbox.min.js"></script>
 
 <style>
   :root {
@@ -173,7 +175,7 @@
 
   @media (max-width: 768px) {
     .page-wrap {
-      padding: 1.5rem 1rem 4rem;
+      padding: 0;
     }
 
     .page-header {
@@ -212,25 +214,7 @@
   <!-- ── Announcements Card ── -->
   <div class="card" id="announcement-list">
     <div class="card-body">
-      {% if announcements %}
-        <!-- Announcement cards will be rendered here -->
-        <div class="announcement-placeholder">
-          <h4><i class="bi bi-megaphone-fill"></i> Coming Soon</h4>
-          <p>Announcement cards are being designed and will appear here.</p>
-        </div>
-      {% else %}
-        <div class="empty-state">
-          <i class="bi bi-megaphone"></i>
-          <h3>No announcements yet</h3>
-          <p>
-            {% if is_admin %}
-              Be the first to share important updates with the group.
-            {% else %}
-              Check back later for important group announcements.
-            {% endif %}
-          </p>
-        </div>
-      {% endif %}
+      {% include 'groups/partials/announcement_list.html' %}
     </div>
   </div>
 
@@ -246,19 +230,95 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <form id="createAnnouncementForm">
+        <form id="createAnnouncementForm" 
+              hx-post="{% url 'groups:group_announcements_api' group_id=group.id %}"
+              hx-target="#announcement-list"
+              hx-swap="innerHTML"
+              enctype="multipart/form-data">
           {% csrf_token %}
           <div class="mb-3">
             <label class="form-label fw-bold" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.09em;">Title</label>
-            <input type="text" class="form-control" id="announcementTitle" placeholder="Announcement title..." required>
+            <input type="text" class="form-control" name="title" placeholder="Announcement title..." required>
           </div>
           <div class="mb-3">
             <label class="form-label fw-bold" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.09em;">Message</label>
-            <textarea class="form-control" id="announcementMessage" rows="4" placeholder="Write your announcement..." required></textarea>
+            <textarea class="form-control" name="content" rows="4" placeholder="Write your announcement..." required></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.09em;">Priority</label>
+            <select class="form-select" name="priority">
+              <option value="NORMAL">Normal</option>
+              <option value="IMPORTANT">Important</option>
+              <option value="URGENT">Urgent</option>
+            </select>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="is_pinned" id="pinAnnouncement">
+            <label class="form-check-label" for="pinAnnouncement">
+              Pin this announcement
+            </label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.09em;">Attachments (Optional)</label>
+            <input type="file" class="form-control" name="attachments" accept="image/*,.pdf,.doc,.docx,.txt" multiple>
+            <div class="form-text">You can select multiple files</div>
           </div>
           <div class="d-grid gap-2">
             <button type="submit" class="btn btn-primary fw-bold">
               <i class="bi bi-send-fill me-1"></i> Post Announcement
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Edit Announcement ── -->
+<div class="modal fade" id="editAnnouncementModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Announcement</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editAnnouncementForm" 
+              hx-target="#announcement-list"
+              hx-swap="innerHTML"
+              enctype="multipart/form-data"
+              hx-indicator="#editSubmitBtn">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label fw-bold" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.09em;">Title</label>
+            <input type="text" class="form-control" name="title" id="editTitle" placeholder="Announcement title..." required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.09em;">Message</label>
+            <textarea class="form-control" name="content" id="editContent" rows="4" placeholder="Write your announcement..." required></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.09em;">Priority</label>
+            <select class="form-select" name="priority" id="editPriority">
+              <option value="NORMAL">Normal</option>
+              <option value="IMPORTANT">Important</option>
+              <option value="URGENT">Urgent</option>
+            </select>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="is_pinned" id="editPin">
+            <label class="form-check-label" for="editPin">
+              Pin this announcement
+            </label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.09em;">Attachments (Optional)</label>
+            <input type="file" class="form-control" name="attachments" accept="image/*,.pdf,.doc,.docx,.txt" multiple>
+            <small class="text-muted">Leave empty to keep existing attachments, or select new files to replace all</small>
+          </div>
+          <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary fw-bold" id="editSubmitBtn">
+              <i class="bi bi-check-circle-fill me-1"></i> Update Announcement
             </button>
           </div>
         </form>
@@ -272,14 +332,165 @@
 document.addEventListener('DOMContentLoaded', function() {
   const form = document.getElementById('createAnnouncementForm');
   if (form) {
-    form.addEventListener('submit', function(e) {
-      e.preventDefault();
-      // Placeholder for announcement creation logic
-      alert('Announcement creation coming soon!');
-      const modal = bootstrap.Modal.getInstance(document.getElementById('createAnnouncementModal'));
-      if (modal) modal.hide();
+    form.addEventListener('htmx:beforeRequest', function(e) {
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Creating...';
+      // Remove any existing error messages
+      const existingAlert = form.querySelector('.alert-danger');
+      if (existingAlert) existingAlert.remove();
+    });
+    
+    form.addEventListener('htmx:afterRequest', function(e) {
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.disabled = false;
+      
+      if (e.detail.successful) {
+        submitBtn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Posted!';
+        setTimeout(() => {
+          submitBtn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Post Announcement';
+        }, 2000);
+        const modal = bootstrap.Modal.getInstance(document.getElementById('createAnnouncementModal'));
+        if (modal) modal.hide();
+        form.reset();
+      } else {
+        submitBtn.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i> Failed';
+        setTimeout(() => {
+          submitBtn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Post Announcement';
+        }, 2000);
+        
+        // Show error message
+        let errorMsg = 'Failed to create announcement. Please try again.';
+        if (e.detail.xhr && e.detail.xhr.responseText) {
+          try {
+            const errorData = JSON.parse(e.detail.xhr.responseText);
+            if (errorData.detail) errorMsg = errorData.detail;
+          } catch (e) {
+            // If not JSON, use default message
+          }
+        }
+        
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-danger mt-3';
+        alertDiv.innerHTML = `<i class="bi bi-exclamation-circle me-2"></i>${errorMsg}`;
+        form.appendChild(alertDiv);
+      }
     });
   }
+  
+  const editForm = document.getElementById('editAnnouncementForm');
+  if (editForm) {
+    editForm.addEventListener('htmx:beforeRequest', function(e) {
+      const submitBtn = editForm.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Updating...';
+      // Remove any existing error messages
+      const existingAlert = editForm.querySelector('.alert-danger');
+      if (existingAlert) existingAlert.remove();
+    });
+    
+    editForm.addEventListener('htmx:afterRequest', function(e) {
+      const submitBtn = editForm.querySelector('button[type="submit"]');
+      submitBtn.disabled = false;
+      
+      if (e.detail.successful) {
+        submitBtn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Updated!';
+        setTimeout(() => {
+          submitBtn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Update Announcement';
+        }, 2000);
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editAnnouncementModal'));
+        if (modal) modal.hide();
+      } else {
+        submitBtn.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i> Failed';
+        setTimeout(() => {
+          submitBtn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Update Announcement';
+        }, 2000);
+        
+        // Show error message
+        let errorMsg = 'Failed to update announcement. Please try again.';
+        if (e.detail.xhr && e.detail.xhr.responseText) {
+          try {
+            const errorData = JSON.parse(e.detail.xhr.responseText);
+            if (errorData.detail) errorMsg = errorData.detail;
+          } catch (e) {
+            // If not JSON, use default message
+          }
+        }
+        
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-danger mt-3';
+        alertDiv.innerHTML = `<i class="bi bi-exclamation-circle me-2"></i>${errorMsg}`;
+        editForm.appendChild(alertDiv);
+      }
+    });
+  }
+  
+  // Handle edit button clicks to populate form
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('[data-bs-target="#editAnnouncementModal"]')) {
+      const link = e.target.closest('[data-bs-target="#editAnnouncementModal"]');
+      const hxVals = link.getAttribute('data-hx-vals');
+      const hxPatchUrl = link.getAttribute('data-hx-patch-url');
+      
+      if (hxVals && hxPatchUrl) {
+        try {
+          const data = JSON.parse(hxVals.replace(/"/g, '"'));
+          
+          // Wait for modal to be shown before populating
+          const modal = document.getElementById('editAnnouncementModal');
+          modal.addEventListener('shown.bs.modal', function() {
+            const titleInput = document.getElementById('editTitle');
+            const contentInput = document.getElementById('editContent');
+            const priorityInput = document.getElementById('editPriority');
+            const pinInput = document.getElementById('editPin');
+            
+            if (titleInput) titleInput.value = data.title || '';
+            if (contentInput) contentInput.value = data.content || '';
+            if (priorityInput) priorityInput.value = data.priority || 'NORMAL';
+            if (pinInput) pinInput.checked = data.is_pinned || false;
+            
+            // Set the form action URL
+            editForm.setAttribute('hx-patch', hxPatchUrl);
+          }, { once: true });
+          
+        } catch (err) {
+          console.error('Error parsing announcement data:', err);
+        }
+      }
+    }
+  });
+});
+
+function toggleAnnouncementExpand(announcementId, button) {
+  const contentDiv = document.getElementById('announcement-content-' + announcementId);
+  const icon = button.querySelector('i');
+  const isExpanded = contentDiv.classList.contains('expanded');
+  
+  if (isExpanded) {
+    contentDiv.classList.remove('expanded');
+    icon.classList.remove('bi-chevron-up');
+    icon.classList.add('bi-chevron-down');
+    button.setAttribute('aria-expanded', 'false');
+    button.setAttribute('aria-label', 'Expand announcement');
+  } else {
+    contentDiv.classList.add('expanded');
+    icon.classList.remove('bi-chevron-down');
+    icon.classList.add('bi-chevron-up');
+    button.setAttribute('aria-expanded', 'true');
+    button.setAttribute('aria-label', 'Collapse announcement');
+  }
+}
+
+// Initialize lightbox for image attachments
+document.addEventListener('DOMContentLoaded', function() {
+  lightbox.option({
+    'resizeDuration': 200,
+    'wrapAround': true,
+    'fadeDuration': 200,
+    'imageFadeDuration': 200,
+    'disableScrolling': true,
+    'albumLabel': 'Image %1 of %2'
+  });
 });
 </script>
 

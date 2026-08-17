@@ -59,6 +59,11 @@ class FontStylePreference(models.TextChoices):
     ITALIC = 'italic', 'Italic'
 
 
+class AudioPreference(models.TextChoices):
+    MUTED = 'muted', 'Muted'
+    UNMUTED = 'unmuted', 'Unmuted'
+
+
 class PrivacyLevel(models.TextChoices):
     PUBLIC = 'PUBLIC', 'Everyone'
     AUTHENTICATED = 'AUTHENTICATED', 'PwaniNet Users'
@@ -186,6 +191,14 @@ class User(AbstractUser):
         max_length=10,
         choices=FontStylePreference.choices,
         default=FontStylePreference.NORMAL
+    )
+
+    # Audio preference for video playback
+    audio_preference = models.CharField(
+        max_length=10,
+        choices=AudioPreference.choices,
+        default=AudioPreference.MUTED,
+        help_text="Default audio state for video playback"
     )
 
     # Online status tracking

@@ -25,7 +25,7 @@
 <!-- Trending Documents -->
 <div class="doc-section" style="margin-bottom: 48px;">
     {% include 'documents/partials/section_header.html' with title='Trending Documents' show_view_all=True view_all_url='search/?sort=downloads' %}
-    
+
     <div class="doc-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
         {% for document in trending_documents %}
             {% include 'documents/partials/document_card.html' %}
@@ -38,7 +38,7 @@
 <!-- Recently Added -->
 <div class="doc-section" style="margin-bottom: 48px;">
     {% include 'documents/partials/section_header.html' with title='Recently Added' show_view_all=True view_all_url='search/?sort=newest' %}
-    
+
     <div class="doc-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
         {% for document in recent_documents %}
             {% include 'documents/partials/document_card.html' %}
@@ -51,7 +51,7 @@
 <!-- Most Downloaded -->
 <div class="doc-section" style="margin-bottom: 48px;">
     {% include 'documents/partials/section_header.html' with title='Most Downloaded' show_view_all=True view_all_url='search/?sort=downloads' %}
-    
+
     <div class="doc-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
         {% for document in most_downloaded %}
             {% include 'documents/partials/document_card.html' %}
@@ -60,5 +60,54 @@
         {% endfor %}
     </div>
 </div>
+
+<style>
+/* Responsive Document Grid */
+.doc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+/* Tablets and smaller desktops */
+@media (max-width: 1024px) {
+    .doc-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 16px;
+    }
+}
+
+/* Mobile landscape and small tablets */
+@media (max-width: 768px) {
+    .doc-grid {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 12px;
+    }
+}
+
+/* Mobile portrait */
+@media (max-width: 480px) {
+    .doc-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
+    }
+}
+
+/* Very small mobile devices */
+@media (max-width: 360px) {
+    .doc-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 10px;
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 320px) {
+    .doc-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+}
+</style>
 
 {% endblock %}

@@ -163,7 +163,7 @@
   </div>
 
   <!-- Lazy Loading Trigger for Infinite Scroll -->
-  <div id="load-more-trigger" data-cursor="" data-loading="false" style="height: 20px; margin-top: 2rem;"></div>
+  <div id="load-more-trigger" data-cursor="{{ next_cursor|default:'' }}" data-loading="false" style="height: 20px; margin-top: 2rem;"></div>
   
   <!-- Loading Indicator -->
   <div id="loading-indicator" style="display: none; text-align: center; padding: 1rem;">

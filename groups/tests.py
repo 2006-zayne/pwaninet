@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
-from .models import Group, Membership, JoinPolicy, MembershipRole, MembershipStatus
+from .models import Group, Membership, JoinPolicy, MembershipRole, MembershipStatus, Announcement, AnnouncementPriority
 from courses.models import Course, Year
 
 User = get_user_model()
@@ -134,3 +134,162 @@ class MembershipModelTest(TestCase):
             status=MembershipStatus.PENDING
         )
         self.assertEqual(membership.status, 'PENDING')
+
+
+class AnnouncementModelTest(TestCase):
+    """Test cases for Announcement model"""
+    
+    def setUp(self):
+        """Set up test data"""
+        self.course = Course.objects.create(name='Computer Science')
+        self.year = Year.objects.create(course=self.course, level=1)
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            course=self.course,
+            year=self.year,
+            password='testpass123'
+        )
+        self.group = Group.objects.create(
+            name='Test Group',
+            created_by=self.user,
+            description='A test group',
+            course=self.course,
+            year=self.year
+        )
+        self.membership = Membership.objects.create(
+            user=self.user,
+            group=self.group,
+            role=MembershipRole.ADMIN,
+            status=MembershipStatus.APPROVED
+        )
+    
+    def test_announcement_creation(self):
+        """Test that an announcement can be created"""
+        announcement = Announcement.objects.create(
+            group=self.group,
+            author=self.user,
+            title='Test Announcement',
+            content='This is a test announcement',
+            priority=AnnouncementPriority.NORMAL
+        )
+        self.assertEqual(announcement.title, 'Test Announcement')
+        self.assertEqual(announcement.group, self.group)
+        self.assertEqual(announcement.author, self.user)
+        self.assertEqual(announcement.priority, 'NORMAL')
+        self.assertFalse(announcement.is_pinned)
+    
+    def test_announcement_str(self):
+        """Test announcement string representation"""
+        announcement = Announcement.objects.create(
+            group=self.group,
+            author=self.user,
+            title='Test Announcement',
+            content='This is a test announcement'
+        )
+        self.assertEqual(str(announcement), 'Test Announcement - Test Group')
+    
+    def test_announcement_priority_choices(self):
+        """Test priority field choices"""
+        announcement = Announcement.objects.create(
+            group=self.group,
+            author=self.user,
+            title='Important Announcement',
+            content='This is important',
+            priority=AnnouncementPriority.IMPORTANT
+        )
+        self.assertEqual(announcement.priority, 'IMPORTANT')
+        
+        announcement.priority = AnnouncementPriority.URGENT
+        announcement.save()
+        self.assertEqual(announcement.priority, 'URGENT')
+    
+    def test_announcement_pinned_state(self):
+        """Test pinned state"""
+        announcement = Announcement.objects.create(
+            group=self.group,
+            author=self.user,
+            title='Pinned Announcement',
+            content='This is pinned',
+            is_pinned=True
+        )
+        self.assertTrue(announcement.is_pinned)
+        
+        announcement.is_pinned = False
+        announcement.save()
+        self.assertFalse(announcement.is_pinned)
+    
+    def test_announcement_ordering(self):
+        """Test that announcements are ordered correctly (pinned first, then by date)"""
+        announcement1 = Announcement.objects.create(
+            group=self.group,
+            author=self.user,
+            title='First Announcement',
+            content='First',
+            is_pinned=False
+        )
+        announcement2 = Announcement.objects.create(
+            group=self.group,
+            author=self.user,
+            title='Pinned Announcement',
+            content='Pinned',
+            is_pinned=True
+        )
+        announcement3 = Announcement.objects.create(
+            group=self.group,
+            author=self.user,
+            title='Second Announcement',
+            content='Second',
+            is_pinned=False
+        )
+        
+        announcements = list(Announcement.objects.filter(group=self.group))
+        # Pinned should come first
+        self.assertEqual(announcements[0].is_pinned, True)
+        self.assertEqual(announcements[0].title, 'Pinned Announcement')
+        # Non-pinned should be ordered by date (newest first)
+        self.assertEqual(announcements[1].title, 'Second Announcement')
+        self.assertEqual(announcements[2].title, 'First Announcement')
+    
+    def test_announcement_group_isolation(self):
+        """Test that announcements belong to specific groups"""
+        group2 = Group.objects.create(
+            name='Test Group 2',
+            created_by=self.user,
+            description='Another test group',
+            course=self.course,
+            year=self.year
+        )
+        
+        announcement1 = Announcement.objects.create(
+            group=self.group,
+            author=self.user,
+            title='Group 1 Announcement',
+            content='For group 1'
+        )
+        
+        announcement2 = Announcement.objects.create(
+            group=group2,
+            author=self.user,
+            title='Group 2 Announcement',
+            content='For group 2'
+        )
+        
+        group1_announcements = Announcement.objects.filter(group=self.group)
+        group2_announcements = Announcement.objects.filter(group=group2)
+        
+        self.assertEqual(group1_announcements.count(), 1)
+        self.assertEqual(group2_announcements.count(), 1)
+        self.assertEqual(group1_announcements.first().title, 'Group 1 Announcement')
+        self.assertEqual(group2_announcements.first().title, 'Group 2 Announcement')
+    
+    def test_announcement_attachment(self):
+        """Test announcement attachment field"""
+        announcement = Announcement.objects.create(
+            group=self.group,
+            author=self.user,
+            title='Announcement with Attachment',
+            content='This has an attachment'
+        )
+        # Test that attachments relationship exists and can be empty
+        self.assertEqual(announcement.attachments.count(), 0)

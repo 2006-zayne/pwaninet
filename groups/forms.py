@@ -1,5 +1,5 @@
 from django import forms
-from groups.models import Group, JoinPolicy
+from groups.models import Group, JoinPolicy, PostVisibility, EditPermission, InvitePermission
 
 
 class GroupForm(forms.ModelForm):
@@ -28,4 +28,71 @@ class GroupForm(forms.ModelForm):
             'join_policy': forms.Select(
                 attrs={
                     'class': 'form-control rounded-pill'}),
+        }
+
+
+class GroupDetailsForm(forms.ModelForm):
+    """Form for editing group details (name, description, profile pic, cover photo)"""
+    class Meta:
+        model = Group
+        fields = ['name', 'description', 'group_pic', 'cover_photo']
+        
+        widgets = {
+            'name': forms.TextInput(
+                attrs={
+                    'placeholder': 'Group Name'}),
+            'description': forms.Textarea(
+                attrs={
+                    'rows': 4,
+                    'placeholder': 'Tell people about your group...'}),
+            'group_pic': forms.FileInput(
+                attrs={
+                    'accept': 'image/*'}),
+            'cover_photo': forms.FileInput(
+                attrs={
+                    'accept': 'image/*'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Remove the required attribute from file fields to allow optional updates
+        self.fields['group_pic'].required = False
+        self.fields['cover_photo'].required = False
+
+
+class RoleAssignmentForm(forms.Form):
+    """Form for assigning roles to group members"""
+    user_id = forms.IntegerField(widget=forms.HiddenInput())
+    role = forms.ChoiceField(
+        choices=[
+            ('MEMBER', 'Member'),
+            ('DELEGATE', 'Delegate'),
+            ('MODERATOR', 'Moderator'),
+            ('ADMIN', 'Admin'),
+        ],
+        widget=forms.Select(attrs={
+            'class': 'django-form-field'
+        })
+    )
+
+
+class GroupPrivacyForm(forms.ModelForm):
+    """Form for group privacy settings"""
+    class Meta:
+        model = Group
+        fields = ['join_policy', 'post_visibility', 'edit_permission', 'invite_permission']
+        
+        widgets = {
+            'join_policy': forms.Select(attrs={
+                'class': 'django-form-field'
+            }),
+            'post_visibility': forms.Select(attrs={
+                'class': 'django-form-field'
+            }),
+            'edit_permission': forms.Select(attrs={
+                'class': 'django-form-field'
+            }),
+            'invite_permission': forms.Select(attrs={
+                'class': 'django-form-field'
+            }),
         }

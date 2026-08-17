@@ -158,7 +158,7 @@ class NotificationObjectAdapter(PayloadAdapter):
         actors = []
         
         # System notifications use PwaniNet icon instead of user avatar
-        is_system_notification = notification.notification_type in ['RELEASE', 'SYSTEM', 'MAINTENANCE', 'ACCOUNT_VERIFIED']
+        is_system_notification = notification.notification_type in ['SYSTEM', 'MAINTENANCE', 'ACCOUNT_VERIFIED']
         system_avatar = '/static/images/favicon.svg'  # PwaniNet system icon
         
         # For aggregated notifications, get all actors from source events
@@ -501,25 +501,25 @@ class NotificationObjectAdapter(PayloadAdapter):
             'ACCEPT': {
                 'label': 'Accept',
                 'style': 'primary',
-                'url_builder': lambda n: f'/groups/{n.context_id}/accept-invite/' if n.context_type == 'GROUP' and n.context_id else None,
+                'url_builder': lambda n: f'/groups/invite/respond/{n.id}/accept/' if n.id else None,
                 'method': 'POST'
             },
             'DECLINE': {
                 'label': 'Decline',
                 'style': 'danger',
-                'url_builder': lambda n: f'/groups/{n.context_id}/decline-invite/' if n.context_type == 'GROUP' and n.context_id else None,
+                'url_builder': lambda n: f'/groups/invite/respond/{n.id}/decline/' if n.id else None,
                 'method': 'POST'
             },
             'APPROVE': {
                 'label': 'Approve',
                 'style': 'primary',
-                'url_builder': lambda n: f'/groups/{n.context_id}/approve-from-notification/{n.metadata.get("actor_id")}/' if n.context_type == 'GROUP' and n.context_id and n.metadata.get('actor_id') else None,
+                'url_builder': lambda n: f'/groups/{n.context_id}/approve/{n.metadata.get("user_id")}/' if n.context_type == 'GROUP' and n.context_id and n.metadata.get('user_id') else None,
                 'method': 'POST'
             },
             'REJECT': {
                 'label': 'Reject',
                 'style': 'danger',
-                'url_builder': lambda n: f'/groups/{n.context_id}/reject-from-notification/{n.metadata.get("actor_id")}/' if n.context_type == 'GROUP' and n.context_id and n.metadata.get('actor_id') else None,
+                'url_builder': lambda n: f'/groups/{n.context_id}/reject/{n.metadata.get("user_id")}/' if n.context_type == 'GROUP' and n.context_id and n.metadata.get('user_id') else None,
                 'method': 'POST'
             },
             'VIEW_POST': {

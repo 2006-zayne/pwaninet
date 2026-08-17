@@ -6,6 +6,8 @@
     --brand: #2563eb;
     --brand-light: #dbeafe;
     --brand-mid: #bfdbfe;
+    --brand-glow: rgba(37, 99, 235, 0.15);
+    --border-hover: #94a3b8;
     --page-bg: #f8fafc;
     --card-bg: #ffffff;
     --border: #e2e8f0;
@@ -22,6 +24,8 @@
     --brand: #6366f1;
     --brand-light: #312e81;
     --brand-mid: #4338ca;
+    --brand-glow: rgba(99, 102, 241, 0.15);
+    --border-hover: #64748b;
     --page-bg: #18191f;
     --card-bg: #242526;
     --border: #3a3b3c;
@@ -40,18 +44,6 @@
 
   .page-header {
     margin-bottom: 2rem;
-  }
-
-  .page-eyebrow {
-    font-size: 0.62rem;
-    font-weight: 800;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
   }
 
   .page-title {
@@ -96,7 +88,7 @@
   }
 
   .settings-section-body {
-    padding: 1.5rem;
+    padding: 4px;
   }
 
   .settings-section-title {
@@ -120,16 +112,448 @@
     margin-top: 0.25rem;
   }
 
-  .placeholder-section {
-    text-align: center;
-    padding: 3rem 2rem;
+  /* Member list styling */
+  .member-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .member-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--border);
+    border-top: none;
+    transition: all 0.18s ease;
+    background: var(--card-bg);
+  }
+
+  .member-item:first-child {
+    border-top: 1px solid var(--border);
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+  }
+
+  .member-item:last-child {
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+  }
+
+  .member-item:only-child {
+    border-radius: var(--radius-md);
+  }
+
+  .member-item:hover {
+    background: var(--brand-light);
+  }
+
+  /* Search bar styling */
+  .search-container {
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .search-wrapper {
+    position: relative;
+    flex: 1;
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-pill);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    outline: none;
+    background: var(--card-bg);
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .search-input:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-glow);
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 1rem;
+  }
+
+  /* Modal styling */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .modal-overlay.active {
+    display: flex;
+  }
+
+  .modal-content {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .modal-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    line-height: 1;
+  }
+
+  .modal-close:hover {
+    color: var(--text-primary);
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* Friend cards in modal */
+  .friend-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .friend-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+
+  .friend-card:hover {
+    background: var(--brand-light);
+    border-color: var(--brand);
+  }
+
+  .friend-card.selected {
+    background: var(--brand-light);
+    border-color: var(--brand);
+  }
+
+  .friend-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border);
+  }
+
+  .friend-info {
+    flex: 1;
+  }
+
+  .friend-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .friend-username {
+    font-size: 0.75rem;
     color: var(--text-secondary);
   }
 
-  .placeholder-section i {
-    font-size: 3rem;
+  .friend-checkbox {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--brand);
+  }
+
+  .invite-count {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .invite-count strong {
+    color: var(--brand);
+  }
+
+  .modal-search {
     margin-bottom: 1rem;
+  }
+
+  .modal-search input {
+    padding: 0.6rem 1rem 0.6rem 2.2rem;
+    font-size: 0.85rem;
+  }
+
+  .modal-search .search-icon {
+    left: 0.8rem;
+    font-size: 0.9rem;
+  }
+
+  .no-friends {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
+  }
+
+  .no-friends i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
     opacity: 0.5;
+  }
+
+  .member-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+    transition: border-color 0.18s ease;
+  }
+
+  .member-avatar-link {
+    display: block;
+    text-decoration: none;
+  }
+
+  .member-avatar-link:hover .member-avatar {
+    border-color: var(--brand);
+  }
+
+  .member-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .member-name-link {
+    text-decoration: none;
+    display: block;
+  }
+
+  .member-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.15rem;
+    transition: color 0.18s ease;
+  }
+
+  .member-name-link:hover .member-name {
+    color: var(--brand);
+  }
+
+  .member-username {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .member-role {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-pill);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .role-admin {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    color: #92400e;
+    border: 1px solid #f59e0b;
+  }
+
+  [data-theme="dark"] .role-admin {
+    background: linear-gradient(135deg, #451a03 0%, #78350f 100%);
+    color: #fbbf24;
+    border-color: #d97706;
+  }
+
+  .role-moderator {
+    background: var(--brand-light);
+    color: var(--brand);
+    border: 1px solid var(--brand-mid);
+  }
+
+  .role-delegate {
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #0ea5e9;
+  }
+
+  [data-theme="dark"] .role-delegate {
+    background: #0c4a6e;
+    color: #7dd3fc;
+    border-color: #0284c7;
+  }
+
+  .role-member {
+    background: var(--page-bg);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+
+  .member-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .btn-action {
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .btn-role {
+    background: var(--brand-light);
+    color: var(--brand);
+    border: 1px solid var(--brand-mid);
+  }
+
+  .btn-role:hover {
+    background: var(--brand-mid);
+    color: #0f172a;
+  }
+
+  .btn-remove {
+    background: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #ef4444;
+  }
+
+  .btn-remove:hover {
+    background: #fecaca;
+    color: #b91c1c;
+  }
+
+  [data-theme="dark"] .btn-remove {
+    background: #7f1d1d;
+    color: #fca5a5;
+    border-color: #dc2626;
+  }
+
+  [data-theme="dark"] .btn-remove:hover {
+    background: #991b1b;
+    color: #f87171;
+  }
+
+  /* Form styling */
+  .django-form-field {
+    padding: 0.5rem 0.75rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    outline: none;
+    background: var(--card-bg);
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .django-form-field:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-glow);
+  }
+
+  /* Read-only banner */
+  .readonly-banner {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 1px solid #f59e0b;
+    border-radius: var(--radius-md);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  [data-theme="dark"] .readonly-banner {
+    background: linear-gradient(135deg, #451a03 0%, #78350f 100%);
+    border-color: #d97706;
+  }
+
+  .readonly-banner i {
+    font-size: 1.25rem;
+    color: #d97706;
+  }
+
+  .readonly-banner-text {
+    flex: 1;
+  }
+
+  .readonly-banner-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #92400e;
+    margin-bottom: 0.25rem;
+  }
+
+  [data-theme="dark"] .readonly-banner-title {
+    color: #fbbf24;
+  }
+
+  .readonly-banner-desc {
+    font-size: 0.75rem;
+    color: #b45309;
+  }
+
+  [data-theme="dark"] .readonly-banner-desc {
+    color: #d97706;
   }
 
   @media (max-width: 768px) {
@@ -140,6 +564,16 @@
     .settings-section {
       border-left: none;
       border-right: none;
+    }
+
+    .member-item {
+      flex-wrap: wrap;
+    }
+
+    .member-actions {
+      width: 100%;
+      justify-content: flex-end;
+      margin-top: 0.5rem;
     }
   }
 </style>
@@ -161,19 +595,341 @@
       <p class="settings-section-description">Control member access and permissions</p>
     </div>
     <div class="settings-section-body">
-      <div class="placeholder-section">
-        <i class="bi bi-person-gear"></i>
-        <p>User management features coming soon:</p>
-        <ul style="text-align: left; display: inline-block; margin-top: 1rem; color: var(--text-muted);">
-          <li>Remove users from group</li>
-          <li>Freeze users (restrict posting)</li>
-          <li>Assign roles (Admin, Moderator, Member)</li>
-          <li>Reassign roles</li>
-        </ul>
+      <!-- Read-only banner for non-admins -->
+      {% if not is_admin %}
+      <div class="readonly-banner">
+        <i class="bi bi-lock-fill"></i>
+        <div class="readonly-banner-text">
+          <div class="readonly-banner-title">Read-Only Mode</div>
+          <div class="readonly-banner-desc">Only group admins can manage members and roles. Contact an admin to make changes.</div>
+        </div>
       </div>
+      {% endif %}
+
+      <!-- Search bar and invite button -->
+      <div class="search-container">
+        <div class="search-wrapper">
+          <i class="bi bi-search search-icon"></i>
+          <input type="text" id="memberSearch" class="search-input" placeholder="Search members by name or username...">
+        </div>
+        {% if can_invite %}
+        <button type="button" class="btn-action btn-role" id="inviteUsersBtn" style="margin-left: 0.5rem; white-space: nowrap;">
+          <i class="bi bi-person-plus"></i> Invite Users
+        </button>
+        {% endif %}
+      </div>
+
+      <!-- Member list -->
+      <div class="member-list" id="memberList">
+        {% for member in members %}
+        <form method="POST" class="member-item" data-name="{{ member.user.first_name }} {{ member.user.last_name }}" data-username="{{ member.user.username }}">
+          {% csrf_token %}
+          <input type="hidden" name="user_id" value="{{ member.user.id }}">
+          
+          {% if member.user.profile_pic %}
+          <a href="/users/{{ member.user.username }}/" class="member-avatar-link">
+            <img src="{{ member.user.profile_pic.url }}" class="member-avatar" alt="{{ member.user.username }}">
+          </a>
+          {% else %}
+          <a href="/users/{{ member.user.username }}/" class="member-avatar-link">
+            <div class="member-avatar" style="background: var(--brand-light); display: flex; align-items: center; justify-content: center;">
+              <i class="bi bi-person" style="color: var(--brand); font-size: 1.5rem;"></i>
+            </div>
+          </a>
+          {% endif %}
+          
+          <div class="member-info">
+            <a href="/users/{{ member.user.username }}/" class="member-name-link">
+              <div class="member-name">
+                {{ member.user.first_name }} {{ member.user.last_name }}
+                {% if member.user == request.user %}
+                <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;">(You)</span>
+                {% endif %}
+              </div>
+              <div class="member-username">@{{ member.user.username }}</div>
+            </a>
+          </div>
+          
+          <span class="member-role role-{{ member.role.lower }}">
+            {{ member.role }}
+          </span>
+          
+          {% if is_admin %}
+          <div class="member-actions">
+            <select name="role" class="django-form-field">
+              <option value="MEMBER" {% if member.role == 'MEMBER' %}selected{% endif %}>Member</option>
+              <option value="DELEGATE" {% if member.role == 'DELEGATE' %}selected{% endif %}>Delegate</option>
+              <option value="MODERATOR" {% if member.role == 'MODERATOR' %}selected{% endif %}>Moderator</option>
+              <option value="ADMIN" {% if member.role == 'ADMIN' %}selected{% endif %}>Admin</option>
+            </select>
+            <button type="submit" name="action" value="assign_role" class="btn-action btn-role">
+              <i class="bi bi-check-lg"></i> Update
+            </button>
+            {% if member.user != request.user %}
+            <button type="submit" name="action" value="remove_member" class="btn-action btn-remove" onclick="return confirm('Are you sure you want to remove {{ member.user.username }} from the group?');">
+              <i class="bi bi-trash"></i> Remove
+            </button>
+            {% endif %}
+          </div>
+          {% endif %}
+        </form>
+        {% empty %}
+        <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+          <i class="bi bi-people" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+          <p>No members in this group yet.</p>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Pagination -->
+      {% if members.has_other_pages %}
+      <div style="display: flex; justify-content: center; align-items: center; gap: 0.5rem; padding: 1rem; margin-top: 1rem;">
+        {% if members.has_previous %}
+        <a href="?page={{ members.previous_page_number }}" class="btn-action btn-role" style="text-decoration: none;">
+          <i class="bi bi-chevron-left"></i> Previous
+        </a>
+        {% endif %}
+        
+        <span style="font-size: 0.85rem; color: var(--text-secondary);">
+          Page {{ members.number }} of {{ members.paginator.num_pages }}
+        </span>
+        
+        {% if members.has_next %}
+        <a href="?page={{ members.next_page_number }}" class="btn-action btn-role" style="text-decoration: none;">
+          Next <i class="bi bi-chevron-right"></i>
+        </a>
+        {% endif %}
+      </div>
+      {% endif %}
     </div>
   </div>
 
 </div>
+
+<!-- Invite Users Modal -->
+<div class="modal-overlay" id="inviteModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 class="modal-title">Invite Users to Group</h3>
+      <button class="modal-close" id="closeModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-search">
+        <div class="search-wrapper">
+          <i class="bi bi-search search-icon"></i>
+          <input type="text" id="friendSearch" class="search-input" placeholder="Search friends...">
+        </div>
+      </div>
+      <div class="friend-list" id="friendList">
+        <div class="no-friends">
+          <i class="bi bi-people"></i>
+          <p>Loading friends...</p>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div class="invite-count">
+        Selected: <strong id="selectedCount">0</strong>/10
+      </div>
+      <button type="button" class="btn-action btn-role" id="sendInvitesBtn" disabled>
+        <i class="bi bi-send"></i> Send Invites
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('memberSearch');
+    const memberList = document.getElementById('memberList');
+    const memberItems = memberList.querySelectorAll('.member-item');
+
+    // Member search functionality
+    searchInput.addEventListener('input', function() {
+      const searchTerm = this.value.toLowerCase().trim();
+
+      memberItems.forEach(function(item) {
+        const name = item.dataset.name.toLowerCase();
+        const username = item.dataset.username.toLowerCase();
+
+        if (name.includes(searchTerm) || username.includes(searchTerm)) {
+          item.style.display = 'flex';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    });
+
+    // Modal functionality
+    const inviteBtn = document.getElementById('inviteUsersBtn');
+    const modal = document.getElementById('inviteModal');
+    const closeModal = document.getElementById('closeModal');
+    const friendList = document.getElementById('friendList');
+    const friendSearch = document.getElementById('friendSearch');
+    const selectedCount = document.getElementById('selectedCount');
+    const sendInvitesBtn = document.getElementById('sendInvitesBtn');
+
+    let selectedFriends = new Set();
+    let allFriends = [];
+
+    // Open modal
+    inviteBtn.addEventListener('click', function() {
+      modal.classList.add('active');
+      loadFriends();
+    });
+
+    // Close modal
+    closeModal.addEventListener('click', function() {
+      modal.classList.remove('active');
+    });
+
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) {
+        modal.classList.remove('active');
+      }
+    });
+
+    // Load friends from API
+    function loadFriends() {
+      const groupId = '{{ group.id }}';
+      fetch(`/groups/api/groups/${groupId}/mutual-friends/`)
+        .then(response => response.json())
+        .then(data => {
+          allFriends = data.friends;
+          renderFriends(allFriends);
+        })
+        .catch(error => {
+          friendList.innerHTML = `
+            <div class="no-friends">
+              <i class="bi bi-exclamation-triangle"></i>
+              <p>Error loading friends</p>
+            </div>
+          `;
+        });
+    }
+
+    // Render friend cards
+    function renderFriends(friends) {
+      if (friends.length === 0) {
+        friendList.innerHTML = `
+          <div class="no-friends">
+            <i class="bi bi-people"></i>
+            <p>No mutual friends available to invite</p>
+          </div>
+        `;
+        return;
+      }
+
+      friendList.innerHTML = friends.map(friend => `
+        <div class="friend-card ${selectedFriends.has(friend.id) ? 'selected' : ''}" data-id="${friend.id}">
+          ${friend.profile_pic ? 
+            `<img src="${friend.profile_pic}" class="friend-avatar" alt="${friend.username}">` :
+            `<div class="friend-avatar" style="background: var(--brand-light); display: flex; align-items: center; justify-content: center;">
+              <i class="bi bi-person" style="color: var(--brand); font-size: 1.2rem;"></i>
+            </div>`
+          }
+          <div class="friend-info">
+            <div class="friend-name">${friend.first_name} ${friend.last_name}</div>
+            <div class="friend-username">@${friend.username}</div>
+          </div>
+          <input type="checkbox" class="friend-checkbox" ${selectedFriends.has(friend.id) ? 'checked' : ''}>
+        </div>
+      `).join('');
+
+      // Add click handlers
+      document.querySelectorAll('.friend-card').forEach(card => {
+        card.addEventListener('click', function(e) {
+          if (e.target.classList.contains('friend-checkbox')) {
+            e.stopPropagation();
+          }
+          const friendId = parseInt(this.dataset.id);
+          const checkbox = this.querySelector('.friend-checkbox');
+          
+          if (selectedFriends.has(friendId)) {
+            selectedFriends.delete(friendId);
+            this.classList.remove('selected');
+            checkbox.checked = false;
+          } else {
+            if (selectedFriends.size >= 10) {
+              alert('Maximum 10 invites at once');
+              return;
+            }
+            selectedFriends.add(friendId);
+            this.classList.add('selected');
+            checkbox.checked = true;
+          }
+          
+          updateSelectedCount();
+        });
+      });
+    }
+
+    // Friend search in modal
+    friendSearch.addEventListener('input', function() {
+      const searchTerm = this.value.toLowerCase().trim();
+      const filteredFriends = allFriends.filter(friend => 
+        friend.first_name.toLowerCase().includes(searchTerm) ||
+        friend.last_name.toLowerCase().includes(searchTerm) ||
+        friend.username.toLowerCase().includes(searchTerm)
+      );
+      renderFriends(filteredFriends);
+    });
+
+    // Update selected count
+    function updateSelectedCount() {
+      selectedCount.textContent = selectedFriends.size;
+      sendInvitesBtn.disabled = selectedFriends.size === 0;
+    }
+
+    // Send invites
+    sendInvitesBtn.addEventListener('click', function() {
+      const groupId = '{{ group.id }}';
+      const selectedIds = Array.from(selectedFriends);
+      
+      console.log('DEBUG: Sending invites for user_ids:', selectedIds);
+      
+      fetch(`/groups/api/groups/${groupId}/send-invites/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+          user_ids: selectedIds
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        console.log('DEBUG: Response from server:', data);
+        if (data.success) {
+          if (data.sent_count > 0) {
+            alert(`Invites sent to ${data.sent_count} users`);
+            modal.classList.remove('active');
+            selectedFriends.clear();
+            updateSelectedCount();
+          } else {
+            let errorMsg = `No invites sent. `;
+            if (data.skipped_count > 0) {
+              errorMsg += `${data.skipped_count} users already members. `;
+            }
+            if (data.not_found_count > 0) {
+              errorMsg += `${data.not_found_count} users not found. `;
+            }
+            if (data.errors && data.errors.length > 0) {
+              errorMsg += `\n\nDetails:\n${data.errors.join('\n')}`;
+            }
+            alert(errorMsg);
+          }
+        } else {
+          alert(data.error || 'Error sending invites');
+        }
+      })
+      .catch(error => {
+        console.error('DEBUG: Error sending invites:', error);
+        alert('Error sending invites');
+      });
+    });
+  });
+</script>
 
 {% endblock %}

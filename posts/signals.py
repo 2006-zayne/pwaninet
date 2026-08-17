@@ -156,9 +156,53 @@ def repost_created(sender, instance, created, **kwargs):
 
 
 @receiver(post_save, sender=Post)
-def post_repost_created(sender, instance, created, **kwargs):
-    """Emit event when a post is reposted via Post.repost_of field."""
-    if created and instance.repost_of:
+def post_created(sender, instance, created, **kwargs):
+    """Emit event when a post is created."""
+    if created and not instance.repost_of:
+        # This is a new post (not a repost)
+        logger.info(f'[post_created] Signal triggered, created={created}, author={instance.author.username}')
+        
+        # Get thumbnail URL for notification preview
+        thumbnail_url = None
+        if instance.thumbnail:
+            thumbnail_url = instance.thumbnail.url
+        elif instance.images.exists():
+            thumbnail_url = instance.images.first().get_thumbnail_url('400')
+        elif instance.video_poster:
+            thumbnail_url = instance.video_poster.url
+        elif instance.shared_document:
+            try:
+                from documents.models import DocumentFile
+                if instance.shared_document.latest_version:
+                    first_file = instance.shared_document.latest_version.files.first()
+                    if first_file and first_file.preview_path:
+                        thumbnail_url = f"/media/{first_file.preview_path}"
+            except:
+                pass
+        
+        logger.info(f'[post_created] Publishing event for new post by {instance.author.username}')
+        
+        publish_event(
+            event_type=EventTypes.POSTS_POST_CREATED.value,
+            source=EventSources.POSTS.value,
+            action=EventActions.CREATED.value,
+            actor=instance.author,
+            target_type='Post',
+            target_id=str(instance.id),
+            context_type='POST',
+            context_id=str(instance.id),
+            metadata={
+                'actor_username': instance.author.username,
+                'post_content': instance.content[:100] if instance.content else '',
+                'thumbnail_url': thumbnail_url,
+                'resource_type': 'POST',
+                'group_id': str(instance.group.id) if instance.group else None,
+            }
+        )
+        
+        logger.info(f'[post_created] Event published successfully')
+    elif created and instance.repost_of:
+        # This is a repost via Post.repost_of field
         logger.info(f'[post_repost_created] Signal triggered, created={created}, reposter={instance.author.username}')
         
         original_post = instance.repost_of

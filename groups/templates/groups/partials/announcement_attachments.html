@@ -1,0 +1,27 @@
+{% load static %}
+{% if announcement.attachments.all %}
+<div>
+    <div class="row g-2">
+        {% for attachment in announcement.attachments.all %}
+            <div class="col-12 p-0">
+                {% if attachment.attachment_type == 'document' and attachment.document %}
+                    <!-- Document attachment - use document preview template -->
+                    <a href="{% url 'documents:document_detail' attachment.document.id %}" class="text-decoration-none">
+                        {% include "documents/partials/document_preview_compact.html" with document=attachment.document %}
+                    </a>
+                {% elif attachment.attachment_type == 'image' and attachment.file %}
+                    <!-- Image attachment - use thumbnail with full-screen viewer -->
+                    <div class="position-relative">
+                        <a href="{{ attachment.file.url }}" data-lightbox="announcement-{{ announcement.id }}" class="text-decoration-none">
+                            <img src="{% if attachment.thumbnail %}{{ attachment.thumbnail.url }}{% else %}{{ attachment.file.url }}{% endif %}" 
+                                 alt="{{ attachment.file.name }}" 
+                                 class="img-fluid rounded-2"
+                                 style="aspect-ratio: 16/10; object-fit: cover; width: 100%;">
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
