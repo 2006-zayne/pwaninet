@@ -191,6 +191,15 @@
         video.addEventListener('play', () => {
             videoData.isPlaying = true;
             videoData.hasStarted = true;
+
+            // Enforce single-video playback - pause all other videos
+            if (state.currentPlayingVideo && state.currentPlayingVideo !== video) {
+                const currentData = state.videos.get(state.currentPlayingVideo);
+                if (currentData) {
+                    pauseVideo(state.currentPlayingVideo, currentData);
+                }
+            }
+            state.currentPlayingVideo = video;
         });
 
         // Pause event
