@@ -122,6 +122,20 @@ class PostCreateSerializer(serializers.ModelSerializer):
                 )
         return value
 
+    def validate(self, attrs):
+        # Ensure post has at least some content
+        has_content = bool(attrs.get('content'))
+        has_images = bool(attrs.get('images'))
+        has_video = bool(attrs.get('video'))
+        has_docs = bool(attrs.get('docs'))
+        has_audio = bool(attrs.get('audio'))
+        
+        if not (has_content or has_images or has_video or has_docs or has_audio):
+            raise serializers.ValidationError(
+                "Post must have at least text content, images, video, documents, or audio."
+            )
+        return attrs
+
     def create(self, validated_data):
         import logging
         logger = logging.getLogger(__name__)

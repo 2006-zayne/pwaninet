@@ -918,9 +918,26 @@ def toggle_like(request, post_id):
 
 @login_required
 def post_likers_list(request, post_id):
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
     post = get_object_or_404(Post, id=post_id)
-    likers = User.objects.filter(like__post=post) if hasattr(User, "like_set") else User.objects.filter(id__in=post.likes.values_list("user_id", flat=True))
-    return render(request, 'posts/partials/likers_modal_content.html', {'likers': likers})
+    likers = User.objects.filter(id__in=post.likes.values_list("user_id", flat=True)).order_by('username')
+    
+    page = request.GET.get('page', 1)
+    paginator = Paginator(likers, 20)  # Show 20 likers per page
+    
+    try:
+        likers_page = paginator.page(page)
+    except PageNotAnInteger:
+        likers_page = paginator.page(1)
+    except EmptyPage:
+        likers_page = paginator.page(paginator.num_pages)
+    
+    return render(request, 'posts/partials/likers_modal_content.html', {
+        'likers': likers_page,
+        'page_obj': likers_page,
+        'paginator': paginator,
+        'post': post
+    })
 
 
 @login_required

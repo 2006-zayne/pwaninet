@@ -263,6 +263,28 @@
     color: #ef4444 !important;
   }
 
+  /* Engagement button pills */
+  .engagement-button {
+    background-color: #e9ecef;
+    border-radius: 999px;
+    height: 42px;
+    padding: 0 16px;
+    transition: all 0.2s ease;
+  }
+
+  .engagement-button:hover {
+    background-color: #dee2e6;
+    transform: scale(1.02);
+  }
+
+  [data-theme="dark"] .engagement-button {
+    background-color: #3a3b3c !important;
+  }
+
+  [data-theme="dark"] .engagement-button:hover {
+    background-color: #4e4f50 !important;
+  }
+
   /* Reduce post card margin by half */
   .post-card {
     margin-bottom: 0.125rem !important; /* Half of mb-1 (4px -> 2px) */
@@ -559,30 +581,30 @@
     {% endif %}
 
     <div class="d-flex align-items-center justify-content-between px-3 py-2 border-top">
-        <div class="d-flex align-items-center gap-4">
+        <div class="d-flex align-items-center gap-2">
             <div id="like-section-{{ post.id }}">
                 {% include "posts/partials/like_button.html" with post=post %}
             </div>
-            <a href="{% url 'posts:post_details' post.id %}" class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none">
+            <a href="{% url 'posts:post_details' post.id %}" class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button">
                 <i class="bi bi-chat-dots fs-5"></i>
                 <span class="fw-bold">{{ post.comments.count }}</span>
             </a>
-            <button id="repost-btn-{{ post.id }}" class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none"
+            <button id="repost-btn-{{ post.id }}" class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button"
                     data-bs-toggle="modal" data-bs-target="#repostModal-{{ post.id }}">
                 <i class="bi bi-repeat fs-5"></i>
                 <span class="fw-bold">{{ post.repost_count }}</span>
             </button>
-            <button class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none"
+            <button class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button"
                     data-bs-toggle="modal" data-bs-target="#shareModal-{{ post.id }}">
                 <i class="bi bi-share fs-5"></i>
                 <span class="fw-bold">{% trans "Share" %}</span>
             </button>
             {% if post.shared_document %}
-                <span class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none">
+                <span class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button">
                     <i class="bi bi-hand-thumbs-up fs-5"></i>
                     <span class="fw-bold">{% if post.shared_document.analytics %}{{ post.shared_document.analytics.positive_rating_percentage }}{% else %}0{% endif %}%</span>
                 </span>
-                <span class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none">
+                <span class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button">
                     <i class="bi bi-hand-thumbs-down fs-5"></i>
                     <span class="fw-bold">{% if post.shared_document.analytics %}{{ post.shared_document.analytics.negative_rating_percentage }}{% else %}0{% endif %}%</span>
                 </span>

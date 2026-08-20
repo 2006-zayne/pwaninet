@@ -32,7 +32,7 @@ class Post(models.Model):
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='posts')
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE, null=True, blank=True)
     unit = models.ForeignKey('courses.Unit', on_delete=models.SET_NULL, null=True, blank=True)
-    content = models.TextField()
+    content = models.TextField(blank=True, null=True)
     video = models.FileField(upload_to='posts/videos', blank=True, null=True)
     video_preview = models.FileField(upload_to='posts/videos/previews', blank=True, null=True)
     video_poster = models.ImageField(upload_to='posts/videos/posters', blank=True, null=True)
