@@ -25,6 +25,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from notifications import views as notification_views
 from core.views import skeleton_preview, skeleton_template
+from users.views import toggle_profile_photo_like
 
 # PWA Manifest - served as static file to bypass auth middleware
 @require_http_methods(["GET", "HEAD"])
@@ -102,6 +103,8 @@ urlpatterns = [
     path('api/push/vapid-public-key/', notification_views.VapidPublicKeyView.as_view(), name='vapid_public_key'),
     path('api/push/subscribe/', notification_views.SubscribeView.as_view(), name='push_subscribe'),
     path('api/push/unsubscribe/', notification_views.UnsubscribeView.as_view(), name='push_unsubscribe'),
+    # User photo like API
+    path('api/users/<str:username>/photos/<str:photo_type>/like/', toggle_profile_photo_like, name='toggle_profile_photo_like'),
     # Domain app URLs
     path('', include(('posts.urls', 'posts'), namespace='posts')),
     path('users/', include(('users.urls', 'users'), namespace='users')),

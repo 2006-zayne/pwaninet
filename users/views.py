@@ -131,6 +131,9 @@ def profile_view(request, username):
     paginator = Paginator(posts_queryset, posts_per_page)
     posts_page = paginator.get_page(page)
     
+    # Get liked post IDs for the current user
+    liked_post_ids = set(Like.objects.filter(user=request.user, post__in=posts_queryset).values_list('post_id', flat=True))
+    
     is_following = Follow.objects.filter(follower=request.user, followed=profile_user).exists()
     
     # Get shared posts for this profile user
@@ -154,6 +157,7 @@ def profile_view(request, username):
             'has_more_posts': posts_page.has_next(),
             'profile_user': profile_user,
             'posts': posts_page,
+            'liked_post_ids': liked_post_ids,
         })
     
     return render(request, 'users/profile.html', {
@@ -170,6 +174,7 @@ def profile_view(request, username):
         'is_own_profile': is_own_profile,
         'profile_completion': profile_completion,
         'has_more_posts': posts_page.has_next(),
+        'liked_post_ids': liked_post_ids,
     })
 
 
@@ -1234,6 +1239,53 @@ def view_profile_photo_fullscreen(request, username, photo_type):
         'like_count': like_count,
         'is_liked': is_liked,
     })
+
+
+@login_required
+def toggle_profile_photo_like(request, username, photo_type):
+    """
+    Toggle like status for a user's profile or cover photo.
+    API endpoint for fullscreen photo view.
+    """
+    profile_user = get_object_or_404(User, username=username)
+    
+    # Validate photo type
+    if photo_type not in ['profile', 'cover']:
+        return JsonResponse(
+            {'detail': 'Invalid photo type. Must be profile or cover.'},
+            status=400
+        )
+    
+    # Check if photo exists
+    if photo_type == 'cover' and not profile_user.cover_photo:
+        return JsonResponse(
+            {'detail': 'This user does not have a cover photo.'},
+            status=404
+        )
+    
+    from .models import UserProfilePhotoLike
+    like, created = UserProfilePhotoLike.objects.get_or_create(
+        user=request.user,
+        profile_user=profile_user,
+        photo_type=photo_type
+    )
+    
+    likes_count = UserProfilePhotoLike.objects.filter(
+        profile_user=profile_user,
+        photo_type=photo_type
+    ).count()
+    
+    if created:
+        return JsonResponse(
+            {'detail': 'Photo liked.', 'likes_count': likes_count},
+            status=201
+        )
+    else:
+        like.delete()
+        return JsonResponse(
+            {'detail': 'Photo unliked.', 'likes_count': likes_count},
+            status=200
+        )
 
 
 # API ViewSets

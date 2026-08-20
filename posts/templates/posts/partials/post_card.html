@@ -254,8 +254,21 @@
     background-color: #2563eb !important;
     border-color: #2563eb !important;
   }
+
+  /* Ensure liked button shows red color in dark mode */
+  [data-theme="dark"] .like-button.text-danger {
+    color: #ef4444 !important;
+  }
+  [data-theme="dark"] .like-button.text-danger i {
+    color: #ef4444 !important;
+  }
+
+  /* Reduce post card margin by half */
+  .post-card {
+    margin-bottom: 0.125rem !important; /* Half of mb-1 (4px -> 2px) */
+  }
 </style>
-<div id="post-card-{{ post.id }}" class="post-card shadow-sm mb-2 bg-white rounded-3 overflow-hidden border-0">
+<div id="post-card-{{ post.id }}" class="post-card shadow-sm mb-1 bg-white rounded-3 overflow-hidden border-0">
     {% if post.repost_of %}
     <!-- Repost Header -->
     <div class="d-flex align-items-center p-2 border-bottom bg-light">

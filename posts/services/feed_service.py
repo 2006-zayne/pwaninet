@@ -89,7 +89,13 @@ def build_home_feed_context(user, cursor=None, limit=10):
     posts = feed_data['posts']
     post_ids = [p.id for p in posts]
     liked_post_ids = get_liked_post_ids_for_user(user, post_ids)
-    following_ids = get_following_ids(user)
+    
+    # Cache following_ids for 60 seconds to reduce database queries
+    following_ids_cache_key = f'feed:following_ids:{user.id}'
+    following_ids = cache.get(following_ids_cache_key)
+    if following_ids is None:
+        following_ids = get_following_ids(user)
+        cache.set(following_ids_cache_key, following_ids, timeout=60)
     
     # Only include group suggestions on initial load (no cursor)
     is_initial_load = cursor is None
@@ -103,11 +109,22 @@ def build_home_feed_context(user, cursor=None, limit=10):
     }
     
     if is_initial_load:
-        suggested_groups = get_suggested_groups(user, following_ids)
+        # Cache suggested groups for 5 minutes
+        suggested_groups_cache_key = f'feed:suggested_groups:{user.id}'
+        suggested_groups = cache.get(suggested_groups_cache_key)
+        if suggested_groups is None:
+            suggested_groups = get_suggested_groups(user, following_ids)
+            cache.set(suggested_groups_cache_key, list(suggested_groups), timeout=300)
         context['suggested_groups'] = suggested_groups
     
     # Friend suggestions appear in feed on all loads (initial and paginated)
-    user_suggestions = get_user_suggestions_from_groups(user)
+    # Cache user suggestions for 5 minutes
+    user_suggestions_cache_key = f'feed:user_suggestions:{user.id}'
+    user_suggestions = cache.get(user_suggestions_cache_key)
+    if user_suggestions is None:
+        user_suggestions = get_user_suggestions_from_groups(user)
+        cache.set(user_suggestions_cache_key, list(user_suggestions), timeout=300)
+    
     context['suggested_users'] = user_suggestions
     context['following_ids'] = following_ids
     context['suggestion_index'] = random.randint(2, 6) if user_suggestions else None
