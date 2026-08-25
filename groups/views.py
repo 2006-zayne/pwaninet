@@ -1,20 +1,31 @@
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework import viewsets, status, filters
+from rest_framework.decorators import action, api_view, permission_classes, parser_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
+from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q, Count
 from django.db import transaction
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
-from .models import Group, Membership, MembershipRole, MembershipStatus, JoinPolicy, EditPermission, InvitePermission, Announcement
+from .models import (
+    Group, Membership, MembershipRole, MembershipStatus, JoinPolicy,
+    EditPermission, InvitePermission, Announcement,
+    GroupMessage, GroupMessageAttachment, GroupMessageReaction
+)
 from .serializers import (
     GroupSerializer, GroupCreateSerializer, MembershipSerializer,
     MembershipCreateSerializer, MembershipActionSerializer, RoleAssignmentSerializer,
-    AnnouncementSerializer, AnnouncementCreateSerializer, AnnouncementUpdateSerializer
+    AnnouncementSerializer, AnnouncementCreateSerializer, AnnouncementUpdateSerializer,
+    GroupMessageSerializer, GroupMessageCreateSerializer,
+    GroupMessageAttachmentSerializer, GroupMessageReactionSerializer
 )
 from .permissions import (
     CanManageGroup, CanManageMembership, CanJoinOfficialGroup,
@@ -855,6 +866,298 @@ def create_group_view(request):
     else:
         form = GroupForm()
     return render(request, 'groups/create_group.html', {'form': form})
+
+
+# ============================================================================
+# GROUP CHAT API VIEWS
+# ============================================================================
+
+class GroupMessageViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing group messages"""
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['group', 'message_type', 'status']
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        """Return messages for groups the user is a member of"""
+        user_groups = Group.objects.filter(
+            memberships__user=self.request.user,
+            memberships__status=MembershipStatus.APPROVED
+        )
+        return GroupMessage.objects.filter(group__in=user_groups).select_related(
+            'sender', 'reply_to'
+        ).prefetch_related('attachments', 'reactions')
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return GroupMessageCreateSerializer
+        return GroupMessageSerializer
+
+    def perform_create(self, serializer):
+        """Create a new message and broadcast via WebSocket"""
+        group_id = self.kwargs.get('group_id')
+        message = serializer.save(
+            group_id=group_id,
+            sender=self.request.user
+        )
+
+        # Broadcast message to group via WebSocket
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'group_{group_id}',
+            {
+                'type': 'group_message',
+                'message': GroupMessageSerializer(message).data
+            }
+        )
+        return message
+
+    @action(detail=True, methods=['post'], url_path='react')
+    def react(self, request, pk=None):
+        """Add or remove a reaction to a message"""
+        message = self.get_object()
+        emoji = request.data.get('emoji')
+
+        if not emoji:
+            return Response(
+                {'error': 'emoji is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if user is a member of the group
+        if not Membership.objects.filter(
+            user=request.user,
+            group=message.group,
+            status=MembershipStatus.APPROVED
+        ).exists():
+            return Response(
+                {'error': 'You must be a member of this group to react'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Toggle reaction
+        reaction, created = GroupMessageReaction.objects.get_or_create(
+            message=message,
+            user=request.user,
+            emoji=emoji
+        )
+
+        if not created:
+            reaction.delete()
+            return Response({'status': 'removed'}, status=status.HTTP_200_OK)
+
+        # Broadcast reaction update
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'group_{message.group.id}',
+            {
+                'type': 'group_reaction',
+                'message_id': message.id,
+                'reaction': GroupMessageReactionSerializer(reaction).data
+            }
+        )
+
+        return Response(
+            GroupMessageReactionSerializer(reaction).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=['post'], url_path='mark-read')
+    def mark_read(self, request, pk=None):
+        """Mark a message as read"""
+        message = self.get_object()
+
+        # Check if user is a member of the group
+        if not Membership.objects.filter(
+            user=request.user,
+            group=message.group,
+            status=MembershipStatus.APPROVED
+        ).exists():
+            return Response(
+                {'error': 'You must be a member of this group'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        message.status = 'read'
+        message.save()
+
+        return Response({'status': 'marked as read'}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def group_attachment_upload(request):
+    """Upload a single attachment for a group message"""
+    group_id = request.data.get('group_id')
+    message_id = request.data.get('message_id')
+    file = request.data.get('file')
+
+    if not group_id or not file:
+        return Response(
+            {'error': 'group_id and file are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Check if user is a member of the group
+    if not Membership.objects.filter(
+        user=request.user,
+        group_id=group_id,
+        status=MembershipStatus.APPROVED
+    ).exists():
+        return Response(
+            {'error': 'You must be a member of this group to upload attachments'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Create or get message
+    if message_id:
+        try:
+            message = GroupMessage.objects.get(id=message_id, group_id=group_id)
+        except GroupMessage.DoesNotExist:
+            return Response(
+                {'error': 'Message not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    else:
+        message = GroupMessage.objects.create(
+            group_id=group_id,
+            sender=request.user,
+            message_type='media_group'
+        )
+
+    # Determine attachment type
+    content_type = file.content_type
+    if content_type.startswith('image/'):
+        attachment_type = 'image'
+    elif content_type.startswith('video/'):
+        attachment_type = 'video'
+    elif content_type.startswith('audio/'):
+        attachment_type = 'audio'
+    else:
+        attachment_type = 'document'
+
+    # Create attachment
+    attachment = GroupMessageAttachment.objects.create(
+        message=message,
+        attachment_type=attachment_type,
+        file=file
+    )
+
+    # Broadcast message update
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f'group_{group_id}',
+        {
+            'type': 'group_message',
+            'message': GroupMessageSerializer(message).data
+        }
+    )
+
+    return Response(
+        GroupMessageAttachmentSerializer(attachment).data,
+        status=status.HTTP_201_CREATED
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def group_batch_attachment_upload(request):
+    """Batch upload attachments for a group message (media groups)"""
+    group_id = request.data.get('group_id')
+    files = request.FILES.getlist('files')
+    global_caption = request.data.get('global_caption', '')
+
+    if not group_id or not files:
+        return Response(
+            {'error': 'group_id and files are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Check if user is a member of the group
+    if not Membership.objects.filter(
+        user=request.user,
+        group_id=group_id,
+        status=MembershipStatus.APPROVED
+    ).exists():
+        return Response(
+            {'error': 'You must be a member of this group to upload attachments'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Create message
+    message = GroupMessage.objects.create(
+        group_id=group_id,
+        sender=request.user,
+        content=global_caption,
+        message_type='media_group'
+    )
+
+    # Create attachments
+    attachments_data = []
+    for index, file in enumerate(files):
+        content_type = file.content_type
+        if content_type.startswith('image/'):
+            attachment_type = 'image'
+        elif content_type.startswith('video/'):
+            attachment_type = 'video'
+        elif content_type.startswith('audio/'):
+            attachment_type = 'audio'
+        else:
+            attachment_type = 'document'
+
+        attachment = GroupMessageAttachment.objects.create(
+            message=message,
+            attachment_type=attachment_type,
+            file=file,
+            order=index
+        )
+        attachments_data.append(GroupMessageAttachmentSerializer(attachment).data)
+
+    # Broadcast message
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f'group_{group_id}',
+        {
+            'type': 'group_message',
+            'message': GroupMessageSerializer(message).data
+        }
+    )
+
+    return Response(
+        {
+            'message': GroupMessageSerializer(message).data,
+            'attachments': attachments_data
+        },
+        status=status.HTTP_201_CREATED
+    )
+
+
+@login_required
+def group_chat_view(request, group_id):
+    """Web view for group chat"""
+    group = get_object_or_404(
+        Group.objects.annotate(member_count=Count('memberships', filter=Q(memberships__status=MembershipStatus.APPROVED))),
+        id=group_id
+    )
+
+    # Check if user is a member
+    if not Membership.objects.filter(
+        user=request.user,
+        group=group,
+        status=MembershipStatus.APPROVED
+    ).exists():
+        messages.error(request, 'You must be a member of this group to access the chat.')
+        return redirect('groups:groups_detail', group_id=group_id)
+
+    context = {
+        'group': group,
+        'unread_notifications_count': get_cached_unread_count(request.user),
+    }
+    return render(request, 'groups/group_chat.html', context)
 
 
 @login_required

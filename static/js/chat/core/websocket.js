@@ -8,6 +8,7 @@ export class WebSocketManager {
     constructor() {
         this.socket = null;
         this.conversationId = null;
+        this.customWsUrl = null;
         this.reconnectAttempts = 0;
         this.reconnectTimer = null;
         this.messageCallback = null;
@@ -29,11 +30,13 @@ export class WebSocketManager {
     /**
      * Initialize WebSocket connection
      * @param {number} conversationId - Conversation ID
+     * @param {string} customWsUrl - Optional custom WebSocket URL (for group chats)
      */
-    init(conversationId) {
-        this._log('WEBSOCKET_INIT', { conversationId });
+    init(conversationId, customWsUrl = null) {
+        this._log('WEBSOCKET_INIT', { conversationId, customWsUrl });
         
         this.conversationId = conversationId;
+        this.customWsUrl = customWsUrl;
         
         this.connect();
     }
@@ -141,7 +144,11 @@ export class WebSocketManager {
         const socketId = ++this.currentSocketId;
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/chat/${this.conversationId}/`;
+        
+        // Use custom WebSocket URL for group chats, otherwise use default direct chat URL
+        const wsUrl = this.customWsUrl 
+            ? `${this.customWsUrl}`
+            : `${protocol}//${window.location.host}/ws/chat/${this.conversationId}/`;
 
         this.socket = new WebSocket(wsUrl);
 

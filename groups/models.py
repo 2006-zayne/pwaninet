@@ -167,7 +167,7 @@ class GroupPhotoLike(models.Model):
         ('group', 'Group Photo'),
         ('cover', 'Cover Photo'),
     ]
-    
+
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='group_photo_likes', db_index=True)
     group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='photo_likes', db_index=True)
     photo_type = models.CharField(max_length=10, choices=PHOTO_TYPE_CHOICES, db_index=True)
@@ -183,3 +183,93 @@ class GroupPhotoLike(models.Model):
 
     def __str__(self):
         return f"{self.user.username} likes {self.group.name}'s {self.photo_type} photo"
+
+
+class GroupMessage(models.Model):
+    """Messages in group chats"""
+    MESSAGE_TYPE_CHOICES = [
+        ('text', 'Text'),
+        ('media_group', 'Media Group'),
+        ('system', 'System'),
+        ('audio', 'Audio'),
+    ]
+
+    STATUS_CHOICES = [
+        ('sent', 'Sent'),
+        ('delivered', 'Delivered'),
+        ('read', 'Read'),
+    ]
+
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='messages', db_index=True)
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sent_group_messages', db_index=True)
+    content = models.TextField(blank=True, null=True)
+    message_type = models.CharField(max_length=20, choices=MESSAGE_TYPE_CHOICES, default='text')
+    reply_to = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='replies')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='sent')
+
+    class Meta:
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['group', '-created_at']),
+            models.Index(fields=['sender', '-created_at']),
+            models.Index(fields=['group', 'status']),
+        ]
+
+    def __str__(self):
+        return f"{self.sender.username} in {self.group.name}: {self.content[:50] if self.content else '[media]'}"
+
+
+class GroupMessageAttachment(models.Model):
+    """Attachments for group messages"""
+    ATTACHMENT_TYPE_CHOICES = [
+        ('image', 'Image'),
+        ('video', 'Video'),
+        ('audio', 'Audio'),
+        ('document', 'Document'),
+    ]
+
+    message = models.ForeignKey(GroupMessage, on_delete=models.CASCADE, related_name='attachments', db_index=True)
+    attachment_type = models.CharField(max_length=20, choices=ATTACHMENT_TYPE_CHOICES)
+    file = models.FileField(upload_to='group_message_attachments/%Y/%m/%d/')
+    thumbnail = models.ImageField(upload_to='group_message_thumbnails/%Y/%m/%d/', blank=True, null=True)
+    caption = models.TextField(blank=True, null=True)
+    order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['order', 'created_at']
+        indexes = [
+            models.Index(fields=['message', 'order']),
+        ]
+
+    def __str__(self):
+        return f"{self.attachment_type} for message {self.message.id}"
+
+
+class GroupMessageReaction(models.Model):
+    """Reactions to group messages"""
+    EMOJI_CHOICES = [
+        ('👍', 'Thumbs Up'),
+        ('❤️', 'Heart'),
+        ('😂', 'Laugh'),
+        ('😮', 'Wow'),
+        ('😢', 'Sad'),
+        ('😡', 'Angry'),
+    ]
+
+    message = models.ForeignKey(GroupMessage, on_delete=models.CASCADE, related_name='reactions', db_index=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='group_message_reactions', db_index=True)
+    emoji = models.CharField(max_length=10, choices=EMOJI_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        unique_together = ('message', 'user', 'emoji')
+        indexes = [
+            models.Index(fields=['message', 'emoji']),
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} reacted {self.emoji} to message {self.message.id}"

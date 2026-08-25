@@ -6,8 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PwaniNet - Offline</title>
     <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
-    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
     
     <script>
         // Set theme immediately to prevent flash - matching base.html logic
@@ -118,6 +116,42 @@
             align-items: center;
         }
 
+        .action-button {
+            background: transparent;
+            color: var(--text-secondary);
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 2px solid var(--border);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            width: 100%;
+            max-width: 280px;
+            justify-content: center;
+        }
+
+        .action-button:hover {
+            background: var(--primary-light);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .action-button.primary {
+            background: #2563eb;
+            color: white;
+            border: 2px solid #2563eb;
+        }
+
+        .action-button.primary:hover {
+            background: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+
         @keyframes fadeInUp {
             from {
                 opacity: 0;
@@ -149,8 +183,8 @@
             }
             
             .offline-icon img {
-                width: 64px;
-                height: 64px;
+                width: 100px;
+                height: 100px;
             }
         }
 
@@ -165,8 +199,8 @@
             }
             
             .offline-icon img {
-                width: 48px;
-                height: 48px;
+                width: 80px;
+                height: 80px;
             }
         }
     </style>
@@ -184,12 +218,20 @@
         </p>
         
         <div class="action-buttons">
-            <a href="/" class="btn btn-outline-secondary rounded-pill fw-bold btn-sm action-button">
-                <i class="bi bi-archive me-1"></i>
+            <a href="/" class="action-button">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 19v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2"></path>
+                    <polyline points="7 9 12 4 17 9"></polyline>
+                    <line x1="12" y1="4" x2="12" y2="17"></line>
+                </svg>
                 <span>VIEW CACHED PAGES</span>
             </a>
-            <a href="/offline-media/" class="btn btn-outline-info rounded-pill fw-bold btn-sm action-button">
-                <i class="bi bi-download me-1"></i>
+            <a href="/offline-media/" class="action-button">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
                 <span>VIEW DOWNLOADED MEDIA</span>
             </a>
         </div>

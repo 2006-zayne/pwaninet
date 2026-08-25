@@ -42,15 +42,15 @@
 
 /* Global Font Application */
 body {
-  font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
-  font-family: var(--font-family, 'Inter', 'Roboto', system-ui, -apple-system, sans-serif);
+  font-family: system-ui, -apple-system, 'Roboto', 'Inter', sans-serif;
+  font-family: var(--font-family, system-ui, -apple-system, 'Roboto', 'Inter', sans-serif);
   font-style: var(--font-style, normal);
   font-display: swap;
 }
 
 /* Apply font variables to all text elements for consistency */
 * {
-  font-family: var(--font-family, 'Inter', 'Roboto', system-ui, -apple-system, sans-serif);
+  font-family: var(--font-family, system-ui, -apple-system, 'Roboto', 'Inter', sans-serif);
   font-style: var(--font-style, normal);
 }
 

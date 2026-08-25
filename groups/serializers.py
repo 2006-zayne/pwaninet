@@ -1,5 +1,9 @@
 from rest_framework import serializers
-from .models import Group, Membership, MembershipRole, MembershipStatus, JoinPolicy, Announcement, AnnouncementPriority, AnnouncementAttachment
+from .models import (
+    Group, Membership, MembershipRole, MembershipStatus, JoinPolicy,
+    Announcement, AnnouncementPriority, AnnouncementAttachment,
+    GroupMessage, GroupMessageAttachment, GroupMessageReaction
+)
 from users.models import User
 from courses.models import Course, Year
 
@@ -451,5 +455,72 @@ class AnnouncementUpdateSerializer(serializers.ModelSerializer):
                     
                     # Trigger document processing
                     # process_document_file.delay(document_file.id)
-        
+
         return instance
+
+
+class GroupMessageAttachmentSerializer(serializers.ModelSerializer):
+    """Serializer for group message attachments"""
+    class Meta:
+        model = GroupMessageAttachment
+        fields = ['id', 'attachment_type', 'file', 'thumbnail', 'caption', 'order', 'created_at']
+        read_only_fields = ['created_at']
+
+
+class GroupMessageReactionSerializer(serializers.ModelSerializer):
+    """Serializer for group message reactions"""
+    user = UserMinimalSerializer(read_only=True)
+
+    class Meta:
+        model = GroupMessageReaction
+        fields = ['id', 'user', 'emoji', 'created_at']
+        read_only_fields = ['created_at']
+
+
+class GroupMessageSerializer(serializers.ModelSerializer):
+    """Serializer for group messages"""
+    sender = UserMinimalSerializer(read_only=True)
+    attachments = GroupMessageAttachmentSerializer(many=True, read_only=True)
+    reactions = GroupMessageReactionSerializer(many=True, read_only=True)
+    reply_to = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GroupMessage
+        fields = [
+            'id', 'group', 'sender', 'content', 'message_type',
+            'reply_to', 'created_at', 'updated_at', 'status',
+            'attachments', 'reactions'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'status']
+
+    def get_reply_to(self, obj):
+        if obj.reply_to:
+            return GroupMessageSerializer(obj.reply_to).data
+        return None
+
+
+class GroupMessageCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating group messages"""
+    class Meta:
+        model = GroupMessage
+        fields = ['content', 'message_type', 'reply_to']
+
+    def create(self, validated_data):
+        group_id = self.context['group_id']
+        user = self.context['request'].user
+
+        # Validate user is a member of the group
+        from .models import Membership, MembershipStatus
+        if not Membership.objects.filter(
+            user=user,
+            group_id=group_id,
+            status=MembershipStatus.APPROVED
+        ).exists():
+            raise serializers.ValidationError("You must be a member of this group to send messages.")
+
+        message = GroupMessage.objects.create(
+            group_id=group_id,
+            sender=user,
+            **validated_data
+        )
+        return message

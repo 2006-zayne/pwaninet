@@ -1,0 +1,985 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}">
+<link rel="stylesheet" href="{% static 'css/chat_theme.css' %}">
+<link rel="stylesheet" href="{% static 'css/messaging/media-composer.css' %}">
+<link rel="stylesheet" href="{% static 'css/chat/telegram-media.css' %}">
+
+
+<div class="chat-container d-flex flex-column" style="height: 100vh;" data-conversation-id="{{ conversation.id }}"
+  data-user-id="{{ request.user.id }}" data-is-encrypted="false">
+  <div class="chat-header" data-conversation-id="{{ conversation.id }}">
+    <a href="{% url 'messaging:conversation_list' %}" class="text-decoration-none" style="color: var(--text-primary);">
+      <i class="bi bi-arrow-left" style="font-size: 20px;"></i>
+    </a>
+    <div class="position-relative">
+      {% if conversation.type == 'group' %}
+      <div class="chat-avatar bg-primary d-flex align-items-center justify-content-center">
+        <i class="bi bi-people-fill text-white"></i>
+      </div>
+      {% else %}
+      {% for member in conversation.members.all %}
+      {% if member.user != request.user %}
+      <a href="/users/user/{{ member.user.username }}/" class="text-decoration-none">
+        {% if member.user.profile_pic %}
+        <img src="{{ member.user.profile_pic.url }}" class="chat-avatar">
+        {% else %}
+        <div class="chat-avatar bg-secondary d-flex align-items-center justify-content-center">
+          <i class="bi bi-person-fill text-white"></i>
+        </div>
+        {% endif %}
+      </a>
+      {% endif %}
+      {% endfor %}
+      {% endif %}
+    </div>
+    <div class="flex-grow-1">
+      <div class="chat-username">
+        {% if conversation.type == 'group' and conversation.name %}
+        {{ conversation.name }}
+        {% else %}
+        {% for member in conversation.members.all %}
+        {% if member.user != request.user %}
+        {{ member.user.username }}
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+      </div>
+      <div class="chat-status" id="chatStatus"></div>
+    </div>
+    <button class="icon-btn" id="searchBtn" title="Search in conversation">
+      <i class="bi bi-search"></i>
+    </button>
+    <div class="dropdown">
+      <button class="btn btn-link" data-bs-toggle="dropdown" style="color: var(--text-primary);">
+        <i class="bi bi-three-dots-vertical" style="font-size: 20px;"></i>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="#" id="muteBtn"><i class="bi bi-bell-slash me-2"></i>Mute</a></li>
+        <li><a class="dropdown-item" href="#" id="viewMediaBtn"><i class="bi bi-images me-2"></i>View Media</a></li>
+        <li><a class="dropdown-item" href="#" id="starBtn"><i class="bi bi-star me-2"></i>Star Messages</a></li>
+        <li>
+          <hr class="dropdown-divider">
+        </li>
+        <li><a class="dropdown-item" href="#" id="themeBtn" data-bs-no-dropdown="true"><i
+              class="bi bi-palette me-2"></i>Chat Theme</a></li>
+        <li>
+          <hr class="dropdown-divider">
+        </li>
+        <li><a class="dropdown-item text-danger" href="#" id="leaveBtn"><i
+              class="bi bi-box-arrow-right me-2"></i>Leave</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="messages-area" id="messagesContainer" data-skeleton="messaging-detail">
+    <!-- Messages will be rendered by JavaScript -->
+  </div>
+
+  <div class="input-area">
+    <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.mp4,.mp3,.wav"
+      style="display: none;">
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
+
+    
+
+    <!-- Input container on the left -->
+    <div class="input-field-container">
+      <button class="icon-btn" id="emojiBtn" title="Emoji">
+        <i class="bi bi-emoji-smile"></i>
+      </button>
+      <textarea class="message-input" placeholder="Message..." id="messageInput" rows="1"></textarea>
+      <button class="icon-btn" id="cameraBtn" title="Camera">
+        <i class="bi bi-camera"></i>
+      </button>
+      <button class="icon-btn" id="attachBtn" title="Attach file">
+        <i class="bi bi-paperclip"></i>
+      </button>
+    </div>
+
+    <!-- Voice/Send button on the right -->
+    <button class="icon-btn voice-send-btn" id="voiceBtn" title="Voice message">
+      <i class="bi bi-mic"></i>
+    </button>
+
+
+  </div>
+</div>
+
+<!-- Context Menu -->
+<div class="context-menu" id="contextMenu">
+  <div class="context-menu-item" data-action="reply">
+    <i class="bi bi-reply"></i> Reply
+  </div>
+  <div class="context-menu-item" data-action="copy">
+    <i class="bi bi-copy"></i> Copy
+  </div>
+  <div class="context-menu-item" data-action="forward">
+    <i class="bi bi-share"></i> Forward
+  </div>
+  <div class="context-menu-item danger" data-action="delete">
+    <i class="bi bi-trash"></i> Delete
+  </div>
+</div>
+
+<!-- Emoji Picker Modal -->
+<div class="overlay" id="overlay"></div>
+<div class="emoji-picker-modal" id="emojiPicker">
+  <div class="emoji-picker-header">
+    <span class="emoji-picker-title">Emoji</span>
+    <div class="emoji-picker-actions">
+      <button class="icon-btn" id="keyboardBtn" title="Keyboard">
+        <i class="bi bi-keyboard"></i>
+      </button>
+      <button class="icon-btn" id="closeEmojiPicker">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+  </div>
+  <div class="emoji-picker-tabs">
+    <button class="emoji-picker-tab active" data-tab="emojis">😀</button>
+    <button class="emoji-picker-tab" data-tab="gifs">GIF</button>
+    <button class="emoji-picker-tab" data-tab="stickers">Stickers</button>
+  </div>
+  <div class="emoji-picker-content" id="emojiContent">
+    <!-- Emojis will be loaded by JavaScript -->
+  </div>
+  <div class="gif-search-container" id="gifSearchContainer" style="display: none;">
+    <input type="text" class="gif-search-input" id="gifSearchInput" placeholder="Search GIFs...">
+  </div>
+  <div class="gif-content" id="gifContent" style="display: none;">
+    <!-- GIFs will be loaded by JavaScript -->
+  </div>
+  <div class="sticker-content" id="stickerContent" style="display: none;">
+    <!-- Stickers will be loaded by JavaScript -->
+  </div>
+</div>
+
+<!-- Attachment Options Modal -->
+<div class="attachment-modal" id="attachmentModal">
+  <div class="attachment-modal-header">
+    <span class="attachment-modal-title">Attach</span>
+    <button class="attachment-close-btn" id="closeAttachmentModal">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </div>
+  <div class="attachment-options">
+    <div class="attachment-option" data-type="photos">
+      <div class="attachment-option-icon photos">
+        <i class="bi bi-image"></i>
+      </div>
+      <span class="attachment-option-label">Photos</span>
+    </div>
+    <div class="attachment-option" data-type="videos">
+      <div class="attachment-option-icon videos">
+        <i class="bi bi-camera-video"></i>
+      </div>
+      <span class="attachment-option-label">Videos</span>
+    </div>
+    <div class="attachment-option" data-type="documents">
+      <div class="attachment-option-icon documents">
+        <i class="bi bi-file-earmark"></i>
+      </div>
+      <span class="attachment-option-label">Documents</span>
+    </div>
+    <div class="attachment-option" data-type="audio">
+      <div class="attachment-option-icon audio">
+        <i class="bi bi-music-note"></i>
+      </div>
+      <span class="attachment-option-label">Audio</span>
+    </div>
+  </div>
+</div>
+
+<!-- Chat Theme Selector Modal -->
+<div class="theme-modal" id="themeModal">
+  <div class="theme-modal-content">
+    <div class="theme-modal-header">
+      <span class="theme-modal-title">Chat Theme</span>
+      <button class="theme-modal-close" id="closeThemeModal">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
+    <!-- Theme Tabs -->
+    <div class="theme-tabs">
+      <button class="theme-tab active" data-tab="background">Background</button>
+      <button class="theme-tab" data-tab="bubbles">Message Bubbles</button>
+    </div>
+
+    <!-- Background Tab -->
+    <div class="theme-tab-content active" id="background-tab">
+      <div class="theme-section">
+        <h4 class="theme-section-title">Preset Backgrounds</h4>
+        <div class="theme-options">
+          <div class="theme-option" data-theme="light">
+            <div class="theme-preview light-preview"></div>
+            <span class="theme-label">Light</span>
+          </div>
+          <div class="theme-option" data-theme="dark">
+            <div class="theme-preview dark-preview"></div>
+            <span class="theme-label">Dark</span>
+          </div>
+          <div class="theme-option" data-theme="wallpaper-1">
+            <div class="theme-preview wallpaper-preview"
+              style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+            <span class="theme-label">Purple</span>
+          </div>
+          <div class="theme-option" data-theme="wallpaper-2">
+            <div class="theme-preview wallpaper-preview"
+              style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
+            <span class="theme-label">Pink</span>
+          </div>
+          <div class="theme-option" data-theme="wallpaper-3">
+            <div class="theme-preview wallpaper-preview"
+              style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
+            <span class="theme-label">Cyan</span>
+          </div>
+          <div class="theme-option" data-theme="wallpaper-4">
+            <div class="theme-preview wallpaper-preview"
+              style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></div>
+            <span class="theme-label">Green</span>
+          </div>
+          <div class="theme-option" data-theme="wallpaper-5">
+            <div class="theme-preview wallpaper-preview"
+              style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);"></div>
+            <span class="theme-label">Warm</span>
+          </div>
+          <div class="theme-option" data-theme="wallpaper-6">
+            <div class="theme-preview wallpaper-preview"
+              style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);"></div>
+            <span class="theme-label">Ocean</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="theme-section">
+        <h4 class="theme-section-title">Custom Image Wallpaper</h4>
+        <div class="image-upload-section">
+          <input type="file" id="wallpaperImageInput" accept="image/*" style="display: none;">
+          <button class="btn-upload-wallpaper" id="uploadWallpaperBtn">
+            <i class="bi bi-image"></i> Upload Image
+          </button>
+          <p class="upload-hint">Max 5MB, JPG/PNG/GIF/WebP</p>
+        </div>
+      </div>
+
+      <div class="theme-section">
+        <h4 class="theme-section-title">Overlay Settings</h4>
+        <div class="overlay-controls">
+          <div class="overlay-control-group">
+            <label for="overlayEnabled">
+              <input type="checkbox" id="overlayEnabled" checked>
+              Enable Overlay
+            </label>
+            <p class="control-hint">Improves text readability over backgrounds</p>
+          </div>
+
+          <div class="overlay-control-group" id="overlayOpacityGroup">
+            <label for="overlayOpacitySlider">Overlay Opacity: <span id="overlayOpacityValue">30%</span></label>
+            <input type="range" id="overlayOpacitySlider" min="0" max="70" value="30" class="opacity-slider">
+            <div class="opacity-presets">
+              <button type="button" class="preset-btn" data-opacity="0">None</button>
+              <button type="button" class="preset-btn" data-opacity="10">10%</button>
+              <button type="button" class="preset-btn" data-opacity="20">20%</button>
+              <button type="button" class="preset-btn active" data-opacity="30">30%</button>
+              <button type="button" class="preset-btn" data-opacity="50">50%</button>
+            </div>
+          </div>
+
+          <div class="overlay-control-group" id="overlayColorGroup">
+            <label for="overlayColorPicker">Overlay Color</label>
+            <div class="color-input-wrapper">
+              <input type="color" id="overlayColorPicker" value="#ffffff" class="color-picker-input">
+              <span id="overlayColorHex">#ffffff</span>
+            </div>
+            <div class="color-presets">
+              <button type="button" class="color-preset-btn" data-color="#ffffff"
+                style="background: #ffffff; border: 1px solid #ddd;"></button>
+              <button type="button" class="color-preset-btn" data-color="#000000" style="background: #000000;"></button>
+              <button type="button" class="color-preset-btn" data-color="#1a1a1a" style="background: #1a1a1a;"></button>
+              <button type="button" class="color-preset-btn" data-color="#f8f9fa"
+                style="background: #f8f9fa; border: 1px solid #ddd;"></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-apply-bubbles" id="applyBackgroundBtn">Apply Background Theme</button>
+    </div>
+
+    <!-- Message Bubbles Tab -->
+    <div class="theme-tab-content" id="bubbles-tab">
+      <div class="theme-section">
+        <h4 class="theme-section-title">Bubble Styles</h4>
+        <div class="bubble-options">
+          <div class="bubble-option" data-bubble="default">
+            <div class="bubble-preview">
+              <div class="demo-bubble sent">Hi there!</div>
+              <div class="demo-bubble received">Hey! How are you?</div>
+            </div>
+            <span class="bubble-label">Default</span>
+          </div>
+          <div class="bubble-option" data-bubble="rounded">
+            <div class="bubble-preview">
+              <div class="demo-bubble sent" style="border-radius: 25px;">Hi there!</div>
+              <div class="demo-bubble received" style="border-radius: 25px;">Hey! How are you?</div>
+            </div>
+            <span class="bubble-label">Rounded</span>
+          </div>
+          <div class="bubble-option" data-bubble="square">
+            <div class="bubble-preview">
+              <div class="demo-bubble sent" style="border-radius: 4px;">Hi there!</div>
+              <div class="demo-bubble received" style="border-radius: 4px;">Hey! How are you?</div>
+            </div>
+            <span class="bubble-label">Square</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="theme-section">
+        <h4 class="theme-section-title">Bubble Colors</h4>
+        <div class="color-pickers">
+          <div class="color-picker-group">
+            <label>Sent Messages</label>
+            <div class="color-input-wrapper">
+              <input type="color" id="sentBubbleColor" value="#0084ff" class="color-picker-input">
+              <span id="sentBubbleHex">#0084ff</span>
+            </div>
+          </div>
+          <div class="color-picker-group">
+            <label>Received Messages</label>
+            <div class="color-input-wrapper">
+              <input type="color" id="receivedBubbleColor" value="#e4e4ea" class="color-picker-input">
+              <span id="receivedBubbleHex">#e4e4ea</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="theme-section">
+        <h4 class="theme-section-title">Live Preview</h4>
+        <div class="demo-message-area" id="demoMessageArea">
+          <div class="demo-message sent">
+            <div class="demo-message-bubble">That's awesome! 🎉</div>
+          </div>
+          <div class="demo-message received">
+            <div class="demo-message-bubble">Thanks! How's everything?</div>
+          </div>
+          <div class="demo-message sent">
+            <div class="demo-message-bubble">Going great!</div>
+          </div>
+          <div class="demo-message received">
+            <div class="demo-message-bubble">Nice to hear that 😊</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-apply-bubbles" id="applyBubblesBtn">Apply Bubble Theme</button>
+    </div>
+  </div>
+</div>
+
+<!-- Voice Recording Modal -->
+<div class="voice-modal" id="voiceModal">
+  <div class="voice-modal-overlay" id="voiceModalOverlay"></div>
+  <div class="voice-modal-content">
+    <div class="voice-modal-header">
+      <button class="voice-modal-close" id="voiceModalClose">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    
+    <div class="voice-modal-body">
+      <!-- Recording State -->
+      <div class="voice-state recording" id="voiceRecordingState">
+        <div class="voice-recording-indicator">
+          <div class="voice-recording-dot"></div>
+          <span class="voice-recording-text">Recording...</span>
+        </div>
+        <div class="voice-timer" id="voiceTimer">0:00</div>
+        <div class="voice-waveform" id="voiceWaveform">
+          <!-- Waveform bars generated dynamically -->
+        </div>
+        <div class="voice-controls">
+          <button class="voice-control-btn delete" id="voiceRecordingDelete" title="Cancel">
+            <i class="bi bi-x-lg"></i>
+          </button>
+          <button class="voice-control-btn stop" id="voiceRecordingStop" title="Stop Recording">
+            <i class="bi bi-stop-fill"></i>
+          </button>
+        </div>
+        <div class="voice-hint">Release to send, swipe up to lock</div>
+      </div>
+      
+      <!-- Preview State -->
+      <div class="voice-state preview" id="voicePreviewState" style="display: none;">
+        <div class="voice-preview-info">
+          <span class="voice-preview-label">Voice Message</span>
+          <span class="voice-preview-duration" id="voicePreviewDuration">0:00</span>
+        </div>
+        <div class="voice-waveform-static" id="voiceWaveformStatic">
+          <!-- Static waveform -->
+        </div>
+        <div class="voice-controls">
+          <button class="voice-control-btn delete" id="voiceDelete" title="Delete">
+            <i class="bi bi-trash"></i>
+          </button>
+          <button class="voice-control-btn play" id="voicePlayPause" title="Play/Pause">
+            <i class="bi bi-play-fill"></i>
+          </button>
+          <button class="voice-control-btn send" id="voiceSend" title="Send">
+            <i class="bi bi-send-fill"></i>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Locked State -->
+      <div class="voice-state locked" id="voiceLockedState" style="display: none;">
+        <div class="voice-locked-indicator">
+          <i class="bi bi-lock-fill"></i>
+          <span>Recording Locked</span>
+        </div>
+        <div class="voice-timer" id="voiceLockedTimer">0:00</div>
+        <div class="voice-waveform" id="voiceLockedWaveform">
+          <!-- Waveform bars generated dynamically -->
+        </div>
+        <div class="voice-controls">
+          <button class="voice-control-btn delete" id="voiceLockedDelete" title="Cancel">
+            <i class="bi bi-x-lg"></i>
+          </button>
+          <button class="voice-control-btn stop" id="voiceLockedStop" title="Stop Recording">
+            <i class="bi bi-stop-fill"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Camera View -->
+<div class="camera-view" id="cameraView">
+  <div class="camera-video-container">
+    <video class="camera-video" id="cameraVideo" autoplay playsinline></video>
+    <div class="camera-flash" id="cameraFlash"></div>
+    <div class="camera-mode-toggle">
+      <button class="camera-mode-btn active" data-mode="photo">Photo</button>
+      <button class="camera-mode-btn" data-mode="video">Video</button>
+    </div>
+  </div>
+  <div class="camera-controls">
+    <button class="camera-btn camera-close-btn" id="cameraCloseBtn" title="Close">
+      <i class="bi bi-x-lg"></i>
+    </button>
+    <button class="camera-btn camera-switch-btn" id="cameraSwitchBtn" title="Switch Camera">
+      <i class="bi bi-arrow-repeat"></i>
+    </button>
+    <button class="camera-capture-btn" id="cameraCaptureBtn" title="Capture">
+      <div class="camera-capture-btn-inner"></div>
+    </button>
+  </div>
+</div>
+
+<style>
+  .camera-view {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    z-index: 10000;
+    display: none;
+  }
+
+  .camera-view.show {
+    display: block;
+  }
+
+  .camera-video-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .camera-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .camera-controls {
+    position: absolute;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0 20px;
+  }
+
+  .camera-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .camera-capture-btn {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: 4px solid white;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .camera-capture-btn-inner {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: white;
+  }
+</style>
+
+<!-- Image Viewer -->
+<div class="image-viewer" id="imageViewer">
+  <span class="image-viewer-close" id="imageViewerClose">&times;</span>
+  <img id="imageViewerImg" src="" alt="Full screen image">
+</div>
+
+<style>
+  .image-viewer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 10001;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .image-viewer.show {
+    display: flex;
+  }
+
+  .image-viewer-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    color: white;
+    font-size: 40px;
+    cursor: pointer;
+    z-index: 10002;
+  }
+
+  .image-viewer img {
+    max-width: 90%;
+    max-height: 90%;
+    object-fit: contain;
+  }
+</style>
+
+<!-- Search Modal -->
+<div class="search-modal" id="searchModal">
+  <div class="search-modal-content">
+    <div class="search-input-container">
+      <input type="text" class="search-input" id="searchInput" placeholder="Search messages...">
+      <button class="search-close-btn" id="searchCloseBtn">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="search-results" id="searchResults"></div>
+  </div>
+</div>
+
+<style>
+  .search-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 100px;
+  }
+
+  .search-modal.show {
+    display: flex;
+  }
+
+  .search-modal-content {
+    background: var(--card-bg);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .search-input-container {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .search-input {
+    flex: 1;
+    border: none;
+    background: none;
+    font-size: 16px;
+    color: var(--text-primary);
+    outline: none;
+  }
+
+  .search-close-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 8px;
+  }
+
+  .search-results {
+    overflow-y: auto;
+    max-height: 60vh;
+    padding: 16px;
+  }
+
+  /* Conversation Intro Panel Styles */
+  .empty-conversation-intro {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    margin: auto;
+    width: 100%;
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  .intro-avatar {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 16px;
+    border: 2px solid var(--border);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  .intro-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+  }
+
+  .intro-username {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+  }
+
+  .intro-profile-btn {
+    margin-bottom: 32px;
+    border-radius: 18px;
+    padding: 6px 16px;
+    font-weight: 600;
+  }
+
+  .intro-hint {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    opacity: 0.8;
+  }
+
+  .intro-quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    max-width: 340px;
+  }
+
+  .quick-chip {
+    padding: 8px 16px;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--text-primary);
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+
+  .quick-chip:hover {
+    background-color: var(--border);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+
+  .quick-chip:active {
+    transform: translateY(0);
+  }
+
+  /* Overlay Controls Styles */
+  .overlay-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .overlay-control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .overlay-control-group label {
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .overlay-control-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+  }
+
+  .control-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.3;
+  }
+
+  .opacity-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .opacity-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--brand);
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .opacity-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--brand);
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .opacity-presets {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .preset-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--background);
+    color: var(--text-primary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .preset-btn:hover {
+    background: var(--border-hover);
+  }
+
+  .preset-btn.active {
+    background: var(--brand);
+    color: white;
+    border-color: var(--brand);
+  }
+
+  .color-presets {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .color-preset-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .color-preset-btn:hover {
+    transform: scale(1.1);
+    border-color: var(--brand);
+  }
+
+  .color-preset-btn.active {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 2px rgba(0, 132, 255, 0.2);
+  }
+
+  /* Disable overlay controls when overlay is disabled */
+  .overlay-control-group:has(#overlayEnabled:not(:checked)) .opacity-slider,
+  .overlay-control-group:has(#overlayEnabled:not(:checked)) .opacity-presets,
+  .overlay-control-group:has(#overlayEnabled:not(:checked)) .color-input-wrapper,
+  .overlay-control-group:has(#overlayEnabled:not(:checked)) .color-presets {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+
+<script>
+  console.log('=== CONVERSATION DETAIL REFACTORED SCRIPT LOADING ===');
+  document.body.dataset.userId = '{{ request.user.id }}';
+  document.body.dataset.conversationId = '{{ conversation.id }}';
+  document.body.dataset.isEncrypted = '{% if conversation.is_encrypted %}true{% else %}false{% endif %}';
+  document.body.dataset.conversationType = '{{ conversation.type }}';
+</script>
+
+{% if conversation.type == 'direct' %}
+{% for member in conversation.members.all %}
+{% if member.user != request.user %}
+<script>
+  document.body.dataset.receiverAvatar = '{{ member.user.profile_pic.url|default:"/static/images/default_pic1.jpg"|escapejs }}';
+  document.body.dataset.receiverName = '{{ member.user.get_full_name|default:member.user.username|escapejs }}';
+  document.body.dataset.receiverUsername = '{{ member.user.username|escapejs }}';
+  document.body.dataset.receiverProfileUrl = '/users/user/{{ member.user.username|escapejs }}/';
+</script>
+{% endif %}
+{% endfor %}
+{% endif %}
+
+<!-- Media Composer Fullscreen Overlay -->
+<div id="mediaComposerOverlay" class="media-composer-overlay">
+  <div class="media-composer-container">
+    <!-- Header -->
+    <div class="media-composer-header" id="mediaComposerHeader">
+      <button class="media-composer-close" id="mediaComposerClose">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+      <div class="media-composer-title">New Message</div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="media-composer-main" id="mediaComposerMain">
+      <!-- Preview Canvas -->
+      <div class="media-preview-container" id="mediaComposerPreview"></div>
+
+      <!-- Tool Rail -->
+      <div class="media-tools-rail" id="mediaComposerTools"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="media-composer-footer" id="mediaComposerFooter">
+      <!-- Thumbnail Strip -->
+      <div class="media-thumbnails" id="mediaComposerThumbnails"></div>
+
+      <!-- Caption Inputs -->
+      <div class="media-captions">
+        <div class="global-caption-container" id="mediaComposerGlobalCaption">
+          <textarea 
+            class="caption-input global-caption" 
+            placeholder="Add a caption for all media..."
+            rows="2"
+            maxlength="500"
+          ></textarea>
+        </div>
+        <div class="media-caption-container" id="mediaComposerMediaCaption" style="display: none;">
+          <textarea 
+            class="caption-input media-caption" 
+            placeholder="Add a caption for this media..."
+            rows="2"
+            maxlength="500"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Send Button -->
+      <button class="media-composer-send" id="mediaComposerSend">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+        Send
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'js/encryption.js' %}"></script>
+<script type="module" src="{% static 'js/chat/bootstrap.js' %}?v=12"></script>
+
+<!-- Chat theme handler for per-conversation customization -->
+<script src="{% static 'js/chat-theme-handler.js' %}"></script>
+
+<script>
+  // Handle quick action chip clicks from renderer
+  window.addEventListener('quickActionClick', function (e) {
+    const input = document.getElementById('messageInput');
+    if (input) {
+      input.value = e.detail.text;
+      input.focus();
+      // Trigger input event for auto-resizing textareas
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  });
+</script>
+
+{% endblock %}

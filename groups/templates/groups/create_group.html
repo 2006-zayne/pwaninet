@@ -40,7 +40,7 @@
     --shadow-hover:   0 4px 12px rgba(0,0,0,0.4), 0 16px 40px rgba(0,0,0,0.3);
   }
 
-  *, *::before, *::after { font-family: var(--font-family, 'Inter', 'Roboto', system-ui, -apple-system, sans-serif); font-style: var(--font-style, normal); box-sizing: border-box; }
+  *, *::before, *::after { font-family: var(--font-family, system-ui, -apple-system, 'Roboto', 'Inter', sans-serif); font-style: var(--font-style, normal); box-sizing: border-box; }
   body { background: var(--page-bg); color: var(--text-primary); }
 
   /* ── Page wrapper ── */
@@ -106,7 +106,7 @@
     outline: none;
     background: var(--card-bg);
     transition: border-color 0.18s, box-shadow 0.18s;
-    font-family: var(--font-family, 'Inter', 'Roboto', system-ui, -apple-system, sans-serif);
+    font-family: var(--font-family, system-ui, -apple-system, 'Roboto', 'Inter', sans-serif);
   }
   .form-field:focus {
     border-color: var(--brand);
