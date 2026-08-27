@@ -259,7 +259,23 @@ export class MessageService {
         console.log('[MESSAGE_SERVICE] Loading conversation history for:', conversationId);
         try {
             console.log('[MESSAGE_SERVICE] Fetching messages from API');
-            const res = await fetch(`/messaging/v1/messages/?conversation=${conversationId}`, {
+            
+            // Use group chat API endpoint if IS_GROUP_CHAT is set, otherwise use direct chat endpoint
+            const isGroupChat = window.IS_GROUP_CHAT || false;
+            let apiUrl;
+ let queryParams;
+            
+            if (isGroupChat) {
+                // Group chat endpoint: /groups/api/groups/<group_id>/messages/
+                apiUrl = `/groups/api/groups/${conversationId}/messages/`;
+                queryParams = '';
+            } else {
+                // Direct chat endpoint: /messaging/v1/messages/?conversation=<conversation_id>
+                apiUrl = `/messaging/v1/messages/`;
+                queryParams = `?conversation=${conversationId}`;
+            }
+            
+            const res = await fetch(`${apiUrl}${queryParams}`, {
                 headers: {
                     'X-CSRFToken': getCSRFToken()
                 }

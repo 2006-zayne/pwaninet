@@ -1,10 +1,36 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block content %}
+
+{% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}">
 <link rel="stylesheet" href="{% static 'css/chat_theme.css' %}">
 <link rel="stylesheet" href="{% static 'css/messaging/media-composer.css' %}">
 <link rel="stylesheet" href="{% static 'css/chat/telegram-media.css' %}">
+
+<!-- Groups-specific configuration for global messaging bootstrap -->
+<script>
+  // Set groups-specific configuration IMMEDIATELY before base.html loads bootstrap.js
+  window.GROUPS_API_BASE = '/groups/api';
+  window.GROUPS_WS_URL = `ws://${window.location.host}/ws/groups/chat/{{ group.id }}/`;
+  window.IS_GROUP_CHAT = true;
+
+  // Override fetch IMMEDIATELY for groups API
+  const originalFetch = window.fetch;
+  window.fetch = function(url, options) {
+    if (typeof url === 'string' && url.includes('/messaging/api/')) {
+      url = url.replace('/messaging/api/', window.GROUPS_API_BASE + '/');
+    }
+    if (typeof url === 'string' && url.includes('/messaging/v1/')) {
+      url = url.replace('/messaging/v1/', window.GROUPS_API_BASE + '/');
+    }
+    return originalFetch(url, options);
+  };
+
+  console.log('Groups configuration set IMMEDIATELY for group: {{ group.id }}');
+</script>
+{% endblock %}
+
+{% block content %}
 
 <style>
   /* Ensure group chat uses the same font system as the rest of the site */
@@ -24,7 +50,7 @@
   .empty-state,
   .empty-state h3,
   .empty-state p {
-    font-family: var(--font-family, 'Inter', 'Roboto', system-ui, -apple-system, sans-serif) !important;
+    font-family: var(--font-family, system-ui, -apple-system, 'Roboto', 'Inter', sans-serif) !important;
     font-style: var(--font-style, normal) !important;
     font-size: calc(1rem * var(--font-scale, 1.00)) !important;
   }
@@ -41,8 +67,8 @@
 </style>
 
 <div class="chat-container d-flex flex-column" style="height: 100vh;" data-group-id="{{ group.id }}"
-  data-user-id="{{ request.user.id }}" data-is-encrypted="false">
-  <div class="chat-header" data-group-id="{{ group.id }}">
+  data-conversation-id="{{ group.id }}" data-user-id="{{ request.user.id }}" data-is-encrypted="false">
+  <div class="chat-header" data-group-id="{{ group.id }}" data-conversation-id="{{ group.id }}">
     <a href="{% url 'groups:groups_detail' group.id %}" class="text-decoration-none" style="color: var(--text-primary);">
       <i class="bi bi-arrow-left" style="font-size: 20px;"></i>
     </a>
@@ -834,30 +860,5 @@
     pointer-events: none;
   }
 </style>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  const messageInput = document.getElementById('messageInput');
-  
-  if (messageInput) {
-    // Auto-resize textarea
-    messageInput.addEventListener('input', function() {
-      this.style.height = 'auto';
-      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-    });
-
-    // Send on Enter (Shift+Enter for new line) - placeholder for now
-    messageInput.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        // Placeholder for message sending logic
-        console.log('Group chat UI ready - backend integration coming soon');
-      }
-    });
-  }
-
-  console.log('Group Chat UI loaded - visual components ready');
-});
-</script>
 
 {% endblock %}

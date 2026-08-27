@@ -1,0 +1,563 @@
+{% load static %}
+{% load messaging_extras %}
+
+<div class="messaging-suggestions-container">
+    <div class="d-flex gap-3 overflow-auto pb-2 messaging-suggestions-scroll" style="scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x mandatory;">
+        {% for user in suggested_users %}
+            <div class="messaging-suggestion-card" style="min-width: 180px; scroll-snap-align: start;">
+                <div class="messaging-card-image-container">
+                    <a href="{% url 'users:profile' user.username %}" class="text-decoration-none">
+                        {% if user.profile_picture %}
+                            <img src="{{ user.profile_picture.url }}" class="messaging-card-image" alt="{{ user.get_full_name }}">
+                        {% else %}
+                            <div class="messaging-card-image-placeholder">
+                                <i class="bi bi-person-circle"></i>
+                            </div>
+                        {% endif %}
+                    </a>
+                    <button class="messaging-card-dismiss" title="Dismiss suggestion">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+                <div class="messaging-card-info">
+                    <a href="{% url 'users:profile' user.username %}" class="text-decoration-none">
+                        <p class="messaging-card-name mb-1">{{ user.get_full_name|default:user.username }}</p>
+                        <p class="messaging-card-details mb-2">{{ user.course.name|default:"Student" }} • {{ user.year.name|default:"Year" }}</p>
+                    </a>
+                    <div class="messaging-card-actions">
+                        {% if user.id in following_ids %}
+                            <button class="btn btn-primary btn-sm messaging-btn-primary w-100" data-user-id="{{ user.id }}">
+                                <i class="bi bi-chat-dots me-1"></i>Message
+                            </button>
+                        {% else %}
+                            <button class="btn btn-primary btn-sm messaging-btn-primary w-100" data-user-id="{{ user.id }}">
+                                <i class="bi bi-person-plus me-1"></i>Add Friend
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="no-suggestions">
+                <div class="empty-state">
+                    <i class="bi bi-people"></i>
+                    <h3>No suggestions available</h3>
+                    <p>Start following more users or join groups to get friend suggestions.</p>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+/* Dark theme support */
+[data-theme="dark"] .messaging-suggestion-card {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border) !important;
+}
+[data-theme="dark"] .messaging-card-name {
+    color: #ffffff !important;
+}
+[data-theme="dark"] .messaging-card-details {
+    color: #d1d5db !important;
+}
+[data-theme="dark"] .messaging-card-image-placeholder {
+    background: linear-gradient(135deg, #374151 0%, #4b5563 100%) !important;
+    color: #9ca3af !important;
+}
+[data-theme="dark"] .messaging-card-dismiss {
+    background: rgba(55, 65, 81, 0.9) !important;
+    color: #9ca3af !important;
+}
+[data-theme="dark"] .messaging-card-dismiss:hover {
+    background: #ef4444 !important;
+    color: white !important;
+}
+[data-theme="dark"] .messaging-btn-primary {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+}
+
+/* Messaging Suggestions Enhanced Styles */
+.messaging-suggestions-container {
+    position: relative;
+}
+
+.messaging-suggestions-scroll {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.messaging-suggestions-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.messaging-suggestion-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 0;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    position: relative;
+}
+
+.messaging-suggestion-card:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+    border-color: #3b82f6;
+}
+
+.messaging-suggestion-card:active {
+    transform: translateY(-2px) scale(1.01);
+    transition: all 0.1s ease;
+}
+
+.messaging-card-image-container {
+    position: relative;
+    width: 100%;
+    height: 180px;
+    overflow: hidden;
+}
+
+.messaging-card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    transition: transform 0.3s ease;
+}
+
+.messaging-suggestion-card:hover .messaging-card-image {
+    transform: scale(1.05);
+}
+
+.messaging-card-image-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    font-size: 3rem;
+}
+
+.messaging-card-dismiss {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+    opacity: 0;
+    transform: scale(0.8);
+}
+
+.messaging-suggestion-card:hover .messaging-card-dismiss {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.messaging-card-dismiss:hover {
+    background: #ef4444;
+    color: white;
+    transform: scale(1.1);
+}
+
+.messaging-card-info {
+    padding: 16px;
+}
+
+.messaging-card-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #1e293b;
+    margin: 0;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.messaging-card-details {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin: 0;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.messaging-card-actions {
+    margin-top: 12px;
+}
+
+.messaging-btn-primary {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    border: none;
+    border-radius: 12px;
+    padding: 8px 16px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.messaging-btn-primary:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+}
+
+.messaging-btn-primary:active {
+    transform: translateY(0);
+}
+
+/* Empty state styling */
+.no-suggestions {
+    text-align: center;
+    padding: 3rem 1rem;
+    width: 100%;
+}
+
+.empty-state {
+    color: var(--text-muted);
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.empty-state h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-secondary);
+}
+
+.empty-state p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 767px) {
+    .messaging-suggestion-card {
+        min-width: 170px !important;
+    }
+    
+    .messaging-card-image-container {
+        height: 160px;
+    }
+    
+    .messaging-card-info {
+        padding: 12px;
+    }
+    
+    .messaging-card-name {
+        font-size: 0.85rem;
+    }
+    
+    .messaging-card-details {
+        font-size: 0.75rem;
+    }
+    
+    .messaging-btn-primary {
+        padding: 6px 12px;
+        font-size: 0.75rem;
+    }
+}
+
+/* Small mobile devices */
+@media (max-width: 375px) {
+    .messaging-suggestion-card {
+        min-width: 160px !important;
+    }
+}
+
+/* Smooth fade-in animation */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.messaging-suggestion-card {
+    animation: fadeInUp 0.5s ease forwards;
+}
+
+.messaging-suggestion-card:nth-child(1) { animation-delay: 0.1s; }
+.messaging-suggestion-card:nth-child(2) { animation-delay: 0.2s; }
+.messaging-suggestion-card:nth-child(3) { animation-delay: 0.3s; }
+.messaging-suggestion-card:nth-child(4) { animation-delay: 0.4s; }
+.messaging-suggestion-card:nth-child(5) { animation-delay: 0.5s; }
+</style>
+
+<script>
+// Messaging Suggestions Micro-interactions
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle dismiss button clicks
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.messaging-card-dismiss')) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const card = e.target.closest('.messaging-suggestion-card');
+            if (card) {
+                // Add dismiss animation
+                card.style.transition = 'all 0.3s ease';
+                card.style.transform = 'scale(0.8) rotate(5deg)';
+                card.style.opacity = '0';
+                
+                setTimeout(() => {
+                    card.remove();
+                    // Optionally trigger a refresh or load more suggestions
+                    refreshMessagingSuggestions();
+                }, 300);
+            }
+        }
+    });
+
+    // Handle friend button clicks with feedback
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.messaging-btn-primary')) {
+            const button = e.target.closest('.messaging-btn-primary');
+            
+            // Add click feedback
+            button.style.transform = 'scale(0.95)';
+            button.style.transition = 'transform 0.1s ease';
+            
+            setTimeout(() => {
+                button.style.transform = '';
+            }, 100);
+            
+            // Handle action based on button text and icon
+            const userId = button.dataset.userId;
+            if (userId) {
+                const buttonHTML = button.innerHTML;
+                if (buttonHTML.includes('bi-chat-dots') || buttonHTML.includes('Message')) {
+                    handleMessagingAction(button, userId);
+                } else if (buttonHTML.includes('bi-person-plus') || buttonHTML.includes('Add Friend')) {
+                    handleFollowAction(button, userId);
+                } else {
+                    console.warn('Unknown button type:', buttonHTML);
+                }
+            }
+        }
+    });
+
+    // Touch feedback for mobile
+    const messagingCards = document.querySelectorAll('.messaging-suggestion-card');
+    messagingCards.forEach(card => {
+        card.addEventListener('touchstart', function() {
+            this.style.transform = 'translateY(-2px) scale(1.01)';
+        });
+        
+        card.addEventListener('touchend', function() {
+            this.style.transform = '';
+        });
+    });
+
+    // Smooth scroll behavior for messaging suggestions
+    const scrollContainer = document.querySelector('.messaging-suggestions-scroll');
+    if (scrollContainer) {
+        let isDown = false;
+        let startX;
+        let scrollLeft;
+
+        scrollContainer.addEventListener('mousedown', (e) => {
+            isDown = true;
+            startX = e.pageX - scrollContainer.offsetLeft;
+            scrollLeft = scrollContainer.scrollLeft;
+        });
+
+        scrollContainer.addEventListener('mouseleave', () => {
+            isDown = false;
+        });
+
+        scrollContainer.addEventListener('mouseup', () => {
+            isDown = false;
+        });
+
+        scrollContainer.addEventListener('mousemove', (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - scrollContainer.offsetLeft;
+            const walk = (x - startX) * 2;
+            scrollContainer.scrollLeft = scrollLeft - walk;
+        });
+    }
+});
+
+function handleFollowAction(button, userId) {
+    console.log('handleFollowAction called for user ID:', userId);
+    const isFollowing = button.textContent.includes('Message');
+    
+    // Show loading state
+    const originalContent = button.innerHTML;
+    button.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Loading...';
+    button.disabled = true;
+    
+    // Get username from the card
+    const card = button.closest('.messaging-suggestion-card');
+    const usernameLink = card.querySelector('a[href*="/user/"]');
+    const username = usernameLink ? usernameLink.href.split('/user/')[1].split('/')[0] : null;
+    
+    if (!username) {
+        console.error('Could not find username for user ID:', userId);
+        button.innerHTML = originalContent;
+        button.disabled = false;
+        return;
+    }
+    
+    // Make actual API call to toggle follow
+    fetch(`/toggle-follow/${username}/`, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: JSON.stringify({})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('Error:', data.error);
+            button.innerHTML = originalContent;
+            button.disabled = false;
+            return;
+        }
+        
+        if (data.is_following) {
+            // Now following - show message button
+            button.innerHTML = '<i class="bi bi-chat-dots me-1"></i>Message';
+            button.classList.remove('btn-primary');
+            button.classList.add('btn-secondary');
+        } else {
+            // Unfollowed - show add friend button
+            button.innerHTML = '<i class="bi bi-person-plus me-1"></i>Add Friend';
+            button.classList.remove('btn-secondary');
+            button.classList.add('btn-primary');
+        }
+        
+        button.disabled = false;
+        
+        // Add success animation
+        button.style.animation = 'pulse 0.5s ease';
+        setTimeout(() => {
+            button.style.animation = '';
+        }, 500);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        button.innerHTML = originalContent;
+        button.disabled = false;
+    });
+}
+
+function handleMessagingAction(button, userId) {
+    console.log('handleMessagingAction called for user ID:', userId);
+    // Show loading state
+    const originalContent = button.innerHTML;
+    button.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Loading...';
+    button.disabled = true;
+    
+    // Create form data for conversation creation
+    const formData = new FormData();
+    formData.append('user_id', userId);
+    formData.append('type', 'direct');
+    
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                      getCookie('csrftoken');
+    
+    // Make POST request to create conversation
+    fetch('/messaging/create/', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': csrfToken,
+        },
+        body: formData,
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (response.redirected) {
+            // Redirect to conversation
+            window.location.href = response.url;
+            return;
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data && data.error) {
+            console.error('Error:', data.error);
+            button.innerHTML = originalContent;
+            button.disabled = false;
+        } else if (data && data.redirect_url) {
+            window.location.href = data.redirect_url;
+        } else {
+            // Fallback: redirect to messages page
+            window.location.href = '/messaging/';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        button.innerHTML = originalContent;
+        button.disabled = false;
+        // Fallback: redirect to messages page
+        window.location.href = '/messaging/';
+    });
+}
+
+// Helper function to get CSRF token from cookies
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function refreshMessagingSuggestions() {
+    // This would typically make an API call to get more suggestions
+    console.log('Refreshing messaging suggestions...');
+}
+
+// Add pulse animation
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+`;
+document.head.appendChild(style);
+</script>

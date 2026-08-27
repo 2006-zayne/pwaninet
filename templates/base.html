@@ -4,7 +4,7 @@
 <html lang="{% if LANGUAGE_CODE == 'sw' %}sw{% else %}en{% endif %}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>PwaniNet</title>
     
     <!-- PWA Manifest -->
@@ -55,6 +55,13 @@
     <script>
         // Set theme immediately to prevent flash
         (function() {
+            // Capacitor detection - use hasOwnProperty for reliable native environment detection
+            const isNative = window.hasOwnProperty('Capacitor');
+            if (isNative) {
+                document.documentElement.classList.add('is-capacitor');
+                // Will move .is-native-app to body once body is available
+            }
+
             const userPreference = '{{ request.user.theme_preference|default:"system" }}';
             const savedTheme = localStorage.getItem('theme');
             const theme = userPreference !== 'system' ? userPreference : (savedTheme || 'system');
@@ -275,13 +282,16 @@
     
     <!-- Load CSS files -->
     <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
-    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
     <link rel="stylesheet" href="{% static 'css/people-modal.css' %}">
     <link rel="stylesheet" href="{% static 'css/comments.css' %}">
     <script src="{% static 'js/htmx.min.js' %}"></script>
     <script src="{% static 'js/device_manager.js' %}"></script>
+    
+    <!-- Native App Enhancements (Capacitor-specific) -->
+    <script src="{% static 'js/native-app.js' %}"></script>
     
     <!-- Lazy Image Loader for performance -->
     <script src="{% static 'js/lazy-load-images.js' %}"></script>
@@ -671,30 +681,30 @@
         body {
             background-color: var(--background) !important;
             color: var(--text-dark);
-            font-family: var(--font-family, 'Inter', 'Roboto', system-ui, -apple-system, sans-serif);
+            font-family: var(--font-family, system-ui, -apple-system, 'Roboto', 'Inter', sans-serif);
             font-style: var(--font-style, normal);
             padding-top: 75px;
-            padding-bottom: 80px;
+            padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
             font-size: 1rem;
         }
 
         @media (max-width: 767px) {
             body {
-                padding-bottom: 80px;
+                padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
             }
         }
 
         /* iPhone SE and very small screens (320px width) */
         @media (max-width: 360px) {
             body {
-                padding-bottom: 75px;
+                padding-bottom: calc(75px + env(safe-area-inset-bottom, 0px));
             }
             
             .mobile-bottom-nav {
                 width: 95%;
                 max-width: 380px;
                 height: 55px;
-                bottom: 6px;
+                bottom: calc(6px + env(safe-area-inset-bottom, 0px));
                 padding: 0 4px;
                 border-radius: 16px;
             }
@@ -742,7 +752,7 @@
             background: var(--nav-bg) !important;
             backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border);
-            height: 65px;
+            height: 75px;
         }
 
         .nav-chip {
@@ -764,7 +774,7 @@
             border-radius: 20px;
             height: 60px;
             position: fixed;
-            bottom: 8px;
+            bottom: calc(8px + env(safe-area-inset-bottom, 0px));
             left: 50%;
             transform: translateX(-50%);
             width: 95%;
@@ -979,6 +989,17 @@
       data-app-build="{{ app_build }}"
       data-app-environment="{{ app_environment }}">
 
+    <script>
+        // Add .is-native-app class to body when running in Capacitor native environment
+        (function() {
+            const isNative = window.hasOwnProperty('Capacitor');
+            if (isNative) {
+                document.body.classList.add('is-native-app');
+                console.log('[NativeApp] Running in Capacitor native environment');
+            }
+        })();
+    </script>
+
     {# Status modal must stay outside #app so welcome/login flows stay visible when #app is hidden #}
     {% include 'partials/status_modal.html' %}
 
@@ -1139,7 +1160,10 @@
     <script src="{% static 'js/status-modal.js' %}"></script>
     <script src="{% static 'js/reaction-sound.js' %}"></script>
     <script src="{% static 'js/post-content.js' %}"></script>
-    
+
+    <!-- Messaging Domain Bootstrap (only loads if chat-container exists) -->
+    <script type="module" src="{% static 'js/chat/bootstrap.js' %}"></script>
+
     {% block page_scripts %}{% endblock %}
     <script type="module">
         import { uploadManager } from '{% static "js/upload/upload_manager.js" %}';

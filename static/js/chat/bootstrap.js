@@ -28,7 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const config = {
         conversationId: parseInt(chatContainer?.dataset.conversationId || document.body.dataset.conversationId),
         currentUserId: parseInt(chatContainer?.dataset.userId || document.body.dataset.userId),
-        isEncrypted: (chatContainer?.dataset.isEncrypted || document.body.dataset.isEncrypted) === 'true'
+        isEncrypted: (chatContainer?.dataset.isEncrypted || document.body.dataset.isEncrypted) === 'true',
+        isGroupChat: !!chatContainer?.dataset.groupId
     };
 
     // Validate configuration
@@ -49,7 +50,9 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('✅ Message service initialized (ingestion layer)');
 
     // 3. WebSocket (transport ONLY)
-    webSocketManager.init(config.conversationId);
+    // Check if groups-specific WebSocket URL is set
+    const wsUrl = window.GROUPS_WS_URL || null;
+    webSocketManager.init(config.conversationId, wsUrl);
     console.log('✅ WebSocket initialized (transport layer)');
 
     // 4. UI controller (read-only consumer)
@@ -80,15 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.store = store;
     window.messageService = messageService;
     window.webSocketManager = webSocketManager;
-    window.uiController = uiController;
-    window.attachmentService = attachmentService;
-    window.attachmentUI = attachmentUI;
-    window.cameraService = cameraService;
-    window.voiceService = voiceService;
-    window.voiceModalController = voiceModalController;
-    window.emojiService = emojiService;
-    window.contextMenuService = contextMenuService;
-    window.messageSoundManager = messageSoundManager;
 
     console.log('🎉 SOT architecture initialized with mandatory data flow enforcement');
     console.log('📊 Data flow: websocket → message-service → store → ui-controller → renderer');

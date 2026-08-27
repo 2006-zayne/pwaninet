@@ -230,3 +230,79 @@
     background-color: var(--gradient-color1, #141E30);
     color: var(--text-color, #ffffff);
 }
+
+/* ================================
+   NATIVE MOBILE ENHANCEMENTS
+   All styles scoped to .is-native-app to ensure
+   desktop and PWA behavior is not affected
+================================ */
+
+/* Disable text selection globally in native app, but allow it in form inputs */
+body.is-native-app {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* Explicitly whitelist text selection for form inputs */
+body.is-native-app input,
+body.is-native-app textarea {
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+/* Disable long-press menus on links and images in native app */
+body.is-native-app a,
+body.is-native-app img {
+    -webkit-touch-callout: none;
+}
+
+/* Safe area insets for header in native app */
+/* Navbar extends into status bar area with solid status bar background matching navbar */
+body.is-native-app .navbar-top {
+    /* Use padding-top to handle safe area, ensure box-sizing includes padding in height */
+    padding-top: env(safe-area-inset-top);
+    height: 90px;
+    box-sizing: border-box;
+    /* Ensure navbar extends to the top edge */
+    margin-top: 0;
+}
+
+/* Adjust body padding to match navbar height in native app with safe area consideration */
+body.is-native-app {
+    padding-top: 90px;
+    /* Account for both bottom nav height and system navigation bar */
+    padding-bottom: calc(85px + env(safe-area-inset-bottom, 0px));
+    /* Ensure content can extend under system bars */
+    margin-top: 0;
+}
+
+/* Safe area insets for footer in native app - floats above system navigation bar */
+body.is-native-app .mobile-bottom-nav {
+    /* Update bottom position to float above system bar */
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    /* Reset padding-bottom as the container itself is moved up */
+    padding-bottom: 0;
+    /* Ensure navbar extends to the bottom edge is NOT desired for floating pill */
+    margin-bottom: 0;
+}
+
+/* Instant button touch states for native app */
+body.is-native-app .btn.activated,
+body.is-native-app .btn-native.activated,
+body.is-native-app button.activated {
+    opacity: 0.7;
+    transform: scale(0.98);
+}
+
+/* Theme-specific activated states */
+body.is-native-app[data-theme="light"] .btn.activated,
+body.is-native-app[data-theme="light"] .btn-native.activated,
+body.is-native-app[data-theme="light"] button.activated {
+    background-color: var(--primary-hover) !important;
+}
+
+body.is-native-app[data-theme="dark"] .btn.activated,
+body.is-native-app[data-theme="dark"] .btn-native.activated,
+body.is-native-app[data-theme="dark"] button.activated {
+    background-color: var(--primary-hover) !important;
+}

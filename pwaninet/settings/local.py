@@ -9,8 +9,7 @@ ALLOWED_HOSTS = [
     host.split(':')[0].strip()
     for host in os.environ.get(
         'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,0.0.0.0,pwaninet.app,192.168.73.221,192.168.43.170'
-
+        'localhost,127.0.0.1,0.0.0.0,pwaninet.app,192.168.59.221,192.168.43.170,10.0.2.2'
     ).split(',')
     if host.strip()
 ]
@@ -18,7 +17,7 @@ ALLOWED_HOSTS = [
 # Ensure the specific IP is in ALLOWED_HOSTS
 if 'pwaninet.app' not in ALLOWED_HOSTS:
 
-        ALLOWED_HOSTS.append('192.168.73.221')
+        ALLOWED_HOSTS.append('pwaninet.app')
 
 
 
@@ -59,6 +58,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://10.20.152.125:8000',
     'https://10.20.152.125',
     'https://10.20.152.125:8000',
+    'http://10.0.2.2',
+    'http://10.0.2.2:8000',
     'http://192.168.213.221',
     'http://192.168.213.221:8000',
     'https://192.168.213.221',
@@ -83,6 +84,10 @@ CSRF_TRUSTED_ORIGINS = [
     'http://172.18.0.1:8000',
     'https://172.18.0.1',
     'https://172.18.0.1:8000',
+    'capacitor://localhost',
+    'http://localhost',
+    'http://192.168.127.221',
+    'http://192.168.127.221:8000',
 ]
 
 # Disable CSRF for API endpoints in local development

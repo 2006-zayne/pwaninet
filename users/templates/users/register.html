@@ -56,13 +56,24 @@
 
   .password-input-wrapper {
     position: relative;
+    display: flex;
+    width: 100%;
+  }
+
+  .password-input-wrapper .form-control {
+    padding-right: 3rem !important;
+    width: 100%;
   }
 
   .password-toggle-btn {
     position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: none;
     border: none;
     cursor: pointer;
@@ -79,6 +90,15 @@
   .password-toggle-btn:focus {
     outline: none;
     box-shadow: none;
+  }
+
+  @media (max-width: 576px) {
+    .password-input-wrapper .form-control {
+      padding-right: 2.5rem !important;
+    }
+    .password-toggle-btn {
+      width: 2.5rem;
+    }
   }
 
   .field-error {

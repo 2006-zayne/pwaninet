@@ -113,9 +113,8 @@ urlpatterns = [
     path('courses/', include('courses.urls')),
     path('documents/', include(('documents.urls', 'documents'), namespace='documents')),
     path('', include('releases.urls')),
-    # Messaging - FROZEN FOR MVP - Redirect to home page
-    path('messaging/', redirect_messaging),
-    # path('messaging/', include(('messaging.urls', 'messaging'), namespace='messaging')),
+    # Messaging - Unfrozen for group chat functionality
+    path('messaging/', include(('messaging.urls', 'messaging'), namespace='messaging')),
     # JWT Token endpoints (temporarily disabled due to pkg_resources issue)
     # path('api/token/', include('rest_framework_simplejwt.urls')),
 ]

@@ -1,0 +1,427 @@
+from rest_framework import serializers
+from django.core.validators import FileExtensionValidator
+import os
+from .models import Conversation, ConversationMember, Message, MessageAttachment, MessageReaction, ConversationTheme, LinkPreview
+from users.serializers import UserSerializer
+
+
+class LinkPreviewSerializer(serializers.ModelSerializer):
+    """Serializer for link previews."""
+    image_url = serializers.SerializerMethodField()
+    favicon_url = serializers.SerializerMethodField()
+    has_thumbnail = serializers.SerializerMethodField()
+    has_favicon = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LinkPreview
+        fields = [
+            'id', 'url', 'title', 'description', 'site_name', 'domain',
+            'image_url', 'favicon_url', 'has_thumbnail', 'has_favicon',
+            'cached_at', 'created_at', 'fetch_failed'
+        ]
+        read_only_fields = ['id', 'cached_at', 'created_at', 'fetch_failed']
+
+    def get_image_url(self, obj):
+        """Get the URL of the cached image."""
+        if obj.image:
+            return obj.image.url
+        return None
+
+    def get_favicon_url(self, obj):
+        """Get the URL of the cached favicon."""
+        if obj.favicon:
+            return obj.favicon.url
+        return None
+
+    def get_has_thumbnail(self, obj):
+        """Check if preview has a thumbnail."""
+        return obj.has_thumbnail()
+
+    def get_has_favicon(self, obj):
+        """Check if preview has a favicon."""
+        return obj.has_favicon()
+
+
+class MessageReactionSerializer(serializers.ModelSerializer):
+    """Serializer for message reactions."""
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = MessageReaction
+        fields = ['id', 'message', 'user', 'emoji', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class MessageAttachmentSerializer(serializers.ModelSerializer):
+    """Serializer for message attachments."""
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MessageAttachment
+        fields = [
+            'id', 'file', 'file_url', 'file_type', 'caption', 'order',
+            'size', 'width', 'height', 'duration', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+    def get_file_url(self, obj):
+        """Get the URL of the attachment file."""
+        if obj.file:
+            return obj.file.url
+        return None
+
+
+class MessageSerializer(serializers.ModelSerializer):
+    """Serializer for messages."""
+    sender = UserSerializer(read_only=True)
+    reactions = MessageReactionSerializer(many=True, read_only=True)
+    reply_to_details = serializers.SerializerMethodField()
+    attachment_url = serializers.SerializerMethodField()
+    read_status = serializers.SerializerMethodField()
+    attachments = MessageAttachmentSerializer(many=True, read_only=True)
+    link_preview = LinkPreviewSerializer(read_only=True)
+
+    class Meta:
+        model = Message
+        fields = [
+            'id', 'conversation', 'sender', 'content', 'encrypted_content', 'is_encrypted',
+            'attachment', 'attachment_type', 'reply_to', 'reactions',
+            'reply_to_details', 'attachment_url', 'read_status', 'status', 'created_at', 'edited_at', 'is_deleted',
+            'link_url', 'link_title', 'link_description', 'link_image', 'link_type',
+            'global_caption', 'message_type', 'attachments', 'link_preview'
+        ]
+        read_only_fields = ['id', 'created_at', 'edited_at', 'is_encrypted', 'status']
+
+    def get_reply_to_details(self, obj):
+        """Get details of the message being replied to."""
+        if obj.reply_to:
+            return MessageSerializer(obj.reply_to).data
+        return None
+
+    def get_attachment_url(self, obj):
+        """Get the URL of the attachment (legacy single attachment)."""
+        if obj.attachment:
+            return obj.attachment.url
+        return None
+
+    def get_read_status(self, obj):
+        """Get the read status of the message using ConversationMember.last_read_message."""
+        request = self.context.get('request')
+
+        # If there's no request user, default to sent
+        if not request or not request.user.is_authenticated:
+            return 'sent'
+
+        # If the current user sent this message, check if others have read it
+        if obj.sender == request.user:
+            # Check if any other member has read this message using last_read_message
+            other_members = obj.conversation.members.exclude(user=request.user)
+            for member in other_members:
+                if member.last_read_message and member.last_read_message.id >= obj.id:
+                    return 'read'
+            # If no one has read it, it's just 'sent'
+            return 'sent'
+
+        # If the current user received this message, check if they've read it
+        member = obj.conversation.members.filter(user=request.user).first()
+        if member and member.last_read_message and member.last_read_message.id >= obj.id:
+            return 'read'
+
+        # For the receiver, if they see the message but haven't read it, it's 'delivered'
+        return 'delivered'
+
+
+class FileUploadValidator:
+    """Validator for file uploads with size, MIME type, and extension checks."""
+    
+    FILE_SIZE_LIMITS = {
+        'image': 10 * 1024 * 1024,      # 10MB for images
+        'video': 100 * 1024 * 1024,     # 100MB for videos
+        'audio': 25 * 1024 * 1024,      # 25MB for audio
+        'document': 50 * 1024 * 1024,    # 50MB for documents
+    }
+    
+    ALLOWED_TYPES = {
+        'image': ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
+        'video': ['video/mp4', 'video/webm', 'video/quicktime'],
+        'audio': ['audio/mpeg', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/aac'],
+        'document': ['application/pdf', 'text/plain', 'application/msword', 
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'application/vnd.ms-excel',
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+    }
+    
+    MIME_EXT_MAP = {
+        'image/jpeg': ['.jpg', '.jpeg'],
+        'image/png': ['.png'],
+        'image/gif': ['.gif'],
+        'image/webp': ['.webp'],
+        'image/svg+xml': ['.svg'],
+        'video/mp4': ['.mp4'],
+        'video/webm': ['.webm'],
+        'video/quicktime': ['.mov'],
+        'audio/mpeg': ['.mp3'],
+        'audio/wav': ['.wav'],
+        'audio/webm': ['.webm'],
+        'audio/ogg': ['.ogg'],
+        'audio/aac': ['.aac'],
+        'application/pdf': ['.pdf'],
+        'text/plain': ['.txt'],
+    }
+    
+    @classmethod
+    def validate(cls, file):
+        """Validate a file upload. Returns (is_valid, error_code, error_message, attachment_type)."""
+        if not file:
+            return False, 'NO_FILE', 'No file provided', None
+        
+        content_type = file.content_type.lower()
+        
+        # Determine attachment type and validate MIME type
+        attachment_type = None
+        max_size = None
+        
+        if content_type.startswith('image/'):
+            if content_type not in cls.ALLOWED_TYPES['image']:
+                return False, 'INVALID_IMAGE_TYPE', f'Image type {content_type} is not allowed. Allowed types: JPEG, PNG, GIF, WebP, SVG', None
+            attachment_type = 'image'
+            max_size = cls.FILE_SIZE_LIMITS['image']
+        elif content_type.startswith('video/'):
+            if content_type not in cls.ALLOWED_TYPES['video']:
+                return False, 'INVALID_VIDEO_TYPE', f'Video type {content_type} is not allowed. Allowed types: MP4, WebM, QuickTime', None
+            attachment_type = 'video'
+            max_size = cls.FILE_SIZE_LIMITS['video']
+        elif content_type.startswith('audio/'):
+            if content_type not in cls.ALLOWED_TYPES['audio']:
+                return False, 'INVALID_AUDIO_TYPE', f'Audio type {content_type} is not allowed. Allowed types: MP3, WAV, WebM, OGG, AAC', None
+            attachment_type = 'audio'
+            max_size = cls.FILE_SIZE_LIMITS['audio']
+        elif content_type in cls.ALLOWED_TYPES['document']:
+            attachment_type = 'document'
+            max_size = cls.FILE_SIZE_LIMITS['document']
+        else:
+            return False, 'INVALID_FILE_TYPE', f'File type {content_type} is not allowed', None
+        
+        # Validate file size
+        if file.size > max_size:
+            size_mb = max_size / (1024 * 1024)
+            return False, 'FILE_TOO_LARGE', f'File size exceeds {size_mb:.0f}MB limit for {attachment_type}s', attachment_type
+        
+        # Validate file extension matches MIME type
+        file_ext = os.path.splitext(file.name)[1].lower()
+        if content_type in cls.MIME_EXT_MAP and file_ext not in cls.MIME_EXT_MAP[content_type]:
+            return False, 'EXTENSION_MISMATCH', f'File extension {file_ext} does not match MIME type {content_type}', attachment_type
+        
+        return True, None, None, attachment_type
+
+
+class MessageCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating messages."""
+    class Meta:
+        model = Message
+        fields = ['conversation', 'content', 'encrypted_content', 'is_encrypted', 'reply_to', 'attachment', 'attachment_type',
+                  'link_url', 'link_title', 'link_description', 'link_image', 'link_type',
+                  'global_caption', 'message_type']
+
+
+class MessageAttachmentCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating message attachments."""
+    class Meta:
+        model = MessageAttachment
+        fields = ['file', 'file_type', 'caption', 'order', 'size', 'width', 'height', 'duration']
+
+
+class MessageUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for updating messages."""
+    class Meta:
+        model = Message
+        fields = ['content']
+        read_only_fields = ['id', 'created_at', 'sender', 'conversation']
+
+
+class ConversationMemberSerializer(serializers.ModelSerializer):
+    """Serializer for conversation members."""
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = ConversationMember
+        fields = ['id', 'conversation', 'user', 'joined_at', 'last_read_message', 'is_muted', 'public_key']
+        read_only_fields = ['id', 'joined_at']
+
+
+class ConversationSerializer(serializers.ModelSerializer):
+    """Serializer for conversations."""
+    members = ConversationMemberSerializer(many=True, read_only=True)
+    last_message = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
+    existing = serializers.SerializerMethodField()
+    member_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+
+    class Meta:
+        model = Conversation
+        fields = [
+            'id', 'type', 'name', 'is_encrypted', 'members', 'member_ids',
+            'created_at', 'updated_at', 'last_message', 'unread_count', 'existing'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'is_encrypted']
+
+    def get_last_message(self, obj):
+        """Get the last message in the conversation."""
+        last_message = obj.messages.last()
+        if last_message:
+            return MessageSerializer(last_message).data
+        return None
+
+    def get_unread_count(self, obj):
+        """Get the count of unread messages for the current user."""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            member = obj.members.filter(user=request.user).first()
+            if member and member.last_read_message:
+                return obj.messages.filter(
+                    created_at__gt=member.last_read_message.created_at
+                ).count()
+            return obj.messages.count()
+        return 0
+
+    def get_existing(self, obj):
+        """Check if this conversation already existed (for direct conversations)."""
+        return getattr(obj, '_existing', False)
+
+    def create(self, validated_data):
+        """
+        Create a new conversation or return existing one for direct messages.
+        For direct conversations between two users, only one conversation is allowed.
+        """
+        member_ids = validated_data.pop('member_ids', [])
+        request = self.context.get('request')
+        current_user = request.user if request else None
+
+        # For direct conversations, check if one already exists between these users
+        if validated_data.get('type') == Conversation.DIRECT and current_user:
+            # Include current user in the check
+            all_member_ids = set(member_ids + [current_user.id])
+
+            # Only check for duplicates if there are exactly 2 members (1-on-1 conversation)
+            if len(all_member_ids) == 2:
+                other_user_id = list(all_member_ids - {current_user.id})[0]
+                from users.models import User
+                try:
+                    other_user = User.objects.get(id=other_user_id)
+                    existing = Conversation.get_direct_conversation_between(
+                        current_user, other_user
+                    )
+                    if existing:
+                        # Mark as existing and return it
+                        existing._existing = True
+                        return existing
+                except User.DoesNotExist:
+                    pass
+
+        # Create new conversation
+        conversation = Conversation.objects.create(**validated_data)
+        conversation._existing = False
+
+        # Add members
+        if member_ids:
+            from users.models import User
+            members = User.objects.filter(id__in=member_ids)
+            for member in members:
+                ConversationMember.objects.create(
+                    conversation=conversation,
+                    user=member
+                )
+
+        return conversation
+
+
+class ConversationThemeSerializer(serializers.ModelSerializer):
+    """Serializer for conversation themes."""
+    light_image_url = serializers.SerializerMethodField()
+    dark_image_url = serializers.SerializerMethodField()
+    css_variables_light = serializers.SerializerMethodField()
+    css_variables_dark = serializers.SerializerMethodField()
+    overlay_light = serializers.SerializerMethodField()
+    overlay_dark = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConversationTheme
+        fields = [
+            'id', 'conversation', 'theme_type', 'light_color', 'dark_color',
+            'light_gradient_start', 'light_gradient_end', 'dark_gradient_start', 
+            'dark_gradient_end', 'gradient_angle', 'light_image_url', 'dark_image_url',
+            'image_fit', 'overlay_opacity', 'light_overlay_color', 'dark_overlay_color',
+            'css_variables_light', 'css_variables_dark', 'overlay_light', 'overlay_dark',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_light_image_url(self, obj):
+        if obj.light_image:
+            return obj.light_image.url
+        return None
+
+    def get_dark_image_url(self, obj):
+        if obj.dark_image:
+            return obj.dark_image.url
+        return None
+
+    def get_css_variables_light(self, obj):
+        return obj.get_css_variables('light')
+
+    def get_css_variables_dark(self, obj):
+        return obj.get_css_variables('dark')
+
+    def get_overlay_light(self, obj):
+        return obj.get_overlay_css('light')
+
+    def get_overlay_dark(self, obj):
+        return obj.get_overlay_css('dark')
+
+
+class ConversationThemeCreateUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for creating and updating conversation themes."""
+    
+    class Meta:
+        model = ConversationTheme
+        fields = [
+            'theme_type', 'light_color', 'dark_color',
+            'light_gradient_start', 'light_gradient_end', 'dark_gradient_start', 
+            'dark_gradient_end', 'gradient_angle', 'light_image', 'dark_image',
+            'image_fit', 'overlay_opacity', 'light_overlay_color', 'dark_overlay_color'
+        ]
+
+    def validate(self, data):
+        theme_type = data.get('theme_type')
+        
+        if theme_type == 'solid':
+            if not data.get('light_color') or not data.get('dark_color'):
+                raise serializers.ValidationError(
+                    "Solid color theme requires both light_color and dark_color"
+                )
+        elif theme_type == 'gradient':
+            required_fields = ['light_gradient_start', 'light_gradient_end', 
+                             'dark_gradient_start', 'dark_gradient_end']
+            if not all(data.get(field) for field in required_fields):
+                raise serializers.ValidationError(
+                    "Gradient theme requires all gradient color fields"
+                )
+        elif theme_type == 'image':
+            if not data.get('light_image') and not data.get('dark_image'):
+                raise serializers.ValidationError(
+                    "Image theme requires at least one image (light or dark mode)"
+                )
+        
+        return data
+
+
+class ConversationDetailSerializer(ConversationSerializer):
+    """Detailed serializer for conversations with messages."""
+    messages = MessageSerializer(many=True, read_only=True)
+
+    class Meta(ConversationSerializer.Meta):
+        fields = ConversationSerializer.Meta.fields + ['messages']

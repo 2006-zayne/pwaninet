@@ -35,7 +35,7 @@ ALLOWED_HOSTS = [
     host.split(':')[0].strip()
     for host in os.environ.get(
         'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,10.20.152.125,pwaninet.app,192.168.114.221,192.168.43.170'
+        'localhost,127.0.0.1,10.20.152.125,pwaninet.app,192.168.114.221,192.168.43.170,192.168.127.221'
     ).split(',')
     if host.strip()
 ]
@@ -63,8 +63,7 @@ INSTALLED_APPS = [
     'notifications',
     'documents',
     'releases',
-    # Messaging - FROZEN FOR MVP
-    # 'messaging',
+    'messaging',
 ]
 
 MIDDLEWARE = [
@@ -289,7 +288,7 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
+CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://10.0.2.2:8000').split(',')
 CORS_ALLOW_CREDENTIALS = True
 
 # CSRF settings

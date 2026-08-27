@@ -1,0 +1,33 @@
+{
+  "appId": "com.pwaninet.app",
+  "appName": "Pwaninet",
+  "webDir": "www",
+  "server": {
+    "url": "https://pwaninet.app",
+    "cleartext": false,
+    "errorPath": "/offline.html",
+    "allowNavigation": ["*"]
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0,
+      "launchAutoHide": true,
+      "backgroundColor": "#0f172a",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "androidSpinnerStyle": "large",
+      "iosSpinnerStyle": "small",
+      "spinnerColor": "#2563eb",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true,
+      "layoutName": "splash_screen",
+      "useDialog": true
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#00000000",
+      "overlaysWebView": true
+    }
+  }
+}
