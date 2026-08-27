@@ -59,44 +59,35 @@ function initInstantTouchStates() {
 
 /**
  * Status bar integration with theme matching
+ * Uses official Capacitor StatusBar plugin for transparency control
+ * Handles both status bar (top) and navigation bar (bottom) on Android
  */
 async function initStatusBar() {
     try {
-        const { StatusBar } = await import('@capacitor/status-bar');
-
-        // Get current theme
-        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-
-        // Set status bar style based on theme
-        await updateStatusBarForTheme(currentTheme);
-
-        // Make status bar transparent to blend with app background
-        const isAndroid = /android/i.test(navigator.userAgent);
-        if (isAndroid) {
-            await StatusBar.setBackgroundColor({ color: '#00000000' }); // Transparent
-            console.log('[NativeApp] Status bar set to transparent');
+        if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.StatusBar) {
+            console.error('[NativeApp] StatusBar plugin not available on window.Capacitor.Plugins');
+            return;
         }
+        const { StatusBar } = window.Capacitor.Plugins;
 
-        // Debug logging for safe area insets
-        setTimeout(() => {
-            const safeAreaTop = getComputedStyle(document.documentElement).getPropertyValue('safe-area-inset-top');
-            const navbar = document.querySelector('.navbar-top');
-            if (navbar) {
-                const navbarHeight = getComputedStyle(navbar).height;
-                const navbarPaddingTop = getComputedStyle(navbar).paddingTop;
-                console.log('[NativeApp] Debug - Safe area inset top:', safeAreaTop);
-                console.log('[NativeApp] Debug - Navbar height:', navbarHeight);
-                console.log('[NativeApp] Debug - Navbar padding top:', navbarPaddingTop);
-                console.log('[NativeApp] Debug - Expected height calculation:', `calc(${safeAreaTop} + 80px)`);
-            }
-        }, 1000);
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const initialStyle = currentTheme === 'light' ? 'LIGHT' : 'DARK';
 
-        // Listen for theme changes
+        await StatusBar.setStyle({ style: initialStyle });
+        await StatusBar.setBackgroundColor({ color: '#00000000' });
+        await StatusBar.setOverlaysWebView({ overlay: true });
+
+        console.log(`[NativeApp] StatusBar configured for edge-to-edge with initial style: ${initialStyle}`);
+
+        await updateStatusBarForTheme(currentTheme);
+        await updateNavigationBarForTheme(currentTheme);
+
         const observer = new MutationObserver(function(mutations) {
             mutations.forEach(function(mutation) {
                 if (mutation.type === 'attributes' && mutation.attributeName === 'data-theme') {
                     const newTheme = document.documentElement.getAttribute('data-theme') || 'light';
                     updateStatusBarForTheme(newTheme);
+                    updateNavigationBarForTheme(newTheme);
                 }
             });
         });
@@ -112,44 +103,59 @@ async function initStatusBar() {
 }
 
 /**
- * Update status bar style when theme changes
+ * Update status bar theme when theme changes
+ * Uses official Capacitor StatusBar plugin for control
+ * Handles both status bar (top) and navigation bar (bottom) on Android
  */
 async function updateStatusBarForTheme(theme) {
     try {
-        const { StatusBar } = await import('@capacitor/status-bar');
-        
-        if (theme === 'dark') {
-            await StatusBar.setStyle({ style: 'Light' });
-            console.log('[NativeApp] Status bar updated to Light style for dark theme');
-        } else {
-            await StatusBar.setStyle({ style: 'Dark' });
-            console.log('[NativeApp] Status bar updated to Dark style for light theme');
+        if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.StatusBar) {
+            console.error('[NativeApp] StatusBar plugin not available on window.Capacitor.Plugins');
+            return;
         }
+        const { StatusBar } = window.Capacitor.Plugins;
+
+        const statusBarStyle = theme === 'light' ? 'LIGHT' : 'DARK';
+        await StatusBar.setStyle({ style: statusBarStyle });
+        await StatusBar.setBackgroundColor({ color: '#00000000' });
+        await StatusBar.setOverlaysWebView({ overlay: true });
+
+        console.log('[NativeApp] Status/navigation bars updated to:', theme, 'with style:', statusBarStyle);
     } catch (error) {
-        console.error('[NativeApp] Failed to update status bar style:', error);
+        console.error('[NativeApp] Failed to update status/navigation bars:', error);
     }
 }
 
 /**
- * Helper function to convert RGB color to hex
+ * Update navigation bar theme when theme changes
+ * Uses community SafeArea plugin for Android navigation bar control
+ * Sets navigation bar to transparent so app theme background shows through
  */
-function rgbToHex(rgb) {
-    // Handle hex colors
-    if (rgb.startsWith('#')) {
-        return rgb;
+async function updateNavigationBarForTheme(theme) {
+    try {
+        if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.SafeArea) {
+            console.error('[NativeApp] SafeArea plugin not available on window.Capacitor.Plugins');
+            return;
+        }
+        const { SafeArea } = window.Capacitor.Plugins;
+
+        await SafeArea.enable({
+            config: {
+                customColorsForSystemBars: true,
+                statusBarColor: '#00000000',
+                statusBarContent: theme === 'light' ? 'dark' : 'light',
+                // Transparent nav bar background — the app's own themed
+                // background (bottom tab bar / page background) shows through
+                // instead of a separate solid bar.
+                navigationBarColor: '#00000000',
+                navigationBarContent: theme === 'light' ? 'dark' : 'light',
+            }
+        });
+
+        console.log('[NativeApp] Navigation bar updated to:', theme, '(transparent, icon content:', theme === 'light' ? 'dark' : 'light', ')');
+    } catch (error) {
+        console.error('[NativeApp] Failed to update navigation bar:', error);
     }
-    
-    // Handle rgb/rgba format
-    const rgbMatch = rgb.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)$/);
-    if (rgbMatch) {
-        const r = parseInt(rgbMatch[1], 16).toString(16).padStart(2, '0');
-        const g = parseInt(rgbMatch[2], 16).toString(16).padStart(2, '0');
-        const b = parseInt(rgbMatch[3], 16).toString(16).padStart(2, '0');
-        return `#${r}${g}${b}`;
-    }
-    
-    // Default fallback
-    return '#2563eb';
 }
 
 /**

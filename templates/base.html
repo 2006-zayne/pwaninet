@@ -684,27 +684,27 @@
             font-family: var(--font-family, system-ui, -apple-system, 'Roboto', 'Inter', sans-serif);
             font-style: var(--font-style, normal);
             padding-top: 75px;
-            padding-bottom: 80px;
+            padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
             font-size: 1rem;
         }
 
         @media (max-width: 767px) {
             body {
-                padding-bottom: 80px;
+                padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
             }
         }
 
         /* iPhone SE and very small screens (320px width) */
         @media (max-width: 360px) {
             body {
-                padding-bottom: 75px;
+                padding-bottom: calc(75px + env(safe-area-inset-bottom, 0px));
             }
             
             .mobile-bottom-nav {
                 width: 95%;
                 max-width: 380px;
                 height: 55px;
-                bottom: 6px;
+                bottom: calc(6px + env(safe-area-inset-bottom, 0px));
                 padding: 0 4px;
                 border-radius: 16px;
             }
@@ -752,7 +752,7 @@
             background: var(--nav-bg) !important;
             backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border);
-            height: 65px;
+            height: 75px;
         }
 
         .nav-chip {
@@ -774,7 +774,7 @@
             border-radius: 20px;
             height: 60px;
             position: fixed;
-            bottom: 8px;
+            bottom: calc(8px + env(safe-area-inset-bottom, 0px));
             left: 50%;
             transform: translateX(-50%);
             width: 95%;

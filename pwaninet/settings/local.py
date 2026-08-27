@@ -17,7 +17,7 @@ ALLOWED_HOSTS = [
 # Ensure the specific IP is in ALLOWED_HOSTS
 if 'pwaninet.app' not in ALLOWED_HOSTS:
 
-        ALLOWED_HOSTS.append('192.168.127.221')
+        ALLOWED_HOSTS.append('pwaninet.app')
 
 
 

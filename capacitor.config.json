@@ -3,8 +3,8 @@
   "appName": "Pwaninet",
   "webDir": "www",
   "server": {
-    "url": "http://192.168.127.221:8000",
-    "cleartext":true,
+    "url": "https://pwaninet.app",
+    "cleartext": false,
     "errorPath": "/offline.html",
     "allowNavigation": ["*"]
   },
@@ -25,11 +25,9 @@
       "useDialog": true
     },
     "StatusBar": {
-      "style": "DEFAULT",
+      "style": "DARK",
+      "backgroundColor": "#00000000",
       "overlaysWebView": true
-    },
-    "App": {
-      "statusBarStyle": "DEFAULT"
     }
   }
 }

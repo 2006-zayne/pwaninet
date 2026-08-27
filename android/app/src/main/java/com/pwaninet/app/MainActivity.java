@@ -5,11 +5,15 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+
+import androidx.activity.EdgeToEdge;
+import androidx.activity.SystemBarStyle;
 
 import com.getcapacitor.BridgeActivity;
 
@@ -22,13 +26,24 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        setTheme(R.style.AppTheme_NoActionBar);
         super.onCreate(savedInstanceState);
+
+        // Fixed style, not auto() — auto() continuously re-derives icon
+        // appearance from the DEVICE's system theme and overrides any style
+        // set via the StatusBar JS plugin, which is why in-app theme changes
+        // were never reflected in the status/nav bar icons. The StatusBar
+        // plugin (driven by data-theme, see initStatusBar()/
+        // updateStatusBarForTheme() in the JS) is now the single source of
+        // truth for icon appearance.
+        EdgeToEdge.enable(this,
+            SystemBarStyle.dark(Color.TRANSPARENT),
+            SystemBarStyle.dark(Color.TRANSPARENT));
+        
+        // StatusBar plugin handles system bar transparency and edge-to-edge layout
         
         setupNetworkMonitoring();
         setupCustomWebViewClient();
         setupWebViewCaching();
-        setupTransparentStatusBar();
         
         // Restore WebView state if available
         if (savedInstanceState != null) {
@@ -145,22 +160,10 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    private void setupTransparentStatusBar() {
-        // Enable transparent status bar to blend with app background
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-            getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
-            getWindow().getDecorView().setSystemUiVisibility(
-                android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
-                android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-            );
-            System.out.println("[MainActivity] Transparent status bar enabled");
-        }
-    }
-
     private void loadOfflinePage(WebView webView) {
         try {
             // Load the offline.html file from assets
-            InputStream inputStream = getAssets().open("www/offline.html");
+            InputStream inputStream = getAssets().open("public/offline.html");
             StringBuilder htmlBuilder = new StringBuilder();
             
             byte[] buffer = new byte[1024];
@@ -170,7 +173,7 @@ public class MainActivity extends BridgeActivity {
             }
             inputStream.close();
             
-            webView.loadDataWithBaseURL("file:///android_asset/www/", 
+            webView.loadDataWithBaseURL("file:///android_asset/public/", 
                 htmlBuilder.toString(), "text/html", "UTF-8", null);
         } catch (IOException e) {
             e.printStackTrace();
