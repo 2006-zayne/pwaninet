@@ -954,6 +954,10 @@
           <i class="bi bi-images"></i>
           <span>{% trans "Images" %}</span>
         </div>
+        <div class="attachment-option d-none" id="attachCameraNative">
+          <i class="bi bi-camera-fill"></i>
+          <span>{% trans "Camera" %}</span>
+        </div>
         <div class="attachment-option" id="attachVideo">
           <i class="bi bi-play-btn"></i>
           <span>{% trans "Video" %}</span>
@@ -1087,6 +1091,34 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Attachment options
+    const attachCameraNative = document.getElementById('attachCameraNative');
+    if (window.hasOwnProperty('Capacitor')) {
+        attachCameraNative.classList.remove('d-none');
+    }
+
+    attachCameraNative.addEventListener('click', async () => {
+        attachmentModal.classList.remove('show');
+        if (window.Capacitor && window.Capacitor.Plugins.Camera) {
+            try {
+                const { Camera, CameraResultType, CameraSource } = window.Capacitor.Plugins;
+                const image = await Camera.getPhoto({
+                    quality: 90,
+                    allowEditing: false,
+                    resultType: CameraResultType.Uri,
+                    source: CameraSource.Camera
+                });
+
+                const response = await fetch(image.webPath);
+                const blob = await response.blob();
+                const file = new File([blob], `captured_image_${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+                addFiles([file]);
+            } catch (error) {
+                console.error('[NativeApp] Camera capture failed:', error);
+            }
+        }
+    });
+
     document.getElementById('attachImages').addEventListener('click', () => {
         imageInput.click();
         attachmentModal.classList.remove('show');

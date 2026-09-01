@@ -85,7 +85,11 @@ class DownloadsManager {
 
             // Save file
             let fileHandle;
-            if (this.useOPFS) {
+            const isNative = window.hasOwnProperty('Capacitor');
+
+            if (isNative && window.Capacitor.Plugins.Filesystem) {
+                fileHandle = await this.saveToNative(finalFilename, blob);
+            } else if (this.useOPFS) {
                 fileHandle = await this.saveToOPFS(finalFilename, blob);
             } else {
                 fileHandle = await this.saveToIndexedDB(finalFilename, blob);
@@ -118,6 +122,45 @@ class DownloadsManager {
                 error: error.message,
             });
             throw error;
+        }
+    }
+
+    /**
+     * Save file to Native Downloads folder (Capacitor only)
+     * @param {string} filename - File name
+     * @param {Blob} blob - File blob
+     * @returns {Promise<string>} File path or name
+     */
+    async saveToNative(filename, blob) {
+        try {
+            const { Filesystem } = window.Capacitor.Plugins;
+            const { Directory } = window.Capacitor.Plugins.Filesystem;
+
+            // Convert blob to base64
+            const reader = new FileReader();
+            const base64Data = await new Promise((resolve, reject) => {
+                reader.onload = () => {
+                    const base64String = reader.result.split(',')[1];
+                    resolve(base64String);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+
+            const result = await Filesystem.writeFile({
+                path: filename,
+                data: base64Data,
+                directory: Directory.Documents, // Using Documents as primary user-visible storage
+                recursive: true
+            });
+
+            console.log('[DownloadsManager] File saved to native storage:', result.uri);
+            return result.uri;
+        } catch (error) {
+            console.error('Failed to save to native storage:', error);
+            // Fallback to OPFS or IndexedDB if native fails
+            if (this.useOPFS) return await this.saveToOPFS(filename, blob);
+            return await this.saveToIndexedDB(filename, blob);
         }
     }
 
@@ -198,11 +241,23 @@ class DownloadsManager {
 
         try {
             let blob;
+            const isNative = window.hasOwnProperty('Capacitor');
 
             if (this.useOPFS) {
                 blob = await this.getFromOPFS(metadata.filename);
             } else {
                 blob = await this.getFromIndexedDB(metadata.filename);
+            }
+
+            // If we have a blob and we're on mobile, we might want to "Share" instead of just opening
+            if (isNative && window.Capacitor.Plugins.Filesystem) {
+                // For native, we often prefer the system share sheet for "Opening" a file
+                try {
+                    await this.share(downloadId);
+                    return;
+                } catch (e) {
+                    console.warn('[DownloadsManager] Native share failed, falling back to URL open', e);
+                }
             }
 
             // Handle different media types

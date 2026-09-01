@@ -28,19 +28,10 @@
     </script>
     <meta name="theme-color" content="#2563eb">
 
-    <!-- iOS PWA: enable standalone and provide startup images -->
+    <!-- iOS PWA: enable standalone -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
-    <!-- Generic apple-touch-icon already present; add startup images for common sizes -->
-    <link rel="apple-touch-startup-image" href="{% static 'images/splash-640x1136.png' %}" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)">
-    <link rel="apple-touch-startup-image" href="{% static 'images/splash-750x1334.png' %}" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)">
-    <link rel="apple-touch-startup-image" href="{% static 'images/splash-1125x2436.png' %}" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">
-    <link rel="apple-touch-startup-image" href="{% static 'images/splash-1242x2208.png' %}" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)">
-    <link rel="apple-touch-startup-image" href="{% static 'images/splash-1536x2048.png' %}" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)">
-    <link rel="apple-touch-startup-image" href="{% static 'images/splash-1668x2388.png' %}" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)">
-    <link rel="apple-touch-startup-image" href="{% static 'images/splash-2048x2732.png' %}" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)">
-    
     <!-- PWA Icons - Comprehensive Favicon Support -->
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/favicon-96x96.png' %}">
@@ -329,312 +320,6 @@
     <script src="{% static 'js/comments/comment-renderer.js' %}"></script>
     <script src="{% static 'js/comments/comment-manager.js' %}"></script>
 
-    <!-- Startup Splash Screen CSS -->
-    <style>
-        :root {
-            --bs-backdrop-zindex: 1000000;
-            --bs-modal-zindex: 1000001;
-        }
-
-        /* Prevent black screen during initial page load */
-        body {
-            background-color: #f8fafc;
-            margin: 0;
-            padding: 0;
-        }
-
-        [data-theme="dark"] body {
-            background-color: #0f172a;
-        }
-
-        /* Splash hidden by default - no flash on internal navigation */
-        #startup-splash {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: var(--background);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 999999;
-            opacity: 0;
-            pointer-events: none; /* Ensure it doesn't intercept clicks when hidden */
-            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            will-change: opacity;
-        }
-        
-        /* Show splash immediately on fresh launch (class set by inline script in <head>) */
-        html.fresh-launch #startup-splash,
-        #startup-splash.show-splash {
-            opacity: 1;
-            pointer-events: auto; /* Allow interaction while splash is visible intentionally */
-        }
-        
-        /* App hidden by default until page loads */
-        #app {
-            opacity: 0;
-            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            will-change: opacity;
-        }
-
-        /* Show app when loaded */
-        #app.loaded {
-            opacity: 1;
-        }
-
-        /* Hide app on fresh launch (handled by startup splash) */
-        html.fresh-launch #app {
-            opacity: 0;
-        }
-        
-        /* JS-controlled classes (for fallback) */
-        #startup-splash.show-splash {
-            opacity: 1;
-        }
-        #app.hide-for-splash {
-            opacity: 0;
-        }
-        
-        #startup-splash.fade-out {
-            opacity: 0;
-            pointer-events: none;
-        }
-        
-        .splash-logo-container {
-            text-align: center;
-            animation: logoGlow 2s ease-in-out infinite alternate;
-        }
-        
-        @keyframes logoGlow {
-            0% {
-                filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.3));
-                transform: scale(1);
-            }
-            100% {
-                filter: drop-shadow(0 0 40px rgba(99, 102, 241, 0.6));
-                transform: scale(1.02);
-            }
-        }
-        
-        .splash-logo {
-            width: 80px;
-            height: 80px;
-            background: var(--card-bg);
-            border: 2px solid var(--border);
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .splash-logo::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: linear-gradient(
-                45deg,
-                transparent 30%,
-                rgba(255, 255, 255, 0.1) 50%,
-                transparent 70%
-            );
-            animation: shine 3s ease-in-out infinite;
-        }
-        
-        @keyframes shine {
-            0% {
-                transform: translateX(-100%) translateY(-100%) rotate(45deg);
-            }
-            50% {
-                transform: translateX(100%) translateY(100%) rotate(45deg);
-            }
-            100% {
-                transform: translateX(-100%) translateY(-100%) rotate(45deg);
-            }
-        }
-        
-        .splash-brand {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            font-size: 32px;
-            font-weight: 700;
-            color: var(--text-dark);
-            margin-bottom: 30px;
-            letter-spacing: -0.5px;
-        }
-        
-        .splash-brand::after {
-            content: '|';
-            animation: blink 1s ease-in-out infinite;
-            color: var(--primary);
-        }
-        
-        @keyframes blink {
-            0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0; }
-        }
-        
-        .splash-loading {
-            display: flex;
-            gap: 8px;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-        
-        .splash-dot {
-            width: 12px;
-            height: 12px;
-            background: var(--primary);
-            border-radius: 50%;
-            animation: bounce 1.4s ease-in-out infinite both;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-        }
-        
-        .splash-dot:nth-child(1) { animation-delay: -0.32s; }
-        .splash-dot:nth-child(2) { animation-delay: -0.16s; }
-        .splash-dot:nth-child(3) { animation-delay: 0; }
-        
-        @keyframes bounce {
-            0%, 80%, 100% {
-                transform: scale(0.8);
-                opacity: 0.5;
-            }
-            40% {
-                transform: scale(1.2);
-                opacity: 1;
-            }
-        }
-        
-        .splash-text {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 14px;
-            color: var(--text-secondary);
-            font-weight: 500;
-            letter-spacing: 0.5px;
-        }
-        
-        .splash-progress {
-            width: 200px;
-            height: 4px;
-            background: var(--border);
-            border-radius: 2px;
-            overflow: hidden;
-            margin: 20px 0;
-        }
-        
-        .splash-progress-bar {
-            height: 100%;
-            background: var(--primary);
-            border-radius: 2px;
-            width: 0%;
-            transition: width 0.5s ease;
-        }
-        
-        .splash-progress-bar.filling {
-            width: 70%;
-        }
-        
-        .splash-progress-bar.ready {
-            width: 100%;
-            transition: width 0.3s ease;
-        }
-        
-        #app.show {
-            opacity: 1 !important;
-        }
-        
-        /* Theme-aware colors are now handled by CSS variables */
-        
-        /* Mobile optimizations */
-        @media (max-width: 768px) {
-            .splash-logo {
-                width: 60px;
-                height: 60px;
-            }
-            
-            .splash-brand {
-                font-size: 24px;
-                margin-bottom: 20px;
-            }
-            
-            .splash-dot {
-                width: 10px;
-                height: 10px;
-            }
-            
-            .splash-text {
-                font-size: 12px;
-            }
-        }
-        
-        /* Performance optimizations */
-        .splash-logo-container,
-        .splash-logo,
-        .splash-brand,
-        .splash-loading,
-        .splash-dot {
-            will-change: transform, opacity;
-            backface-visibility: hidden;
-            perspective: 1000px;
-        }
-        
-        /* Pulse animation for text changes */
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
-        }
-        
-        /* Offline icon styling */
-        .splash-offline-icon {
-            font-size: 24px;
-            opacity: 0.8;
-            animation: pulse 2s ease-in-out infinite;
-        }
-        
-        /* Connection status animations */
-        .splash-text.connecting {
-            animation: pulse 1s ease-in-out infinite;
-        }
-        
-        .splash-text.error {
-            color: var(--text-secondary);
-            animation: shake 0.5s ease-in-out;
-        }
-        
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
-        }
-        
-        /* Reduced motion */
-        @media (prefers-reduced-motion: reduce) {
-            .splash-logo-container,
-            .splash-logo::before,
-            .splash-dot,
-            .splash-offline-icon {
-                animation: none;
-            }
-            
-            .splash-progress-bar {
-                transition: none;
-            }
-            
-            .splash-brand::after {
-                animation: none;
-                content: '';
-            }
-        }
-    </style>
-    
     <style>
         :root, [data-theme="light"] {
             --primary: #2563eb;
@@ -753,6 +438,47 @@
             backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border);
             height: 75px;
+        }
+
+        /* Navigation Progress Bar */
+        #navigation-progress {
+            position: fixed;
+            top: 75px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: transparent;
+            z-index: 10000;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        #navigation-progress-bar {
+            width: 0%;
+            height: 100%;
+            background: var(--primary, #2563eb);
+            transition: width 0.2s ease-out, opacity 0.3s ease-out;
+            opacity: 0;
+        }
+
+        #navigation-progress.active #navigation-progress-bar {
+            opacity: 1;
+        }
+
+        #navigation-progress.completing #navigation-progress-bar {
+            transition: width 0.15s ease-in, opacity 0.3s ease-out;
+        }
+
+        /* Capacitor safe area adjustment */
+        .is-capacitor #navigation-progress {
+            top: calc(75px + env(safe-area-inset-top, 0px));
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            #navigation-progress-bar {
+                transition: none;
+            }
         }
 
         .nav-chip {
@@ -948,6 +674,15 @@
             background-color: #4e4f50 !important;
             border-color: #6366f1 !important;
         }
+        [data-theme="dark"] .tactical-form-input {
+            background-color: #3a3b3c !important;
+            border-color: #3a3b3c !important;
+            color: #e4e6eb !important;
+        }
+        [data-theme="dark"] .tactical-form-input:focus {
+            background-color: #4e4f50 !important;
+            border-color: #6366f1 !important;
+        }
 
         /* Form Inputs */
         .form-control:focus {
@@ -1014,7 +749,7 @@
 
             <div class="d-none d-md-flex gap-2">
                 <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
-                    <i class="bi bi-house-door-fill" style="font-size: 1.5rem;"></i>
+                    <i class="bi bi-house-fill" style="font-size: 1.5rem;"></i>
                     <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Home" %}</span>
                 </a>
                 <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
@@ -1087,6 +822,11 @@
         </div>
     </nav>
 
+    <!-- Navigation Progress Bar -->
+    <div id="navigation-progress" aria-hidden="true">
+        <div id="navigation-progress-bar"></div>
+    </div>
+
     <main class="container">
         <div class="row justify-content-center">
             <div class="col-12 col-lg-8">
@@ -1110,7 +850,7 @@
     {% block mobile_bottom_nav %}
         <div class="mobile-bottom-nav d-md-none">
             <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
-                <i class="bi bi-house-door-fill"></i>
+                <i class="bi bi-house-fill"></i>
                 <span style="font-size: 0.55rem; font-weight: 600;">{% trans "Home" %}</span>
             </a>
             <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
@@ -1191,26 +931,6 @@
         }
     </script>
     <script>
-        // Failsafe: Ensure app is visible even if startup fails
-        window.addEventListener('error', function() {
-            const app = document.getElementById('app');
-            if (app) {
-                app.style.opacity = '1';
-                app.style.pointerEvents = 'auto';
-                document.body.classList.add('startup-failed');
-            }
-        });
-
-        // Failsafe timeout: Force app visible after 5 seconds
-        setTimeout(function() {
-            const app = document.getElementById('app');
-            if (app && getComputedStyle(app).opacity === '0') {
-                app.style.opacity = '1';
-                app.style.pointerEvents = 'auto';
-                console.warn('[Failsafe] App forced visible after timeout');
-            }
-        }, 5000);
-
         // Offline/Online event listeners
         window.addEventListener('offline', function() {
             console.log('[Connectivity] Gone offline');
@@ -1459,34 +1179,11 @@ window.addEventListener('beforeinstallprompt', (e) => {
 {% endblock %}
 </div>
     
-    <!-- Startup Manager - Critical for PWA experience -->
-    <script>
-        // Set theme immediately to prevent flash
-        (function() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-        })();
-    </script>
-    
-    <!-- Load unified page skeleton manager (handles initial page load) -->
-    <script src="{% static 'js/page-skeleton-manager.js' %}"></script>
-    
-    <!-- Load home content script (media management and skeleton debugging) -->
+    <!-- Navigation Progress Bar -->
+    <script src="{% static 'js/navigation-progress.js' %}"></script>
+
+    <!-- Load home content script (media management) -->
     <script src="{% static 'js/home-content.js' %}"></script>
-    
-    <!-- Load main app styles -->
-    <link rel="stylesheet" href="/static/css/splash.css">
-
-    <!-- Feed skeleton indicator styles -->
-    <style>
-        #feed-skeleton {
-            display: none;
-        }
-
-        #feed-skeleton.htmx-request {
-            display: block;
-        }
-    </style>
 
     <!-- Global WebSocket Connection for Real-time Notifications -->
     {% if request.user.is_authenticated %}
@@ -1800,8 +1497,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
     </script>
     {% endverbatim %}
     {% endif %}
-
-    <!-- Page skeleton is now managed by page-skeleton-manager.js -->
 
     <!-- Version Footer -->
     <footer style="text-align: center; padding: 1rem; background: transparent; border-top: none; margin-top: auto; font-size: 0.8rem; color: #64748b;">

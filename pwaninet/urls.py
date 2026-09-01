@@ -24,7 +24,6 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from notifications import views as notification_views
-from core.views import skeleton_preview, skeleton_template
 from users.views import toggle_profile_photo_like
 
 # PWA Manifest - served as static file to bypass auth middleware
@@ -69,18 +68,9 @@ urlpatterns = [
     path('manifest.webmanifest', serve_manifest, name='manifest'),
     path('service-worker.js', serve_service_worker, name='service_worker'),
     # PWA Test Pages
-    path('test/splash/', TemplateView.as_view(template_name='splash_test.html'), name='splash_test'),
-    path('test/splash-debug/', TemplateView.as_view(template_name='splash_debug.html'), name='splash_debug'),
-    path('test/splash-offline/', TemplateView.as_view(template_name='splash_offline_test.html'), name='splash_offline_test'),
-    path('test/splash-always/', TemplateView.as_view(template_name='splash_always_test.html'), name='splash_always_test'),
     path('test/native-pwa/', TemplateView.as_view(template_name='native_pwa_test.html'), name='native_pwa_test'),
-    path('test/pwa-debug/', TemplateView.as_view(template_name='debug_pwa_launch.html'), name='debug_pwa_launch'),
-    path('test/pwa-detection/', TemplateView.as_view(template_name='debug_pwa_detection.html'), name='debug_pwa_detection'),
     path('clear-cache/', TemplateView.as_view(template_name='clear_cache.html'), name='clear_cache'),
-    path('startup/', TemplateView.as_view(template_name='startup_base.html'), name='startup_base'),
     path('api/health/', TemplateView.as_view(template_name='health_check.html'), name='health_check'),
-    path('debug/startup/', TemplateView.as_view(template_name='debug_startup.html'), name='debug_startup'),
-    path('test/startup-diagnostics/', TemplateView.as_view(template_name='startup_diagnostic_test.html'), name='startup_diagnostics'),
     # Messaging Test Pages - FROZEN FOR MVP
     # path('test/messaging/', TemplateView.as_view(template_name='test_messaging_architecture.html'), name='test_messaging_architecture'),
     # path('test/messaging-debug/', TemplateView.as_view(template_name='debug_messaging.html'), name='debug_messaging'),
@@ -90,11 +80,6 @@ urlpatterns = [
     path('test/pwa/', TemplateView.as_view(template_name='pwa_test.html'), name='pwa_test'),
     path('test/pwa-install/', TemplateView.as_view(template_name='pwa_install_test.html'), name='pwa_install_test'),
     path('test/static-js/', TemplateView.as_view(template_name='test_static_js.html'), name='test_static_js'),
-    # Skeleton Preview
-    path('skeleton-preview/', TemplateView.as_view(template_name='skeleton_preview.html'), name='skeleton_preview'),
-    path('skeleton-preview/<str:skeleton_name>/', skeleton_preview, name='skeleton_preview_partial'),
-    # Skeleton Templates for Dynamic Loading
-    path('skeleton-template/<str:template_name>/', skeleton_template, name='skeleton_template'),
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),

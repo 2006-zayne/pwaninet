@@ -12,6 +12,12 @@ function initNativeAppEnhancements() {
         return;
     }
 
+    // Prevent duplicate initialization during HTMX swaps or manual re-runs
+    if (window._pwaninet_native_initialized) {
+        console.log('[NativeApp] Already initialized, skipping');
+        return;
+    }
+
     console.log('[NativeApp] Initializing native app enhancements');
 
     // Initialize instant button touch states
@@ -22,6 +28,14 @@ function initNativeAppEnhancements() {
     
     // Initialize caching
     initCaching();
+
+    // Initialize back button handling
+    initBackNavigation();
+
+    // Initialize native media handling
+    initNativeMedia();
+
+    window._pwaninet_native_initialized = true;
 }
 
 /**
@@ -188,6 +202,165 @@ function initCaching() {
     } catch (error) {
         console.error('[NativeApp] Failed to initialize caching:', error);
     }
+}
+
+/**
+ * Native Media Handling (Camera/Gallery)
+ * Provides bridges for Capacitor Camera plugin
+ */
+function initNativeMedia() {
+    // Intercept file inputs that have capture="camera" or capture="environment"
+    document.addEventListener('click', async (e) => {
+        const target = e.target.closest('input[type="file"][capture]');
+        if (target && window.Capacitor.Plugins.Camera) {
+            e.preventDefault();
+            console.log('[NativeApp] Intercepting camera capture input');
+
+            try {
+                const { Camera, CameraResultType, CameraSource } = window.Capacitor.Plugins;
+
+                const image = await Camera.getPhoto({
+                    quality: 90,
+                    allowEditing: false,
+                    resultType: CameraResultType.Uri,
+                    source: CameraSource.Camera
+                });
+
+                // Convert URI to blob
+                const response = await fetch(image.webPath);
+                const blob = await response.blob();
+                const file = new File([blob], `captured_image_${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+                // Trigger a change event on the target with the new file
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                target.files = dataTransfer.files;
+                target.dispatchEvent(new Event('change', { bubbles: true }));
+
+            } catch (error) {
+                console.error('[NativeApp] Camera capture failed:', error);
+                // If user cancelled, don't show error
+                if (error.message !== 'User cancelled photos app') {
+                    showNativeError('Camera Error', 'Could not access the camera. Please check your permissions.');
+                }
+            }
+        }
+    }, true);
+}
+
+/**
+ * Show a native-friendly error notification
+ */
+function showNativeError(title, message) {
+    // Try to use the application's existing status modal if available
+    if (window.showStatusModal) {
+        window.showStatusModal('error', title, message);
+    } else {
+        alert(`${title}: ${message}`);
+    }
+}
+
+/**
+ * Android Back Button Handling
+ * Hierarchy: Overlays -> Browser History -> App Exit
+ */
+async function initBackNavigation() {
+    try {
+        if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) {
+            console.error('[NativeApp] App plugin not available for back button handling');
+            return;
+        }
+
+        const { App } = window.Capacitor.Plugins;
+
+        App.addListener('backButton', async (data) => {
+            console.log('[NativeApp] Back button pressed', data);
+
+            // 1. Try to dismiss active overlays first
+            const dismissed = dismissActiveOverlays();
+            if (dismissed) {
+                console.log('[NativeApp] Overlay dismissed, stopping back propagation');
+                return;
+            }
+
+            // 2. Check browser history
+            // We consider the root to be / or /home/
+            const currentPath = window.location.pathname;
+            const isRoot = currentPath === '/' || currentPath === '/home/';
+
+            if (!isRoot && window.history.length > 1) {
+                console.log('[NativeApp] Navigating back in browser history');
+                window.history.back();
+            } else {
+                // 3. Exit the app if at root or no history
+                console.log('[NativeApp] At root or no history, exiting app');
+                await App.exitApp();
+            }
+        });
+
+        console.log('[NativeApp] Back button listener initialized');
+    } catch (error) {
+        console.error('[NativeApp] Failed to initialize back navigation:', error);
+    }
+}
+
+/**
+ * Dismisses any active UI overlays
+ * Returns true if an overlay was dismissed, false otherwise
+ */
+function dismissActiveOverlays() {
+    let dismissed = false;
+
+    // 1. Bootstrap Modals
+    const activeModals = document.querySelectorAll('.modal.show, #pwaninetStatusModal.show');
+    if (activeModals.length > 0) {
+        activeModals.forEach(modalEl => {
+            // Use Bootstrap API if available, otherwise manual hide
+            if (window.bootstrap && window.bootstrap.Modal) {
+                const modal = window.bootstrap.Modal.getInstance(modalEl);
+                if (modal) {
+                    modal.hide();
+                    dismissed = true;
+                }
+            }
+
+            // Fallback: trigger hidden events if manual hide is needed
+            if (!dismissed) {
+                modalEl.classList.remove('show');
+                modalEl.style.display = 'none';
+                document.body.classList.remove('modal-open');
+                const backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) backdrop.remove();
+                dismissed = true;
+            }
+        });
+        if (dismissed) return true;
+    }
+
+    // 2. Custom Overlays (Messaging, Voice, theme selector, etc.)
+    const customOverlays = document.querySelectorAll('.overlay.show, .emoji-picker-modal.show, .attachment-modal.show, .voice-recording-preview.show, .context-menu.show, #themeModal.show, #voiceModal.show, #attachmentModal.show');
+    if (customOverlays.length > 0) {
+        customOverlays.forEach(overlay => {
+            overlay.classList.remove('show');
+            if (overlay.classList.contains('context-menu')) {
+                overlay.style.display = 'none';
+            }
+            dismissed = true;
+        });
+        if (dismissed) return true;
+    }
+
+    // 3. Dropdowns
+    const activeDropdowns = document.querySelectorAll('.dropdown-menu.show');
+    if (activeDropdowns.length > 0) {
+        activeDropdowns.forEach(dropdown => {
+            dropdown.classList.remove('show');
+            dismissed = true;
+        });
+        if (dismissed) return true;
+    }
+
+    return dismissed;
 }
 
 // Initialize when DOM is ready

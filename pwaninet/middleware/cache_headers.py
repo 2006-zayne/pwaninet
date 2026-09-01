@@ -26,11 +26,6 @@ class CacheHeadersMiddleware:
             response['Cache-Control'] = 'public, max-age=31536000, immutable'
             return response
         
-        # Cache skeleton templates for 1 hour
-        if request.path.startswith('/skeleton-template/'):
-            response['Cache-Control'] = 'public, max-age=3600'
-            return response
-        
         # Default: don't cache HTML pages (they may have user-specific content)
         if request.path.endswith('.html'):
             response['Cache-Control'] = 'no-cache, no-store, must-revalidate'

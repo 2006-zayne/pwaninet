@@ -55,8 +55,7 @@ const CORE_ASSETS = [
     '/static/js/messaging/sync-manager.js',
     '/static/js/messaging/offline-ui.js',
     '/static/js/messaging/offline-integration.js',
-    '/static/js/native-pwa-install.js',
-    '/static/js/splash-screen.js'
+    '/static/js/native-pwa-install.js'
 ];
 
 // Page shells to cache for offline access

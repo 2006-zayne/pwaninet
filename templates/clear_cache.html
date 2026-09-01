@@ -249,7 +249,6 @@ function clearPWAFlags() {
     const pwaFlags = [
         'pwaInstalled',
         'forcePWAMode',
-        'debugSplashMode',
         'overrideDisplayMode',
         'justLoggedIn'
     ];
@@ -269,12 +268,6 @@ function resetPWADetection() {
     clearPWAFlags();
     
     // Reset any global variables
-    if (window.splashScreenManager) {
-        log('Resetting splash screen manager...', 'info');
-        // Force reinitialization
-        window.splashScreenManager = null;
-    }
-    
     log('PWA detection reset', 'success');
 }
 
