@@ -329,18 +329,6 @@
 
     </div>
 
-    <!-- Loading indicator (inside header, below search) - DISABLED -->
-    <!-- Only page-skeleton-manager.js should handle loading states -->
-    <!--
-    <div class="content-wrapper" style="padding-top:0; padding-bottom:0;">
-      <div id="search-indicator" class="htmx-indicator">
-        <div class="search-dots">
-          <span></span><span></span><span></span>
-        </div>
-        Searching…
-      </div>
-    </div>
-    -->
   </header>
 
   <!-- Main Content -->
@@ -368,7 +356,6 @@
       {% endif %}
 
       <div id="main-content-area"
-           data-skeleton="post-feed"
          data-upload-feed-refresh
          data-upload-feed-refresh-url="{% url 'posts:home' %}"
            hx-swap-oob="true">

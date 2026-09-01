@@ -13,26 +13,11 @@
   [data-theme="dark"] .text-muted {
     color: #d1d5db !important;
   }
-  [data-theme="dark"] .form-control {
-    background-color: var(--card-bg) !important;
-    border-color: var(--border) !important;
-    color: #ffffff !important;
-  }
-  [data-theme="dark"] .form-control::placeholder {
-    color: #d1d5db !important;
-    opacity: 1 !important;
-  }
   [data-theme="dark"] .form-label {
     color: #ffffff !important;
   }
   [data-theme="dark"] .form-text {
     color: #d1d5db !important;
-  }
-  [data-theme="dark"] .password-toggle-btn {
-    color: #9ca3af !important;
-  }
-  [data-theme="dark"] .password-toggle-btn:hover {
-    color: #e4e6eb !important;
   }
   [data-theme="dark"] .field-error {
     color: #f87171 !important;
@@ -52,53 +37,6 @@
   }
   [data-theme="dark"] .modal-body {
     color: #9ca3af !important;
-  }
-
-  .password-input-wrapper {
-    position: relative;
-    display: flex;
-    width: 100%;
-  }
-
-  .password-input-wrapper .form-control {
-    padding-right: 3rem !important;
-    width: 100%;
-  }
-
-  .password-toggle-btn {
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 3rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-    color: #64748b;
-    transition: color 0.2s ease;
-    z-index: 10;
-  }
-
-  .password-toggle-btn:hover {
-    color: #2563eb;
-  }
-
-  .password-toggle-btn:focus {
-    outline: none;
-    box-shadow: none;
-  }
-
-  @media (max-width: 576px) {
-    .password-input-wrapper .form-control {
-      padding-right: 2.5rem !important;
-    }
-    .password-toggle-btn {
-      width: 2.5rem;
-    }
   }
 
   .field-error {
@@ -209,15 +147,33 @@
     border-color: #2563eb;
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
   }
+
+  /* Mobile full width card */
+  @media (max-width: 767px) {
+    .auth-card-container {
+      padding: 0 !important;
+      max-width: 100% !important;
+    }
+    .auth-card {
+      width: 100% !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      margin-bottom: 0.125rem !important;
+      border: none !important;
+    }
+    .auth-card .card-body {
+      padding: 1.5rem 1rem !important;
+    }
+  }
 </style>
 <script src="{% static 'js/password-strength.js' %}"></script>
 <div class="container">
     <div class="row justify-content-center align-items-center" style="min-height: 75vh;">
-        <div class="col-md-5">
-            <div class="card shadow-lg border-0" style="border-radius: 20px; overflow: hidden;">
+        <div class="col-md-5 auth-card-container">
+            <div class="card shadow-lg border-0 auth-card rounded-3" style="overflow: hidden;">
                 <div class="row g-0">
-                    <div class="card-body p-5">
-                        <div class="text-center mb-4">
+                    <div class="card-body p-3">
+                        <div class="text-center mb-3">
                             <h2 class="fw-bold text-dark">Join the Squad, Comrade!</h2>
                             <p class="text-muted">Create your account to access the PwaniNet feed.</p>
                         </div>
@@ -226,7 +182,7 @@
                             {% csrf_token %}
 
                             {% for field in form %}
-                                <div class="mb-3">
+                                <div class="mb-2">
                                     <label class="form-label fw-semibold small" for="{{ field.id_for_label }}">{{ field.label }}</label>
                                     {% if field.name == 'programme' %}
                                         <div class="course-search-wrapper">
@@ -267,7 +223,7 @@
                                 </div>
                             {% endfor %}
 
-                            <div class="d-grid gap-2 mt-4">
+                            <div class="d-grid gap-2 mt-3">
                                 <button class="btn btn-primary btn-lg shadow-sm" type="submit" id="registerSubmitBtn" style="border-radius: 10px;">
                                     <span id="registerBtnText">Create Account</span>
                                     <span id="registerSpinner" class="spinner-border spinner-border-sm ms-2" style="display: none;"></span>
@@ -275,7 +231,7 @@
                             </div>
                         </form>
 
-                        <hr class="my-4">
+                        <hr class="my-3">
 
                         <div class="text-center">
                             <p class="mb-0 text-muted">Already in the squad?</p>
@@ -285,7 +241,7 @@
                 </div>
             </div>
 
-            <div class="text-center mt-4">
+            <div class="text-center mt-3">
                 <a href="{% url 'posts:home' %}" class="text-secondary small text-decoration-none">← Back to Public View</a>
             </div>
         </div>
@@ -294,6 +250,14 @@
 
 <script>
 (function() {
+    // Apply tactical-form-input class to all form inputs
+    const formInputs = document.querySelectorAll('#registerForm input, #registerForm select');
+    formInputs.forEach(function(input) {
+        if (!input.classList.contains('password-toggle-btn') && !input.classList.contains('course-search-input')) {
+            input.classList.add('tactical-form-input');
+        }
+    });
+
     // Password visibility toggles
     const passwordToggleBtns = document.querySelectorAll('.password-toggle-btn');
     

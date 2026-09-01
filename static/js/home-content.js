@@ -88,40 +88,5 @@ if (!window.homeContentScriptLoaded) {
             pauseMedia(currentPlayingMedia);
         }
     });
-
-    // Skeleton loader management
-    function manageSkeletonLoaders() {
-        const feedSkeleton = document.getElementById('feed-skeleton');
-        
-        // Debug HTMX indicator behavior
-        console.log('[HomeContent] HTMX skeleton loading managed by hx-indicator');
-        console.log('[HomeContent] Skeleton element found:', !!feedSkeleton);
-        
-        // Monitor HTMX requests to debug skeleton visibility
-        document.body.addEventListener('htmx:beforeRequest', function(event) {
-            const target = event.target;
-            const isInfiniteScroll = target.getAttribute('hx-get')?.includes('cursor');
-            
-            if (isInfiniteScroll) {
-                console.log('[HomeContent] Infinite scroll request detected');
-                console.log('[HomeContent] Skeleton classes:', feedSkeleton?.className);
-                console.log('[HomeContent] Skeleton display:', window.getComputedStyle(feedSkeleton)?.display);
-            }
-        });
-        
-        document.body.addEventListener('htmx:afterRequest', function(event) {
-            const target = event.target;
-            const isInfiniteScroll = target.getAttribute('hx-get')?.includes('cursor');
-            
-            if (isInfiniteScroll) {
-                console.log('[HomeContent] Infinite scroll request completed');
-                console.log('[HomeContent] Skeleton classes:', feedSkeleton?.className);
-                console.log('[HomeContent] Skeleton display:', window.getComputedStyle(feedSkeleton)?.display);
-            }
-        });
-    }
-    
-    // Initialize skeleton loader management
-    manageSkeletonLoaders();
 })();
 }

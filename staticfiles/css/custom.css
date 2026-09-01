@@ -40,6 +40,71 @@
 }
 
 /* ================================
+   PASSWORD INPUT WRAPPER
+================================ */
+.password-input-wrapper {
+    position: relative;
+    display: flex;
+    width: 100%;
+}
+
+.password-input-wrapper .tactical-form-input,
+.password-input-wrapper input[type="password"],
+.password-input-wrapper input[type="text"],
+.password-input-wrapper select {
+    padding-right: 3rem !important;
+    width: 100%;
+}
+
+.password-toggle-btn {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    color: #64748b;
+    transition: color 0.2s ease;
+    z-index: 10;
+}
+
+.password-toggle-btn:hover {
+    color: #2563eb;
+}
+
+.password-toggle-btn:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+@media (max-width: 576px) {
+    .password-input-wrapper .tactical-form-input,
+    .password-input-wrapper input[type="password"],
+    .password-input-wrapper input[type="text"],
+    .password-input-wrapper select {
+        padding-right: 2.5rem !important;
+    }
+    .password-toggle-btn {
+        width: 2.5rem;
+    }
+}
+
+/* Dark mode for password toggle */
+[data-theme="dark"] .password-toggle-btn {
+    color: #9ca3af !important;
+}
+
+[data-theme="dark"] .password-toggle-btn:hover {
+    color: #e4e6eb !important;
+}
+
+/* ================================
    FOCUS STATE (UNIFIED)
 ================================ */
 .tactical-form-input:focus,

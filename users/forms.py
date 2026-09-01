@@ -42,6 +42,15 @@ class PwaniSignupForm(UserCreationForm):
         # Make email required
         self.fields['email'].required = True
 
+        # Add placeholders to form fields
+        self.fields['username'].widget.attrs['placeholder'] = 'Choose a username'
+        self.fields['email'].widget.attrs['placeholder'] = 'Enter your email address'
+        self.fields['first_name'].widget.attrs['placeholder'] = 'Enter your first name'
+        self.fields['second_name'].widget.attrs['placeholder'] = 'Enter your middle name (optional)'
+        self.fields['last_name'].widget.attrs['placeholder'] = 'Enter your last name'
+        self.fields['password1'].widget.attrs['placeholder'] = 'Create a password'
+        self.fields['password2'].widget.attrs['placeholder'] = 'Confirm your password'
+
         # Start with empty querysets for cascading dropdowns
         self.fields['academic_level'].queryset = AcademicLevel.objects.none()
         self.fields['academic_year'].queryset = AcademicYear.objects.none()
