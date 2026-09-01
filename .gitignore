@@ -73,3 +73,13 @@ dist/
 # =========================
 node_modules/
 dump.rdb
+# =========================
+# ANDROID / GRADLE
+# =========================
+android/.gradle/
+android/local.properties
+android/.idea/
+android/.kotlin/
+android/**/build/
+android/**/.cxx/
+android/**/captures/
