@@ -774,8 +774,6 @@
                     <i class="bi bi-house-fill" style="font-size: 1.5rem;"></i>
                     <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Home" %}</span>
                 </a>
-                    <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Home" %}</span>
-                </a>
                 <a href="{% url 'groups:groups_dashboard' %}"
                    class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}"
                    style="display: flex; flex-direction: column; align-items: center; gap: 0px;"
@@ -907,8 +905,6 @@
                hx-push-url="true"
                hx-history="true">
                 <i class="bi bi-house-fill"></i>
-                <span style="font-size: 0.55rem; font-weight: 600;">{% trans "Home" %}</span>
-            </a>
                 <span style="font-size: 0.55rem; font-weight: 600;">{% trans "Home" %}</span>
             </a>
             <a href="{% url 'groups:groups_dashboard' %}"
