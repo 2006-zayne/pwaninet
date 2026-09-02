@@ -3,7 +3,7 @@
 	"appName": "Pwaninet",
 	"webDir": "www",
 	"server": {
-		"url": "http://192.168.153.221:8000",
+		"url": "http://192.168.58.221:8000",
 		"cleartext": true,
 		"errorPath": "/offline.html",
 		"allowNavigation": [
