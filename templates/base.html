@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>PwaniNet</title>
-    
+
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.webmanifest">
     <script>
@@ -38,7 +38,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/favicon-96x96.png' %}">
     <link rel="icon" type="image/svg+xml" href="{% static 'images/favicon.svg' %}">
     <link rel="shortcut icon" href="{% static 'images/favicon.ico' %}">
-    
+
     <!-- Force favicon caching and display -->
     <meta name="msapplication-TileColor" content="#2563eb">
     <meta name="msapplication-config" content="{% static 'images/browserconfig.xml' %}">
@@ -140,7 +140,7 @@
         [data-theme="dark"] body {
             background-color: #0f172a;
         }
-        
+
         /* Critical gradient classes to prevent FOUC */
         .grad-ocean {
             background: linear-gradient(135deg, #0f172a 0%, #2563eb 100%);
@@ -198,7 +198,7 @@
             // Preload favicon to force caching
             const favicon = new Image();
             favicon.src = '{% static "images/favicon.ico" %}';
-            
+
             // Force favicon refresh if needed
             setTimeout(() => {
                 const links = document.querySelectorAll('link[rel*="icon"]');
@@ -213,7 +213,7 @@
             }, 1000);
         })();
     </script>
-    
+
     <!-- Preload critical CSS -->
     <link rel="preload" href="{% static 'css/custom.css' %}" as="style">
     <link rel="preload" href="{% static 'css/bootstrap.min.css' %}" as="style">
@@ -270,7 +270,7 @@
     {% elif request.user.font_family_preference == 'tangerine' %}
         <link rel="preload" href="{% static 'fonts/custom/Tangerine-Regular.woff2' %}" as="font" type="font/woff2" crossorigin="anonymous">
     {% endif %}
-    
+
     <!-- Load CSS files -->
     <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
@@ -278,32 +278,41 @@
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
     <link rel="stylesheet" href="{% static 'css/people-modal.css' %}">
     <link rel="stylesheet" href="{% static 'css/comments.css' %}">
+    <link rel="stylesheet" href="{% static 'css/profile.css' %}">
+    <link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}">
     <script src="{% static 'js/htmx.min.js' %}"></script>
+    <script>
+        // Configure HTMX for proper history handling
+        htmx.config.historyEnabled = true;
+        htmx.config.historyCacheSize = 10;
+        htmx.config.refreshOnHistoryMiss = true; // Refresh content if cache miss occurs
+        console.log('[HTMX Config] History caching enabled with refresh on miss');
+    </script>
     <script src="{% static 'js/device_manager.js' %}"></script>
-    
+
     <!-- Native App Enhancements (Capacitor-specific) -->
     <script src="{% static 'js/native-app.js' %}"></script>
-    
+
     <!-- Lazy Image Loader for performance -->
     <script src="{% static 'js/lazy-load-images.js' %}"></script>
-    
+
     <!-- Video Manager - replaces auto_video_play.js -->
     <script src="{% static 'js/video-manager.js' %}"></script>
-    
+
     <!-- Global Audio Manager -->
     <script defer src="{% static 'js/global-audio-manager.js' %}"></script>
-    
+
     <!-- Native PWA Install Manager -->
     <script src="{% static 'js/native-pwa-install.js' %}"></script>
-    
+
     <!-- Update Manager -->
     <script src="{% static 'js/update-manager.js' %}"></script>
-    
+
     <!-- What's New Modal -->
     <script>
         // Set authentication status for What's New modal
         window.isAuthenticated = {{ request.user.is_authenticated|lower }};
-        
+
         // Set user-specific data for audio manager
         {% if request.user.is_authenticated %}
         window.PwaniNetUsername = '{{ request.user.username }}';
@@ -314,7 +323,7 @@
         {% endif %}
     </script>
     <script src="{% static 'js/whats-new-modal.js' %}"></script>
-    
+
     <!-- Comment System - Phase 2 Threaded Comments -->
     <script src="{% static 'js/comments/comment-api.js' %}"></script>
     <script src="{% static 'js/comments/comment-renderer.js' %}"></script>
@@ -384,7 +393,7 @@
             body {
                 padding-bottom: calc(75px + env(safe-area-inset-bottom, 0px));
             }
-            
+
             .mobile-bottom-nav {
                 width: 95%;
                 max-width: 380px;
@@ -397,13 +406,13 @@
             .mobile-bottom-nav .nav-chip i {
                 font-size: 1.6rem;
             }
-            
+
             .mobile-bottom-nav .nav-chip {
                 padding: 6px 8px;
                 min-width: 40px;
                 min-height: 40px;
             }
-            
+
             /* Notification badge adjustments for small screens */
             .mobile-bottom-nav .nav-chip .badge {
                 font-size: 0.5rem !important;
@@ -740,19 +749,41 @@
 
     <!-- Main App Container -->
     <div id="app">
-    
+
     <nav class="navbar navbar-top fixed-top">
         <div class="container d-flex justify-content-between align-items-center">
-            <a class="nav-brand-tactical" href="{% url 'posts:home' %}">
+            <a class="nav-brand-tactical"
+               href="{% url 'posts:home' %}"
+               hx-get="{% url 'posts:home' %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true">
                 PWANI<span class="brand-net">NET</span>
             </a>
 
             <div class="d-none d-md-flex gap-2">
-                <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
+                <a href="{% url 'posts:home' %}"
+                   class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
+                   style="display: flex; flex-direction: column; align-items: center; gap: 0px;"
+                   hx-get="{% url 'posts:home' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
                     <i class="bi bi-house-fill" style="font-size: 1.5rem;"></i>
                     <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Home" %}</span>
                 </a>
-                <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
+                    <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Home" %}</span>
+                </a>
+                <a href="{% url 'groups:groups_dashboard' %}"
+                   class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}"
+                   style="display: flex; flex-direction: column; align-items: center; gap: 0px;"
+                   hx-get="{% url 'groups:groups_dashboard' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
                     <i class="bi bi-people-fill" style="font-size: 1.5rem;"></i>
                     <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Groups" %}</span>
                 </a>
@@ -766,7 +797,15 @@
                     <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Post" %}</span>
                 </a>
                 {% endif %}
-                <a href="{% url 'notifications:notifications' %}" class="nav-chip {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}" id="notification-badge-container-desktop" style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 60px;">
+                <a href="{% url 'notifications:notifications' %}"
+                   class="nav-chip {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
+                   id="notification-badge-container-desktop"
+                   style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 60px;"
+                   hx-get="{% url 'notifications:notifications' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
                     <span style="position: relative; display: inline-block;">
                         <i class="bi bi-bell-fill" style="font-size: 1.5rem;"></i>
                         {% if unread_notifications_count > 0 %}
@@ -812,7 +851,12 @@
                     </ul>
                 </div>
                 {% if request.user.is_authenticated %}
-                    <a href="{% url 'users:profile' request.user.username %}">
+                    <a href="{% url 'users:profile' request.user.username %}"
+                       hx-get="{% url 'users:profile' request.user.username %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true">
                         <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 35px; height: 35px; object-fit: cover; margin-right:8px;">
                     </a>
                 {% else %}
@@ -829,11 +873,16 @@
 
     <main class="container">
         <div class="row justify-content-center">
-            <div class="col-12 col-lg-8">
+            <div class="col-12 col-lg-8" id="page-content-target" hx-history-elt>
                 {% block content %}{% endblock %}
             </div>
         </div>
     </main>
+
+    <!-- Floating Actions Container - swapped via HTMX out-of-band -->
+    {% block floating_actions %}
+        <div id="profile-floating-actions"></div>
+    {% endblock %}
 
     {% block modals %}
         <div class="modal fade" id="likersModal" tabindex="-1" aria-hidden="true">
@@ -849,11 +898,27 @@
 
     {% block mobile_bottom_nav %}
         <div class="mobile-bottom-nav d-md-none">
-            <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
+            <a href="{% url 'posts:home' %}"
+               class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
+               style="display: flex; flex-direction: column; align-items: center; gap: 0px;"
+               hx-get="{% url 'posts:home' %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true">
                 <i class="bi bi-house-fill"></i>
                 <span style="font-size: 0.55rem; font-weight: 600;">{% trans "Home" %}</span>
             </a>
-            <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
+                <span style="font-size: 0.55rem; font-weight: 600;">{% trans "Home" %}</span>
+            </a>
+            <a href="{% url 'groups:groups_dashboard' %}"
+               class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}"
+               style="display: flex; flex-direction: column; align-items: center; gap: 0px;"
+               hx-get="{% url 'groups:groups_dashboard' %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true">
                 <i class="bi bi-people-fill"></i>
                 <span style="font-size: 0.55rem; font-weight: 600;">{% trans "Groups" %}</span>
             </a>
@@ -869,7 +934,12 @@
                 <a href="{% url 'notifications:notifications' %}"
                     class="nav-chip {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
                     id="notification-badge-container"
-                    style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 50px;">
+                    style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 50px;"
+                    hx-get="{% url 'notifications:notifications' %}"
+                    hx-target="#page-content-target"
+                    hx-swap="innerHTML"
+                    hx-push-url="true"
+                    hx-history="true">
                         <span style="position: relative; display: inline-block;">
                             <i class="bi bi-bell-fill"></i>
                             {% if unread_notifications_count > 0 %}
@@ -888,7 +958,14 @@
                         </span>
                         <span style="font-size: 0.55rem; font-weight: 600; white-space: nowrap;">{% trans "Notifications" %}</span>
                 </a>
-                <a href="{% url 'users:profile' request.user.username %}" class="nav-chip {% if request.resolver_match.url_name == 'profile' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
+                <a href="{% url 'users:profile' request.user.username %}"
+                   class="nav-chip {% if request.resolver_match.url_name == 'profile' %}active{% endif %}"
+                   style="display: flex; flex-direction: column; align-items: center; gap: 0px;"
+                   hx-get="{% url 'users:profile' request.user.username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
                     <i class="bi bi-person-circle"></i>
                     <span style="font-size: 0.55rem; font-weight: 600;">{% trans "Profile" %}</span>
                 </a>
@@ -900,6 +977,7 @@
     <script src="{% static 'js/status-modal.js' %}"></script>
     <script src="{% static 'js/reaction-sound.js' %}"></script>
     <script src="{% static 'js/post-content.js' %}"></script>
+    <script src="{% static 'js/profile.js' %}"></script>
 
     <!-- Messaging Domain Bootstrap (only loads if chat-container exists) -->
     <script type="module" src="{% static 'js/chat/bootstrap.js' %}"></script>
@@ -994,7 +1072,7 @@
         // Protocol: Reset modal intel on close
         const likersModal = document.getElementById('likersModal');
         likersModal.addEventListener('hidden.bs.modal', function () {
-            document.getElementById('modal-content-target').innerHTML = 
+            document.getElementById('modal-content-target').innerHTML =
                 '<div class="p-5 text-center">' +
                     '<div class="spinner-border text-primary spinner-border-sm" role="status"></div>' +
                 '</div>';
@@ -1157,7 +1235,7 @@ let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    
+
     // Show install button (optional)
     const installButton = document.getElementById('install-button');
     if (installButton) {
@@ -1178,7 +1256,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 </script>
 {% endblock %}
 </div>
-    
+
     <!-- Navigation Progress Bar -->
     <script src="{% static 'js/navigation-progress.js' %}"></script>
 
@@ -1206,31 +1284,31 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = protocol + '//' + window.location.host + '/ws/notifications/';
-        
+
         console.log('[GLOBAL] Connecting to notifications WebSocket:', wsUrl);
-        
+
         try {
             globalNotificationsSocket = new WebSocket(wsUrl);
-            
+
             globalNotificationsSocket.onopen = function(e) {
                 console.log('[GLOBAL] Notifications WebSocket connected successfully');
                 globalReconnectAttempts = 0;
-                
+
                 // Stop polling since WebSocket is connected
                 stopNotificationCountPolling();
-                
+
                 // Hide any connection error indicators
                 const errorIndicator = document.getElementById('websocket-error');
                 if (errorIndicator) {
                     errorIndicator.style.display = 'none';
                 }
             };
-            
+
             globalNotificationsSocket.onmessage = function(e) {
                 try {
                     const data = JSON.parse(e.data);
                     console.log('[GLOBAL] Received notification:', data);
-                    
+
                     // Handle different notification types
                     // Messaging handlers - FROZEN FOR MVP
                     /*
@@ -1239,7 +1317,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         if (typeof updateConversationInList === 'function') {
                             updateConversationInList(data);
                         }
-                    } else 
+                    } else
                     */
                     if (data.type === 'notification') {
                         // Handle general notifications
@@ -1259,18 +1337,18 @@ window.addEventListener('beforeinstallprompt', (e) => {
                     console.error('[GLOBAL] Error parsing WebSocket message:', error);
                 }
             };
-            
+
             globalNotificationsSocket.onclose = function(e) {
                 console.log('[GLOBAL] Notifications WebSocket disconnected:', e.code, e.reason);
-                
+
                 // Start polling as fallback when WebSocket disconnects
                 startNotificationCountPolling();
-                
+
                 // Attempt to reconnect with exponential backoff
                 if (globalReconnectAttempts < maxReconnectAttempts) {
                     const delay = Math.min(1000 * Math.pow(2, globalReconnectAttempts), 30000);
                     console.log('[GLOBAL] Reconnecting notifications in ' + delay + 'ms...');
-                    
+
                     setTimeout(() => {
                         globalReconnectAttempts++;
                         connectGlobalNotificationsWebSocket();
@@ -1280,11 +1358,11 @@ window.addEventListener('beforeinstallprompt', (e) => {
                     showWebSocketError();
                 }
             };
-            
+
             globalNotificationsSocket.onerror = function(e) {
                 console.error('[GLOBAL] Notifications WebSocket error:', e);
             };
-            
+
         } catch (error) {
             console.error('[GLOBAL] Failed to create WebSocket connection:', error);
             showWebSocketError();
@@ -1306,11 +1384,11 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
     function updateNotificationCount(count) {
         console.log('[GLOBAL] updateNotificationCount called with count:', count);
-        
+
         // Update notification icon badges in navigation (both desktop and mobile)
         const notificationBadges = document.querySelectorAll('.notification-badge');
         console.log('[GLOBAL] Found notification badges:', notificationBadges.length);
-        
+
         notificationBadges.forEach(badge => {
             if (count > 0) {
                 badge.textContent = count > 99 ? '99+' : count;
@@ -1330,7 +1408,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
             .then(html => {
                 const badge = document.getElementById('unread-count-badge');
                 if (badge) badge.outerHTML = html;
-                
+
                 // Also update navigation badges
                 const navBadges = document.querySelectorAll('.notification-badge');
                 const countMatch = html.match(/(\d+)/);
@@ -1349,10 +1427,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
         if (notificationCountPollInterval) {
             clearInterval(notificationCountPollInterval);
         }
-        
+
         // Poll every 5 seconds
         notificationCountPollInterval = setInterval(pollNotificationCount, 5000);
-        
+
         // Initial poll
         pollNotificationCount();
     }
@@ -1372,12 +1450,12 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 icon: '/static/images/logo.png'
             });
         }
-        
+
         // Show in-page notification
         const notificationDiv = document.createElement('div');
         notificationDiv.className = 'alert alert-info alert-dismissible fade show position-fixed';
         notificationDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-        notificationDiv.innerHTML = 
+        notificationDiv.innerHTML =
             (notification.body || notification.message) +
             '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
         document.body.appendChild(notificationDiv);
@@ -1455,7 +1533,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
         // Handle real-time comment updates
         if (postData.comment) {
             console.log('[GLOBAL] New comment received for post:', postData.id);
-            
+
             // Refresh the post to show new comment
             const postElement = document.querySelector(`[data-post-id="${postData.id}"]`);
             if (postElement) {
@@ -1472,10 +1550,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
     // Connect when page loads
     document.addEventListener('DOMContentLoaded', function() {
         // User is authenticated if we're in this script block (wrapped in {% if request.user.is_authenticated %})
-        
+
         // Start polling as fallback initially
         startNotificationCountPolling();
-        
+
         // Try to connect WebSocket (will stop polling if successful)
         connectGlobalNotificationsWebSocket();
         connectGlobalFeedWebSocket();
@@ -1497,6 +1575,148 @@ window.addEventListener('beforeinstallprompt', (e) => {
     </script>
     {% endverbatim %}
     {% endif %}
+
+
+
+    <!-- HTMX Navigation Active State Management -->
+    <script>
+    function updateActiveState(url) {
+        console.log('[HTMX History] updateActiveState called with URL:', url);
+        if (!url) return;
+
+        let pathname = url;
+        try {
+            if (url.startsWith('http://') || url.startsWith('https://')) {
+                pathname = new URL(url).pathname;
+            }
+        } catch (e) {
+            pathname = url;
+        }
+        pathname = pathname.split('?')[0].split('#')[0];
+
+        // Remove 'active' class from all nav chips
+        document.querySelectorAll('.nav-chip').forEach(chip => {
+            chip.classList.remove('active');
+        });
+
+        // Match explicit route patterns
+        if (pathname === '/') {
+            const homeNavChips = document.querySelectorAll('.nav-chip[href="/"]');
+            homeNavChips.forEach(chip => chip.classList.add('active'));
+            console.log('[HTMX History] Set Home nav chips as active');
+        } else if (pathname.startsWith('/groups')) {
+            const groupsNavChips = document.querySelectorAll('.nav-chip[href*="/groups"]');
+            groupsNavChips.forEach(chip => chip.classList.add('active'));
+            console.log('[HTMX History] Set Groups nav chips as active');
+        } else if (pathname.startsWith('/notifications')) {
+            const notifNavChips = document.querySelectorAll('.nav-chip[href*="/notifications"]');
+            notifNavChips.forEach(chip => chip.classList.add('active'));
+            console.log('[HTMX History] Set Notifications nav chips as active');
+        } else if (pathname.includes('/user/')) {
+            const profileNavChips = document.querySelectorAll('.nav-chip[href*="/user/"]');
+            profileNavChips.forEach(chip => chip.classList.add('active'));
+            console.log('[HTMX History] Set Profile nav chips as active');
+        } else if (pathname.includes('/create')) {
+            const createNavChips = document.querySelectorAll('.nav-chip[href*="/create"]');
+            createNavChips.forEach(chip => chip.classList.add('active'));
+            console.log('[HTMX History] Set Create Post nav chips as active');
+        } else if (pathname.startsWith('/users/settings')) {
+            console.log('[HTMX History] Settings route active - no top-level chip activated');
+        }
+    }
+
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        console.log('[HTMX History] htmx:afterSwap event fired', {
+            targetId: evt.detail.target.id,
+            status: evt.detail.xhr.status,
+            responseURL: evt.detail.xhr.responseURL
+        });
+
+        // Only update active state for main content navigation, not modal/partial swaps
+        if (evt.detail.target.id === 'page-content-target' && evt.detail.xhr.status === 200) {
+            const targetUrl = evt.detail.xhr.responseURL || window.location.pathname;
+            updateActiveState(targetUrl);
+        }
+    });
+
+    // Handle browser back/forward navigation - update active state after content is restored
+    document.body.addEventListener('htmx:historyRestore', function(evt) {
+        console.log('[HTMX History] htmx:historyRestore event fired', {
+            pathname: window.location.pathname,
+            item: evt.detail.item
+        });
+
+        // Update active state based on current URL after history restore
+        updateActiveState(window.location.pathname);
+    });
+
+    // Add debug logging for history cache miss
+    document.body.addEventListener('htmx:historyCacheMiss', function(evt) {
+        console.warn('[HTMX History] Cache miss for:', evt.detail.path);
+    });
+
+    // Add debug logging for history cache hit
+    document.body.addEventListener('htmx:historyCacheHit', function(evt) {
+        console.log('[HTMX History] Cache hit for:', evt.detail.path);
+    });
+    </script>
+
+    <!-- Post Content Truncation -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initPostContentTruncation();
+    });
+
+    document.body.addEventListener('htmx:afterSwap', function() {
+        initPostContentTruncation();
+    });
+
+    function initPostContentTruncation() {
+        const contentWrappers = document.querySelectorAll('.post-content-wrapper');
+
+        contentWrappers.forEach(wrapper => {
+            const fullContent = wrapper.querySelector('.post-content-full');
+            const truncatedContent = wrapper.querySelector('.post-content-truncated');
+            const seeMoreBtn = wrapper.querySelector('.see-more-btn');
+
+            if (!fullContent || !truncatedContent || !seeMoreBtn) return;
+
+            const text = fullContent.textContent.trim();
+            const maxLength = 200; // Character limit for truncation
+
+            if (text.length > maxLength) {
+                // Truncate the text
+                const truncatedText = text.substring(0, maxLength) + '...';
+                truncatedContent.textContent = truncatedText;
+
+                // Show truncated version and hide full version
+                fullContent.style.display = 'none';
+                truncatedContent.style.display = 'inline';
+                seeMoreBtn.style.display = 'inline';
+
+                // Handle see more button click
+                seeMoreBtn.onclick = function(e) {
+                    e.preventDefault();
+                    if (fullContent.style.display === 'none') {
+                        fullContent.style.display = 'inline';
+                        truncatedContent.style.display = 'none';
+                        seeMoreBtn.textContent = 'See less';
+                    } else {
+                        fullContent.style.display = 'none';
+                        truncatedContent.style.display = 'inline';
+                        seeMoreBtn.textContent = 'See more';
+                    }
+                };
+            } else {
+                // Content is short enough, don't truncate
+                fullContent.style.display = 'inline';
+                truncatedContent.style.display = 'none';
+                seeMoreBtn.style.display = 'none';
+            }
+        });
+    }
+    </script>
+
 
     <!-- Version Footer -->
     <footer style="text-align: center; padding: 1rem; background: transparent; border-top: none; margin-top: auto; font-size: 0.8rem; color: #64748b;">

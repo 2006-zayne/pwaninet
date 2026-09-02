@@ -103,7 +103,7 @@ def profile_view(request, username):
         ),
         username=username
     )
-    
+
     # Fast individual count queries instead of a massive Cartesian product JOIN
     followers_count = profile_user.follower_relationships.count()
     following_count = profile_user.following_relationships.count()
@@ -115,14 +115,14 @@ def profile_view(request, username):
     from django.core.paginator import Paginator
     page = int(request.GET.get('page', 1))
     posts_per_page = 10
-    
+
     # Filter posts: show regular posts and group posts only if viewing user is a member of the group
     from groups.models import Membership, MembershipStatus
     viewer_group_ids = list(Membership.objects.filter(
-        user=request.user, 
+        user=request.user,
         status=MembershipStatus.APPROVED
     ).values_list('group_id', flat=True))
-    
+
     posts_queryset = Post.objects.filter(
         author=profile_user
     ).filter(
@@ -130,28 +130,49 @@ def profile_view(request, username):
     ).select_related('author', 'group', 'course', 'unit', 'repost_of').prefetch_related('likes', 'images', 'comments').order_by('-created_at')
     paginator = Paginator(posts_queryset, posts_per_page)
     posts_page = paginator.get_page(page)
-    
+
     # Get liked post IDs for the current user
     liked_post_ids = set(Like.objects.filter(user=request.user, post__in=posts_queryset).values_list('post_id', flat=True))
-    
+
     is_following = Follow.objects.filter(follower=request.user, followed=profile_user).exists()
-    
+
     # Get shared posts for this profile user
     from posts.models import SharedPost
     from posts.services.share_service import get_user_received_shares
     shared_posts = get_user_received_shares(profile_user)
-    
+
     # Count unseen shared posts for the badge
     unseen_shared_count = shared_posts.filter(is_viewed=False).count()
-    
+
     # Determine if viewing own profile
     is_own_profile = request.user == profile_user
-    
+
     # Get profile completion percentage for owner
     profile_completion = profile_user.profile_completion_percentage if is_own_profile else None
-    
-    # Check if HTMX request for more posts
-    if request.headers.get('HX-Request'):
+
+    # HTMX Navigation Request: Return full navigation partial for page navigation
+    # Distinguished from infinite scroll (has page parameter)
+    if request.headers.get('HX-Request') and not request.GET.get('page'):
+        context = {
+            'profile_user': profile_user,
+            'posts': posts_page,
+            'is_following': is_following,
+            'followers_count': followers_count,
+            'following_count': following_count,
+            'total_likes': total_likes,
+            'pinches_sent_count': pinches_sent_count,
+            'pinches_received_count': pinches_received_count,
+            'shared_posts': shared_posts,
+            'unseen_shared_count': unseen_shared_count,
+            'is_own_profile': is_own_profile,
+            'profile_completion': profile_completion,
+            'has_more_posts': posts_page.has_next(),
+            'liked_post_ids': liked_post_ids,
+        }
+        return render(request, 'users/partials/profile_navigation_partial.html', context)
+
+    # For HTMX infinite scroll: render only the posts partial
+    if request.headers.get('HX-Request') and page:
         return render(request, 'posts/partials/post_cards_list.html', {
             'posts': posts_page,
             'has_more_posts': posts_page.has_next(),
@@ -159,7 +180,7 @@ def profile_view(request, username):
             'posts': posts_page,
             'liked_post_ids': liked_post_ids,
         })
-    
+
     return render(request, 'users/profile.html', {
         'profile_user': profile_user,
         'posts': posts_page,
@@ -182,7 +203,7 @@ def profile_view(request, username):
 def profile_connections(request, username, list_type):
     """Return followers, following, pinches sent, or pinches received list for profile connections sheet."""
     from django.core.paginator import Paginator
-    
+
     profile_user = get_object_or_404(User, username=username)
     page = int(request.GET.get('page', 1))
     page_size = 20
@@ -230,7 +251,7 @@ def profile_connections(request, username, list_type):
     # Paginate users
     paginator = Paginator(users, page_size)
     users_page = paginator.get_page(page)
-    
+
     # Build next page URL if there are more pages
     next_url = None
     if users_page.has_next():
@@ -253,27 +274,27 @@ def people_search(request):
     from django.core.paginator import Paginator
     from django.db.models import Q
     import logging
-    
+
     logger = logging.getLogger(__name__)
-    
+
     search_query = request.GET.get('q', '').strip()
     connection_type = request.GET.get('connection_type', '')
     profile_username = request.GET.get('profile_username', '')
     page = int(request.GET.get('page', 1))
     page_size = 20
-    
+
     logger.info(f"people_search called - q={search_query}, connection_type={connection_type}, profile_username={profile_username}, page={page}")
-    
+
     users = User.objects.none()
     list_type = 'all'
     empty_message = 'No users found.'
     empty_icon = 'search'
-    
+
     # Get base users based on connection type
     if connection_type and profile_username:
         profile_user = get_object_or_404(User, username=profile_username)
         logger.info(f"Profile user found: {profile_user.username}")
-        
+
         if connection_type == 'followers':
             # Use values_list to get user IDs, then filter User queryset
             follower_ids = Follow.objects.filter(followed=profile_user).values_list('follower_id', flat=True)
@@ -316,7 +337,7 @@ def people_search(request):
             list_type = 'pinches_received'
             empty_message = 'No pinches received yet.'
             logger.info(f"Found {pinch_ids.count()} pinches received")
-        
+
         # Apply search filter if provided
         if search_query:
             logger.info(f"Applying search filter '{search_query}' to users queryset")
@@ -354,13 +375,13 @@ def people_search(request):
         empty_message = 'No users available'
         empty_icon = 'people'
         logger.info(f"Suggested users: {len(users)}")
-    
+
     # Paginate
     paginator = Paginator(users, page_size)
     users_page = paginator.get_page(page)
-    
+
     logger.info(f"After pagination: {len(users_page)} users on page {page}, has_more={users_page.has_next()}")
-    
+
     # Build next page URL
     next_url = None
     if users_page.has_next():
@@ -373,9 +394,9 @@ def people_search(request):
             url_params.append(f"profile_username={profile_username}")
         url_params.append(f"page={users_page.next_page_number()}")
         next_url = f"?{'&'.join(url_params)}"
-    
+
     logger.info(f"Rendering people_list.html with {len(users_page)} users")
-    
+
     return render(request, 'users/partials/people_list.html', {
         'users': users_page,
         'list_type': list_type,
@@ -506,7 +527,7 @@ def toggle_pinch(request, username):
     from users.models import Pinch
     from django.utils import timezone
     from django.db.models import Count
-    
+
     target = get_object_or_404(User, username=username)
     is_hx = request.headers.get('HX-Request')
     is_ajax = is_hx or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
@@ -526,7 +547,7 @@ def toggle_pinch(request, username):
 
     # Create pinch
     pinch = Pinch.objects.create(pinch_user=request.user, pinched_user=target)
-    
+
     # Invalidate cache
     invalidate_unread_count_cache(target.id)
 
@@ -536,7 +557,7 @@ def toggle_pinch(request, username):
             pinches_sent_count=Count('pinches_sent', distinct=True),
             pinches_received_count=Count('pinches_received', distinct=True)
         ).first()
-        
+
         return render(request, 'users/partials/pinch_button.html', {
             'profile_user': target,
             'pinches_sent_count': request_user.pinches_sent_count,
@@ -560,6 +581,10 @@ def get_suggestions(request):
 @login_required
 def settings_view(request):
     """Main settings landing page - navigation hub for all settings categories"""
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/index_content.html'
+        })
     return render(request, 'users/settings/index.html')
 
 
@@ -590,12 +615,21 @@ def settings_profile_view(request):
 @login_required
 def settings_appearance_view(request):
     """Appearance settings page"""
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/appearance_content.html'
+        })
     return render(request, 'users/settings/appearance.html')
+
 
 
 @login_required
 def settings_privacy_view(request):
     """Privacy and security settings page"""
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/privacy_content.html'
+        })
     return render(request, 'users/settings/privacy.html')
 
 
@@ -608,12 +642,20 @@ def settings_storage_view(request):
 @login_required
 def settings_downloads_view(request):
     """Downloads manager page"""
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/downloads_content.html'
+        })
     return render(request, 'users/settings/downloads.html')
 
 
 @login_required
 def settings_about_view(request):
     """About PwaniNet page with version information"""
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/about_content.html'
+        })
     return render(request, 'users/settings/about.html')
 
 
@@ -624,29 +666,49 @@ def settings_password_manager_view(request):
         current_password = request.POST.get('current_password')
         new_password = request.POST.get('new_password')
         confirm_password = request.POST.get('confirm_password')
-        
+
         if not request.user.check_password(current_password):
             messages.error(request, 'Current password is incorrect.')
+            if request.headers.get('HX-Request'):
+                return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+                    'settings_content_partial': 'users/settings/partials/password_content.html'
+                })
             return render(request, 'users/settings/password_manager.html')
-        
+
         if new_password != confirm_password:
             messages.error(request, 'New passwords do not match.')
+            if request.headers.get('HX-Request'):
+                return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+                    'settings_content_partial': 'users/settings/partials/password_content.html'
+                })
             return render(request, 'users/settings/password_manager.html')
-        
+
         if len(new_password) < 8:
             messages.error(request, 'Password must be at least 8 characters long.')
+            if request.headers.get('HX-Request'):
+                return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+                    'settings_content_partial': 'users/settings/partials/password_content.html'
+                })
             return render(request, 'users/settings/password_manager.html')
-        
+
         request.user.set_password(new_password)
         request.user.save()
-        
+
         # Update session to keep user logged in
         from django.contrib.auth import update_session_auth_hash
         update_session_auth_hash(request, request.user)
-        
+
         messages.success(request, 'Password changed successfully.')
+        if request.headers.get('HX-Request'):
+            return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+                'settings_content_partial': 'users/settings/partials/password_content.html'
+            })
         return redirect('users:settings_password_manager')
-    
+
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/password_content.html'
+        })
     return render(request, 'users/settings/password_manager.html')
 
 
@@ -656,21 +718,21 @@ def settings_active_devices_view(request):
     from django.contrib.sessions.models import Session
     from user_agents import parse
     import re
-    
+
     def parse_device_info(user_agent_string):
         """Parse detailed device information from user agent string"""
         user_agent = parse(user_agent_string)
-        
+
         # Determine device type
         device_type = 'desktop'
         if user_agent.is_mobile:
             device_type = 'mobile'
         elif user_agent.is_tablet:
             device_type = 'tablet'
-        
+
         # Try to extract device model from user agent string
         device_model = user_agent.device.family or 'Unknown Device'
-        
+
         # Common Android device patterns
         android_patterns = [
             r'(SM-[A-Z0-9]+)',  # Samsung
@@ -689,25 +751,25 @@ def settings_active_devices_view(request):
             r'(LG-[A-Za-z0-9]+)',  # LG
             r'(Sony [A-Za-z0-9]+)',  # Sony
         ]
-        
+
         for pattern in android_patterns:
             match = re.search(pattern, user_agent_string, re.IGNORECASE)
             if match:
                 device_model = match.group(1)
                 break
-        
+
         # iPhone/iPad detection
         if 'iPhone' in user_agent_string:
             device_model = 'iPhone'
         elif 'iPad' in user_agent_string:
             device_model = 'iPad'
-        
+
         # OS version formatting
         os_version = user_agent.os.version_string or ''
         if user_agent.os.family == 'Android' and os_version:
             # Clean up Android version (e.g., "12" instead of "12.0.0")
             os_version = os_version.split('.')[0]
-        
+
         # Browser info
         browser_name = user_agent.browser.family or 'Unknown Browser'
         browser_version = user_agent.browser.version_string or ''
@@ -715,12 +777,12 @@ def settings_active_devices_view(request):
             browser_info = f"{browser_name} {browser_version.split('.')[0]}"
         else:
             browser_info = browser_name
-        
+
         # OS info
         os_info = f"{user_agent.os.family}"
         if os_version:
             os_info += f" {os_version}"
-        
+
         return {
             'device_type': device_type,
             'device_model': device_model,
@@ -730,11 +792,11 @@ def settings_active_devices_view(request):
             'is_tablet': user_agent.is_tablet,
             'is_pc': user_agent.is_pc,
         }
-    
+
     # Get current session
     current_session_key = request.session.session_key
     current_session = None
-    
+
     # Try to get or create UserSession for current session
     try:
         current_session = UserSession.objects.get(
@@ -747,9 +809,9 @@ def settings_active_devices_view(request):
         # Create session record
         user_agent_string = request.META.get('HTTP_USER_AGENT', '')
         device_info = parse_device_info(user_agent_string)
-        
+
         ip_address = request.META.get('REMOTE_ADDR')
-        
+
         current_session = UserSession.objects.create(
             user=request.user,
             session_key=current_session_key,
@@ -761,14 +823,14 @@ def settings_active_devices_view(request):
             device_type=device_info['device_type'],
             is_current=True
         )
-    
+
     # Get other sessions
     other_sessions = UserSession.objects.filter(
         user=request.user
     ).exclude(
         session_key=current_session_key
     ).order_by('-last_activity')
-    
+
     # Parse device info for other sessions
     for session in other_sessions:
         if session.user_agent:
@@ -777,7 +839,7 @@ def settings_active_devices_view(request):
             session.device_model = device_info['device_model']
             session.browser = device_info['browser']
             session.os = device_info['os']
-    
+
     # Parse device info for current session
     if current_session and current_session.user_agent:
         device_info = parse_device_info(current_session.user_agent)
@@ -785,7 +847,14 @@ def settings_active_devices_view(request):
         current_session.device_model = device_info['device_model']
         current_session.browser = device_info['browser']
         current_session.os = device_info['os']
-    
+
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/active_devices_content.html',
+            'current_session': current_session,
+            'other_sessions': other_sessions
+        })
+
     return render(request, 'users/settings/active_devices.html', {
         'current_session': current_session,
         'other_sessions': other_sessions
@@ -798,7 +867,13 @@ def settings_blocked_users_view(request):
     blocked_users = Block.objects.filter(
         blocker=request.user
     ).select_related('blocked').order_by('-created_at')
-    
+
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/blocked_content.html',
+            'blocked_users': blocked_users
+        })
+
     return render(request, 'users/settings/blocked_users.html', {
         'blocked_users': blocked_users
     })
@@ -809,18 +884,27 @@ def settings_profile_privacy_view(request):
     """Profile privacy settings page"""
     if request.method == 'POST':
         profile_privacy = request.POST.get('profile_privacy')
-        
+
         if profile_privacy not in PrivacyLevel.values:
             messages.error(request, 'Invalid privacy level.')
-            return redirect('users:settings_profile_privacy')
-        
-        request.user.profile_privacy = profile_privacy
-        request.user.save()
-        
-        messages.success(request, 'Profile privacy updated successfully.')
+        else:
+            request.user.profile_privacy = profile_privacy
+            request.user.save()
+            messages.success(request, 'Profile privacy updated successfully.')
+
+        if request.headers.get('HX-Request'):
+            return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+                'settings_content_partial': 'users/settings/partials/profile_privacy_content.html',
+                'privacy_levels': PrivacyLevel.choices
+            })
         return redirect('users:settings_profile_privacy')
-    
+
     privacy_levels = PrivacyLevel.choices
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/profile_privacy_content.html',
+            'privacy_levels': privacy_levels
+        })
     return render(request, 'users/settings/profile_privacy.html', {
         'privacy_levels': privacy_levels
     })
@@ -831,18 +915,27 @@ def settings_post_privacy_view(request):
     """Post privacy settings page"""
     if request.method == 'POST':
         post_privacy = request.POST.get('post_privacy')
-        
+
         if post_privacy not in PrivacyLevel.values:
             messages.error(request, 'Invalid privacy level.')
-            return redirect('users:settings_post_privacy')
-        
-        request.user.post_privacy = post_privacy
-        request.user.save()
-        
-        messages.success(request, 'Post privacy updated successfully.')
+        else:
+            request.user.post_privacy = post_privacy
+            request.user.save()
+            messages.success(request, 'Post privacy updated successfully.')
+
+        if request.headers.get('HX-Request'):
+            return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+                'settings_content_partial': 'users/settings/partials/post_privacy_content.html',
+                'privacy_levels': PrivacyLevel.choices
+            })
         return redirect('users:settings_post_privacy')
-    
+
     privacy_levels = PrivacyLevel.choices
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/post_privacy_content.html',
+            'privacy_levels': privacy_levels
+        })
     return render(request, 'users/settings/post_privacy.html', {
         'privacy_levels': privacy_levels
     })
@@ -854,7 +947,13 @@ def settings_hidden_authors_view(request):
     hidden_authors = HiddenAuthor.objects.filter(
         hider=request.user
     ).select_related('hidden_author').order_by('-created_at')
-    
+
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/hidden_content.html',
+            'hidden_authors': hidden_authors
+        })
+
     return render(request, 'users/settings/hidden_authors.html', {
         'hidden_authors': hidden_authors
     })
@@ -865,7 +964,7 @@ def settings_notifications_view(request):
     """Notification preferences settings page"""
     from notifications.services.preference_service import NotificationPreferenceService
     from notifications.events import EventTypes
-    
+
     # Handle form submission
     if request.method == 'POST':
         # Update global preferences
@@ -874,7 +973,7 @@ def settings_notifications_view(request):
         push_enabled = request.POST.get('push_enabled') == 'on'
         push_sound = request.POST.get('push_sound') == 'on'
         in_app_enabled = request.POST.get('in_app_enabled') == 'on'
-        
+
         NotificationPreferenceService.update_global_preferences(
             request.user,
             email_enabled=email_enabled,
@@ -883,12 +982,12 @@ def settings_notifications_view(request):
             push_sound=push_sound,
             in_app_enabled=in_app_enabled
         )
-        
+
         # Update quiet hours
         quiet_hours_enabled = request.POST.get('quiet_hours_enabled') == 'on'
         quiet_hours_start = request.POST.get('quiet_hours_start')
         quiet_hours_end = request.POST.get('quiet_hours_end')
-        
+
         from datetime import time
         NotificationPreferenceService.update_quiet_hours(
             request.user,
@@ -896,7 +995,7 @@ def settings_notifications_view(request):
             start=time.fromisoformat(quiet_hours_start) if quiet_hours_start else None,
             end=time.fromisoformat(quiet_hours_end) if quiet_hours_end else None
         )
-        
+
         # Update type preferences
         type_preferences = {}
         event_type_mapping = {
@@ -922,26 +1021,27 @@ def settings_notifications_view(request):
             'MESSAGING_CONVERSATION_MEMBER_ADDED': EventTypes.MESSAGING_CONVERSATION_MEMBER_ADDED.value,
             'COURSES_ASSIGNMENT_PUBLISHED': EventTypes.COURSES_ASSIGNMENT_PUBLISHED.value,
         }
-        
+
         for field_name, event_type in event_type_mapping.items():
             type_preferences[event_type] = {
                 'email': request.POST.get(f'type_{field_name}_email') == 'on',
                 'push': request.POST.get(f'type_{field_name}_push') == 'on',
                 'in_app': request.POST.get(f'type_{field_name}_in_app') == 'on',
             }
-        
+
         NotificationPreferenceService.update_type_preferences(request.user, type_preferences)
-        
-        return redirect('users:settings_notifications')
-    
-    # Get or create user preferences for GET request
+
+        if not request.headers.get('HX-Request'):
+            return redirect('users:settings_notifications')
+
+    # Get or create user preferences for GET request or HTMX POST response
     preferences = NotificationPreferenceService.get_or_create_preferences(request.user)
-    
+
     # Initialize type preferences if empty only - don't merge with defaults
     if not preferences.type_preferences:
         preferences.type_preferences = NotificationPreferenceService.get_default_type_preferences()
         preferences.save()
-    
+
     # Create a mapping for template access (dot keys -> underscore keys)
     event_type_mapping = {
         'POSTS_POST_LIKED': EventTypes.POSTS_POST_LIKED.value,
@@ -966,14 +1066,20 @@ def settings_notifications_view(request):
         'MESSAGING_CONVERSATION_MEMBER_ADDED': EventTypes.MESSAGING_CONVERSATION_MEMBER_ADDED.value,
         'COURSES_ASSIGNMENT_PUBLISHED': EventTypes.COURSES_ASSIGNMENT_PUBLISHED.value,
     }
-    
+
     # Create a copy of preferences with underscore keys for template
     template_preferences = preferences
     template_preferences.type_preferences_template = {}
     for underscore_key, dot_key in event_type_mapping.items():
         if dot_key in preferences.type_preferences:
             template_preferences.type_preferences_template[underscore_key] = preferences.type_preferences[dot_key]
-    
+
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/notification_preferences_content.html',
+            'preferences': template_preferences
+        })
+
     return render(request, 'users/settings/notifications.html', {
         'preferences': template_preferences
     })
@@ -985,11 +1091,11 @@ def api_sign_out_session(request, session_id):
     """Sign out a specific session (API endpoint for HTMX)"""
     try:
         session = UserSession.objects.get(id=session_id, user=request.user)
-        
+
         # Prevent signing out current session
         if session.session_key == request.session.session_key:
             return JsonResponse({'error': 'Cannot sign out current session'}, status=400)
-        
+
         # Delete the Django session
         from django.contrib.sessions.models import Session
         try:
@@ -997,10 +1103,10 @@ def api_sign_out_session(request, session_id):
             django_session.delete()
         except Session.DoesNotExist:
             pass
-        
+
         # Delete our UserSession record
         session.delete()
-        
+
         return HttpResponse('')  # HTMX will remove the element
     except UserSession.DoesNotExist:
         return JsonResponse({'error': 'Session not found'}, status=404)
@@ -1011,14 +1117,14 @@ def api_sign_out_session(request, session_id):
 def api_sign_out_all_sessions(request):
     """Sign out all other sessions (API endpoint for HTMX)"""
     current_session_key = request.session.session_key
-    
+
     # Delete all other sessions
     other_sessions = UserSession.objects.filter(
         user=request.user
     ).exclude(
         session_key=current_session_key
     )
-    
+
     from django.contrib.sessions.models import Session
     for session in other_sessions:
         try:
@@ -1027,8 +1133,15 @@ def api_sign_out_all_sessions(request):
         except Session.DoesNotExist:
             pass
         session.delete()
-    
+
     messages.success(request, 'All other devices have been signed out.')
+    if request.headers.get('HX-Request'):
+        current_session = UserSession.objects.filter(user=request.user, session_key=current_session_key).first()
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/active_devices_content.html',
+            'current_session': current_session,
+            'other_sessions': []
+        })
     return redirect('users:settings_active_devices')
 
 
@@ -1040,7 +1153,7 @@ def api_unblock_user(request, user_id):
         blocked_user = User.objects.get(id=user_id)
         block = Block.objects.get(blocker=request.user, blocked=blocked_user)
         block.delete()
-        
+
         return HttpResponse('')  # HTMX will remove the element
     except User.DoesNotExist:
         return JsonResponse({'error': 'User not found'}, status=404)
@@ -1056,7 +1169,7 @@ def api_show_hidden_author(request, user_id):
         hidden_author = User.objects.get(id=user_id)
         hidden = HiddenAuthor.objects.get(hider=request.user, hidden_author=hidden_author)
         hidden.delete()
-        
+
         return HttpResponse('')  # HTMX will remove the element
     except User.DoesNotExist:
         return JsonResponse({'error': 'User not found'}, status=404)
@@ -1082,17 +1195,17 @@ def switch_account_view(request, user_id):
     """
     # Try to get device ID from headers first (HTMX requests)
     device_id = request.headers.get('X-Device-ID')
-    
+
     # Fallback to query parameter (link clicks)
     if not device_id:
         device_id = request.GET.get('device_id')
-    
+
     if not device_id:
         messages.error(request, 'Unable to identify device. Please refresh the page.')
         return redirect('posts:home')
-    
+
     hashed_device_id = hash_device_id(device_id)
-    
+
     # Verify the target account is associated with this device
     try:
         device_account = DeviceAccount.objects.get(
@@ -1103,17 +1216,17 @@ def switch_account_view(request, user_id):
     except DeviceAccount.DoesNotExist:
         messages.error(request, 'Account not found on this device.')
         return redirect('posts:home')
-    
+
     # Logout current user
     logout(request)
-    
+
     # Login as target user
     login(request, target_user, backend='django.contrib.auth.backends.ModelBackend')
-    
+
     # Update the device account record
     device_account.session_key = request.session.session_key
     device_account.save()
-    
+
     messages.success(request, f'Switched to {target_user.username}')
     return redirect('posts:home')
 
@@ -1126,16 +1239,16 @@ def get_device_accounts_view(request):
     """
     # Try to get device ID from headers first (HTMX requests)
     device_id = request.headers.get('X-Device-ID')
-    
+
     if not device_id:
         return JsonResponse({'accounts': [], 'error': 'Device not identified'})
-    
+
     hashed_device_id = hash_device_id(device_id)
-    
+
     device_accounts = DeviceAccount.objects.filter(
         device_id=hashed_device_id
     ).select_related('user').order_by('-last_used')
-    
+
     accounts_data = []
     for da in device_accounts:
         accounts_data.append({
@@ -1146,7 +1259,7 @@ def get_device_accounts_view(request):
             'last_used': da.last_used.isoformat(),
             'is_current': da.user.id == request.user.id
         })
-    
+
     return JsonResponse({'accounts': accounts_data})
 
 
@@ -1158,22 +1271,22 @@ def remove_account_from_device_view(request, user_id):
     """
     # Try to get device ID from headers first (HTMX requests)
     device_id = request.headers.get('X-Device-ID')
-    
+
     # Fallback to query parameter (link clicks)
     if not device_id:
         device_id = request.GET.get('device_id')
-    
+
     if not device_id:
         messages.error(request, 'Unable to identify device.')
         return redirect('posts:home')
-    
+
     hashed_device_id = hash_device_id(device_id)
-    
+
     # Prevent removing the current account
     if user_id == request.user.id:
         messages.error(request, 'Cannot remove the currently active account.')
         return redirect('posts:home')
-    
+
     try:
         device_account = DeviceAccount.objects.get(
             user_id=user_id,
@@ -1183,7 +1296,7 @@ def remove_account_from_device_view(request, user_id):
         messages.success(request, 'Account removed from device.')
     except DeviceAccount.DoesNotExist:
         messages.error(request, 'Account not found on this device.')
-    
+
     return redirect('posts:home')
 
 
@@ -1194,15 +1307,15 @@ def view_profile_photo_fullscreen(request, username, photo_type):
     Only accessible if the viewer is following the profile user or if it's their own profile.
     """
     profile_user = get_object_or_404(User, username=username)
-    
+
     # Check if user is allowed to view the photo
     is_own_profile = request.user == profile_user
     is_following = Follow.objects.filter(follower=request.user, followed=profile_user).exists()
-    
+
     if not is_own_profile and not is_following:
         messages.error(request, 'You need to follow this user to view their photos in full screen.')
         return redirect('users:profile', username=username)
-    
+
     # Determine which photo to show
     if photo_type == 'profile':
         photo_url = profile_user.profile_pic.url
@@ -1216,20 +1329,20 @@ def view_profile_photo_fullscreen(request, username, photo_type):
     else:
         messages.error(request, 'Invalid photo type.')
         return redirect('users:profile', username=username)
-    
+
     # Get like count and check if current user liked the photo
     from .models import UserProfilePhotoLike
     like_count = UserProfilePhotoLike.objects.filter(
         profile_user=profile_user,
         photo_type=photo_type
     ).count()
-    
+
     is_liked = UserProfilePhotoLike.objects.filter(
         user=request.user,
         profile_user=profile_user,
         photo_type=photo_type
     ).exists()
-    
+
     return render(request, 'users/profile_photo_fullscreen.html', {
         'profile_user': profile_user,
         'photo_url': photo_url,
@@ -1248,33 +1361,33 @@ def toggle_profile_photo_like(request, username, photo_type):
     API endpoint for fullscreen photo view.
     """
     profile_user = get_object_or_404(User, username=username)
-    
+
     # Validate photo type
     if photo_type not in ['profile', 'cover']:
         return JsonResponse(
             {'detail': 'Invalid photo type. Must be profile or cover.'},
             status=400
         )
-    
+
     # Check if photo exists
     if photo_type == 'cover' and not profile_user.cover_photo:
         return JsonResponse(
             {'detail': 'This user does not have a cover photo.'},
             status=404
         )
-    
+
     from .models import UserProfilePhotoLike
     like, created = UserProfilePhotoLike.objects.get_or_create(
         user=request.user,
         profile_user=profile_user,
         photo_type=photo_type
     )
-    
+
     likes_count = UserProfilePhotoLike.objects.filter(
         profile_user=profile_user,
         photo_type=photo_type
     ).count()
-    
+
     if created:
         return JsonResponse(
             {'detail': 'Photo liked.', 'likes_count': likes_count},
@@ -1361,33 +1474,33 @@ class UserViewSet(viewsets.ModelViewSet):
     def photo_like(self, request, pk=None, photo_type=None):
         """Like or unlike a user's profile or cover photo"""
         profile_user = self.get_object()
-        
+
         # Validate photo type
         if photo_type not in ['profile', 'cover']:
             return Response(
                 {'detail': 'Invalid photo type. Must be profile or cover.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Check if photo exists
         if photo_type == 'cover' and not profile_user.cover_photo:
             return Response(
                 {'detail': 'This user does not have a cover photo.'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         from .models import UserProfilePhotoLike
         like, created = UserProfilePhotoLike.objects.get_or_create(
             user=request.user,
             profile_user=profile_user,
             photo_type=photo_type
         )
-        
+
         likes_count = UserProfilePhotoLike.objects.filter(
             profile_user=profile_user,
             photo_type=photo_type
         ).count()
-        
+
         if created:
             return Response(
                 {'detail': 'Photo liked.', 'likes_count': likes_count},
@@ -1620,15 +1733,15 @@ def user_online_status_api(request, user_id):
     try:
         # Messaging presence - FROZEN FOR MVP
         # from messaging.presence import PresenceService
-        
+
         # Check if user is online based on heartbeat freshness - FROZEN FOR MVP
         # is_online = PresenceService.is_user_online(user_id)
         # last_seen = PresenceService.get_last_seen(user_id)
-        
+
         # Fallback to basic User model is_online field
         from users.models import User
         user = User.objects.get(id=user_id)
-        
+
         return JsonResponse({
             'is_online': user.is_online,
             'user_id': int(user_id),

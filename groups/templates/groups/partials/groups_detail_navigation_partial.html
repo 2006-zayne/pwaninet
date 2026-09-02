@@ -1,0 +1,9 @@
+{% load i18n %}
+{% load static %}
+{% load group_extras %}
+
+<!-- HTMX Navigation Partial for Group Detail Page -->
+{% include 'groups/partials/groups_detail_content.html' %}
+
+<!-- Clear profile floating actions when navigating to Group Detail -->
+<div id="profile-floating-actions" hx-swap-oob="true"></div>

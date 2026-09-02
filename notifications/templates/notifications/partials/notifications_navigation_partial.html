@@ -1,0 +1,6 @@
+{% load static %}
+<!-- Notifications HTMX Navigation Bridge -->
+{% include 'notifications/partials/notifications_content.html' %}
+
+<!-- Explicitly clear any legacy OOB components like profile floating actions -->
+<div id="profile-floating-actions" hx-swap-oob="true"></div>

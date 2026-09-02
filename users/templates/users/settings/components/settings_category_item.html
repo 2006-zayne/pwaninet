@@ -1,5 +1,5 @@
 {% load i18n %}
-<a href="{% url url_name %}" class="settings-category-item">
+<a href="{% url url_name %}" class="settings-category-item" {% if is_htmx %}hx-get="{% url url_name %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true"{% endif %}>
   <div class="settings-category-icon">
     <i class="bi {{ icon_class }}"></i>
   </div>

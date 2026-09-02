@@ -3,7 +3,7 @@
 <div class="pref-section">
   <div class="pref-section-title">Delivery Channels</div>
   <div class="pref-section-description">Choose how you want to receive notifications</div>
-  
+
   <div class="form-check">
     <div>
       <input type="checkbox" class="form-check-input" id="email_enabled" name="email_enabled" {% if preferences.email_enabled %}checked{% endif %}>
@@ -13,7 +13,7 @@
       </label>
     </div>
   </div>
-  
+
   <div class="form-check">
     <div>
       <input type="checkbox" class="form-check-input" id="email_digest" name="email_digest" {% if preferences.email_digest %}checked{% endif %}>
@@ -23,7 +23,7 @@
       </label>
     </div>
   </div>
-  
+
   <div class="form-check">
     <div>
       <input type="checkbox" class="form-check-input" id="push_enabled" name="push_enabled" {% if preferences.push_enabled %}checked{% endif %}>
@@ -63,7 +63,7 @@
       </button>
     </div>
   </div>
-  
+
   <div class="form-check">
     <div>
       <input type="checkbox" class="form-check-input" id="push_sound" name="push_sound" {% if preferences.push_sound %}checked{% endif %}>
@@ -73,7 +73,7 @@
       </label>
     </div>
   </div>
-  
+
   <div class="form-check">
     <div>
       <input type="checkbox" class="form-check-input" id="in_app_enabled" name="in_app_enabled" {% if preferences.in_app_enabled %}checked{% endif %}>
@@ -89,14 +89,14 @@
 <div class="pref-section">
   <div class="pref-section-title">Notification Types</div>
   <div class="pref-section-description">Customize which notifications you receive</div>
-  
+
   <div class="pref-type-grid">
     <!-- Social Notifications -->
     <div class="pref-type-group">
       <div class="pref-type-group-title">
         <i class="bi bi-people"></i> Social
       </div>
-      
+
       <div class="pref-type-item">
         <div class="pref-type-name">Post Likes</div>
         <div class="pref-type-channels">
@@ -114,7 +114,7 @@
           </label>
         </div>
       </div>
-      
+
       <div class="pref-type-item">
         <div class="pref-type-name">Comments</div>
         <div class="pref-type-channels">
@@ -132,7 +132,7 @@
           </label>
         </div>
       </div>
-      
+
       <div class="pref-type-item">
         <div class="pref-type-name">Follows</div>
         <div class="pref-type-channels">
@@ -150,7 +150,7 @@
           </label>
         </div>
       </div>
-      
+
       <div class="pref-type-item">
         <div class="pref-type-name">Comment Replies</div>
         <div class="pref-type-channels">
@@ -168,7 +168,7 @@
           </label>
         </div>
       </div>
-      
+
       <div class="pref-type-item">
         <div class="pref-type-name">Post Shares</div>
         <div class="pref-type-channels">
@@ -187,13 +187,13 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Group Notifications -->
     <div class="pref-type-group">
       <div class="pref-type-group-title">
         <i class="bi bi-people-fill"></i> Groups
       </div>
-      
+
       <div class="pref-type-item">
         <div class="pref-type-name">Group Invites</div>
         <div class="pref-type-channels">
@@ -211,7 +211,7 @@
           </label>
         </div>
       </div>
-      
+
       <div class="pref-type-item">
         <div class="pref-type-name">Group Requests</div>
         <div class="pref-type-channels">
@@ -229,7 +229,7 @@
           </label>
         </div>
       </div>
-      
+
       <div class="pref-type-item">
         <div class="pref-type-name">Group Approvals</div>
         <div class="pref-type-channels">
@@ -247,7 +247,7 @@
           </label>
         </div>
       </div>
-      
+
       <div class="pref-type-item">
         <div class="pref-type-name">Group Rejections</div>
         <div class="pref-type-channels">
@@ -265,7 +265,7 @@
           </label>
         </div>
       </div>
-      
+
       <div class="pref-type-item">
         <div class="pref-type-name">Post Shared to Group</div>
         <div class="pref-type-channels">
@@ -284,13 +284,13 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Document Notifications -->
     <div class="pref-type-group">
       <div class="pref-type-group-title">
         <i class="bi bi-file-earmark-text"></i> Documents
       </div>
-      
+
       <div class="pref-type-item">
         <div class="pref-type-name">Document Uploads</div>
         <div class="pref-type-channels">
@@ -308,8 +308,8 @@
           </label>
         </div>
       </div>
-      
-      
+
+
       <div class="pref-type-item">
         <div class="pref-type-name">Document Downloads</div>
         <div class="pref-type-channels">
@@ -328,13 +328,13 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Messaging Notifications -->
     <div class="pref-type-group">
       <div class="pref-type-group-title">
         <i class="bi bi-chat-dots"></i> Messaging
       </div>
-      
+
       <div class="pref-type-item">
         <div class="pref-type-name">New Messages</div>
         <div class="pref-type-channels">
@@ -352,7 +352,7 @@
           </label>
         </div>
       </div>
-      
+
       <div class="pref-type-item">
         <div class="pref-type-name">Conversation Created</div>
         <div class="pref-type-channels">
@@ -371,7 +371,7 @@
         </div>
       </div>
     </div>
-    
+
   </div>
 </div>
 
@@ -379,7 +379,7 @@
 <div class="pref-section">
   <div class="pref-section-title">Quiet Hours</div>
   <div class="pref-section-description">Pause notifications during specific hours</div>
-  
+
   <div class="form-check">
     <div>
       <input type="checkbox" class="form-check-input" id="quiet_hours_enabled" name="quiet_hours_enabled" {% if preferences.quiet_hours_enabled %}checked{% endif %}>
@@ -389,7 +389,7 @@
       </label>
     </div>
   </div>
-  
+
   <div class="quiet-hours-inputs">
     <div class="time-input-group">
       <label for="quiet_hours_start">From</label>
@@ -406,14 +406,14 @@
 <div class="pref-section">
   <div class="pref-section-title">Do Not Disturb</div>
   <div class="pref-section-description">Temporarily pause all notifications</div>
-  
+
   <div class="dnd-buttons">
     <button type="button" class="btn-dnd" onclick="setDnd(1)">1 hour</button>
     <button type="button" class="btn-dnd" onclick="setDnd(8)">8 hours</button>
     <button type="button" class="btn-dnd" onclick="setDnd(24)">24 hours</button>
     <button type="button" class="btn-dnd btn-dnd-clear" onclick="clearDnd()">Clear</button>
   </div>
-  
+
   {% if preferences.do_not_disturb_until %}
     <div class="dnd-status">
       <i class="bi bi-info-circle"></i>
@@ -465,30 +465,30 @@ function getCsrfToken() {
     padding: 1.5rem;
     border-bottom: 1px solid var(--border);
   }
-  
+
   .pref-section:last-child {
     border-bottom: none;
   }
-  
+
   .pref-section-title {
     font-size: 1rem;
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 0.5rem;
   }
-  
+
   .pref-section-description {
     font-size: 0.85rem;
     color: var(--text-secondary);
     margin-bottom: 1rem;
   }
-  
+
   .form-check {
     padding: 0.75rem 0;
     display: flex;
     align-items: center;
   }
-  
+
   .form-check-input {
     width: 1.25rem;
     height: 1.25rem;
@@ -498,7 +498,7 @@ function getCsrfToken() {
     border: 2px solid var(--border);
     border-radius: 4px;
   }
-  
+
   .form-check-label {
     margin-left: 0.75rem;
     font-weight: 500;
@@ -506,7 +506,7 @@ function getCsrfToken() {
     cursor: pointer;
     flex: 1;
   }
-  
+
   .form-check-description {
     display: block;
     font-size: 0.85rem;
@@ -514,20 +514,20 @@ function getCsrfToken() {
     margin-top: 0.25rem;
     font-weight: 400;
   }
-  
+
   .pref-type-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 1.5rem;
     margin-top: 1rem;
   }
-  
+
   .pref-type-group {
     background: var(--page-bg);
     border-radius: var(--radius-md);
     padding: 1rem;
   }
-  
+
   .pref-type-group-title {
     font-size: 0.9rem;
     font-weight: 600;
@@ -537,28 +537,28 @@ function getCsrfToken() {
     align-items: center;
     gap: 0.5rem;
   }
-  
+
   .pref-type-item {
     padding: 0.75rem 0;
     border-bottom: 1px solid var(--border);
   }
-  
+
   .pref-type-item:last-child {
     border-bottom: none;
   }
-  
+
   .pref-type-name {
     font-size: 0.85rem;
     font-weight: 500;
     color: var(--text-primary);
     margin-bottom: 0.5rem;
   }
-  
+
   .pref-type-channels {
     display: flex;
     gap: 1rem;
   }
-  
+
   .channel-toggle {
     display: flex;
     align-items: center;
@@ -567,7 +567,7 @@ function getCsrfToken() {
     color: var(--text-secondary);
     cursor: pointer;
   }
-  
+
   .channel-toggle input {
     cursor: pointer;
     width: 1rem;
@@ -576,39 +576,39 @@ function getCsrfToken() {
     border: 2px solid var(--border);
     border-radius: 3px;
   }
-  
+
   .quiet-hours-inputs {
     display: flex;
     gap: 1rem;
     margin-top: 1rem;
   }
-  
+
   .time-input-group {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
   }
-  
+
   .time-input-group label {
     font-size: 0.8rem;
     font-weight: 500;
     color: var(--text-secondary);
   }
-  
+
   .time-input-group input {
     padding: 0.5rem;
     border: 1px solid var(--border);
     border-radius: 6px;
     font-size: 0.9rem;
   }
-  
+
   .dnd-buttons {
     display: flex;
     gap: 0.5rem;
     margin-top: 1rem;
     flex-wrap: wrap;
   }
-  
+
   .btn-dnd {
     padding: 0.5rem 1rem;
     background: var(--brand-light);
@@ -620,23 +620,23 @@ function getCsrfToken() {
     cursor: pointer;
     transition: all 0.2s ease;
   }
-  
+
   .btn-dnd:hover {
     background: var(--brand);
     color: #fff;
   }
-  
+
   .btn-dnd-clear {
     background: var(--danger-light);
     color: var(--danger);
     border-color: #fecaca;
   }
-  
+
   .btn-dnd-clear:hover {
     background: var(--danger);
     color: #fff;
   }
-  
+
   .dnd-status {
     margin-top: 1rem;
     padding: 0.75rem;
@@ -652,121 +652,180 @@ function getCsrfToken() {
 
 <script src="/static/js/notifications/push-subscription.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', async function() {
-  const pushManager = new PushSubscriptionManager();
-  
-  // UI elements
-  const loadingEl = document.getElementById('push-status-loading');
-  const notSupportedEl = document.getElementById('push-status-not-supported');
-  const deniedEl = document.getElementById('push-status-denied');
-  const unsubscribedEl = document.getElementById('push-status-unsubscribed');
-  const subscribedEl = document.getElementById('push-status-subscribed');
-  const subscribeBtn = document.getElementById('btn-push-subscribe');
-  const unsubscribeBtn = document.getElementById('btn-push-unsubscribe');
-  
-  // Hide all status elements
-  function hideAllStatus() {
-    loadingEl.style.display = 'none';
-    notSupportedEl.style.display = 'none';
-    deniedEl.style.display = 'none';
-    unsubscribedEl.style.display = 'none';
-    subscribedEl.style.display = 'none';
-  }
-  
-  // Update UI based on status
-  function updateStatusUI(status) {
-    hideAllStatus();
-    
-    if (!status.supported) {
-      notSupportedEl.style.display = 'flex';
-      return;
-    }
-    
-    if (status.permission === 'denied') {
-      deniedEl.style.display = 'flex';
-      return;
-    }
-    
-    if (status.subscribed) {
-      subscribedEl.style.display = 'flex';
-    } else {
-      unsubscribedEl.style.display = 'flex';
-    }
-  }
-  
-  // Check subscription status on load
-  async function checkStatus() {
-    hideAllStatus();
-    loadingEl.style.display = 'flex';
-    
-    try {
-      const status = await pushManager.getSubscriptionStatus();
-      updateStatusUI(status);
-    } catch (error) {
-      console.error('Error checking push status:', error);
-      notSupportedEl.style.display = 'flex';
-    }
-  }
-  
-  // Subscribe button click handler
-  subscribeBtn.addEventListener('click', async function() {
-    try {
-      subscribeBtn.disabled = true;
-      subscribeBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Subscribing...';
-      
-      await pushManager.subscribe();
-      
-      // Update UI
-      const status = await pushManager.getSubscriptionStatus();
-      updateStatusUI(status);
-      
-      // Also enable the push_enabled checkbox
-      const pushEnabledCheckbox = document.getElementById('push_enabled');
-      if (pushEnabledCheckbox) {
-        pushEnabledCheckbox.checked = true;
+(function() {
+  window.setDnd = function(hours) {
+    fetch('/notifications/set-dnd/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken()
+      },
+      body: JSON.stringify({ hours: hours })
+    }).then(() => {
+      if (window.htmx) {
+        htmx.ajax('GET', window.location.pathname, {target: '#page-content-target', swap: 'innerHTML'});
+      } else {
+        location.reload();
       }
-    } catch (error) {
-      console.error('Subscription failed:', error);
-      alert('Failed to enable push notifications: ' + error.message);
-    } finally {
-      subscribeBtn.disabled = false;
-      subscribeBtn.innerHTML = '<i class="bi bi-bell"></i> Enable Push Notifications';
-    }
-  });
-  
-  // Unsubscribe button click handler
-  unsubscribeBtn.addEventListener('click', async function() {
-    if (!confirm('Are you sure you want to disable push notifications?')) {
-      return;
-    }
-    
-    try {
-      unsubscribeBtn.disabled = true;
-      unsubscribeBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Disabling...';
-      
-      await pushManager.unsubscribe();
-      
-      // Update UI
-      const status = await pushManager.getSubscriptionStatus();
-      updateStatusUI(status);
-      
-      // Also disable the push_enabled checkbox
-      const pushEnabledCheckbox = document.getElementById('push_enabled');
-      if (pushEnabledCheckbox) {
-        pushEnabledCheckbox.checked = false;
+    });
+  };
+
+  window.clearDnd = function() {
+    fetch('/notifications/clear-dnd/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken()
       }
-    } catch (error) {
-      console.error('Unsubscription failed:', error);
-      alert('Failed to disable push notifications: ' + error.message);
-    } finally {
-      unsubscribeBtn.disabled = false;
-      unsubscribeBtn.innerHTML = '<i class="bi bi-bell-slash"></i> Disable';
+    }).then(() => {
+      if (window.htmx) {
+        htmx.ajax('GET', window.location.pathname, {target: '#page-content-target', swap: 'innerHTML'});
+      } else {
+        location.reload();
+      }
+    });
+  };
+
+  window.getCsrfToken = function() {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'csrftoken') {
+        return decodeURIComponent(value);
+      }
     }
-  });
-  
-  // Initial status check
-  checkStatus();
-});
+    return '';
+  };
+
+  function initPushSubscription() {
+    const statusContainer = document.querySelector('.push-subscription-status');
+    if (!statusContainer || statusContainer.dataset.initialized === 'true') return;
+    statusContainer.dataset.initialized = 'true';
+
+    if (typeof PushSubscriptionManager === 'undefined') return;
+    const pushManager = new PushSubscriptionManager();
+
+    // UI elements
+    const loadingEl = document.getElementById('push-status-loading');
+    const notSupportedEl = document.getElementById('push-status-not-supported');
+    const deniedEl = document.getElementById('push-status-denied');
+    const unsubscribedEl = document.getElementById('push-status-unsubscribed');
+    const subscribedEl = document.getElementById('push-status-subscribed');
+    const subscribeBtn = document.getElementById('btn-push-subscribe');
+    const unsubscribeBtn = document.getElementById('btn-push-unsubscribe');
+
+    if (!loadingEl || !notSupportedEl || !deniedEl || !unsubscribedEl || !subscribedEl) return;
+
+    // Hide all status elements
+    function hideAllStatus() {
+      loadingEl.style.display = 'none';
+      notSupportedEl.style.display = 'none';
+      deniedEl.style.display = 'none';
+      unsubscribedEl.style.display = 'none';
+      subscribedEl.style.display = 'none';
+    }
+
+    // Update UI based on status
+    function updateStatusUI(status) {
+      hideAllStatus();
+
+      if (!status.supported) {
+        notSupportedEl.style.display = 'flex';
+        return;
+      }
+
+      if (status.permission === 'denied') {
+        deniedEl.style.display = 'flex';
+        return;
+      }
+
+      if (status.subscribed) {
+        subscribedEl.style.display = 'flex';
+      } else {
+        unsubscribedEl.style.display = 'flex';
+      }
+    }
+
+    // Check subscription status on load
+    async function checkStatus() {
+      hideAllStatus();
+      loadingEl.style.display = 'flex';
+
+      try {
+        const status = await pushManager.getSubscriptionStatus();
+        updateStatusUI(status);
+      } catch (error) {
+        console.error('Error checking push status:', error);
+        notSupportedEl.style.display = 'flex';
+      }
+    }
+
+    // Subscribe button click handler
+    if (subscribeBtn) {
+      subscribeBtn.addEventListener('click', async function() {
+        try {
+          subscribeBtn.disabled = true;
+          subscribeBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Subscribing...';
+
+          await pushManager.subscribe();
+
+          const status = await pushManager.getSubscriptionStatus();
+          updateStatusUI(status);
+
+          const pushEnabledCheckbox = document.getElementById('push_enabled');
+          if (pushEnabledCheckbox) {
+            pushEnabledCheckbox.checked = true;
+          }
+        } catch (error) {
+          console.error('Subscription failed:', error);
+          alert('Failed to enable push notifications: ' + error.message);
+        } finally {
+          subscribeBtn.disabled = false;
+          subscribeBtn.innerHTML = '<i class="bi bi-bell"></i> Enable Push Notifications';
+        }
+      });
+    }
+
+    // Unsubscribe button click handler
+    if (unsubscribeBtn) {
+      unsubscribeBtn.addEventListener('click', async function() {
+        if (!confirm('Are you sure you want to disable push notifications?')) {
+          return;
+        }
+
+        try {
+          unsubscribeBtn.disabled = true;
+          unsubscribeBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Disabling...';
+
+          await pushManager.unsubscribe();
+
+          const status = await pushManager.getSubscriptionStatus();
+          updateStatusUI(status);
+
+          const pushEnabledCheckbox = document.getElementById('push_enabled');
+          if (pushEnabledCheckbox) {
+            pushEnabledCheckbox.checked = false;
+          }
+        } catch (error) {
+          console.error('Unsubscription failed:', error);
+          alert('Failed to disable push notifications: ' + error.message);
+        } finally {
+          unsubscribeBtn.disabled = false;
+          unsubscribeBtn.innerHTML = '<i class="bi bi-bell-slash"></i> Disable';
+        }
+      });
+    }
+
+    // Initial status check
+    checkStatus();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initPushSubscription, { once: true });
+  } else {
+    initPushSubscription();
+  }
+})();
 </script>
 
 <style>
@@ -785,12 +844,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     transition: all 0.2s ease;
     margin-top: 1.5rem;
   }
-  
+
   .btn-save:hover {
     background: #1d4ed8;
     transform: translateY(-1px);
   }
-  
+
   @media (max-width: 768px) {
     .pref-type-grid {
       grid-template-columns: 1fr;

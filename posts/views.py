@@ -94,21 +94,21 @@ class PostViewSet(viewsets.ModelViewSet):
         Report a post.
         """
         post = self.get_object()
-        
+
         # Check if user already reported this post
         if Report.objects.filter(reporter=request.user, post=post).exists():
             return Response(
                 {'detail': 'You have already reported this post.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         serializer = ReportCreateSerializer(
             data=request.data,
             context={'request': request}
         )
         serializer.is_valid(raise_exception=True)
         serializer.save(post=post)
-        
+
         return Response(
             ReportSerializer(serializer.instance).data,
             status=status.HTTP_201_CREATED
@@ -121,7 +121,7 @@ class PostViewSet(viewsets.ModelViewSet):
         Like a post.
         """
         post = self.get_object()
-        
+
         # Check if user is approved member of the group
         if post.group:
             from groups.models import Membership, MembershipStatus
@@ -136,12 +136,12 @@ class PostViewSet(viewsets.ModelViewSet):
                     {'detail': 'You must be an approved member to like posts in this group.'},
                     status=status.HTTP_403_FORBIDDEN
                 )
-        
+
         like, created = Like.objects.get_or_create(
             user=request.user,
             post=post
         )
-        
+
         if created:
             return Response(
                 {'detail': 'Post liked.'},
@@ -161,7 +161,7 @@ class PostViewSet(viewsets.ModelViewSet):
         Like or unlike a specific post image.
         """
         post = self.get_object()
-        
+
         try:
             post_image = post.images.get(id=image_id)
         except PostImage.DoesNotExist:
@@ -169,7 +169,7 @@ class PostViewSet(viewsets.ModelViewSet):
                 {'detail': 'Image not found.'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         # Check if user is approved member of the group
         if post.group:
             from groups.models import Membership, MembershipStatus
@@ -184,14 +184,14 @@ class PostViewSet(viewsets.ModelViewSet):
                     {'detail': 'You must be an approved member to like images in this group.'},
                     status=status.HTTP_403_FORBIDDEN
                 )
-        
+
         like, created = PostImageLike.objects.get_or_create(
             user=request.user,
             post_image=post_image
         )
-        
+
         likes_count = post_image.likes.count()
-        
+
         if created:
             return Response(
                 {'detail': 'Image liked.', 'likes_count': likes_count},
@@ -209,12 +209,12 @@ class PostViewSet(viewsets.ModelViewSet):
         """
         GET /posts/{id}/images/{image_id}/comments/
         List all comments for a specific post image.
-        
+
         POST /posts/{id}/images/{image_id}/comments/
         Create a new comment for a specific post image.
         """
         post = self.get_object()
-        
+
         try:
             post_image = post.images.get(id=image_id)
         except PostImage.DoesNotExist:
@@ -222,10 +222,10 @@ class PostViewSet(viewsets.ModelViewSet):
                 {'detail': 'Image not found.'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         if request.method == 'GET':
             comments = post_image.comments.select_related('author').all()
-            
+
             # Format comments for response
             comments_data = []
             for comment in comments:
@@ -239,21 +239,21 @@ class PostViewSet(viewsets.ModelViewSet):
                     },
                     'created_at': comment.created_at.strftime('%B %d, %Y at %I:%M %p')
                 })
-            
+
             return Response({
                 'comments': comments_data,
                 'total_count': len(comments_data)
             }, status=status.HTTP_200_OK)
-        
+
         elif request.method == 'POST':
             content = request.data.get('content', '').strip()
-            
+
             if not content:
                 return Response(
                     {'detail': 'Comment content is required.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
+
             # Check if user is approved member of the group
             if post.group:
                 from groups.models import Membership, MembershipStatus
@@ -268,16 +268,16 @@ class PostViewSet(viewsets.ModelViewSet):
                         {'detail': 'You must be an approved member to comment on images in this group.'},
                         status=status.HTTP_403_FORBIDDEN
                     )
-            
+
             # Use the service function to add comment (mirrors post comment functionality)
             comment = add_comment_to_image(post_image, request.user, content)
-            
+
             if not comment:
                 return Response(
                     {'detail': 'Failed to add comment.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
+
             return Response({
                 'id': comment.id,
                 'content': comment.content,
@@ -420,15 +420,15 @@ class PostViewSet(viewsets.ModelViewSet):
         post = self.get_object()
         share_data = request.data.copy()
         message = share_data.get('message', '')
-        
+
         # Handle bulk user sharing
         if 'shared_to_usernames' in share_data:
             usernames_str = share_data['shared_to_usernames']
             usernames = [u.strip() for u in str(usernames_str).split(',') if u.strip()]
-            
+
             shared_posts = []
             errors = []
-            
+
             for username in usernames:
                 try:
                     user = User.objects.get(username=username)
@@ -438,7 +438,7 @@ class PostViewSet(viewsets.ModelViewSet):
                     errors.append(f'User {username} not found')
                 except Exception as e:
                     errors.append(f'Error sharing to {username}: {str(e)}')
-            
+
             if shared_posts:
                 return Response({
                     'detail': f'Shared to {len(shared_posts)} user(s) successfully.',
@@ -450,15 +450,15 @@ class PostViewSet(viewsets.ModelViewSet):
                     {'detail': 'No successful shares.', 'errors': errors},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-        
+
         # Handle bulk group sharing
         elif 'shared_to_group_ids' in share_data:
             group_ids_str = share_data['shared_to_group_ids']
             group_ids = [g.strip() for g in str(group_ids_str).split(',') if g.strip()]
-            
+
             shared_posts = []
             errors = []
-            
+
             from groups.models import Group
             for group_id in group_ids:
                 try:
@@ -469,7 +469,7 @@ class PostViewSet(viewsets.ModelViewSet):
                     errors.append(f'Group {group_id} not found')
                 except Exception as e:
                     errors.append(f'Error sharing to group {group_id}: {str(e)}')
-            
+
             if shared_posts:
                 return Response({
                     'detail': f'Shared to {len(shared_posts)} group(s) successfully.',
@@ -481,7 +481,7 @@ class PostViewSet(viewsets.ModelViewSet):
                     {'detail': 'No successful shares.', 'errors': errors},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-        
+
         # Handle single user/group sharing (backward compatibility)
         else:
             # If username is provided, look up the user ID
@@ -495,7 +495,7 @@ class PostViewSet(viewsets.ModelViewSet):
                         {'detail': 'User not found.'},
                         status=status.HTTP_404_NOT_FOUND
                     )
-            
+
             # If group_id is provided, look up the group
             if 'shared_to_group_id' in share_data and not share_data.get('shared_to_group'):
                 from groups.models import Group
@@ -508,14 +508,14 @@ class PostViewSet(viewsets.ModelViewSet):
                         {'detail': 'Group not found.'},
                         status=status.HTTP_404_NOT_FOUND
                     )
-            
+
             serializer = SharedPostCreateSerializer(
                 data=share_data,
                 context={'request': request}
             )
             serializer.is_valid(raise_exception=True)
             serializer.save(original_post=post)
-            
+
             return Response(
                 SharedPostSerializer(serializer.instance, context={'request': request}).data,
                 status=status.HTTP_201_CREATED
@@ -543,13 +543,13 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         comment = serializer.save(author=self.request.user)
-        
+
         # Broadcast new comment via WebSocket for real-time updates
         from channels.layers import get_channel_layer
         from asgiref.sync import async_to_sync
-        
+
         channel_layer = get_channel_layer()
-        
+
         # Broadcast to post author's feed
         if comment.post.author.id != self.request.user.id:
             async_to_sync(channel_layer.group_send)(
@@ -580,13 +580,13 @@ class CommentViewSet(viewsets.ModelViewSet):
         """
         parent_comment = self.get_object()
         content = request.data.get('content', '').strip()
-        
+
         if not content:
             return Response(
                 {'detail': 'Reply content cannot be empty.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Check if user can comment on the post (group membership check)
         if parent_comment.post.group:
             from groups.models import Membership, MembershipStatus
@@ -601,7 +601,7 @@ class CommentViewSet(viewsets.ModelViewSet):
                     {'detail': 'You must be an approved member to comment on posts in this group.'},
                     status=status.HTTP_403_FORBIDDEN
                 )
-        
+
         # Create the reply using the service
         from posts.services.comment_service import add_comment_to_post
         reply = add_comment_to_post(
@@ -610,7 +610,7 @@ class CommentViewSet(viewsets.ModelViewSet):
             content,
             parent_comment=parent_comment
         )
-        
+
         serializer = CommentSerializer(reply, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -623,7 +623,7 @@ class CommentViewSet(viewsets.ModelViewSet):
         comment = self.get_object()
         from posts.services.comment_service import toggle_comment_like_for_user
         result = toggle_comment_like_for_user(comment, request.user)
-        
+
         if result['comment'].is_liked_by(request.user):
             return Response(
                 {'detail': 'Comment liked.', 'likes_count': comment.likes.count()},
@@ -643,13 +643,13 @@ class CommentViewSet(viewsets.ModelViewSet):
         """
         parent_comment = self.get_object()
         replies = parent_comment.replies.select_related('author').order_by('created_at')
-        
+
         # Pagination
         page = self.paginate_queryset(replies)
         if page is not None:
             serializer = CommentSerializer(page, many=True, context={'request': request})
             return self.get_paginated_response(serializer.data)
-        
+
         serializer = CommentSerializer(replies, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -779,10 +779,10 @@ class SharedPostViewSet(viewsets.ReadOnlyModelViewSet):
 def home_view(request):
     cursor = request.GET.get('cursor')
     context = build_home_feed_context(request.user, cursor=cursor)
-    
-    # Only add explore_groups on initial page load (no cursor, not HTMX pagination)
-    is_initial_load = cursor is None and not request.headers.get('HX-Request')
-    if is_initial_load:
+
+    # Add explore_groups for initial page load and HTMX navigation (no cursor)
+    # Exclude for infinite scroll (has cursor) and search (has query)
+    if cursor is None and not request.GET.get('q'):
         from groups.models import Group, Membership, MembershipStatus
         user_group_ids = set(Group.objects.filter(
             memberships__user=request.user,
@@ -790,14 +790,19 @@ def home_view(request):
         ).values_list('id', flat=True))
         explore_groups = Group.objects.exclude(id__in=user_group_ids).order_by('-created_at')[:8]
         context['explore_groups'] = explore_groups
-    
-    # If HTMX requests the home feed (e.g. when clearing search), return the inner content
-    if request.headers.get('HX-Request') and not request.GET.get('q'):
-        return render(request, 'posts/partials/home_content.html', context)
+
+    # HTMX Navigation Request: Return full navigation partial for page navigation
+    # Distinguished from infinite scroll (has cursor) and search (has query)
+    if request.headers.get('HX-Request') and not cursor and not request.GET.get('q'):
+        return render(request, 'posts/partials/home_navigation_partial.html', context)
 
     # For HTMX infinite scroll: render only the posts partial
-    if request.headers.get('HX-Request'):
+    if request.headers.get('HX-Request') and cursor:
         return render(request, 'posts/partials/post_list.html', context)
+
+    # If HTMX requests the home feed (e.g. when clearing search), return the inner content
+    if request.headers.get('HX-Request'):
+        return render(request, 'posts/partials/home_content.html', context)
 
     context['unread_notifications_count'] = get_cached_unread_count(request.user)
     return render(request, 'posts/home.html', context)
@@ -807,23 +812,23 @@ def home_view(request):
 def create_post_view(request):
     import logging
     logger = logging.getLogger(__name__)
-    
+
     # Get user's groups for the dropdown
     from groups.models import Group, Membership, MembershipStatus
     user_groups = Group.objects.filter(
         memberships__user=request.user,
         memberships__status=MembershipStatus.APPROVED
     ).distinct()
-    
+
     if request.method == 'POST':
         logger.info(f"POST request received. FILES keys: {list(request.FILES.keys())}")
         logger.info(f"POST data keys: {list(request.POST.keys())}")
-        
+
         form = PostForm(request.POST, request.FILES, user=request.user)
         logger.info(f"Form is valid: {form.is_valid()}")
         if not form.is_valid():
             logger.error(f"Form errors: {form.errors}")
-        
+
         if form.is_valid():
             logger.info(f"Calling create_post_for_user with FILES: {request.FILES}")
             # Get group from POST data (hidden input)
@@ -864,25 +869,25 @@ def post_detail_view(request, post_id):
     context = build_comments_context(post, request.user, show_all_comments=show_all)
     context['is_liked'] = post.is_liked_by(request.user)
     context['unread_notifications_count'] = get_cached_unread_count(request.user)
-    
+
     # Track previous page for back button logic
     is_new_post = request.session.pop('is_new_post', False)
     new_post_id = request.session.pop('new_post_id', None)
-    
+
     # If not a new post, save the referring URL for back button
     if not is_new_post and request.META.get('HTTP_REFERER'):
         # Only save if it's not already the post detail page
         referer = request.META.get('HTTP_REFERER')
         if str(post_id) not in referer:
             request.session['previous_page'] = referer
-    
+
     context['is_new_post'] = is_new_post
     context['previous_page'] = request.session.get('previous_page', reverse('posts:home'))
-    
+
     # For HTMX requests to show all comments, return only the comments section
     if request.headers.get('HX-Request') and show_all:
         return render(request, 'posts/partials/comments_section.html', context)
-    
+
     return render(request, 'posts/post_detail.html', context)
 
 
@@ -921,17 +926,17 @@ def post_likers_list(request, post_id):
     from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
     post = get_object_or_404(Post, id=post_id)
     likers = User.objects.filter(id__in=post.likes.values_list("user_id", flat=True)).order_by('username')
-    
+
     page = request.GET.get('page', 1)
     paginator = Paginator(likers, 20)  # Show 20 likers per page
-    
+
     try:
         likers_page = paginator.page(page)
     except PageNotAnInteger:
         likers_page = paginator.page(1)
     except EmptyPage:
         likers_page = paginator.page(paginator.num_pages)
-    
+
     return render(request, 'posts/partials/likers_modal_content.html', {
         'likers': likers_page,
         'page_obj': likers_page,
@@ -982,7 +987,7 @@ def search_view(request):
 def view_image_fullscreen(request, post_id, image_index):
     post = get_object_or_404(Post, id=post_id)
     all_images = list(post.images.all())
-    
+
     # Handle both index and ID (for backward compatibility with existing links)
     if image_index < len(all_images):
         current_index = image_index
@@ -1034,12 +1039,12 @@ def share_post_view(request, post_id):
         post = get_object_or_404(Post, id=post_id)
         share_type = request.POST.get('share_type')  # 'user' or 'group'
         message = request.POST.get('message', '')
-        
+
         # Debug: Log the POST data
         import logging
         logger = logging.getLogger(__name__)
         logger.info(f"Share request - share_type: {share_type}, POST data: {dict(request.POST)}")
-        
+
         try:
             if share_type == 'user':
                 # Handle multiple users (comma-separated)
@@ -1047,7 +1052,7 @@ def share_post_view(request, post_id):
                 logger.info(f"Usernames string: {usernames_str}")
                 usernames = [u.strip() for u in usernames_str.split(',') if u.strip()]
                 logger.info(f"Parsed usernames: {usernames}")
-                
+
                 shared_count = 0
                 for username in usernames:
                     try:
@@ -1056,7 +1061,7 @@ def share_post_view(request, post_id):
                         shared_count += 1
                     except User.DoesNotExist:
                         continue  # Skip invalid usernames
-                
+
                 if shared_count > 0:
                     if request.headers.get('HX-Request'):
                         return HttpResponse(
@@ -1069,12 +1074,12 @@ def share_post_view(request, post_id):
                             '<div class="alert alert-danger">No valid users found.</div>'
                         )
                     messages.error(request, 'No valid users found.')
-                    
+
             elif share_type == 'group':
                 # Handle multiple groups (comma-separated)
                 group_ids_str = request.POST.get('shared_to_group_ids', '')
                 group_ids = [int(g.strip()) for g in group_ids_str.split(',') if g.strip()]
-                
+
                 shared_count = 0
                 errors = []
                 from groups.models import Group
@@ -1089,7 +1094,7 @@ def share_post_view(request, post_id):
                     except ValidationError as e:
                         errors.append(str(e))
                         continue  # Skip groups that can't be shared to
-                
+
                 if shared_count > 0:
                     if request.headers.get('HX-Request'):
                         return HttpResponse(
@@ -1117,7 +1122,7 @@ def share_post_view(request, post_id):
                     f'<div class="alert alert-danger">Error: {str(e)}</div>'
                 )
             messages.error(request, str(e))
-    
+
     # Only redirect if not an HTMX request
     if not request.headers.get('HX-Request'):
         return redirect('posts:post_details', post_id=post_id)
@@ -1128,12 +1133,12 @@ def share_post_view(request, post_id):
 def shared_posts_view(request):
     """View to show all posts shared to the user (direct shares and group shares)"""
     shared_posts = get_user_received_shares(request.user)
-    
+
     context = {
         'shared_posts': shared_posts,
         'unread_notifications_count': get_cached_unread_count(request.user),
     }
-    
+
     return render(request, 'posts/shared_posts.html', context)
 
 
@@ -1141,16 +1146,16 @@ def shared_posts_view(request):
 def search_following_users(request):
     """HTMX search endpoint for users the current user is following"""
     query = request.GET.get('user_search', '') or request.GET.get('q', '')
-    
+
     from users.models import Follow
     following_ids = Follow.objects.filter(follower=request.user).values_list('followed_id', flat=True)
-    
+
     users = User.objects.filter(
         id__in=following_ids
     ).filter(
         username__icontains=query
     )[:10]
-    
+
     return render(request, 'posts/partials/share_user_results.html', {'users': users})
 
 
@@ -1158,19 +1163,19 @@ def search_following_users(request):
 def search_user_groups(request):
     """HTMX search endpoint for groups the current user is a member of"""
     query = request.GET.get('group_search', '') or request.GET.get('q', '')
-    
+
     from groups.models import Membership, MembershipStatus
     group_ids = Membership.objects.filter(
         user=request.user,
         status=MembershipStatus.APPROVED
     ).values_list('group_id', flat=True)
-    
+
     from groups.models import Group
     groups = Group.objects.filter(id__in=group_ids)
-    
+
     if query:
         groups = groups.filter(name__icontains=query)
-    
+
     return render(request, 'posts/partials/share_group_results.html', {'groups': groups})
 
 
@@ -1178,12 +1183,12 @@ def search_user_groups(request):
 def task_status_view(request, task_id):
     """API endpoint to check Celery task status for progress tracking"""
     from .tasks import create_post_with_media
-    
+
     task = AsyncResult(task_id, app=create_post_with_media)
-    
+
     response_data = {
         'state': task.state,
         'meta': task.info if task.state != 'FAILURE' else {'status': str(task.info)}
     }
-    
+
     return JsonResponse(response_data)

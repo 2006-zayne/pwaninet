@@ -42,10 +42,10 @@ def expand_notification(request, notif_id):
             recipient=request.user
         )
         from notifications.rendering.adapters import get_payload_adapter
-        
+
         adapter = get_payload_adapter(notification)
         payload = adapter.to_standard_payload(notification)
-        
+
         # Render the expanded actors list
         return render(request, 'notifications/partials/expanded_actors.html', {
             'payload': payload
@@ -66,17 +66,17 @@ def notifications_list(request):
     hybrid_grouped_param = request.GET.get('hybrid_grouped', 'false')
     search_query = request.GET.get('search', '')
     partial = request.GET.get('partial', 'false')
-    
+
     is_read = None
     if is_read_param == 'true':
         is_read = True
     elif is_read_param == 'false':
         is_read = False
-    
+
     grouped = grouped_param == 'true'
     sender_grouped = sender_grouped_param == 'true'
     hybrid_grouped = hybrid_grouped_param == 'true'
-    
+
     # Use time-based grouping by default (unless explicitly overridden)
     if sender_grouped:
         from notifications.queries.notification_queries import get_notifications_grouped_by_sender
@@ -173,14 +173,14 @@ def notifications_list(request):
             'search_query': search_query,
             'next_cursor': next_cursor
         }
-    
+
     # If partial request, return JSON for infinite scroll
     if partial == 'true':
         from notifications.rendering.adapters import get_payload_adapter
-        
+
         html_content = ''
         total_count = 0
-        
+
         if 'time_grouped' in context:
             # Render time-grouped notifications with section headers
             period_names = {
@@ -191,26 +191,29 @@ def notifications_list(request):
                 'last_week': 'Last Week',
                 'earlier': 'Earlier'
             }
-            
+
             for period, notifications in context['time_grouped'].items():
                 if notifications:
                     total_count += len(notifications)
                     # Add section header
                     html_content += f'<div class="time-section"><div class="time-section-header"><h6 class="fw-bold text-uppercase text-muted small mb-2 px-2">{period_names.get(period, period)}</h6></div>'
-                    
+
                     # Render notification cards for this period
                     for notif in notifications:
                         html_content += render_notification(notif)
-                    
+
                     html_content += '</div>'
-        
+
         return JsonResponse({
             'html': html_content,
             'next_cursor': context.get('next_cursor'),
             'has_more': context.get('next_cursor') is not None,
             'count': total_count
         })
-    
+
+    if request.headers.get('HX-Request') and partial != 'true':
+        return render(request, 'notifications/partials/notifications_navigation_partial.html', context)
+
     return render(request, 'notifications/notifications.html', context)
 
 
@@ -229,10 +232,10 @@ def resource_preview(request, notif_id):
             recipient=request.user
         )
         from notifications.rendering.adapters import get_payload_adapter
-        
+
         adapter = get_payload_adapter(notification)
         payload = adapter.to_standard_payload(notification)
-        
+
         # Generate preview HTML based on resource type
         if payload.get('resource'):
             resource = payload['resource']
@@ -259,7 +262,7 @@ def mark_notification_as_read(request, notif_id):
         invalidate_unread_count_cache(request.user.id)
     except NotificationObject.DoesNotExist:
         pass
-    
+
     # Return updated notification item
     context = {
         'notifications': [notification] if notification else []
@@ -293,26 +296,26 @@ def delete_notification(request, notif_id):
             invalidate_unread_count_cache(request.user.id)
         except NotificationObject.DoesNotExist:
             pass
-        
+
         notification_type = request.GET.get('type')
         is_read_param = request.GET.get('read')
         page = request.GET.get('page', 1)
-        
+
         context = build_notifications_context(
             request.user,
             mark_read=False,
             notification_type=notification_type,
             is_read=True if is_read_param == 'true' else (False if is_read_param == 'false' else None)
         )
-        
+
         paginator = Paginator(context['notifications'], 20)
         notifications_page = paginator.get_page(page)
-        
+
         context['notifications'] = notifications_page
         context['unread_notifications_count'] = get_cached_unread_count(request.user)
         context['current_filter_type'] = notification_type
         context['current_filter_read'] = is_read_param
-        
+
         response = render(request, 'notifications/partials/notification_list_items.html', context)
         response['HX-Trigger'] = 'updateUnreadCount'
         return response
@@ -346,9 +349,9 @@ def set_do_not_disturb(request):
     try:
         data = json.loads(request.body)
         hours = data.get('hours', 1)
-        
+
         NotificationPreferenceService.set_do_not_disturb(request.user, hours)
-        
+
         return JsonResponse({'success': True})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
@@ -360,7 +363,7 @@ def clear_do_not_disturb(request):
     """Clear do not disturb"""
     try:
         NotificationPreferenceService.clear_do_not_disturb(request.user)
-        
+
         return JsonResponse({'success': True})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
@@ -428,10 +431,10 @@ class NotificationViewSet(viewsets.ModelViewSet):
         """Get the rendered payload for a specific notification (for testing)"""
         notification = self.get_object()
         from notifications.rendering.adapters import get_payload_adapter
-        
+
         adapter = get_payload_adapter(notification)
         payload = adapter.to_standard_payload(notification)
-        
+
         return Response({
             'notification_id': str(notification.notification_id),
             'payload': payload
@@ -442,7 +445,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
         """Get list of notifications with rendered payloads (for testing)"""
         notifications = self.get_queryset()
         from notifications.rendering.adapters import get_payload_adapter
-        
+
         rendered = []
         for notification in notifications[:10]:  # Limit to 10 for testing
             adapter = get_payload_adapter(notification)
@@ -451,7 +454,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
                 'notification_id': str(notification.notification_id),
                 'payload': payload
             })
-        
+
         return Response({
             'count': len(rendered),
             'notifications': rendered
@@ -481,10 +484,10 @@ class NotificationViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             notification_ids = serializer.validated_data['notification_ids']
             action_type = serializer.validated_data['action']
-            
+
             queryset = self.get_queryset().filter(notification_id__in=notification_ids)
             count = queryset.count()
-            
+
             if action_type == 'mark_read':
                 queryset.update(status=NotificationStatuses.READ.value)
                 invalidate_unread_count_cache(request.user.id)
@@ -502,7 +505,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
                     {'error': 'Invalid action'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-        
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

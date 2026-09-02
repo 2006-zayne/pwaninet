@@ -78,5 +78,6 @@
       }
     </style>
     <!-- Automatically restore home feed if q is empty -->
-    <div hx-get="{% url 'posts:home' %}" hx-trigger="load delay:100ms" hx-target="#main-content-area" hx-swap="innerHTML"></div>
+    <!-- Target page-content-target to load full navigation partial including search header -->
+    <div hx-get="{% url 'posts:home' %}" hx-trigger="load delay:100ms" hx-target="#page-content-target" hx-swap="innerHTML"></div>
 {% endif %}
