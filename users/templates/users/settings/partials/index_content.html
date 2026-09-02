@@ -1,0 +1,32 @@
+{% load i18n %}
+
+<div class="page-header">
+  <a href="{% url 'users:profile' request.user.username %}" class="back-link" hx-get="{% url 'users:profile' request.user.username %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">
+    <i class="bi bi-arrow-left"></i> {% trans "Back to Profile" %}
+  </a>
+  <h1 class="page-title">{% trans "Settings" %}</h1>
+  <p class="page-subtitle">{% trans "Manage your account preferences and application settings" %}</p>
+</div>
+
+<div class="settings-list-container">
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_profile' icon_class='bi-person' title='Profile' subtitle='Manage your profile, username, bio...' %}
+  
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_appearance' icon_class='bi-palette' title='Appearance' subtitle='Theme, dark mode, language...' is_htmx=True %}
+  
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_notifications' icon_class='bi-bell' title='Notifications' subtitle='Push notifications, mentions...' is_htmx=True %}
+  
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_privacy' icon_class='bi-shield-lock' title='Privacy & Security' subtitle='Password, sessions, blocked users...' is_htmx=True %}
+  
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_storage' icon_class='bi-database' title='Storage' subtitle='Cache, downloads, storage...' %}
+  
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_about' icon_class='bi-info-circle' title='About PwaniNet' subtitle='Version, support, licenses...' is_htmx=True %}
+</div>
+
+<style>
+  .settings-list-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+</style>

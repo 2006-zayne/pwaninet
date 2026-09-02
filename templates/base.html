@@ -287,7 +287,16 @@
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
     <link rel="stylesheet" href="{% static 'css/people-modal.css' %}">
     <link rel="stylesheet" href="{% static 'css/comments.css' %}">
+    <link rel="stylesheet" href="{% static 'css/profile.css' %}">
+    <link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}">
     <script src="{% static 'js/htmx.min.js' %}"></script>
+    <script>
+        // Configure HTMX for proper history handling
+        htmx.config.historyEnabled = true;
+        htmx.config.historyCacheSize = 10;
+        htmx.config.refreshOnHistoryMiss = true; // Refresh content if cache miss occurs
+        console.log('[HTMX Config] History caching enabled with refresh on miss');
+    </script>
     <script src="{% static 'js/device_manager.js' %}"></script>
     
     <!-- Native App Enhancements (Capacitor-specific) -->
@@ -1008,16 +1017,36 @@
     
     <nav class="navbar navbar-top fixed-top">
         <div class="container d-flex justify-content-between align-items-center">
-            <a class="nav-brand-tactical" href="{% url 'posts:home' %}">
+            <a class="nav-brand-tactical"
+               href="{% url 'posts:home' %}"
+               hx-get="{% url 'posts:home' %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true">
                 PWANI<span class="brand-net">NET</span>
             </a>
 
             <div class="d-none d-md-flex gap-2">
-                <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
+                <a href="{% url 'posts:home' %}"
+                   class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
+                   style="display: flex; flex-direction: column; align-items: center; gap: 0px;"
+                   hx-get="{% url 'posts:home' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
                     <i class="bi bi-house-door-fill" style="font-size: 1.5rem;"></i>
                     <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Home" %}</span>
                 </a>
-                <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
+                <a href="{% url 'groups:groups_dashboard' %}"
+                   class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}"
+                   style="display: flex; flex-direction: column; align-items: center; gap: 0px;"
+                   hx-get="{% url 'groups:groups_dashboard' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
                     <i class="bi bi-people-fill" style="font-size: 1.5rem;"></i>
                     <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Groups" %}</span>
                 </a>
@@ -1031,7 +1060,15 @@
                     <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Post" %}</span>
                 </a>
                 {% endif %}
-                <a href="{% url 'notifications:notifications' %}" class="nav-chip {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}" id="notification-badge-container-desktop" style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 60px;">
+                <a href="{% url 'notifications:notifications' %}"
+                   class="nav-chip {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
+                   id="notification-badge-container-desktop"
+                   style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 60px;"
+                   hx-get="{% url 'notifications:notifications' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
                     <span style="position: relative; display: inline-block;">
                         <i class="bi bi-bell-fill" style="font-size: 1.5rem;"></i>
                         {% if unread_notifications_count > 0 %}
@@ -1077,7 +1114,12 @@
                     </ul>
                 </div>
                 {% if request.user.is_authenticated %}
-                    <a href="{% url 'users:profile' request.user.username %}">
+                    <a href="{% url 'users:profile' request.user.username %}"
+                       hx-get="{% url 'users:profile' request.user.username %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true">
                         <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 35px; height: 35px; object-fit: cover; margin-right:8px;">
                     </a>
                 {% else %}
@@ -1089,11 +1131,16 @@
 
     <main class="container">
         <div class="row justify-content-center">
-            <div class="col-12 col-lg-8">
+            <div class="col-12 col-lg-8" id="page-content-target" hx-history-elt>
                 {% block content %}{% endblock %}
             </div>
         </div>
     </main>
+
+    <!-- Floating Actions Container - swapped via HTMX out-of-band -->
+    {% block floating_actions %}
+        <div id="profile-floating-actions"></div>
+    {% endblock %}
 
     {% block modals %}
         <div class="modal fade" id="likersModal" tabindex="-1" aria-hidden="true">
@@ -1109,11 +1156,25 @@
 
     {% block mobile_bottom_nav %}
         <div class="mobile-bottom-nav d-md-none">
-            <a href="{% url 'posts:home' %}" class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
+            <a href="{% url 'posts:home' %}"
+               class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
+               style="display: flex; flex-direction: column; align-items: center; gap: 0px;"
+               hx-get="{% url 'posts:home' %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true">
                 <i class="bi bi-house-door-fill"></i>
                 <span style="font-size: 0.55rem; font-weight: 600;">{% trans "Home" %}</span>
             </a>
-            <a href="{% url 'groups:groups_dashboard' %}" class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
+            <a href="{% url 'groups:groups_dashboard' %}"
+               class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}"
+               style="display: flex; flex-direction: column; align-items: center; gap: 0px;"
+               hx-get="{% url 'groups:groups_dashboard' %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true">
                 <i class="bi bi-people-fill"></i>
                 <span style="font-size: 0.55rem; font-weight: 600;">{% trans "Groups" %}</span>
             </a>
@@ -1129,7 +1190,12 @@
                 <a href="{% url 'notifications:notifications' %}"
                     class="nav-chip {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
                     id="notification-badge-container"
-                    style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 50px;">
+                    style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 50px;"
+                    hx-get="{% url 'notifications:notifications' %}"
+                    hx-target="#page-content-target"
+                    hx-swap="innerHTML"
+                    hx-push-url="true"
+                    hx-history="true">
                         <span style="position: relative; display: inline-block;">
                             <i class="bi bi-bell-fill"></i>
                             {% if unread_notifications_count > 0 %}
@@ -1148,7 +1214,14 @@
                         </span>
                         <span style="font-size: 0.55rem; font-weight: 600; white-space: nowrap;">{% trans "Notifications" %}</span>
                 </a>
-                <a href="{% url 'users:profile' request.user.username %}" class="nav-chip {% if request.resolver_match.url_name == 'profile' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
+                <a href="{% url 'users:profile' request.user.username %}"
+                   class="nav-chip {% if request.resolver_match.url_name == 'profile' %}active{% endif %}"
+                   style="display: flex; flex-direction: column; align-items: center; gap: 0px;"
+                   hx-get="{% url 'users:profile' request.user.username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
                     <i class="bi bi-person-circle"></i>
                     <span style="font-size: 0.55rem; font-weight: 600;">{% trans "Profile" %}</span>
                 </a>
@@ -1160,6 +1233,7 @@
     <script src="{% static 'js/status-modal.js' %}"></script>
     <script src="{% static 'js/reaction-sound.js' %}"></script>
     <script src="{% static 'js/post-content.js' %}"></script>
+    <script src="{% static 'js/profile.js' %}"></script>
 
     <!-- Messaging Domain Bootstrap (only loads if chat-container exists) -->
     <script type="module" src="{% static 'js/chat/bootstrap.js' %}"></script>
@@ -1802,6 +1876,145 @@ window.addEventListener('beforeinstallprompt', (e) => {
     {% endif %}
 
     <!-- Page skeleton is now managed by page-skeleton-manager.js -->
+
+    <!-- HTMX Navigation Active State Management -->
+    <script>
+    function updateActiveState(url) {
+        console.log('[HTMX History] updateActiveState called with URL:', url);
+        if (!url) return;
+
+        let pathname = url;
+        try {
+            if (url.startsWith('http://') || url.startsWith('https://')) {
+                pathname = new URL(url).pathname;
+            }
+        } catch (e) {
+            pathname = url;
+        }
+        pathname = pathname.split('?')[0].split('#')[0];
+
+        // Remove 'active' class from all nav chips
+        document.querySelectorAll('.nav-chip').forEach(chip => {
+            chip.classList.remove('active');
+        });
+
+        // Match explicit route patterns
+        if (pathname === '/') {
+            const homeNavChips = document.querySelectorAll('.nav-chip[href="/"]');
+            homeNavChips.forEach(chip => chip.classList.add('active'));
+            console.log('[HTMX History] Set Home nav chips as active');
+        } else if (pathname.startsWith('/groups')) {
+            const groupsNavChips = document.querySelectorAll('.nav-chip[href*="/groups"]');
+            groupsNavChips.forEach(chip => chip.classList.add('active'));
+            console.log('[HTMX History] Set Groups nav chips as active');
+        } else if (pathname.startsWith('/notifications')) {
+            const notifNavChips = document.querySelectorAll('.nav-chip[href*="/notifications"]');
+            notifNavChips.forEach(chip => chip.classList.add('active'));
+            console.log('[HTMX History] Set Notifications nav chips as active');
+        } else if (pathname.includes('/user/')) {
+            const profileNavChips = document.querySelectorAll('.nav-chip[href*="/user/"]');
+            profileNavChips.forEach(chip => chip.classList.add('active'));
+            console.log('[HTMX History] Set Profile nav chips as active');
+        } else if (pathname.includes('/create')) {
+            const createNavChips = document.querySelectorAll('.nav-chip[href*="/create"]');
+            createNavChips.forEach(chip => chip.classList.add('active'));
+            console.log('[HTMX History] Set Create Post nav chips as active');
+        } else if (pathname.startsWith('/users/settings')) {
+            console.log('[HTMX History] Settings route active - no top-level chip activated');
+        }
+    }
+
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        console.log('[HTMX History] htmx:afterSwap event fired', {
+            targetId: evt.detail.target.id,
+            status: evt.detail.xhr.status,
+            responseURL: evt.detail.xhr.responseURL
+        });
+        
+        // Only update active state for main content navigation, not modal/partial swaps
+        if (evt.detail.target.id === 'page-content-target' && evt.detail.xhr.status === 200) {
+            const targetUrl = evt.detail.xhr.responseURL || window.location.pathname;
+            updateActiveState(targetUrl);
+        }
+    });
+
+    // Handle browser back/forward navigation - update active state after content is restored
+    document.body.addEventListener('htmx:historyRestore', function(evt) {
+        console.log('[HTMX History] htmx:historyRestore event fired', {
+            pathname: window.location.pathname,
+            item: evt.detail.item
+        });
+        
+        // Update active state based on current URL after history restore
+        updateActiveState(window.location.pathname);
+    });
+
+    // Add debug logging for history cache miss
+    document.body.addEventListener('htmx:historyCacheMiss', function(evt) {
+        console.warn('[HTMX History] Cache miss for:', evt.detail.path);
+    });
+
+    // Add debug logging for history cache hit
+    document.body.addEventListener('htmx:historyCacheHit', function(evt) {
+        console.log('[HTMX History] Cache hit for:', evt.detail.path);
+    });
+    </script>
+
+    <!-- Post Content Truncation -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initPostContentTruncation();
+    });
+
+    document.body.addEventListener('htmx:afterSwap', function() {
+        initPostContentTruncation();
+    });
+
+    function initPostContentTruncation() {
+        const contentWrappers = document.querySelectorAll('.post-content-wrapper');
+        
+        contentWrappers.forEach(wrapper => {
+            const fullContent = wrapper.querySelector('.post-content-full');
+            const truncatedContent = wrapper.querySelector('.post-content-truncated');
+            const seeMoreBtn = wrapper.querySelector('.see-more-btn');
+            
+            if (!fullContent || !truncatedContent || !seeMoreBtn) return;
+            
+            const text = fullContent.textContent.trim();
+            const maxLength = 200; // Character limit for truncation
+            
+            if (text.length > maxLength) {
+                // Truncate the text
+                const truncatedText = text.substring(0, maxLength) + '...';
+                truncatedContent.textContent = truncatedText;
+                
+                // Show truncated version and hide full version
+                fullContent.style.display = 'none';
+                truncatedContent.style.display = 'inline';
+                seeMoreBtn.style.display = 'inline';
+                
+                // Handle see more button click
+                seeMoreBtn.onclick = function(e) {
+                    e.preventDefault();
+                    if (fullContent.style.display === 'none') {
+                        fullContent.style.display = 'inline';
+                        truncatedContent.style.display = 'none';
+                        seeMoreBtn.textContent = 'See less';
+                    } else {
+                        fullContent.style.display = 'none';
+                        truncatedContent.style.display = 'inline';
+                        seeMoreBtn.textContent = 'See more';
+                    }
+                };
+            } else {
+                // Content is short enough, don't truncate
+                fullContent.style.display = 'inline';
+                truncatedContent.style.display = 'none';
+                seeMoreBtn.style.display = 'none';
+            }
+        });
+    }
+    </script>
 
     <!-- Version Footer -->
     <footer style="text-align: center; padding: 1rem; background: transparent; border-top: none; margin-top: auto; font-size: 0.8rem; color: #64748b;">

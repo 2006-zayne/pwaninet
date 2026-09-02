@@ -1,0 +1,8 @@
+{% load i18n %}
+{% load group_extras %}
+
+<!-- HTMX Navigation Partial for Groups Dashboard Page -->
+{% include 'groups/partials/groups_dashboard_content.html' %}
+
+<!-- Clear profile floating actions when navigating to Groups Dashboard -->
+<div id="profile-floating-actions" hx-swap-oob="true"></div>

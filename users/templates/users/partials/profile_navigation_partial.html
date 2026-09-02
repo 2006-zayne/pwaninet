@@ -1,0 +1,14 @@
+{% load i18n %}
+{% load static %}
+{% load user_extras %}
+{% csrf_token %}
+
+<!-- HTMX Navigation Partial for Profile Page -->
+{% include 'users/partials/profile_content.html' %}
+
+<!-- Floating Actions swapped out-of-band -->
+{% include 'users/partials/profile_floating_actions.html' with oob=True %}
+
+<!-- Modals for Profile Page -->
+{% include 'users/partials/people_modal.html' %}
+{% include 'users/partials/account_switcher_modal.html' %}

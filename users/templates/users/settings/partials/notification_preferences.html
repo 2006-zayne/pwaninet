@@ -652,121 +652,180 @@ function getCsrfToken() {
 
 <script src="/static/js/notifications/push-subscription.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', async function() {
-  const pushManager = new PushSubscriptionManager();
-  
-  // UI elements
-  const loadingEl = document.getElementById('push-status-loading');
-  const notSupportedEl = document.getElementById('push-status-not-supported');
-  const deniedEl = document.getElementById('push-status-denied');
-  const unsubscribedEl = document.getElementById('push-status-unsubscribed');
-  const subscribedEl = document.getElementById('push-status-subscribed');
-  const subscribeBtn = document.getElementById('btn-push-subscribe');
-  const unsubscribeBtn = document.getElementById('btn-push-unsubscribe');
-  
-  // Hide all status elements
-  function hideAllStatus() {
-    loadingEl.style.display = 'none';
-    notSupportedEl.style.display = 'none';
-    deniedEl.style.display = 'none';
-    unsubscribedEl.style.display = 'none';
-    subscribedEl.style.display = 'none';
-  }
-  
-  // Update UI based on status
-  function updateStatusUI(status) {
-    hideAllStatus();
-    
-    if (!status.supported) {
-      notSupportedEl.style.display = 'flex';
-      return;
-    }
-    
-    if (status.permission === 'denied') {
-      deniedEl.style.display = 'flex';
-      return;
-    }
-    
-    if (status.subscribed) {
-      subscribedEl.style.display = 'flex';
-    } else {
-      unsubscribedEl.style.display = 'flex';
-    }
-  }
-  
-  // Check subscription status on load
-  async function checkStatus() {
-    hideAllStatus();
-    loadingEl.style.display = 'flex';
-    
-    try {
-      const status = await pushManager.getSubscriptionStatus();
-      updateStatusUI(status);
-    } catch (error) {
-      console.error('Error checking push status:', error);
-      notSupportedEl.style.display = 'flex';
-    }
-  }
-  
-  // Subscribe button click handler
-  subscribeBtn.addEventListener('click', async function() {
-    try {
-      subscribeBtn.disabled = true;
-      subscribeBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Subscribing...';
-      
-      await pushManager.subscribe();
-      
-      // Update UI
-      const status = await pushManager.getSubscriptionStatus();
-      updateStatusUI(status);
-      
-      // Also enable the push_enabled checkbox
-      const pushEnabledCheckbox = document.getElementById('push_enabled');
-      if (pushEnabledCheckbox) {
-        pushEnabledCheckbox.checked = true;
+(function() {
+  window.setDnd = function(hours) {
+    fetch('/notifications/set-dnd/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken()
+      },
+      body: JSON.stringify({ hours: hours })
+    }).then(() => {
+      if (window.htmx) {
+        htmx.ajax('GET', window.location.pathname, {target: '#page-content-target', swap: 'innerHTML'});
+      } else {
+        location.reload();
       }
-    } catch (error) {
-      console.error('Subscription failed:', error);
-      alert('Failed to enable push notifications: ' + error.message);
-    } finally {
-      subscribeBtn.disabled = false;
-      subscribeBtn.innerHTML = '<i class="bi bi-bell"></i> Enable Push Notifications';
+    });
+  };
+
+  window.clearDnd = function() {
+    fetch('/notifications/clear-dnd/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken()
+      }
+    }).then(() => {
+      if (window.htmx) {
+        htmx.ajax('GET', window.location.pathname, {target: '#page-content-target', swap: 'innerHTML'});
+      } else {
+        location.reload();
+      }
+    });
+  };
+
+  window.getCsrfToken = function() {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'csrftoken') {
+        return decodeURIComponent(value);
+      }
     }
-  });
-  
-  // Unsubscribe button click handler
-  unsubscribeBtn.addEventListener('click', async function() {
-    if (!confirm('Are you sure you want to disable push notifications?')) {
-      return;
+    return '';
+  };
+
+  function initPushSubscription() {
+    const statusContainer = document.querySelector('.push-subscription-status');
+    if (!statusContainer || statusContainer.dataset.initialized === 'true') return;
+    statusContainer.dataset.initialized = 'true';
+
+    if (typeof PushSubscriptionManager === 'undefined') return;
+    const pushManager = new PushSubscriptionManager();
+    
+    // UI elements
+    const loadingEl = document.getElementById('push-status-loading');
+    const notSupportedEl = document.getElementById('push-status-not-supported');
+    const deniedEl = document.getElementById('push-status-denied');
+    const unsubscribedEl = document.getElementById('push-status-unsubscribed');
+    const subscribedEl = document.getElementById('push-status-subscribed');
+    const subscribeBtn = document.getElementById('btn-push-subscribe');
+    const unsubscribeBtn = document.getElementById('btn-push-unsubscribe');
+    
+    if (!loadingEl || !notSupportedEl || !deniedEl || !unsubscribedEl || !subscribedEl) return;
+
+    // Hide all status elements
+    function hideAllStatus() {
+      loadingEl.style.display = 'none';
+      notSupportedEl.style.display = 'none';
+      deniedEl.style.display = 'none';
+      unsubscribedEl.style.display = 'none';
+      subscribedEl.style.display = 'none';
     }
     
-    try {
-      unsubscribeBtn.disabled = true;
-      unsubscribeBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Disabling...';
+    // Update UI based on status
+    function updateStatusUI(status) {
+      hideAllStatus();
       
-      await pushManager.unsubscribe();
-      
-      // Update UI
-      const status = await pushManager.getSubscriptionStatus();
-      updateStatusUI(status);
-      
-      // Also disable the push_enabled checkbox
-      const pushEnabledCheckbox = document.getElementById('push_enabled');
-      if (pushEnabledCheckbox) {
-        pushEnabledCheckbox.checked = false;
+      if (!status.supported) {
+        notSupportedEl.style.display = 'flex';
+        return;
       }
-    } catch (error) {
-      console.error('Unsubscription failed:', error);
-      alert('Failed to disable push notifications: ' + error.message);
-    } finally {
-      unsubscribeBtn.disabled = false;
-      unsubscribeBtn.innerHTML = '<i class="bi bi-bell-slash"></i> Disable';
+      
+      if (status.permission === 'denied') {
+        deniedEl.style.display = 'flex';
+        return;
+      }
+      
+      if (status.subscribed) {
+        subscribedEl.style.display = 'flex';
+      } else {
+        unsubscribedEl.style.display = 'flex';
+      }
     }
-  });
-  
-  // Initial status check
-  checkStatus();
-});
+    
+    // Check subscription status on load
+    async function checkStatus() {
+      hideAllStatus();
+      loadingEl.style.display = 'flex';
+      
+      try {
+        const status = await pushManager.getSubscriptionStatus();
+        updateStatusUI(status);
+      } catch (error) {
+        console.error('Error checking push status:', error);
+        notSupportedEl.style.display = 'flex';
+      }
+    }
+    
+    // Subscribe button click handler
+    if (subscribeBtn) {
+      subscribeBtn.addEventListener('click', async function() {
+        try {
+          subscribeBtn.disabled = true;
+          subscribeBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Subscribing...';
+          
+          await pushManager.subscribe();
+          
+          const status = await pushManager.getSubscriptionStatus();
+          updateStatusUI(status);
+          
+          const pushEnabledCheckbox = document.getElementById('push_enabled');
+          if (pushEnabledCheckbox) {
+            pushEnabledCheckbox.checked = true;
+          }
+        } catch (error) {
+          console.error('Subscription failed:', error);
+          alert('Failed to enable push notifications: ' + error.message);
+        } finally {
+          subscribeBtn.disabled = false;
+          subscribeBtn.innerHTML = '<i class="bi bi-bell"></i> Enable Push Notifications';
+        }
+      });
+    }
+    
+    // Unsubscribe button click handler
+    if (unsubscribeBtn) {
+      unsubscribeBtn.addEventListener('click', async function() {
+        if (!confirm('Are you sure you want to disable push notifications?')) {
+          return;
+        }
+        
+        try {
+          unsubscribeBtn.disabled = true;
+          unsubscribeBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Disabling...';
+          
+          await pushManager.unsubscribe();
+          
+          const status = await pushManager.getSubscriptionStatus();
+          updateStatusUI(status);
+          
+          const pushEnabledCheckbox = document.getElementById('push_enabled');
+          if (pushEnabledCheckbox) {
+            pushEnabledCheckbox.checked = false;
+          }
+        } catch (error) {
+          console.error('Unsubscription failed:', error);
+          alert('Failed to disable push notifications: ' + error.message);
+        } finally {
+          unsubscribeBtn.disabled = false;
+          unsubscribeBtn.innerHTML = '<i class="bi bi-bell-slash"></i> Disable';
+        }
+      });
+    }
+    
+    // Initial status check
+    checkStatus();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initPushSubscription, { once: true });
+  } else {
+    initPushSubscription();
+  }
+})();
 </script>
 
 <style>

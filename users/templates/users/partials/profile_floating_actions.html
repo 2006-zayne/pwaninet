@@ -1,0 +1,13 @@
+{% load i18n %}
+
+<div id="profile-floating-actions"{% if oob %} hx-swap-oob="true"{% endif %}>
+    {% if request.user == profile_user %}
+    <a href="{% url 'documents:home' %}"
+       class="floating-btn btn-secondary initial-animation"
+       id="documents-btn"
+       style="bottom: 110px;">
+        <span class="btn-icon"><i class="bi bi-folder-fill"></i></span>
+        <span class="btn-text">{% trans "Documents" %}</span>
+    </a>
+    {% endif %}
+</div>

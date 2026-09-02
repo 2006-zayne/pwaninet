@@ -211,6 +211,9 @@ def notifications_list(request):
             'count': total_count
         })
     
+    if request.headers.get('HX-Request') and partial != 'true':
+        return render(request, 'notifications/partials/notifications_navigation_partial.html', context)
+
     return render(request, 'notifications/notifications.html', context)
 
 

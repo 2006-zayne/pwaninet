@@ -3,7 +3,12 @@
 <div class="groups-explore-section">
     <div class="groups-explore-header">
         <span class="groups-explore-title">GROUPS TO EXPLORE</span>
-        <a href="{% url 'groups:groups_dashboard' %}" class="groups-explore-link">View All</a>
+        <a href="{% url 'groups:groups_dashboard' %}"
+           class="groups-explore-link"
+           hx-get="{% url 'groups:groups_dashboard' %}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true">View All</a>
     </div>
     <div class="groups-explore-list">
         {% for group in explore_groups %}

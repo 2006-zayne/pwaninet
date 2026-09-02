@@ -780,9 +780,9 @@ def home_view(request):
     cursor = request.GET.get('cursor')
     context = build_home_feed_context(request.user, cursor=cursor)
     
-    # Only add explore_groups on initial page load (no cursor, not HTMX pagination)
-    is_initial_load = cursor is None and not request.headers.get('HX-Request')
-    if is_initial_load:
+    # Add explore_groups for initial page load and HTMX navigation (no cursor)
+    # Exclude for infinite scroll (has cursor) and search (has query)
+    if cursor is None and not request.GET.get('q'):
         from groups.models import Group, Membership, MembershipStatus
         user_group_ids = set(Group.objects.filter(
             memberships__user=request.user,
@@ -791,13 +791,18 @@ def home_view(request):
         explore_groups = Group.objects.exclude(id__in=user_group_ids).order_by('-created_at')[:8]
         context['explore_groups'] = explore_groups
     
-    # If HTMX requests the home feed (e.g. when clearing search), return the inner content
-    if request.headers.get('HX-Request') and not request.GET.get('q'):
-        return render(request, 'posts/partials/home_content.html', context)
+    # HTMX Navigation Request: Return full navigation partial for page navigation
+    # Distinguished from infinite scroll (has cursor) and search (has query)
+    if request.headers.get('HX-Request') and not cursor and not request.GET.get('q'):
+        return render(request, 'posts/partials/home_navigation_partial.html', context)
 
     # For HTMX infinite scroll: render only the posts partial
-    if request.headers.get('HX-Request'):
+    if request.headers.get('HX-Request') and cursor:
         return render(request, 'posts/partials/post_list.html', context)
+
+    # If HTMX requests the home feed (e.g. when clearing search), return the inner content
+    if request.headers.get('HX-Request'):
+        return render(request, 'posts/partials/home_content.html', context)
 
     context['unread_notifications_count'] = get_cached_unread_count(request.user)
     return render(request, 'posts/home.html', context)

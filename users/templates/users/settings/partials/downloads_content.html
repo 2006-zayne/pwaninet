@@ -1,0 +1,338 @@
+{% load i18n %}
+
+<div class="page-header">
+  <a href="{% url 'users:settings_storage' %}" class="back-link">
+    <i class="bi bi-arrow-left"></i> {% trans "Back to Storage" %}
+  </a>
+  <h1 class="page-title">{% trans "Downloads" %}</h1>
+  <p class="page-subtitle">{% trans "Manage your downloaded files" %}</p>
+</div>
+
+<div class="downloads-manager">
+  <!-- Tabs -->
+  <ul class="nav nav-tabs mb-3" id="downloadsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="all-tab" data-bs-toggle="tab" data-bs-target="#all-content" type="button" role="tab">All</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="images-tab" data-bs-toggle="tab" data-bs-target="#images-content" type="button" role="tab">Images</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="videos-tab" data-bs-toggle="tab" data-bs-target="#videos-content" type="button" role="tab">Videos</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents-content" type="button" role="tab">Documents</button>
+    </li>
+  </ul>
+
+  <!-- Search and Sort -->
+  <div class="d-flex gap-2 mb-3">
+    <div class="flex-grow-1">
+      <input type="text" id="downloads-search" class="form-control" placeholder="Search downloads...">
+    </div>
+    <select id="downloads-sort" class="form-select" style="width: auto;">
+      <option value="newest">Newest</option>
+      <option value="oldest">Oldest</option>
+      <option value="largest">Largest</option>
+      <option value="smallest">Smallest</option>
+      <option value="az">A-Z</option>
+    </select>
+  </div>
+
+  <!-- Tab Content -->
+  <div class="tab-content" id="downloadsTabContent">
+    <!-- All Downloads -->
+    <div class="tab-pane fade show active" id="all-content" role="tabpanel">
+      <div id="all-downloads-list" class="downloads-list">
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-download fs-1 mb-3 d-block"></i>
+          <p>No downloads yet</p>
+          <small>Downloaded files will appear here</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Images -->
+    <div class="tab-pane fade" id="images-content" role="tabpanel">
+      <div id="images-downloads-list" class="downloads-list">
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-image fs-1 mb-3 d-block"></i>
+          <p>No downloaded images</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Videos -->
+    <div class="tab-pane fade" id="videos-content" role="tabpanel">
+      <div id="videos-downloads-list" class="downloads-list">
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-camera-video fs-1 mb-3 d-block"></i>
+          <p>No downloaded videos</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Documents -->
+    <div class="tab-pane fade" id="documents-content" role="tabpanel">
+      <div id="documents-downloads-list" class="downloads-list">
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-file-earmark fs-1 mb-3 d-block"></i>
+          <p>No downloaded documents</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Storage Statistics -->
+  <div class="mt-4 p-3 bg-light rounded">
+    <h6 class="mb-3">Storage Statistics</h6>
+    <div class="row g-3">
+      <div class="col-6 col-md-3">
+        <div class="text-center">
+          <div class="fw-bold" id="stat-downloads-count">0</div>
+          <small class="text-muted">Downloads</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-center">
+          <div class="fw-bold" id="stat-images-count">0</div>
+          <small class="text-muted">Images</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-center">
+          <div class="fw-bold" id="stat-videos-count">0</div>
+          <small class="text-muted">Videos</small>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="text-center">
+          <div class="fw-bold" id="stat-documents-count">0</div>
+          <small class="text-muted">Documents</small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .downloads-list {
+    min-height: 200px;
+  }
+
+  .download-item {
+    transition: background-color 0.2s ease;
+  }
+
+  .download-item:hover {
+    background-color: var(--brand-light);
+  }
+
+  .download-thumbnail img {
+    object-fit: cover;
+  }
+
+  .dropdown-menu {
+    min-width: 150px;
+  }
+</style>
+
+<script type="module">
+  import { downloadsManager } from '/static/js/upload/downloads_manager.js';
+  import { storageManager } from '/static/js/upload/storage_manager.js';
+
+  let allDownloads = [];
+  let currentCategory = 'all';
+  let currentSort = 'newest';
+  let searchQuery = '';
+
+  async function initDownloads() {
+    await loadDownloads();
+    setupEventListeners();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDownloads);
+  } else {
+    initDownloads();
+  }
+
+  async function loadDownloads() {
+    try {
+      await downloadsManager.initialize();
+      allDownloads = await downloadsManager.getAllDownloads();
+      renderDownloads();
+      updateStatistics();
+    } catch (error) {
+      console.error('Failed to load downloads:', error);
+    }
+  }
+
+  function setupEventListeners() {
+    document.querySelectorAll('#downloadsTabs button').forEach(tab => {
+      tab.addEventListener('shown.bs.tab', async (event) => {
+        currentCategory = event.target.id.replace('-tab', '');
+        renderDownloads();
+      });
+    });
+
+    const searchInput = document.getElementById('downloads-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value;
+        renderDownloads();
+      });
+    }
+
+    const sortSelect = document.getElementById('downloads-sort');
+    if (sortSelect) {
+      sortSelect.addEventListener('change', (e) => {
+        currentSort = e.target.value;
+        renderDownloads();
+      });
+    }
+  }
+
+  function renderDownloads() {
+    let filteredDownloads = [...allDownloads];
+
+    if (currentCategory !== 'all') {
+      filteredDownloads = filteredDownloads.filter(d => d.category === currentCategory);
+    }
+
+    if (searchQuery) {
+      filteredDownloads = downloadsManager.searchDownloads(filteredDownloads, searchQuery);
+    }
+
+    filteredDownloads = downloadsManager.sortDownloads(filteredDownloads, currentSort);
+
+    const containerId = currentCategory === 'all' ? 'all-downloads-list' : 
+                        currentCategory === 'images' ? 'images-downloads-list' :
+                        currentCategory === 'videos' ? 'videos-downloads-list' : 'documents-downloads-list';
+    
+    const container = document.getElementById(containerId);
+
+    if (!container) return;
+
+    if (filteredDownloads.length === 0) {
+      container.innerHTML = getEmptyState(currentCategory);
+      return;
+    }
+
+    const formatBytes = storageManager.formatBytes.bind(storageManager);
+    container.innerHTML = filteredDownloads.map(download => renderDownloadItem(download, formatBytes)).join('');
+
+    container.querySelectorAll('.dropdown-toggle').forEach(toggle => {
+      new bootstrap.Dropdown(toggle);
+    });
+  }
+
+  function renderDownloadItem(download, formatBytes) {
+    const icon = getCategoryIcon(download.category);
+    const thumbnail = download.thumbnail || '';
+
+    return `
+      <div class="download-item d-flex align-items-center gap-3 py-3 border-bottom" data-id="${download.id}">
+        <div class="download-thumbnail flex-shrink-0">
+          ${thumbnail ? 
+            `<img src="${thumbnail}" class="rounded-2" style="width: 64px; height: 64px; object-fit: cover;">` :
+            `<div class="bg-light rounded-2 d-flex align-items-center justify-content-center" style="width: 64px; height: 64px;">
+              <i class="${icon} text-muted fs-3"></i>
+            </div>`
+          }
+        </div>
+        <div class="flex-grow-1 min-width-0">
+          <div class="fw-bold text-truncate">${download.filename}</div>
+          <div class="text-muted small">${formatBytes(download.size)} • ${new Date(download.downloadDate).toLocaleDateString()}</div>
+          ${download.category === 'video' && download.duration ? 
+            `<div class="text-muted small">${download.duration}</div>` : ''}
+        </div>
+        <div class="dropdown">
+          <button class="btn btn-sm border-0 text-muted" data-bs-toggle="dropdown">
+            <i class="bi bi-three-dots-vertical fs-5"></i>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li>
+              <button class="dropdown-item" onclick="window.downloadsUI.open('${download.id}')">
+                <i class="bi bi-box-arrow-up-right me-2"></i> Open
+              </button>
+            </li>
+            ${download.category === 'video' ? `
+            <li>
+              <button class="dropdown-item" onclick="window.downloadsUI.play('${download.id}')">
+                <i class="bi bi-play-fill me-2"></i> Play
+              </button>
+            </li>
+            ` : ''}
+            <li>
+              <button class="dropdown-item" onclick="window.downloadsUI.share('${download.id}')">
+                <i class="bi bi-share me-2"></i> Share
+              </button>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <button class="dropdown-item text-danger" onclick="window.downloadsUI.delete('${download.id}')">
+                <i class="bi bi-trash me-2"></i> Delete
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    `;
+  }
+
+  function getEmptyState(category) {
+    const states = {
+      all: { icon: 'bi-download', title: 'No downloads yet', subtitle: 'Downloaded files will appear here' },
+      images: { icon: 'bi-image', title: 'No downloaded images', subtitle: 'Your downloaded images will appear here' },
+      videos: { icon: 'bi-camera-video', title: 'No downloaded videos', subtitle: 'Your downloaded videos will appear here' },
+      documents: { icon: 'bi-file-earmark', title: 'No downloaded documents', subtitle: 'Your downloaded documents will appear here' }
+    };
+    const state = states[category] || states.all;
+    return `
+      <div class="text-center text-muted py-5">
+        <i class="${state.icon} fs-1 mb-3 d-block"></i>
+        <p>${state.title}</p>
+        <small>${state.subtitle}</small>
+      </div>
+    `;
+  }
+
+  function getCategoryIcon(category) {
+    const icons = { image: 'bi bi-image', video: 'bi bi-camera-video', document: 'bi bi-file-earmark', audio: 'bi bi-music-note' };
+    return icons[category] || 'bi bi-file';
+  }
+
+  function updateStatistics() {
+    const statDownloads = document.getElementById('stat-downloads-count');
+    const statImages = document.getElementById('stat-images-count');
+    const statVideos = document.getElementById('stat-videos-count');
+    const statDocuments = document.getElementById('stat-documents-count');
+    if (statDownloads) statDownloads.textContent = allDownloads.length;
+    if (statImages) statImages.textContent = allDownloads.filter(d => d.category === 'image').length;
+    if (statVideos) statVideos.textContent = allDownloads.filter(d => d.category === 'video').length;
+    if (statDocuments) statDocuments.textContent = allDownloads.filter(d => d.category === 'document').length;
+  }
+
+  window.downloadsUI = {
+    open: async (id) => {
+      try { await downloadsManager.open(id); } catch (error) { alert('Failed to open: ' + error.message); }
+    },
+    play: async (id) => {
+      try { await downloadsManager.open(id); } catch (error) { alert('Failed to play: ' + error.message); }
+    },
+    share: async (id) => {
+      try { await downloadsManager.share(id); } catch (error) { alert('Failed to share: ' + error.message); }
+    },
+    delete: async (id) => {
+      if (confirm('Delete this download? This will not affect the original post.')) {
+        try {
+          await downloadsManager.delete(id);
+          await loadDownloads();
+        } catch (error) {
+          alert('Failed to delete: ' + error.message);
+        }
+      }
+    }
+  };
+</script>

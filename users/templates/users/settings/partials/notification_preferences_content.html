@@ -1,0 +1,87 @@
+{% load i18n user_extras %}
+
+<div id="notification-preferences-container">
+  <div class="page-header">
+    <a href="{% url 'users:settings' %}" class="back-link" hx-get="{% url 'users:settings' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">
+      <i class="bi bi-arrow-left"></i> {% trans "Back to Settings" %}
+    </a>
+    <h1 class="page-title">{% trans "Notifications" %}</h1>
+    <p class="page-subtitle">{% trans "Choose which notifications you want to receive" %}</p>
+  </div>
+
+  <div class="settings-list-container">
+    <div class="settings-list-header">
+      <div class="settings-list-header-icon">
+        <i class="bi bi-bell"></i>
+      </div>
+      <div class="settings-list-header-content">
+        <div class="settings-list-header-title">{% trans "Notification Preferences" %}</div>
+        <div class="settings-list-header-subtitle">{% trans "Manage how and when you receive notifications" %}</div>
+      </div>
+    </div>
+
+    <form method="post" action="{% url 'users:settings_notifications' %}" hx-post="{% url 'users:settings_notifications' %}" hx-target="#page-content-target" hx-swap="innerHTML">
+      {% csrf_token %}
+      <div class="settings-list-body">
+        {% include 'users/settings/partials/notification_preferences.html' %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+  .settings-list-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .settings-list-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--brand-light);
+  }
+
+  .settings-list-header-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .settings-list-header-icon i {
+    font-size: 1.25rem;
+    color: white;
+  }
+
+  .settings-list-header-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .settings-list-header-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .settings-list-header-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+  }
+
+  .settings-list-body {
+    padding: 1.5rem;
+  }
+</style>

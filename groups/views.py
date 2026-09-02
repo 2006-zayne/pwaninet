@@ -818,7 +818,7 @@ def groups_dashboard(request):
     # Get recent searches from session
     recent_searches = request.session.get('recent_group_searches', [])
     
-    return render(request, 'groups/groups_dashboard.html', {
+    context = {
         'user_groups': user_groups,
         'all_groups': suggested_groups,
         'user_group_ids': user_group_ids,
@@ -827,7 +827,13 @@ def groups_dashboard(request):
         'group_unread_counts': group_unread_counts,
         'query': query,
         'recent_searches': recent_searches,
-    })
+    }
+
+    if request.headers.get('HX-Request'):
+        return render(request, 'groups/partials/groups_dashboard_navigation_partial.html', context)
+
+    return render(request, 'groups/groups_dashboard.html', context)
+
 
 
 @login_required

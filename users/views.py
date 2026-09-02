@@ -150,8 +150,29 @@ def profile_view(request, username):
     # Get profile completion percentage for owner
     profile_completion = profile_user.profile_completion_percentage if is_own_profile else None
     
-    # Check if HTMX request for more posts
-    if request.headers.get('HX-Request'):
+    # HTMX Navigation Request: Return full navigation partial for page navigation
+    # Distinguished from infinite scroll (has page parameter)
+    if request.headers.get('HX-Request') and not request.GET.get('page'):
+        context = {
+            'profile_user': profile_user,
+            'posts': posts_page,
+            'is_following': is_following,
+            'followers_count': followers_count,
+            'following_count': following_count,
+            'total_likes': total_likes,
+            'pinches_sent_count': pinches_sent_count,
+            'pinches_received_count': pinches_received_count,
+            'shared_posts': shared_posts,
+            'unseen_shared_count': unseen_shared_count,
+            'is_own_profile': is_own_profile,
+            'profile_completion': profile_completion,
+            'has_more_posts': posts_page.has_next(),
+            'liked_post_ids': liked_post_ids,
+        }
+        return render(request, 'users/partials/profile_navigation_partial.html', context)
+
+    # For HTMX infinite scroll: render only the posts partial
+    if request.headers.get('HX-Request') and page:
         return render(request, 'posts/partials/post_cards_list.html', {
             'posts': posts_page,
             'has_more_posts': posts_page.has_next(),
@@ -560,6 +581,10 @@ def get_suggestions(request):
 @login_required
 def settings_view(request):
     """Main settings landing page - navigation hub for all settings categories"""
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/index_content.html'
+        })
     return render(request, 'users/settings/index.html')
 
 
@@ -590,12 +615,21 @@ def settings_profile_view(request):
 @login_required
 def settings_appearance_view(request):
     """Appearance settings page"""
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/appearance_content.html'
+        })
     return render(request, 'users/settings/appearance.html')
+
 
 
 @login_required
 def settings_privacy_view(request):
     """Privacy and security settings page"""
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/privacy_content.html'
+        })
     return render(request, 'users/settings/privacy.html')
 
 
@@ -608,12 +642,20 @@ def settings_storage_view(request):
 @login_required
 def settings_downloads_view(request):
     """Downloads manager page"""
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/downloads_content.html'
+        })
     return render(request, 'users/settings/downloads.html')
 
 
 @login_required
 def settings_about_view(request):
     """About PwaniNet page with version information"""
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/about_content.html'
+        })
     return render(request, 'users/settings/about.html')
 
 
@@ -627,14 +669,26 @@ def settings_password_manager_view(request):
         
         if not request.user.check_password(current_password):
             messages.error(request, 'Current password is incorrect.')
+            if request.headers.get('HX-Request'):
+                return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+                    'settings_content_partial': 'users/settings/partials/password_content.html'
+                })
             return render(request, 'users/settings/password_manager.html')
         
         if new_password != confirm_password:
             messages.error(request, 'New passwords do not match.')
+            if request.headers.get('HX-Request'):
+                return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+                    'settings_content_partial': 'users/settings/partials/password_content.html'
+                })
             return render(request, 'users/settings/password_manager.html')
         
         if len(new_password) < 8:
             messages.error(request, 'Password must be at least 8 characters long.')
+            if request.headers.get('HX-Request'):
+                return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+                    'settings_content_partial': 'users/settings/partials/password_content.html'
+                })
             return render(request, 'users/settings/password_manager.html')
         
         request.user.set_password(new_password)
@@ -645,8 +699,16 @@ def settings_password_manager_view(request):
         update_session_auth_hash(request, request.user)
         
         messages.success(request, 'Password changed successfully.')
+        if request.headers.get('HX-Request'):
+            return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+                'settings_content_partial': 'users/settings/partials/password_content.html'
+            })
         return redirect('users:settings_password_manager')
     
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/password_content.html'
+        })
     return render(request, 'users/settings/password_manager.html')
 
 
@@ -786,6 +848,13 @@ def settings_active_devices_view(request):
         current_session.browser = device_info['browser']
         current_session.os = device_info['os']
     
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/active_devices_content.html',
+            'current_session': current_session,
+            'other_sessions': other_sessions
+        })
+        
     return render(request, 'users/settings/active_devices.html', {
         'current_session': current_session,
         'other_sessions': other_sessions
@@ -799,6 +868,12 @@ def settings_blocked_users_view(request):
         blocker=request.user
     ).select_related('blocked').order_by('-created_at')
     
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/blocked_content.html',
+            'blocked_users': blocked_users
+        })
+        
     return render(request, 'users/settings/blocked_users.html', {
         'blocked_users': blocked_users
     })
@@ -812,15 +887,24 @@ def settings_profile_privacy_view(request):
         
         if profile_privacy not in PrivacyLevel.values:
             messages.error(request, 'Invalid privacy level.')
-            return redirect('users:settings_profile_privacy')
+        else:
+            request.user.profile_privacy = profile_privacy
+            request.user.save()
+            messages.success(request, 'Profile privacy updated successfully.')
         
-        request.user.profile_privacy = profile_privacy
-        request.user.save()
-        
-        messages.success(request, 'Profile privacy updated successfully.')
+        if request.headers.get('HX-Request'):
+            return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+                'settings_content_partial': 'users/settings/partials/profile_privacy_content.html',
+                'privacy_levels': PrivacyLevel.choices
+            })
         return redirect('users:settings_profile_privacy')
     
     privacy_levels = PrivacyLevel.choices
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/profile_privacy_content.html',
+            'privacy_levels': privacy_levels
+        })
     return render(request, 'users/settings/profile_privacy.html', {
         'privacy_levels': privacy_levels
     })
@@ -834,15 +918,24 @@ def settings_post_privacy_view(request):
         
         if post_privacy not in PrivacyLevel.values:
             messages.error(request, 'Invalid privacy level.')
-            return redirect('users:settings_post_privacy')
+        else:
+            request.user.post_privacy = post_privacy
+            request.user.save()
+            messages.success(request, 'Post privacy updated successfully.')
         
-        request.user.post_privacy = post_privacy
-        request.user.save()
-        
-        messages.success(request, 'Post privacy updated successfully.')
+        if request.headers.get('HX-Request'):
+            return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+                'settings_content_partial': 'users/settings/partials/post_privacy_content.html',
+                'privacy_levels': PrivacyLevel.choices
+            })
         return redirect('users:settings_post_privacy')
     
     privacy_levels = PrivacyLevel.choices
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/post_privacy_content.html',
+            'privacy_levels': privacy_levels
+        })
     return render(request, 'users/settings/post_privacy.html', {
         'privacy_levels': privacy_levels
     })
@@ -855,6 +948,12 @@ def settings_hidden_authors_view(request):
         hider=request.user
     ).select_related('hidden_author').order_by('-created_at')
     
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/hidden_content.html',
+            'hidden_authors': hidden_authors
+        })
+        
     return render(request, 'users/settings/hidden_authors.html', {
         'hidden_authors': hidden_authors
     })
@@ -932,9 +1031,10 @@ def settings_notifications_view(request):
         
         NotificationPreferenceService.update_type_preferences(request.user, type_preferences)
         
-        return redirect('users:settings_notifications')
+        if not request.headers.get('HX-Request'):
+            return redirect('users:settings_notifications')
     
-    # Get or create user preferences for GET request
+    # Get or create user preferences for GET request or HTMX POST response
     preferences = NotificationPreferenceService.get_or_create_preferences(request.user)
     
     # Initialize type preferences if empty only - don't merge with defaults
@@ -974,6 +1074,12 @@ def settings_notifications_view(request):
         if dot_key in preferences.type_preferences:
             template_preferences.type_preferences_template[underscore_key] = preferences.type_preferences[dot_key]
     
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/notification_preferences_content.html',
+            'preferences': template_preferences
+        })
+
     return render(request, 'users/settings/notifications.html', {
         'preferences': template_preferences
     })
@@ -1029,6 +1135,13 @@ def api_sign_out_all_sessions(request):
         session.delete()
     
     messages.success(request, 'All other devices have been signed out.')
+    if request.headers.get('HX-Request'):
+        current_session = UserSession.objects.filter(user=request.user, session_key=current_session_key).first()
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/active_devices_content.html',
+            'current_session': current_session,
+            'other_sessions': []
+        })
     return redirect('users:settings_active_devices')
 
 
