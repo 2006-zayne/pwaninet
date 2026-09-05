@@ -20,6 +20,7 @@ import android.webkit.WebViewClient;
 import androidx.activity.EdgeToEdge;
 import androidx.activity.SystemBarStyle;
 import androidx.core.graphics.Insets;
+import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -28,6 +29,8 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.WebViewListener;
 
+import android.os.Handler;
+import android.os.Looper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Locale;
@@ -35,6 +38,8 @@ import java.util.Locale;
 public class MainActivity extends BridgeActivity {
     private boolean isNetworkAvailable = true;
     private static final String WEBVIEW_STATE_KEY = "WEBVIEW_STATE";
+    private volatile boolean isPageReady = false;
+    private static final long SPLASH_WATCHDOG_TIMEOUT_MS = 6000L;
 
     private int lastSafeTop = 0;
     private int lastSafeBottom = 0;
@@ -159,6 +164,15 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Keep splash screen on screen until WebView renders initial page content
+        SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
+        splashScreen.setKeepOnScreenCondition(() -> !isPageReady);
+
+        // Safety watchdog: ensure splash screen dismisses if network is slow or hangs
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            isPageReady = true;
+        }, SPLASH_WATCHDOG_TIMEOUT_MS);
+
         registerPlugin(NavigationBarPlugin.class);
 
         // Configure edge-to-edge once at Activity creation
@@ -260,6 +274,7 @@ public class MainActivity extends BridgeActivity {
             getBridge().addWebViewListener(new WebViewListener() {
                 @Override
                 public void onPageLoaded(WebView webView) {
+                    isPageReady = true;
                     setupAndroidBridge();
                     injectSafeAreaInsets();
                     syncSystemBarThemeFromDom();
@@ -268,6 +283,7 @@ public class MainActivity extends BridgeActivity {
 
                 @Override
                 public void onPageCommitVisible(WebView view, String url) {
+                    isPageReady = true;
                     setupAndroidBridge();
                     injectSafeAreaInsets();
                     syncSystemBarThemeFromDom();
@@ -276,6 +292,7 @@ public class MainActivity extends BridgeActivity {
 
                 @Override
                 public void onReceivedError(WebView webView) {
+                    isPageReady = true;
                     loadOfflinePage(webView);
                 }
             });
@@ -410,6 +427,10 @@ public class MainActivity extends BridgeActivity {
         if (getBridge() != null && getBridge().getWebView() != null) {
             WebView webView = getBridge().getWebView();
             
+            // Set initial WebView background to match system splash background
+            boolean isSystemNight = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+            webView.setBackgroundColor(isSystemNight ? Color.parseColor("#0f172a") : Color.WHITE);
+
             // Enable caching for better performance and offline support
             webView.getSettings().setDomStorageEnabled(true);
             webView.getSettings().setDatabaseEnabled(true);
