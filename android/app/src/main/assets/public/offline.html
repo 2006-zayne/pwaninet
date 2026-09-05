@@ -217,14 +217,21 @@
         (function() {
             const savedTheme = localStorage.getItem('theme') || 'system';
             
+            let resolvedTheme = 'light';
             if (savedTheme === 'dark') {
+                resolvedTheme = 'dark';
                 document.documentElement.setAttribute('data-theme', 'dark');
             } else if (savedTheme === 'light') {
+                resolvedTheme = 'light';
                 document.documentElement.setAttribute('data-theme', 'light');
             } else {
                 // System preference
                 const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+                resolvedTheme = prefersDark ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', resolvedTheme);
+            }
+            if (window.AndroidBridge && typeof window.AndroidBridge.setSystemBarTheme === 'function') {
+                window.AndroidBridge.setSystemBarTheme(resolvedTheme);
             }
         })();
 
@@ -249,14 +256,21 @@
         });
 
         function applyTheme(theme) {
+            let resolvedTheme = 'light';
             if (theme === 'dark') {
+                resolvedTheme = 'dark';
                 document.documentElement.setAttribute('data-theme', 'dark');
             } else if (theme === 'light') {
+                resolvedTheme = 'light';
                 document.documentElement.setAttribute('data-theme', 'light');
             } else {
                 // System preference
                 const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+                resolvedTheme = prefersDark ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', resolvedTheme);
+            }
+            if (window.AndroidBridge && typeof window.AndroidBridge.setSystemBarTheme === 'function') {
+                window.AndroidBridge.setSystemBarTheme(resolvedTheme);
             }
         }
 

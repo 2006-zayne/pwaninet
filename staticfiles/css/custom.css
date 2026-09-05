@@ -325,8 +325,9 @@ body.is-native-app img {
 /* Navbar extends into status bar area with solid status bar background matching navbar */
 body.is-native-app .navbar-top {
     /* Use padding-top to handle safe area, ensure box-sizing includes padding in height */
-    padding-top: var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px));
-    height: calc(75px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)));
+    padding-top: var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: 0 !important;
+    height: calc(var(--navbar-height, 56px) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
     box-sizing: border-box;
     /* Ensure navbar extends to the top edge */
     margin-top: 0;
@@ -334,9 +335,9 @@ body.is-native-app .navbar-top {
 
 /* Adjust body padding to match navbar height in native app with safe area consideration */
 body.is-native-app {
-    padding-top: calc(75px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)));
-    /* Increased padding-bottom to 120px to ensure content cleared the floating pill nav */
-    padding-bottom: calc(120px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+    padding-top: calc(var(--navbar-height, 56px) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+    /* Content clearance for the floating pill nav + safe area */
+    padding-bottom: calc(90px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
     /* Ensure content can extend under system bars */
     margin-top: 0;
 }
@@ -344,13 +345,11 @@ body.is-native-app {
 /* Safe area insets for footer in native app - floats above system navigation bar */
 body.is-native-app .mobile-bottom-nav {
     /* Update bottom position to float above system bar with safe area buffer */
-    /* 12px provides slightly better clearance for gesture bars vs buttons */
-    bottom: calc(12px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+    bottom: calc(12px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
     /* Reset padding-bottom as the container itself is moved up */
     padding-bottom: 0;
-    /* Ensure navbar extends to the bottom edge is NOT desired for floating pill */
     margin-bottom: 0;
-    /* Ensure z-index is high enough to stay above system navigation area */
+    /* Ensure z-index is high enough to stay above other content */
     z-index: 10000;
 }
 

@@ -1,13 +1,17 @@
 package com.pwaninet.app;
 
 import android.content.Context;
+import android.content.res.Configuration;
+import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
-import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.view.Window;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
@@ -17,9 +21,12 @@ import androidx.activity.EdgeToEdge;
 import androidx.activity.SystemBarStyle;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.WebViewListener;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,23 +41,138 @@ public class MainActivity extends BridgeActivity {
     private int lastSafeLeft = 0;
     private int lastSafeRight = 0;
 
+    public static class WebAppInterface {
+        private final java.lang.ref.WeakReference<MainActivity> activityRef;
+
+        public WebAppInterface(MainActivity activity) {
+            this.activityRef = new java.lang.ref.WeakReference<>(activity);
+        }
+
+        @JavascriptInterface
+        public void setSystemBarTheme(String theme) {
+            MainActivity activity = activityRef.get();
+            if (activity != null) {
+                boolean isLight = !"dark".equalsIgnoreCase(theme);
+                activity.applySystemBarTheme(isLight);
+            }
+        }
+
+        @JavascriptInterface
+        public void setNavigationBarTheme(String theme) {
+            setSystemBarTheme(theme);
+        }
+    }
+
+    public void applySystemBarTheme(boolean isLight) {
+        runOnUiThread(() -> {
+            try {
+                Window window = getWindow();
+                if (window == null) return;
+
+                View decorView = window.getDecorView();
+                WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, decorView);
+                if (controller != null) {
+                    controller.setAppearanceLightStatusBars(isLight);
+                    controller.setAppearanceLightNavigationBars(isLight);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    private void setupAndroidBridge() {
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            WebView webView = getBridge().getWebView();
+            WebAppInterface bridge = new WebAppInterface(this);
+            webView.addJavascriptInterface(bridge, "AndroidBridge");
+            webView.addJavascriptInterface(bridge, "PwaninetBridge");
+        }
+    }
+
+    public void injectThemeObserver() {
+        runOnUiThread(() -> {
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                String js =
+                    "(function() {" +
+                    "  function syncTheme() {" +
+                    "    var root = document.documentElement;" +
+                    "    var theme = root.getAttribute('data-theme');" +
+                    "    if (!theme || theme === 'system') {" +
+                    "      var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;" +
+                    "      theme = prefersDark ? 'dark' : 'light';" +
+                    "    }" +
+                    "    var isLight = theme !== 'dark';" +
+                    "    var bridge = window.AndroidBridge || window.PwaninetBridge;" +
+                    "    if (bridge && bridge.setSystemBarTheme) {" +
+                    "      bridge.setSystemBarTheme(theme);" +
+                    "    } else if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.NavigationBar) {" +
+                    "      window.Capacitor.Plugins.NavigationBar.setStyle({ style: isLight ? 'LIGHT' : 'DARK' });" +
+                    "    }" +
+                    "  }" +
+                    "  if (!window._pwaninet_native_theme_observer_active) {" +
+                    "    window._pwaninet_native_theme_observer_active = true;" +
+                    "    var observer = new MutationObserver(function(mutations) {" +
+                    "      for (var i = 0; i < mutations.length; i++) {" +
+                    "        if (mutations[i].attributeName === 'data-theme') {" +
+                    "          syncTheme();" +
+                    "          break;" +
+                    "        }" +
+                    "      }" +
+                    "    });" +
+                    "    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });" +
+                    "    document.addEventListener('click', function() { setTimeout(syncTheme, 150); }, { passive: true });" +
+                    "    window.addEventListener('storage', function(e) { if (e.key === 'theme') syncTheme(); });" +
+                    "  }" +
+                    "  syncTheme();" +
+                    "})();";
+                getBridge().getWebView().evaluateJavascript(js, null);
+            }
+        });
+    }
+
+    private void syncSystemBarThemeFromDom() {
+        runOnUiThread(() -> {
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                getBridge().getWebView().evaluateJavascript(
+                    "(function() {" +
+                    "  var theme = document.documentElement.getAttribute('data-theme');" +
+                    "  if (!theme || theme === 'system') {" +
+                    "    var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;" +
+                    "    theme = prefersDark ? 'dark' : 'light';" +
+                    "  }" +
+                    "  return theme;" +
+                    "})();",
+                    themeValue -> {
+                        if (themeValue != null) {
+                            String cleanTheme = themeValue.replace("\"", "").trim();
+                            if (!cleanTheme.isEmpty() && !"null".equalsIgnoreCase(cleanTheme) && !"undefined".equalsIgnoreCase(cleanTheme)) {
+                                boolean isLight = !"dark".equalsIgnoreCase(cleanTheme);
+                                applySystemBarTheme(isLight);
+                            }
+                        }
+                    }
+                );
+            }
+        });
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+        registerPlugin(NavigationBarPlugin.class);
 
-        // Fixed style, not auto() — auto() continuously re-derives icon
-        // appearance from the DEVICE's system theme and overrides any style
-        // set via the StatusBar JS plugin, which is why in-app theme changes
-        // were never reflected in the status/nav bar icons. The StatusBar
-        // plugin (driven by data-theme, see initStatusBar()/
-        // updateStatusBarForTheme() in the JS) is now the single source of
-        // truth for icon appearance.
+        // Configure edge-to-edge once at Activity creation
         EdgeToEdge.enable(this,
             SystemBarStyle.dark(Color.TRANSPARENT),
-            SystemBarStyle.dark(Color.TRANSPARENT));
-        
-        // StatusBar plugin handles system bar transparency and edge-to-edge layout
-        
+            SystemBarStyle.dark(Color.TRANSPARENT)
+        );
+
+        super.onCreate(savedInstanceState);
+
+        boolean isSystemNight = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        applySystemBarTheme(!isSystemNight);
+
+        setupAndroidBridge();
         setupSafeAreaInsets();
         setupNetworkMonitoring();
         setupCustomWebViewClient();
@@ -134,26 +256,27 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void setupCustomWebViewClient() {
-        if (getBridge() != null && getBridge().getWebView() != null) {
-            getBridge().getWebView().setWebViewClient(new WebViewClient() {
+        if (getBridge() != null) {
+            getBridge().addWebViewListener(new WebViewListener() {
                 @Override
-                public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                    // Handle network errors for navigation requests
-                    if (request.isForMainFrame()) {
-                        loadOfflinePage(view);
-                    }
-                }
-
-                @Override
-                public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                    // Allow the WebView to handle all URL loading
-                    return false;
-                }
-
-                @Override
-                public void onPageFinished(WebView view, String url) {
-                    super.onPageFinished(view, url);
+                public void onPageLoaded(WebView webView) {
+                    setupAndroidBridge();
                     injectSafeAreaInsets();
+                    syncSystemBarThemeFromDom();
+                    injectThemeObserver();
+                }
+
+                @Override
+                public void onPageCommitVisible(WebView view, String url) {
+                    setupAndroidBridge();
+                    injectSafeAreaInsets();
+                    syncSystemBarThemeFromDom();
+                    injectThemeObserver();
+                }
+
+                @Override
+                public void onReceivedError(WebView webView) {
+                    loadOfflinePage(webView);
                 }
             });
         }
@@ -162,32 +285,105 @@ public class MainActivity extends BridgeActivity {
     private void setupSafeAreaInsets() {
         View decorView = getWindow().getDecorView();
         ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, windowInsets) -> {
-            Insets insets = windowInsets.getInsets(
-                WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
-            );
+            updateInsetsFrom(windowInsets);
+            return ViewCompat.onApplyWindowInsets(v, windowInsets);
+        });
+
+        View contentView = findViewById(android.R.id.content);
+        if (contentView != null) {
+            ViewCompat.setOnApplyWindowInsetsListener(contentView, (v, windowInsets) -> {
+                updateInsetsFrom(windowInsets);
+                return ViewCompat.onApplyWindowInsets(v, windowInsets);
+            });
+        }
+
+        // Check root insets immediately if already available
+        WindowInsetsCompat rootInsets = ViewCompat.getRootWindowInsets(decorView);
+        if (rootInsets != null) {
+            updateInsetsFrom(rootInsets);
+        } else if (hasNavigationBar()) {
+            lastSafeBottom = getNavigationBarHeightDp();
+            injectSafeAreaInsets();
+        }
+    }
+
+    private void updateInsetsFrom(WindowInsetsCompat windowInsets) {
+        if (windowInsets == null) return;
+
+        Insets sysBars = windowInsets.getInsets(
+            WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
+        );
+        Insets navBars = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars());
+
+        float density = getResources().getDisplayMetrics().density;
+        if (density > 0) {
+            int top = Math.round(sysBars.top / density);
+            int bottom = Math.round(Math.max(sysBars.bottom, navBars.bottom) / density);
+            int left = Math.round(sysBars.left / density);
+            int right = Math.round(sysBars.right / density);
+
+            // Fallback for 3-button navigation if bottom reports 0 but system navigation bar exists
+            if (bottom == 0 && hasNavigationBar()) {
+                bottom = getNavigationBarHeightDp();
+            }
+
+            lastSafeTop = top;
+            lastSafeBottom = bottom;
+            lastSafeLeft = left;
+            lastSafeRight = right;
+
+            injectSafeAreaInsets();
+        }
+    }
+
+    private boolean hasNavigationBar() {
+        int id = getResources().getIdentifier("config_showNavigationBar", "bool", "android");
+        return id > 0 && getResources().getBoolean(id);
+    }
+
+    private int getNavigationBarHeightDp() {
+        int resourceId = getResources().getIdentifier("navigation_bar_height", "dimen", "android");
+        if (resourceId > 0) {
             float density = getResources().getDisplayMetrics().density;
             if (density > 0) {
-                lastSafeTop = Math.round(insets.top / density);
-                lastSafeBottom = Math.round(insets.bottom / density);
-                lastSafeLeft = Math.round(insets.left / density);
-                lastSafeRight = Math.round(insets.right / density);
-                injectSafeAreaInsets();
+                return Math.round(getResources().getDimensionPixelSize(resourceId) / density);
             }
-            return windowInsets;
-        });
+        }
+        return 48; // Standard Android 3-button navigation height in dp
     }
 
     private void injectSafeAreaInsets() {
         runOnUiThread(() -> {
             if (getBridge() != null && getBridge().getWebView() != null) {
+                if (lastSafeBottom == 0) {
+                    View decorView = getWindow().getDecorView();
+                    WindowInsetsCompat rootInsets = ViewCompat.getRootWindowInsets(decorView);
+                    if (rootInsets != null) {
+                        float density = getResources().getDisplayMetrics().density;
+                        if (density > 0) {
+                            Insets navBars = rootInsets.getInsets(WindowInsetsCompat.Type.navigationBars());
+                            Insets sysBars = rootInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+                            int b = Math.round(Math.max(sysBars.bottom, navBars.bottom) / density);
+                            if (b > 0) lastSafeBottom = b;
+                            int t = Math.round(sysBars.top / density);
+                            if (t > 0) lastSafeTop = t;
+                        }
+                    }
+                    if (lastSafeBottom == 0 && hasNavigationBar()) {
+                        lastSafeBottom = getNavigationBarHeightDp();
+                    }
+                }
+
                 String js = String.format(Locale.US,
                     "(function() {" +
                     "  var root = document.documentElement;" +
+                    "  root.classList.add('is-capacitor', 'is-native-app');" +
                     "  root.style.setProperty('--pwaninet-safe-area-top', '%dpx');" +
                     "  root.style.setProperty('--pwaninet-safe-area-bottom', '%dpx');" +
                     "  root.style.setProperty('--pwaninet-safe-area-left', '%dpx');" +
                     "  root.style.setProperty('--pwaninet-safe-area-right', '%dpx');" +
                     "  if (document.body) {" +
+                    "    document.body.classList.add('is-capacitor', 'is-native-app');" +
                     "    document.body.style.setProperty('--pwaninet-safe-area-top', '%dpx');" +
                     "    document.body.style.setProperty('--pwaninet-safe-area-bottom', '%dpx');" +
                     "  }" +
@@ -206,6 +402,8 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         injectSafeAreaInsets();
+        syncSystemBarThemeFromDom();
+        injectThemeObserver();
     }
 
     private void setupWebViewCaching() {

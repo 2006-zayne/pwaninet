@@ -399,7 +399,7 @@
 
     /* Adjust sticky positioning for tablets */
     .sticky-top {
-        top: 75px !important;
+        top: var(--navbar-height, 60px) !important;
     }
 
     /* Adjust card padding on tablets */

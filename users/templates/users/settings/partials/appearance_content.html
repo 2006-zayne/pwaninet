@@ -666,13 +666,28 @@
 
     function setTheme(theme) {
       const html = document.documentElement;
+      let resolvedTheme = 'light';
       if (theme === 'system') {
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+        resolvedTheme = prefersDark ? 'dark' : 'light';
+        html.setAttribute('data-theme', resolvedTheme);
         localStorage.setItem('theme', 'system');
       } else {
-        html.setAttribute('data-theme', theme);
+        resolvedTheme = theme === 'dark' ? 'dark' : 'light';
+        html.setAttribute('data-theme', resolvedTheme);
         localStorage.setItem('theme', theme);
+      }
+      var bridge = window.AndroidBridge || window.PwaninetBridge;
+      if (bridge && typeof bridge.setSystemBarTheme === 'function') {
+        bridge.setSystemBarTheme(resolvedTheme);
+      }
+      if (window.Capacitor && window.Capacitor.Plugins) {
+        if (window.Capacitor.Plugins.NavigationBar) {
+          window.Capacitor.Plugins.NavigationBar.setStyle({ style: resolvedTheme === 'dark' ? 'DARK' : 'LIGHT' });
+        }
+        if (window.Capacitor.Plugins.StatusBar) {
+          window.Capacitor.Plugins.StatusBar.setStyle({ style: resolvedTheme === 'dark' ? 'DARK' : 'LIGHT' });
+        }
       }
     }
 
