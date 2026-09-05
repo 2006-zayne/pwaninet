@@ -1,4 +1,11 @@
-<a href="{% url 'users:profile' user.username %}" class="connection-user-row text-decoration-none">
+<a href="{% url 'users:profile' user.username %}"
+   hx-get="{% url 'users:profile' user.username %}"
+   hx-target="#page-content-target"
+   hx-swap="innerHTML"
+   hx-push-url="true"
+   hx-history="true"
+   data-bs-dismiss="modal"
+   class="connection-user-row text-decoration-none">
     <img src="{{ user.profile_pic.url }}" alt="{{ user.username }}" class="connection-user-avatar">
     <div class="connection-user-info flex-grow-1 min-w-0">
         <div class="connection-user-name text-truncate">{{ user.get_full_name|default:user.username }}</div>

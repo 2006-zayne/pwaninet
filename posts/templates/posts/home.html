@@ -312,6 +312,11 @@
       <!-- Search Form -->
       <form method="GET"
             action="{% url 'posts:search' %}"
+            hx-get="{% url 'posts:search' %}"
+            hx-target="#page-content-target"
+            hx-swap="innerHTML"
+            hx-push-url="true"
+            hx-history="true"
             class="search-form"
             autocomplete="off">
         <i class="bi bi-search search-icon"></i>

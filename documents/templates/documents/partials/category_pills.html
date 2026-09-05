@@ -7,6 +7,11 @@
         {% if categories %}
             {% for category in categories %}
                 <a href="{% url 'documents:search' %}?category={{ category.code }}"
+                   hx-get="{% url 'documents:search' %}?category={{ category.code }}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
                    class="doc-category-pill {% if active_category == category.code %}active{% endif %}"
                    style="flex-shrink: 0; padding: 10px 20px; 
                           border-radius: 24px; border: 2px solid var(--border);
@@ -19,6 +24,11 @@
         {% else %}
             <!-- Fallback hardcoded categories if no data -->
             <a href="{% url 'documents:search' %}?category=past_paper"
+               hx-get="{% url 'documents:search' %}?category=past_paper"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
                class="doc-category-pill {% if active_category == 'past_paper' %}active{% endif %}"
                style="flex-shrink: 0; padding: 10px 20px; 
                       border-radius: 24px; border: 2px solid var(--border);
@@ -29,6 +39,11 @@
             </a>
             
             <a href="{% url 'documents:search' %}?category=lecture_notes"
+               hx-get="{% url 'documents:search' %}?category=lecture_notes"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
                class="doc-category-pill {% if active_category == 'lecture_notes' %}active{% endif %}"
                style="flex-shrink: 0; padding: 10px 20px; 
                       border-radius: 24px; border: 2px solid var(--border);
@@ -39,6 +54,11 @@
             </a>
             
             <a href="{% url 'documents:search' %}?category=cat"
+               hx-get="{% url 'documents:search' %}?category=cat"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
                class="doc-category-pill {% if active_category == 'cat' %}active{% endif %}"
                style="flex-shrink: 0; padding: 10px 20px; 
                       border-radius: 24px; border: 2px solid var(--border);
@@ -49,6 +69,11 @@
             </a>
             
             <a href="{% url 'documents:search' %}?category=assignment"
+               hx-get="{% url 'documents:search' %}?category=assignment"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
                class="doc-category-pill {% if active_category == 'assignment' %}active{% endif %}"
                style="flex-shrink: 0; padding: 10px 20px; 
                       border-radius: 24px; border: 2px solid var(--border);
@@ -59,6 +84,11 @@
             </a>
             
             <a href="{% url 'documents:search' %}?category=slides"
+               hx-get="{% url 'documents:search' %}?category=slides"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
                class="doc-category-pill {% if active_category == 'slides' %}active{% endif %}"
                style="flex-shrink: 0; padding: 10px 20px; 
                       border-radius: 24px; border: 2px solid var(--border);

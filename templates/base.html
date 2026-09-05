@@ -911,7 +911,14 @@
                  <a href="#" class="nav-chip">
                     <i class="bi bi-chat-dots-fill"></i>
                 </a> -->
-                <a href="{% url 'posts:create_post' %}" class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}" style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
+                <a href="{% url 'posts:create_post' %}"
+                   class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}"
+                   hx-get="{% url 'posts:create_post' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
+                   style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
                     <i class="bi bi-plus-circle-fill" style="font-size: 1.5rem;"></i>
                     <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Post" %}</span>
                 </a>
@@ -1042,6 +1049,11 @@
             {% if user.is_authenticated %}
                 <a href="{% url 'posts:create_post' %}"
                    class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}"
+                   hx-get="{% url 'posts:create_post' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
                    aria-label="{% trans 'Create Post' %}">
                     <i class="bi bi-plus-circle-fill"></i>
                     <span>{% trans "Post" %}</span>
@@ -1095,7 +1107,16 @@
     <!-- Messaging Domain Bootstrap (only loads if chat-container exists) -->
     <script type="module" src="{% static 'js/chat/bootstrap.js' %}"></script>
 
+    <!-- hls.js — adaptive bitrate HLS player for all browsers.
+         Safari uses its native HLS engine; hls.js handles Chromium, Firefox, Android.
+         See: https://github.com/video-dev/hls.js -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.18/dist/hls.min.js" defer></script>
+    <!-- hls_player.js initialises hls.js on feed video elements -->
+    <script src="{% static 'js/hls_player.js' %}" defer></script>
+
     {% block page_scripts %}{% endblock %}
+
+
     <script type="module">
         import { uploadManager } from '{% static "js/upload/upload_manager.js" %}';
         import { uploadUI } from '{% static "js/upload/upload_ui.js" %}';
@@ -1631,10 +1652,29 @@ window.addEventListener('beforeinstallprompt', (e) => {
                     if (data.type === 'feed_update') {
                         handleFeedUpdate(data.post);
                     }
+
+                    // HLS transcoding progress from Celery → FeedConsumer → browser.
+                    // Re-dispatch as a DOM CustomEvent so upload_manager.js can
+                    // update the persistent upload banner without coupling.
+                    if (data.type === 'video_progress') {
+                        window.dispatchEvent(new CustomEvent('feedVideoProgress', { detail: data }));
+                    }
+
+                    // Relay other feed metric updates (likes, reposts, comments)
+                    if (data.type === 'post_like_update') {
+                        window.dispatchEvent(new CustomEvent('feedPostLikeUpdate', { detail: data }));
+                    }
+                    if (data.type === 'post_repost_update') {
+                        window.dispatchEvent(new CustomEvent('feedPostRepostUpdate', { detail: data }));
+                    }
+                    if (data.type === 'post_comment_update') {
+                        window.dispatchEvent(new CustomEvent('feedPostCommentUpdate', { detail: data }));
+                    }
                 } catch (error) {
                     console.error('[GLOBAL] Error parsing feed WebSocket message:', error);
                 }
             };
+
 
             globalFeedSocket.onclose = function(e) {
                 console.log('[GLOBAL] Feed WebSocket disconnected:', e.code, e.reason);
@@ -1746,8 +1786,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
             const profileNavChips = document.querySelectorAll('.nav-chip[href*="/user/"]');
             profileNavChips.forEach(chip => chip.classList.add('active'));
             console.log('[HTMX History] Set Profile nav chips as active');
-        } else if (pathname.includes('/create')) {
-            const createNavChips = document.querySelectorAll('.nav-chip[href*="/create"]');
+        } else if (pathname.startsWith('/post/new') || pathname.includes('/create')) {
+            const createNavChips = document.querySelectorAll('.nav-chip[href*="/post/new"], .nav-chip[href*="/create"]');
             createNavChips.forEach(chip => chip.classList.add('active'));
             console.log('[HTMX History] Set Create Post nav chips as active');
         } else if (pathname.startsWith('/users/settings')) {
@@ -1791,61 +1831,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
     });
     </script>
 
-    <!-- Post Content Truncation -->
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        initPostContentTruncation();
-    });
-
-    document.body.addEventListener('htmx:afterSwap', function() {
-        initPostContentTruncation();
-    });
-
-    function initPostContentTruncation() {
-        const contentWrappers = document.querySelectorAll('.post-content-wrapper');
-
-        contentWrappers.forEach(wrapper => {
-            const fullContent = wrapper.querySelector('.post-content-full');
-            const truncatedContent = wrapper.querySelector('.post-content-truncated');
-            const seeMoreBtn = wrapper.querySelector('.see-more-btn');
-
-            if (!fullContent || !truncatedContent || !seeMoreBtn) return;
-
-            const text = fullContent.textContent.trim();
-            const maxLength = 200; // Character limit for truncation
-
-            if (text.length > maxLength) {
-                // Truncate the text
-                const truncatedText = text.substring(0, maxLength) + '...';
-                truncatedContent.textContent = truncatedText;
-
-                // Show truncated version and hide full version
-                fullContent.style.display = 'none';
-                truncatedContent.style.display = 'inline';
-                seeMoreBtn.style.display = 'inline';
-
-                // Handle see more button click
-                seeMoreBtn.onclick = function(e) {
-                    e.preventDefault();
-                    if (fullContent.style.display === 'none') {
-                        fullContent.style.display = 'inline';
-                        truncatedContent.style.display = 'none';
-                        seeMoreBtn.textContent = 'See less';
-                    } else {
-                        fullContent.style.display = 'none';
-                        truncatedContent.style.display = 'inline';
-                        seeMoreBtn.textContent = 'See more';
-                    }
-                };
-            } else {
-                // Content is short enough, don't truncate
-                fullContent.style.display = 'inline';
-                truncatedContent.style.display = 'none';
-                seeMoreBtn.style.display = 'none';
-            }
-        });
-    }
-    </script>
 
 
     <!-- Version Footer -->

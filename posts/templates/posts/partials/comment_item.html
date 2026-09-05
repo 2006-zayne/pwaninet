@@ -7,11 +7,22 @@
   }
 </style>
 <div class="d-flex gap-2 p-3 border-bottom" id="comment-{{ comment.id }}">
-    <a href="{% url 'users:profile' comment.author.username %}">
+    <a href="{% url 'users:profile' comment.author.username %}"
+       hx-get="{% url 'users:profile' comment.author.username %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true">
         <img src="{{ comment.author.profile_pic.url }}" class="rounded-circle border flex-shrink-0" style="width: 34px; height: 34px; object-fit: cover;">
     </a>
     <div>
-        <a href="{% url 'users:profile' comment.author.username %}" class="fw-bold small text-dark text-decoration-none">
+        <a href="{% url 'users:profile' comment.author.username %}"
+           hx-get="{% url 'users:profile' comment.author.username %}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-history="true"
+           class="fw-bold small text-dark text-decoration-none">
             {{ comment.author.get_full_name|default:comment.author.username }}
         </a>
         <p class="mb-0 small comment-text" style="font-size: 14px; line-height: 1.5;" data-full-text="{{ comment.content }}" data-truncated-length="100">{{ comment.content }}</p>

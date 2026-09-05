@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.conf import settings
 from drf_spectacular.utils import extend_schema_serializer
 from .models import User, Follow, DeviceAccount, CollaborationStatus, Pinch
 from courses.models import Course, Year
@@ -65,14 +66,15 @@ class UserSerializer(serializers.ModelSerializer):
         return False
 
     def get_profile_pic_url(self, obj):
-        if obj.profile_pic:
+        if obj.profile_pic and hasattr(obj.profile_pic, 'url'):
             return obj.profile_pic.url
-        return '/static/img/default_profile.jpg'
+        return f"{settings.STATIC_URL}images/default_pic1.jpg"
 
     def get_cover_photo_url(self, obj):
-        if obj.cover_photo:
+        if obj.cover_photo and hasattr(obj.cover_photo, 'url'):
             return obj.cover_photo.url
-        return None
+        return f"{settings.STATIC_URL}images/default-cover.jpg"
+
 
     def get_profile_completion_percentage(self, obj):
         return obj.profile_completion_percentage
@@ -114,9 +116,10 @@ class UserPublicSerializer(serializers.ModelSerializer):
         return False
 
     def get_profile_pic_url(self, obj):
-        if obj.profile_pic:
+        if obj.profile_pic and hasattr(obj.profile_pic, 'url'):
             return obj.profile_pic.url
-        return '/static/img/default_profile.jpg'
+        return f"{settings.STATIC_URL}images/default_pic1.jpg"
+
 
 
 class FollowSerializer(serializers.ModelSerializer):

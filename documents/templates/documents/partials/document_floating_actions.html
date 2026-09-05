@@ -1,0 +1,75 @@
+{% load i18n %}
+
+<div id="profile-floating-actions"{% if oob %} hx-swap-oob="true"{% endif %}>
+    {% if show_library_button|default:True %}
+    <a href="{% url 'documents:my_library' %}"
+       class="floating-btn btn-secondary initial-animation"
+       id="library-btn"
+       hx-get="{% url 'documents:my_library' %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true"
+       style="bottom: {% if show_upload_button|default:True %}180px{% else %}110px{% endif %};">
+        <span class="btn-icon"><i class="bi bi-book"></i></span>
+        <span class="btn-text">{% trans "My Library" %}</span>
+    </a>
+    {% endif %}
+
+    {% if show_upload_button|default:True %}
+    <a href="{% url 'documents:upload' %}"
+       class="floating-btn btn-primary initial-animation"
+       id="upload-btn"
+       hx-get="{% url 'documents:upload' %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true"
+       style="bottom: 110px; animation-delay: 0.2s;">
+        <span class="btn-icon"><i class="bi bi-plus-lg"></i></span>
+        <span class="btn-text">{% trans "Upload" %}</span>
+    </a>
+    {% endif %}
+
+    <script>
+    (function() {
+        const libraryBtn = document.getElementById('library-btn');
+        const uploadBtn = document.getElementById('upload-btn');
+
+        setTimeout(() => {
+            if (libraryBtn) libraryBtn.classList.remove('initial-animation');
+            if (uploadBtn) uploadBtn.classList.remove('initial-animation');
+        }, 5200);
+
+        if (!window._docFloatingScrollAttached) {
+            window._docFloatingScrollAttached = true;
+            let lastScrollTop = 0;
+            const scrollThreshold = 100;
+
+            window.addEventListener('scroll', function() {
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                const lib = document.getElementById('library-btn');
+                const upl = document.getElementById('upload-btn');
+
+                if (lib) {
+                    if (scrollTop > lastScrollTop && scrollTop > scrollThreshold) {
+                        lib.classList.add('hidden');
+                    } else if (scrollTop < lastScrollTop - 50) {
+                        lib.classList.remove('hidden');
+                    }
+                }
+
+                if (upl) {
+                    if (scrollTop > lastScrollTop && scrollTop > scrollThreshold) {
+                        upl.classList.add('hidden');
+                    } else if (scrollTop < lastScrollTop - 50) {
+                        upl.classList.remove('hidden');
+                    }
+                }
+
+                lastScrollTop = scrollTop;
+            });
+        }
+    })();
+    </script>
+</div>

@@ -27,6 +27,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebViewClient;
 import com.getcapacitor.WebViewListener;
 
 import android.os.Handler;
@@ -37,6 +38,7 @@ import java.util.Locale;
 
 public class MainActivity extends BridgeActivity {
     private boolean isNetworkAvailable = true;
+    private boolean isOfflinePageShowing = false;
     private static final String WEBVIEW_STATE_KEY = "WEBVIEW_STATE";
     private volatile boolean isPageReady = false;
     private static final long SPLASH_WATCHDOG_TIMEOUT_MS = 6000L;
@@ -246,11 +248,13 @@ public class MainActivity extends BridgeActivity {
                 new ConnectivityManager.NetworkCallback() {
                     @Override
                     public void onAvailable(Network network) {
+                        boolean wasOffline = !isNetworkAvailable;
                         isNetworkAvailable = true;
                         runOnUiThread(() -> {
-                            // Reload the page when network becomes available
-                            if (getBridge() != null && getBridge().getWebView() != null) {
-                                getBridge().getWebView().reload();
+                            // Only reload or navigate if we were previously offline or currently showing the offline page
+                            if ((wasOffline || isOfflinePageShowing) && getBridge() != null && getBridge().getWebView() != null) {
+                                isOfflinePageShowing = false;
+                                getBridge().getWebView().loadUrl("https://pwaninet.app");
                             }
                         });
                     }
@@ -271,10 +275,46 @@ public class MainActivity extends BridgeActivity {
 
     private void setupCustomWebViewClient() {
         if (getBridge() != null) {
+            getBridge().setWebViewClient(new BridgeWebViewClient(getBridge()) {
+                @Override
+                public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                    super.onReceivedError(view, request, error);
+                    // Only handle genuine network failures on top-level main frame navigation
+                    if (request != null && request.isForMainFrame()) {
+                        int errorCode = 0;
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            errorCode = error.getErrorCode();
+                        }
+                        if (errorCode == WebViewClient.ERROR_HOST_LOOKUP ||
+                            errorCode == WebViewClient.ERROR_CONNECT ||
+                            errorCode == WebViewClient.ERROR_TIMEOUT ||
+                            !isNetworkAvailable) {
+                            isPageReady = true;
+                            isOfflinePageShowing = true;
+                            loadOfflinePage(view);
+                        }
+                    }
+                }
+
+                @Override
+                public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                    super.onReceivedError(view, errorCode, description, failingUrl);
+                    if (errorCode == WebViewClient.ERROR_HOST_LOOKUP ||
+                        errorCode == WebViewClient.ERROR_CONNECT ||
+                        errorCode == WebViewClient.ERROR_TIMEOUT ||
+                        !isNetworkAvailable) {
+                        isPageReady = true;
+                        isOfflinePageShowing = true;
+                        loadOfflinePage(view);
+                    }
+                }
+            });
+
             getBridge().addWebViewListener(new WebViewListener() {
                 @Override
                 public void onPageLoaded(WebView webView) {
                     isPageReady = true;
+                    isOfflinePageShowing = false;
                     setupAndroidBridge();
                     injectSafeAreaInsets();
                     syncSystemBarThemeFromDom();
@@ -284,6 +324,7 @@ public class MainActivity extends BridgeActivity {
                 @Override
                 public void onPageCommitVisible(WebView view, String url) {
                     isPageReady = true;
+                    isOfflinePageShowing = false;
                     setupAndroidBridge();
                     injectSafeAreaInsets();
                     syncSystemBarThemeFromDom();
@@ -292,8 +333,9 @@ public class MainActivity extends BridgeActivity {
 
                 @Override
                 public void onReceivedError(WebView webView) {
+                    // Do NOT trigger loadOfflinePage here because WebViewListener
+                    // receives callbacks for all subresources (images, fonts, canceled requests).
                     isPageReady = true;
-                    loadOfflinePage(webView);
                 }
             });
         }
@@ -446,6 +488,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void loadOfflinePage(WebView webView) {
+        isOfflinePageShowing = true;
         try {
             // Load the offline.html file from assets
             InputStream inputStream = getAssets().open("public/offline.html");

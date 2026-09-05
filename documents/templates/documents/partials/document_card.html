@@ -1,6 +1,13 @@
 {% load static %}
 {% load humanize %}
-<a href="{% url 'documents:document_detail' document.id %}" class="doc-card-link" style="text-decoration: none;">
+<a href="{% url 'documents:document_detail' document.id %}"
+   hx-get="{% url 'documents:document_detail' document.id %}"
+   hx-target="#page-content-target"
+   hx-swap="innerHTML"
+   hx-push-url="true"
+   hx-history="true"
+   class="doc-card-link"
+   style="text-decoration: none;">
 <div class="doc-card" 
      style="background: var(--card-bg); 
             border: 1px solid var(--border); 

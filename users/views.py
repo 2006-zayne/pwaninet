@@ -449,12 +449,18 @@ def mark_shared_viewed(request, username):
 
 @login_required
 def update_profile_view(request):
+    is_htmx = bool(request.headers.get('HX-Request'))
     if request.method == 'POST':
         form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
             try:
                 form.save()
                 messages.success(request, 'Profile updated successfully.')
+                if is_htmx:
+                    from django.urls import reverse
+                    response = HttpResponse(status=204)
+                    response['HX-Redirect'] = reverse('users:profile', kwargs={'username': request.user.username})
+                    return response
                 return redirect('users:profile', username=request.user.username)
             except Exception as e:
                 messages.error(request, f'Error saving profile: {str(e)}')
@@ -469,7 +475,9 @@ def update_profile_view(request):
                     messages.error(request, f'{field}: {error}')
     else:
         form = ProfileUpdateForm(instance=request.user)
-    return render(request, 'users/update_profile.html', {'form': form})
+
+    template = 'users/partials/update_profile_navigation_partial.html' if is_htmx else 'users/update_profile.html'
+    return render(request, template, {'form': form})
 
 
 @login_required
@@ -591,12 +599,18 @@ def settings_view(request):
 @login_required
 def settings_profile_view(request):
     """Profile settings page"""
+    is_htmx = bool(request.headers.get('HX-Request'))
     if request.method == 'POST':
         form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
             try:
                 form.save()
                 messages.success(request, 'Profile updated successfully.')
+                if is_htmx:
+                    from django.urls import reverse
+                    response = HttpResponse(status=204)
+                    response['HX-Redirect'] = reverse('users:settings_profile')
+                    return response
                 return redirect('users:settings_profile')
             except Exception as e:
                 messages.error(request, f'Error saving profile: {str(e)}')
@@ -609,6 +623,12 @@ def settings_profile_view(request):
                     messages.error(request, f'{field}: {error}')
     else:
         form = ProfileUpdateForm(instance=request.user)
+
+    if is_htmx:
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/profile_content.html',
+            'form': form,
+        })
     return render(request, 'users/settings/profile.html', {'form': form})
 
 
@@ -636,6 +656,10 @@ def settings_privacy_view(request):
 @login_required
 def settings_storage_view(request):
     """Storage settings page"""
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/storage_content.html'
+        })
     return render(request, 'users/settings/storage.html')
 
 
@@ -1240,16 +1264,31 @@ def get_device_accounts_view(request):
     import logging
     logger = logging.getLogger(__name__)
     
-    # Try to get device ID from headers first (HTMX requests)
+    # Try to get device ID from headers first, then query parameters
     device_id = request.headers.get('X-Device-ID')
-    logger.info(f'[Device Accounts] Request from user {request.user.username}, device_id header: {device_id[:8] if device_id else "None"}...')
+    if not device_id:
+        device_id = request.GET.get('device_id')
+    logger.info(f'[Device Accounts] Request from user {request.user.username}, device_id: {device_id[:8] if device_id else "None"}...')
 
     if not device_id:
-        logger.warning('[Device Accounts] No device ID in request headers')
+        logger.warning('[Device Accounts] No device ID in request headers or query parameters')
         return JsonResponse({'accounts': [], 'error': 'Device not identified'})
 
     hashed_device_id = hash_device_id(device_id)
     logger.info(f'[Device Accounts] Hashed device ID: {hashed_device_id[:16]}...')
+
+    # Ensure the current logged-in user is associated with this device
+    try:
+        current_da, created = DeviceAccount.objects.get_or_create(
+            user=request.user,
+            device_id=hashed_device_id,
+            defaults={'session_key': request.session.session_key}
+        )
+        if not created and not current_da.session_key and request.session.session_key:
+            current_da.session_key = request.session.session_key
+            current_da.save(update_fields=['session_key', 'last_used'])
+    except Exception as e:
+        logger.warning(f'[Device Accounts] Could not link current user: {e}')
 
     device_accounts = DeviceAccount.objects.filter(
         device_id=hashed_device_id
@@ -1260,12 +1299,13 @@ def get_device_accounts_view(request):
     accounts_data = []
     for da in device_accounts:
         try:
+            pic_url = da.user.profile_pic.url if (da.user.profile_pic and hasattr(da.user.profile_pic, 'url')) else '/static/images/default_pic1.jpg'
             accounts_data.append({
                 'id': da.user.id,
                 'username': da.user.username,
-                'full_name': str(da.user),
-                'profile_pic': da.user.profile_pic.url if da.user.profile_pic else None,
-                'last_used': da.last_used.isoformat(),
+                'full_name': da.user.get_full_name() or str(da.user),
+                'profile_pic': pic_url,
+                'last_used': da.last_used.isoformat() if da.last_used else None,
                 'is_current': da.user.id == request.user.id
             })
         except Exception as e:
@@ -1273,6 +1313,7 @@ def get_device_accounts_view(request):
 
     logger.info(f'[Device Accounts] Returning {len(accounts_data)} accounts')
     return JsonResponse({'accounts': accounts_data})
+
 
 
 @login_required
@@ -1355,7 +1396,7 @@ def view_profile_photo_fullscreen(request, username, photo_type):
         photo_type=photo_type
     ).exists()
 
-    return render(request, 'users/profile_photo_fullscreen.html', {
+    context = {
         'profile_user': profile_user,
         'photo_url': photo_url,
         'photo_type': photo_type,
@@ -1363,7 +1404,11 @@ def view_profile_photo_fullscreen(request, username, photo_type):
         'is_own_profile': is_own_profile,
         'like_count': like_count,
         'is_liked': is_liked,
-    })
+    }
+
+    if request.headers.get('HX-Request'):
+        return render(request, 'users/partials/profile_photo_fullscreen_navigation_partial.html', context)
+    return render(request, 'users/profile_photo_fullscreen.html', context)
 
 
 @login_required

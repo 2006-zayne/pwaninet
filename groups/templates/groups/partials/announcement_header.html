@@ -1,7 +1,12 @@
 {% load static %}
 <div class="p-3 border-bottom d-flex align-items-start">
     <div class="position-relative me-3">
-        <a href="{% url 'users:profile' announcement.author.username %}">
+        <a href="{% url 'users:profile' announcement.author.username %}"
+           hx-get="{% url 'users:profile' announcement.author.username %}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-history="true">
             <img src="{{ announcement.author.profile_pic.url|default:'' }}" 
                  onerror="this.src='{% static 'images/default_user.jpg' %}'"
                  alt="{{ announcement.author.get_full_name|default:announcement.author.username }}" 
@@ -13,7 +18,12 @@
     <div class="flex-grow-1">
         <div class="d-flex justify-content-between align-items-start">
             <div>
-                <a href="{% url 'users:profile' announcement.author.username %}" 
+                <a href="{% url 'users:profile' announcement.author.username %}"
+                   hx-get="{% url 'users:profile' announcement.author.username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
                    class="text-decoration-none">
                     <span class="fw-bold small text-dark">
                         {{ announcement.author.get_full_name|default:announcement.author.username }}

@@ -39,19 +39,40 @@
 {% for operative in likers %}
         <div class="people-user-row d-flex align-items-center justify-content-between">
             <div class="d-flex align-items-center gap-3">
-                <a href="{% url 'users:profile' operative.username %}">
+                <a href="{% url 'users:profile' operative.username %}"
+                   hx-get="{% url 'users:profile' operative.username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
+                   data-bs-dismiss="modal">
                     <img src="{{ operative.profile_pic.url }}" 
                          class="rounded-circle border border-2 border-light shadow-sm people-user-avatar" 
                          style="width: 48px; height: 48px; object-fit: cover;">
                 </a>
                 <div>
-                    <h6 class="mb-0 fw-bold people-user-name">
-                        {{ operative.get_full_name|default:operative.username }}
-                    </h6>
+                    <a href="{% url 'users:profile' operative.username %}"
+                       hx-get="{% url 'users:profile' operative.username %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true"
+                       data-bs-dismiss="modal"
+                       class="text-decoration-none">
+                        <h6 class="mb-0 fw-bold people-user-name">
+                            {{ operative.get_full_name|default:operative.username }}
+                        </h6>
+                    </a>
                     <small class="people-user-meta">@{{ operative.username }}</small>
                 </div>
             </div>
             <a href="{% url 'users:profile' operative.username %}" 
+               hx-get="{% url 'users:profile' operative.username %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
+               data-bs-dismiss="modal"
                class="btn btn-outline-primary btn-sm rounded-pill px-3 py-1 fw-bold" 
                style="font-size: 0.8rem;">
                 View Profile

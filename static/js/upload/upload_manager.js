@@ -195,9 +195,16 @@ class UploadManager {
 
             tracker.completeUpload();
 
+            // Determine whether this post has a video file so we know
+            // whether to wait for live HLS transcoding progress.
+            const postId   = response?.id ?? null;
+            const hasVideo = session.files?.some(
+                (f) => f.type?.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi)$/i.test(f.name ?? '')
+            ) ?? false;
+
             this.transitionState(uploadId, UploadState.SERVER_PROCESSING);
             tracker.updateServerProcessingProgress(1, 3, 'Processing media...');
-            await this.simulateServerProcessing(uploadId);
+            await this.waitForServerProcessing(uploadId, postId, hasVideo);
             tracker.completeServerProcessing();
 
             this.transitionState(uploadId, UploadState.PUBLISHED);
@@ -233,15 +240,82 @@ class UploadManager {
         });
     }
 
-    async simulateServerProcessing(uploadId) {
+    /**
+     * Wait for the server to finish processing a post.
+     *
+     * For video posts we listen to the feed WebSocket for ``video_progress``
+     * messages emitted by the Celery HLS transcoding task.  For image / text
+     * posts (or when no WebSocket is available) we fall back to a fast
+     * two-step synthetic update so the banner disappears promptly.
+     *
+     * @param {string} uploadId
+     * @param {number|string|null} postId   – returned by the API (null for non-video)
+     * @param {boolean} hasVideo
+     * @returns {Promise<void>}
+     */
+    async waitForServerProcessing(uploadId, postId, hasVideo) {
         const tracker = progressManager.getTracker(uploadId);
+        if (!tracker) return;
 
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        tracker.updateServerProcessingProgress(2, 3, 'Saving to database...');
+        // ----------------------------------------------------------------
+        // Non-video posts: quick synthetic update, done immediately.
+        // ----------------------------------------------------------------
+        if (!hasVideo || !postId) {
+            tracker.updateServerProcessingProgress(1, 2, 'Saving to database…');
+            await new Promise((r) => setTimeout(r, 400));
+            tracker.updateServerProcessingProgress(2, 2, 'Published!');
+            return;
+        }
 
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        tracker.updateServerProcessingProgress(3, 3, 'Finalizing...');
+        // ----------------------------------------------------------------
+        // Video posts: subscribe to live Celery progress via feed WS.
+        // ----------------------------------------------------------------
+        const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes hard cap
+
+        return new Promise((resolve) => {
+            let resolved = false;
+            const finish = () => {
+                if (resolved) return;
+                resolved = true;
+                window.removeEventListener('feedVideoProgress', onProgress);
+                resolve();
+            };
+
+            const timeoutHandle = setTimeout(() => {
+                tracker.updateServerProcessingProgress(3, 3, 'Processing…');
+                finish();
+            }, TIMEOUT_MS);
+
+            const onProgress = (evt) => {
+                const { post_id, status, progress, message } = evt.detail;
+                // Only handle messages for this specific post
+                if (String(post_id) !== String(postId)) return;
+
+                tracker.updateServerProcessingProgress(
+                    Math.max(1, Math.round(progress / 100 * 3)),
+                    3,
+                    message || 'Processing video…'
+                );
+
+                if (status === 'ready' || status === 'failed') {
+                    clearTimeout(timeoutHandle);
+                    finish();
+                }
+            };
+
+            // feedVideoProgress is dispatched by base.html's feed WS handler
+            window.addEventListener('feedVideoProgress', onProgress);
+
+            // Seed the UI immediately so the banner doesn't sit blank
+            tracker.updateServerProcessingProgress(1, 3, 'Video received — starting transcoding…');
+        });
     }
+
+    /** @deprecated  Replaced by waitForServerProcessing — kept for safety. */
+    async simulateServerProcessing(uploadId) {
+        await this.waitForServerProcessing(uploadId, null, false);
+    }
+
 
     cancelUpload(uploadId) {
         const session = this.uploads.get(uploadId);

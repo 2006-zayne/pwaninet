@@ -295,10 +295,20 @@
     <!-- Repost Header -->
     <div class="d-flex align-items-center p-2 border-bottom bg-light">
         <div class="position-relative me-3" style="width: 120px; height: 72px;">
-            <a href="{% url 'users:profile' post.author.username %}">
+            <a href="{% url 'users:profile' post.author.username %}"
+               hx-get="{% url 'users:profile' post.author.username %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true">
                 <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm position-absolute" style="width: 72px; height: 72px; object-fit: cover; left: 0; top: 0;">
             </a>
-            <a href="{% url 'users:profile' post.repost_of.author.username %}">
+            <a href="{% url 'users:profile' post.repost_of.author.username %}"
+               hx-get="{% url 'users:profile' post.repost_of.author.username %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true">
                 <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm position-absolute" style="width: 72px; height: 72px; object-fit: cover; left: 48px; top: 0;">
             </a>
         </div>
@@ -319,25 +329,50 @@
     <div class="d-flex align-items-center p-3">
         <div class="position-relative me-3" style="width: 72px; height: 72px;">
             {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
-                <a href="{% url 'groups:groups_detail' post.group.id %}">
+                <a href="{% url 'groups:groups_detail' post.group.id %}"
+                   hx-get="{% url 'groups:groups_detail' post.group.id %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
                     <img src="{{ post.group.get_photo_url }}" class="rounded-circle border border-2 border-white shadow-sm" style="width: 72px; height: 72px; object-fit: cover;">
                 </a>
                 {% if post.repost_of %}
-                    <a href="{% url 'users:profile' post.repost_of.author.username %}">
+                    <a href="{% url 'users:profile' post.repost_of.author.username %}"
+                       hx-get="{% url 'users:profile' post.repost_of.author.username %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true">
                         <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 36px; height: 36px; object-fit: cover; transform: translate(15%, 15%);">
                     </a>
                 {% else %}
-                    <a href="{% url 'users:profile' post.author.username %}">
+                    <a href="{% url 'users:profile' post.author.username %}"
+                       hx-get="{% url 'users:profile' post.author.username %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true">
                         <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 36px; height: 36px; object-fit: cover; transform: translate(15%, 15%);">
                     </a>
                 {% endif %}
             {% else %}
                 {% if post.repost_of %}
-                    <a href="{% url 'users:profile' post.repost_of.author.username %}">
+                    <a href="{% url 'users:profile' post.repost_of.author.username %}"
+                       hx-get="{% url 'users:profile' post.repost_of.author.username %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true">
                         <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 72px; height: 72px; object-fit: cover;">
                     </a>
                 {% else %}
-                    <a href="{% url 'users:profile' post.author.username %}">
+                    <a href="{% url 'users:profile' post.author.username %}"
+                       hx-get="{% url 'users:profile' post.author.username %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true">
                         <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 72px; height: 72px; object-fit: cover;">
                     </a>
                 {% endif %}
@@ -347,18 +382,36 @@
         <div class="flex-grow-1">
             <h6 class="mb-0 fw-bold small">
                 {% if post.repost_of %}
-                    <a href="{% url 'users:profile' post.repost_of.author.username %}" class="text-dark text-decoration-none">
+                    <a href="{% url 'users:profile' post.repost_of.author.username %}"
+                       hx-get="{% url 'users:profile' post.repost_of.author.username %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true"
+                       class="text-dark text-decoration-none">
                         {{ post.repost_of.author.get_full_name|default:post.repost_of.author.username }}
                     </a>
                 {% else %}
-                    <a href="{% url 'users:profile' post.author.username %}" class="text-dark text-decoration-none">
+                    <a href="{% url 'users:profile' post.author.username %}"
+                       hx-get="{% url 'users:profile' post.author.username %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true"
+                       class="text-dark text-decoration-none">
                         {{ post.author.get_full_name|default:post.author.username }}
                     </a>
                 {% endif %}
                 {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
                     {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
                         <span class="text-muted fw-normal mx-1">posted in</span>
-                        <a href="{% url 'groups:groups_detail' post.group.id %}" class="text-primary text-decoration-none">{{ post.group.name }}</a>
+                        <a href="{% url 'groups:groups_detail' post.group.id %}"
+                           hx-get="{% url 'groups:groups_detail' post.group.id %}"
+                           hx-target="#page-content-target"
+                           hx-swap="innerHTML"
+                           hx-push-url="true"
+                           hx-history="true"
+                           class="text-primary text-decoration-none">{{ post.group.name }}</a>
                     {% endif %}
                 {% endif %}
             </h6>
@@ -485,7 +538,12 @@
     {% endif %}
 
     {% if post.images.exists %}
-    <a href="{% url 'posts:post_details' post.id %}">
+    <a href="{% url 'posts:post_details' post.id %}"
+       hx-get="{% url 'posts:post_details' post.id %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true">
         <div class="post-media border-top border-bottom bg-light" data-post-id="{{ post.id }}" data-media-type="image">
             <button class="media-download-btn" data-post-id="{{ post.id }}" data-media-type="image" data-url="{{ post.images.first.image.url }}" title="Download">
                 <i class="bi bi-download"></i>
@@ -505,7 +563,12 @@
         </div>
     </a>
     {% elif post.get_intel_file and not post.shared_document %}
-    <a href="{% url 'posts:post_details' post.id %}">
+    <a href="{% url 'posts:post_details' post.id %}"
+       hx-get="{% url 'posts:post_details' post.id %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true">
         <div class="post-media border-top border-bottom bg-light">
             {% with f_url=post.get_intel_file.url|lower %}
                 {% if ".jpg" in f_url or ".png" in f_url or ".jpeg" in f_url or ".webp" in f_url %}
@@ -525,10 +588,29 @@
                                data-post-id="{{ post.id }}"
                                data-autoplay="true"
                                poster="{{ post.get_video_poster|default:'' }}"
+                               {# HLS adaptive streaming — hls.js picks up data-hls-url when present #}
+                               {% if post.hls_playlist %}
+                               data-hls-url="{{ post.get_hls_url }}"
+                               {% endif %}
                                data-video-url="{{ post.get_video_for_feed.url }}">
+                            {# Fallback source for browsers without hls.js and for non-HLS posts #}
                             <source src="{{ post.get_video_for_feed.url }}" type="video/mp4">
                         </video>
+                        {% if post.video and post.video_status != 'ready' %}
+                        <div class="position-absolute bottom-0 start-0 m-2">
+                            <span class="badge bg-dark bg-opacity-75 text-white small">
+                                {% if post.video_status == 'transcoding' %}
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>HD processing…
+                                {% elif post.video_status == 'failed' %}
+                                <i class="bi bi-exclamation-triangle me-1"></i>Processing failed
+                                {% else %}
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Preparing…
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% endif %}
                     </div>
+
                 {% elif ".mp3" in f_url or ".wav" in f_url or ".ogg" in f_url or ".m4a" in f_url %}
                     <button class="media-download-btn" data-post-id="{{ post.id }}" data-media-type="audio" data-url="{{ post.get_intel_file.url }}" title="Download">
                         <i class="bi bi-download"></i>
@@ -573,7 +655,13 @@
     {% endif %}
 
     {% if post.shared_document %}
-    <a href="{% url 'documents:document_detail' post.shared_document.id %}" class="text-decoration-none">
+    <a href="{% url 'documents:document_detail' post.shared_document.id %}"
+       hx-get="{% url 'documents:document_detail' post.shared_document.id %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true"
+       class="text-decoration-none">
         <div class="post-media border-top border-bottom bg-light position-relative" style="padding: 0;">
             {% include "documents/partials/document_preview_full.html" with document=post.shared_document %}
         </div>
@@ -585,7 +673,13 @@
             <div id="like-section-{{ post.id }}">
                 {% include "posts/partials/like_button.html" with post=post %}
             </div>
-            <a href="{% url 'posts:post_details' post.id %}" class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button">
+            <a href="{% url 'posts:post_details' post.id %}"
+               hx-get="{% url 'posts:post_details' post.id %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
+               class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button">
                 <i class="bi bi-chat-dots fs-5"></i>
                 <span class="fw-bold">{{ post.comments.count }}</span>
             </a>
@@ -915,12 +1009,11 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <script>
-// Video controls are now handled by video-manager.js
-// Mute toggle and video interactions are managed centrally
+(function() {
+    // Enhanced post card interactions
+    const postCard = document.getElementById('post-card-{{ post.id }}');
+    if (!postCard) return;
 
-// Enhanced post card interactions
-const postCard = document.getElementById('post-card-{{ post.id }}');
-if (postCard) {
     // Touch feedback for mobile
     postCard.addEventListener('touchstart', function() {
         this.style.transform = 'translateY(-1px)';
@@ -933,116 +1026,46 @@ if (postCard) {
     // Enhanced button interactions
     const buttons = postCard.querySelectorAll('.btn');
     buttons.forEach(button => {
-            button.addEventListener('click', function() {
-                // Add loading state for async actions
-                if (this.classList.contains('start-conversation') || 
-                    this.id === 'repost-btn-{{ post.id }}' ||
-                    this.closest('[data-bs-toggle="modal"]')) {
-                    return; // Skip these as they have their own handling
-                }
-
-                // Add click feedback
-                this.style.transform = 'scale(0.95)';
-                setTimeout(() => {
-                    this.style.transform = '';
-                }, 100);
-            });
-        });
-
-        // Enhanced comment input interactions
-        const commentInput = postCard.querySelector('input[name="content"]');
-        if (commentInput) {
-            commentInput.addEventListener('focus', function() {
-                this.parentElement.style.transform = 'translateY(-1px)';
-            });
-            
-            commentInput.addEventListener('blur', function() {
-                this.parentElement.style.transform = '';
-            });
-        }
-
-        // Media hover effects
-        const mediaElements = postCard.querySelectorAll('.post-media');
-        mediaElements.forEach(media => {
-            media.addEventListener('mouseenter', function() {
-                this.style.transform = 'scale(1.02)';
-            });
-
-            media.addEventListener('mouseleave', function() {
-                this.style.transform = '';
-            });
-        });
-
-        // Post content truncation with See more/See less
-        const contentWrapper = postCard.querySelector('.post-content-wrapper');
-        if (contentWrapper) {
-            const postId = contentWrapper.dataset.postId;
-            const fullContent = contentWrapper.querySelector('.post-content-full');
-            const truncatedContent = contentWrapper.querySelector('.post-content-truncated');
-            const seeMoreBtn = contentWrapper.querySelector('.see-more-btn');
-
-            if (fullContent && truncatedContent && seeMoreBtn) {
-                const contentText = fullContent.textContent;
-                const maxLength = 150;
-
-                // Check if content needs truncation
-                if (contentText.length > maxLength) {
-                    // Set truncated text
-                    truncatedContent.textContent = contentText.substring(0, maxLength) + '...';
-                    truncatedContent.style.display = 'inline';
-                    fullContent.style.display = 'none';
-                    seeMoreBtn.style.display = 'inline-block';
-
-                    // Check sessionStorage for expanded state
-                    const storageKey = `post-expanded-${postId}`;
-                    const isExpanded = sessionStorage.getItem(storageKey) === 'true';
-
-                    if (isExpanded) {
-                        fullContent.style.display = 'inline';
-                        truncatedContent.style.display = 'none';
-                        seeMoreBtn.textContent = 'See less';
-                    } else {
-                        fullContent.style.display = 'none';
-                        truncatedContent.style.display = 'inline';
-                        seeMoreBtn.textContent = 'See more';
-                    }
-
-                    // Toggle functionality
-                    seeMoreBtn.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-
-                        const isCurrentlyExpanded = fullContent.style.display !== 'none';
-
-                        if (isCurrentlyExpanded) {
-                            // Collapse
-                            fullContent.style.display = 'none';
-                            truncatedContent.style.display = 'inline';
-                            seeMoreBtn.textContent = 'See more';
-                            sessionStorage.setItem(storageKey, 'false');
-                        } else {
-                            // Expand
-                            fullContent.style.display = 'inline';
-                            truncatedContent.style.display = 'none';
-                            seeMoreBtn.textContent = 'See less';
-                            sessionStorage.setItem(storageKey, 'true');
-                        }
-                    });
-                } else {
-                    // Content doesn't need truncation, hide button
-                    seeMoreBtn.style.display = 'none';
-                    truncatedContent.style.display = 'none';
-                    fullContent.style.display = 'inline';
-                }
+        button.addEventListener('click', function() {
+            if (this.classList.contains('start-conversation') || 
+                this.id === 'repost-btn-{{ post.id }}' ||
+                this.closest('[data-bs-toggle="modal"]')) {
+                return;
             }
-        }
-    }
-});
 
-// Download media functionality
-document.addEventListener('DOMContentLoaded', function() {
-    const downloadButtons = document.querySelectorAll('.media-download-btn');
-    
+            this.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                this.style.transform = '';
+            }, 100);
+        });
+    });
+
+    // Enhanced comment input interactions
+    const commentInput = postCard.querySelector('input[name="content"]');
+    if (commentInput) {
+        commentInput.addEventListener('focus', function() {
+            this.parentElement.style.transform = 'translateY(-1px)';
+        });
+        
+        commentInput.addEventListener('blur', function() {
+            this.parentElement.style.transform = '';
+        });
+    }
+
+    // Media hover effects
+    const mediaElements = postCard.querySelectorAll('.post-media');
+    mediaElements.forEach(media => {
+        media.addEventListener('mouseenter', function() {
+            this.style.transform = 'scale(1.02)';
+        });
+
+        media.addEventListener('mouseleave', function() {
+            this.style.transform = '';
+        });
+    });
+
+    // Download media functionality
+    const downloadButtons = postCard.querySelectorAll('.media-download-btn');
     downloadButtons.forEach(button => {
         button.addEventListener('click', async function(e) {
             e.preventDefault();
@@ -1057,10 +1080,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Determine filename from URL
             const filename = mediaUrl.split('/').pop();
-            
-            // Determine category based on media type
             let category = 'document';
             if (mediaType === 'image') {
                 category = 'image';
@@ -1070,10 +1090,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 category = 'audio';
             }
             
-            // Try to use downloadsManager if available
             if (window.downloadsManager) {
                 try {
-                    const downloadId = await window.downloadsManager.download({
+                    await window.downloadsManager.download({
                         url: mediaUrl,
                         type: category,
                         filename: filename,
@@ -1082,11 +1101,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('Downloaded successfully');
                 } catch (error) {
                     console.error('Download failed:', error);
-                    // Fallback to direct download
                     directDownload(mediaUrl, filename);
                 }
             } else {
-                // Fallback to direct download
                 directDownload(mediaUrl, filename);
             }
         });
@@ -1100,7 +1117,7 @@ document.addEventListener('DOMContentLoaded', function() {
         a.click();
         document.body.removeChild(a);
     }
-});
+})();
 </script>
 
 <!-- Report Modal -->

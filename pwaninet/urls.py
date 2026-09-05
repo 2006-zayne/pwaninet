@@ -61,8 +61,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # This maps 'accounts/login/' and 'accounts/logout/' automatically
     path('accounts/', include('django.contrib.auth.urls')),
-    # PWA Offline Page
+    # PWA Offline Page (handles both /offline/ and /offline.html)
     path('offline/', TemplateView.as_view(template_name='offline.html'), name='offline'),
+    path('offline.html', TemplateView.as_view(template_name='offline.html'), name='offline_html'),
     path('test/offline/', TemplateView.as_view(template_name='offline.html'), name='offline_test'),
     # PWA Manifest and Service Worker - served without auth middleware
     path('manifest.webmanifest', serve_manifest, name='manifest'),

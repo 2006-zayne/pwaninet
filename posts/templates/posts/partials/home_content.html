@@ -8,15 +8,29 @@
            hx-get="{% url 'groups:groups_dashboard' %}"
            hx-target="#page-content-target"
            hx-swap="innerHTML"
-           hx-push-url="true">View All</a>
+           hx-push-url="true"
+           hx-history="true">View All</a>
     </div>
     <div class="groups-explore-list">
         {% for group in explore_groups %}
         <div class="group-explore-item">
-            <a href="{% url 'groups:groups_detail' group.id %}">
+            <a href="{% url 'groups:groups_detail' group.id %}"
+               hx-get="{% url 'groups:groups_detail' group.id %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true">
                 <img src="{{ group.get_photo_url }}" alt="{{ group.name }}" class="group-explore-avatar">
             </a>
-            <span class="group-explore-name">{{ group.name|truncatewords:2 }}</span>
+            <a href="{% url 'groups:groups_detail' group.id %}"
+               hx-get="{% url 'groups:groups_detail' group.id %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
+               class="group-explore-name text-decoration-none">
+                {{ group.name|truncatewords:2 }}
+            </a>
         </div>
         {% endfor %}
     </div>

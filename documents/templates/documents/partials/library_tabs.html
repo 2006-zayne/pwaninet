@@ -1,0 +1,69 @@
+<div class="doc-library-tabs" 
+     style="display: flex; gap: 8px; margin-bottom: 32px; overflow-x: auto; 
+            padding: 8px 4px;">
+    
+    <a href="{% url 'documents:my_library' %}" 
+       hx-get="{% url 'documents:my_library' %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true"
+       class="doc-library-tab {% if active_tab == 'overview' %}active{% endif %}"
+       style="flex-shrink: 0; padding: 12px 24px; border-radius: 12px; 
+              {% if active_tab == 'overview' %}background: var(--primary); color: white;{% else %}background: var(--card-bg); color: var(--text-secondary); border: 1px solid var(--border);{% endif %} text-decoration: none; 
+              font-weight: 600; font-size: 0.95rem; transition: all 0.2s ease;">
+        Overview
+    </a>
+    
+    <a href="{% url 'documents:my_uploads' %}" 
+       hx-get="{% url 'documents:my_uploads' %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true"
+       class="doc-library-tab {% if active_tab == 'uploads' %}active{% endif %}"
+       style="flex-shrink: 0; padding: 12px 24px; border-radius: 12px; 
+              {% if active_tab == 'uploads' %}background: var(--primary); color: white;{% else %}background: var(--card-bg); color: var(--text-secondary); border: 1px solid var(--border);{% endif %} text-decoration: none; 
+              font-weight: 600; font-size: 0.95rem; transition: all 0.2s ease;">
+        My Uploads{% if upload_count is not None %} ({{ upload_count }}){% endif %}
+    </a>
+    
+    <a href="{% url 'documents:my_bookmarks' %}" 
+       hx-get="{% url 'documents:my_bookmarks' %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true"
+       class="doc-library-tab {% if active_tab == 'bookmarks' %}active{% endif %}"
+       style="flex-shrink: 0; padding: 12px 24px; border-radius: 12px; 
+              {% if active_tab == 'bookmarks' %}background: var(--primary); color: white;{% else %}background: var(--card-bg); color: var(--text-secondary); border: 1px solid var(--border);{% endif %} text-decoration: none; 
+              font-weight: 600; font-size: 0.95rem; transition: all 0.2s ease;">
+        Bookmarks{% if bookmark_count is not None %} ({{ bookmark_count }}){% endif %}
+    </a>
+    
+    <a href="{% url 'documents:my_downloads' %}" 
+       hx-get="{% url 'documents:my_downloads' %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true"
+       class="doc-library-tab {% if active_tab == 'downloads' %}active{% endif %}"
+       style="flex-shrink: 0; padding: 12px 24px; border-radius: 12px; 
+              {% if active_tab == 'downloads' %}background: var(--primary); color: white;{% else %}background: var(--card-bg); color: var(--text-secondary); border: 1px solid var(--border);{% endif %} text-decoration: none; 
+              font-weight: 600; font-size: 0.95rem; transition: all 0.2s ease;">
+        Downloads{% if download_count is not None %} ({{ download_count }}){% endif %}
+    </a>
+    
+    <a href="{% url 'documents:my_history' %}" 
+       hx-get="{% url 'documents:my_history' %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true"
+       class="doc-library-tab {% if active_tab == 'history' %}active{% endif %}"
+       style="flex-shrink: 0; padding: 12px 24px; border-radius: 12px; 
+              {% if active_tab == 'history' %}background: var(--primary); color: white;{% else %}background: var(--card-bg); color: var(--text-secondary); border: 1px solid var(--border);{% endif %} text-decoration: none; 
+              font-weight: 600; font-size: 0.95rem; transition: all 0.2s ease;">
+        History{% if view_count is not None %} ({{ view_count }}){% endif %}
+    </a>
+</div>

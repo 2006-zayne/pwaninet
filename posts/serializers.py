@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import Post, PostImage, Like, Comment, CommentLike, Report, Repost, HiddenPost, AuthorPreference, SharedPost
 from django.contrib.auth import get_user_model
-from .tasks import generate_post_thumbnail, generate_video_poster
+from .tasks import generate_post_thumbnail, generate_video_poster, process_large_video
 import logging
 
 logger = logging.getLogger(__name__)
@@ -465,10 +465,16 @@ class PostCreateSerializer(serializers.ModelSerializer):
             logger.info('[PostCreateSerializer] Triggering thumbnail generation for post %s', post.id)
             generate_post_thumbnail.delay(post.id)
         
-        # Trigger video poster generation for video posts
-        if post.video and not post.video_poster:
-            logger.info('[PostCreateSerializer] Triggering video poster generation for post %s', post.id)
+        # Trigger HLS transcoding + poster generation for video posts.
+        # process_large_video handles: ffprobe → 360p/480p/720p renditions →
+        # master.m3u8 → video_status/hls_playlist/video_duration update →
+        # real-time progress events over Channels (feed_{user_id} group).
+        if post.video:
+            logger.info('[PostCreateSerializer] Triggering HLS transcoding for post %s', post.id)
+            process_large_video.delay(post.id)
+            # Also generate a quick poster from first frame while HLS encodes
             generate_video_poster.delay(post.id)
+
                 
         return post
 

@@ -265,6 +265,37 @@ class FeedConsumer(AsyncWebsocketConsumer):
             'comment_count': event['comment_count']
         }))
 
+    async def video_progress(self, event):
+        """
+        Relay HLS transcoding progress from the Celery task to the browser.
+
+        The ``process_large_video`` Celery task sends events to the
+        ``feed_{user_id}`` channel group with this type.  The frontend
+        upload banner subscribes to the feed WebSocket and listens for
+        ``type === 'video_progress'`` messages to update its progress bar.
+
+        Payload forwarded to the client::
+
+            {
+                "type": "video_progress",
+                "post_id": 123,
+                "status": "transcoding" | "ready" | "failed",
+                "progress": 0-100,
+                "message": "Encoding 480p…",
+                "hls_url": "/media/posts/videos/123/hls/master.m3u8"  // only when ready
+            }
+        """
+        await self.send(text_data=json.dumps({
+            'type':     'video_progress',
+            'post_id':  event.get('post_id'),
+            'status':   event.get('status'),
+            'progress': event.get('progress', 0),
+            'message':  event.get('message', ''),
+            'hls_url':  event.get('hls_url', ''),
+        }))
+
+
+
 
 class CommentConsumer(AsyncWebsocketConsumer):
     """Consumer for real-time comment updates on posts."""

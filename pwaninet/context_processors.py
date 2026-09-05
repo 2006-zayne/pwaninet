@@ -24,7 +24,10 @@ def release_metadata(request):
         app_mandatory_update: Whether this is a mandatory update
     """
     # Try to get current release from ReleaseService
-    current_release = ReleaseService.get_current_release()
+    try:
+        current_release = ReleaseService.get_current_release()
+    except Exception:
+        current_release = None
     
     if current_release:
         # Use Release model as source of truth

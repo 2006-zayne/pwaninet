@@ -1,7 +1,13 @@
 {% load i18n %}
 
 <div class="page-header">
-  <a href="{% url 'users:settings_storage' %}" class="back-link">
+  <a href="{% url 'users:settings_storage' %}"
+     hx-get="{% url 'users:settings_storage' %}"
+     hx-target="#page-content-target"
+     hx-swap="innerHTML"
+     hx-push-url="true"
+     hx-history="true"
+     class="back-link">
     <i class="bi bi-arrow-left"></i> {% trans "Back to Storage" %}
   </a>
   <h1 class="page-title">{% trans "Downloads" %}</h1>

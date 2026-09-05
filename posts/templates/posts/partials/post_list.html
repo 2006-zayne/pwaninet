@@ -6,7 +6,13 @@
         <div class="text-center py-5">
             <i class="bi bi-broadcast text-muted fs-1"></i>
             <p class="text-muted mt-2">No posts yet. Be the first one to post.</p>
-            <a href="{% url 'posts:create_post' %}" class="btn btn-primary rounded-pill px-4">Create a post</a>
+            <a href="{% url 'posts:create_post' %}"
+               hx-get="{% url 'posts:create_post' %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
+               class="btn btn-primary rounded-pill px-4">Create a post</a>
         </div>
     {% endif %}
 {% endfor %}

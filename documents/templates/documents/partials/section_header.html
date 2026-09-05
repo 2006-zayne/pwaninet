@@ -8,6 +8,11 @@
     
     {% if show_view_all|default:False %}
     <a href="{{ view_all_url|default:'#' }}" 
+       hx-get="{{ view_all_url|default:'#' }}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true"
        class="doc-view-all"
        style="color: var(--primary); text-decoration: none; 
               font-weight: 600; font-size: 0.9rem; display: flex; 

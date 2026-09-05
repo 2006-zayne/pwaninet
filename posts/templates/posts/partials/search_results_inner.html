@@ -48,11 +48,23 @@
     <div class="bg-white rounded-4 shadow-sm mb-4 overflow-hidden">
         {% for group in groups %}
         <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
-            <a href="{% url 'groups:groups_detail' group.id %}" class="d-flex align-items-center gap-3 text-decoration-none text-dark">
+            <a href="{% url 'groups:groups_detail' group.id %}"
+               hx-get="{% url 'groups:groups_detail' group.id %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
+               class="d-flex align-items-center gap-3 text-decoration-none text-dark">
                 <img src="{{ group.get_photo_url }}" class="rounded-circle border" style="width: 45px; height: 45px; object-fit: cover;">
                 <div class="fw-bold small">{{ group.name }}</div>
             </a>
-            <a href="{% url 'groups:groups_detail' group.id %}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">View</a>
+            <a href="{% url 'groups:groups_detail' group.id %}"
+               hx-get="{% url 'groups:groups_detail' group.id %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
+               class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">View</a>
         </div>
         {% empty %}
             <p class="p-4 text-center text-muted small">No groups found.</p>

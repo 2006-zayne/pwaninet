@@ -250,17 +250,11 @@ async function handleRequest(request) {
 
 async function handleNavigationRequest(request) {
     try {
-        // Try to fetch a small resource
-        const response = await fetch('/static/images/favicon.ico', {
-            method: 'HEAD',
-            cache: 'no-cache'
-        });
-        
-        // Try network first
+        // Try network first directly
         const networkResponse = await fetch(request);
         
         // Cache successful responses
-        if (networkResponse.ok) {
+        if (networkResponse && networkResponse.ok) {
             const cache = await caches.open(CACHE_NAME);
             cache.put(request, networkResponse.clone());
         }
@@ -268,7 +262,7 @@ async function handleNavigationRequest(request) {
         return networkResponse;
         
     } catch (error) {
-        console.log('Service Worker: Network failed, trying cache for navigation');
+        console.log('Service Worker: Network failed, trying cache for navigation:', error);
         
         // Try cache
         const cachedResponse = await caches.match(request);
@@ -276,7 +270,7 @@ async function handleNavigationRequest(request) {
             return cachedResponse;
         }
         
-        // Return offline page for navigation requests
+        // Return offline page only when genuinely unreachable
         return await getOfflinePage();
     }
 }
@@ -508,8 +502,13 @@ async function getOfflinePage() {
                 <button class="retry-button" onclick="window.location.reload()">Retry</button>
             </div>
             <script>
-                window.addEventListener('online', () => window.location.reload());
-                setInterval(() => { if (navigator.onLine) window.location.reload(); }, 5000);
+                function attemptReload() {
+                    fetch('/api/health/', { mode: 'no-cors', cache: 'no-store' })
+                        .then(() => window.location.reload())
+                        .catch(() => {});
+                }
+                window.addEventListener('online', attemptReload);
+                setInterval(() => { if (navigator.onLine) attemptReload(); }, 5000);
             </script>
         </body>
         </html>

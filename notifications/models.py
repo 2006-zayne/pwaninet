@@ -5,30 +5,6 @@ from django.utils import timezone
 import uuid
 
 
-class NotificationAction(models.Model):
-    """
-    Represents actionable items associated with a notification.
-    """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    notification = models.ForeignKey('NotificationObject', on_delete=models.CASCADE, related_name='actions')
-    action_type = models.CharField(max_length=50, help_text="Type of action (e.g., accept, decline, view)")
-    label = models.CharField(max_length=100, help_text="Display label for the action button")
-    url = models.URLField(max_length=500, blank=True, help_text="URL to navigate when action is clicked")
-    method = models.CharField(max_length=10, default='GET', choices=[('GET', 'GET'), ('POST', 'POST')], help_text="HTTP method for the action")
-    payload = models.JSONField(default=dict, blank=True, help_text="Additional payload for POST requests")
-    is_primary = models.BooleanField(default=False, help_text="Whether this is the primary action")
-    order = models.PositiveIntegerField(default=0, help_text="Display order for multiple actions")
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['order']
-        verbose_name = "Notification Action"
-        verbose_name_plural = "Notification Actions"
-
-    def __str__(self):
-        return f"{self.label} ({self.action_type})"
-
-
 class PushSubscription(models.Model):
     """Model for storing web push notification subscriptions."""
 

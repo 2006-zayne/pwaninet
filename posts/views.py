@@ -813,6 +813,8 @@ def create_post_view(request):
     import logging
     logger = logging.getLogger(__name__)
 
+    is_htmx = bool(request.headers.get('HX-Request'))
+
     # Get user's groups for the dropdown
     from groups.models import Group, Membership, MembershipStatus
     user_groups = Group.objects.filter(
@@ -844,10 +846,16 @@ def create_post_view(request):
             # Mark this as a new post in session for back button logic
             request.session['is_new_post'] = True
             request.session['new_post_id'] = post.id
+            if is_htmx:
+                response = HttpResponse(status=204)
+                response['HX-Redirect'] = reverse('posts:post_details', kwargs={'post_id': post.id})
+                return response
             return redirect('posts:post_details', post_id=post.id)
     else:
         form = PostForm(user=request.user)
-    return render(request, 'posts/create_post.html', {'form': form, 'user_groups': user_groups})
+
+    template = 'posts/partials/create_post_navigation_partial.html' if is_htmx else 'posts/create_post.html'
+    return render(request, template, {'form': form, 'user_groups': user_groups})
 
 
 @login_required
@@ -887,6 +895,10 @@ def post_detail_view(request, post_id):
     # For HTMX requests to show all comments, return only the comments section
     if request.headers.get('HX-Request') and show_all:
         return render(request, 'posts/partials/comments_section.html', context)
+
+    # For HTMX page navigation requests, return navigation partial
+    if request.headers.get('HX-Request'):
+        return render(request, 'posts/partials/post_detail_navigation_partial.html', context)
 
     return render(request, 'posts/post_detail.html', context)
 
@@ -950,12 +962,15 @@ def unit_posts_view(request, unit_id):
     unit = get_object_or_404(Unit, id=unit_id)
     posts = Post.objects.filter(unit=unit).select_related('author', 'unit').order_by('-created_at')
     liked_post_ids = set(Like.objects.filter(user=request.user, post__in=posts).values_list('post_id', flat=True))
-    return render(request, 'courses/unit_detail.html', {
+    context = {
         'unit': unit,
         'posts': posts,
         'liked_post_ids': liked_post_ids,
         'unread_notifications_count': get_cached_unread_count(request.user),
-    })
+    }
+    if request.headers.get('HX-Request'):
+        return render(request, 'courses/partials/unit_detail_navigation_partial.html', context)
+    return render(request, 'courses/unit_detail.html', context)
 
 
 @login_required
@@ -976,6 +991,9 @@ def search_view(request):
         'following_ids': following_ids,
         'unread_notifications_count': get_cached_unread_count(request.user),
     }
+
+    if request.headers.get('HX-Target') == 'page-content-target':
+        return render(request, 'posts/partials/search_navigation_partial.html', context)
 
     if request.headers.get('HX-Request'):
         return render(request, 'posts/partials/search_results_inner.html', context)
@@ -1029,6 +1047,8 @@ def view_image_fullscreen(request, post_id, image_index):
         'current_user_profile_pic': request.user.profile_pic.url if request.user.profile_pic else None,
     }
 
+    if request.headers.get('HX-Request'):
+        return render(request, 'posts/partials/image_fullscreen_navigation_partial.html', context)
     return render(request, 'posts/image_fullscreen.html', context)
 
 
@@ -1138,6 +1158,9 @@ def shared_posts_view(request):
         'shared_posts': shared_posts,
         'unread_notifications_count': get_cached_unread_count(request.user),
     }
+
+    if request.headers.get('HX-Request'):
+        return render(request, 'posts/partials/shared_posts_navigation_partial.html', context)
 
     return render(request, 'posts/shared_posts.html', context)
 

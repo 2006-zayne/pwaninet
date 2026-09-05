@@ -2,18 +2,35 @@
 <div class="post-card shadow-sm mb-3 bg-white rounded-3 overflow-hidden border-0">
     <!-- Share Header -->
     <div class="d-flex align-items-center p-2 border-bottom bg-light">
-        <a href="{% url 'users:profile' shared_post.sharer.username %}">
+        <a href="{% url 'users:profile' shared_post.sharer.username %}"
+           hx-get="{% url 'users:profile' shared_post.sharer.username %}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-history="true">
             <img src="{{ shared_post.sharer.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm me-2" style="width: 72px; height: 72px; object-fit: cover;">
         </a>
         <div class="flex-grow-1">
             <small class="fw-bold text-dark">
-                <a href="{% url 'users:profile' shared_post.sharer.username %}" class="text-dark text-decoration-none">{{ shared_post.sharer.get_full_name|default:shared_post.sharer.username }}</a>
+                <a href="{% url 'users:profile' shared_post.sharer.username %}"
+                   hx-get="{% url 'users:profile' shared_post.sharer.username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
+                   class="text-dark text-decoration-none">{{ shared_post.sharer.get_full_name|default:shared_post.sharer.username }}</a>
             </small>
             <div class="d-flex align-items-center" style="font-size: 11px;">
                 <i class="bi bi-share-fill text-primary me-1"></i>
                 <span class="text-muted">shared a post with</span>
                 {% if shared_post.shared_to %}
-                    <a href="{% url 'users:profile' shared_post.shared_to.username %}" class="text-primary text-decoration-none ms-1">{{ shared_post.shared_to.username }}</a>
+                    <a href="{% url 'users:profile' shared_post.shared_to.username %}"
+                       hx-get="{% url 'users:profile' shared_post.shared_to.username %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true"
+                       class="text-primary text-decoration-none ms-1">{{ shared_post.shared_to.username }}</a>
                 {% elif shared_post.shared_to_group %}
                     <span class="text-primary ms-1">{{ shared_post.shared_to_group.name }}</span>
                 {% endif %}
@@ -32,14 +49,29 @@
     <div class="d-flex align-items-center p-3">
         <div class="position-relative me-3" style="width: 72px; height: 72px;">
             {% if shared_post.original_post.group %}
-                <a href="{% url 'groups:groups_detail' shared_post.original_post.group.id %}">
+                <a href="{% url 'groups:groups_detail' shared_post.original_post.group.id %}"
+                   hx-get="{% url 'groups:groups_detail' shared_post.original_post.group.id %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
                     <img src="{{ shared_post.original_post.group.get_photo_url }}" class="rounded-circle border border-2 border-white shadow-sm" style="width: 72px; height: 72px; object-fit: cover;">
                 </a>
-                <a href="{% url 'users:profile' shared_post.original_post.author.username %}">
+                <a href="{% url 'users:profile' shared_post.original_post.author.username %}"
+                   hx-get="{% url 'users:profile' shared_post.original_post.author.username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
                     <img src="{{ shared_post.original_post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 36px; height: 36px; object-fit: cover; transform: translate(15%, 15%);">
                 </a>
             {% else %}
-                <a href="{% url 'users:profile' shared_post.original_post.author.username %}">
+                <a href="{% url 'users:profile' shared_post.original_post.author.username %}"
+                   hx-get="{% url 'users:profile' shared_post.original_post.author.username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
                     <img src="{{ shared_post.original_post.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 72px; height: 72px; object-fit: cover;">
                 </a>
             {% endif %}
@@ -47,12 +79,24 @@
 
         <div class="flex-grow-1">
             <h6 class="mb-0 fw-bold small">
-                <a href="{% url 'users:profile' shared_post.original_post.author.username %}" class="text-dark text-decoration-none">
+                <a href="{% url 'users:profile' shared_post.original_post.author.username %}"
+                   hx-get="{% url 'users:profile' shared_post.original_post.author.username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
+                   class="text-dark text-decoration-none">
                     {{ shared_post.original_post.author.get_full_name|default:shared_post.original_post.author.username }}
                 </a>
                 {% if shared_post.original_post.group %}
                     <span class="text-muted fw-normal mx-1">posted in</span>
-                    <a href="{% url 'groups:groups_detail' shared_post.original_post.group.id %}" class="text-primary text-decoration-none">{{ shared_post.original_post.group.name }}</a>
+                    <a href="{% url 'groups:groups_detail' shared_post.original_post.group.id %}"
+                       hx-get="{% url 'groups:groups_detail' shared_post.original_post.group.id %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true"
+                       class="text-primary text-decoration-none">{{ shared_post.original_post.group.name }}</a>
                 {% endif %}
             </h6>
             <small class="text-muted d-flex align-items-center" style="font-size: 11px;">
@@ -83,7 +127,12 @@
     </div>
 
     {% if shared_post.original_post.images.exists %}
-    <a href="{% url 'posts:post_details' shared_post.original_post.id %}">
+    <a href="{% url 'posts:post_details' shared_post.original_post.id %}"
+       hx-get="{% url 'posts:post_details' shared_post.original_post.id %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true">
         <div class="post-media border-top border-bottom bg-light">
             <div class="image-grid-shared-{{ shared_post.id }}" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px; max-height: 400px;">
                 {% for post_image in shared_post.original_post.images.all|slice:":3" %}
@@ -100,7 +149,12 @@
         </div>
     </a>
     {% elif shared_post.original_post.get_intel_file %}
-    <a href="{% url 'posts:post_details' shared_post.original_post.id %}">
+    <a href="{% url 'posts:post_details' shared_post.original_post.id %}"
+       hx-get="{% url 'posts:post_details' shared_post.original_post.id %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true">
         <div class="post-media border-top border-bottom bg-light">
             {% with f_url=shared_post.original_post.get_intel_file.url|lower %}
                 {% if ".jpg" in f_url or ".png" in f_url or ".jpeg" in f_url or ".webp" in f_url %}
@@ -137,7 +191,13 @@
             <div id="like-section-{{ shared_post.original_post.id }}">
                 {% include "posts/partials/like_button.html" with post=shared_post.original_post %}
             </div>
-            <a href="{% url 'posts:post_details' shared_post.original_post.id %}" class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none">
+            <a href="{% url 'posts:post_details' shared_post.original_post.id %}"
+               hx-get="{% url 'posts:post_details' shared_post.original_post.id %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
+               class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none">
                 <i class="bi bi-chat-dots fs-5"></i>
                 <span class="fw-bold">{{ shared_post.original_post.comments.count }}</span>
             </a>

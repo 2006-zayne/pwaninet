@@ -1,0 +1,1145 @@
+{% load static %}
+{% load humanize %}
+<!-- Back Navigation -->
+<div class="doc-back-nav" style="margin-bottom: 24px;">
+    <a href="{% url 'documents:home' %}" 
+       hx-get="{% url 'documents:home' %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true"
+       class="doc-back-link"
+       style="display: inline-flex; align-items: center; gap: 8px; 
+              color: var(--text-secondary); text-decoration: none; 
+              font-weight: 500; font-size: 0.9rem;">
+        <i class="bi bi-arrow-left"></i>
+        Back to Repository
+    </a>
+</div>
+
+<!-- Document Detail Container -->
+<div class="doc-detail-container">
+    
+    <!-- Document Viewer -->
+    <div class="doc-pdf-viewer doc-order-1" 
+         style="background: var(--card-bg); border: 1px solid var(--border); 
+                border-radius: 16px; overflow: hidden; margin-bottom: 24px;">
+        {% if document.latest_version %}
+            {% with first_file=document.latest_version.files.first %}
+                {% if first_file and first_file.file %}
+                    <div id="document-viewer"
+                         data-file-url="{{ first_file.file.url }}"
+                         data-file-type="{{ first_file.extension }}"
+                         data-file-name="{{ document.title }}.{{ first_file.extension }}"
+                         data-document-id="{{ document.id }}"
+                         data-file-id="{{ first_file.id }}"
+                         style="min-height: 70vh; height: 70vh;"></div>
+                {% else %}
+                    <div class="doc-preview-placeholder" 
+                         style="aspect-ratio: 16/10; background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%); 
+                                display: flex; align-items: center; justify-content: center;">
+                        <div style="text-align: center; color: white;">
+                            <i class="bi bi-file-earmark-text" style="font-size: 4rem; margin-bottom: 16px;"></i>
+                            <p style="font-size: 1.1rem; font-weight: 500;">Document Preview</p>
+                            <p style="font-size: 0.9rem; opacity: 0.8;">File not available</p>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endwith %}
+        {% else %}
+            <div class="doc-preview-placeholder" 
+                 style="aspect-ratio: 16/10; background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%); 
+                        display: flex; align-items: center; justify-content: center;">
+                <div style="text-align: center; color: white;">
+                    <i class="bi bi-file-earmark-text" style="font-size: 4rem; margin-bottom: 16px;"></i>
+                    <p style="font-size: 1.1rem; font-weight: 500;">Document Preview</p>
+                    <p style="font-size: 0.9rem; opacity: 0.8;">No file available</p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    
+    <!-- Description -->
+    <div class="doc-description doc-order-2" 
+         style="background: var(--card-bg); border: 1px solid var(--border); 
+                border-radius: 16px; padding: 24px; margin-bottom: 24px;">
+        <h3 style="font-size: 1.25rem; font-weight: 600; margin: 0 0 16px 0; color: var(--text-dark);">
+            Description
+        </h3>
+        <p style="font-size: 1rem; color: var(--text-secondary); line-height: 1.6; margin: 0;">
+            {{ document.description|default:"No description available." }}
+        </p>
+    </div>
+    
+    <!-- Sidebar / Document Info Card -->
+    <div class="doc-detail-sidebar doc-order-3">
+        <!-- Document Info Card -->
+        <div class="doc-info-card" 
+             style="background: var(--card-bg); border: 1px solid var(--border); 
+                    border-radius: 16px; padding: 24px; margin-bottom: 24px; position: sticky; top: 80px;">
+            
+            <!-- Title -->
+            <h1 class="doc-info-title" 
+                style="font-size: 1.5rem; font-weight: 700; margin: 0 0 12px 0; 
+                       color: var(--text-dark); line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word; hyphens: auto;">
+                {{ document.title }}
+            </h1>
+            
+            <!-- Unit -->
+            {% if primary_unit %}
+                <div class="doc-info-unit" 
+                     style="display: inline-block; background: var(--primary-light); 
+                            color: var(--primary); padding: 6px 14px; border-radius: 20px; 
+                            font-size: 0.875rem; font-weight: 600; margin-bottom: 20px;">
+                    {{ primary_unit.academic_unit.code }}
+                </div>
+            {% endif %}
+            
+            <!-- Metadata -->
+            <div class="doc-info-meta" style="margin-bottom: 24px;">
+                <div class="doc-meta-item" style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">Category</span>
+                    <span style="color: var(--text-dark); font-size: 0.9rem; font-weight: 500;">{{ document.category.name }}</span>
+                </div>
+                <div class="doc-meta-item" style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">File Type</span>
+                    {% if document.latest_version %}
+                        {% with first_file=document.latest_version.files.first %}
+                            <span style="color: var(--text-dark); font-size: 0.9rem; font-weight: 500;">{{ first_file.extension|upper|default:"N/A" }}</span>
+                        {% endwith %}
+                    {% else %}
+                        <span style="color: var(--text-dark); font-size: 0.9rem; font-weight: 500;">N/A</span>
+                    {% endif %}
+                </div>
+                <div class="doc-meta-item" style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">Uploaded</span>
+                    <span style="color: var(--text-dark); font-size: 0.9rem; font-weight: 500;">{{ document.created_at|timesince }} ago</span>
+                </div>
+                <div class="doc-meta-item" style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">Size</span>
+                    {% if document.latest_version %}
+                        {% with first_file=document.latest_version.files.first %}
+                            <span style="color: var(--text-dark); font-size: 0.9rem; font-weight: 500;">{{ first_file.size_mb|default:"N/A" }} MB</span>
+                        {% endwith %}
+                    {% else %}
+                        <span style="color: var(--text-dark); font-size: 0.9rem; font-weight: 500;">N/A</span>
+                    {% endif %}
+                </div>
+                <div class="doc-meta-item" style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">Pages</span>
+                    {% if document.latest_version %}
+                        {% with first_file=document.latest_version.files.first %}
+                            <span style="color: var(--text-dark); font-size: 0.9rem; font-weight: 500;">{{ first_file.page_count|default:"N/A" }}</span>
+                        {% endwith %}
+                    {% else %}
+                        <span style="color: var(--text-dark); font-size: 0.9rem; font-weight: 500;">N/A</span>
+                    {% endif %}
+                </div>
+                <div class="doc-meta-item" style="display: flex; justify-content: space-between; padding: 8px 0;">
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">Language</span>
+                    <span style="color: var(--text-dark); font-size: 0.9rem; font-weight: 500;">{{ document.get_language_display|default:"English" }}</span>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="doc-actions" style="display: flex; flex-direction: column; gap: 12px;">
+                {% if document.latest_version %}
+                    {% with first_file=document.latest_version.files.first %}
+                        <a href="{{ first_file.file.url }}" 
+                           download="{{ document.title }}.{{ first_file.extension }}"
+                           onclick="trackAndDownload(event, {{ document.id }}, {{ first_file.id }})"
+                           class="btn btn-primary" 
+                           style="padding: 14px 24px; border-radius: 12px; font-weight: 600; font-size: 1rem; text-decoration: none; display: inline-block; text-align: center;">
+                            <i class="bi bi-download" style="margin-right: 8px;"></i>
+                            Download ({{ first_file.size_mb|default:"N/A" }} MB)
+                        </a>
+                    {% endwith %}
+                {% else %}
+                    <button class="btn btn-primary" 
+                            style="padding: 14px 24px; border-radius: 12px; font-weight: 600; font-size: 1rem;">
+                        <i class="bi bi-download" style="margin-right: 8px;"></i>
+                        Download
+                    </button>
+                {% endif %}
+                
+                <div style="display: flex; gap: 12px;">
+                    {% if request.user.is_authenticated %}
+                        <div id="bookmark-button-{{ document.id }}">
+                            {% include 'documents/partials/bookmark_button.html' with document=document is_bookmarked=is_bookmarked bookmark_count=document.bookmarks.count %}
+                        </div>
+                    {% else %}
+                        <button class="btn btn-outline-secondary" 
+                                style="flex: 1; padding: 12px; border-radius: 12px; font-weight: 500;">
+                            <i class="bi bi-bookmark"></i>
+                        </button>
+                    {% endif %}
+                    
+                    <button class="btn btn-outline-secondary share-dropdown-toggle" 
+                            style="flex: 1; padding: 12px; border-radius: 12px; font-weight: 500;"
+                            onclick="toggleShareDropdown()">
+                        <i class="bi bi-share"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" 
+                            style="flex: 1; padding: 12px; border-radius: 12px; font-weight: 500;">
+                        <i class="bi bi-flag"></i>
+                    </button>
+                </div>
+                
+                <!-- Share Dropdown -->
+                <div id="share-dropdown" class="share-dropdown" style="display: none; position: relative; margin-top: 8px;">
+                    <div style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                        <button onclick="copyLink({{ document.id }})" style="width: 100%; padding: 10px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+                            <i class="bi bi-link-45deg"></i>
+                            <span>Copy Link</span>
+                        </button>
+                        {% if request.user.is_authenticated %}
+                            <button onclick="shareToProfile({{ document.id }})" style="width: 100%; padding: 10px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                                <i class="bi bi-person"></i>
+                                <span>Share to Profile</span>
+                            </button>
+                            <button onclick="shareToGroup({{ document.id }})" style="width: 100%; padding: 10px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                                <i class="bi bi-people"></i>
+                                <span>Share to Group</span>
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Stats -->
+            <div class="doc-stats" 
+                 style="display: flex; justify-content: space-around; margin-top: 24px; 
+                        padding-top: 20px; border-top: 1px solid var(--border);">
+                <div style="text-align: center;">
+                    <p style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0;">{% if analytics %}{{ analytics.download_count }}{% else %}{{ document.downloads.count }}{% endif %}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Downloads</p>
+                </div>
+                <div style="text-align: center;">
+                    <p style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0;">{% if analytics %}{{ analytics.view_count }}{% else %}{{ document.views.count }}{% endif %}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Views</p>
+                </div>
+                <div style="text-align: center;">
+                    <p style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark); margin: 0;">{% if analytics %}{{ analytics.bookmark_count }}{% else %}{{ document.bookmarks.count }}{% endif %}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">Bookmarks</p>
+                </div>
+            </div>
+            
+            <!-- Rating Buttons -->
+            {% if request.user.is_authenticated %}
+                {% with analytics=document.analytics %}
+                    {% include 'documents/partials/rating_buttons.html' with document=document user_rating=user_rating analytics=analytics %}
+                {% endwith %}
+            {% endif %}
+            
+            <!-- Author -->
+            <div class="doc-author" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);">
+                <p style="font-size: 0.875rem; color: var(--text-secondary); margin: 0 0 8px 0;">Uploaded by</p>
+                <a href="{% url 'users:profile' document.uploaded_by.username %}" hx-get="{% url 'users:profile' document.uploaded_by.username %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true" 
+                   style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit;">
+                    {% if document.uploaded_by.profile_pic and document.uploaded_by.profile_pic.name != 'profile_pic/default_pic1.jpg' %}
+                        <img src="{{ document.uploaded_by.profile_pic.url }}" 
+                             alt="{{ document.uploaded_by.get_full_name|default:document.uploaded_by.username }}"
+                             style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                    {% else %}
+                        <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 1rem;">
+                            {{ document.uploaded_by.username|first|upper }}
+                        </div>
+                    {% endif %}
+                    <div style="display: flex; flex-direction: column;">
+                        <p style="font-size: 0.95rem; color: var(--text-dark); font-weight: 500; margin: 0;">
+                            {{ document.uploaded_by.get_full_name|default:document.uploaded_by.username }}
+                        </p>
+                        {% if document.uploaded_by.course %}
+                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">
+                                {{ document.uploaded_by.course.name }}
+                            </p>
+                        {% endif %}
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Related Documents -->
+    <div class="doc-related doc-order-4" 
+         style="background: var(--card-bg); border: 1px solid var(--border); 
+                border-radius: 16px; padding: 24px;">
+        <h3 style="font-size: 1.25rem; font-weight: 600; margin: 0 0 20px 0; color: var(--text-dark);">
+            Related Documents
+        </h3>
+        <div class="doc-related-grid" 
+             style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
+            {% for related_doc in related_documents %}
+                {% include 'documents/partials/document_card.html' with document=related_doc %}
+            {% empty %}
+                <p style="color: var(--text-secondary);">No related documents found.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script src="{% static 'documents/js/document-viewer.js' %}"></script>
+<script>
+(function() {
+    function initDocumentDetailViewer() {
+        const viewerContainer = document.getElementById('document-viewer');
+        if (viewerContainer && !viewerContainer.dataset.initialized) {
+            viewerContainer.dataset.initialized = 'true';
+            const fileUrl = viewerContainer.dataset.fileUrl;
+            const fileType = viewerContainer.dataset.fileType;
+            const fileName = viewerContainer.dataset.fileName;
+            const documentId = viewerContainer.dataset.documentId;
+            const fileId = viewerContainer.dataset.fileId;
+            
+            function startViewer() {
+                if (typeof DocumentViewer !== 'undefined') {
+                    const viewer = new DocumentViewer(viewerContainer, fileUrl, fileType, fileName, documentId, fileId);
+                    viewer.initialize();
+                }
+            }
+
+            if (typeof DocumentViewer === 'undefined') {
+                const s = document.createElement('script');
+                s.src = "{% static 'documents/js/document-viewer.js' %}";
+                s.onload = startViewer;
+                document.head.appendChild(s);
+            } else {
+                startViewer();
+            }
+        }
+        
+        const documentId = "{{ document.id }}";
+        const viewCountElement = document.querySelector('.doc-stats div:nth-child(2) p:first-child');
+        const downloadCountElement = document.querySelector('.doc-stats div:nth-child(1) p:first-child');
+        const bookmarkCountElement = document.querySelector('.doc-stats div:nth-child(3) p:first-child');
+        
+        if (window._docDetailStatsInterval) {
+            clearInterval(window._docDetailStatsInterval);
+        }
+        window._docDetailStatsInterval = setInterval(function() {
+            if (!document.getElementById('document-viewer')) {
+                clearInterval(window._docDetailStatsInterval);
+                return;
+            }
+            fetch('/documents/document/' + documentId + '/stats/')
+                .then(response => response.json())
+                .then(data => {
+                    if (viewCountElement) viewCountElement.textContent = data.view_count;
+                    if (downloadCountElement) downloadCountElement.textContent = data.download_count;
+                    if (bookmarkCountElement) bookmarkCountElement.textContent = data.bookmark_count;
+                })
+                .catch(error => console.log('Error fetching stats:', error));
+        }, 30000);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDocumentDetailViewer);
+    } else {
+        initDocumentDetailViewer();
+    }
+})();
+
+function toggleShareDropdown() {
+    const dropdown = document.getElementById('share-dropdown');
+    if (dropdown) {
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+function trackAndDownload(event, documentId, fileId) {
+    // Track the download via HTMX endpoint (async, don't block the download)
+    fetch('/documents/document/' + documentId + '/download/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: 'file_id=' + fileId
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update download count in UI
+            const downloadCountElement = document.querySelector('.doc-stats div:nth-child(1) p:first-child');
+            if (downloadCountElement) {
+                downloadCountElement.textContent = data.download_count;
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error tracking download:', error);
+    });
+    // Let the default link behavior proceed (download the file)
+}
+
+function copyLink(documentId) {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(function() {
+        alert('Link copied to clipboard!');
+    }).catch(function(err) {
+        console.error('Failed to copy: ', err);
+    });
+    
+    // Track the share
+    fetch('/documents/document/' + documentId + '/share/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: 'share_type=copy_link'
+    }).then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              console.log('Share tracked:', data.message);
+          }
+      })
+      .catch(error => console.error('Error tracking share:', error));
+    
+    // Close dropdown
+    document.getElementById('share-dropdown').style.display = 'none';
+}
+
+function shareToProfile(documentId) {
+    fetch('/documents/document/' + documentId + '/share/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: 'share_type=profile'
+    }).then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              alert(data.message);
+          } else {
+              alert('Error: ' + (data.error || 'Failed to share'));
+          }
+      })
+      .catch(error => {
+          console.error('Error sharing to profile:', error);
+          alert('Failed to share to profile');
+      });
+    
+    // Close dropdown
+    document.getElementById('share-dropdown').style.display = 'none';
+}
+
+function shareToGroup(documentId) {
+    // Simple prompt for group selection - in production, this should be a proper modal
+    const groupId = prompt('Enter Group ID:');
+    if (!groupId) return;
+    
+    fetch('/documents/document/' + documentId + '/share/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: 'share_type=group&group_id=' + groupId
+    }).then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              alert(data.message);
+          } else {
+              alert('Error: ' + (data.error || 'Failed to share'));
+          }
+      })
+      .catch(error => {
+          console.error('Error sharing to group:', error);
+          alert('Failed to share to group');
+      });
+    
+    // Close dropdown
+    document.getElementById('share-dropdown').style.display = 'none';
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(event) {
+    const dropdown = document.getElementById('share-dropdown');
+    const toggleButton = document.querySelector('.share-dropdown-toggle');
+    
+    if (dropdown && toggleButton) {
+        if (!dropdown.contains(event.target) && !toggleButton.contains(event.target)) {
+            dropdown.style.display = 'none';
+        }
+    }
+});
+</script>
+
+<style>
+.doc-detail-container {
+    display: grid;
+    grid-template-columns: 1fr min(350px, 30vw);
+    grid-template-areas:
+        "preview sidebar"
+        "description sidebar"
+        "related sidebar";
+    gap: 32px;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.doc-pdf-viewer {
+    grid-area: preview;
+}
+
+.doc-description {
+    grid-area: description;
+}
+
+.doc-detail-sidebar {
+    grid-area: sidebar;
+}
+
+.doc-related {
+    grid-area: related;
+}
+
+/* Tablets and smaller desktops */
+@media (max-width: 1024px) {
+    .doc-detail-container {
+        grid-template-columns: 1fr min(300px, 35vw);
+        gap: 24px;
+    }
+}
+
+@media (max-width: 992px) {
+    .doc-detail-container {
+        grid-template-columns: 1fr !important;
+        grid-template-areas:
+            "preview"
+            "description"
+            "sidebar"
+            "related";
+        gap: 24px;
+    }
+
+    .doc-detail-sidebar {
+        position: static !important;
+    }
+}
+
+/* 390dp and below - critical breakpoint */
+@media (max-width: 390px) {
+    .doc-detail-container {
+        grid-template-columns: 1fr !important;
+        grid-template-areas:
+            "preview"
+            "description"
+            "sidebar"
+            "related";
+        gap: 16px !important;
+        padding: 0 8px !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+    }
+
+    /* Compensate for font scaling on small screens */
+    .doc-info-card,
+    .doc-description,
+    .doc-related {
+        max-width: 100% !important;
+        overflow: hidden !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+
+    .doc-related-grid {
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+
+    .doc-info-card {
+        padding: 12px !important;
+    }
+
+    .doc-info-title {
+        font-size: calc(1rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-info-unit {
+        font-size: calc(0.7rem / var(--font-scale, 1)) !important;
+        padding: 3px 8px !important;
+    }
+
+    .doc-meta-item {
+        font-size: calc(0.75rem / var(--font-scale, 1)) !important;
+        padding: 4px 0 !important;
+    }
+
+    .doc-meta-item span {
+        font-size: calc(0.75rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-actions .btn {
+        padding: 8px 12px !important;
+        font-size: calc(0.8rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-stats {
+        gap: 6px !important;
+    }
+
+    .doc-stats p {
+        font-size: calc(0.9rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-stats p:last-child {
+        font-size: calc(0.7rem / var(--font-scale, 1)) !important;
+    }
+
+    #document-viewer {
+        height: 70vh !important;
+        min-height: 70vh !important;
+    }
+
+    .doc-related-grid {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+}
+
+/* iPhone SE (375px) and similar */
+@media (max-width: 375px) {
+    .doc-detail-container {
+        gap: 12px !important;
+        padding: 0 6px !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+    }
+
+    /* Force font size compensation for larger scales */
+    .doc-info-title {
+        font-size: calc(0.95rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-meta-item span {
+        font-size: calc(0.7rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-info-card {
+        padding: 10px !important;
+    }
+
+    .doc-info-unit {
+        font-size: calc(0.65rem / var(--font-scale, 1)) !important;
+        padding: 2px 6px !important;
+    }
+
+    .doc-meta-item {
+        font-size: calc(0.7rem / var(--font-scale, 1)) !important;
+        padding: 3px 0 !important;
+    }
+
+    .doc-meta-item span {
+        font-size: calc(0.7rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-actions .btn {
+        padding: 6px 10px !important;
+        font-size: calc(0.75rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-stats {
+        gap: 4px !important;
+    }
+
+    .doc-stats p {
+        font-size: calc(0.85rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-stats p:last-child {
+        font-size: calc(0.65rem / var(--font-scale, 1)) !important;
+    }
+
+    #document-viewer {
+        height: 70vh !important;
+        min-height: 70vh !important;
+    }
+
+    .viewer-toolbar {
+        padding: 4px 6px !important;
+        gap: 4px !important;
+    }
+
+    .viewer-btn {
+        width: 24px !important;
+        height: 24px !important;
+        min-width: 24px !important;
+    }
+
+    .viewer-btn i {
+        font-size: calc(0.7rem / var(--font-scale, 1)) !important;
+    }
+}
+
+/* Tecno Pop 5 and very small devices (360px and below) */
+@media (max-width: 360px) {
+    .doc-detail-container {
+        gap: 10px !important;
+        padding: 0 4px !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+    }
+
+    /* Aggressive font size compensation for very small screens */
+    .doc-info-title {
+        font-size: calc(0.9rem / var(--font-scale, 1)) !important;
+        line-height: 1.2 !important;
+    }
+
+    .doc-meta-item span {
+        font-size: calc(0.65rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-actions .btn {
+        font-size: calc(0.7rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-info-card {
+        padding: 8px !important;
+    }
+
+    .doc-info-unit {
+        font-size: calc(0.6rem / var(--font-scale, 1)) !important;
+        padding: 2px 5px !important;
+    }
+
+    .doc-meta-item {
+        font-size: calc(0.65rem / var(--font-scale, 1)) !important;
+        padding: 2px 0 !important;
+    }
+
+    .doc-meta-item span {
+        font-size: calc(0.65rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-actions .btn {
+        padding: 5px 8px !important;
+        font-size: calc(0.7rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-stats {
+        gap: 3px !important;
+    }
+
+    .doc-stats p {
+        font-size: calc(0.8rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-stats p:last-child {
+        font-size: calc(0.6rem / var(--font-scale, 1)) !important;
+    }
+
+    #document-viewer {
+        height: 70vh !important;
+        min-height: 70vh !important;
+    }
+
+    .viewer-toolbar {
+        padding: 3px 4px !important;
+        gap: 3px !important;
+    }
+
+    .viewer-btn {
+        width: 22px !important;
+        height: 22px !important;
+        min-width: 22px !important;
+    }
+
+    .viewer-btn i {
+        font-size: calc(0.65rem / var(--font-scale, 1)) !important;
+    }
+
+    .viewer-page-indicator,
+    #viewer-zoom-indicator {
+        font-size: calc(0.65rem / var(--font-scale, 1)) !important;
+    }
+}
+
+/* Extra small devices (320px) */
+@media (max-width: 320px) {
+    .doc-detail-container {
+        gap: 8px !important;
+        padding: 0 2px !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+    }
+
+    /* Maximum font size compensation for smallest screens */
+    .doc-info-title {
+        font-size: calc(0.85rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-meta-item span {
+        font-size: calc(0.6rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-actions .btn {
+        font-size: calc(0.65rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-info-card {
+        padding: 6px !important;
+    }
+
+    .doc-info-unit {
+        font-size: calc(0.55rem / var(--font-scale, 1)) !important;
+        padding: 1px 4px !important;
+    }
+
+    .doc-meta-item {
+        font-size: calc(0.6rem / var(--font-scale, 1)) !important;
+        padding: 2px 0 !important;
+    }
+
+    .doc-actions .btn {
+        padding: 4px 6px !important;
+        font-size: calc(0.65rem / var(--font-scale, 1)) !important;
+    }
+
+    #document-viewer {
+        height: 70vh !important;
+        min-height: 70vh !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .doc-detail-container {
+        grid-template-columns: 1fr !important;
+        grid-template-areas:
+            "preview"
+            "description"
+            "sidebar"
+            "related";
+        gap: 20px !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        overflow-x: hidden !important;
+        padding: 0 16px;
+        box-sizing: border-box !important;
+    }
+
+    /* Ensure all child elements respect container width */
+    .doc-detail-container > * {
+        max-width: 100% !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+    }
+
+    .doc-pdf-viewer {
+        margin-bottom: 20px !important;
+        overflow: hidden !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    #document-viewer {
+        height: 400px !important;
+        overflow: hidden !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    .image-viewer-container,
+    .pdf-viewer-container,
+    .docx-viewer-container,
+    .text-viewer-container {
+        overflow: hidden !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        overflow-x: hidden !important;
+    }
+
+    .image-viewer-container img,
+    .pdf-viewer-container canvas,
+    .pdf-viewer-container > div,
+    .docx-viewer-container > div,
+    .text-viewer-container > div {
+        max-width: 100% !important;
+        height: auto !important;
+        overflow: hidden !important;
+        overflow-x: hidden !important;
+    }
+
+    /* Prevent horizontal scroll on the entire page */
+    body, html {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+    }
+
+    .doc-detail-container {
+        overflow-x: hidden !important;
+        max-width: 100% !important;
+    }
+
+    .doc-info-card {
+        padding: 20px !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+
+    .doc-info-title {
+        font-size: 1.25rem;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+    }
+
+    .doc-info-unit {
+        font-size: calc(0.8rem / var(--font-scale, 1)) !important;
+        padding: 4px 12px !important;
+    }
+
+    .doc-meta-item {
+        font-size: calc(0.85rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-actions {
+        flex-direction: column;
+    }
+
+    .doc-actions .btn {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box;
+    }
+
+    .doc-stats {
+        flex-wrap: wrap !important;
+        gap: 12px !important;
+    }
+
+    .doc-stats > div {
+        flex: 1 1 auto;
+        min-width: 60px;
+    }
+
+    .doc-related-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important;
+        gap: 12px !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+
+    /* Font scaling compensation for related doc cards */
+    .doc-card .doc-title {
+        font-size: calc(1rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-card .doc-unit {
+        font-size: calc(0.875rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-card .doc-category-badge {
+        font-size: calc(0.75rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-card .doc-stats span {
+        font-size: calc(0.8rem / var(--font-scale, 1)) !important;
+    }
+
+    .viewer-toolbar {
+        padding: 8px 12px !important;
+        gap: 6px !important;
+    }
+
+    .viewer-btn {
+        width: 32px !important;
+        height: 32px !important;
+        min-width: 32px !important;
+    }
+
+    .viewer-btn i {
+        font-size: calc(0.9rem / var(--font-scale, 1)) !important;
+    }
+
+    .viewer-page-indicator,
+    #viewer-zoom-indicator {
+        font-size: calc(0.8rem / var(--font-scale, 1)) !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .doc-detail-container {
+        padding: 0 !important;
+        gap: 16px !important;
+    }
+
+    .doc-info-card {
+        padding: 16px !important;
+    }
+
+    .doc-info-title {
+        font-size: calc(1.1rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-info-unit {
+        font-size: calc(0.75rem / var(--font-scale, 1)) !important;
+        padding: 4px 10px !important;
+    }
+
+    .doc-meta-item {
+        font-size: calc(0.8rem / var(--font-scale, 1)) !important;
+        padding: 6px 0 !important;
+    }
+
+    .doc-meta-item span {
+        font-size: calc(0.8rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-actions .btn {
+        padding: 12px 16px !important;
+        font-size: calc(0.9rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-stats {
+        gap: 8px !important;
+    }
+
+    .doc-stats p {
+        font-size: calc(1rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-stats p:last-child {
+        font-size: calc(0.75rem / var(--font-scale, 1)) !important;
+    }
+
+    #document-viewer {
+        height: 350px !important;
+    }
+
+    .doc-related-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+        gap: 10px !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+
+    /* Font scaling compensation for related doc cards */
+    .doc-card .doc-title {
+        font-size: calc(0.95rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-card .doc-unit {
+        font-size: calc(0.8rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-card .doc-category-badge {
+        font-size: calc(0.7rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-card .doc-stats span {
+        font-size: calc(0.75rem / var(--font-scale, 1)) !important;
+    }
+
+    .viewer-toolbar {
+        padding: 6px 8px !important;
+    }
+
+    .viewer-btn {
+        width: 28px !important;
+        height: 28px !important;
+        min-width: 28px !important;
+    }
+
+    .viewer-btn i {
+        font-size: calc(0.8rem / var(--font-scale, 1)) !important;
+    }
+}
+
+@media (max-width: 375px) {
+    .doc-detail-container {
+        padding: 0 8px !important;
+        gap: 14px !important;
+    }
+
+    .doc-info-card {
+        padding: 14px !important;
+    }
+
+    .doc-info-title {
+        font-size: 1rem !important;
+    }
+
+    .doc-meta-item {
+        font-size: 0.75rem !important;
+    }
+
+    .doc-actions .btn {
+        padding: 10px 14px !important;
+        font-size: 0.85rem !important;
+    }
+
+    .doc-related-grid {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+
+    /* Font scaling compensation for related doc cards */
+    .doc-card .doc-title {
+        font-size: calc(0.9rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-card .doc-unit {
+        font-size: calc(0.75rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-card .doc-category-badge {
+        font-size: calc(0.65rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-card .doc-stats span {
+        font-size: calc(0.7rem / var(--font-scale, 1)) !important;
+    }
+
+    #document-viewer {
+        height: 300px !important;
+    }
+}
+
+@media (max-width: 320px) {
+    .doc-detail-container {
+        padding: 0 4px !important;
+        gap: 12px !important;
+    }
+
+    .doc-info-card {
+        padding: 12px !important;
+    }
+
+    .doc-info-title {
+        font-size: calc(0.95rem / var(--font-scale, 1)) !important;
+    }
+
+    .doc-actions .btn {
+        padding: 8px 12px !important;
+        font-size: 0.8rem !important;
+    }
+}
+</style>
+

@@ -1,0 +1,366 @@
+{% csrf_token %}
+<style>
+  /* Hide mobile bottom nav in fullscreen mode */
+  body.modal-open .mobile-bottom-nav,
+  .mobile-bottom-nav {
+    display: none !important;
+  }
+
+  .fullscreen-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    overflow: hidden;
+  }
+
+  .fullscreen-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    touch-action: pan-y;
+  }
+
+  .close-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    color: #fff;
+  }
+
+  .close-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+  }
+
+  .photo-info {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 25px;
+    font-size: 14px;
+    z-index: 10000;
+    max-width: 90%;
+    text-align: center;
+  }
+
+  .photo-info a {
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .photo-info a:hover {
+    text-decoration: underline;
+  }
+
+  /* Bottom Action Bar */
+  .bottom-action-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 10000;
+  }
+
+  .action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .action-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #fff;
+    font-size: 20px;
+    position: relative;
+  }
+
+  .action-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+  }
+
+  .action-btn.liked {
+    color: #ff3040;
+  }
+
+  .like-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ff3040;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+  }
+
+  /* Three-dot menu */
+  .three-dot-menu {
+    position: relative;
+  }
+
+  .menu-dropdown {
+    position: absolute;
+    bottom: 60px;
+    right: 0;
+    background: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 8px 0;
+    min-width: 180px;
+    display: none;
+    z-index: 100000;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    overflow: visible;
+  }
+
+  .menu-dropdown.show {
+    display: block;
+    animation: slideUp 0.2s ease;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    color: #fff;
+    text-decoration: none;
+    font-size: 14px;
+    transition: background 0.2s;
+    cursor: pointer;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+
+  .menu-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .menu-item i {
+    font-size: 18px;
+    width: 20px;
+    text-align: center;
+  }
+
+  .menu-item.danger {
+    color: #ff6b6b;
+  }
+
+  @media (max-width: 768px) {
+    .close-btn {
+      top: 15px;
+      right: 15px;
+      width: 45px;
+      height: 45px;
+      font-size: 20px;
+    }
+
+    .photo-info {
+      bottom: 15px;
+      font-size: 12px;
+      padding: 10px 16px;
+    }
+  }
+</style>
+
+<div class="fullscreen-container" id="fullscreenContainer">
+  <a href="{% url 'groups:groups_detail' group.id %}" class="close-btn"
+     hx-get="{% url 'groups:groups_detail' group.id %}"
+     hx-target="#page-content-target"
+     hx-swap="innerHTML"
+     hx-push-url="true"
+     hx-history="true"
+     aria-label="Close fullscreen view">
+    <i class="bi bi-x-lg"></i>
+  </a>
+
+  <img src="{{ photo_url }}" class="fullscreen-image" alt="{{ photo_title }}" id="fullscreenImage">
+
+  <div class="photo-info">
+    <a href="{% url 'groups:groups_detail' group.id %}"
+       hx-get="{% url 'groups:groups_detail' group.id %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true">{{ group.name }}</a>
+    {% if photo_type == 'group' %}'s Group Photo{% else %}'s Cover Photo{% endif %}
+  </div>
+
+  <!-- Bottom Action Bar -->
+  <div class="bottom-action-bar">
+    <div class="action-buttons">
+      <button class="action-btn like-btn {% if is_liked %}liked{% endif %}" data-photo-type="{{ photo_type }}" data-group-id="{{ group.id }}" aria-label="Like photo">
+        <i class="bi bi-heart{% if is_liked %}-fill{% endif %}"></i>
+        <span class="like-count">{{ like_count }}</span>
+      </button>
+    </div>
+    <div class="three-dot-menu">
+      <button class="action-btn menu-btn" aria-label="More options">
+        <i class="bi bi-three-dots"></i>
+      </button>
+      <div class="menu-dropdown">
+        <a href="#" class="menu-item download-btn" data-image-url="{{ photo_url }}" data-filename="{{ group.name }}_{{ photo_type }}.jpg">
+          <i class="bi bi-download"></i> Download
+        </a>
+        <a href="#" class="menu-item danger report-btn">
+          <i class="bi bi-flag"></i> Report
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  function initGroupPhotoFullscreenViewer() {
+    const container = document.getElementById('fullscreenContainer');
+    if (!container) return;
+    const closeBtn = container.querySelector('.close-btn');
+
+    // Keyboard navigation
+    function handleKeyDown(e) {
+      if (!document.getElementById('fullscreenContainer')) {
+        document.removeEventListener('keydown', handleKeyDown);
+        return;
+      }
+      if (e.key === 'Escape' && closeBtn) {
+        closeBtn.click();
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Menu toggle functionality
+    const menuBtn = container.querySelector('.menu-btn');
+    const menuDropdown = container.querySelector('.menu-dropdown');
+    if (menuBtn && menuDropdown) {
+      menuBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        menuDropdown.classList.toggle('show');
+      });
+      document.addEventListener('click', function(e) {
+        if (!menuDropdown.contains(e.target) && !menuBtn.contains(e.target)) {
+          menuDropdown.classList.remove('show');
+        }
+      });
+    }
+
+    // Download button functionality
+    const downloadBtn = container.querySelector('.download-btn');
+    if (downloadBtn) {
+      downloadBtn.addEventListener('click', async function(e) {
+        e.preventDefault();
+        const imageUrl = this.getAttribute('data-image-url');
+        const filename = this.getAttribute('data-filename');
+        try {
+          const module = await import('/static/js/storage/downloads_manager.js');
+          const downloadsManager = module.downloadsManager;
+          await downloadsManager.download({
+            url: imageUrl,
+            filename: filename,
+            mimeType: 'image/jpeg',
+            category: 'image'
+          });
+        } catch (error) {
+          console.error('Download failed:', error);
+          alert('Download failed: ' + error.message);
+        }
+      });
+    }
+
+    // Like button functionality
+    const likeBtn = container.querySelector('.like-btn');
+    if (likeBtn) {
+      likeBtn.addEventListener('click', async function(e) {
+        e.preventDefault();
+        const photoType = this.getAttribute('data-photo-type');
+        const groupId = this.getAttribute('data-group-id');
+        try {
+          const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : '';
+          const response = await fetch(`/api/groups/${groupId}/photos/${photoType}/like/`, {
+            method: 'POST',
+            headers: {
+              'X-CSRFToken': csrfToken,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (response.ok) {
+            const data = await response.json();
+            this.classList.toggle('liked');
+            const icon = this.querySelector('i');
+            icon.classList.toggle('bi-heart');
+            icon.classList.toggle('bi-heart-fill');
+            const countSpan = this.querySelector('.like-count');
+            countSpan.textContent = data.likes_count;
+          }
+        } catch (error) {
+          console.error('Like failed:', error);
+        }
+      });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGroupPhotoFullscreenViewer);
+  } else {
+    initGroupPhotoFullscreenViewer();
+  }
+})();
+</script>

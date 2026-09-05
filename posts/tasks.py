@@ -132,18 +132,276 @@ def create_post_with_media(self, user_id, content, unit_id=None, group_id=None,
         raise
 
 
-@shared_task
-def process_large_video(post_id, video_file_path):
+@shared_task(bind=True, max_retries=3, default_retry_delay=30)
+def process_large_video(self, post_id):
     """
-    Process large video files in the background (compression, transcoding, etc.)
-    
+    Transcode an uploaded video into multi-bitrate HLS streams.
+
+    Produces up to three renditions (360p / 480p / 720p) depending on
+    the source resolution, writes a master playlist, and updates the
+    Post model throughout.
+
+    Progress is broadcast over Django Channels to the ``feed_{user_id}``
+    group so the persistent upload banner can show live percentages.
+
     Args:
-        post_id: ID of the post
-        video_file_path: Path to the video file to process
+        post_id: Primary key of the Post whose ``video`` field should be
+                 transcoded.
     """
-    # This would contain video processing logic
-    # For now, it's a placeholder for future implementation
-    pass
+    import subprocess
+    import tempfile
+    import shutil
+    import json as _json
+    from django.conf import settings
+    from channels.layers import get_channel_layer
+    from asgiref.sync import async_to_sync
+    from posts.models import Post
+
+    FFMPEG  = '/usr/bin/ffmpeg'
+    FFPROBE = '/usr/bin/ffprobe'
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+    def _emit(user_id, payload):
+        """Send a video.progress message to the user's feed channel group."""
+        try:
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f'feed_{user_id}',
+                {'type': 'video_progress', **payload},
+            )
+        except Exception as exc:
+            logger.warning('Could not emit video progress for user %s: %s', user_id, exc)
+
+    def _probe(video_path):
+        """Return (duration_seconds, width, height) via ffprobe."""
+        cmd = [
+            FFPROBE, '-v', 'quiet', '-print_format', 'json',
+            '-show_streams', video_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True, check=True)
+        info = _json.loads(result.stdout)
+        video_stream = next(
+            (s for s in info.get('streams', []) if s.get('codec_type') == 'video'),
+            {}
+        )
+        duration = float(video_stream.get('duration', 0) or info.get('format', {}).get('duration', 0))
+        width  = int(video_stream.get('width',  0))
+        height = int(video_stream.get('height', 0))
+        return duration, width, height
+
+    # ------------------------------------------------------------------
+    # Rendition ladder: (label, target_height, video_kbps, audio_kbps)
+    # Renditions taller than the source are skipped automatically.
+    # Higher audio bitrates (128k/160k/192k) prevent metallic/scratchy quantization artifacts.
+    # ------------------------------------------------------------------
+    RENDITIONS = [
+        ('360p',  360,  800, 128),
+        ('480p',  480, 1400, 160),
+        ('720p',  720, 2800, 192),
+    ]
+
+    post = None
+    tmp_dir = None
+    try:
+        post = Post.objects.get(id=post_id)
+        user_id = post.author_id
+
+        if not post.video:
+            logger.info('[HLS] Post %s has no video, skipping', post_id)
+            return
+
+        # Mark as transcoding
+        Post.objects.filter(id=post_id).update(video_status=Post.VIDEO_STATUS_TRANSCODING)
+        _emit(user_id, {
+            'post_id':  post_id,
+            'status':   'transcoding',
+            'progress': 0,
+            'message':  'Starting video transcoding…',
+        })
+
+        # ------------------------------------------------------------------
+        # Resolve source path (local filesystem or cloud storage download)
+        # ------------------------------------------------------------------
+        try:
+            # Local filesystem — fastest path
+            source_path = post.video.path
+        except (NotImplementedError, ValueError):
+            # Cloud storage: download to a temp file
+            tmp_dir = tempfile.mkdtemp(prefix='pwani_hls_')
+            ext = os.path.splitext(post.video.name)[1] or '.mp4'
+            source_path = os.path.join(tmp_dir, f'source{ext}')
+            with post.video.open('rb') as src, open(source_path, 'wb') as dst:
+                shutil.copyfileobj(src, dst)
+
+        # Probe source
+        duration, src_width, src_height = _probe(source_path)
+        logger.info('[HLS] Post %s: duration=%.1fs  %dx%d', post_id, duration, src_width, src_height)
+
+        # Update duration on post
+        if duration:
+            Post.objects.filter(id=post_id).update(video_duration=int(duration))
+
+        # ------------------------------------------------------------------
+        # Prepare output directory
+        # ------------------------------------------------------------------
+        hls_rel_dir = os.path.join('posts', 'videos', str(post_id), 'hls')
+        hls_abs_dir = os.path.join(settings.MEDIA_ROOT, hls_rel_dir)
+        os.makedirs(hls_abs_dir, exist_ok=True)
+
+        # ------------------------------------------------------------------
+        # Transcode renditions
+        # ------------------------------------------------------------------
+        produced = []   # list of (label, bandwidth_bps, playlist_rel_path)
+        eligible  = [(lbl, h, vk, ak) for lbl, h, vk, ak in RENDITIONS if src_height == 0 or h <= src_height]
+        if not eligible:
+            eligible = [RENDITIONS[0]]  # always produce at least 360p
+
+        total_steps = len(eligible)
+        for step, (label, target_h, video_kbps, audio_kbps) in enumerate(eligible, start=1):
+            _emit(user_id, {
+                'post_id':  post_id,
+                'status':   'transcoding',
+                'progress': int((step - 1) / total_steps * 90),
+                'message':  f'Encoding {label}…',
+            })
+
+            out_dir      = os.path.join(hls_abs_dir, label)
+            os.makedirs(out_dir, exist_ok=True)
+            playlist_abs = os.path.join(out_dir, 'index.m3u8')
+            segment_tmpl = os.path.join(out_dir, 'seg%05d.ts')
+
+            # Scale: keep aspect ratio, height = target_h, force even dims
+            vf_scale = f'scale=-2:{target_h}'
+
+            cmd = [
+                FFMPEG, '-y',
+                '-i', source_path,
+                '-vf', vf_scale,
+                '-c:v', 'libx264',
+                '-preset', 'fast',
+                '-crf', '23',
+                '-maxrate', f'{video_kbps}k',
+                '-bufsize', f'{video_kbps * 2}k',
+                # Audio settings:
+                # 1. Higher bitrates (128k+) prevent high-frequency swishing/scratchiness
+                # 2. aresample=async=1 synchronizes timestamps across 6s HLS chunks
+                # 3. -ar 48000 enforces broadcast-standard audio sample rate
+                # 4. -profile:a aac_low ensures universal clean AAC-LC playback
+                '-c:a', 'aac',
+                '-b:a', f'{audio_kbps}k',
+                '-ar', '48000',
+                '-ac', '2',
+                '-af', 'aresample=async=1:first_pts=0',
+                '-profile:a', 'aac_low',
+                # HLS muxer options
+                '-f', 'hls',
+                '-hls_time', '6',
+                '-hls_list_size', '0',
+                '-hls_segment_filename', segment_tmpl,
+                '-hls_flags', 'independent_segments',
+                playlist_abs,
+            ]
+
+            logger.info('[HLS] Running: %s', ' '.join(cmd))
+            proc = subprocess.run(cmd, capture_output=True)
+
+            if proc.returncode != 0:
+                stderr_text = proc.stderr.decode('utf-8', errors='replace')
+                logger.error('[HLS] FFmpeg failed for %s/%s: %s', post_id, label, stderr_text)
+                raise RuntimeError(f'FFmpeg failed for {label}: {stderr_text[-500:]}')
+
+            playlist_rel = os.path.join(hls_rel_dir, label, 'index.m3u8')
+            produced.append((label, (video_kbps + audio_kbps) * 1000, playlist_rel))
+            logger.info('[HLS] Post %s: %s done', post_id, label)
+
+        # ------------------------------------------------------------------
+        # Write master playlist
+        # ------------------------------------------------------------------
+        master_abs = os.path.join(hls_abs_dir, 'master.m3u8')
+        master_rel = os.path.join(hls_rel_dir, 'master.m3u8')
+
+        with open(master_abs, 'w') as f:
+            f.write('#EXTM3U\n')
+            f.write('#EXT-X-VERSION:3\n')
+            for label, bandwidth, playlist_rel in produced:
+                # Use a relative URL: ../360p/index.m3u8 etc.
+                playlist_name = os.path.join(label, 'index.m3u8')
+                f.write(f'#EXT-X-STREAM-INF:BANDWIDTH={bandwidth},NAME="{label}"\n')
+                f.write(f'{playlist_name}\n')
+
+        # ------------------------------------------------------------------
+        # Upload HLS files to Cloudflare R2 if cloud storage is active
+        # ------------------------------------------------------------------
+        if getattr(settings, 'USE_S3', False):
+            _emit(user_id, {
+                'post_id':  post_id,
+                'status':   'transcoding',
+                'progress': 95,
+                'message':  'Uploading video streams to CDN…',
+            })
+            try:
+                import boto3
+                r2_cfg = getattr(settings, 'R2_BOTO3_CONFIG', {})
+                s3_client = boto3.client('s3', **r2_cfg)
+                bucket_name = settings.AWS_STORAGE_BUCKET_NAME
+
+                for root, _, files in os.walk(hls_abs_dir):
+                    for fname in files:
+                        file_path = os.path.join(root, fname)
+                        rel_to_media = os.path.relpath(file_path, settings.MEDIA_ROOT)
+                        s3_key = f"media/{rel_to_media.replace(os.sep, '/')}"
+                        content_type = 'application/vnd.apple.mpegurl' if fname.endswith('.m3u8') else 'video/mp2t'
+                        extra_args = {
+                            'ContentType': content_type,
+                            'CacheControl': 'max-age=3600' if fname.endswith('.m3u8') else 'max-age=31536000, public',
+                        }
+                        s3_client.upload_file(file_path, bucket_name, s3_key, ExtraArgs=extra_args)
+                logger.info('[HLS] Uploaded all HLS files to R2 bucket %s for post %s', bucket_name, post_id)
+            except Exception as r2_err:
+                logger.error('[HLS] Failed to upload HLS files to R2 for post %s: %s', post_id, r2_err)
+                raise
+
+        # ------------------------------------------------------------------
+        # Persist & emit done
+        # ------------------------------------------------------------------
+        Post.objects.filter(id=post_id).update(
+            video_status=Post.VIDEO_STATUS_READY,
+            hls_playlist=master_rel,
+        )
+        final_hls_url = f"{settings.MEDIA_URL.rstrip('/')}/{master_rel.lstrip('/')}"
+        _emit(user_id, {
+            'post_id':    post_id,
+            'status':     'ready',
+            'progress':   100,
+            'message':    'Video is ready!',
+            'hls_url':    final_hls_url,
+        })
+        logger.info('[HLS] Post %s: all renditions complete → %s', post_id, master_rel)
+
+    except Post.DoesNotExist:
+        logger.error('[HLS] Post %s not found', post_id)
+
+    except Exception as exc:
+        logger.error('[HLS] Transcoding failed for post %s: %s', post_id, exc, exc_info=True)
+        if post:
+            Post.objects.filter(id=post_id).update(video_status=Post.VIDEO_STATUS_FAILED)
+            try:
+                _emit(post.author_id, {
+                    'post_id':  post_id,
+                    'status':   'failed',
+                    'progress': 0,
+                    'message':  'Video processing failed.',
+                })
+            except Exception:
+                pass
+        raise self.retry(exc=exc)
+
+    finally:
+        if tmp_dir and os.path.isdir(tmp_dir):
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
 
 
 @shared_task
@@ -365,14 +623,27 @@ def generate_video_poster(post_id):
             return
         
         import subprocess
+        import tempfile
+        import shutil
         from django.conf import settings
-        
-        video_path = post.video.path
+
+        tmp_video_path = None
+        try:
+            video_path = post.video.path
+        except (NotImplementedError, ValueError, AttributeError):
+            # Cloud storage: download to temporary file
+            ext = os.path.splitext(post.video.name)[1] or '.mp4'
+            tmp_fd, tmp_video_path = tempfile.mkstemp(prefix=f'poster_{post.id}_', suffix=ext)
+            os.close(tmp_fd)
+            with post.video.open('rb') as src, open(tmp_video_path, 'wb') as dst:
+                shutil.copyfileobj(src, dst)
+            video_path = tmp_video_path
+
         poster_path = os.path.join(settings.MEDIA_ROOT, 'posts/videos/posters', f"post_{post.id}_poster.jpg")
-        
+
         # Ensure directory exists
         os.makedirs(os.path.dirname(poster_path), exist_ok=True)
-        
+
         # Use ffmpeg to extract first frame as poster
         try:
             cmd = [
@@ -384,16 +655,24 @@ def generate_video_poster(post_id):
                 poster_path
             ]
             subprocess.run(cmd, check=True, capture_output=True)
-            
-            # Update post with poster
+
+            # Update post with poster (uses Django storage backend, saves to R2 automatically if USE_S3=1)
             with open(poster_path, 'rb') as f:
                 post.video_poster.save(f"post_{post.id}_poster.jpg", f, save=True)
-            
+
             logger.info(f"Generated video poster for post {post_id}")
-            
+
         except subprocess.CalledProcessError as e:
             logger.error(f"FFmpeg error for post {post_id}: {e.stderr.decode() if e.stderr else str(e)}")
         except FileNotFoundError:
+            logger.warning("FFmpeg not found, skipping video poster generation")
+        finally:
+            if tmp_video_path and os.path.exists(tmp_video_path):
+                try:
+                    os.remove(tmp_video_path)
+                except Exception:
+                    pass
+
             logger.warning("FFmpeg not found, skipping video poster generation")
             
     except Post.DoesNotExist:

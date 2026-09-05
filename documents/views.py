@@ -57,7 +57,12 @@ def repository_home(request):
         'recent_documents': recent_documents,
         'popular_documents': popular_documents,
         'recent_searches': recent_searches,
+        'document_content_partial': 'documents/partials/home_content.html',
+        'show_library_button': True,
+        'show_upload_button': True,
     }
+    if request.headers.get('HX-Request'):
+        return render(request, 'documents/partials/documents_navigation_partial.html', context)
     return render(request, 'documents/home.html', context)
 
 
@@ -186,7 +191,12 @@ def search_results(request):
         'schools': schools,
         'departments': departments,
         'did_you_mean': did_you_mean,
+        'document_content_partial': 'documents/partials/search_content.html',
+        'show_library_button': True,
+        'show_upload_button': True,
     }
+    if request.headers.get('HX-Request'):
+        return render(request, 'documents/partials/documents_navigation_partial.html', context)
     return render(request, 'documents/search.html', context)
 
 
@@ -195,8 +205,13 @@ def clear_recent_searches(request):
     Clear recent searches from session.
     """
     request.session['recent_searches'] = []
+    if request.headers.get('HX-Request'):
+        from django.http import HttpResponse
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = request.META.get('HTTP_REFERER', '/documents/search/')
+        return response
     from django.http import HttpResponseRedirect
-    return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
+    return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/documents/search/'))
 
 
 def document_detail(request, document_id):
@@ -285,7 +300,12 @@ def document_detail(request, document_id):
         'is_bookmarked': is_bookmarked,
         'user_rating': user_rating,
         'analytics': analytics,
+        'document_content_partial': 'documents/partials/document_detail_content.html',
+        'show_library_button': True,
+        'show_upload_button': False,
     }
+    if request.headers.get('HX-Request'):
+        return render(request, 'documents/partials/documents_navigation_partial.html', context)
     return render(request, 'documents/document_detail.html', context)
 
 
@@ -434,7 +454,12 @@ def upload_document(request):
         'semesters': semesters,
         'academic_years': academic_years,
         'academic_levels': academic_levels,
+        'document_content_partial': 'documents/partials/upload_content.html',
+        'show_library_button': True,
+        'show_upload_button': False,
     }
+    if request.headers.get('HX-Request'):
+        return render(request, 'documents/partials/documents_navigation_partial.html', context)
     return render(request, 'documents/upload.html', context)
 
 
@@ -506,7 +531,12 @@ def my_library(request):
         'view_count': view_count,
         'recent_uploads': recent_uploads,
         'recent_bookmarks': recent_bookmarks,
+        'document_content_partial': 'documents/partials/my_library_content.html',
+        'show_library_button': False,
+        'show_upload_button': True,
     }
+    if request.headers.get('HX-Request'):
+        return render(request, 'documents/partials/documents_navigation_partial.html', context)
     return render(request, 'documents/my_library.html', context)
 
 
@@ -519,6 +549,11 @@ def clear_history(request):
         DocumentView.objects.filter(user=request.user).delete()
         from django.contrib import messages
         messages.success(request, 'Your viewing history has been cleared.')
+    if request.headers.get('HX-Request'):
+        from django.http import HttpResponse
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = request.META.get('HTTP_REFERER', '/documents/library/')
+        return response
     from django.http import HttpResponseRedirect
     return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/documents/library/'))
 
@@ -537,7 +572,12 @@ def my_uploads(request):
     context = {
         'page_title': 'My Uploads',
         'documents': documents,
+        'document_content_partial': 'documents/partials/library_uploads_content.html',
+        'show_library_button': False,
+        'show_upload_button': True,
     }
+    if request.headers.get('HX-Request'):
+        return render(request, 'documents/partials/documents_navigation_partial.html', context)
     return render(request, 'documents/library_uploads.html', context)
 
 
@@ -553,7 +593,12 @@ def my_bookmarks(request):
     context = {
         'page_title': 'My Bookmarks',
         'bookmarks': bookmarks,
+        'document_content_partial': 'documents/partials/library_bookmarks_content.html',
+        'show_library_button': False,
+        'show_upload_button': True,
     }
+    if request.headers.get('HX-Request'):
+        return render(request, 'documents/partials/documents_navigation_partial.html', context)
     return render(request, 'documents/library_bookmarks.html', context)
 
 
@@ -569,7 +614,12 @@ def my_downloads(request):
     context = {
         'page_title': 'My Downloads',
         'downloads': downloads,
+        'document_content_partial': 'documents/partials/library_downloads_content.html',
+        'show_library_button': False,
+        'show_upload_button': True,
     }
+    if request.headers.get('HX-Request'):
+        return render(request, 'documents/partials/documents_navigation_partial.html', context)
     return render(request, 'documents/library_downloads.html', context)
 
 
@@ -585,7 +635,12 @@ def my_history(request):
     context = {
         'page_title': 'My History',
         'views': views,
+        'document_content_partial': 'documents/partials/library_history_content.html',
+        'show_library_button': False,
+        'show_upload_button': True,
     }
+    if request.headers.get('HX-Request'):
+        return render(request, 'documents/partials/documents_navigation_partial.html', context)
     return render(request, 'documents/library_history.html', context)
 
 

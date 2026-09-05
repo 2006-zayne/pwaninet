@@ -24,6 +24,11 @@
         <div class="actor-stack flex-shrink-0" style="position: relative; width: 72px; height: 72px; margin-left: -16px;">
           {% for actor in payload.actors|slice:":3" %}
             <a href="{% url 'users:profile' actor.username %}"
+               hx-get="{% url 'users:profile' actor.username %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
                class="rounded-circle border position-absolute"
                style="{% if forloop.first %}left: 0px;{% elif forloop.counter == 2 %}left: 14px;{% else %}left: 28px;{% endif %} width: 48px; height: 48px; background-color: var(--bg-secondary); z-index: {{ 3|add:forloop.counter0 }}; top: 12px; text-decoration: none;"
                onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
@@ -127,6 +132,11 @@
           {# Show actor avatar for other notifications #}
           {% with actor=payload.actors.0 %}
           <a href="{% url 'users:profile' actor.username %}"
+             hx-get="{% url 'users:profile' actor.username %}"
+             hx-target="#page-content-target"
+             hx-swap="innerHTML"
+             hx-push-url="true"
+             hx-history="true"
              class="rounded-circle border d-flex align-items-center justify-content-center"
              style="width: 72px; height: 72px; background-color: var(--bg-secondary); text-decoration: none; margin-left: -16px;"
              onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
@@ -217,6 +227,13 @@
                   </button>
                 {% else %}
                   <a href="{{ action.url }}"
+                     {% if action.id != 'SEE_WHATS_NEW' %}
+                     hx-get="{{ action.url }}"
+                     hx-target="#page-content-target"
+                     hx-swap="innerHTML"
+                     hx-push-url="true"
+                     hx-history="true"
+                     {% endif %}
                      class="btn btn-sm"
                      style="background-color: {% if action.style == 'primary' %}var(--brand){% elif action.style == 'danger' %}var(--danger){% elif action.style == 'success' %}var(--success){% else %}var(--bg-secondary){% endif %}; color: {% if action.style in 'primary danger success' %}white{% else %}var(--text-primary){% endif %}; text-decoration: none; border-radius: 20px;"
                      onclick="{% if action.id == 'SEE_WHATS_NEW' %}event.preventDefault(); event.stopPropagation(); console.log('Opening modal for release:', '{{ payload.raw_data.target_id }}'); console.log('Function check:', typeof window.openWhatsNewModal); if (typeof window.openWhatsNewModal === 'function') { window.openWhatsNewModal('{{ payload.raw_data.target_id }}', event); } else { console.error('openWhatsNewModal function not found on window object'); console.log('Available window functions:', Object.keys(window).filter(k => k.includes('whats') || k.includes('Whats'))); }{% else %}event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this);{% endif %}"
@@ -247,6 +264,11 @@
             <div class="d-flex flex-column gap-2 py-2">
               {% for actor in payload.actors|slice:":5" %}
                 <a href="{% url 'users:profile' actor.username %}"
+                   hx-get="{% url 'users:profile' actor.username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
                    class="d-flex align-items-center gap-2 p-2 rounded"
                    style="text-decoration: none; color: var(--text-primary); background-color: var(--bg-secondary);"
                    onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
@@ -344,6 +366,11 @@
       {% if components.preview and preview.enabled and payload.resource %}
         {% if payload.resource.url %}
         <a href="{{ payload.resource.url }}"
+           hx-get="{{ payload.resource.url }}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-history="true"
            class="resource-preview flex-shrink-0"
            style="width: 60px; height: 60px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background-color: var(--bg-secondary); text-decoration: none; margin-right: -16px;"
            onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">

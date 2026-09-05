@@ -1,0 +1,44 @@
+{% load static %}
+{% load humanize %}
+
+<!-- Back Navigation -->
+<div class="doc-back-nav" style="margin-bottom: 24px;">
+    <a href="{% url 'documents:my_library' %}" 
+       hx-get="{% url 'documents:my_library' %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true"
+       class="doc-back-link"
+       style="display: inline-flex; align-items: center; gap: 8px; 
+              color: var(--text-secondary); text-decoration: none; 
+              font-weight: 500; font-size: 0.9rem;">
+        <i class="bi bi-arrow-left"></i>
+        Back to Library
+    </a>
+</div>
+
+<!-- Header -->
+<div class="doc-library-header" style="padding: 40px 20px;">
+    <h1 class="doc-library-title" 
+        style="font-size: 2rem; font-weight: 700; margin: 0 0 12px 0; 
+               color: var(--text-dark);">
+        My History
+    </h1>
+    <p class="doc-library-subtitle" 
+       style="font-size: 1rem; color: var(--text-secondary); margin: 0;">
+        Documents you've recently viewed
+    </p>
+</div>
+
+<!-- Library Navigation Tabs -->
+{% include 'documents/partials/library_tabs.html' with active_tab='history' %}
+
+<!-- History Grid -->
+<div class="doc-history-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+    {% for view in views %}
+        {% include 'documents/partials/document_card.html' with document=view.document %}
+    {% empty %}
+        {% include 'documents/partials/empty_state.html' with title="No viewing history yet" message="Start exploring documents to build your viewing history." %}
+    {% endfor %}
+</div>

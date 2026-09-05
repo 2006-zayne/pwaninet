@@ -78,6 +78,11 @@
               <!-- Activity Links -->
               {% if notif.post %}
                 <a href="{% url 'posts:post_details' notif.post.id %}" 
+                   hx-get="{% url 'posts:post_details' notif.post.id %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
                    class="activity-link"
                    onclick="markActivityAsRead({{ notif.id }}, event)">
                   View post
@@ -85,6 +90,11 @@
               {% endif %}
               {% if notif.group %}
                 <a href="{% url 'groups:groups_detail' notif.group.id %}" 
+                   hx-get="{% url 'groups:groups_detail' notif.group.id %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
                    class="activity-link"
                    onclick="markActivityAsRead({{ notif.id }}, event)">
                   {{ notif.group.name }}
@@ -92,6 +102,11 @@
               {% endif %}
               {% if notif.notification_type == 'FOLLOW' %}
                 <a href="{% url 'users:profile' notif.sender.username %}" 
+                   hx-get="{% url 'users:profile' notif.sender.username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
                    class="activity-link"
                    onclick="markActivityAsRead({{ notif.id }}, event)">
                   View profile
@@ -137,17 +152,32 @@
     <!-- Render as activity-grouped -->
     {% if item.post %}
       <a href="{% url 'posts:post_details' item.post.id %}" 
+         hx-get="{% url 'posts:post_details' item.post.id %}"
+         hx-target="#page-content-target"
+         hx-swap="innerHTML"
+         hx-push-url="true"
+         hx-history="true"
          class="notif-item {% if not item.is_read %}unread{% endif %}"
          onclick="markGroupAsRead({{ item.notifications.0.id }}, event)"
          style="text-decoration: none; display: block;">
     {% elif item.group %}
       <a href="{% url 'groups:groups_detail' item.group.id %}" 
+         hx-get="{% url 'groups:groups_detail' item.group.id %}"
+         hx-target="#page-content-target"
+         hx-swap="innerHTML"
+         hx-push-url="true"
+         hx-history="true"
          class="notif-item {% if not item.is_read %}unread{% endif %}"
          onclick="markGroupAsRead({{ item.notifications.0.id }}, event)"
          style="text-decoration: none; display: block;">
     {% elif item.notification_type == 'FOLLOW' %}
       {% if item.notifications.0.sender.username and item.notifications.0.sender.username != "" %}
       <a href="{% url 'users:profile' item.notifications.0.sender.username %}" 
+         hx-get="{% url 'users:profile' item.notifications.0.sender.username %}"
+         hx-target="#page-content-target"
+         hx-swap="innerHTML"
+         hx-push-url="true"
+         hx-history="true"
          class="notif-item {% if not item.is_read %}unread{% endif %}"
          onclick="markGroupAsRead({{ item.notifications.0.id }}, event)"
          style="text-decoration: none; display: block;">

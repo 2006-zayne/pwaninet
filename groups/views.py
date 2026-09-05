@@ -8,6 +8,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.urls import reverse
 from django.db.models import Q, Count
 from django.db import transaction
 from django.views.decorators.http import require_http_methods
@@ -847,19 +848,26 @@ def groups_detail_view(request, group_id):
     context['liked_post_ids'] = liked_post_ids
     context['unread_notifications_count'] = get_cached_unread_count(request.user)
 
-    # Check if HTMX request for more posts
+    # Check if HTMX request
     if request.headers.get('HX-Request'):
-        return render(request, 'posts/partials/post_cards_list.html', {
-            'posts': context['posts'],
-            'has_more_posts': context['has_next'],
-            'liked_post_ids': liked_post_ids,
-        })
+        # If pagination request for infinite scroll of group posts
+        if request.headers.get('HX-Target') == 'posts-container' or (request.GET.get('page') and page > 1):
+            return render(request, 'groups/partials/group_post_cards_list.html', {
+                'group': group,
+                'posts': context['posts'],
+                'has_more_posts': context['has_next'],
+                'next_page': context.get('next_page'),
+                'liked_post_ids': liked_post_ids,
+                'is_member': context.get('is_member'),
+            })
+        return render(request, 'groups/partials/groups_detail_navigation_partial.html', context)
 
     return render(request, 'groups/groups_detail.html', context)
 
 
 @login_required
 def create_group_view(request):
+    is_htmx = bool(request.headers.get('HX-Request'))
     if request.method == 'POST':
         form = GroupForm(request.POST, request.FILES)
         if form.is_valid():
@@ -868,10 +876,17 @@ def create_group_view(request):
             group.save()
             Membership.objects.create(group=group, user=request.user, role=MembershipRole.ADMIN, status=MembershipStatus.APPROVED)
             messages.success(request, f'Squad "{group.name}" created successfully.')
+            if is_htmx:
+                from django.urls import reverse
+                response = HttpResponse(status=204)
+                response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
+                return response
             return redirect('groups:groups_detail', group_id=group.id)
     else:
         form = GroupForm()
-    return render(request, 'groups/create_group.html', {'form': form})
+
+    template = 'groups/partials/create_group_navigation_partial.html' if is_htmx else 'groups/create_group.html'
+    return render(request, template, {'form': form})
 
 
 # ============================================================================
@@ -1502,14 +1517,18 @@ def view_group_photo_fullscreen(request, group_id, photo_type):
         photo_type=photo_type
     ).exists()
 
-    return render(request, 'groups/group_photo_fullscreen.html', {
+    context = {
         'group': group,
         'photo_url': photo_url,
         'photo_type': photo_type,
         'photo_title': photo_title,
         'like_count': like_count,
         'is_liked': is_liked,
-    })
+    }
+
+    if request.headers.get('HX-Request'):
+        return render(request, 'groups/partials/group_photo_fullscreen_navigation_partial.html', context)
+    return render(request, 'groups/group_photo_fullscreen.html', context)
 
 
 @login_required
@@ -1616,6 +1635,9 @@ def group_announcements_view(request, group_id):
         'is_admin': is_admin,
     }
 
+    if request.headers.get('HX-Request'):
+        return render(request, 'groups/partials/group_announcements_navigation_partial.html', context)
+
     return render(request, 'groups/group_announcements.html', context)
 
 
@@ -1633,6 +1655,10 @@ def group_settings_view(request, group_id):
         )
     except Membership.DoesNotExist:
         messages.error(request, 'You must be a member to view group settings.')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
+            return response
         return redirect('groups:groups_detail', group_id=group.id)
 
     # Check if user is admin
@@ -1643,6 +1669,8 @@ def group_settings_view(request, group_id):
         'is_admin': is_admin,
     }
 
+    if request.headers.get('HX-Request'):
+        return render(request, 'groups/partials/group_settings_navigation_partial.html', context)
     return render(request, 'groups/group_settings.html', context)
 
 
@@ -1683,6 +1711,10 @@ def group_settings_details_view(request, group_id):
         )
     except Membership.DoesNotExist:
         messages.error(request, 'You must be a member to view group settings.')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
+            return response
         return redirect('groups:groups_detail', group_id=group.id)
 
     # Check if user is admin
@@ -1703,6 +1735,10 @@ def group_settings_details_view(request, group_id):
         if form.is_valid():
             form.save()
             messages.success(request, 'Group details updated successfully.')
+            if request.headers.get('HX-Request'):
+                response = HttpResponse(status=204)
+                response['HX-Redirect'] = reverse('groups:group_settings_details', kwargs={'group_id': group.id})
+                return response
             return redirect('groups:group_settings_details', group_id=group.id)
         else:
             messages.error(request, 'Please correct the errors below.')
@@ -1713,8 +1749,11 @@ def group_settings_details_view(request, group_id):
         'group': group,
         'form': form,
         'can_edit': can_edit,
+        'subpage_content_partial': 'groups/settings/partials/group_settings_details_content.html',
     }
 
+    if request.headers.get('HX-Request'):
+        return render(request, 'groups/settings/partials/group_settings_subpage_navigation_partial.html', context)
     return render(request, 'groups/settings/group_settings_details.html', context)
 
 
@@ -1732,6 +1771,10 @@ def group_settings_members_view(request, group_id):
         )
     except Membership.DoesNotExist:
         messages.error(request, 'You must be a member to view group settings.')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
+            return response
         return redirect('groups:groups_detail', group_id=group.id)
 
     # Check if user is admin (only admins can manage members)
@@ -1802,12 +1845,21 @@ def group_settings_members_view(request, group_id):
                     else:
                         target_membership.delete()
                         messages.success(request, f'{target_membership.user.username} removed from group.')
+                        if request.headers.get('HX-Request'):
+                            response = HttpResponse(status=204)
+                            response['HX-Redirect'] = reverse('groups:group_settings_members', kwargs={'group_id': group.id})
+                            return response
                         return redirect('groups:group_settings_members', group_id=group.id)
                 else:
                     target_membership.delete()
                     messages.success(request, f'{target_membership.user.username} removed from group.')
             except Membership.DoesNotExist:
                 messages.error(request, 'Member not found.')
+
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse('groups:group_settings_members', kwargs={'group_id': group.id})
+            return response
 
     # Get all approved members with their roles
     members = Membership.objects.filter(
@@ -1839,8 +1891,11 @@ def group_settings_members_view(request, group_id):
         'is_admin': is_admin,
         'can_invite': can_invite,
         'membership_roles': MembershipRole,
+        'subpage_content_partial': 'groups/settings/partials/group_settings_members_content.html',
     }
 
+    if request.headers.get('HX-Request'):
+        return render(request, 'groups/settings/partials/group_settings_subpage_navigation_partial.html', context)
     return render(request, 'groups/settings/group_settings_members.html', context)
 
 
@@ -1999,12 +2054,20 @@ def group_settings_privacy_view(request, group_id):
         )
     except Membership.DoesNotExist:
         messages.error(request, 'You must be a member to view group settings.')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
+            return response
         return redirect('groups:groups_detail', group_id=group.id)
 
     # Check if user is admin (only admins can access privacy settings)
     is_admin = membership.role == MembershipRole.ADMIN
     if not is_admin:
         messages.error(request, 'Only admins can access privacy settings.')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse('groups:group_settings', kwargs={'group_id': group.id})
+            return response
         return redirect('groups:group_settings', group_id=group.id)
 
     if request.method == 'POST':
@@ -2012,6 +2075,10 @@ def group_settings_privacy_view(request, group_id):
         if form.is_valid():
             form.save()
             messages.success(request, 'Privacy settings updated successfully.')
+            if request.headers.get('HX-Request'):
+                response = HttpResponse(status=204)
+                response['HX-Redirect'] = reverse('groups:group_settings_privacy', kwargs={'group_id': group.id})
+                return response
             return redirect('groups:group_settings_privacy', group_id=group.id)
         else:
             messages.error(request, 'Please correct the errors below.')
@@ -2022,8 +2089,11 @@ def group_settings_privacy_view(request, group_id):
         'group': group,
         'form': form,
         'is_admin': is_admin,
+        'subpage_content_partial': 'groups/settings/partials/group_settings_privacy_content.html',
     }
 
+    if request.headers.get('HX-Request'):
+        return render(request, 'groups/settings/partials/group_settings_subpage_navigation_partial.html', context)
     return render(request, 'groups/settings/group_settings_privacy.html', context)
 
 
@@ -2041,12 +2111,19 @@ def group_settings_announcements_view(request, group_id):
         )
     except Membership.DoesNotExist:
         messages.error(request, 'You must be a member to view group settings.')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
+            return response
         return redirect('groups:groups_detail', group_id=group.id)
 
     context = {
         'group': group,
+        'subpage_content_partial': 'groups/settings/partials/group_settings_announcements_content.html',
     }
 
+    if request.headers.get('HX-Request'):
+        return render(request, 'groups/settings/partials/group_settings_subpage_navigation_partial.html', context)
     return render(request, 'groups/settings/group_settings_announcements.html', context)
 
 
@@ -2064,12 +2141,19 @@ def group_settings_documents_view(request, group_id):
         )
     except Membership.DoesNotExist:
         messages.error(request, 'You must be a member to view group settings.')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
+            return response
         return redirect('groups:groups_detail', group_id=group.id)
 
     context = {
         'group': group,
+        'subpage_content_partial': 'groups/settings/partials/group_settings_documents_content.html',
     }
 
+    if request.headers.get('HX-Request'):
+        return render(request, 'groups/settings/partials/group_settings_subpage_navigation_partial.html', context)
     return render(request, 'groups/settings/group_settings_documents.html', context)
 
 
@@ -2087,10 +2171,17 @@ def group_settings_about_view(request, group_id):
         )
     except Membership.DoesNotExist:
         messages.error(request, 'You must be a member to view group settings.')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
+            return response
         return redirect('groups:groups_detail', group_id=group.id)
 
     context = {
         'group': group,
+        'subpage_content_partial': 'groups/settings/partials/group_settings_about_content.html',
     }
 
+    if request.headers.get('HX-Request'):
+        return render(request, 'groups/settings/partials/group_settings_subpage_navigation_partial.html', context)
     return render(request, 'groups/settings/group_settings_about.html', context)

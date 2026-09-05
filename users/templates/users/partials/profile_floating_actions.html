@@ -3,6 +3,11 @@
 <div id="profile-floating-actions"{% if oob %} hx-swap-oob="true"{% endif %}>
     {% if request.user == profile_user %}
     <a href="{% url 'documents:home' %}"
+       hx-get="{% url 'documents:home' %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true"
        class="floating-btn btn-secondary initial-animation"
        id="documents-btn"
        style="bottom: 110px;">

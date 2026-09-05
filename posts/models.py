@@ -36,6 +36,38 @@ class Post(models.Model):
     video = models.FileField(upload_to='posts/videos', blank=True, null=True)
     video_preview = models.FileField(upload_to='posts/videos/previews', blank=True, null=True)
     video_poster = models.ImageField(upload_to='posts/videos/posters', blank=True, null=True)
+
+    # Async video processing state (populated by the process_large_video Celery task)
+    VIDEO_STATUS_PENDING     = 'pending'
+    VIDEO_STATUS_TRANSCODING = 'transcoding'
+    VIDEO_STATUS_READY       = 'ready'
+    VIDEO_STATUS_FAILED      = 'failed'
+    VIDEO_STATUS_CHOICES = [
+        (VIDEO_STATUS_PENDING,     'Pending'),
+        (VIDEO_STATUS_TRANSCODING, 'Transcoding'),
+        (VIDEO_STATUS_READY,       'Ready'),
+        (VIDEO_STATUS_FAILED,      'Failed'),
+    ]
+    video_status = models.CharField(
+        max_length=20,
+        choices=VIDEO_STATUS_CHOICES,
+        default=VIDEO_STATUS_PENDING,
+        blank=True,
+        db_index=True,
+        help_text='Processing state of the uploaded video',
+    )
+    hls_playlist = models.CharField(
+        max_length=500,
+        blank=True,
+        null=True,
+        help_text='Relative path or CDN URL to the HLS master playlist (master.m3u8)',
+    )
+    video_duration = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Duration of the video in seconds (populated by ffprobe)',
+    )
+
     docs = models.FileField(upload_to='posts/docs', blank=True, null=True)
     audio = models.FileField(upload_to='posts/audio', blank=True, null=True, help_text='Attach music/audio to post')
     thumbnail = models.ImageField(upload_to='posts/thumbnails', blank=True, null=True, help_text='Thumbnail for gradient/text posts')
@@ -82,6 +114,17 @@ class Post(models.Model):
         if self.video:
             return self.video.url + '#poster'
         return None
+
+    @property
+    def get_hls_url(self):
+        """Get full CDN or media URL for HLS master playlist"""
+        if not self.hls_playlist:
+            return None
+        if self.hls_playlist.startswith('http://') or self.hls_playlist.startswith('https://'):
+            return self.hls_playlist
+        media_url = getattr(settings, 'MEDIA_URL', '/media/')
+        return f"{media_url.rstrip('/')}/{self.hls_playlist.lstrip('/')}"
+
     
     def is_liked_by(self, user):
         if user.is_authenticated:

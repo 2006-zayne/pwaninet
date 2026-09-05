@@ -2,7 +2,7 @@
 
 <div id="appearance-settings-container">
   <div class="page-header">
-    <a href="{% url 'users:settings' %}" class="back-link" hx-get="{% url 'users:settings' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">
+    <a href="{% url 'users:settings' %}" class="back-link" hx-get="{% url 'users:settings' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true">
       <i class="bi bi-arrow-left"></i> {% trans "Back to Settings" %}
     </a>
     <h1 class="page-title">{% trans "Appearance" %}</h1>

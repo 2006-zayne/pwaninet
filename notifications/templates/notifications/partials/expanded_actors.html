@@ -1,5 +1,10 @@
 {% for actor in payload.actors|slice:":5" %}
   <a href="{% url 'users:profile' actor.username %}"
+     hx-get="{% url 'users:profile' actor.username %}"
+     hx-target="#page-content-target"
+     hx-swap="innerHTML"
+     hx-push-url="true"
+     hx-history="true"
      class="d-flex align-items-center gap-2 p-2 rounded"
      style="text-decoration: none; color: var(--text-primary); background-color: var(--bg-secondary);"
      onclick="event.stopPropagation()">

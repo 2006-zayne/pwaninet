@@ -1,0 +1,118 @@
+{% load static %}
+
+<div class="container mt-3" style="padding-bottom: 80px;">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+            <h4 class="fw-bold mb-3">Shared with You</h4>
+            
+            {% if shared_posts %}
+                {% for shared_post in shared_posts %}
+                    <div class="post-card shadow-sm mb-3 bg-white rounded-3 overflow-hidden border-0">
+                        <div class="d-flex align-items-center p-3 border-bottom">
+                            <div class="position-relative me-3" style="width: 50px; height: 50px;">
+                                <a href="{% url 'users:profile' shared_post.sharer.username %}"
+                                   hx-get="{% url 'users:profile' shared_post.sharer.username %}"
+                                   hx-target="#page-content-target"
+                                   hx-swap="innerHTML"
+                                   hx-push-url="true"
+                                   hx-history="true">
+                                    <img src="{{ shared_post.sharer.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 48px; height: 48px; object-fit: cover;">
+                                </a>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-0 fw-bold small">
+                                    <a href="{% url 'users:profile' shared_post.sharer.username %}"
+                                       hx-get="{% url 'users:profile' shared_post.sharer.username %}"
+                                       hx-target="#page-content-target"
+                                       hx-swap="innerHTML"
+                                       hx-push-url="true"
+                                       hx-history="true"
+                                       class="text-dark text-decoration-none">
+                                        {{ shared_post.sharer.get_full_name|default:shared_post.sharer.username }}
+                                    </a>
+                                    <span class="text-muted fw-normal mx-1">shared a post</span>
+                                    {% if shared_post.shared_to %}
+                                        <span class="text-muted fw-normal">with you</span>
+                                    {% elif shared_post.shared_to_group %}
+                                        <span class="text-muted fw-normal">to</span>
+                                        <a href="{% url 'groups:groups_detail' shared_post.shared_to_group.id %}"
+                                           hx-get="{% url 'groups:groups_detail' shared_post.shared_to_group.id %}"
+                                           hx-target="#page-content-target"
+                                           hx-swap="innerHTML"
+                                           hx-push-url="true"
+                                           hx-history="true"
+                                           class="text-primary text-decoration-none">{{ shared_post.shared_to_group.name }}</a>
+                                    {% endif %}
+                                </h6>
+                                <small class="text-muted" style="font-size: 11px;">
+                                    {{ shared_post.created_at|timesince }} ago
+                                </small>
+                            </div>
+                            {% if not shared_post.is_viewed %}
+                                <span class="badge bg-primary rounded-pill">New</span>
+                            {% endif %}
+                        </div>
+                        
+                        {% if shared_post.message %}
+                        <div class="px-3 py-2 bg-light border-bottom">
+                            <p class="mb-0 small text-muted fst-italic">"{{ shared_post.message }}"</p>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="p-3">
+                            <a href="{% url 'posts:post_details' shared_post.original_post.id %}"
+                               hx-get="{% url 'posts:post_details' shared_post.original_post.id %}"
+                               hx-target="#page-content-target"
+                               hx-swap="innerHTML"
+                               hx-push-url="true"
+                               hx-history="true"
+                               class="text-decoration-none">
+                                <div class="d-flex align-items-center">
+                                    <div class="position-relative me-3" style="width: 40px; height: 40px;">
+                                        <a href="{% url 'users:profile' shared_post.original_post.author.username %}"
+                                           hx-get="{% url 'users:profile' shared_post.original_post.author.username %}"
+                                           hx-target="#page-content-target"
+                                           hx-swap="innerHTML"
+                                           hx-push-url="true"
+                                           hx-history="true">
+                                            <img src="{{ shared_post.original_post.author.profile_pic.url }}" class="rounded-circle border" style="width: 36px; height: 36px; object-fit: cover;">
+                                        </a>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-0 fw-bold small text-dark">
+                                            {{ shared_post.original_post.author.get_full_name|default:shared_post.original_post.author.username }}
+                                        </h6>
+                                        <small class="text-muted" style="font-size: 11px;">
+                                            {{ shared_post.original_post.created_at|timesince }} ago
+                                        </small>
+                                    </div>
+                                </div>
+                                <p class="mb-0 mt-2 text-dark small" style="line-height: 1.4;">
+                                    {{ shared_post.original_post.content|truncatewords:30 }}
+                                </p>
+                            </a>
+                        </div>
+                        
+                        <div class="px-3 py-2 border-top">
+                            <a href="{% url 'posts:post_details' shared_post.original_post.id %}"
+                               hx-get="{% url 'posts:post_details' shared_post.original_post.id %}"
+                               hx-target="#page-content-target"
+                               hx-swap="innerHTML"
+                               hx-push-url="true"
+                               hx-history="true"
+                               class="btn btn-sm btn-primary w-100">
+                                View Post
+                            </a>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-share fs-1 text-muted mb-3"></i>
+                    <h5 class="text-muted">No posts shared with you yet</h5>
+                    <p class="text-muted">When someone shares a post with you, it will appear here.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>

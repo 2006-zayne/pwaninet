@@ -160,8 +160,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # File upload settings
 FILE_UPLOAD_TEMP_DIR = BASE_DIR / 'media' / 'temp'
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+# Must match the client-side validator in upload_validator.js (150MB)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 150 * 1024 * 1024  # 150MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 150 * 1024 * 1024  # 150MB
 
 # Auth settings
 LOGIN_REDIRECT_URL = 'posts:home'
@@ -287,16 +288,32 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
 
-# CORS settings
-CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://10.0.2.2:8000').split(',')
+# CORS settings (includes Capacitor origins and CDN)
+_default_cors = [
+    'http://localhost',
+    'https://localhost',
+    'http://localhost:3000',
+    'http://localhost:8000',
+    'capacitor://localhost',
+    'http://10.0.2.2:8000',
+    'https://pwaninet.app',
+    'https://cdn.pwaninet.app',
+]
+_env_cors = [c.strip() for c in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if c.strip()]
+CORS_ALLOWED_ORIGINS = list(set(_default_cors + _env_cors))
 CORS_ALLOW_CREDENTIALS = True
 
-# CSRF settings
-CSRF_TRUSTED_ORIGINS = [
-    f"http://{host.split(':')[0].strip()}"
-    for host in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-    if host.strip()
-]
+# CSRF settings (supports both http:// and https:// for web and Capacitor)
+_csrf_hosts = [h.split(':')[0].strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,pwaninet.app').split(',') if h.strip()]
+CSRF_TRUSTED_ORIGINS = list(set([
+    'https://pwaninet.app',
+    'https://cdn.pwaninet.app',
+    'capacitor://localhost',
+    'http://localhost',
+    'https://localhost',
+    *[f"http://{h}" for h in _csrf_hosts],
+    *[f"https://{h}" for h in _csrf_hosts],
+]))
 
 # VAPID keys for Web Push notifications
 VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
@@ -315,3 +332,110 @@ SERVER_EMAIL = os.environ.get('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
 
 # Notification processing configuration
 ENABLE_NOTIFICATION_PROCESSING = True
+
+# ---------------------------------------------------------------------------
+# Cloud Storage & CDN (django-storages + boto3 → Cloudflare R2)
+# ---------------------------------------------------------------------------
+# Set USE_S3=1 in .env to activate.  Locally the app stays on local disk.
+# All values come from .env — no secrets are hardcoded here.
+# ---------------------------------------------------------------------------
+USE_S3 = os.environ.get('USE_S3', '0') == '1'
+
+# Expose CDN domain at module level so Post.get_hls_url can use it
+CDN_DOMAIN = os.environ.get('CDN_DOMAIN', '')
+
+if USE_S3:
+    from botocore.config import Config
+
+    # --- Credentials & bucket ------------------------------------------------
+    AWS_ACCESS_KEY_ID       = os.environ.get('AWS_ACCESS_KEY_ID', '')
+    AWS_SECRET_ACCESS_KEY   = os.environ.get('AWS_SECRET_ACCESS_KEY', '')
+    AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', '')
+
+    # Cloudflare R2 endpoint:  https://<accountid>.r2.cloudflarestorage.com
+    AWS_S3_ENDPOINT_URL     = os.environ.get('AWS_S3_ENDPOINT_URL', '')
+    AWS_S3_REGION_NAME      = os.environ.get('AWS_S3_REGION_NAME', 'auto')
+    AWS_S3_ADDRESSING_STYLE = 'path'
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
+
+    # --- R2-specific: ACLs are NOT supported ---------------------------------
+    # Empty string from .env must become None so boto3 never sends an ACL header
+    _acl_raw        = os.environ.get('AWS_DEFAULT_ACL', '')
+    AWS_DEFAULT_ACL = _acl_raw if _acl_raw else None
+
+    # Boto3 client config for Cloudflare R2 compatibility:
+    AWS_S3_CLIENT_CONFIG = Config(
+        signature_version='s3v4',
+        s3={'addressing_style': 'path'},
+    )
+
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': 'max-age=86400, public',
+    }
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_QUERYSTRING_AUTH  = False   # public bucket — no signed URLs for reads
+
+    # Expose boto3 config so Celery tasks can upload HLS segments directly
+    R2_BOTO3_CONFIG = {
+        'endpoint_url':          AWS_S3_ENDPOINT_URL,
+        'aws_access_key_id':     AWS_ACCESS_KEY_ID,
+        'aws_secret_access_key': AWS_SECRET_ACCESS_KEY,
+        'region_name':           AWS_S3_REGION_NAME,
+        'config':                AWS_S3_CLIENT_CONFIG,
+    }
+
+    # --- CDN edge domain (cdn.pwaninet.app) ----------------------------------
+    AWS_S3_CUSTOM_DOMAIN = CDN_DOMAIN
+
+    # Allow opting into S3 for staticfiles if explicitly set (default: keep static local for WhiteNoise)
+    USE_S3_STATIC = os.environ.get('USE_S3_STATIC', '0') == '1'
+
+    # --- Storage backend routing (django-storages) ---------------------------
+    STORAGES = {
+        'default': {
+            # All media uploads (video, images, HLS segments, docs, audio)
+            'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
+            'OPTIONS': {
+                'bucket_name':       AWS_STORAGE_BUCKET_NAME,
+                'endpoint_url':      AWS_S3_ENDPOINT_URL,
+                'region_name':       AWS_S3_REGION_NAME,
+                'access_key':        AWS_ACCESS_KEY_ID,
+                'secret_key':        AWS_SECRET_ACCESS_KEY,
+                'location':          'media',
+                'default_acl':       None,          # R2: no ACLs
+                'file_overwrite':    False,
+                'custom_domain':     CDN_DOMAIN or None,
+                'object_parameters': {'CacheControl': 'max-age=604800, public'},  # 7 days
+                'signature_version': 's3v4',
+                'addressing_style':  'path',
+                'client_config':     AWS_S3_CLIENT_CONFIG,
+            },
+        },
+        'staticfiles': {
+            # Static files stay local for WhiteNoise / Nginx unless USE_S3_STATIC=1
+            'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage' if USE_S3_STATIC else 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            **({
+                'OPTIONS': {
+                    'bucket_name':       AWS_STORAGE_BUCKET_NAME,
+                    'endpoint_url':      AWS_S3_ENDPOINT_URL,
+                    'region_name':       AWS_S3_REGION_NAME,
+                    'access_key':        AWS_ACCESS_KEY_ID,
+                    'secret_key':        AWS_SECRET_ACCESS_KEY,
+                    'location':          'static',
+                    'default_acl':       None,
+                    'file_overwrite':    True,
+                    'custom_domain':     CDN_DOMAIN or None,
+                    'object_parameters': {'CacheControl': 'max-age=31536000, public'},
+                    'signature_version': 's3v4',
+                    'addressing_style':  'path',
+                    'client_config':     AWS_S3_CLIENT_CONFIG,
+                }
+            } if USE_S3_STATIC else {})
+        },
+    }
+
+    # Rewrite Django's MEDIA_URL to the CDN edge
+    MEDIA_URL  = f'https://{CDN_DOMAIN}/media/'
+    if USE_S3_STATIC:
+        STATIC_URL = f'https://{CDN_DOMAIN}/static/'
+

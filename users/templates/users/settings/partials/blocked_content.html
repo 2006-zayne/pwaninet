@@ -1,7 +1,7 @@
 {% load i18n %}
 
 <div class="page-header">
-  <a href="{% url 'users:settings_privacy' %}" class="back-link" hx-get="{% url 'users:settings_privacy' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">
+  <a href="{% url 'users:settings_privacy' %}" class="back-link" hx-get="{% url 'users:settings_privacy' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true">
     <i class="bi bi-arrow-left"></i> {% trans "Back to Privacy & Security" %}
   </a>
   <h1 class="page-title">{% trans "Blocked Users" %}</h1>

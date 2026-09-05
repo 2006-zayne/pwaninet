@@ -1,0 +1,672 @@
+{% csrf_token %}
+<script>
+  var currentUserProfilePic = "{{ current_user_profile_pic|default:'' }}";
+</script>
+<style>
+  /* Hide mobile bottom nav in fullscreen mode */
+  body.modal-open .mobile-bottom-nav,
+  .mobile-bottom-nav {
+    display: none !important;
+  }
+
+  .fullscreen-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    overflow: hidden;
+  }
+
+  .fullscreen-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    touch-action: pan-y;
+  }
+
+  .close-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    color: #fff;
+  }
+
+  .close-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+  }
+
+  .nav-btn {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    color: #fff;
+  }
+
+  .nav-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+  }
+
+  .nav-btn.prev {
+    left: 20px;
+  }
+
+  .nav-btn.next {
+    right: 20px;
+  }
+
+  .download-btn {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    transition: all 0.2s ease;
+    color: #fff;
+  }
+
+  .download-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+  }
+
+  .image-counter {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 14px;
+    z-index: 10000;
+  }
+
+  .likes-display {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-size: 14px;
+    z-index: 10000;
+    max-width: 90%;
+    text-align: center;
+  }
+
+  .likes-display a {
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .likes-display a:hover {
+    text-decoration: underline;
+  }
+
+  /* Bottom Action Bar */
+  .bottom-action-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 10000;
+  }
+
+  .action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .action-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #fff;
+    font-size: 20px;
+    position: relative;
+  }
+
+  .action-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+  }
+
+  .action-btn.liked {
+    color: #ff3040;
+  }
+
+  .like-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ff3040;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+  }
+
+  /* Three-dot menu */
+  .three-dot-menu {
+    position: relative;
+  }
+
+  .menu-dropdown {
+    position: absolute;
+    bottom: 60px;
+    right: 0;
+    background: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 8px 0;
+    min-width: 180px;
+    display: none;
+    z-index: 100000;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    overflow: visible;
+  }
+
+  .menu-dropdown.show {
+    display: block;
+    animation: slideUp 0.2s ease;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    color: #fff;
+    text-decoration: none;
+    font-size: 14px;
+    transition: background 0.2s;
+    cursor: pointer;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+
+  .menu-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .menu-item i {
+    font-size: 18px;
+    width: 20px;
+    text-align: center;
+  }
+
+  .menu-item.danger {
+    color: #ff6b6b;
+  }
+
+  @media (max-width: 768px) {
+    .close-btn {
+      top: 15px;
+      right: 15px;
+      width: 45px;
+      height: 45px;
+      font-size: 20px;
+    }
+
+    .nav-btn {
+      width: 45px;
+      height: 45px;
+      font-size: 20px;
+    }
+
+    .nav-btn.prev {
+      left: 15px;
+    }
+
+    .nav-btn.next {
+      right: 15px;
+    }
+
+    .image-counter {
+      bottom: 70px;
+      font-size: 12px;
+      padding: 8px 16px;
+    }
+
+    .likes-display {
+      bottom: 15px;
+      font-size: 12px;
+      padding: 10px 16px;
+    }
+  }
+</style>
+
+<div class="fullscreen-container" id="fullscreenContainer">
+  <a href="{% url 'posts:post_details' post.id %}" class="close-btn"
+     hx-get="{% url 'posts:post_details' post.id %}"
+     hx-target="#page-content-target"
+     hx-swap="innerHTML"
+     hx-push-url="true"
+     hx-history="true"
+     aria-label="Close fullscreen view">
+    <i class="bi bi-x-lg"></i>
+  </a>
+
+  <button class="download-btn" data-image-url="{{ post_image.image.url }}" data-filename="{{ post_image.image.name|default:'image.jpg' }}" data-post-id="{{ post.id }}" aria-label="Download image">
+    <i class="bi bi-download"></i>
+  </button>
+
+  {% if has_prev %}
+  <a href="{% url 'posts:view_image_fullscreen' post.id prev_index %}" class="nav-btn prev" id="prevBtn"
+     hx-get="{% url 'posts:view_image_fullscreen' post.id prev_index %}"
+     hx-target="#page-content-target"
+     hx-swap="innerHTML"
+     hx-push-url="true"
+     hx-history="true"
+     aria-label="Previous image">
+    <i class="bi bi-chevron-left"></i>
+  </a>
+  {% endif %}
+
+  <img src="{{ post_image.image.url }}" class="fullscreen-image" alt="Image {{ current_index|add:1 }}" id="fullscreenImage">
+
+  {% if has_next %}
+  <a href="{% url 'posts:view_image_fullscreen' post.id next_index %}" class="nav-btn next" id="nextBtn"
+     hx-get="{% url 'posts:view_image_fullscreen' post.id next_index %}"
+     hx-target="#page-content-target"
+     hx-swap="innerHTML"
+     hx-push-url="true"
+     hx-history="true"
+     aria-label="Next image">
+    <i class="bi bi-chevron-right"></i>
+  </a>
+  {% endif %}
+
+  <div class="image-counter">
+    {{ current_index|add:1 }} / {{ all_images|length }}
+  </div>
+
+  {% if total_likes > 0 %}
+  <div class="likes-display">
+    {% if followed_likers %}
+      Liked by
+      {% for liker in followed_likers %}
+        <a href="{% url 'users:profile' liker.username %}"
+           hx-get="{% url 'users:profile' liker.username %}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-history="true">{{ liker.get_full_name|default:liker.username }}</a>{% if not forloop.last %}, {% endif %}
+      {% endfor %}
+      {% if other_likers_count > 0 %}
+        and {{ other_likers_count }} other{{ other_likers_count|pluralize }}
+      {% endif %}
+    {% else %}
+      Liked by {{ total_likes }} user{{ total_likes|pluralize }}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Bottom Action Bar -->
+  <div class="bottom-action-bar">
+    <div class="action-buttons">
+      <button class="action-btn like-btn {% if is_liked %}liked{% endif %}" data-image-id="{{ post_image.id }}" data-post-id="{{ post.id }}" aria-label="Like image">
+        <i class="bi bi-heart{% if is_liked %}-fill{% endif %}"></i>
+        <span class="like-count">{{ total_likes }}</span>
+      </button>
+      <button class="action-btn comment-btn" data-image-id="{{ post_image.id }}" data-post-id="{{ post.id }}" aria-label="Comment on image">
+        <i class="bi bi-chat"></i>
+      </button>
+    </div>
+    <div class="three-dot-menu">
+      <button class="action-btn menu-btn" aria-label="More options">
+        <i class="bi bi-three-dots"></i>
+      </button>
+      <div class="menu-dropdown">
+        <a href="#" class="menu-item download-btn" data-image-url="{{ post_image.image.url }}" data-filename="{{ post_image.image.name|default:'image.jpg' }}" data-post-id="{{ post.id }}">
+          <i class="bi bi-download"></i> Download
+        </a>
+        <a href="#" class="menu-item hide-btn">
+          <i class="bi bi-eye-slash"></i> Hide
+        </a>
+        <a href="#" class="menu-item danger report-btn">
+          <i class="bi bi-flag"></i> Report
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Comment Modal -->
+{% include 'posts/partials/comment_modal.html' %}
+
+<script>
+(function() {
+  function initImageFullscreenViewer() {
+    const container = document.getElementById('fullscreenContainer');
+    if (!container) return;
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const closeBtn = container.querySelector('.close-btn');
+
+    let touchStartX = 0;
+    let touchEndX = 0;
+    const minSwipeDistance = 50;
+
+    container.addEventListener('touchstart', function(e) {
+      touchStartX = e.changedTouches[0].screenX;
+    }, false);
+
+    container.addEventListener('touchend', function(e) {
+      touchEndX = e.changedTouches[0].screenX;
+      handleSwipe();
+    }, false);
+
+    function handleSwipe() {
+      const swipeDistance = touchEndX - touchStartX;
+      if (Math.abs(swipeDistance) > minSwipeDistance) {
+        if (swipeDistance > 0 && prevBtn) {
+          prevBtn.click();
+        } else if (swipeDistance < 0 && nextBtn) {
+          nextBtn.click();
+        }
+      }
+    }
+
+    // Keyboard navigation
+    function handleKeyDown(e) {
+      if (!document.getElementById('fullscreenContainer')) {
+        document.removeEventListener('keydown', handleKeyDown);
+        return;
+      }
+      if (e.key === 'ArrowLeft' && prevBtn) {
+        prevBtn.click();
+      } else if (e.key === 'ArrowRight' && nextBtn) {
+        nextBtn.click();
+      } else if (e.key === 'Escape' && closeBtn) {
+        closeBtn.click();
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Download button functionality
+    const downloadBtns = container.querySelectorAll('.download-btn');
+    downloadBtns.forEach(btn => {
+      btn.addEventListener('click', async function(e) {
+        e.preventDefault();
+        const imageUrl = this.getAttribute('data-image-url');
+        const filename = this.getAttribute('data-filename');
+        const postId = this.getAttribute('data-post-id');
+        try {
+          const module = await import('/static/js/storage/downloads_manager.js');
+          const downloadsManager = module.downloadsManager;
+          await downloadsManager.download({
+            url: imageUrl,
+            filename: filename,
+            postId: postId,
+            mediaId: postId,
+            mimeType: 'image/jpeg',
+            category: 'image'
+          });
+        } catch (error) {
+          console.error('Download failed:', error);
+          alert('Download failed: ' + error.message);
+        }
+      });
+    });
+
+    // Menu toggle functionality
+    const menuBtn = container.querySelector('.menu-btn');
+    const menuDropdown = container.querySelector('.menu-dropdown');
+    if (menuBtn && menuDropdown) {
+      menuBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        menuDropdown.classList.toggle('show');
+      });
+      document.addEventListener('click', function(e) {
+        if (!menuDropdown.contains(e.target) && !menuBtn.contains(e.target)) {
+          menuDropdown.classList.remove('show');
+        }
+      });
+    }
+
+    // Like button functionality
+    const likeBtn = container.querySelector('.like-btn');
+    if (likeBtn) {
+      likeBtn.addEventListener('click', async function(e) {
+        e.preventDefault();
+        const imageId = this.getAttribute('data-image-id');
+        const postId = this.getAttribute('data-post-id');
+        try {
+          const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : '';
+          const response = await fetch(`/api/posts/${postId}/images/${imageId}/like/`, {
+            method: 'POST',
+            headers: {
+              'X-CSRFToken': csrfToken,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (response.ok) {
+            const data = await response.json();
+            this.classList.toggle('liked');
+            const icon = this.querySelector('i');
+            icon.classList.toggle('bi-heart');
+            icon.classList.toggle('bi-heart-fill');
+            const countSpan = this.querySelector('.like-count');
+            countSpan.textContent = data.likes_count;
+          } else if (response.status === 403) {
+            const data = await response.json();
+            alert(data.detail || 'You must be a group member to like this image.');
+          }
+        } catch (error) {
+          console.error('Like failed:', error);
+        }
+      });
+    }
+
+    // Comment button functionality
+    const commentBtn = container.querySelector('.comment-btn');
+    if (commentBtn) {
+      commentBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const imageId = this.getAttribute('data-image-id');
+        const postId = this.getAttribute('data-post-id');
+        const commentsModal = document.getElementById('commentsModal');
+        if (commentsModal && typeof bootstrap !== 'undefined') {
+          const modal = new bootstrap.Modal(commentsModal);
+          modal.show();
+          loadImageComments(postId, imageId);
+        }
+      });
+    }
+
+    async function loadImageComments(postId, imageId) {
+      const commentsList = document.getElementById('commentsModalList');
+      const emptyState = document.getElementById('commentsEmptyState');
+      const footer = document.getElementById('commentsModalFooter');
+      const commentForm = document.getElementById('commentForm');
+      const avatar = document.querySelector('.comment-input-avatar');
+      if (!commentsList || !commentForm) return;
+
+      if (avatar && typeof currentUserProfilePic !== 'undefined') {
+        avatar.src = currentUserProfilePic;
+        avatar.style.display = 'block';
+      }
+
+      commentForm.dataset.postId = postId;
+      commentForm.dataset.imageId = imageId;
+
+      try {
+        const response = await fetch(`/api/posts/${postId}/images/${imageId}/comments/`);
+        if (response.ok) {
+          const data = await response.json();
+          const existingComments = commentsList.querySelectorAll('.comment-item');
+          existingComments.forEach(el => el.remove());
+          if (data.comments && data.comments.length > 0) {
+            if (emptyState) emptyState.style.display = 'none';
+            const topComments = data.comments.slice(0, 3);
+            topComments.forEach(comment => {
+              const commentEl = document.createElement('div');
+              commentEl.className = 'comment-item';
+              commentEl.id = `comment-${comment.id}`;
+              commentEl.dataset.commentId = comment.id;
+              commentEl.dataset.authorId = comment.author.id;
+              const authorName = comment.author.full_name || comment.author.username;
+              const profilePic = comment.author.profile_pic || '/static/images/default-avatar.png';
+              commentEl.innerHTML = `
+                <a href="/user/${comment.author.username}/" class="comment-avatar-link">
+                  <img src="${profilePic}" alt="${authorName}" class="comment-avatar" loading="lazy">
+                </a>
+                <div class="comment-content">
+                  <div class="comment-header">
+                    <a href="/user/${comment.author.username}/" class="comment-author-link">${authorName}</a>
+                    <span class="comment-timestamp">${comment.created_at}</span>
+                  </div>
+                  <div class="comment-body" id="comment-body-${comment.id}">
+                    ${comment.content}
+                  </div>
+                  <div class="comment-actions">
+                    <button class="comment-action" data-action="like" data-comment-id="${comment.id}" aria-label="Like comment">
+                      <i class="bi bi-heart"></i>
+                      <span>0</span>
+                    </button>
+                    <button class="comment-action" data-action="reply" data-comment-id="${comment.id}" aria-label="Reply to comment">
+                      <i class="bi bi-chat-dots"></i> Reply
+                    </button>
+                  </div>
+                </div>
+              `;
+              commentsList.appendChild(commentEl);
+            });
+            if (data.comments.length > 3) {
+              if (footer) footer.style.display = 'block';
+              const totalCountEl = document.getElementById('totalCommentsCount');
+              if (totalCountEl) totalCountEl.textContent = data.comments.length - 3;
+            } else {
+              if (footer) footer.style.display = 'none';
+            }
+          } else {
+            if (emptyState) emptyState.style.display = 'block';
+            if (footer) footer.style.display = 'none';
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load comments:', error);
+        if (emptyState) emptyState.style.display = 'block';
+        if (footer) footer.style.display = 'none';
+      }
+    }
+
+    const commentForm = document.getElementById('commentForm');
+    if (commentForm) {
+      commentForm.onsubmit = async function(e) {
+        e.preventDefault();
+        const postId = this.dataset.postId;
+        const imageId = this.dataset.imageId;
+        const contentInput = this.querySelector('input[name="content"]');
+        if (!contentInput) return;
+        const content = contentInput.value.trim();
+        if (!content) return;
+        try {
+          const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : '';
+          const response = await fetch(`/api/posts/${postId}/images/${imageId}/comments/`, {
+            method: 'POST',
+            headers: {
+              'X-CSRFToken': csrfToken,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ content: content })
+          });
+          if (response.ok) {
+            contentInput.value = '';
+            loadImageComments(postId, imageId);
+          } else {
+            console.error('Failed to post comment');
+          }
+        } catch (error) {
+          console.error('Failed to post comment:', error);
+        }
+      };
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initImageFullscreenViewer);
+  } else {
+    initImageFullscreenViewer();
+  }
+})();
+</script>

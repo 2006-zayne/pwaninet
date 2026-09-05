@@ -1,7 +1,12 @@
 {% load static %}
 <div class="doc-search-container" style="max-width: 800px; margin: 0 auto 40px auto;">
     <form action="{% url 'documents:search' %}" method="get" class="doc-search-wrapper" 
-         style="position: relative;">
+          hx-get="{% url 'documents:search' %}"
+          hx-target="#page-content-target"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          hx-history="true"
+          style="position: relative;">
         <input type="text" 
                name="q"
                id="doc-search-input"
@@ -37,6 +42,10 @@
                 Recent searches
             </p>
             <a href="{% url 'documents:clear_recent_searches' %}" 
+               hx-post="{% url 'documents:clear_recent_searches' %}"
+               hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
                class="doc-clear-searches"
                style="font-size: 0.8rem; color: var(--primary); cursor: pointer; text-decoration: none;">
                 Clear
@@ -46,6 +55,11 @@
             {% for recent_search in recent_searches %}
             {% if recent_search.query %}
             <a href="{% url 'documents:search' %}?q={{ recent_search.query }}"
+               hx-get="{% url 'documents:search' %}?q={{ recent_search.query }}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
                class="doc-recent-tag"
                style="background: var(--border); padding: 6px 14px; 
                       border-radius: 20px; font-size: 0.875rem; 
@@ -54,6 +68,11 @@
             </a>
             {% else %}
             <a href="{% url 'documents:search' %}?q={{ recent_search }}"
+               hx-get="{% url 'documents:search' %}?q={{ recent_search }}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
                class="doc-recent-tag"
                style="background: var(--border); padding: 6px 14px; 
                       border-radius: 20px; font-size: 0.875rem; 
@@ -113,57 +132,76 @@
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('doc-search-input');
-    const suggestionsDiv = document.getElementById('search-suggestions');
-    let debounceTimer;
+(function() {
+    function initDocSearchBar() {
+        const searchInput = document.getElementById('doc-search-input');
+        const suggestionsDiv = document.getElementById('search-suggestions');
+        let debounceTimer;
 
-    if (searchInput && suggestionsDiv) {
-        searchInput.addEventListener('input', function() {
-            const query = this.value.trim();
-            
-            clearTimeout(debounceTimer);
-            
-            if (query.length < 2) {
-                suggestionsDiv.style.display = 'none';
-                return;
-            }
-            
-            debounceTimer = setTimeout(() => {
-                fetch(`/documents/search-suggestions/?q=${encodeURIComponent(query)}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.suggestions && data.suggestions.length > 0) {
-                            suggestionsDiv.innerHTML = data.suggestions.map(suggestion => `
-                                <div class="suggestion-item">
-                                    <a href="/documents/search/?q=${encodeURIComponent(suggestion)}">
-                                        ${suggestion}
-                                    </a>
-                                </div>
-                            `).join('');
-                            suggestionsDiv.style.display = 'block';
-                        } else {
+        if (searchInput && suggestionsDiv && !searchInput.dataset.initialized) {
+            searchInput.dataset.initialized = 'true';
+            searchInput.addEventListener('input', function() {
+                const query = this.value.trim();
+                
+                clearTimeout(debounceTimer);
+                
+                if (query.length < 2) {
+                    suggestionsDiv.style.display = 'none';
+                    return;
+                }
+                
+                debounceTimer = setTimeout(() => {
+                    fetch(`/documents/search-suggestions/?q=${encodeURIComponent(query)}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.suggestions && data.suggestions.length > 0) {
+                                suggestionsDiv.innerHTML = data.suggestions.map(suggestion => `
+                                    <div class="suggestion-item">
+                                        <a href="/documents/search/?q=${encodeURIComponent(suggestion)}"
+                                           hx-get="/documents/search/?q=${encodeURIComponent(suggestion)}"
+                                           hx-target="#page-content-target"
+                                           hx-swap="innerHTML"
+                                           hx-push-url="true"
+                                           hx-history="true">
+                                            ${suggestion}
+                                        </a>
+                                    </div>
+                                `).join('');
+                                if (window.htmx) {
+                                    window.htmx.process(suggestionsDiv);
+                                }
+                                suggestionsDiv.style.display = 'block';
+                            } else {
+                                suggestionsDiv.style.display = 'none';
+                            }
+                        })
+                        .catch(error => {
                             suggestionsDiv.style.display = 'none';
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error fetching suggestions:', error);
-                        suggestionsDiv.style.display = 'none';
-                    });
-            }, 300);
-        });
+                        });
+                }, 300);
+            });
 
-        // Hide suggestions when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
-                suggestionsDiv.style.display = 'none';
+            // Hide suggestions when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+                    suggestionsDiv.style.display = 'none';
+                }
+            });
+
+            // Hide suggestions on form submit
+            const form = searchInput.closest('form');
+            if (form) {
+                form.addEventListener('submit', function() {
+                    suggestionsDiv.style.display = 'none';
+                });
             }
-        });
-
-        // Hide suggestions on form submit
-        searchInput.closest('form').addEventListener('submit', function() {
-            suggestionsDiv.style.display = 'none';
-        });
+        }
     }
-});
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDocSearchBar);
+    } else {
+        initDocSearchBar();
+    }
+})();
 </script>

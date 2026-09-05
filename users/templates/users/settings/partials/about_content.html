@@ -1,7 +1,7 @@
 {% load i18n %}
 
 <div class="page-header">
-  <a href="{% url 'users:settings' %}" class="back-link" hx-get="{% url 'users:settings' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">
+  <a href="{% url 'users:settings' %}" class="back-link" hx-get="{% url 'users:settings' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true">
     <i class="bi bi-arrow-left"></i> {% trans "Back to Settings" %}
   </a>
   <h1 class="page-title">{% trans "About PwaniNet" %}</h1>
@@ -54,11 +54,23 @@
 
   <div class="settings-list-body">
     <div class="update-links">
-      <a href="/system/releases/" class="update-link">
+      <a href="/system/releases/"
+         hx-get="/system/releases/"
+         hx-target="#page-content-target"
+         hx-swap="innerHTML"
+         hx-push-url="true"
+         hx-history="true"
+         class="update-link">
         <i class="bi bi-box-seam"></i> {% trans "Release Center" %}
       </a>
       {% if current_release %}
-      <a href="/system/releases/{{ current_release.id }}/" class="update-link">
+      <a href="/system/releases/{{ current_release.id }}/"
+         hx-get="/system/releases/{{ current_release.id }}/"
+         hx-target="#page-content-target"
+         hx-swap="innerHTML"
+         hx-push-url="true"
+         hx-history="true"
+         class="update-link">
         <i class="bi bi-info-circle"></i> {% trans "Current Release Details" %}
       </a>
       {% endif %}

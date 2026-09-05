@@ -8,7 +8,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
 from django.conf import settings
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+from django.urls import reverse
 from .models import Release, ReleaseItem, UserReleaseView
 from .services import ReleaseService
 from .selectors import ReleaseSelector
@@ -27,8 +28,11 @@ def release_list(request):
     
     context = {
         'releases': all_releases,
+        'release_content_partial': 'releases/partials/list_content.html',
     }
     
+    if request.headers.get('HX-Request'):
+        return render(request, 'releases/partials/releases_navigation_partial.html', context)
     return render(request, 'releases/list.html', context)
 
 
@@ -68,8 +72,11 @@ def dashboard(request):
         'environment': environment,
         'debug': debug,
         'database_engine': database_engine,
+        'release_content_partial': 'releases/partials/dashboard_content.html',
     }
     
+    if request.headers.get('HX-Request'):
+        return render(request, 'releases/partials/releases_navigation_partial.html', context)
     return render(request, 'releases/dashboard.html', context)
 
 
@@ -130,6 +137,10 @@ def create_release(request):
                 else:
                     messages.success(request, f'Draft release {release.version} created successfully.')
                 
+                if request.headers.get('HX-Request'):
+                    response = HttpResponse(status=204)
+                    response['HX-Redirect'] = reverse('release_dashboard')
+                    return response
                 return redirect('release_dashboard')
                 
             except Exception as e:
@@ -137,7 +148,13 @@ def create_release(request):
     else:
         form = CreateReleaseForm()
     
-    return render(request, 'releases/create.html', {'form': form})
+    context = {
+        'form': form,
+        'release_content_partial': 'releases/partials/create_content.html',
+    }
+    if request.headers.get('HX-Request'):
+        return render(request, 'releases/partials/releases_navigation_partial.html', context)
+    return render(request, 'releases/create.html', context)
 
 
 @login_required
@@ -151,6 +168,10 @@ def edit_release(request, release_id):
     # Check permission
     if not CanManageRelease().has_object_permission(request, None, release):
         messages.error(request, 'You do not have permission to edit this release.')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse('release_dashboard')
+            return response
         return redirect('release_dashboard')
     
     if request.method == 'POST':
@@ -158,11 +179,22 @@ def edit_release(request, release_id):
         if form.is_valid():
             form.save()
             messages.success(request, f'Release {release.version} updated successfully.')
+            if request.headers.get('HX-Request'):
+                response = HttpResponse(status=204)
+                response['HX-Redirect'] = reverse('release_dashboard')
+                return response
             return redirect('release_dashboard')
     else:
         form = ReleaseForm(instance=release)
     
-    return render(request, 'releases/edit.html', {'form': form, 'release': release})
+    context = {
+        'form': form,
+        'release': release,
+        'release_content_partial': 'releases/partials/edit_content.html',
+    }
+    if request.headers.get('HX-Request'):
+        return render(request, 'releases/partials/releases_navigation_partial.html', context)
+    return render(request, 'releases/edit.html', context)
 
 
 @login_required
@@ -178,10 +210,18 @@ def detail_release(request, release_id):
     # Archived releases can only be viewed by users with manage permission
     if release.status == 'ARCHIVED' and not request.user.has_perm('releases.manage_release'):
         messages.error(request, 'Release not found.')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse('release_dashboard')
+            return response
         return redirect('release_dashboard')
     
     if not release.published and not request.user.has_perm('releases.manage_release'):
         messages.error(request, 'Release not found.')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse('release_dashboard')
+            return response
         return redirect('release_dashboard')
     
     # Track that the user has viewed this release (only for published releases)
@@ -191,7 +231,13 @@ def detail_release(request, release_id):
             release=release
         )
     
-    return render(request, 'releases/detail.html', {'release': release})
+    context = {
+        'release': release,
+        'release_content_partial': 'releases/partials/detail_content.html',
+    }
+    if request.headers.get('HX-Request'):
+        return render(request, 'releases/partials/releases_navigation_partial.html', context)
+    return render(request, 'releases/detail.html', context)
 
 
 @login_required
@@ -205,6 +251,10 @@ def publish_release(request, release_id):
     # Check permission
     if not CanPublishRelease().has_object_permission(request, None, release):
         messages.error(request, 'You do not have permission to publish this release.')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse('release_dashboard')
+            return response
         return redirect('release_dashboard')
     
     if request.method == 'POST':
@@ -218,13 +268,24 @@ def publish_release(request, release_id):
                     ReleaseService.set_current_release(release)
                 
                 messages.success(request, f'Release {release.version} published successfully.')
+                if request.headers.get('HX-Request'):
+                    response = HttpResponse(status=204)
+                    response['HX-Redirect'] = reverse('release_dashboard')
+                    return response
                 return redirect('release_dashboard')
             except Exception as e:
                 messages.error(request, f'Error publishing release: {str(e)}')
     else:
         form = PublishReleaseForm()
     
-    return render(request, 'releases/publish.html', {'form': form, 'release': release})
+    context = {
+        'form': form,
+        'release': release,
+        'release_content_partial': 'releases/partials/publish_content.html',
+    }
+    if request.headers.get('HX-Request'):
+        return render(request, 'releases/partials/releases_navigation_partial.html', context)
+    return render(request, 'releases/publish.html', context)
 
 
 @login_required
@@ -238,6 +299,10 @@ def archive_release(request, release_id):
     # Check permission
     if not CanArchiveRelease().has_object_permission(request, None, release):
         messages.error(request, 'You do not have permission to archive this release.')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse('release_dashboard')
+            return response
         return redirect('release_dashboard')
     
     if request.method == 'POST':
@@ -246,13 +311,24 @@ def archive_release(request, release_id):
             try:
                 ReleaseService.archive_release(release)
                 messages.success(request, f'Release {release.version} archived successfully.')
+                if request.headers.get('HX-Request'):
+                    response = HttpResponse(status=204)
+                    response['HX-Redirect'] = reverse('release_dashboard')
+                    return response
                 return redirect('release_dashboard')
             except Exception as e:
                 messages.error(request, f'Error archiving release: {str(e)}')
     else:
         form = ArchiveReleaseForm()
     
-    return render(request, 'releases/archive.html', {'form': form, 'release': release})
+    context = {
+        'form': form,
+        'release': release,
+        'release_content_partial': 'releases/partials/archive_content.html',
+    }
+    if request.headers.get('HX-Request'):
+        return render(request, 'releases/partials/releases_navigation_partial.html', context)
+    return render(request, 'releases/archive.html', context)
 
 
 @login_required
@@ -265,6 +341,10 @@ def set_current_release(request, release_id):
     
     if release.status != 'PUBLISHED':
         messages.error(request, 'Only published releases can be marked as current.')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse('release_dashboard')
+            return response
         return redirect('release_dashboard')
     
     try:
@@ -273,6 +353,10 @@ def set_current_release(request, release_id):
     except Exception as e:
         messages.error(request, f'Error setting current release: {str(e)}')
     
+    if request.headers.get('HX-Request'):
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = reverse('release_dashboard')
+        return response
     return redirect('release_dashboard')
 
 
@@ -298,23 +382,31 @@ def add_release_item(request, release_id):
             
             # Handle multiple image uploads
             images = request.FILES.getlist('images')
-            print(f"DEBUG: Received {len(images)} images")
             for i, image_file in enumerate(images):
-                print(f"DEBUG: Processing image {i}: {image_file.name}, size: {image_file.size}")
                 from .models import ReleaseItemImage
                 ReleaseItemImage.objects.create(
                     release_item=item,
                     image=image_file,
                     display_order=i
                 )
-                print(f"DEBUG: Created image {i}")
             
             messages.success(request, f'Release item added successfully with {len(images)} image(s).')
+            if request.headers.get('HX-Request'):
+                response = HttpResponse(status=204)
+                response['HX-Redirect'] = reverse('release_edit', kwargs={'release_id': release.id})
+                return response
             return redirect('release_edit', release_id=release.id)
     else:
         form = ReleaseItemForm()
     
-    return render(request, 'releases/add_item.html', {'form': form, 'release': release})
+    context = {
+        'form': form,
+        'release': release,
+        'release_content_partial': 'releases/partials/add_item_content.html',
+    }
+    if request.headers.get('HX-Request'):
+        return render(request, 'releases/partials/releases_navigation_partial.html', context)
+    return render(request, 'releases/add_item.html', context)
 
 
 @login_required
@@ -327,4 +419,8 @@ def delete_release_item(request, item_id):
     release_id = item.release.id
     item.delete()
     messages.success(request, 'Release item deleted successfully.')
+    if request.headers.get('HX-Request'):
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = reverse('release_edit', kwargs={'release_id': release_id})
+        return response
     return redirect('release_edit', release_id=release_id)

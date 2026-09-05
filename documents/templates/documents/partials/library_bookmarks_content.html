@@ -1,0 +1,43 @@
+{% load static %}
+
+<!-- Back Navigation -->
+<div class="doc-back-nav" style="margin-bottom: 24px;">
+    <a href="{% url 'documents:my_library' %}" 
+       hx-get="{% url 'documents:my_library' %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true"
+       class="doc-back-link"
+       style="display: inline-flex; align-items: center; gap: 8px; 
+              color: var(--text-secondary); text-decoration: none; 
+              font-weight: 500; font-size: 0.9rem;">
+        <i class="bi bi-arrow-left"></i>
+        Back to Library
+    </a>
+</div>
+
+<!-- Header -->
+<div class="doc-library-header" style="padding: 40px 20px;">
+    <h1 class="doc-library-title" 
+        style="font-size: 2rem; font-weight: 700; margin: 0 0 12px 0; 
+               color: var(--text-dark);">
+        My Bookmarks
+    </h1>
+    <p class="doc-library-subtitle" 
+       style="font-size: 1rem; color: var(--text-secondary); margin: 0;">
+        Documents you've saved for later
+    </p>
+</div>
+
+<!-- Library Navigation Tabs -->
+{% include 'documents/partials/library_tabs.html' with active_tab='bookmarks' %}
+
+<!-- Bookmarks Grid -->
+<div class="doc-bookmarks-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+    {% for bookmark in bookmarks %}
+        {% include 'documents/partials/document_card.html' with document=bookmark.document %}
+    {% empty %}
+        {% include 'documents/partials/empty_state.html' with title="No bookmarks yet" message="Save documents you want to revisit later by bookmarking them." %}
+    {% endfor %}
+</div>

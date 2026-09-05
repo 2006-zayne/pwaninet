@@ -1,7 +1,14 @@
 {% load user_extras %}
 <div class="people-user-row d-flex align-items-center gap-3 p-2 rounded-3 hover-bg-light transition-all" data-username="{{ user.username }}">
     <!-- Avatar -->
-    <a href="{% url 'users:profile' user.username %}" class="text-decoration-none flex-shrink-0">
+    <a href="{% url 'users:profile' user.username %}"
+       hx-get="{% url 'users:profile' user.username %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true"
+       data-bs-dismiss="modal"
+       class="text-decoration-none flex-shrink-0">
         <img src="{{ user.profile_pic.url }}" 
              alt="{{ user.username }}" 
              class="people-user-avatar rounded-circle border border-2 border-light shadow-sm"
@@ -11,7 +18,13 @@
     <!-- User Info -->
     <div class="people-user-info flex-grow-1 min-w-0" style="max-width: 180px;">
         <div class="d-flex align-items-center gap-2">
-            <a href="{% url 'users:profile' user.username %}" 
+            <a href="{% url 'users:profile' user.username %}"
+               hx-get="{% url 'users:profile' user.username %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
+               data-bs-dismiss="modal"
                class="people-user-name text-decoration-none fw-bold text-dark text-truncate">
                 {{ user.get_full_name|default:user.username }}
             </a>

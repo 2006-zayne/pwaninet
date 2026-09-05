@@ -245,10 +245,25 @@
     </div>
 
     <script>
-        // Auto-reconnect when online
-        window.addEventListener('online', () => {
-            window.location.href = '/';
-        });
+        // Auto-reconnect when server is reachable
+        let isReconnecting = false;
+        function attemptReconnect() {
+            if (isReconnecting) return;
+            isReconnecting = true;
+            fetch('/api/health/', { mode: 'no-cors', cache: 'no-store' })
+                .then(() => {
+                    if (checkInterval) {
+                        clearInterval(checkInterval);
+                        checkInterval = null;
+                    }
+                    window.location.href = '/';
+                })
+                .catch(() => {
+                    isReconnecting = false;
+                });
+        }
+
+        window.addEventListener('online', attemptReconnect);
 
         // Listen for theme changes
         window.addEventListener('storage', (e) => {
@@ -284,11 +299,10 @@
             }
         }
 
-        // Periodic connection check
+        // Periodic connection check - verify reachability, avoid blind loop
         let checkInterval = setInterval(() => {
             if (navigator.onLine) {
-                clearInterval(checkInterval);
-                window.location.href = '/';
+                attemptReconnect();
             }
         }, 5000);
 

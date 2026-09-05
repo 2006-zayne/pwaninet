@@ -1,0 +1,305 @@
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold">Release Center</h2>
+        {% if perms.releases.manage_release %}
+        <a href="{% url 'release_create' %}"
+           hx-get="{% url 'release_create' %}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-history="true"
+           class="btn btn-primary">
+            <i class="bi bi-plus-lg me-2"></i>Create Release
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <a href="{% url 'release_list' %}"
+               hx-get="{% url 'release_list' %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
+               class="text-decoration-none">
+                <div class="card clickable-card" style="cursor: pointer;">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Total Releases</h6>
+                        <h3 class="card-title fw-bold">{{ statistics.total_releases }}</h3>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Current Version</h6>
+                    <h3 class="card-title fw-bold">{{ statistics.current_version|default:"None" }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Current Build</h6>
+                    <h3 class="card-title fw-bold">{{ statistics.current_build|default:"None" }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Latest Stable</h6>
+                    <h3 class="card-title fw-bold">{{ statistics.latest_stable|default:"None" }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Current Release Card -->
+    {% if current_release %}
+    <div class="card mb-4 border-primary">
+        <div class="card-header bg-primary text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-check-circle-fill me-2"></i>Current Release
+                </h5>
+                <span class="badge bg-light text-primary">{{ current_release.version }}</span>
+            </div>
+        </div>
+        <div class="card-body">
+            <h5 class="card-title">{{ current_release.release_title }}</h5>
+            <p class="card-text">{{ current_release.release_summary }}</p>
+            <div class="row text-muted small">
+                <div class="col-md-4">
+                    <strong>Build:</strong> {{ current_release.build_number }}
+                </div>
+                <div class="col-md-4">
+                    <strong>Channel:</strong> {{ current_release.get_release_channel_display }}
+                </div>
+                <div class="col-md-4">
+                    <strong>Published:</strong> {{ current_release.published_at|date:"M d, Y" }}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-warning mb-4">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        No current release set. Publish a release and mark it as current.
+    </div>
+    {% endif %}
+
+    <!-- Draft Releases -->
+    {% if perms.releases.manage_release %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-pencil-square me-2"></i>Draft Releases
+                <span class="badge bg-secondary ms-2">{{ draft_releases|length }}</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if draft_releases %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Version</th>
+                            <th>Title</th>
+                            <th>Type</th>
+                            <th>Channel</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for release in draft_releases %}
+                        <tr>
+                            <td><code>{{ release.version }}</code></td>
+                            <td>{{ release.release_title }}</td>
+                            <td>{{ release.get_release_type_display }}</td>
+                            <td>{{ release.get_release_channel_display }}</td>
+                            <td>{{ release.created_at|date:"M d, Y" }}</td>
+                            <td>
+                                <a href="{% url 'release_edit' release.id %}"
+                                   hx-get="{% url 'release_edit' release.id %}"
+                                   hx-target="#page-content-target"
+                                   hx-swap="innerHTML"
+                                   hx-push-url="true"
+                                   hx-history="true"
+                                   class="btn btn-sm btn-outline-primary"
+                                   title="Edit Release">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'release_publish' release.id %}"
+                                   hx-get="{% url 'release_publish' release.id %}"
+                                   hx-target="#page-content-target"
+                                   hx-swap="innerHTML"
+                                   hx-push-url="true"
+                                   hx-history="true"
+                                   class="btn btn-sm btn-outline-success"
+                                   title="Publish Release">
+                                    <i class="bi bi-upload"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">No draft releases.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Published Releases -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-check-circle me-2"></i>Published Releases
+                <span class="badge bg-success ms-2">{{ published_releases|length }}</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if published_releases %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Version</th>
+                            <th>Title</th>
+                            <th>Type</th>
+                            <th>Channel</th>
+                            <th>Published</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for release in published_releases %}
+                        <tr>
+                            <td>
+                                <code>{{ release.version }}</code>
+                                {% if release.is_current_release %}
+                                <span class="badge bg-primary ms-1">Current</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ release.release_title }}</td>
+                            <td>{{ release.get_release_type_display }}</td>
+                            <td>{{ release.get_release_channel_display }}</td>
+                            <td>{{ release.published_at|date:"M d, Y" }}</td>
+                            <td>
+                                <a href="{% url 'release_detail' release.id %}"
+                                   hx-get="{% url 'release_detail' release.id %}"
+                                   hx-target="#page-content-target"
+                                   hx-swap="innerHTML"
+                                   hx-push-url="true"
+                                   hx-history="true"
+                                   class="btn btn-sm btn-outline-secondary"
+                                   title="View Details">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if perms.releases.archive_release and not release.is_current_release %}
+                                <a href="{% url 'release_archive' release.id %}"
+                                   hx-get="{% url 'release_archive' release.id %}"
+                                   hx-target="#page-content-target"
+                                   hx-swap="innerHTML"
+                                   hx-push-url="true"
+                                   hx-history="true"
+                                   class="btn btn-sm btn-outline-warning"
+                                   title="Archive Release">
+                                    <i class="bi bi-archive"></i>
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">No published releases.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Archived Releases -->
+    {% if perms.releases.manage_release %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-archive me-2"></i>Archived Releases
+                <span class="badge bg-secondary ms-2">{{ archived_releases|length }}</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if archived_releases %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Version</th>
+                            <th>Title</th>
+                            <th>Type</th>
+                            <th>Channel</th>
+                            <th>Archived</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for release in archived_releases %}
+                        <tr>
+                            <td><code>{{ release.version }}</code></td>
+                            <td>{{ release.release_title }}</td>
+                            <td>{{ release.get_release_type_display }}</td>
+                            <td>{{ release.get_release_channel_display }}</td>
+                            <td>{{ release.updated_at|date:"M d, Y" }}</td>
+                            <td>
+                                <a href="{% url 'release_detail' release.id %}"
+                                   hx-get="{% url 'release_detail' release.id %}"
+                                   hx-target="#page-content-target"
+                                   hx-swap="innerHTML"
+                                   hx-push-url="true"
+                                   hx-history="true"
+                                   class="btn btn-sm btn-outline-secondary"
+                                   title="View Details">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">No archived releases.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Environment Info -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-info-circle me-2"></i>Environment
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-1"><strong>Environment:</strong> {{ environment }}</p>
+                    <p class="mb-1"><strong>Debug Mode:</strong> {{ debug|yesno:"Yes,No" }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p class="mb-1"><strong>Database:</strong> {{ database_engine }}</p>
+                    <p class="mb-1 text-muted small">Environment is read-only in Release Center</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

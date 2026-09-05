@@ -201,7 +201,7 @@
         </p>
         
         <div class="action-buttons">
-            <button class="action-button primary" onclick="window.location.reload()">
+            <button class="action-button primary" onclick="window.location.href='https://pwaninet.app'">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M23 4v6h-6"></path>
                     <path d="M1 20v-6h6"></path>
@@ -235,10 +235,25 @@
             }
         })();
 
-        // Auto-reconnect when online
-        window.addEventListener('online', () => {
-            window.location.reload();
-        });
+        // Auto-reconnect when server is reachable
+        let isReconnecting = false;
+        function attemptReconnect() {
+            if (isReconnecting) return;
+            isReconnecting = true;
+            fetch('https://pwaninet.app/api/health/', { mode: 'no-cors', cache: 'no-store' })
+                .then(() => {
+                    if (checkInterval) {
+                        clearInterval(checkInterval);
+                        checkInterval = null;
+                    }
+                    window.location.href = 'https://pwaninet.app';
+                })
+                .catch(() => {
+                    isReconnecting = false;
+                });
+        }
+
+        window.addEventListener('online', attemptReconnect);
 
         // Listen for theme changes
         window.addEventListener('storage', (e) => {
@@ -274,11 +289,10 @@
             }
         }
 
-        // Periodic connection check
+        // Periodic connection check - verify reachability, avoid blind loop
         let checkInterval = setInterval(() => {
             if (navigator.onLine) {
-                clearInterval(checkInterval);
-                window.location.reload();
+                attemptReconnect();
             }
         }, 5000);
 
