@@ -359,6 +359,23 @@ def process_large_video(self, post_id):
                         }
                         s3_client.upload_file(file_path, bucket_name, s3_key, ExtraArgs=extra_args)
                 logger.info('[HLS] Uploaded all HLS files to R2 bucket %s for post %s', bucket_name, post_id)
+
+                # Also upload the raw source video to R2 in background so CDN has the full source
+                try:
+                    if post.video and hasattr(post.video, 'name') and post.video.name:
+                        raw_s3_key = f"media/{post.video.name.replace(os.sep, '/')}"
+                        raw_ext = os.path.splitext(post.video.name)[1].lower()
+                        raw_mime = 'video/mp4' if raw_ext == '.mp4' else 'video/quicktime' if raw_ext == '.mov' else 'video/webm'
+                        s3_client.upload_file(
+                            source_path,
+                            bucket_name,
+                            raw_s3_key,
+                            ExtraArgs={'ContentType': raw_mime, 'CacheControl': 'max-age=31536000, public'}
+                        )
+                        logger.info('[HLS] Uploaded raw source video %s to R2 for post %s', raw_s3_key, post_id)
+                except Exception as raw_err:
+                    logger.warning('[HLS] Could not upload raw source video to R2 (non-fatal): %s', raw_err)
+
             except Exception as r2_err:
                 logger.error('[HLS] Failed to upload HLS files to R2 for post %s: %s', post_id, r2_err)
                 raise

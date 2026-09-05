@@ -3,7 +3,13 @@ from django.conf import settings
 from PIL import Image
 from io import BytesIO
 from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.files.storage import FileSystemStorage
 import sys
+
+# Spool uploaded raw videos to local disk to keep web request latency < 1s
+# and prevent Cloudflare HTTP 524 timeouts. Celery handles HLS transcoding
+# and uploads all HLS chunks + the raw video file to Cloudflare R2 asynchronously.
+raw_video_storage = FileSystemStorage()
 
 
 GRADIENT_CHOICES = [
@@ -33,7 +39,7 @@ class Post(models.Model):
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE, null=True, blank=True)
     unit = models.ForeignKey('courses.Unit', on_delete=models.SET_NULL, null=True, blank=True)
     content = models.TextField(blank=True, null=True)
-    video = models.FileField(upload_to='posts/videos', blank=True, null=True)
+    video = models.FileField(upload_to='posts/videos', storage=raw_video_storage, blank=True, null=True)
     video_preview = models.FileField(upload_to='posts/videos/previews', blank=True, null=True)
     video_poster = models.ImageField(upload_to='posts/videos/posters', blank=True, null=True)
 

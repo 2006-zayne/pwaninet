@@ -202,18 +202,24 @@ class UploadManager {
                 (f) => f.type?.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi)$/i.test(f.name ?? '')
             ) ?? false;
 
-            this.transitionState(uploadId, UploadState.SERVER_PROCESSING);
-            tracker.updateServerProcessingProgress(1, 3, 'Processing media...');
-            await this.waitForServerProcessing(uploadId, postId, hasVideo);
-            tracker.completeServerProcessing();
+            // Immediately notify UI and feed that post has been created
+            uploadEvents.emit(UploadEventNames.UPLOAD_PUBLISHED, { uploadId, session, postId, hasVideo });
+
+            if (hasVideo && postId) {
+                this.transitionState(uploadId, UploadState.SERVER_PROCESSING, { hasVideo: true, postId });
+                await this.waitForServerProcessing(uploadId, postId, hasVideo);
+                tracker.completeServerProcessing();
+            } else {
+                tracker.updateServerProcessingProgress(100, 100, 'Published!');
+                tracker.completeServerProcessing();
+            }
 
             this.transitionState(uploadId, UploadState.PUBLISHED);
             tracker.updatePublicationProgress(100);
             tracker.completePublication();
 
             uploadQueue.uploadCompleted(uploadId);
-            uploadEvents.emit(UploadEventNames.UPLOAD_COMPLETED, { uploadId, session });
-            uploadEvents.emit(UploadEventNames.UPLOAD_PUBLISHED, { uploadId, session, postId: response?.id });
+            uploadEvents.emit(UploadEventNames.UPLOAD_COMPLETED, { uploadId, session, postId });
 
             this.cleanupUpload(uploadId);
         } catch (error) {
@@ -261,9 +267,9 @@ class UploadManager {
         // Non-video posts: quick synthetic update, done immediately.
         // ----------------------------------------------------------------
         if (!hasVideo || !postId) {
-            tracker.updateServerProcessingProgress(1, 2, 'Saving to database…');
+            tracker.updateServerProcessingProgress(50, 100, 'Saving to database…');
             await new Promise((r) => setTimeout(r, 400));
-            tracker.updateServerProcessingProgress(2, 2, 'Published!');
+            tracker.updateServerProcessingProgress(100, 100, 'Published!');
             return;
         }
 
@@ -282,7 +288,7 @@ class UploadManager {
             };
 
             const timeoutHandle = setTimeout(() => {
-                tracker.updateServerProcessingProgress(3, 3, 'Processing…');
+                tracker.updateServerProcessingProgress(100, 100, 'Processing…');
                 finish();
             }, TIMEOUT_MS);
 
@@ -292,8 +298,8 @@ class UploadManager {
                 if (String(post_id) !== String(postId)) return;
 
                 tracker.updateServerProcessingProgress(
-                    Math.max(1, Math.round(progress / 100 * 3)),
-                    3,
+                    progress ?? 0,
+                    100,
                     message || 'Processing video…'
                 );
 
@@ -307,7 +313,7 @@ class UploadManager {
             window.addEventListener('feedVideoProgress', onProgress);
 
             // Seed the UI immediately so the banner doesn't sit blank
-            tracker.updateServerProcessingProgress(1, 3, 'Video received — starting transcoding…');
+            tracker.updateServerProcessingProgress(5, 100, 'Video received — starting transcoding…');
         });
     }
 
