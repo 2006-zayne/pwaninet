@@ -53,32 +53,79 @@
 </div>
 
 <script>
+// Helper function to get CSRF token from cookies
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const modal = document.getElementById('accountSwitcherModal');
     const container = document.getElementById('account-list-container');
     const DEVICE_ID_KEY = 'pwaninet_device_id';
     
     modal.addEventListener('show.bs.modal', function() {
+        console.log('[Account Switcher] Modal opening');
+        
         // Get device ID from localStorage (same as device_manager.js)
         let deviceId = localStorage.getItem(DEVICE_ID_KEY);
+        console.log('[Account Switcher] Device ID from localStorage:', deviceId ? deviceId.substring(0, 8) + '...' : 'null');
         
         // If device_manager.js hasn't run yet, create it
         if (!deviceId) {
+            console.log('[Account Switcher] No device ID found, generating new one');
             const array = new Uint8Array(32);
             crypto.getRandomValues(array);
             deviceId = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
             localStorage.setItem(DEVICE_ID_KEY, deviceId);
+            console.log('[Account Switcher] Generated new device ID:', deviceId.substring(0, 8) + '...');
         }
         
         // Load accounts when modal opens
-        fetch('{% url "users:device_accounts" %}', {
+        const deviceAccountsUrl = '{% url "users:device_accounts" %}';
+        console.log('[Account Switcher] Fetching accounts from:', deviceAccountsUrl);
+        
+        // Get CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                         getCookie('csrftoken');
+        
+        fetch(deviceAccountsUrl, {
+            method: 'GET',
             headers: {
-                'X-Device-ID': deviceId
-            }
+                'X-Device-ID': deviceId,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            credentials: 'same-origin'
         })
-            .then(response => response.json())
-            .then(data => {
+            .then(response => {
+                console.log('[Account Switcher] Response status:', response.status);
+                console.log('[Account Switcher] Response headers:', response.headers);
+                return response.json().then(data => {
+                    console.log('[Account Switcher] Response data:', data);
+                    return { response, data };
+                });
+            })
+            .then(({ response, data }) => {
+                if (!response.ok) {
+                    if (response.status === 302 || response.status === 401 || response.status === 403) {
+                        throw new Error('Authentication required. Please refresh the page.');
+                    }
+                    throw new Error(`HTTP ${response.status}: ${data.error || 'Unknown error'}`);
+                }
+                
                 if (data.accounts && data.accounts.length > 0) {
+                    console.log('[Account Switcher] Found', data.accounts.length, 'accounts');
                     container.innerHTML = data.accounts.map(account => `
                         <div class="account-item d-flex align-items-center p-3 mb-2 rounded-3 ${account.is_current ? 'bg-primary bg-opacity-10 border border-primary' : 'bg-light'}">
                             <img src="${account.profile_pic || '/static/images/default_pic1.jpg'}" 
@@ -102,6 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     `).join('');
                 } else {
+                    console.log('[Account Switcher] No accounts found');
                     container.innerHTML = `
                         <div class="text-center py-4">
                             <i class="bi bi-person-circle display-4 text-muted mb-3"></i>
@@ -112,10 +160,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             })
             .catch(error => {
+                console.error('[Account Switcher] Error loading accounts:', error);
                 container.innerHTML = `
                     <div class="text-center py-4 text-danger">
                         <i class="bi bi-exclamation-circle display-4 mb-3"></i>
                         <p>Failed to load accounts</p>
+                        <p class="small text-muted">${error.message}</p>
                     </div>
                 `;
             });

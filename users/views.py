@@ -1237,29 +1237,41 @@ def get_device_accounts_view(request):
     Get list of accounts associated with the current device.
     Returns JSON for the account switcher modal.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     # Try to get device ID from headers first (HTMX requests)
     device_id = request.headers.get('X-Device-ID')
+    logger.info(f'[Device Accounts] Request from user {request.user.username}, device_id header: {device_id[:8] if device_id else "None"}...')
 
     if not device_id:
+        logger.warning('[Device Accounts] No device ID in request headers')
         return JsonResponse({'accounts': [], 'error': 'Device not identified'})
 
     hashed_device_id = hash_device_id(device_id)
+    logger.info(f'[Device Accounts] Hashed device ID: {hashed_device_id[:16]}...')
 
     device_accounts = DeviceAccount.objects.filter(
         device_id=hashed_device_id
     ).select_related('user').order_by('-last_used')
+    
+    logger.info(f'[Device Accounts] Found {device_accounts.count()} device accounts')
 
     accounts_data = []
     for da in device_accounts:
-        accounts_data.append({
-            'id': da.user.id,
-            'username': da.user.username,
-            'full_name': str(da.user),
-            'profile_pic': da.user.profile_pic.url if da.user.profile_pic else None,
-            'last_used': da.last_used.isoformat(),
-            'is_current': da.user.id == request.user.id
-        })
+        try:
+            accounts_data.append({
+                'id': da.user.id,
+                'username': da.user.username,
+                'full_name': str(da.user),
+                'profile_pic': da.user.profile_pic.url if da.user.profile_pic else None,
+                'last_used': da.last_used.isoformat(),
+                'is_current': da.user.id == request.user.id
+            })
+        except Exception as e:
+            logger.error(f'[Device Accounts] Error processing account {da.user.username}: {e}')
 
+    logger.info(f'[Device Accounts] Returning {len(accounts_data)} accounts')
     return JsonResponse({'accounts': accounts_data})
 
 

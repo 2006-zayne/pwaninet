@@ -378,27 +378,44 @@
             font-family: var(--font-family, system-ui, -apple-system, 'Roboto', 'Inter', sans-serif);
             font-style: var(--font-style, normal);
             padding-top: 75px;
-            padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+            padding-bottom: 80px;
             font-size: 1rem;
+        }
+
+        /* Native App Spacing Overrides */
+        body.is-native-app {
+            padding-top: calc(75px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+            padding-bottom: calc(120px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+        }
+
+        body.is-native-app .navbar-top {
+            padding-top: var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)) !important;
+            height: calc(75px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
         }
 
         @media (max-width: 767px) {
             body {
-                padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+                padding-bottom: 80px;
+            }
+            .is-native-app body, body.is-native-app {
+                padding-bottom: calc(120px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
             }
         }
 
         /* iPhone SE and very small screens (320px width) */
         @media (max-width: 360px) {
             body {
-                padding-bottom: calc(75px + env(safe-area-inset-bottom, 0px));
+                padding-bottom: 75px;
+            }
+            .is-native-app body, body.is-native-app {
+                padding-bottom: calc(115px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
             }
 
             .mobile-bottom-nav {
                 width: 95%;
                 max-width: 380px;
                 height: 55px;
-                bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+                bottom: calc(10px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
                 padding: 0 4px;
                 border-radius: 16px;
             }
@@ -480,7 +497,7 @@
 
         /* Capacitor safe area adjustment */
         .is-capacitor #navigation-progress {
-            top: calc(75px + env(safe-area-inset-top, 0px));
+            top: calc(75px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)));
         }
 
         /* Reduced motion support */
@@ -509,7 +526,7 @@
             border-radius: 20px;
             height: 60px;
             position: fixed;
-            bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+            bottom: calc(12px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
             left: 50%;
             transform: translateX(-50%);
             width: 95%;
@@ -708,6 +725,10 @@
 
         @media (min-width: 768px) { .mobile-bottom-nav { display: none; } }
 
+        #page-content-target {
+            padding-top: 0 !important;
+        }
+
         /* Mobile full width fix */
         @media (max-width: 767px) {
             .container, .container-fluid {
@@ -719,6 +740,9 @@
                 padding: 8px !important;
                 max-width: 100% !important;
                 flex: 0 0 100% !important;
+            }
+            #page-content-target {
+                padding-top: 0 !important;
             }
             .row {
                 margin-left: 0 !important;

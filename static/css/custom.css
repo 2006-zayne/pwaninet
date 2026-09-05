@@ -325,8 +325,8 @@ body.is-native-app img {
 /* Navbar extends into status bar area with solid status bar background matching navbar */
 body.is-native-app .navbar-top {
     /* Use padding-top to handle safe area, ensure box-sizing includes padding in height */
-    padding-top: env(safe-area-inset-top);
-    height: 90px;
+    padding-top: var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px));
+    height: calc(75px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)));
     box-sizing: border-box;
     /* Ensure navbar extends to the top edge */
     margin-top: 0;
@@ -334,21 +334,24 @@ body.is-native-app .navbar-top {
 
 /* Adjust body padding to match navbar height in native app with safe area consideration */
 body.is-native-app {
-    padding-top: 90px;
-    /* Account for both bottom nav height and system navigation bar */
-    padding-bottom: calc(85px + env(safe-area-inset-bottom, 0px));
+    padding-top: calc(75px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)));
+    /* Increased padding-bottom to 120px to ensure content cleared the floating pill nav */
+    padding-bottom: calc(120px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
     /* Ensure content can extend under system bars */
     margin-top: 0;
 }
 
 /* Safe area insets for footer in native app - floats above system navigation bar */
 body.is-native-app .mobile-bottom-nav {
-    /* Update bottom position to float above system bar */
-    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    /* Update bottom position to float above system bar with safe area buffer */
+    /* 12px provides slightly better clearance for gesture bars vs buttons */
+    bottom: calc(12px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
     /* Reset padding-bottom as the container itself is moved up */
     padding-bottom: 0;
     /* Ensure navbar extends to the bottom edge is NOT desired for floating pill */
     margin-bottom: 0;
+    /* Ensure z-index is high enough to stay above system navigation area */
+    z-index: 10000;
 }
 
 /* Instant button touch states for native app */

@@ -7,6 +7,7 @@ import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.view.View;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
@@ -14,15 +15,24 @@ import android.webkit.WebViewClient;
 
 import androidx.activity.EdgeToEdge;
 import androidx.activity.SystemBarStyle;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import com.getcapacitor.BridgeActivity;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Locale;
 
 public class MainActivity extends BridgeActivity {
     private boolean isNetworkAvailable = true;
     private static final String WEBVIEW_STATE_KEY = "WEBVIEW_STATE";
+
+    private int lastSafeTop = 0;
+    private int lastSafeBottom = 0;
+    private int lastSafeLeft = 0;
+    private int lastSafeRight = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,6 +51,7 @@ public class MainActivity extends BridgeActivity {
         
         // StatusBar plugin handles system bar transparency and edge-to-edge layout
         
+        setupSafeAreaInsets();
         setupNetworkMonitoring();
         setupCustomWebViewClient();
         setupWebViewCaching();
@@ -138,8 +149,63 @@ public class MainActivity extends BridgeActivity {
                     // Allow the WebView to handle all URL loading
                     return false;
                 }
+
+                @Override
+                public void onPageFinished(WebView view, String url) {
+                    super.onPageFinished(view, url);
+                    injectSafeAreaInsets();
+                }
             });
         }
+    }
+
+    private void setupSafeAreaInsets() {
+        View decorView = getWindow().getDecorView();
+        ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, windowInsets) -> {
+            Insets insets = windowInsets.getInsets(
+                WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
+            );
+            float density = getResources().getDisplayMetrics().density;
+            if (density > 0) {
+                lastSafeTop = Math.round(insets.top / density);
+                lastSafeBottom = Math.round(insets.bottom / density);
+                lastSafeLeft = Math.round(insets.left / density);
+                lastSafeRight = Math.round(insets.right / density);
+                injectSafeAreaInsets();
+            }
+            return windowInsets;
+        });
+    }
+
+    private void injectSafeAreaInsets() {
+        runOnUiThread(() -> {
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                String js = String.format(Locale.US,
+                    "(function() {" +
+                    "  var root = document.documentElement;" +
+                    "  root.style.setProperty('--pwaninet-safe-area-top', '%dpx');" +
+                    "  root.style.setProperty('--pwaninet-safe-area-bottom', '%dpx');" +
+                    "  root.style.setProperty('--pwaninet-safe-area-left', '%dpx');" +
+                    "  root.style.setProperty('--pwaninet-safe-area-right', '%dpx');" +
+                    "  if (document.body) {" +
+                    "    document.body.style.setProperty('--pwaninet-safe-area-top', '%dpx');" +
+                    "    document.body.style.setProperty('--pwaninet-safe-area-bottom', '%dpx');" +
+                    "  }" +
+                    "  window.dispatchEvent(new CustomEvent('pwaninet:safe-area-changed', { detail: { top: %d, bottom: %d, left: %d, right: %d } }));" +
+                    "})();",
+                    lastSafeTop, lastSafeBottom, lastSafeLeft, lastSafeRight,
+                    lastSafeTop, lastSafeBottom,
+                    lastSafeTop, lastSafeBottom, lastSafeLeft, lastSafeRight
+                );
+                getBridge().getWebView().evaluateJavascript(js, null);
+            }
+        });
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        injectSafeAreaInsets();
     }
 
     private void setupWebViewCaching() {
