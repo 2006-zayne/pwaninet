@@ -13,72 +13,95 @@ FEED_PAGE_SIZE = 10
 
 
 def encode_cursor(post):
-    """Encode post id and created_at into a cursor string."""
-    return f"{post.id}|{post.created_at.timestamp()}"
+    """Encode all 4 sort keys into a cursor string so pagination is always stable.
+    
+    The feed orders by: -priority_tier, -engagement_score, -created_at, -id
+    The cursor must reflect ALL of these to avoid repeated or skipped posts.
+    """
+    return (
+        f"{post.priority_tier}|"
+        f"{post.engagement_score}|"
+        f"{post.created_at.timestamp()}|"
+        f"{post.id}"
+    )
 
 
 def decode_cursor(cursor_string):
-    """Decode cursor string into post id and created_at."""
+    """Decode cursor string into all 4 sort key values."""
     if not cursor_string:
         return None
     try:
         parts = cursor_string.split('|')
-        if len(parts) != 2:
+        if len(parts) != 4:
             return None
-        post_id = int(parts[0])
-        created_at_timestamp = float(parts[1])
         from datetime import datetime, timezone
-        created_at = datetime.fromtimestamp(created_at_timestamp, tz=timezone.utc)
-        return {'id': post_id, 'created_at': created_at}
+        return {
+            'priority_tier': int(parts[0]),
+            'engagement_score': float(parts[1]),
+            'created_at': datetime.fromtimestamp(float(parts[2]), tz=timezone.utc),
+            'id': int(parts[3]),
+        }
     except (ValueError, IndexError):
         return None
 
 
 def get_ranked_feed(user, cursor=None, limit=10):
     """
-    Get ranked feed with cursor-based pagination (scales well).
-    
+    Get ranked feed with cursor-based pagination.
+
+    Ordering: -priority_tier, -engagement_score, -created_at, -id
+    Cursor encodes all 4 sort keys so that no post is ever repeated or skipped,
+    even when many posts share the same timestamp or engagement score.
+
     Args:
         user: The user requesting the feed
         cursor: Optional cursor string for pagination
         limit: Number of posts to return (default 10)
-    
+
     Returns:
         dict with posts, next_cursor, has_more
     """
-    # Get user's relationships
     following_ids = get_following_ids(user)
     group_ids = get_user_group_ids(user)
-    
-    # Use the improved feed algorithm from feed_queries (includes filters)
+
     from posts.queries.feed_queries import get_prioritized_feed_queryset
     feed_qs = get_prioritized_feed_queryset(user, following_ids, group_ids)
-    
-    # Apply cursor filtering if provided
+
+    # Apply cursor filtering using all 4 sort columns.
+    # This is the keyset-pagination equivalent of:
+    #   WHERE (pt, es, ca, id) < (cursor_pt, cursor_es, cursor_ca, cursor_id)
+    # ordered DESC on all keys.
     cursor_data = decode_cursor(cursor)
     if cursor_data:
-        # Filter posts that come after the cursor post
-        # Since we order by -priority_tier, -engagement_score, -created_at, -id
-        # We use id and created_at for reliable pagination
+        pt  = cursor_data['priority_tier']
+        es  = cursor_data['engagement_score']
+        ca  = cursor_data['created_at']
+        cid = cursor_data['id']
         feed_qs = feed_qs.filter(
-            Q(created_at__lt=cursor_data['created_at']) |
-            Q(created_at=cursor_data['created_at'], id__lt=cursor_data['id'])
+            # Lower priority_tier entirely
+            Q(priority_tier__lt=pt) |
+            # Same priority_tier, lower engagement_score
+            Q(priority_tier=pt, engagement_score__lt=es) |
+            # Same priority_tier + engagement_score, older created_at
+            Q(priority_tier=pt, engagement_score=es, created_at__lt=ca) |
+            # Same priority_tier + engagement_score + created_at, lower id (tie-break)
+            Q(priority_tier=pt, engagement_score=es, created_at=ca, id__lt=cid)
         )
-    
-    # Fetch one extra to check if there are more results
+
+    # Fetch limit+1 to cheaply determine has_more
     posts = list(feed_qs[:limit + 1])
     has_more = len(posts) > limit
-    
+
     if has_more:
         posts = posts[:limit]
         next_cursor = encode_cursor(posts[-1])
     else:
         next_cursor = None
-    
+
     return {
         'posts': posts,
         'next_cursor': next_cursor,
-        'has_more': has_more
+        'has_more': has_more,
     }
 
 

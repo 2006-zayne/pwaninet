@@ -18,9 +18,15 @@
 {% endfor %}
 
 {% if has_more %}
-<div hx-get="{% url 'posts:home' %}?cursor={{ next_cursor }}"
+<div id="feed-load-trigger"
+     hx-get="{% url 'posts:home' %}?cursor={{ next_cursor }}"
      hx-trigger="revealed"
-     hx-swap="afterend"
-     style="height: 1px;">
+     hx-swap="outerHTML"
+     class="d-flex justify-content-center py-3">
+  <div class="spinner-border text-primary" role="status">
+    <span class="visually-hidden">Loading…</span>
+  </div>
 </div>
+{% else %}
+<div class="text-center py-3 text-muted small">You're all caught up 🎉</div>
 {% endif %}
