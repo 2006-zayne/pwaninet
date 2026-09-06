@@ -41,7 +41,14 @@
         </div>
       </div>
 
-      <form method="POST" enctype="multipart/form-data" class="profile-update-form">
+      <form method="POST"
+            action="{% url 'users:settings_profile' %}"
+            hx-post="{% url 'users:settings_profile' %}"
+            hx-target="#page-content-target"
+            hx-swap="innerHTML"
+            hx-encoding="multipart/form-data"
+            enctype="multipart/form-data"
+            class="profile-update-form">
         {% csrf_token %}
 
         {% if form %}

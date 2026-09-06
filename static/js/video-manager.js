@@ -51,6 +51,9 @@
     }
 
     function getVideoType(video) {
+        if (video.dataset.autoplay === 'false' || video.hasAttribute('data-disable-autoplay') || video.closest('#search-tab-content')) {
+            return 'no-autoplay';
+        }
         if (video.classList.contains('feed-video')) return 'feed';
         if (video.classList.contains('post-detail-video')) return 'detail';
         return 'unknown';
@@ -82,6 +85,9 @@
 
     function observeVideo(video) {
         if (state.observer && video) {
+            const data = state.videos.get(video);
+            if (data && data.type === 'no-autoplay') return;
+            if (video.dataset.autoplay === 'false' || video.hasAttribute('data-disable-autoplay') || video.closest('#search-tab-content')) return;
             state.observer.observe(video);
         }
     }
@@ -248,6 +254,11 @@
         const globalAudioPref = localStorage.getItem(storageKey) || window.PwaniNetUserAudioPreference || 'muted';
         video.muted = globalAudioPref === 'muted';
 
+        // Resume HLS segment loading if HLS player is active
+        if (video._hlsInstance && typeof video._hlsInstance.startLoad === 'function') {
+            video._hlsInstance.startLoad();
+        }
+
         // Play new video
         video.play().then(() => {
             state.currentPlayingVideo = video;
@@ -265,6 +276,11 @@
 
     function pauseVideo(video, videoData) {
         if (!video) return;
+
+        // Stop background HLS segment fetching to preserve bandwidth for visible content
+        if (video._hlsInstance && typeof video._hlsInstance.stopLoad === 'function') {
+            video._hlsInstance.stopLoad();
+        }
 
         video.pause();
         videoData.isPlaying = false;
@@ -293,6 +309,9 @@
             if (entry.isIntersecting) {
                 // Video entered viewport - play it
                 videoData.isVisible = true;
+                if (videoData.type === 'no-autoplay' || video.dataset.autoplay === 'false' || video.hasAttribute('data-disable-autoplay') || video.closest('#search-tab-content')) {
+                    return;
+                }
                 if (videoData.type === 'feed' && !videoData.hasStarted) {
                     playVideo(video, videoData);
                 }
@@ -333,6 +352,7 @@
     function getVisibleVideo() {
         for (let [video, videoData] of state.videos) {
             if (videoData.type !== 'feed') continue;
+            if (videoData.type === 'no-autoplay' || video.dataset.autoplay === 'false' || video.hasAttribute('data-disable-autoplay') || video.closest('#search-tab-content')) continue;
             
             const rect = video.getBoundingClientRect();
             const isVisible = (
@@ -357,6 +377,16 @@
     function cleanupVideo(video) {
         const videoData = state.videos.get(video);
         if (!videoData) return;
+
+        // Destroy HLS instance to prevent zombie network requests and memory leaks
+        if (video._hlsInstance && typeof video._hlsInstance.destroy === 'function') {
+            try {
+                video._hlsInstance.destroy();
+            } catch (e) {
+                console.warn('[VideoManager] Error destroying HLS instance:', e);
+            }
+            delete video._hlsInstance;
+        }
 
         // Unobserve
         unobserveVideo(video);

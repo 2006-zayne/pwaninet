@@ -265,20 +265,21 @@ class DocumentSelector:
         filters: dict = None,
         limit: int = 20,
         user=None,
+        sort_by: str = 'relevance',
     ) -> List[Document]:
-        """Search documents with advanced full-text search."""
-        from ..services.search_service import SearchService
-        
-        search_service = SearchService()
-        documents, total_count = search_service.search(
+        """Search documents with advanced full-text search via UnifiedSearchService."""
+        from search.services.unified_search_service import UnifiedSearchService
+
+        search_service = UnifiedSearchService()
+        documents, total_count = search_service.search_documents_models(
             query=query,
+            user=user,
             filters=filters,
-            sort_by='relevance',
+            sort_by=sort_by,
             page=1,
             per_page=limit,
-            user=user,
         )
-        
+
         return documents
     
     @staticmethod

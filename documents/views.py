@@ -18,6 +18,7 @@ from .models import (
 )
 from documents.engagement.models import DocumentRating, DocumentShare, DocumentAnalytics
 from .selectors.document_selectors import DocumentSelector
+from pwaninet.utils.htmx import htmx_location_response
 
 
 # ============== PAGE VIEWS ==============
@@ -138,15 +139,16 @@ def search_results(request):
             filters['academic_year'] = request.user.academic_year.id
     
     # Get "Did you mean" suggestion
-    from .services.search_service import SearchService
-    search_service = SearchService()
-    did_you_mean = search_service.get_did_you_mean(query) if query else None
+    from search.services.unified_search_service import UnifiedSearchService
+    unified_service = UnifiedSearchService()
+    did_you_mean = unified_service.get_document_did_you_mean(query) if query else None
     
     documents = DocumentSelector.search_documents(
         query=query,
         filters=filters,
         limit=50,
-        user=request.user if request.user.is_authenticated else None
+        user=request.user if request.user.is_authenticated else None,
+        sort_by=sort_by,
     )
     
     # Get categories for filter dropdown
@@ -206,10 +208,7 @@ def clear_recent_searches(request):
     """
     request.session['recent_searches'] = []
     if request.headers.get('HX-Request'):
-        from django.http import HttpResponse
-        response = HttpResponse(status=204)
-        response['HX-Redirect'] = request.META.get('HTTP_REFERER', '/documents/search/')
-        return response
+        return htmx_location_response(request.META.get('HTTP_REFERER', '/documents/search/'))
     from django.http import HttpResponseRedirect
     return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/documents/search/'))
 
@@ -222,9 +221,9 @@ def search_suggestions_view(request):
     if len(q) < 2:
         return JsonResponse({'suggestions': []})
 
-    from .services.search_service import SearchService
-    search_service = SearchService()
-    suggestions = search_service.get_search_suggestions(q)
+    from search.services.unified_search_service import UnifiedSearchService
+    search_service = UnifiedSearchService()
+    suggestions = search_service.get_document_suggestions(q)
     return JsonResponse({'suggestions': suggestions})
 
 
@@ -564,10 +563,7 @@ def clear_history(request):
         from django.contrib import messages
         messages.success(request, 'Your viewing history has been cleared.')
     if request.headers.get('HX-Request'):
-        from django.http import HttpResponse
-        response = HttpResponse(status=204)
-        response['HX-Redirect'] = request.META.get('HTTP_REFERER', '/documents/library/')
-        return response
+        return htmx_location_response(request.META.get('HTTP_REFERER', '/documents/library/'))
     from django.http import HttpResponseRedirect
     return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/documents/library/'))
 

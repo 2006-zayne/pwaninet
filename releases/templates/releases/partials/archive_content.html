@@ -48,7 +48,7 @@
                 </table>
             </div>
 
-            <form method="post">
+            <form method="post" action="{% url 'release_archive' release.id %}" hx-post="{% url 'release_archive' release.id %}" hx-target="#page-content-target" hx-swap="innerHTML">
                 {% csrf_token %}
                 
                 <div class="form-check mb-3">

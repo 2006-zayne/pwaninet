@@ -219,7 +219,13 @@
   <!-- ── Form Card ── -->
   <div class="card">
     <div class="card-body">
-      <form method="POST" enctype="multipart/form-data">
+      <form method="POST"
+            action="{% url 'groups:create_group' %}"
+            hx-post="{% url 'groups:create_group' %}"
+            hx-target="#page-content-target"
+            hx-swap="innerHTML"
+            hx-encoding="multipart/form-data"
+            enctype="multipart/form-data">
         {% csrf_token %}
 
         <div class="mb-4">

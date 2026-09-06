@@ -673,7 +673,7 @@
             <button class="btn btn-outline-secondary rounded-pill fw-bold btn-sm profile-action-btn" disabled style="opacity: 0.7; cursor: not-allowed;">
               <i class="bi bi-clock-fill me-1"></i> Request Sent ⏳
             </button>
-            <form method="post" action="{% url 'groups:toggle_membership' group.id %}" style="display: inline;">
+            <form method="post" action="{% url 'groups:toggle_membership' group.id %}" hx-post="{% url 'groups:toggle_membership' group.id %}" hx-target="#page-content-target" hx-swap="innerHTML" style="display: inline;">
               {% csrf_token %}
               <button type="submit" class="btn btn-outline-danger rounded-pill fw-bold btn-sm profile-action-btn w-100">
                 <i class="bi bi-x-circle-fill me-1"></i> Cancel Request
@@ -682,7 +682,7 @@
           </div>
         {% elif is_rejected %}
           <div class="d-grid gap-2 px-2">
-            <form method="post" action="{% url 'groups:toggle_membership' group.id %}" style="display: inline;">
+            <form method="post" action="{% url 'groups:toggle_membership' group.id %}" hx-post="{% url 'groups:toggle_membership' group.id %}" hx-target="#page-content-target" hx-swap="innerHTML" style="display: inline;">
               {% csrf_token %}
               <button type="submit" class="btn btn-outline-primary rounded-pill fw-bold btn-sm profile-action-btn w-100">
                 <i class="bi bi-arrow-clockwise me-1"></i> Request Again
@@ -697,7 +697,7 @@
               </button>
               <p class="text-center small text-muted mt-1 mb-0">You have to be invited to join this group</p>
             {% else %}
-              <form method="post" action="{% url 'groups:toggle_membership' group.id %}" style="display: inline;">
+              <form method="post" action="{% url 'groups:toggle_membership' group.id %}" hx-post="{% url 'groups:toggle_membership' group.id %}" hx-target="#page-content-target" hx-swap="innerHTML" style="display: inline;">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-outline-primary rounded-pill fw-bold btn-sm profile-action-btn w-100">
                   <i class="bi bi-plus-circle-fill me-1"></i> Join Group
@@ -808,7 +808,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <form action="{% url 'groups:edit_group' group.id %}" method="POST" enctype="multipart/form-data">
+        <form action="{% url 'groups:edit_group' group.id %}" method="POST" enctype="multipart/form-data" hx-post="{% url 'groups:edit_group' group.id %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-encoding="multipart/form-data">
           {% csrf_token %}
           <div class="mb-3">
             <label class="field-label">Group Name</label>
@@ -1166,7 +1166,7 @@ if (document.readyState === 'loading') {
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <form id="groupCreatePostForm" action="{% url 'posts:create_post' %}?group={{ group.id }}" method="POST" enctype="multipart/form-data">
+        <form id="groupCreatePostForm" action="{% url 'posts:create_post' %}?group={{ group.id }}" method="POST" enctype="multipart/form-data" hx-post="{% url 'posts:create_post' %}?group={{ group.id }}" hx-target="#page-content-target" hx-swap="innerHTML" hx-encoding="multipart/form-data">
           {% csrf_token %}
           <input type="hidden" name="group" value="{{ group.id }}">
 

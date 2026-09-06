@@ -17,7 +17,7 @@
             <h5 class="mb-0">Edit Release</h5>
         </div>
         <div class="card-body">
-            <form method="post">
+            <form method="post" action="{% url 'release_edit' release.id %}" hx-post="{% url 'release_edit' release.id %}" hx-target="#page-content-target" hx-swap="innerHTML">
                 {% csrf_token %}
                 
                 <div class="row mb-3">

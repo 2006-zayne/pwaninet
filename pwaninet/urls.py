@@ -92,6 +92,7 @@ urlpatterns = [
     # User photo like API
     path('api/users/<str:username>/photos/<str:photo_type>/like/', toggle_profile_photo_like, name='toggle_profile_photo_like'),
     # Domain app URLs
+    path('search/', include(('search.urls', 'search'), namespace='search')),
     path('', include(('posts.urls', 'posts'), namespace='posts')),
     path('users/', include(('users.urls', 'users'), namespace='users')),
     path('groups/', include(('groups.urls', 'groups'), namespace='groups')),

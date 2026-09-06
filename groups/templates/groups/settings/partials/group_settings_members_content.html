@@ -626,7 +626,7 @@
       <!-- Member list -->
       <div class="member-list" id="memberList">
         {% for member in members %}
-        <form method="POST" class="member-item" data-name="{{ member.user.first_name }} {{ member.user.last_name }}" data-username="{{ member.user.username }}">
+        <form method="POST" action="{% url 'groups:group_settings_members' group.id %}" hx-post="{% url 'groups:group_settings_members' group.id %}" hx-target="#page-content-target" hx-swap="innerHTML" class="member-item" data-name="{{ member.user.first_name }} {{ member.user.last_name }}" data-username="{{ member.user.username }}">
           {% csrf_token %}
           <input type="hidden" name="user_id" value="{{ member.user.id }}">
           
@@ -707,7 +707,7 @@
       {% if members.has_other_pages %}
       <div style="display: flex; justify-content: center; align-items: center; gap: 0.5rem; padding: 1rem; margin-top: 1rem;">
         {% if members.has_previous %}
-        <a href="?page={{ members.previous_page_number }}" class="btn-action btn-role" style="text-decoration: none;">
+        <a href="?page={{ members.previous_page_number }}" hx-get="?page={{ members.previous_page_number }}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" class="btn-action btn-role" style="text-decoration: none;">
           <i class="bi bi-chevron-left"></i> Previous
         </a>
         {% endif %}
@@ -717,7 +717,7 @@
         </span>
         
         {% if members.has_next %}
-        <a href="?page={{ members.next_page_number }}" class="btn-action btn-role" style="text-decoration: none;">
+        <a href="?page={{ members.next_page_number }}" hx-get="?page={{ members.next_page_number }}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" class="btn-action btn-role" style="text-decoration: none;">
           Next <i class="bi bi-chevron-right"></i>
         </a>
         {% endif %}
@@ -766,8 +766,6 @@ function initGroupMembersSettings() {
     const memberList = document.getElementById('memberList');
     if (!memberList || memberList.dataset.initialized === 'true') return;
     memberList.dataset.initialized = 'true';
-    const searchInput = document.getElementById('memberSearch');
-    const memberList = document.getElementById('memberList');
     const memberItems = memberList.querySelectorAll('.member-item');
 
     // Member search functionality

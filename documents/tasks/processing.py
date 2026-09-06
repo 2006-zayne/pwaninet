@@ -36,25 +36,44 @@ def get_local_filepath(doc_file: DocumentFile):
     If the file is already on local disk, yields its path directly.
     If stored on remote storage (S3/R2), downloads to a temporary file and deletes it on exit.
     """
-    if not doc_file.file:
+    if not doc_file.file or not doc_file.file.name:
         yield None
         return
 
     try:
         path = doc_file.file.path
-        if os.path.exists(path):
+        if path and os.path.exists(path):
             yield path
             return
     except (NotImplementedError, AttributeError, ValueError):
+        pass
+
+    # Check local MEDIA_ROOT fallback (e.g., when remote storage is configured but file exists locally)
+    try:
+        if hasattr(settings, 'MEDIA_ROOT') and doc_file.file.name:
+            local_fallback = os.path.join(str(settings.MEDIA_ROOT), doc_file.file.name)
+            if os.path.exists(local_fallback):
+                yield local_fallback
+                return
+    except Exception:
         pass
 
     # Remote or streamable storage: download to temporary file
     suffix = f".{doc_file.extension}" if doc_file.extension else ""
     temp_path = None
     try:
+        try:
+            doc_file.file.open('rb')
+        except (FileNotFoundError, Exception) as open_err:
+            logger.warning(
+                "Source file not accessible for file %s (%s): %s",
+                doc_file.id, doc_file.file.name, open_err
+            )
+            yield None
+            return
+
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tf:
             temp_path = tf.name
-            doc_file.file.open('rb')
             for chunk in doc_file.file.chunks():
                 tf.write(chunk)
             doc_file.file.close()
@@ -250,6 +269,10 @@ def generate_thumbnail(self, file_id: int):
         file = DocumentFile.objects.get(id=file_id)
         logger.info(f"Generating thumbnail for file {file_id}")
         
+        if not file.file:
+            logger.info(f"File {file_id} has no file attached, skipping thumbnail")
+            return
+
         # Only generate thumbnails for supported file types
         if file.extension not in ['pdf', 'pptx', 'ppt', 'docx', 'doc']:
             logger.info(f"Skipping thumbnail for {file.extension} file")
@@ -275,6 +298,10 @@ def generate_thumbnail(self, file_id: int):
         
         logger.info(f"Generated thumbnail for file {file_id}")
         
+    except DocumentFile.DoesNotExist:
+        logger.error(f"File {file_id} not found")
+    except FileNotFoundError as e:
+        logger.warning(f"Source file not found for thumbnail of file {file_id}: {e}")
     except Exception as e:
         logger.error(f"Error generating thumbnail for file {file_id}: {e}")
         raise self.retry(exc=e, countdown=30)
@@ -287,6 +314,13 @@ def generate_preview(self, file_id: int):
         file = DocumentFile.objects.get(id=file_id)
         logger.info(f"Generating preview for file {file_id}")
         
+        if not file.file:
+            logger.info(f"File {file_id} has no file attached, skipping preview")
+            file.processing_status = 'failed'
+            file.processing_error = 'No file attached'
+            file.save(update_fields=['processing_status', 'processing_error'])
+            return
+
         # Generate preview based on file type
         if file.extension == 'pdf':
             _generate_pdf_preview(file)
@@ -302,51 +336,97 @@ def generate_preview(self, file_id: int):
             file.save(update_fields=['processing_status'])
             return
         
-        # Update processing status after successful preview generation
-        file.processing_status = 'completed'
-        file.save(update_fields=['processing_status'])
-        
-        logger.info(f"Generated preview for file {file_id}")
+        # Check if preview was generated
+        file.refresh_from_db()
+        if file.preview_path:
+            file.processing_status = 'completed'
+            file.processing_error = ''
+            file.save(update_fields=['processing_status', 'processing_error'])
+            logger.info(f"Generated preview for file {file_id}")
+        else:
+            file.processing_status = 'failed'
+            file.processing_error = file.processing_error or 'Preview generation produced no output'
+            file.save(update_fields=['processing_status', 'processing_error'])
+            logger.warning(f"Preview was not generated for file {file_id}")
         
     except DocumentFile.DoesNotExist:
         logger.error(f"File {file_id} not found")
+    except FileNotFoundError as e:
+        logger.warning(f"Source file not found for preview of file {file_id}: {e}")
+        try:
+            file = DocumentFile.objects.get(id=file_id)
+            file.processing_status = 'failed'
+            file.processing_error = f"Source file does not exist: {e}"
+            file.save(update_fields=['processing_status', 'processing_error'])
+        except Exception:
+            pass
     except Exception as e:
         logger.error(f"Error generating preview for file {file_id}: {e}")
         # Update status to failed
         try:
             file = DocumentFile.objects.get(id=file_id)
             file.processing_status = 'failed'
-            file.save(update_fields=['processing_status'])
+            file.processing_error = str(e)
+            file.save(update_fields=['processing_status', 'processing_error'])
         except:
             pass
         raise self.retry(exc=e, countdown=30)
 
 
+def _sync_to_storage_if_remote(local_file_path, rel_storage_path):
+    """If default_storage is remote (e.g. S3/R2), upload the locally generated file."""
+    try:
+        from django.core.files.storage import default_storage
+        from django.core.files.base import ContentFile
+        if default_storage.__class__.__name__ != 'FileSystemStorage':
+            with open(local_file_path, 'rb') as f:
+                if default_storage.exists(rel_storage_path):
+                    default_storage.delete(rel_storage_path)
+                default_storage.save(rel_storage_path, ContentFile(f.read()))
+    except Exception as exc:
+        logger.warning(f"Failed to sync {rel_storage_path} to remote storage: {exc}")
+
+
 def _generate_pdf_preview(file):
-    """Generate preview for PDF files using PyMuPDF."""
-    import fitz  # PyMuPDF
-    from pathlib import Path
-    from django.conf import settings
-    
-    preview_dir = Path(settings.MEDIA_ROOT) / 'previews'
-    preview_dir.mkdir(parents=True, exist_ok=True)
-    
-    if file.file and hasattr(file.file, 'path'):
-        pdf_path = file.file.path
-        doc = fitz.open(pdf_path)
-        if doc.page_count > 0:
-            # Store page count
-            file.page_count = doc.page_count
-            
-            page = doc[0]
-            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-            preview_path = preview_dir / f"{file.id}_preview.jpg"
-            pix.save(preview_path)
-            doc.close()
-            file.preview_path = f"previews/{file.id}_preview.jpg"
-            file.save(update_fields=['preview_path', 'page_count'])
-        else:
-            doc.close()
+    """Generate preview for PDF files using PyMuPDF.
+    Supports both local and remote storage by using a temporary local copy
+    when the storage backend does not expose an absolute path.
+    """
+    try:
+        import fitz  # PyMuPDF
+        from pathlib import Path
+        from django.conf import settings
+        
+        preview_dir = Path(settings.MEDIA_ROOT) / 'previews'
+        preview_dir.mkdir(parents=True, exist_ok=True)
+        
+        with get_local_filepath(file) as local_path:
+            if not local_path:
+                logger.error(f"Unable to obtain local path for PDF preview of file {file.id}")
+                return
+            doc = fitz.open(local_path)
+            if doc.page_count > 0:
+                file.page_count = doc.page_count
+                page = doc[0]
+                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                preview_filename = f"{file.id}_preview.jpg"
+                preview_path = preview_dir / preview_filename
+                pix.save(preview_path)
+                doc.close()
+                
+                rel_path = f"previews/{preview_filename}"
+                _sync_to_storage_if_remote(preview_path, rel_path)
+                
+                file.preview_path = rel_path
+                # Also fallback thumbnail_path if missing
+                if not file.thumbnail_path:
+                    file.thumbnail_path = rel_path
+                file.save(update_fields=['preview_path', 'thumbnail_path', 'page_count'])
+            else:
+                doc.close()
+                logger.warning(f"PDF file {file.id} has no pages; preview not generated")
+    except Exception as e:
+        logger.error(f"Error generating PDF preview for file {file.id}: {e}")
 
 
 def _generate_docx_preview(file):
@@ -355,20 +435,20 @@ def _generate_docx_preview(file):
         from docx import Document
         from pathlib import Path
         from django.conf import settings
+        from PIL import Image, ImageDraw, ImageFont
         
         preview_dir = Path(settings.MEDIA_ROOT) / 'previews'
         preview_dir.mkdir(parents=True, exist_ok=True)
         
-        if file.file and hasattr(file.file, 'path'):
-            doc_path = file.file.path
-            doc = Document(doc_path)
+        with get_local_filepath(file) as local_path:
+            if not local_path:
+                logger.error(f"Unable to obtain local path for DOCX preview of file {file.id}")
+                return
+            doc = Document(local_path)
             
-            # Create a simple text preview image with white background
-            from PIL import Image, ImageDraw, ImageFont
             img = Image.new('RGB', (800, 600), color='white')
             draw = ImageDraw.Draw(img)
             
-            # Add title with dark text
             try:
                 title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
             except:
@@ -376,7 +456,6 @@ def _generate_docx_preview(file):
             
             draw.text((20, 20), "Document Preview", fill='#1F2937', font=title_font)
             
-            # Add first few paragraphs
             try:
                 text_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
             except:
@@ -388,12 +467,21 @@ def _generate_docx_preview(file):
                 draw.text((20, y_offset), text, fill='#374151', font=text_font)
                 y_offset += 25
             
-            preview_path = preview_dir / f"{file.id}_preview.jpg"
+            preview_filename = f"{file.id}_preview.jpg"
+            preview_path = preview_dir / preview_filename
             img.save(preview_path)
-            file.preview_path = f"previews/{file.id}_preview.jpg"
-            file.save(update_fields=['preview_path'])
+            
+            rel_path = f"previews/{preview_filename}"
+            _sync_to_storage_if_remote(preview_path, rel_path)
+            
+            file.preview_path = rel_path
+            if not file.thumbnail_path:
+                file.thumbnail_path = rel_path
+            file.save(update_fields=['preview_path', 'thumbnail_path'])
     except ImportError:
         logger.error("python-docx or PIL not installed")
+    except Exception as e:
+        logger.error(f"Error generating DOCX preview: {e}")
 
 
 def _generate_pptx_preview(file):
@@ -407,9 +495,11 @@ def _generate_pptx_preview(file):
         preview_dir = Path(settings.MEDIA_ROOT) / 'previews'
         preview_dir.mkdir(parents=True, exist_ok=True)
         
-        if file.file and hasattr(file.file, 'path'):
-            ppt_path = file.file.path
-            prs = Presentation(ppt_path)
+        with get_local_filepath(file) as local_path:
+            if not local_path:
+                logger.error(f"Unable to obtain local path for PPTX preview of file {file.id}")
+                return
+            prs = Presentation(local_path)
             img = Image.new('RGB', (800, 600), color='#DC2626')
             draw = ImageDraw.Draw(img)
             
@@ -421,12 +511,21 @@ def _generate_pptx_preview(file):
             draw.text((20, 20), "Presentation Preview", fill='white', font=title_font)
             draw.text((20, 60), f"Slides: {len(prs.slides)}", fill='white', font=title_font)
             
-            preview_path = preview_dir / f"{file.id}_preview.jpg"
+            preview_filename = f"{file.id}_preview.jpg"
+            preview_path = preview_dir / preview_filename
             img.save(preview_path)
-            file.preview_path = f"previews/{file.id}_preview.jpg"
-            file.save(update_fields=['preview_path'])
+            
+            rel_path = f"previews/{preview_filename}"
+            _sync_to_storage_if_remote(preview_path, rel_path)
+            
+            file.preview_path = rel_path
+            if not file.thumbnail_path:
+                file.thumbnail_path = rel_path
+            file.save(update_fields=['preview_path', 'thumbnail_path'])
     except ImportError:
         logger.error("python-pptx or PIL not installed")
+    except Exception as e:
+        logger.error(f"Error generating PPTX preview: {e}")
 
 
 def _generate_text_preview(file):
@@ -439,13 +538,13 @@ def _generate_text_preview(file):
         preview_dir = Path(settings.MEDIA_ROOT) / 'previews'
         preview_dir.mkdir(parents=True, exist_ok=True)
         
-        if file.file and hasattr(file.file, 'path'):
-            text_path = file.file.path
-            
-            with open(text_path, 'r', encoding='utf-8', errors='ignore') as f:
+        with get_local_filepath(file) as local_path:
+            if not local_path:
+                logger.error(f"Unable to obtain local path for text preview of file {file.id}")
+                return
+            with open(local_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
             
-            # Create a simple text preview image
             img = Image.new('RGB', (800, 600), color='#059669')
             draw = ImageDraw.Draw(img)
             
@@ -468,10 +567,17 @@ def _generate_text_preview(file):
                 draw.text((20, y_offset), text, fill='white', font=text_font)
                 y_offset += 25
             
-            preview_path = preview_dir / f"{file.id}_preview.jpg"
+            preview_filename = f"{file.id}_preview.jpg"
+            preview_path = preview_dir / preview_filename
             img.save(preview_path)
-            file.preview_path = f"previews/{file.id}_preview.jpg"
-            file.save(update_fields=['preview_path'])
+            
+            rel_path = f"previews/{preview_filename}"
+            _sync_to_storage_if_remote(preview_path, rel_path)
+            
+            file.preview_path = rel_path
+            if not file.thumbnail_path:
+                file.thumbnail_path = rel_path
+            file.save(update_fields=['preview_path', 'thumbnail_path'])
     except Exception as e:
         logger.error(f"Error generating text preview: {e}")
 
@@ -480,27 +586,35 @@ def _generate_pdf_thumbnail(file, thumbnail_dir):
     """Generate thumbnail for PDF files using PyMuPDF."""
     try:
         import fitz  # PyMuPDF
-        
-        if file.file and hasattr(file.file, 'path'):
-            pdf_path = file.file.path
-            doc = fitz.open(pdf_path)
-            if doc.page_count > 0:
-                page = doc[0]
-                # Create thumbnail with smaller dimensions
-                pix = page.get_pixmap(matrix=fitz.Matrix(1, 1))  # Lower resolution for thumbnail
-                thumbnail_path = thumbnail_dir / f"{file.id}_thumbnail.jpg"
-                pix.save(thumbnail_path)
-                doc.close()
-                file.thumbnail_path = f"thumbnails/{file.id}_thumbnail.jpg"
-                file.save(update_fields=['thumbnail_path'])
-            else:
-                doc.close()
     except ImportError:
         logger.error("PyMuPDF not installed for PDF thumbnail generation")
-        # Fallback: use preview as thumbnail
         if file.preview_path:
             file.thumbnail_path = file.preview_path
             file.save(update_fields=['thumbnail_path'])
+        return
+
+    try:
+        with get_local_filepath(file) as local_path:
+            if not local_path:
+                logger.error(f"Unable to obtain local path for PDF thumbnail of file {file.id}")
+                return
+            doc = fitz.open(local_path)
+            if doc.page_count > 0:
+                page = doc[0]
+                pix = page.get_pixmap(matrix=fitz.Matrix(1, 1))
+                thumb_filename = f"{file.id}_thumbnail.jpg"
+                thumbnail_path = thumbnail_dir / thumb_filename
+                pix.save(thumbnail_path)
+                doc.close()
+                
+                rel_path = f"thumbnails/{thumb_filename}"
+                _sync_to_storage_if_remote(thumbnail_path, rel_path)
+                
+                file.thumbnail_path = rel_path
+                file.save(update_fields=['thumbnail_path'])
+            else:
+                doc.close()
+                logger.warning(f"PDF file {file.id} has no pages; thumbnail not generated")
     except Exception as e:
         logger.error(f"Error generating PDF thumbnail: {e}")
 
@@ -510,7 +624,6 @@ def _generate_docx_thumbnail(file, thumbnail_dir):
     try:
         from PIL import Image, ImageDraw, ImageFont
         
-        # Create a simple thumbnail with document icon
         img = Image.new('RGB', (200, 150), color='#2563EB')
         draw = ImageDraw.Draw(img)
         
@@ -521,13 +634,17 @@ def _generate_docx_thumbnail(file, thumbnail_dir):
         
         draw.text((20, 20), "DOCX", fill='white', font=title_font)
         
-        thumbnail_path = thumbnail_dir / f"{file.id}_thumbnail.jpg"
+        thumb_filename = f"{file.id}_thumbnail.jpg"
+        thumbnail_path = thumbnail_dir / thumb_filename
         img.save(thumbnail_path)
-        file.thumbnail_path = f"thumbnails/{file.id}_thumbnail.jpg"
+        
+        rel_path = f"thumbnails/{thumb_filename}"
+        _sync_to_storage_if_remote(thumbnail_path, rel_path)
+        
+        file.thumbnail_path = rel_path
         file.save(update_fields=['thumbnail_path'])
     except Exception as e:
         logger.error(f"Error generating DOCX thumbnail: {e}")
-        # Fallback: use preview as thumbnail
         if file.preview_path:
             file.thumbnail_path = file.preview_path
             file.save(update_fields=['thumbnail_path'])
@@ -538,7 +655,6 @@ def _generate_pptx_thumbnail(file, thumbnail_dir):
     try:
         from PIL import Image, ImageDraw, ImageFont
         
-        # Create a simple thumbnail with presentation icon
         img = Image.new('RGB', (200, 150), color='#DC2626')
         draw = ImageDraw.Draw(img)
         
@@ -549,13 +665,17 @@ def _generate_pptx_thumbnail(file, thumbnail_dir):
         
         draw.text((20, 20), "PPTX", fill='white', font=title_font)
         
-        thumbnail_path = thumbnail_dir / f"{file.id}_thumbnail.jpg"
+        thumb_filename = f"{file.id}_thumbnail.jpg"
+        thumbnail_path = thumbnail_dir / thumb_filename
         img.save(thumbnail_path)
-        file.thumbnail_path = f"thumbnails/{file.id}_thumbnail.jpg"
+        
+        rel_path = f"thumbnails/{thumb_filename}"
+        _sync_to_storage_if_remote(thumbnail_path, rel_path)
+        
+        file.thumbnail_path = rel_path
         file.save(update_fields=['thumbnail_path'])
     except Exception as e:
         logger.error(f"Error generating PPTX thumbnail: {e}")
-        # Fallback: use preview as thumbnail
         if file.preview_path:
             file.thumbnail_path = file.preview_path
             file.save(update_fields=['thumbnail_path'])

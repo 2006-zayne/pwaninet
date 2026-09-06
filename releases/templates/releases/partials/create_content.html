@@ -17,7 +17,7 @@
             <h5 class="mb-0">New Release</h5>
         </div>
         <div class="card-body">
-            <form method="post" enctype="multipart/form-data">
+            <form method="post" action="{% url 'release_create' %}" enctype="multipart/form-data" hx-post="{% url 'release_create' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-encoding="multipart/form-data">
                 {% csrf_token %}
                 
                 <div class="row mb-3">

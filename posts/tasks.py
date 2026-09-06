@@ -194,12 +194,13 @@ def process_large_video(self, post_id):
     # ------------------------------------------------------------------
     # Rendition ladder: (label, target_height, video_kbps, audio_kbps)
     # Renditions taller than the source are skipped automatically.
-    # Higher audio bitrates (128k/160k/192k) prevent metallic/scratchy quantization artifacts.
+    # Includes 240p for ultra-low bandwidth / poor connectivity environments.
     # ------------------------------------------------------------------
     RENDITIONS = [
-        ('360p',  360,  800, 128),
-        ('480p',  480, 1400, 160),
-        ('720p',  720, 2800, 192),
+        ('240p',  240,   350,  64),
+        ('360p',  360,   700,  96),
+        ('480p',  480,  1200, 128),
+        ('720p',  720,  2400, 160),
     ]
 
     post = None
@@ -253,10 +254,10 @@ def process_large_video(self, post_id):
         # ------------------------------------------------------------------
         # Transcode renditions
         # ------------------------------------------------------------------
-        produced = []   # list of (label, bandwidth_bps, playlist_rel_path)
+        produced = []   # list of (label, target_h, bandwidth_bps, playlist_rel_path)
         eligible  = [(lbl, h, vk, ak) for lbl, h, vk, ak in RENDITIONS if src_height == 0 or h <= src_height]
         if not eligible:
-            eligible = [RENDITIONS[0]]  # always produce at least 360p
+            eligible = [RENDITIONS[0]]  # always produce at least 240p
 
         total_steps = len(eligible)
         for step, (label, target_h, video_kbps, audio_kbps) in enumerate(eligible, start=1):
@@ -284,20 +285,20 @@ def process_large_video(self, post_id):
                 '-crf', '23',
                 '-maxrate', f'{video_kbps}k',
                 '-bufsize', f'{video_kbps * 2}k',
-                # Audio settings:
-                # 1. Higher bitrates (128k+) prevent high-frequency swishing/scratchiness
-                # 2. aresample=async=1 synchronizes timestamps across 6s HLS chunks
-                # 3. -ar 48000 enforces broadcast-standard audio sample rate
-                # 4. -profile:a aac_low ensures universal clean AAC-LC playback
+                # GOP & Keyframe alignment: force IDR keyframe every 2s, disable scene cuts
+                # Ensures identical segment cuts & seamless ABR switching across all variants
+                '-force_key_frames', 'expr:gte(t,n_forced*2)',
+                '-sc_threshold', '0',
+                # Audio settings
                 '-c:a', 'aac',
                 '-b:a', f'{audio_kbps}k',
                 '-ar', '48000',
                 '-ac', '2',
                 '-af', 'aresample=async=1:first_pts=0',
                 '-profile:a', 'aac_low',
-                # HLS muxer options
+                # HLS muxer options (4s segments optimize TTFF on poor networks)
                 '-f', 'hls',
-                '-hls_time', '6',
+                '-hls_time', '4',
                 '-hls_list_size', '0',
                 '-hls_segment_filename', segment_tmpl,
                 '-hls_flags', 'independent_segments',
@@ -313,7 +314,7 @@ def process_large_video(self, post_id):
                 raise RuntimeError(f'FFmpeg failed for {label}: {stderr_text[-500:]}')
 
             playlist_rel = os.path.join(hls_rel_dir, label, 'index.m3u8')
-            produced.append((label, (video_kbps + audio_kbps) * 1000, playlist_rel))
+            produced.append((label, target_h, (video_kbps + audio_kbps) * 1000, playlist_rel))
             logger.info('[HLS] Post %s: %s done', post_id, label)
 
         # ------------------------------------------------------------------
@@ -325,10 +326,20 @@ def process_large_video(self, post_id):
         with open(master_abs, 'w') as f:
             f.write('#EXTM3U\n')
             f.write('#EXT-X-VERSION:3\n')
-            for label, bandwidth, playlist_rel in produced:
-                # Use a relative URL: ../360p/index.m3u8 etc.
+            for label, target_h, bandwidth, playlist_rel in produced:
+                # Compute width preserving aspect ratio, ensuring even dimension
+                if src_height and src_width:
+                    target_w = int(round(src_width * (target_h / src_height)))
+                else:
+                    target_w = int(round(target_h * 16 / 9))
+                if target_w % 2 != 0:
+                    target_w += 1
+                avg_bandwidth = int(bandwidth * 0.9)
                 playlist_name = os.path.join(label, 'index.m3u8')
-                f.write(f'#EXT-X-STREAM-INF:BANDWIDTH={bandwidth},NAME="{label}"\n')
+                f.write(
+                    f'#EXT-X-STREAM-INF:BANDWIDTH={bandwidth},AVERAGE-BANDWIDTH={avg_bandwidth},'
+                    f'RESOLUTION={target_w}x{target_h},CODECS="avc1.4d401f,mp4a.40.2",NAME="{label}"\n'
+                )
                 f.write(f'{playlist_name}\n')
 
         # ------------------------------------------------------------------

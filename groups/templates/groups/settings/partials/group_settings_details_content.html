@@ -339,7 +339,15 @@
         </div>
       </div>
 
-      <form method="POST" enctype="multipart/form-data" class="group-details-form" {% if not can_edit %}onsubmit="return false;"{% endif %}>
+      <form method="POST"
+            action="{% url 'groups:group_settings_details' group.id %}"
+            hx-post="{% url 'groups:group_settings_details' group.id %}"
+            hx-target="#page-content-target"
+            hx-swap="innerHTML"
+            hx-encoding="multipart/form-data"
+            enctype="multipart/form-data"
+            class="group-details-form"
+            {% if not can_edit %}onsubmit="return false;"{% endif %}>
         {% csrf_token %}
 
         {% if form %}

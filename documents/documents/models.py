@@ -226,6 +226,26 @@ class Document(models.Model):
         """Get the total number of versions."""
         return self.versions.count()
 
+    @property
+    def preview_url(self):
+        """Get preview URL from latest version's first file."""
+        ver = self.latest_version
+        if ver:
+            first_file = ver.files.first()
+            if first_file:
+                return first_file.preview_url
+        return None
+
+    @property
+    def thumbnail_url(self):
+        """Get thumbnail URL from latest version's first file."""
+        ver = self.latest_version
+        if ver:
+            first_file = ver.files.first()
+            if first_file:
+                return first_file.thumbnail_url
+        return None
+
 
 class DocumentVersion(models.Model):
     """Represents a version of a document.
@@ -416,6 +436,36 @@ class DocumentFile(models.Model):
     def size_mb(self):
         """Return file size in megabytes."""
         return round(self.size_bytes / (1024 * 1024), 2)
+
+    @property
+    def preview_url(self):
+        """Return public URL for the preview image, supporting both local and remote storage."""
+        if self.preview_path:
+            try:
+                from django.core.files.storage import default_storage
+                return default_storage.url(self.preview_path)
+            except Exception:
+                from django.conf import settings
+                media_url = getattr(settings, 'MEDIA_URL', '/media/')
+                return f"{media_url.rstrip('/')}/{self.preview_path.lstrip('/')}"
+        if self.thumbnail_path:
+            return self.thumbnail_url
+        return None
+
+    @property
+    def thumbnail_url(self):
+        """Return public URL for the thumbnail image, supporting both local and remote storage."""
+        if self.thumbnail_path:
+            try:
+                from django.core.files.storage import default_storage
+                return default_storage.url(self.thumbnail_path)
+            except Exception:
+                from django.conf import settings
+                media_url = getattr(settings, 'MEDIA_URL', '/media/')
+                return f"{media_url.rstrip('/')}/{self.thumbnail_path.lstrip('/')}"
+        if self.preview_path:
+            return self.preview_url
+        return None
 
 
 class DocumentAuthor(models.Model):

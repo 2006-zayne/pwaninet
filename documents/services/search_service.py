@@ -36,15 +36,17 @@ class SearchService:
         per_page: int = 20,
         user=None,
     ) -> tuple[List[Document], int]:
-        """Search for documents with advanced ranking."""
-        if not query or not query.strip():
-            return [], 0
-        
-        if self.use_postgres_fts:
-            return self._search_postgres(query, filters, sort_by, page, per_page, user)
-        else:
-            # Fallback to basic search
-            return self._search_basic(query, filters, sort_by, page, per_page)
+        """Search for documents with advanced ranking via UnifiedSearchService."""
+        from search.services.unified_search_service import UnifiedSearchService
+        service = UnifiedSearchService()
+        return service.search_documents_models(
+            query=query,
+            user=user,
+            filters=filters,
+            sort_by=sort_by,
+            page=page,
+            per_page=per_page
+        )
     
     def _search_postgres(
         self,
@@ -354,34 +356,13 @@ class SearchService:
     
     def get_search_suggestions(self, query: str, limit: int = 10) -> List[str]:
         """Get autocomplete suggestions based on query."""
-        if not query or len(query) < 2:
-            return []
-        
-        from django.contrib.postgres.search import TrigramWordSimilarity
-        
-        # Search in titles for suggestions
-        suggestions = DocumentSearchIndex.objects.annotate(
-            similarity=TrigramWordSimilarity('title', query)
-        ).filter(similarity__gte=0.3).order_by('-similarity')[:limit]
-        
-        return [suggestion.title for suggestion in suggestions]
-    
+        from search.services.unified_search_service import UnifiedSearchService
+        return UnifiedSearchService().get_document_suggestions(query, limit=limit)
+
     def get_did_you_mean(self, query: str) -> Optional[str]:
         """Get spelling correction suggestion using fuzzy matching."""
-        if not query or len(query) < 3:
-            return None
-        
-        from django.contrib.postgres.search import TrigramSimilarity
-        
-        # Find similar titles with high similarity
-        similar = DocumentSearchIndex.objects.annotate(
-            similarity=TrigramSimilarity('title', query)
-        ).filter(similarity__gte=0.6).order_by('-similarity').first()
-        
-        if similar and similar.similarity >= 0.7:
-            return similar.title
-        
-        return None
+        from search.services.unified_search_service import UnifiedSearchService
+        return UnifiedSearchService().get_document_did_you_mean(query)
     
     def index_document(self, document: Document, ocr_text: Optional[str] = None):
         """Index a document for search with weighted vectors."""

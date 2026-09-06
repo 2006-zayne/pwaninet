@@ -1,0 +1,456 @@
+{% load static %}
+
+<style>
+  :root, [data-theme="light"] {
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --primary-light: #dbeafe;
+    --search-bg: #f3f0ec;
+    --card-bg: #ffffff;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --border-soft: #e2e8f0;
+    --transition-smooth: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  [data-theme="dark"] {
+    --primary: #6366f1;
+    --primary-hover: #818cf8;
+    --primary-light: #312e81;
+    --search-bg: #3a3b3c;
+    --card-bg: #242526;
+    --text-main: #e4e6eb;
+    --text-muted: #d1d5db;
+    --border-soft: #3a3b3c;
+  }
+
+  /* Smooth Theme Transition */
+  .search-card,
+  .search-entity-row,
+  .search-entity-row * {
+    transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+  }
+
+  [data-theme="dark"] .search-card {
+    background-color: var(--card-bg, #242526) !important;
+    border-color: var(--border-soft, #3a3b3c) !important;
+    color: var(--text-main, #e4e6eb) !important;
+  }
+  .search-card {
+    background-color: var(--card-bg, #ffffff);
+    border: 1px solid var(--border-soft, #e2e8f0);
+    border-radius: 16px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.25s ease, border-color 0.25s ease;
+  }
+  .search-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  }
+  [data-theme="dark"] .search-card:hover {
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  }
+  .search-entity-row {
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .search-entity-row:hover {
+    background-color: rgba(0, 0, 0, 0.03) !important;
+  }
+  [data-theme="dark"] .search-entity-row:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+  }
+</style>
+
+{% if query %}
+  {% if active_tab == 'documents' and did_you_mean %}
+    <div class="search-did-you-mean d-flex align-items-center gap-2 px-3 py-2 mb-3"
+         style="background: var(--primary-light); border: 1px solid var(--primary); border-radius: 12px;">
+      <i class="bi bi-lightbulb-fill" style="color: var(--primary); font-size: 1.1rem;"></i>
+      <span style="font-size: 0.95rem; color: var(--text-main);">
+        Did you mean: 
+        <a href="{% url 'search:unified_search' %}?q={{ did_you_mean|urlencode }}&tab={{ active_tab }}"
+           hx-get="{% url 'search:unified_search' %}?q={{ did_you_mean|urlencode }}&tab={{ active_tab }}"
+           hx-target="#search-tab-content"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           style="color: var(--primary); font-weight: 700; text-decoration: underline;">
+          {{ did_you_mean }}
+        </a>?
+      </span>
+    </div>
+  {% endif %}
+
+  {% if active_tab == 'all' %}
+    <!-- ==================== ALL TAB COMPOSITE VIEW ==================== -->
+    {% if not results.people and not results.documents and not results.posts and not results.groups %}
+      <div class="p-5 text-center text-muted my-4">
+        <i class="bi bi-search display-5 d-block mb-3 opacity-50"></i>
+        <h5 class="fw-bold" style="color: var(--text-main);">No results found for "{{ query }}"</h5>
+        <p class="small mb-0">Try searching with different keywords or check spelling.</p>
+      </div>
+    {% else %}
+
+      <!-- People Section -->
+      {% if results.people %}
+        <div class="mb-4">
+          <div class="d-flex align-items-center justify-content-between mb-2 px-1">
+            <h6 class="fw-bold text-uppercase small mb-0" style="color: var(--text-muted); letter-spacing: 0.5px;">
+              <i class="bi bi-people me-1"></i> People ({{ counts.people }})
+            </h6>
+            {% if counts.people > 4 %}
+              <a hx-get="{% url 'search:unified_search' %}?q={{ query|urlencode }}&tab=people"
+                 hx-target="#page-content-target"
+                 hx-push-url="true"
+                 class="small fw-bold text-primary text-decoration-none">
+                See all {{ counts.people }} &rarr;
+              </a>
+            {% endif %}
+          </div>
+          <div class="d-flex flex-column gap-2">
+            {% for item in results.people %}
+              <div class="search-entity-row d-flex align-items-center justify-content-between py-2 px-1 rounded-3"
+                   style="background: transparent; border: none;">
+                <!-- Avatar + Names -->
+                <div class="d-flex align-items-center gap-3 min-w-0">
+                  <a href="{{ item.detail_url }}"
+                     hx-get="{{ item.detail_url }}"
+                     hx-target="#page-content-target"
+                     hx-push-url="true"
+                     class="flex-shrink-0">
+                    <img src="{{ item.avatar_url }}"
+                         alt="{{ item.title }}"
+                         class="rounded-circle border"
+                         style="width: 48px; height: 48px; object-fit: cover;">
+                  </a>
+                  <div class="min-w-0">
+                    <a href="{{ item.detail_url }}"
+                       hx-get="{{ item.detail_url }}"
+                       hx-target="#page-content-target"
+                       hx-push-url="true"
+                       class="text-decoration-none fw-bold d-block text-truncate"
+                       style="color: var(--text-main);">
+                      {{ item.title }}
+                      {% if item.global_role == 'VERIFIED' %}
+                        <i class="bi bi-patch-check-fill text-primary ms-1" style="font-size: 0.85rem;"></i>
+                      {% elif item.global_role == 'PRESIDENT' or item.global_role == 'DELEGATE' %}
+                        <i class="bi bi-star-fill text-warning ms-1" style="font-size: 0.85rem;"></i>
+                      {% endif %}
+                    </a>
+                    <div class="small text-truncate" style="color: var(--text-muted);">
+                      {{ item.subtitle }}{% if item.headline %} · {{ item.headline }}{% endif %}
+                    </div>
+                  </div>
+                </div>
+                <!-- Action Button (Follow) -->
+                <div class="ms-2 flex-shrink-0">
+                  <div id="follow-search-{{ item.id }}">
+                    {% if item.id in following_ids %}
+                      {% include "users/partials/follow_button_search.html" with recruit=item.obj|default:item is_following=True %}
+                    {% else %}
+                      {% include "users/partials/follow_button_search.html" with recruit=item.obj|default:item is_following=False %}
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Documents Section -->
+      {% if results.documents %}
+        <div class="mb-4">
+          <div class="d-flex align-items-center justify-content-between mb-3 px-1">
+            <h6 class="fw-bold text-uppercase small mb-0" style="color: var(--text-muted); letter-spacing: 0.5px;">
+              <i class="bi bi-file-earmark-text me-1"></i> Documents ({{ counts.documents }})
+            </h6>
+            {% if counts.documents > 4 %}
+              <a hx-get="{% url 'search:unified_search' %}?q={{ query|urlencode }}&tab=documents"
+                 hx-target="#page-content-target"
+                 hx-push-url="true"
+                 class="small fw-bold text-primary text-decoration-none">
+                See all {{ counts.documents }} &rarr;
+              </a>
+            {% endif %}
+          </div>
+          <div class="row g-3">
+            {% for item in results.documents %}
+              {% with document=item.obj|default:item %}
+                <div class="col-12 col-md-6 col-lg-4">
+                  {% include "documents/partials/document_card.html" with document=document %}
+                </div>
+              {% endwith %}
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Posts Section -->
+      {% if results.posts %}
+        <div class="mb-4">
+          <div class="d-flex align-items-center justify-content-between mb-3 px-1">
+            <h6 class="fw-bold text-uppercase small mb-0" style="color: var(--text-muted); letter-spacing: 0.5px;">
+              <i class="bi bi-chat-square-text me-1"></i> Posts ({{ counts.posts }})
+            </h6>
+            {% if counts.posts > 4 %}
+              <a hx-get="{% url 'search:unified_search' %}?q={{ query|urlencode }}&tab=posts"
+                 hx-target="#page-content-target"
+                 hx-push-url="true"
+                 class="small fw-bold text-primary text-decoration-none">
+                See all {{ counts.posts }} &rarr;
+              </a>
+            {% endif %}
+          </div>
+          <div>
+            {% for item in results.posts %}
+              {% with post=item.obj|default:item %}
+                {% include "posts/partials/post_card.html" with post=post disable_autoplay=True in_search=True %}
+              {% endwith %}
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Groups Section -->
+      {% if results.groups %}
+        <div class="mb-4">
+          <div class="d-flex align-items-center justify-content-between mb-2 px-1">
+            <h6 class="fw-bold text-uppercase small mb-0" style="color: var(--text-muted); letter-spacing: 0.5px;">
+              <i class="bi bi-shield me-1"></i> Groups ({{ counts.groups }})
+            </h6>
+            {% if counts.groups > 4 %}
+              <a hx-get="{% url 'search:unified_search' %}?q={{ query|urlencode }}&tab=groups"
+                 hx-target="#page-content-target"
+                 hx-push-url="true"
+                 class="small fw-bold text-primary text-decoration-none">
+                See all {{ counts.groups }} &rarr;
+              </a>
+            {% endif %}
+          </div>
+          <div class="d-flex flex-column gap-2">
+            {% for item in results.groups %}
+              <div class="search-entity-row d-flex align-items-center justify-content-between py-2 px-1 rounded-3"
+                   style="background: transparent; border: none;">
+                <!-- Avatar + Names -->
+                <div class="d-flex align-items-center gap-3 min-w-0">
+                  <a href="{{ item.detail_url }}"
+                     hx-get="{{ item.detail_url }}"
+                     hx-target="#page-content-target"
+                     hx-push-url="true"
+                     class="flex-shrink-0">
+                    <img src="{{ item.avatar_url }}"
+                         alt="{{ item.title }}"
+                         class="rounded-circle border"
+                         style="width: 48px; height: 48px; object-fit: cover;">
+                  </a>
+                  <div class="min-w-0">
+                    <a href="{{ item.detail_url }}"
+                       hx-get="{{ item.detail_url }}"
+                       hx-target="#page-content-target"
+                       hx-push-url="true"
+                       class="text-decoration-none fw-bold d-block text-truncate"
+                       style="color: var(--text-main);">
+                      {{ item.title }}
+                      {% if item.is_official %}
+                        <i class="bi bi-patch-check-fill text-primary ms-1" style="font-size: 0.85rem;"></i>
+                      {% endif %}
+                    </a>
+                    <div class="small text-truncate" style="color: var(--text-muted);">
+                      {{ item.subtitle }}
+                    </div>
+                  </div>
+                </div>
+                <!-- Action Button (View) -->
+                <div class="ms-2 flex-shrink-0">
+                  <a href="{{ item.detail_url }}"
+                     hx-get="{{ item.detail_url }}"
+                     hx-target="#page-content-target"
+                     hx-push-url="true"
+                     class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
+                    View
+                  </a>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+    {% endif %}
+
+  {% elif active_tab == 'people' %}
+    <!-- ==================== PEOPLE TAB ==================== -->
+    <div class="d-flex flex-column gap-2 mb-3">
+      {% for item in results.people %}
+        <div class="search-entity-row d-flex align-items-center justify-content-between py-2 px-1 rounded-3"
+             style="background: transparent; border: none;">
+          <!-- Avatar + Names -->
+          <div class="d-flex align-items-center gap-3 min-w-0">
+            <a href="{{ item.detail_url }}"
+               hx-get="{{ item.detail_url }}"
+               hx-target="#page-content-target"
+               hx-push-url="true"
+               class="flex-shrink-0">
+              <img src="{{ item.avatar_url }}"
+                   alt="{{ item.title }}"
+                   class="rounded-circle border"
+                   style="width: 48px; height: 48px; object-fit: cover;">
+            </a>
+            <div class="min-w-0">
+              <a href="{{ item.detail_url }}"
+                 hx-get="{{ item.detail_url }}"
+                 hx-target="#page-content-target"
+                 hx-push-url="true"
+                 class="text-decoration-none fw-bold d-block text-truncate"
+                 style="color: var(--text-main);">
+                {{ item.title }}
+                {% if item.global_role == 'VERIFIED' %}
+                  <i class="bi bi-patch-check-fill text-primary ms-1" style="font-size: 0.85rem;"></i>
+                {% elif item.global_role == 'PRESIDENT' or item.global_role == 'DELEGATE' %}
+                  <i class="bi bi-star-fill text-warning ms-1" style="font-size: 0.85rem;"></i>
+                {% endif %}
+              </a>
+              <div class="small text-truncate" style="color: var(--text-muted);">
+                {{ item.subtitle }}{% if item.headline %} · {{ item.headline }}{% endif %}
+              </div>
+            </div>
+          </div>
+          <!-- Action Button (Follow) -->
+          <div class="ms-2 flex-shrink-0">
+            <div id="follow-search-{{ item.id }}">
+              {% if item.id in following_ids %}
+                {% include "users/partials/follow_button_search.html" with recruit=item.obj|default:item is_following=True %}
+              {% else %}
+                {% include "users/partials/follow_button_search.html" with recruit=item.obj|default:item is_following=False %}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% empty %}
+        <div class="p-5 text-center text-muted">
+          <i class="bi bi-person-x display-6 d-block mb-2 opacity-50"></i>
+          <p class="mb-0">No people found matching "{{ query }}"</p>
+        </div>
+      {% endfor %}
+    </div>
+
+  {% elif active_tab == 'documents' %}
+    <!-- ==================== DOCUMENTS TAB ==================== -->
+    <div class="row g-3 mb-3">
+      {% for item in results.documents %}
+        {% with document=item.obj|default:item %}
+          <div class="col-12 col-md-6 col-lg-4">
+            {% include "documents/partials/document_card.html" with document=document %}
+          </div>
+        {% endwith %}
+      {% empty %}
+        <div class="col-12">
+          <div class="p-5 text-center text-muted">
+            <i class="bi bi-file-earmark-x display-6 d-block mb-2 opacity-50"></i>
+            <p class="mb-0">No documents found matching "{{ query }}"</p>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+  {% elif active_tab == 'posts' %}
+    <!-- ==================== POSTS TAB ==================== -->
+    <div>
+      {% for item in results.posts %}
+        {% with post=item.obj|default:item %}
+          {% include "posts/partials/post_card.html" with post=post disable_autoplay=True in_search=True %}
+        {% endwith %}
+      {% empty %}
+        <div class="p-5 text-center text-muted">
+          <i class="bi bi-chat-square-x display-6 d-block mb-2 opacity-50"></i>
+          <p class="mb-0">No posts found matching "{{ query }}"</p>
+        </div>
+      {% endfor %}
+    </div>
+
+  {% elif active_tab == 'groups' %}
+    <!-- ==================== GROUPS TAB ==================== -->
+    <div class="d-flex flex-column gap-2 mb-3">
+      {% for item in results.groups %}
+        <div class="search-entity-row d-flex align-items-center justify-content-between py-2 px-1 rounded-3"
+             style="background: transparent; border: none;">
+          <!-- Avatar + Names -->
+          <div class="d-flex align-items-center gap-3 min-w-0">
+            <a href="{{ item.detail_url }}"
+               hx-get="{{ item.detail_url }}"
+               hx-target="#page-content-target"
+               hx-push-url="true"
+               class="flex-shrink-0">
+              <img src="{{ item.avatar_url }}"
+                   alt="{{ item.title }}"
+                   class="rounded-circle border"
+                   style="width: 48px; height: 48px; object-fit: cover;">
+            </a>
+            <div class="min-w-0">
+              <a href="{{ item.detail_url }}"
+                 hx-get="{{ item.detail_url }}"
+                 hx-target="#page-content-target"
+                 hx-push-url="true"
+                 class="text-decoration-none fw-bold d-block text-truncate"
+                 style="color: var(--text-main);">
+                {{ item.title }}
+                {% if item.is_official %}
+                  <i class="bi bi-patch-check-fill text-primary ms-1" style="font-size: 0.85rem;"></i>
+                {% endif %}
+              </a>
+              <div class="small text-truncate" style="color: var(--text-muted);">
+                {{ item.subtitle }}
+              </div>
+            </div>
+          </div>
+          <!-- Action Button (View) -->
+          <div class="ms-2 flex-shrink-0">
+            <a href="{{ item.detail_url }}"
+               hx-get="{{ item.detail_url }}"
+               hx-target="#page-content-target"
+               hx-push-url="true"
+               class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
+              View
+            </a>
+          </div>
+        </div>
+      {% empty %}
+        <div class="p-5 text-center text-muted">
+          <i class="bi bi-shield-x display-6 d-block mb-2 opacity-50"></i>
+          <p class="mb-0">No groups found matching "{{ query }}"</p>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- Pagination Controls for Single Tab Views -->
+  {% if active_tab != 'all' and pagination.total_pages > 1 %}
+    <div class="d-flex align-items-center justify-content-center gap-2 py-3">
+      {% if pagination.has_previous %}
+        <a hx-get="{% url 'search:unified_search' %}?q={{ query|urlencode }}&tab={{ active_tab }}&page={{ pagination.page|add:'-1' }}"
+           hx-target="#page-content-target"
+           hx-push-url="true"
+           class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+          &larr; Previous
+        </a>
+      {% endif %}
+
+      <span class="small text-muted px-2">Page {{ pagination.page }} of {{ pagination.total_pages }}</span>
+
+      {% if pagination.has_next %}
+        <a hx-get="{% url 'search:unified_search' %}?q={{ query|urlencode }}&tab={{ active_tab }}&page={{ pagination.page|add:'1' }}"
+           hx-target="#page-content-target"
+           hx-push-url="true"
+           class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+          Next &rarr;
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
+
+{% else %}
+  <div class="p-5 text-center text-muted my-4">
+    <i class="bi bi-search display-5 d-block mb-3 opacity-50"></i>
+    <h5 class="fw-bold" style="color: var(--text-main);">Search PwaniNet</h5>
+    <p class="small mb-0">Search across classmates, study documents, discussions, and student groups.</p>
+  </div>
+{% endif %}

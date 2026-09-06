@@ -247,7 +247,7 @@
         Admin-Only Access
       </div>
 
-      <form method="POST" class="privacy-form">
+      <form method="POST" action="{% url 'groups:group_settings_privacy' group.id %}" hx-post="{% url 'groups:group_settings_privacy' group.id %}" hx-target="#page-content-target" hx-swap="innerHTML" class="privacy-form">
         {% csrf_token %}
 
         {% if form %}

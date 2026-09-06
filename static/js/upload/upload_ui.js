@@ -82,6 +82,7 @@ class UploadBanner {
                         Preparing media…
                     </div>
                     <div class="upload-quality-pills" id="upload-quality-pills" style="display: none;">
+                        <span class="quality-pill" id="pill-240p">240p</span>
                         <span class="quality-pill" id="pill-360p">360p</span>
                         <span class="quality-pill" id="pill-480p">480p</span>
                         <span class="quality-pill" id="pill-720p">720p HD</span>
@@ -568,18 +569,22 @@ class UploadBanner {
     }
 
     updateQualityPills(percent) {
+        const p240 = document.getElementById('pill-240p');
         const p360 = document.getElementById('pill-360p');
         const p480 = document.getElementById('pill-480p');
         const p720 = document.getElementById('pill-720p');
 
+        if (p240) {
+            p240.className = percent >= 22 ? 'quality-pill ready' : 'quality-pill encoding';
+        }
         if (p360) {
-            p360.className = percent >= 30 ? 'quality-pill ready' : 'quality-pill encoding';
+            p360.className = percent >= 45 ? 'quality-pill ready' : percent >= 22 ? 'quality-pill encoding' : 'quality-pill';
         }
         if (p480) {
-            p480.className = percent >= 65 ? 'quality-pill ready' : percent >= 30 ? 'quality-pill encoding' : 'quality-pill';
+            p480.className = percent >= 67 ? 'quality-pill ready' : percent >= 45 ? 'quality-pill encoding' : 'quality-pill';
         }
         if (p720) {
-            p720.className = percent >= 95 ? 'quality-pill ready' : percent >= 65 ? 'quality-pill encoding' : 'quality-pill';
+            p720.className = percent >= 90 ? 'quality-pill ready' : percent >= 67 ? 'quality-pill encoding' : 'quality-pill';
         }
     }
 

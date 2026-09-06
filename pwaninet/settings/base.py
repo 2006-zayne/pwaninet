@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'documents',
     'releases',
     'messaging',
+    'search',
 ]
 
 MIDDLEWARE = [

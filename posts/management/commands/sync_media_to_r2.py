@@ -29,8 +29,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '--folders',
             type=str,
-            default='profile_pic,group_profile_pic,group_covers,covers,thumbnails,announcements,release_images',
-            help='Comma-separated list of media subdirectories to sync (default: profile and group image folders).'
+            default='profile_pic,group_profile_pic,group_covers,covers,thumbnails,previews,documents,announcements,release_images',
+            help='Comma-separated list of media subdirectories to sync (default: common media folders).'
         )
         parser.add_argument(
             '--all',

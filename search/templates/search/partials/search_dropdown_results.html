@@ -1,0 +1,137 @@
+{% load static %}
+{% if results.people or results.documents or results.posts or results.groups %}
+  <div class="p-2" style="max-height: 480px; overflow-y: auto;">
+    
+    <!-- People Preview -->
+    {% if results.people %}
+      <div class="px-3 pt-2 pb-1 text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 0.05em;">
+        <i class="bi bi-people me-1"></i> People
+      </div>
+      {% for u in results.people %}
+        <a href="{{ u.detail_url }}"
+           hx-get="{{ u.detail_url }}"
+           hx-target="#page-content-target"
+           hx-push-url="true"
+           onclick="const d = document.getElementById('search-dropdown-results'); if(d) { d.innerHTML=''; d.style.display='none'; }"
+           class="d-flex align-items-center gap-3 p-2 rounded-3 text-decoration-none text-body hover-bg"
+           style="transition: background 0.15s;">
+          <img src="{{ u.avatar_url }}" class="rounded-circle border" style="width: 38px; height: 38px; object-fit: cover;" alt="{{ u.title }}">
+          <div class="min-w-0 flex-grow-1">
+            <div class="fw-bold small text-truncate d-flex align-items-center gap-1">
+              {{ u.title }}
+              {% if u.global_role == 'VERIFIED' %}
+                <i class="bi bi-patch-check-fill text-primary" style="font-size: 0.75rem;"></i>
+              {% elif u.global_role == 'PRESIDENT' or u.global_role == 'DELEGATE' %}
+                <i class="bi bi-star-fill text-warning" style="font-size: 0.75rem;"></i>
+              {% endif %}
+            </div>
+            <div class="text-muted text-truncate" style="font-size: 0.75rem;">
+              {{ u.subtitle }}{% if u.headline %} · {{ u.headline }}{% endif %}
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+    {% endif %}
+
+    <!-- Documents Preview -->
+    {% if results.documents %}
+      <div class="px-3 pt-2 pb-1 text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 0.05em;">
+        <i class="bi bi-file-earmark-text me-1"></i> Documents
+      </div>
+      {% for doc in results.documents %}
+        <a href="{{ doc.detail_url }}"
+           hx-get="{{ doc.detail_url }}"
+           hx-target="#page-content-target"
+           hx-push-url="true"
+           onclick="const d = document.getElementById('search-dropdown-results'); if(d) { d.innerHTML=''; d.style.display='none'; }"
+           class="d-flex align-items-center gap-3 p-2 rounded-3 text-decoration-none text-body hover-bg"
+           style="transition: background 0.15s;">
+          <div class="rounded-2 d-flex align-items-center justify-content-center bg-primary-subtle text-primary fw-bold"
+               style="width: 38px; height: 38px; flex-shrink: 0; font-size: 0.75rem;">
+            {{ doc.file_type }}
+          </div>
+          <div class="min-w-0 flex-grow-1">
+            <div class="fw-bold small text-truncate">{{ doc.title }}</div>
+            <div class="text-muted text-truncate" style="font-size: 0.75rem;">
+              {{ doc.category_display }}{% if doc.subtitle %} · {{ doc.subtitle }}{% endif %}
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+    {% endif %}
+
+    <!-- Posts Preview -->
+    {% if results.posts %}
+      <div class="px-3 pt-2 pb-1 text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 0.05em;">
+        <i class="bi bi-chat-square-text me-1"></i> Posts
+      </div>
+      {% for p in results.posts %}
+        <a href="{{ p.detail_url }}"
+           hx-get="{{ p.detail_url }}"
+           hx-target="#page-content-target"
+           hx-push-url="true"
+           onclick="const d = document.getElementById('search-dropdown-results'); if(d) { d.innerHTML=''; d.style.display='none'; }"
+           class="d-flex align-items-center gap-3 p-2 rounded-3 text-decoration-none text-body hover-bg"
+           style="transition: background 0.15s;">
+          <img src="{{ p.author.avatar_url }}" class="rounded-circle border" style="width: 38px; height: 38px; object-fit: cover;" alt="{{ p.author.name }}">
+          <div class="min-w-0 flex-grow-1">
+            <div class="fw-bold small text-truncate">{{ p.title }}</div>
+            <div class="text-muted text-truncate" style="font-size: 0.75rem;">
+              {{ p.author.name }} · {{ p.created_at }}
+            </div>
+          </div>
+          {% if p.has_video %}
+            <span class="badge bg-secondary-subtle text-secondary rounded-pill" style="font-size: 0.65rem;">
+              <i class="bi bi-play-circle me-1"></i>Video
+            </span>
+          {% endif %}
+        </a>
+      {% endfor %}
+    {% endif %}
+
+    <!-- Groups Preview -->
+    {% if results.groups %}
+      <div class="px-3 pt-2 pb-1 text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 0.05em;">
+        <i class="bi bi-shield me-1"></i> Groups
+      </div>
+      {% for g in results.groups %}
+        <a href="{{ g.detail_url }}"
+           hx-get="{{ g.detail_url }}"
+           hx-target="#page-content-target"
+           hx-push-url="true"
+           onclick="const d = document.getElementById('search-dropdown-results'); if(d) { d.innerHTML=''; d.style.display='none'; }"
+           class="d-flex align-items-center gap-3 p-2 rounded-3 text-decoration-none text-body hover-bg"
+           style="transition: background 0.15s;">
+          <img src="{{ g.avatar_url }}" class="rounded-circle border" style="width: 38px; height: 38px; object-fit: cover;" alt="{{ g.title }}">
+          <div class="min-w-0 flex-grow-1">
+            <div class="fw-bold small text-truncate d-flex align-items-center gap-1">
+              {{ g.title }}
+              {% if g.is_official %}
+                <i class="bi bi-patch-check-fill text-primary" style="font-size: 0.75rem;"></i>
+              {% endif %}
+            </div>
+            <div class="text-muted text-truncate" style="font-size: 0.75rem;">{{ g.subtitle }}</div>
+          </div>
+        </a>
+      {% endfor %}
+    {% endif %}
+
+  </div>
+
+  <!-- Actionable Footer -->
+  <a href="{% url 'search:unified_search' %}?q={{ query|urlencode }}&tab=all"
+     hx-get="{% url 'search:unified_search' %}?q={{ query|urlencode }}&tab=all"
+     hx-target="#page-content-target"
+     hx-push-url="true"
+     onclick="const d = document.getElementById('search-dropdown-results'); if(d) { d.innerHTML=''; d.style.display='none'; }"
+     class="d-block text-center py-2 fw-bold text-primary text-decoration-none border-top bg-light-subtle"
+     style="font-size: 0.82rem;">
+     See all results for "{{ query }}" ({{ counts.all }}) &rarr;
+  </a>
+
+{% else %}
+  <div class="p-4 text-center text-muted">
+    <i class="bi bi-search fs-4 d-block mb-1"></i>
+    <span style="font-size: 0.85rem;">No results found for "{{ query }}"</span>
+  </div>
+{% endif %}

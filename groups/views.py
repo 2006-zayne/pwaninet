@@ -51,6 +51,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 import json
 from users.models import Follow
+from pwaninet.utils.htmx import htmx_location_response
 
 
 class GroupViewSet(viewsets.ModelViewSet):
@@ -790,38 +791,40 @@ def groups_dashboard(request):
     user_groups = Group.objects.filter(memberships__user=request.user, memberships__status=MembershipStatus.APPROVED)
     pending_groups = Group.objects.filter(memberships__user=request.user, memberships__status=MembershipStatus.PENDING)
 
-    # Get suggested groups based on who user follows
-    following_ids = get_following_ids(request.user)
-    suggested_groups = Group.objects.filter(
-        memberships__user_id__in=following_ids,
-        memberships__status=MembershipStatus.APPROVED
-    ).exclude(memberships__user=request.user).annotate(
-        member_count=Count('memberships', filter=Q(memberships__status=MembershipStatus.APPROVED))
-    )
-
-    # Apply search filter if query exists (before slicing)
     if query:
-        suggested_groups = suggested_groups.filter(
-            Q(name__icontains=query) |
-            Q(description__icontains=query)
+        from search.services.unified_search_service import UnifiedSearchService
+        search_service = UnifiedSearchService()
+        matched_groups, _ = search_service.search_groups_models(
+            query=query,
+            user=request.user,
+            limit=20,
+            offset=0
         )
-
-    # Apply ordering and slicing after filtering
-    suggested_groups = suggested_groups.order_by('-member_count')[:20]
+        display_groups = matched_groups
+    else:
+        # Get suggested groups based on who user follows
+        following_ids = get_following_ids(request.user)
+        suggested_groups = Group.objects.filter(
+            memberships__user_id__in=following_ids,
+            memberships__status=MembershipStatus.APPROVED
+        ).exclude(memberships__user=request.user).annotate(
+            member_count=Count('memberships', filter=Q(memberships__status=MembershipStatus.APPROVED))
+        ).order_by('-member_count')[:20]
+        display_groups = list(suggested_groups)
 
     user_group_ids = set(user_groups.values_list('id', flat=True))
     pending_group_ids = set(pending_groups.values_list('id', flat=True))
 
-    # Get unread notification counts for suggested groups
-    suggested_group_ids = list(suggested_groups.values_list('id', flat=True))
-    group_unread_counts = get_group_unread_counts(request.user, suggested_group_ids)
+    # Get unread notification counts for display groups
+    display_group_ids = [g.id for g in display_groups]
+    group_unread_counts = get_group_unread_counts(request.user, display_group_ids)
 
     # Get recent searches from session
     recent_searches = request.session.get('recent_group_searches', [])
 
     context = {
         'user_groups': user_groups,
-        'all_groups': suggested_groups,
+        'all_groups': display_groups,
         'user_group_ids': user_group_ids,
         'pending_group_ids': pending_group_ids,
         'unread_notifications_count': get_cached_unread_count(request.user),
@@ -877,10 +880,7 @@ def create_group_view(request):
             Membership.objects.create(group=group, user=request.user, role=MembershipRole.ADMIN, status=MembershipStatus.APPROVED)
             messages.success(request, f'Squad "{group.name}" created successfully.')
             if is_htmx:
-                from django.urls import reverse
-                response = HttpResponse(status=204)
-                response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
-                return response
+                return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group.id}))
             return redirect('groups:groups_detail', group_id=group.id)
     else:
         form = GroupForm()
@@ -1190,6 +1190,8 @@ def toggle_group_membership(request, group_id):
     if group.is_official and group.course and group.year:
         if request.user.course != group.course or request.user.year != group.year:
             messages.error(request, 'You can only join official groups that match your course and year.')
+            if request.headers.get('HX-Request'):
+                return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group_id}))
             return redirect('groups:groups_detail', group_id=group_id)
 
     # Check if already has membership
@@ -1206,6 +1208,8 @@ def toggle_group_membership(request, group_id):
             membership_status = MembershipStatus.PENDING
         elif group.join_policy == JoinPolicy.INVITE_ONLY:
             messages.error(request, 'This group is invite-only.')
+            if request.headers.get('HX-Request'):
+                return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group_id}))
             return redirect('groups:groups_detail', group_id=group_id)
         else:
             membership_status = MembershipStatus.PENDING
@@ -1221,6 +1225,8 @@ def toggle_group_membership(request, group_id):
             # Send admin notifications for pending requests
             send_group_join_request_notification(request.user, group)
 
+    if request.headers.get('HX-Request'):
+        return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group_id}))
     return redirect('groups:groups_detail', group_id=group_id)
 
 
@@ -1238,6 +1244,8 @@ def edit_group(request, group_id):
 
     if not is_admin:
         messages.error(request, 'Only admins can edit this group.')
+        if request.headers.get('HX-Request'):
+            return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group_id}))
         return redirect('groups:groups_detail', group_id=group_id)
 
     if request.method == 'POST':
@@ -1245,6 +1253,8 @@ def edit_group(request, group_id):
         if form.is_valid():
             form.save()
             messages.success(request, 'Squad updated.')
+            if request.headers.get('HX-Request'):
+                return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group_id}))
             return redirect('groups:groups_detail', group_id=group_id)
     else:
         form = GroupForm(instance=group)
@@ -1258,6 +1268,8 @@ def invite_to_group(request, group_id, user_id):
     if not Membership.objects.filter(group=group, user=target).exists():
         send_group_invite_notification(target, request.user, group)
         messages.success(request, f'Invite sent to {target.username}.')
+    if request.headers.get('HX-Request'):
+        return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group_id}))
     return redirect('groups:groups_detail', group_id=group_id)
 
 
@@ -1656,9 +1668,7 @@ def group_settings_view(request, group_id):
     except Membership.DoesNotExist:
         messages.error(request, 'You must be a member to view group settings.')
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
-            return response
+            return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group.id}))
         return redirect('groups:groups_detail', group_id=group.id)
 
     # Check if user is admin
@@ -1712,9 +1722,7 @@ def group_settings_details_view(request, group_id):
     except Membership.DoesNotExist:
         messages.error(request, 'You must be a member to view group settings.')
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
-            return response
+            return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group.id}))
         return redirect('groups:groups_detail', group_id=group.id)
 
     # Check if user is admin
@@ -1736,9 +1744,7 @@ def group_settings_details_view(request, group_id):
             form.save()
             messages.success(request, 'Group details updated successfully.')
             if request.headers.get('HX-Request'):
-                response = HttpResponse(status=204)
-                response['HX-Redirect'] = reverse('groups:group_settings_details', kwargs={'group_id': group.id})
-                return response
+                return htmx_location_response(reverse('groups:group_settings_details', kwargs={'group_id': group.id}))
             return redirect('groups:group_settings_details', group_id=group.id)
         else:
             messages.error(request, 'Please correct the errors below.')
@@ -1772,9 +1778,7 @@ def group_settings_members_view(request, group_id):
     except Membership.DoesNotExist:
         messages.error(request, 'You must be a member to view group settings.')
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
-            return response
+            return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group.id}))
         return redirect('groups:groups_detail', group_id=group.id)
 
     # Check if user is admin (only admins can manage members)
@@ -1846,9 +1850,7 @@ def group_settings_members_view(request, group_id):
                         target_membership.delete()
                         messages.success(request, f'{target_membership.user.username} removed from group.')
                         if request.headers.get('HX-Request'):
-                            response = HttpResponse(status=204)
-                            response['HX-Redirect'] = reverse('groups:group_settings_members', kwargs={'group_id': group.id})
-                            return response
+                            return htmx_location_response(reverse('groups:group_settings_members', kwargs={'group_id': group.id}))
                         return redirect('groups:group_settings_members', group_id=group.id)
                 else:
                     target_membership.delete()
@@ -1857,9 +1859,7 @@ def group_settings_members_view(request, group_id):
                 messages.error(request, 'Member not found.')
 
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('groups:group_settings_members', kwargs={'group_id': group.id})
-            return response
+            return htmx_location_response(reverse('groups:group_settings_members', kwargs={'group_id': group.id}))
 
     # Get all approved members with their roles
     members = Membership.objects.filter(
@@ -2055,9 +2055,7 @@ def group_settings_privacy_view(request, group_id):
     except Membership.DoesNotExist:
         messages.error(request, 'You must be a member to view group settings.')
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
-            return response
+            return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group.id}))
         return redirect('groups:groups_detail', group_id=group.id)
 
     # Check if user is admin (only admins can access privacy settings)
@@ -2065,9 +2063,7 @@ def group_settings_privacy_view(request, group_id):
     if not is_admin:
         messages.error(request, 'Only admins can access privacy settings.')
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('groups:group_settings', kwargs={'group_id': group.id})
-            return response
+            return htmx_location_response(reverse('groups:group_settings', kwargs={'group_id': group.id}))
         return redirect('groups:group_settings', group_id=group.id)
 
     if request.method == 'POST':
@@ -2076,9 +2072,7 @@ def group_settings_privacy_view(request, group_id):
             form.save()
             messages.success(request, 'Privacy settings updated successfully.')
             if request.headers.get('HX-Request'):
-                response = HttpResponse(status=204)
-                response['HX-Redirect'] = reverse('groups:group_settings_privacy', kwargs={'group_id': group.id})
-                return response
+                return htmx_location_response(reverse('groups:group_settings_privacy', kwargs={'group_id': group.id}))
             return redirect('groups:group_settings_privacy', group_id=group.id)
         else:
             messages.error(request, 'Please correct the errors below.')
@@ -2112,9 +2106,7 @@ def group_settings_announcements_view(request, group_id):
     except Membership.DoesNotExist:
         messages.error(request, 'You must be a member to view group settings.')
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
-            return response
+            return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group.id}))
         return redirect('groups:groups_detail', group_id=group.id)
 
     context = {
@@ -2142,9 +2134,7 @@ def group_settings_documents_view(request, group_id):
     except Membership.DoesNotExist:
         messages.error(request, 'You must be a member to view group settings.')
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
-            return response
+            return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group.id}))
         return redirect('groups:groups_detail', group_id=group.id)
 
     context = {
@@ -2172,9 +2162,7 @@ def group_settings_about_view(request, group_id):
     except Membership.DoesNotExist:
         messages.error(request, 'You must be a member to view group settings.')
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('groups:groups_detail', kwargs={'group_id': group.id})
-            return response
+            return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group.id}))
         return redirect('groups:groups_detail', group_id=group.id)
 
     context = {

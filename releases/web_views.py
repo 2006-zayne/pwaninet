@@ -15,6 +15,7 @@ from .services import ReleaseService
 from .selectors import ReleaseSelector
 from .forms import CreateReleaseForm, ReleaseForm, PublishReleaseForm, ArchiveReleaseForm, ReleaseItemForm
 from .permissions import CanManageRelease, CanPublishRelease, CanArchiveRelease
+from pwaninet.utils.htmx import htmx_location_response
 
 
 @login_required
@@ -138,9 +139,7 @@ def create_release(request):
                     messages.success(request, f'Draft release {release.version} created successfully.')
                 
                 if request.headers.get('HX-Request'):
-                    response = HttpResponse(status=204)
-                    response['HX-Redirect'] = reverse('release_dashboard')
-                    return response
+                    return htmx_location_response(reverse('release_dashboard'))
                 return redirect('release_dashboard')
                 
             except Exception as e:
@@ -169,9 +168,7 @@ def edit_release(request, release_id):
     if not CanManageRelease().has_object_permission(request, None, release):
         messages.error(request, 'You do not have permission to edit this release.')
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('release_dashboard')
-            return response
+            return htmx_location_response(reverse('release_dashboard'))
         return redirect('release_dashboard')
     
     if request.method == 'POST':
@@ -180,9 +177,7 @@ def edit_release(request, release_id):
             form.save()
             messages.success(request, f'Release {release.version} updated successfully.')
             if request.headers.get('HX-Request'):
-                response = HttpResponse(status=204)
-                response['HX-Redirect'] = reverse('release_dashboard')
-                return response
+                return htmx_location_response(reverse('release_dashboard'))
             return redirect('release_dashboard')
     else:
         form = ReleaseForm(instance=release)
@@ -211,17 +206,13 @@ def detail_release(request, release_id):
     if release.status == 'ARCHIVED' and not request.user.has_perm('releases.manage_release'):
         messages.error(request, 'Release not found.')
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('release_dashboard')
-            return response
+            return htmx_location_response(reverse('release_dashboard'))
         return redirect('release_dashboard')
     
     if not release.published and not request.user.has_perm('releases.manage_release'):
         messages.error(request, 'Release not found.')
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('release_dashboard')
-            return response
+            return htmx_location_response(reverse('release_dashboard'))
         return redirect('release_dashboard')
     
     # Track that the user has viewed this release (only for published releases)
@@ -252,9 +243,7 @@ def publish_release(request, release_id):
     if not CanPublishRelease().has_object_permission(request, None, release):
         messages.error(request, 'You do not have permission to publish this release.')
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('release_dashboard')
-            return response
+            return htmx_location_response(reverse('release_dashboard'))
         return redirect('release_dashboard')
     
     if request.method == 'POST':
@@ -269,9 +258,7 @@ def publish_release(request, release_id):
                 
                 messages.success(request, f'Release {release.version} published successfully.')
                 if request.headers.get('HX-Request'):
-                    response = HttpResponse(status=204)
-                    response['HX-Redirect'] = reverse('release_dashboard')
-                    return response
+                    return htmx_location_response(reverse('release_dashboard'))
                 return redirect('release_dashboard')
             except Exception as e:
                 messages.error(request, f'Error publishing release: {str(e)}')
@@ -300,9 +287,7 @@ def archive_release(request, release_id):
     if not CanArchiveRelease().has_object_permission(request, None, release):
         messages.error(request, 'You do not have permission to archive this release.')
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('release_dashboard')
-            return response
+            return htmx_location_response(reverse('release_dashboard'))
         return redirect('release_dashboard')
     
     if request.method == 'POST':
@@ -312,9 +297,7 @@ def archive_release(request, release_id):
                 ReleaseService.archive_release(release)
                 messages.success(request, f'Release {release.version} archived successfully.')
                 if request.headers.get('HX-Request'):
-                    response = HttpResponse(status=204)
-                    response['HX-Redirect'] = reverse('release_dashboard')
-                    return response
+                    return htmx_location_response(reverse('release_dashboard'))
                 return redirect('release_dashboard')
             except Exception as e:
                 messages.error(request, f'Error archiving release: {str(e)}')
@@ -342,9 +325,7 @@ def set_current_release(request, release_id):
     if release.status != 'PUBLISHED':
         messages.error(request, 'Only published releases can be marked as current.')
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('release_dashboard')
-            return response
+            return htmx_location_response(reverse('release_dashboard'))
         return redirect('release_dashboard')
     
     try:
@@ -354,9 +335,7 @@ def set_current_release(request, release_id):
         messages.error(request, f'Error setting current release: {str(e)}')
     
     if request.headers.get('HX-Request'):
-        response = HttpResponse(status=204)
-        response['HX-Redirect'] = reverse('release_dashboard')
-        return response
+        return htmx_location_response(reverse('release_dashboard'))
     return redirect('release_dashboard')
 
 
@@ -392,9 +371,7 @@ def add_release_item(request, release_id):
             
             messages.success(request, f'Release item added successfully with {len(images)} image(s).')
             if request.headers.get('HX-Request'):
-                response = HttpResponse(status=204)
-                response['HX-Redirect'] = reverse('release_edit', kwargs={'release_id': release.id})
-                return response
+                return htmx_location_response(reverse('release_edit', kwargs={'release_id': release.id}))
             return redirect('release_edit', release_id=release.id)
     else:
         form = ReleaseItemForm()
@@ -420,7 +397,5 @@ def delete_release_item(request, item_id):
     item.delete()
     messages.success(request, 'Release item deleted successfully.')
     if request.headers.get('HX-Request'):
-        response = HttpResponse(status=204)
-        response['HX-Redirect'] = reverse('release_edit', kwargs={'release_id': release_id})
-        return response
+        return htmx_location_response(reverse('release_edit', kwargs={'release_id': release_id}))
     return redirect('release_edit', release_id=release_id)

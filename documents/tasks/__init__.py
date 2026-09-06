@@ -12,6 +12,7 @@ from .processing import (
     update_search_index,
     remove_from_search_index,
     reindex_all_documents,
+    get_local_filepath,
 )
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     'update_search_index',
     'remove_from_search_index',
     'reindex_all_documents',
+    'get_local_filepath',
 ]

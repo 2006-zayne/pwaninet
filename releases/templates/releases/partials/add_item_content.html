@@ -17,7 +17,7 @@
             <h5 class="mb-0">Add Release Item</h5>
         </div>
         <div class="card-body">
-            <form method="post" enctype="multipart/form-data">
+            <form method="post" action="{% url 'release_add_item' release.id %}" enctype="multipart/form-data" hx-post="{% url 'release_add_item' release.id %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-encoding="multipart/form-data">
                 {% csrf_token %}
                 
                 <div class="mb-3">

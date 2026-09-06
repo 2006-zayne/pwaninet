@@ -583,10 +583,15 @@
                     <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post-id="{{ post.id }}">
                         <video id="video-{{ post.id }}"
                                preload="metadata"
-                               class="w-100 h-100 feed-video"
+                               class="w-100 h-100 {% if not disable_autoplay and not in_search %}feed-video{% endif %}"
                                muted loop playsinline controls
                                data-post-id="{{ post.id }}"
+                               {% if disable_autoplay or in_search %}
+                               data-autoplay="false"
+                               data-disable-autoplay="true"
+                               {% else %}
                                data-autoplay="true"
+                               {% endif %}
                                poster="{{ post.get_video_poster|default:'' }}"
                                {# HLS adaptive streaming — hls.js picks up data-hls-url when present #}
                                {% if post.hls_playlist %}
@@ -625,7 +630,7 @@
                                 <small class="text-muted">MUSIC/AUDIO</small>
                             </div>
                         </div>
-                        <audio id="audio-{{ post.id }}" controls preload="metadata" class="w-100" style="max-width: 200px; background: transparent; background-color: transparent;" muted loop autoplay>
+                        <audio id="audio-{{ post.id }}" controls preload="metadata" class="w-100" style="max-width: 200px; background: transparent; background-color: transparent;" muted loop {% if not disable_autoplay and not in_search %}autoplay{% endif %}>
                             <source src="{{ post.get_intel_file.url }}" type="audio/mpeg">
                             Your browser does not support the audio element.
                         </audio>
@@ -637,9 +642,13 @@
                                 <i class="bi bi-download"></i>
                             </button>
                             <div class="d-flex align-items-center">
-                                <div class="bg-danger bg-opacity-10 p-3 rounded-3 me-3">
-                                    <i class="bi bi-file-earmark-pdf-fill text-danger fs-3"></i>
-                                </div>
+                                {% if post.thumbnail %}
+                                    <img src="{{ post.thumbnail.url }}" class="rounded-3 me-3" style="width: 48px; height: 48px; object-fit: cover;" alt="Thumbnail">
+                                {% else %}
+                                    <div class="bg-danger bg-opacity-10 p-3 rounded-3 me-3">
+                                        <i class="bi bi-file-earmark-pdf-fill text-danger fs-3"></i>
+                                    </div>
+                                {% endif %}
                                 <div>
                                     <h6 class="mb-0 fw-bold small">Academic Files</h6>
                                     <small class="text-muted">PDF DOCUMENT</small>
@@ -708,7 +717,10 @@
 
     <!-- Inline comment input -->
     <div class="px-3 pb-3 pt-1 border-top bg-white">
-        <form method="POST" action="{% url 'posts:add_comment' post.id %}" class="d-flex align-items-center gap-2">
+        <form hx-post="{% url 'posts:add_comment' post.id %}?from_card=1"
+              hx-swap="none"
+              class="d-flex align-items-center gap-2"
+              hx-on::after-request="if(event.detail.successful) this.reset();">
             {% csrf_token %}
             <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border flex-shrink-0" style="width: 32px; height: 32px; object-fit: cover;">
             <div class="flex-grow-1 position-relative">

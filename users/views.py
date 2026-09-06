@@ -22,6 +22,7 @@ from notifications.models import NotificationObject
 from notifications.services.notification_service import invalidate_unread_count_cache
 from users.services.device_service import get_or_create_device_id, hash_device_id
 from users.services.email_verification_service import send_verification_email, verify_email_token
+from pwaninet.utils.htmx import htmx_location_response
 from .serializers import (
     UserSerializer, UserPublicSerializer, FollowSerializer, PinchSerializer,
     DeviceAccountSerializer, UserUpdateSerializer, NotificationPreferencesSerializer
@@ -270,139 +271,31 @@ def profile_connections(request, username, list_type):
 
 @login_required
 def people_search(request):
-    """Search for users via HTMX for the people modal"""
-    from django.core.paginator import Paginator
-    from django.db.models import Q
-    import logging
-
-    logger = logging.getLogger(__name__)
-
+    """Search for users via HTMX for the people modal powered by UnifiedSearchService."""
     search_query = request.GET.get('q', '').strip()
     connection_type = request.GET.get('connection_type', '')
     profile_username = request.GET.get('profile_username', '')
     page = int(request.GET.get('page', 1))
     page_size = 20
 
-    logger.info(f"people_search called - q={search_query}, connection_type={connection_type}, profile_username={profile_username}, page={page}")
+    from search.services.unified_search_service import UnifiedSearchService
+    search_service = UnifiedSearchService()
 
-    users = User.objects.none()
-    list_type = 'all'
-    empty_message = 'No users found.'
-    empty_icon = 'search'
-
-    # Get base users based on connection type
-    if connection_type and profile_username:
-        profile_user = get_object_or_404(User, username=profile_username)
-        logger.info(f"Profile user found: {profile_user.username}")
-
-        if connection_type == 'followers':
-            # Use values_list to get user IDs, then filter User queryset
-            follower_ids = Follow.objects.filter(followed=profile_user).values_list('follower_id', flat=True)
-            users = (
-                User.objects.filter(id__in=follower_ids)
-                .select_related('course', 'year')
-                .order_by('-id')
-            )
-            list_type = 'followers'
-            empty_message = 'No followers yet.'
-            logger.info(f"Found {follower_ids.count()} followers")
-        elif connection_type == 'following':
-            # Use values_list to get user IDs, then filter User queryset
-            following_ids = Follow.objects.filter(follower=profile_user).values_list('followed_id', flat=True)
-            users = (
-                User.objects.filter(id__in=following_ids)
-                .select_related('course', 'year')
-                .order_by('-id')
-            )
-            list_type = 'following'
-            empty_message = 'Not following anyone yet.'
-            logger.info(f"Found {following_ids.count()} following")
-        elif connection_type == 'pinches_sent':
-            pinch_ids = Pinch.objects.filter(pinch_user=profile_user).values_list('pinched_user_id', flat=True)
-            users = (
-                User.objects.filter(id__in=pinch_ids)
-                .select_related('course', 'year')
-                .order_by('-id')
-            )
-            list_type = 'pinches_sent'
-            empty_message = 'No pinches sent yet.'
-            logger.info(f"Found {pinch_ids.count()} pinches sent")
-        elif connection_type == 'pinches_received':
-            pinch_ids = Pinch.objects.filter(pinched_user=profile_user).values_list('pinch_user_id', flat=True)
-            users = (
-                User.objects.filter(id__in=pinch_ids)
-                .select_related('course', 'year')
-                .order_by('-id')
-            )
-            list_type = 'pinches_received'
-            empty_message = 'No pinches received yet.'
-            logger.info(f"Found {pinch_ids.count()} pinches received")
-
-        # Apply search filter if provided
-        if search_query:
-            logger.info(f"Applying search filter '{search_query}' to users queryset")
-            users = users.filter(
-                Q(username__icontains=search_query) |
-                Q(first_name__icontains=search_query) |
-                Q(last_name__icontains=search_query)
-            )
-            empty_message = f'No results for "{search_query}"'
-            logger.info(f"After search filter: {users.count()} users")
-    elif search_query:
-        # Global search when no connection type
-        users = (
-            User.objects.filter(
-                Q(username__icontains=search_query) |
-                Q(first_name__icontains=search_query) |
-                Q(last_name__icontains=search_query)
-            )
-            .select_related('course', 'year')
-            .exclude(id=request.user.id)
-            .order_by('username')
-        )
-        list_type = 'search'
-        empty_message = f'No results for "{search_query}"'
-        logger.info(f"Global search found {len(users)} users")
-    else:
-        # Show suggested users when no search query and no connection type
-        users = (
-            User.objects
-            .select_related('course', 'year')
-            .exclude(id=request.user.id)
-            .order_by('?')[:20]
-        )
-        list_type = 'suggested'
-        empty_message = 'No users available'
-        empty_icon = 'people'
-        logger.info(f"Suggested users: {len(users)}")
-
-    # Paginate
-    paginator = Paginator(users, page_size)
-    users_page = paginator.get_page(page)
-
-    logger.info(f"After pagination: {len(users_page)} users on page {page}, has_more={users_page.has_next()}")
-
-    # Build next page URL
-    next_url = None
-    if users_page.has_next():
-        url_params = []
-        if search_query:
-            url_params.append(f"q={search_query}")
-        if connection_type:
-            url_params.append(f"connection_type={connection_type}")
-        if profile_username:
-            url_params.append(f"profile_username={profile_username}")
-        url_params.append(f"page={users_page.next_page_number()}")
-        next_url = f"?{'&'.join(url_params)}"
-
-    logger.info(f"Rendering people_list.html with {len(users_page)} users")
+    users_page, list_type, empty_message, empty_icon, has_more, next_url = search_service.search_people_models(
+        query=search_query,
+        user=request.user,
+        connection_type=connection_type,
+        profile_username=profile_username,
+        page=page,
+        page_size=page_size,
+    )
 
     return render(request, 'users/partials/people_list.html', {
         'users': users_page,
         'list_type': list_type,
         'empty_message': empty_message,
         'empty_icon': empty_icon,
-        'has_more': users_page.has_next(),
+        'has_more': has_more,
         'next_url': next_url,
     })
 
@@ -458,9 +351,7 @@ def update_profile_view(request):
                 messages.success(request, 'Profile updated successfully.')
                 if is_htmx:
                     from django.urls import reverse
-                    response = HttpResponse(status=204)
-                    response['HX-Redirect'] = reverse('users:profile', kwargs={'username': request.user.username})
-                    return response
+                    return htmx_location_response(reverse('users:profile', kwargs={'username': request.user.username}))
                 return redirect('users:profile', username=request.user.username)
             except Exception as e:
                 messages.error(request, f'Error saving profile: {str(e)}')
@@ -608,9 +499,7 @@ def settings_profile_view(request):
                 messages.success(request, 'Profile updated successfully.')
                 if is_htmx:
                     from django.urls import reverse
-                    response = HttpResponse(status=204)
-                    response['HX-Redirect'] = reverse('users:settings_profile')
-                    return response
+                    return htmx_location_response(reverse('users:settings_profile'))
                 return redirect('users:settings_profile')
             except Exception as e:
                 messages.error(request, f'Error saving profile: {str(e)}')

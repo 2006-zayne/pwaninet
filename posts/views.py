@@ -32,6 +32,7 @@ from posts.services.hide_service import hide_post, unhide_post, is_post_hidden
 from posts.services.author_preference_service import set_author_preference, get_author_preference, get_all_preferences
 from posts.services.share_service import share_post, get_shared_posts, mark_share_as_viewed, get_user_received_shares
 from notifications.services.notification_service import get_cached_unread_count
+from pwaninet.utils.htmx import htmx_location_response
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -847,9 +848,7 @@ def create_post_view(request):
             request.session['is_new_post'] = True
             request.session['new_post_id'] = post.id
             if is_htmx:
-                response = HttpResponse(status=204)
-                response['HX-Redirect'] = reverse('posts:post_details', kwargs={'post_id': post.id})
-                return response
+                return htmx_location_response(reverse('posts:post_details', kwargs={'post_id': post.id}))
             return redirect('posts:post_details', post_id=post.id)
     else:
         form = PostForm(user=request.user)
@@ -908,6 +907,12 @@ def add_comment(request, post_id):
     post = get_object_or_404(Post, id=post_id)
     if request.method == 'POST':
         handle_add_comment_request(request, post)
+        if request.headers.get('HX-Request'):
+            if request.GET.get('from_card'):
+                return HttpResponse(status=204)
+            context = build_comments_context(post, request.user, show_all_comments=True)
+            context['post'] = post
+            return render(request, 'posts/partials/comments_section.html', context)
     return redirect('posts:post_details', post_id=post_id)
 
 

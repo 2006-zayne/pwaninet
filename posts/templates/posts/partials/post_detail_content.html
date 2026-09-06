@@ -334,8 +334,12 @@
                                class="w-100 h-100 post-detail-video"
                                muted loop playsinline controls
                                data-post-id="{{ post.id }}"
-                               poster="{{ post.get_video_poster|default:'' }}">
-                            <source src="{{ post.video.url }}" type="video/mp4">
+                               poster="{{ post.get_video_poster|default:'' }}"
+                               {% if post.hls_playlist %}
+                               data-hls-url="{{ post.get_hls_url }}"
+                               {% endif %}
+                               data-video-url="{{ post.get_video_for_feed.url }}">
+                            <source src="{{ post.get_video_for_feed.url }}" type="video/mp4">
                         </video>
                     </div>
                 {% elif ".mp3" in f_url or ".wav" in f_url or ".ogg" in f_url or ".m4a" in f_url %}
@@ -439,7 +443,11 @@
     <div class="container py-3" style="background-color: transparent;">
         <div class="row justify-content-center">
             <div class="col-12 col-lg-8">
-                <form method="POST" action="{% url 'posts:add_comment' post.id %}" class="main-composer">
+                <form hx-post="{% url 'posts:add_comment' post.id %}"
+                      hx-target="#comments-section"
+                      hx-swap="outerHTML"
+                      class="main-composer"
+                      hx-on::after-request="if(event.detail.successful) this.reset();">
                     {% csrf_token %}
                     <img src="{{ request.user.profile_pic.url }}" 
                          alt="{{ request.user.username }}" 
