@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize',
+    'django.contrib.postgres',
     'channels',
     'rest_framework',
     'corsheaders',
@@ -287,6 +288,35 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
+
+CELERY_TASK_DEFAULT_QUEUE = 'default'
+
+CELERY_TASK_QUEUES = {
+    'default': {},
+    'media_queue': {},
+    'docs_queue': {},
+    'search_queue': {},
+}
+
+CELERY_TASK_ROUTES = {
+    # Heavy video processing & future speech/transcription tasks
+    'posts.tasks.process_large_video': {'queue': 'media_queue'},
+    'posts.tasks.extract_video_transcript': {'queue': 'media_queue'},
+    
+    # Document extraction & rendering pipelines
+    'documents.tasks.processing.process_document': {'queue': 'docs_queue'},
+    'documents.tasks.processing.process_file': {'queue': 'docs_queue'},
+    'documents.tasks.processing.generate_thumbnail': {'queue': 'docs_queue'},
+    'documents.tasks.processing.generate_preview': {'queue': 'docs_queue'},
+    'documents.tasks.processing.extract_ocr_text_for_document': {'queue': 'docs_queue'},
+    
+    # Search indexing & suggestions tasks
+    'search.tasks.*': {'queue': 'search_queue'},
+    'documents.tasks.search_indexing.*': {'queue': 'search_queue'},
+    
+    # Fallback to default
+    '*': {'queue': 'default'},
+}
 
 # CORS settings (includes Capacitor origins and CDN)
 _default_cors = [

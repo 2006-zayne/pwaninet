@@ -397,6 +397,13 @@ def process_large_video(self, post_id):
         })
         logger.info('[HLS] Post %s: all renditions complete → %s', post_id, master_rel)
 
+        # Dispatch speech-to-text audio transcription in background
+        try:
+            extract_video_transcript.delay(post_id)
+            logger.info('[HLS] Dispatched extract_video_transcript for post %s', post_id)
+        except Exception as transcript_err:
+            logger.warning('[HLS] Could not dispatch extract_video_transcript for post %s: %s', post_id, transcript_err)
+
     except Post.DoesNotExist:
         logger.error('[HLS] Post %s not found', post_id)
 
@@ -419,6 +426,78 @@ def process_large_video(self, post_id):
         if tmp_dir and os.path.isdir(tmp_dir):
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
+
+@shared_task(bind=True, queue='media_queue', max_retries=2, default_retry_delay=60)
+def extract_video_transcript(self, post_id: int):
+    """Extract audio track and transcribe speech from post video.
+    
+    Runs asynchronously on media_queue after video transcoding is complete.
+    Saves extracted transcript to post.video_transcript and updates post search vector.
+    """
+    import os
+    import tempfile
+    import shutil
+    from posts.models import Post
+    from posts.utils.transcription import extract_audio_from_video, transcribe_audio_file
+    from search.indexing import update_post_search_vector
+
+    post = None
+    tmp_dir = None
+    audio_path = None
+    try:
+        post = Post.objects.get(id=post_id)
+        if not post.video:
+            logger.info("Post %s has no video, skipping transcript extraction", post_id)
+            return
+
+        logger.info("Starting audio extraction and transcription for post %s", post_id)
+
+        # ------------------------------------------------------------------
+        # Resolve source video path (local filesystem or cloud storage)
+        # ------------------------------------------------------------------
+        source_path = None
+        try:
+            source_path = post.video.path
+            if not os.path.exists(source_path):
+                source_path = None
+        except (NotImplementedError, ValueError, AttributeError):
+            pass
+
+        if not source_path:
+            tmp_dir = tempfile.mkdtemp(prefix=f'pwani_transcribe_{post_id}_')
+            ext = os.path.splitext(post.video.name)[1] or '.mp4'
+            source_path = os.path.join(tmp_dir, f'video{ext}')
+            with post.video.open('rb') as src, open(source_path, 'wb') as dst:
+                shutil.copyfileobj(src, dst)
+
+        # Temporary audio file
+        if not tmp_dir:
+            tmp_dir = tempfile.mkdtemp(prefix=f'pwani_transcribe_{post_id}_')
+        audio_path = os.path.join(tmp_dir, 'audio.wav')
+
+        # Extract 16kHz mono audio
+        success = extract_audio_from_video(source_path, audio_path)
+        if not success:
+            logger.warning("Failed to extract audio track for post %s", post_id)
+            return
+
+        # Transcribe audio file
+        transcript = transcribe_audio_file(audio_path)
+        if transcript:
+            Post.objects.filter(id=post_id).update(video_transcript=transcript)
+            update_post_search_vector(post_id)
+            logger.info("Successfully updated video transcript and search vector for post %s (%d chars)", post_id, len(transcript))
+        else:
+            logger.info("No speech transcribed for post %s", post_id)
+
+    except Post.DoesNotExist:
+        logger.warning("Post %s not found for video transcription", post_id)
+    except Exception as exc:
+        logger.error("Error transcribing video for post %s: %s", post_id, exc, exc_info=True)
+        raise self.retry(exc=exc)
+    finally:
+        if tmp_dir and os.path.isdir(tmp_dir):
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 @shared_task

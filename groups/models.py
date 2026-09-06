@@ -1,5 +1,7 @@
 from django.db import models
 from django.conf import settings
+from django.contrib.postgres.search import SearchVectorField
+from django.contrib.postgres.indexes import GinIndex, OpClass
 
 
 class JoinPolicy(models.TextChoices):
@@ -57,9 +59,27 @@ class Group(models.Model):
     course = models.ForeignKey('courses.Course', on_delete=models.SET_NULL, null=True, blank=True)
     year = models.ForeignKey('courses.Year', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    search_vector = SearchVectorField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            GinIndex(fields=['search_vector'], name='group_search_vector_idx'),
+            GinIndex(
+                OpClass('name', name='gin_trgm_ops'),
+                name='group_name_trgm_idx',
+            ),
+        ]
+
+    def update_search_vector(self):
+        """Recompute search vector with field weights."""
+        from django.contrib.postgres.search import SearchVector
+        Group.objects.filter(pk=self.pk).update(
+            search_vector=(
+                SearchVector('name', weight='A') +
+                SearchVector('description', weight='B')
+            )
+        )
 
     def __str__(self):
         return self.name

@@ -26,6 +26,7 @@ urlpatterns = [
     # Search
     path('search/', views.search_results, name='search'),
     path('search/clear/', views.clear_recent_searches, name='clear_recent_searches'),
+    path('search-suggestions/', views.search_suggestions_view, name='search_suggestions'),
     
     # Document Details
     path('document/<int:document_id>/', views.document_detail, name='document_detail'),

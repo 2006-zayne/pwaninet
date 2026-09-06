@@ -4,8 +4,9 @@ from django.core.exceptions import ValidationError
 from PIL import Image
 from io import BytesIO
 from django.core.files.uploadedfile import InMemoryUploadedFile
-import sys
 from django.contrib.postgres.fields import JSONField
+from django.contrib.postgres.search import SearchVectorField
+from django.contrib.postgres.indexes import GinIndex, OpClass
 
 
 class GlobalRole(models.TextChoices):
@@ -224,6 +225,36 @@ class User(AbstractUser):
         default=PrivacyLevel.PUBLIC,
         help_text="Default visibility for new posts"
     )
+    search_vector = SearchVectorField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'user'
+        verbose_name_plural = 'users'
+        indexes = [
+            GinIndex(fields=['search_vector'], name='user_search_vector_idx'),
+            GinIndex(
+                OpClass('username', name='gin_trgm_ops'),
+                name='user_username_trgm_idx',
+            ),
+            GinIndex(
+                OpClass('first_name', name='gin_trgm_ops'),
+                OpClass('last_name', name='gin_trgm_ops'),
+                name='user_names_trgm_idx',
+            ),
+        ]
+
+    def update_search_vector(self):
+        """Recompute search vector with field weights."""
+        from django.contrib.postgres.search import SearchVector
+        User.objects.filter(pk=self.pk).update(
+            search_vector=(
+                SearchVector('username', weight='A') +
+                SearchVector('first_name', weight='A') +
+                SearchVector('last_name', weight='A') +
+                SearchVector('headline', weight='B') +
+                SearchVector('bio', weight='C')
+            )
+        )
 
     def clean(self):
         super().clean()

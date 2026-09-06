@@ -383,7 +383,7 @@ class SearchService:
         
         return None
     
-    def index_document(self, document: Document):
+    def index_document(self, document: Document, ocr_text: Optional[str] = None):
         """Index a document for search with weighted vectors."""
         # Get all related data
         academic_units = document.academic_units.select_related('academic_unit', 'semester', 'academic_year')
@@ -446,6 +446,10 @@ class SearchService:
             files = latest_version.files.all()
             index_data['file_types'] = [f.extension for f in files]
             index_data['file_count'] = files.count()
+
+        # Update OCR text if explicitly provided
+        if ocr_text is not None:
+            index_data['ocr_text'] = ocr_text
         
         # Get engagement metrics
         try:

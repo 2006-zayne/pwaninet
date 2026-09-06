@@ -92,6 +92,11 @@ def create_post_for_user(form, user, files, group_id=None):
                     post.video = video_file
                     post.save()
                     logger.info(f"Video saved successfully: {post.video}")
+                    from posts.tasks import process_large_video, generate_video_poster
+                    if post.video:
+                        logger.info(f"Triggering HLS transcoding and poster generation for post {post.id}")
+                        process_large_video.delay(post.id)
+                        generate_video_poster.delay(post.id)
                 except Exception as e:
                     # Log error but don't fail the entire post creation
                     logger.error(f"Error saving video file: {e}")

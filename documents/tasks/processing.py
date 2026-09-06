@@ -11,6 +11,10 @@ OCR Pipeline Architecture:
 - The pipeline supports multiple OCR engines (Tesseract, Google Vision, etc.)
 """
 
+import os
+import tempfile
+from contextlib import contextmanager
+from typing import Union
 import logging
 from celery import shared_task
 from celery.exceptions import Retry
@@ -20,99 +24,128 @@ from django.utils import timezone
 from ..documents.models import Document, DocumentFile, DocumentVersion
 from ..services.storage_service import StorageService
 from ..services.search_service import SearchService
+from ..utils.text_extraction import extract_text_from_file, _clean_and_truncate_text
 
 logger = logging.getLogger(__name__)
 
 
-# OCR Extension Points
-# These functions provide clear extension points for future OCR implementation
-# without requiring architectural changes
+@contextmanager
+def get_local_filepath(doc_file: DocumentFile):
+    """Context manager providing a local filesystem path for a DocumentFile.
+    
+    If the file is already on local disk, yields its path directly.
+    If stored on remote storage (S3/R2), downloads to a temporary file and deletes it on exit.
+    """
+    if not doc_file.file:
+        yield None
+        return
+
+    try:
+        path = doc_file.file.path
+        if os.path.exists(path):
+            yield path
+            return
+    except (NotImplementedError, AttributeError, ValueError):
+        pass
+
+    # Remote or streamable storage: download to temporary file
+    suffix = f".{doc_file.extension}" if doc_file.extension else ""
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tf:
+            temp_path = tf.name
+            doc_file.file.open('rb')
+            for chunk in doc_file.file.chunks():
+                tf.write(chunk)
+            doc_file.file.close()
+        yield temp_path
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+
 
 def extract_ocr_text(file: DocumentFile) -> str:
-    """Extract text from document using OCR.
-    
-    This is an extension point for future OCR implementation.
-    Currently returns empty string.
-    
-    Future implementations could use:
-    - Tesseract OCR for PDFs and images
-    - Google Vision API
-    - AWS Textract
-    - Azure Form Recognizer
-    - pdfplumber for text extraction from PDFs
+    """Extract text from document using PyMuPDF, python-docx, python-pptx, etc.
     
     Args:
         file: DocumentFile instance to extract text from
         
     Returns:
-        Extracted text as string
+        Extracted and sanitized text as string
     """
-    # Extension point for OCR implementation
-    # When implementing OCR, uncomment and modify the following:
-    #
-    # if file.extension == 'pdf':
-    #     return _extract_text_from_pdf(file)
-    # elif file.extension in ['jpg', 'jpeg', 'png', 'tiff']:
-    #     return _extract_text_from_image(file)
-    # elif file.extension == 'docx':
-    #     return _extract_text_from_docx(file)
-    #
-    return ""
+    try:
+        with get_local_filepath(file) as local_path:
+            if not local_path:
+                return ""
+            return extract_text_from_file(
+                file_path=local_path,
+                mime_type=file.mime_type or "",
+                extension=file.extension or ""
+            )
+    except Exception as exc:
+        logger.warning(
+            "Failed to extract text from file %s (%s): %s",
+            file.id, getattr(file, 'original_filename', ''), exc, exc_info=True
+        )
+        return ""
 
 
-def _extract_text_from_pdf(file: DocumentFile) -> str:
-    """Extract text from PDF file.
+@shared_task(queue='docs_queue')
+def extract_ocr_text_for_document(document_id_or_instance: Union[int, Document]) -> str:
+    """Extract OCR / body text for all files in a document's latest version.
     
-    Extension point for PDF text extraction.
-    Could use pdfplumber, PyPDF2, or OCR for scanned PDFs.
-    """
-    # Future implementation
-    return ""
-
-
-def _extract_text_from_image(file: DocumentFile) -> str:
-    """Extract text from image file using OCR.
-    
-    Extension point for image OCR.
-    Could use Tesseract, Google Vision, etc.
-    """
-    # Future implementation
-    return ""
-
-
-def _extract_text_from_docx(file: DocumentFile) -> str:
-    """Extract text from DOCX file.
-    
-    Extension point for DOCX text extraction.
-    Could use python-docx.
-    """
-    # Future implementation
-    return ""
-
-
-def extract_ocr_text_for_document(document: Document) -> str:
-    """Extract OCR text for all files in a document.
-    
-    This function coordinates OCR extraction across all files
-    in the document's latest version.
+    Coordinates extraction across files, enforces guardrails,
+    persists extracted text to DocumentSearchIndex.ocr_text,
+    and updates weighted search vectors.
     
     Args:
-        document: Document instance
+        document_id_or_instance: Document instance or Document ID integer
         
     Returns:
-        Combined OCR text from all files
+        Combined OCR/body text from all files
     """
-    version = document.latest_version
-    if not version:
+    if isinstance(document_id_or_instance, Document):
+        document = document_id_or_instance
+    else:
+        try:
+            document = Document.objects.get(id=document_id_or_instance)
+        except Document.DoesNotExist:
+            logger.warning("Document %s not found for OCR text extraction", document_id_or_instance)
+            return ""
+
+    try:
+        version = document.latest_version
+        if not version:
+            return ""
+        
+        all_text = []
+        for file in version.files.all():
+            text = extract_ocr_text(file)
+            if text:
+                all_text.append(text)
+        
+        combined_text = "\n\n".join(all_text)
+        combined_text = _clean_and_truncate_text(combined_text)
+        
+        # Persist extracted text to DocumentSearchIndex.ocr_text and recompute weighted vectors
+        search_service = SearchService()
+        search_service.index_document(document, ocr_text=combined_text)
+        
+        if combined_text:
+            logger.info(
+                "Extracted %d characters of body text for document %s",
+                len(combined_text), document.id
+            )
+        return combined_text
+    except Exception as exc:
+        logger.warning(
+            "Error extracting OCR text for document %s: %s",
+            getattr(document, 'id', document_id_or_instance), exc, exc_info=True
+        )
         return ""
-    
-    all_text = []
-    for file in version.files.all():
-        text = extract_ocr_text(file)
-        if text:
-            all_text.append(text)
-    
-    return " ".join(all_text)
 
 
 @shared_task(bind=True, max_retries=3)
@@ -123,8 +156,8 @@ def process_document(self, document_id: int):
     1. Generate thumbnails
     2. Generate previews
     3. Extract metadata
-    4. Extract OCR text (extension point)
-    5. Index for search
+    4. Extract OCR / body text
+    5. Index for search with weighted vectors
     6. Mark as ready
     """
     try:
@@ -144,14 +177,16 @@ def process_document(self, document_id: int):
         # Wait for all files to be processed (simplified)
         # In production, use group/chord for parallel processing
         
-        # Extract OCR text (extension point - currently no-op)
-        ocr_text = extract_ocr_text_for_document(document)
-        if ocr_text:
-            logger.info(f"Extracted {len(ocr_text)} characters of OCR text for document {document_id}")
+        # Extract OCR / body text and persist to DocumentSearchIndex
+        ocr_text = ""
+        try:
+            ocr_text = extract_ocr_text_for_document(document)
+        except Exception as e:
+            logger.warning(f"OCR text extraction failed for document {document_id}: {e}", exc_info=True)
         
-        # Index document for search
+        # Ensure document is indexed with any updated metadata
         search_service = SearchService()
-        search_service.index_document(document)
+        search_service.index_document(document, ocr_text=ocr_text if ocr_text else None)
         
         # Mark document as ready
         document.status = 'ready'

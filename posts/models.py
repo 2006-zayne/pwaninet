@@ -1,5 +1,7 @@
 from django.db import models
 from django.conf import settings
+from django.contrib.postgres.search import SearchVectorField
+from django.contrib.postgres.indexes import GinIndex
 from PIL import Image
 from io import BytesIO
 from django.core.files.uploadedfile import InMemoryUploadedFile
@@ -87,9 +89,24 @@ class Post(models.Model):
     shared_document = models.ForeignKey('documents.Document', on_delete=models.SET_NULL, null=True, blank=True, related_name='shared_in_posts')
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
+    video_transcript = models.TextField(blank=True, default='')
+    search_vector = SearchVectorField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            GinIndex(fields=['search_vector'], name='post_search_vector_idx'),
+        ]
+
+    def update_search_vector(self):
+        """Recompute search vector with field weights."""
+        from django.contrib.postgres.search import SearchVector
+        Post.objects.filter(pk=self.pk).update(
+            search_vector=(
+                SearchVector('content', weight='B') +
+                SearchVector('video_transcript', weight='C')
+            )
+        )
 
     def __str__(self):
         return f"Post by {self.author} on {self.created_at.strftime('%Y-%m-%d')}"

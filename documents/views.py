@@ -214,6 +214,20 @@ def clear_recent_searches(request):
     return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/documents/search/'))
 
 
+def search_suggestions_view(request):
+    """
+    Autocomplete search suggestions endpoint returning JSON.
+    """
+    q = request.GET.get('q', '').strip()
+    if len(q) < 2:
+        return JsonResponse({'suggestions': []})
+
+    from .services.search_service import SearchService
+    search_service = SearchService()
+    suggestions = search_service.get_search_suggestions(q)
+    return JsonResponse({'suggestions': suggestions})
+
+
 def document_detail(request, document_id):
     """
     Individual document detail page with preview and metadata.
