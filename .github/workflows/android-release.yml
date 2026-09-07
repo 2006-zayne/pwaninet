@@ -43,7 +43,7 @@ jobs:
       - name: Set up Node.js for semantic-release
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Run semantic-release
         id: semver
@@ -86,10 +86,10 @@ jobs:
           echo "Building APK for Tag: ${TAG}, Version: ${RAW}"
           git checkout "${TAG}"
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Install npm dependencies & sync Capacitor
