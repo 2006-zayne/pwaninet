@@ -19,6 +19,11 @@ module.exports = {
       '@semantic-release/commit-analyzer',
       {
         preset: 'angular',
+        parserOpts: {
+          // Lenient pattern: accepts both "fix: msg" and "fix:msg"
+          headerPattern: /^(\w+)(?:\(([^)]+)\))?!?:(?:\s*)(.+)$/,
+          headerCorrespondence: ['type', 'scope', 'subject'],
+        },
         releaseRules: [
           { type: 'feat',     release: 'minor' },
           { type: 'fix',      release: 'patch' },
@@ -40,6 +45,10 @@ module.exports = {
       '@semantic-release/release-notes-generator',
       {
         preset: 'angular',
+        parserOpts: {
+          headerPattern: /^(\w+)(?:\(([^)]+)\))?!?:(?:\s*)(.+)$/,
+          headerCorrespondence: ['type', 'scope', 'subject'],
+        },
         writerOpts: {
           // Group commits into sections in the GitHub Release body
           groupBy: 'type',

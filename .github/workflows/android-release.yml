@@ -82,7 +82,7 @@ jobs:
           fi
           echo "TAG_NAME=${TAG}" >> $GITHUB_ENV
           echo "VERSION_NAME=${RAW}" >> $GITHUB_ENV
-          echo "VERSION_CODE=${{ github.run_number }}" >> $GITHUB_ENV
+          echo "VERSION_CODE=$(git rev-list --count HEAD)" >> $GITHUB_ENV
           echo "Building APK for Tag: ${TAG}, Version: ${RAW}"
           git checkout "${TAG}"
 
