@@ -169,13 +169,70 @@ class ReleaseService:
         return release
     
     @staticmethod
+    def ensure_git_release_in_db() -> Optional[Release]:
+        """
+        Synchronize the Git release version to the database Release model.
+        Acts as the bridge between Git/mobile releases and the Django database.
+
+        If a Release record for the current Git version does not exist,
+        it automatically creates one, marks it PUBLISHED, and sets is_current_release=True.
+        Caches the lookup in Django's cache for 5 minutes so it does not query DB on every request.
+        """
+        from pwaninet import version as app_version
+        git_ver = app_version.resolve_version()
+        git_build = app_version.resolve_build_number()
+
+        cache_key = f'release:current_git_release:{git_ver}'
+        try:
+            cached_release = cache.get(cache_key)
+            if cached_release:
+                return cached_release
+        except Exception:
+            pass
+
+        try:
+            with transaction.atomic():
+                release = Release.objects.filter(version=git_ver).first()
+                if not release:
+                    # Auto-create release record for this git tag
+                    release = Release.objects.create(
+                        version=git_ver,
+                        build_number=git_build,
+                        release_title=f"Release {git_ver}",
+                        release_summary=f"PwaniNet Release {git_ver}",
+                        release_type='PATCH' if git_ver.count('.') == 2 and git_ver.split('.')[-1] != '0' else 'MINOR',
+                        status='PUBLISHED',
+                        published=True,
+                        release_channel='STABLE',
+                        is_current_release=True,
+                    )
+                    # Unset any other active releases
+                    Release.objects.filter(is_current_release=True).exclude(id=release.id).update(is_current_release=False)
+                elif not release.is_current_release:
+                    Release.objects.filter(is_current_release=True).exclude(id=release.id).update(is_current_release=False)
+                    release.is_current_release = True
+                    release.save(update_fields=['is_current_release'])
+
+                try:
+                    cache.set(cache_key, release, timeout=300)
+                except Exception:
+                    pass
+
+                return release
+        except Exception:
+            # If DB is not ready or connection fails, return None gracefully
+            return None
+
+    @staticmethod
     def get_current_release() -> Optional[Release]:
         """
-        Get the current release.
-        
-        Returns:
-            Current Release instance or None
+        Get the current release matching the active Git release.
+        Ensures the Git version exists in the DB, then returns it.
+        Falls back to any is_current_release=True if DB sync fails.
         """
+        release = ReleaseService.ensure_git_release_in_db()
+        if release:
+            return release
         return Release.objects.filter(is_current_release=True).first()
     
     @staticmethod

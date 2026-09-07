@@ -206,3 +206,48 @@ class SharedPostModelTest(TestCase):
         )
         self.assertEqual(shared.original_post, self.post)
         self.assertEqual(shared.shared_to_group, self.group)
+
+
+class PostSerializerFilenameTest(TestCase):
+    """Test cases for long filenames in PostCreateSerializer"""
+
+    def setUp(self):
+        self.course = Course.objects.create(name='Computer Science')
+        self.year = Year.objects.create(course=self.course, level=1)
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            course=self.course,
+            year=self.year,
+            password='testpass123'
+        )
+
+    def test_video_filename_108_characters(self):
+        """Test that a video filename with 108 characters is accepted"""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from posts.serializers import PostCreateSerializer
+
+        filename = "a" * 104 + ".mp4"  # 108 characters
+        video = SimpleUploadedFile(filename, b"fake video content", content_type="video/mp4")
+
+        serializer = PostCreateSerializer(
+            data={'video': video, 'content': 'Test video post'},
+            context={'request': type('Req', (), {'user': self.user})()}
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_video_filename_extremely_long_truncated(self):
+        """Test that an extremely long filename (>200 chars) is safely truncated and accepted"""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from posts.serializers import PostCreateSerializer
+
+        filename = "b" * 250 + ".mp4"  # 254 characters
+        video = SimpleUploadedFile(filename, b"fake video content", content_type="video/mp4")
+
+        serializer = PostCreateSerializer(
+            data={'video': video, 'content': 'Test video post'},
+            context={'request': type('Req', (), {'user': self.user})()}
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertLessEqual(len(video.name), 200)
+

@@ -408,30 +408,5 @@ class CreateReleaseView(APIView):
         return f"{major}.{minor}.{patch}"
 
     def update_version_file(self, new_version, new_build_number):
-        """Update pwaninet/version.py with new version and build number"""
-        version_file_path = '/home/zayne/projects/pwaninet/pwaninet/version.py'
-
-        with open(version_file_path, 'r') as f:
-            content = f.read()
-
-        # Update version
-        content = content.replace(
-            f'__version__ = "{version.__version__}"',
-            f'__version__ = "{new_version}"'
-        )
-
-        # Update build number
-        content = content.replace(
-            f'__build_number__ = {version.__build_number__}',
-            f'__build_number__ = {new_build_number}'
-        )
-
-        # Update release date
-        new_release_date = timezone.now().isoformat() + 'Z'
-        content = content.replace(
-            f'__release_date__ = "{version.__release_date__}"',
-            f'__release_date__ = "{new_release_date}"'
-        )
-
-        with open(version_file_path, 'w') as f:
-            f.write(content)
+        """Deprecated: version.py is now dynamically resolved from Git tags."""
+        pass

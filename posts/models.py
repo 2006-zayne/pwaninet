@@ -41,9 +41,9 @@ class Post(models.Model):
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE, null=True, blank=True)
     unit = models.ForeignKey('courses.Unit', on_delete=models.SET_NULL, null=True, blank=True)
     content = models.TextField(blank=True, null=True)
-    video = models.FileField(upload_to='posts/videos', storage=raw_video_storage, blank=True, null=True)
-    video_preview = models.FileField(upload_to='posts/videos/previews', blank=True, null=True)
-    video_poster = models.ImageField(upload_to='posts/videos/posters', blank=True, null=True)
+    video = models.FileField(upload_to='posts/videos', storage=raw_video_storage, max_length=500, blank=True, null=True)
+    video_preview = models.FileField(upload_to='posts/videos/previews', max_length=500, blank=True, null=True)
+    video_poster = models.ImageField(upload_to='posts/videos/posters', max_length=500, blank=True, null=True)
 
     # Async video processing state (populated by the process_large_video Celery task)
     VIDEO_STATUS_PENDING     = 'pending'
@@ -76,9 +76,9 @@ class Post(models.Model):
         help_text='Duration of the video in seconds (populated by ffprobe)',
     )
 
-    docs = models.FileField(upload_to='posts/docs', blank=True, null=True)
-    audio = models.FileField(upload_to='posts/audio', blank=True, null=True, help_text='Attach music/audio to post')
-    thumbnail = models.ImageField(upload_to='posts/thumbnails', blank=True, null=True, help_text='Thumbnail for gradient/text posts')
+    docs = models.FileField(upload_to='posts/docs', max_length=500, blank=True, null=True)
+    audio = models.FileField(upload_to='posts/audio', max_length=500, blank=True, null=True, help_text='Attach music/audio to post')
+    thumbnail = models.ImageField(upload_to='posts/thumbnails', max_length=500, blank=True, null=True, help_text='Thumbnail for gradient/text posts')
     gradient_class = models.CharField(max_length=50, choices=GRADIENT_CHOICES, default='grad-ocean', blank=True)
     has_signature = models.BooleanField(default=False)
     custom_gradient_text = models.CharField(max_length=100, blank=True, null=True, help_text='Custom text for gradient patterns')
@@ -179,9 +179,9 @@ class Post(models.Model):
 
 class PostImage(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='images')
-    image = models.ImageField(upload_to='posts/images')
-    thumbnail_400 = models.ImageField(upload_to='posts/images/thumbnails', blank=True, null=True)
-    thumbnail_800 = models.ImageField(upload_to='posts/images/thumbnails', blank=True, null=True)
+    image = models.ImageField(upload_to='posts/images', max_length=500)
+    thumbnail_400 = models.ImageField(upload_to='posts/images/thumbnails', max_length=500, blank=True, null=True)
+    thumbnail_800 = models.ImageField(upload_to='posts/images/thumbnails', max_length=500, blank=True, null=True)
     order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 

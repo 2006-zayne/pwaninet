@@ -3,6 +3,7 @@ from .models import Post, PostImage, Like, Comment, CommentLike, Report, Repost,
 from django.contrib.auth import get_user_model
 from .tasks import generate_post_thumbnail, generate_video_poster, process_large_video
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +136,19 @@ class PostCreateSerializer(serializers.ModelSerializer):
                 "Post must have at least text content, images, video, documents, or audio."
             )
         return attrs
+
+    def to_internal_value(self, data):
+        for key in ('video', 'docs', 'audio'):
+            file_obj = data.get(key)
+            if hasattr(file_obj, 'name') and file_obj.name and len(file_obj.name) > 200:
+                name, ext = os.path.splitext(file_obj.name)
+                file_obj.name = f"{name[:180]}{ext}"
+        if hasattr(data, 'getlist'):
+            for img in data.getlist('images'):
+                if hasattr(img, 'name') and img.name and len(img.name) > 200:
+                    name, ext = os.path.splitext(img.name)
+                    img.name = f"{name[:180]}{ext}"
+        return super().to_internal_value(data)
 
     def create(self, validated_data):
         import logging
@@ -484,6 +498,14 @@ class PostUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = ['content', 'video', 'docs', 'audio', 'gradient_class', 'has_signature']
+
+    def to_internal_value(self, data):
+        for key in ('video', 'docs', 'audio'):
+            file_obj = data.get(key)
+            if hasattr(file_obj, 'name') and file_obj.name and len(file_obj.name) > 200:
+                name, ext = os.path.splitext(file_obj.name)
+                file_obj.name = f"{name[:180]}{ext}"
+        return super().to_internal_value(data)
 
 
 class CommentSerializer(serializers.ModelSerializer):
