@@ -1,29 +1,73 @@
 name: Build & Release Android APK
 
-'on':
+on:
   push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-    inputs:
-      version_name:
-        description: 'Version name (e.g. 1.0.0 or v1.0.0)'
-        required: false
-        default: ''
+    branches:
+      - main          # auto-release on every push to main
+  workflow_dispatch:  # keep manual trigger for emergencies
 
 permissions:
-  contents: write
+  contents: write     # needed to push tags and create releases
 
 jobs:
-  build-and-release:
-    name: Build & Release Android APK
+  # ─────────────────────────────────────────────────────────────────────────
+  # Step 1: Determine next semantic version from conventional commit messages
+  #   fix: …           →  patch   1.0.0 → 1.0.1
+  #   feat: …          →  minor   1.0.1 → 1.1.0
+  #   feat!: … or
+  #   BREAKING CHANGE  →  major   1.1.0 → 2.0.0
+  # If there are no releasable commits, new_release_published = 'false'
+  # and the build job is skipped automatically.
+  # ─────────────────────────────────────────────────────────────────────────
+  version:
+    name: Determine Next Version
     runs-on: ubuntu-latest
+    outputs:
+      new_release_published: ${{ steps.semver.outputs.new_release_published }}
+      new_release_version:   ${{ steps.semver.outputs.new_release_version }}
+      new_release_git_tag:   ${{ steps.semver.outputs.new_release_git_tag }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout (full history for semantic-release)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Node.js for semantic-release
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run semantic-release
+        id: semver
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx --yes semantic-release
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Step 2: Build & sign APK — only runs when a new version was published
+  # ─────────────────────────────────────────────────────────────────────────
+  build-and-release:
+    name: Build & Upload Android APK
+    needs: version
+    if: needs.version.outputs.new_release_published == 'true'
+    runs-on: ubuntu-latest
+
+    env:
+      VERSION_NAME: ${{ needs.version.outputs.new_release_version }}
+      TAG_NAME:     ${{ needs.version.outputs.new_release_git_tag }}
+
+    steps:
+      - name: Checkout repository at new tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.new_release_git_tag }}
+          fetch-depth: 0
+
+      - name: Set VERSION_CODE from run number
+        run: echo "VERSION_CODE=${{ github.run_number }}" >> $GITHUB_ENV
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
@@ -46,26 +90,6 @@ jobs:
       - name: Make Gradle Wrapper Executable
         run: chmod +x android/gradlew
 
-      - name: Determine Version Name & Code
-        id: versioning
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version_name }}" ]; then
-            INPUT_VER="${{ github.event.inputs.version_name }}"
-            RAW_VER="${INPUT_VER#v}"
-          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            RAW_VER="${GITHUB_REF_NAME#v}"
-          else
-            RAW_VER="1.0.0"
-          fi
-
-          TAG="v${RAW_VER}"
-          RUN_NUM="${{ github.run_number }}"
-
-          echo "VERSION_NAME=${RAW_VER}" >> $GITHUB_ENV
-          echo "VERSION_CODE=${RUN_NUM}" >> $GITHUB_ENV
-          echo "TAG_NAME=${TAG}" >> $GITHUB_ENV
-          echo "Resolved VERSION_NAME=${RAW_VER}, VERSION_CODE=${RUN_NUM}, TAG_NAME=${TAG}"
-
       - name: Decode Release Keystore
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/release.jks
@@ -73,12 +97,10 @@ jobs:
       - name: Build Android Release APK
         working-directory: android
         env:
-          KEYSTORE_PATH: ${{ github.workspace }}/android/release.jks
+          KEYSTORE_PATH:     ${{ github.workspace }}/android/release.jks
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          VERSION_CODE: ${{ env.VERSION_CODE }}
-          VERSION_NAME: ${{ env.VERSION_NAME }}
+          KEY_ALIAS:         ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD:      ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           ./gradlew assembleRelease --stacktrace
 
@@ -89,15 +111,10 @@ jobs:
 
       - name: Clean Up Keystore
         if: always()
-        run: |
-          rm -f android/release.jks
+        run: rm -f android/release.jks
 
-      - name: Publish GitHub Release
+      - name: Upload APK to existing GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG_NAME }}
-          name: PwaniNet Release ${{ env.TAG_NAME }}
           files: output/pwaninet.apk
-          generate_release_notes: true
-          draft: false
-          prerelease: false
