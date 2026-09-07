@@ -131,7 +131,13 @@
       ]
     }
   ],
-  "related_applications": [],
+  "related_applications": [
+    {
+      "platform": "play",
+      "id": "com.pwaninet.app",
+      "url": "https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk"
+    }
+  ],
   "prefer_related_applications": false,
   "edge_side_panel": {
     "preferred_width": 400

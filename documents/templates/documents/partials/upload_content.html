@@ -43,7 +43,7 @@
                        id="file-input" 
                        name="files" 
                        multiple 
-                       accept=".pdf,.docx,.pptx,.zip"
+                       accept=".pdf,.docx,.doc,.pptx,.ppt,.zip,.rar"
                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
                 <div class="doc-drop-icon" 
                      style="width: 80px; height: 80px; margin: 0 auto 20px auto; 
@@ -63,7 +63,7 @@
                     Choose Files
                 </button>
                 <p style="font-size: 0.85rem; color: var(--text-muted); margin: 16px 0 0 0;">
-                    Supported formats: PDF, DOCX, PPTX, ZIP (max 50MB each)
+                    Supported formats: PDF, DOCX, DOC, PPTX, PPT, ZIP, RAR (max 50MB each)
                 </p>
             </div>
         </form>
@@ -271,64 +271,6 @@
                 <i class="bi bi-upload" style="margin-right: 8px;"></i>
                 Upload 3 Documents
             </button>
-        </div>
-    </div>
-    
-    <!-- Stage 3: Upload Progress (hidden initially) -->
-    <div class="doc-upload-stage" id="upload-stage-3" style="display: none;">
-        <div class="doc-upload-progress" 
-             style="background: var(--card-bg); border: 1px solid var(--border); 
-                    border-radius: 16px; padding: 40px; text-align: center;">
-            
-            <div class="doc-progress-icon" 
-                 style="width: 100px; height: 100px; margin: 0 auto 24px auto; 
-                        background: var(--primary-light); border-radius: 50%; 
-                        display: flex; align-items: center; justify-content: center;">
-                <i class="bi bi-cloud-arrow-up" 
-                   style="font-size: 3rem; color: var(--primary);"></i>
-            </div>
-            
-            <h3 style="font-size: 1.5rem; font-weight: 600; margin: 0 0 8px 0; color: var(--text-dark);">
-                Uploading Documents
-            </h3>
-            <p style="font-size: 1rem; color: var(--text-secondary); margin: 0 0 32px 0;">
-                Please wait while we process your files
-            </p>
-            
-            <!-- Progress Stages -->
-            <div class="doc-progress-stages" style="max-width: 400px; margin: 0 auto;">
-                <div class="doc-progress-stage" style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-                    <i class="bi bi-check-circle-fill" style="color: #10b981; font-size: 1.25rem;"></i>
-                    <span style="color: var(--text-dark); font-weight: 500;">Uploading files</span>
-                </div>
-                <div class="doc-progress-stage" style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-                    <i class="bi bi-circle" style="color: var(--border); font-size: 1.25rem;"></i>
-                    <span style="color: var(--text-secondary);">Generating previews</span>
-                </div>
-                <div class="doc-progress-stage" style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-                    <i class="bi bi-circle" style="color: var(--border); font-size: 1.25rem;"></i>
-                    <span style="color: var(--text-secondary);">Extracting metadata</span>
-                </div>
-                <div class="doc-progress-stage" style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-                    <i class="bi bi-circle" style="color: var(--border); font-size: 1.25rem;"></i>
-                    <span style="color: var(--text-secondary);">Preparing search index</span>
-                </div>
-                <div class="doc-progress-stage" style="display: flex; align-items: center; gap: 12px;">
-                    <i class="bi bi-circle" style="color: var(--border); font-size: 1.25rem;"></i>
-                    <span style="color: var(--text-secondary);">Complete</span>
-                </div>
-            </div>
-            
-            <!-- Overall Progress Bar -->
-            <div style="max-width: 400px; margin: 32px auto 0 auto;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                    <span style="font-size: 0.875rem; color: var(--text-secondary);">Overall Progress</span>
-                    <span style="font-size: 0.875rem; color: var(--text-dark); font-weight: 600;">25%</span>
-                </div>
-                <div style="height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
-                    <div style="height: 100%; width: 25%; background: var(--primary); border-radius: 4px; transition: width 0.3s ease;"></div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -583,30 +525,29 @@
                 alert('Please select at least one file to upload');
                 return;
             }
-            
-            // Show stage 3 (progress)
-            stage2.style.display = 'none';
-            document.getElementById('upload-stage-3').style.display = 'block';
-            
-            // Start progress animation
-            simulateUploadProgress();
-            
-            // Create FormData with files and metadata
-            const formData = new FormData();
-            
-            // Add files
-            selectedFiles.forEach(file => {
-                formData.append('files', file);
-            });
-            
-            // Add shared metadata
+
             const academicUnit = document.querySelector('select[name="academic_unit"]').value;
             const category = document.querySelector('select[name="category"]').value;
             const academicLevel = document.querySelector('select[name="academic_level"]').value;
             const academicYear = document.querySelector('select[name="academic_year"]').value;
             const semester = document.querySelector('select[name="semester"]').value;
-            const tags = document.querySelector('input[placeholder="e.g., database, SQL, normalization"]').value;
+            const tagsInput = document.querySelector('input[placeholder="e.g., database, SQL, normalization"]');
+            const tags = tagsInput ? tagsInput.value : '';
+
+            if (!category) {
+                alert('Please select a category');
+                return;
+            }
+
+            const originalBtnHtml = uploadBtn.innerHTML;
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Uploading...';
             
+            // Create FormData with files and metadata
+            const formData = new FormData();
+            selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
             formData.append('academic_unit', academicUnit);
             formData.append('category', category);
             formData.append('academic_level', academicLevel);
@@ -625,188 +566,185 @@
                 formData.append(`file_${index}_description`, input.value);
             });
             
-            // Submit form via fetch
-            fetch('{% url "documents:upload" %}', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                credentials: 'same-origin'
-            }).then(response => {
-                // Check if response is JSON
-                const contentType = response.headers.get('content-type');
-                if (contentType && contentType.includes('application/json')) {
-                    return response.json();
-                } else {
-                    return response.text().then(text => {
-                        throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. Response: ${text.substring(0, 200)}`);
+            // Submit form via XMLHttpRequest for upload progress & persistent banner integration
+            const xhr = new XMLHttpRequest();
+            window._activeDocumentUploadXhr = xhr;
+
+            // Activate persistent upload banner if uploadUI is available
+            if (window.uploadUI) {
+                window.uploadUI.show();
+                window.uploadUI.setHeaderTitle('UPLOADING DOCUMENT', 'phase-upload');
+                const bannerTitle = selectedFiles.length === 1 
+                    ? `Uploading ${selectedFiles[0].name}…` 
+                    : `Uploading ${selectedFiles.length} Documents…`;
+                window.uploadUI.setTitle(bannerTitle);
+                window.uploadUI.setSubtitle('Sending to repository…');
+                window.uploadUI.updateProgress(0);
+                window.uploadUI.setProgressFillClass('phase-upload');
+
+                const thumbContainer = document.getElementById('upload-banner-thumb');
+                if (thumbContainer) {
+                    thumbContainer.innerHTML = '<i class="bi bi-file-earmark-text-fill upload-thumb-icon" style="font-size: 1.8rem; color: var(--primary);"></i>';
+                }
+
+                // Wire banner cancel button to abort this XHR
+                const cancelBtn = document.getElementById('upload-banner-cancel');
+                if (cancelBtn) {
+                    const cancelHandler = (evt) => {
+                        evt.stopPropagation();
+                        if (window._activeDocumentUploadXhr) {
+                            window._activeDocumentUploadXhr.abort();
+                            window._activeDocumentUploadXhr = null;
+                            if (window.uploadUI) {
+                                window.uploadUI.hide();
+                            }
+                        }
+                    };
+                    cancelBtn.addEventListener('click', cancelHandler, { once: true });
+                }
+            }
+
+            // Immediately dismiss upload view and navigate to My Library
+            if (window.htmx) {
+                window.htmx.ajax('GET', '{% url "documents:my_library" %}', {
+                    target: '#page-content-target',
+                    swap: 'innerHTML',
+                    pushUrl: true
+                });
+            }
+
+            const startTime = Date.now();
+            xhr.upload.addEventListener('progress', function(event) {
+                if (event.lengthComputable && window.uploadUI) {
+                    const percentComplete = (event.loaded / event.total) * 100;
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    const speed = elapsed > 0 ? event.loaded / elapsed : 0;
+                    const remaining = speed > 0 ? (event.total - event.loaded) / speed : 0;
+
+                    window.uploadUI.handleUploadProgress({
+                        loaded: event.loaded,
+                        total: event.total,
+                        percent: percentComplete,
+                        speed: speed,
+                        estimatedTimeRemaining: remaining
                     });
                 }
-            })
-            .then(data => {
-                if (data.success) {
-                    // Start polling real progress using task IDs
-                    if (data.task_ids && data.task_ids.length > 0) {
-                        pollTaskProgress(data.task_ids);
-                    } else {
-                        // Fallback to simulation if no task IDs
-                        simulateUploadProgress();
-                        setTimeout(() => {
-                            completeUploadProgress();
-                            setTimeout(() => {
-                                if (window.htmx) {
-                        htmx.ajax('GET', '{% url "documents:my_library" %}', {target: '#page-content-target', swap: 'innerHTML'});
-                    } else {
-                        window.location.href = '{% url "documents:my_library" %}';
+            });
+
+            xhr.addEventListener('load', function() {
+                window._activeDocumentUploadXhr = null;
+                let data = null;
+                try {
+                    data = JSON.parse(xhr.responseText);
+                } catch (err) {
+                    console.error('Failed to parse upload response:', err);
+                }
+
+                if (xhr.status >= 200 && xhr.status < 300 && data && data.success) {
+                    // Update persistent upload banner to processing phase
+                    if (window.uploadUI) {
+                        window.uploadUI.setHeaderTitle('PROCESSING DOCUMENT', 'phase-transcoding');
+                        window.uploadUI.setTitle('Processing document…');
+                        window.uploadUI.setSubtitle('Generating preview and indexing search…');
+                        window.uploadUI.setProgressFillClass('phase-transcoding');
+                        window.uploadUI.updateProgress(65);
+                        window.uploadUI.updateMiniText('Processing…');
                     }
-                            }, 1000);
-                        }, 3000);
+
+                    // Background tracking of Celery tasks
+                    if (data.task_ids && data.task_ids.length > 0) {
+                        trackBackgroundTasks(data.task_ids, selectedFiles.length);
+                    } else {
+                        finishUploadBanner(selectedFiles.length);
                     }
                 } else {
-                    alert('Upload failed: ' + (data.error || 'Unknown error'));
-                    // Go back to stage 2
-                    document.getElementById('upload-stage-3').style.display = 'none';
-                    stage2.style.display = 'block';
+                    const errorMsg = data?.error || `Upload failed (Status ${xhr.status})`;
+                    if (window.uploadUI) {
+                        window.uploadUI.showError(errorMsg, false);
+                    }
+                    alert('Upload failed: ' + errorMsg);
+                    uploadBtn.disabled = false;
+                    uploadBtn.innerHTML = originalBtnHtml;
                 }
-            }).catch(error => {
-                console.error('Upload error:', error);
-                alert('Upload failed: ' + error.message);
-                document.getElementById('upload-stage-3').style.display = 'none';
-                stage2.style.display = 'block';
             });
+
+            xhr.addEventListener('error', function() {
+                window._activeDocumentUploadXhr = null;
+                if (window.uploadUI) {
+                    window.uploadUI.showError('Network error during upload', false);
+                }
+                alert('Upload failed due to network error');
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = originalBtnHtml;
+            });
+
+            xhr.open('POST', '{% url "documents:upload" %}', true);
+            xhr.setRequestHeader('X-CSRFToken', getCookie('csrftoken'));
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            xhr.send(formData);
         });
     }
     
-    function pollTaskProgress(taskIds) {
-        const stages = document.querySelectorAll('.doc-progress-stage');
-        const progressBar = document.querySelector('.doc-progress-stages').nextElementSibling.querySelector('div[style*="width"]');
-        const progressText = document.querySelector('.doc-progress-stages').nextElementSibling.querySelector('span:last-child');
-        
+    function trackBackgroundTasks(taskIds, fileCount) {
         let completedTasks = 0;
-        let totalTasks = taskIds.length;
-        
-        const pollInterval = setInterval(() => {
-            // Poll task status
+        const totalTasks = taskIds.length;
+        let pollCount = 0;
+        const maxPolls = 120; // 2 minutes max
+
+        const interval = setInterval(() => {
+            pollCount++;
             Promise.all(taskIds.map(taskId => 
                 fetch('/documents/upload/progress/?task_id=' + taskId)
                     .then(response => response.json())
                     .catch(() => ({ status: 'PENDING' }))
             )).then(results => {
                 completedTasks = results.filter(r => r.status === 'SUCCESS').length;
-                const progress = (completedTasks / totalTasks) * 100;
-                
-                // Update progress bar
-                if (progressBar) progressBar.style.width = progress + '%';
-                if (progressText) progressText.textContent = Math.round(progress) + '%';
-                
-                // Update stages based on progress
-                const stageIndex = Math.floor(progress / 25);
-                stages.forEach((stage, index) => {
-                    const icon = stage.querySelector('i');
-                    const text = stage.querySelector('span');
-                    if (index < stageIndex) {
-                        icon.className = 'bi bi-check-circle-fill';
-                        icon.style.color = '#10b981';
-                        text.style.color = 'var(--text-dark)';
-                        text.style.fontWeight = '500';
-                    } else if (index === stageIndex) {
-                        icon.className = 'bi bi-circle-fill';
-                        icon.style.color = 'var(--primary)';
-                        text.style.color = 'var(--text-dark)';
-                        text.style.fontWeight = '500';
-                    } else {
-                        icon.className = 'bi bi-circle';
-                        icon.style.color = 'var(--border)';
-                        text.style.color = 'var(--text-secondary)';
+                const hasFailure = results.some(r => r.status === 'FAILURE');
+
+                if (window.uploadUI) {
+                    const pct = 65 + Math.round((completedTasks / totalTasks) * 35);
+                    window.uploadUI.updateProgress(Math.min(99, pct));
+                }
+
+                if (completedTasks === totalTasks || pollCount >= maxPolls) {
+                    clearInterval(interval);
+                    finishUploadBanner(fileCount);
+                } else if (hasFailure) {
+                    clearInterval(interval);
+                    if (window.uploadUI) {
+                        window.uploadUI.showError('Document processing completed with warnings');
                     }
-                });
-                
-                // Check if all tasks completed
-                if (completedTasks === totalTasks) {
-                    clearInterval(pollInterval);
-                    completeUploadProgress();
-                    setTimeout(() => {
-                        if (window.htmx) {
-                        htmx.ajax('GET', '{% url "documents:my_library" %}', {target: '#page-content-target', swap: 'innerHTML'});
-                    } else {
-                        window.location.href = '{% url "documents:my_library" %}';
-                    }
-                    }, 1000);
                 }
             });
         }, 1000);
-        
-        // Store interval ID to clear it later
-        window.uploadProgressInterval = pollInterval;
-    }
-    
-    function simulateUploadProgress() {
-        const stages = document.querySelectorAll('.doc-progress-stage');
-        const progressBar = document.querySelector('.doc-progress-stages').nextElementSibling.querySelector('div[style*="width"]');
-        const progressText = document.querySelector('.doc-progress-stages').nextElementSibling.querySelector('span:last-child');
-        
-        let currentStage = 0;
-        let progress = 0;
-        
-        const interval = setInterval(() => {
-            progress += Math.random() * 5;
-            if (progress > 95) progress = 95;
-            
-            // Update progress bar
-            if (progressBar) progressBar.style.width = progress + '%';
-            if (progressText) progressText.textContent = Math.round(progress) + '%';
-            
-            // Update stages
-            const stageIndex = Math.floor(progress / 25);
-            if (stageIndex !== currentStage && stageIndex < stages.length) {
-                currentStage = stageIndex;
-                stages.forEach((stage, index) => {
-                    const icon = stage.querySelector('i');
-                    const text = stage.querySelector('span');
-                    if (index < currentStage) {
-                        icon.className = 'bi bi-check-circle-fill';
-                        icon.style.color = '#10b981';
-                        text.style.color = 'var(--text-dark)';
-                        text.style.fontWeight = '500';
-                    } else if (index === currentStage) {
-                        icon.className = 'bi bi-circle-fill';
-                        icon.style.color = 'var(--primary)';
-                        text.style.color = 'var(--text-dark)';
-                        text.style.fontWeight = '500';
-                    } else {
-                        icon.className = 'bi bi-circle';
-                        icon.style.color = 'var(--border)';
-                        text.style.color = 'var(--text-secondary)';
-                    }
-                });
-            }
-        }, 200);
-        
-        // Store interval ID to clear it later
+
         window.uploadProgressInterval = interval;
     }
-    
-    function completeUploadProgress() {
-        clearInterval(window.uploadProgressInterval);
-        
-        const stages = document.querySelectorAll('.doc-progress-stage');
-        const progressBar = document.querySelector('.doc-progress-stages').nextElementSibling.querySelector('div[style*="width"]');
-        const progressText = document.querySelector('.doc-progress-stages').nextElementSibling.querySelector('span:last-child');
-        
-        // Mark all stages as complete
-        stages.forEach(stage => {
-            const icon = stage.querySelector('i');
-            const text = stage.querySelector('span');
-            icon.className = 'bi bi-check-circle-fill';
-            icon.style.color = '#10b981';
-            text.style.color = 'var(--text-dark)';
-            text.style.fontWeight = '500';
-        });
-        
-        // Set progress to 100%
-        if (progressBar) progressBar.style.width = '100%';
-        if (progressText) progressText.textContent = '100%';
+
+    function finishUploadBanner(fileCount) {
+        if (window.uploadUI) {
+            window.uploadUI.setHeaderTitle('DOCUMENT READY', 'phase-published');
+            window.uploadUI.setTitle(fileCount === 1 ? 'Document ready!' : 'All documents ready!');
+            window.uploadUI.setSubtitle('Your documents are live in your library');
+            window.uploadUI.setProgressFillClass('phase-published');
+            window.uploadUI.updateProgress(100);
+            window.uploadUI.updateMiniText('Document ready! ✓');
+
+            setTimeout(() => {
+                if (window.uploadUI) {
+                    window.uploadUI.hide();
+                }
+            }, 3500);
+
+            // If user is currently on library or home page, trigger HTMX refresh
+            const libraryContainer = document.querySelector('.my-library-content') || document.querySelector('.documents-repository-content');
+            if (libraryContainer && window.htmx) {
+                window.htmx.ajax('GET', window.location.pathname, {
+                    target: '#page-content-target',
+                    swap: 'innerHTML'
+                });
+            }
+        }
     }
     
     // Cancel button
@@ -892,5 +830,17 @@
         }
         return cookieValue;
     }
-});
+    } // End initDocumentUpload
+
+    // Initialize immediately for HTMX dynamic partial load
+    initDocumentUpload();
+
+    // Re-initialize on HTMX content swaps and DOMContentLoaded
+    document.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail && (evt.detail.target.id === 'page-content-target' || (evt.detail.target.querySelector && evt.detail.target.querySelector('.doc-upload-container')))) {
+            initDocumentUpload();
+        }
+    });
+    document.addEventListener('DOMContentLoaded', initDocumentUpload);
+})();
 </script>

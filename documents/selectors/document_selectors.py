@@ -68,6 +68,7 @@ class DocumentSelector:
         """List documents for home page with personalization."""
         queryset = Document.objects.filter(
             status='ready',
+            is_available=True,
             visibility='public',
         ).select_related(
             'category',
@@ -105,6 +106,7 @@ class DocumentSelector:
         
         queryset = DocumentSearchIndex.objects.filter(
             document__status='ready',
+            document__is_available=True,
             document__visibility='public',
         ).select_related('document__analytics').order_by('-popularity_score')[:limit]
         
@@ -124,7 +126,7 @@ class DocumentSelector:
     ) -> List[Document]:
         """List documents for a user's library."""
         if document_type == 'uploads':
-            queryset = Document.objects.filter(uploaded_by_id=user_id)
+            queryset = Document.objects.filter(uploaded_by_id=user_id).exclude(status='archived')
         elif document_type == 'bookmarks':
             queryset = Document.objects.filter(
                 bookmarks__user_id=user_id
@@ -142,6 +144,7 @@ class DocumentSelector:
             'category',
         ).prefetch_related(
             'academic_units__academic_unit',
+            'versions__files',
         ).order_by('-created_at')[:limit]
     
     @staticmethod
@@ -156,6 +159,7 @@ class DocumentSelector:
         # Use search index for trending score
         queryset = DocumentSearchIndex.objects.filter(
             document__status='ready',
+            document__is_available=True,
             document__visibility='public',
             document__created_at__gte=cutoff_date,
         ).select_related('document').order_by('-trending_score')[:limit]
@@ -234,6 +238,7 @@ class DocumentSelector:
         """Get documents by category."""
         return Document.objects.filter(
             status='ready',
+            is_available=True,
             visibility='public',
             category__code=category_code,
         ).select_related(
@@ -251,6 +256,7 @@ class DocumentSelector:
         """Get documents by academic unit."""
         return Document.objects.filter(
             status='ready',
+            is_available=True,
             visibility='public',
             academic_units__academic_unit__code=unit_code,
         ).select_related(
@@ -341,6 +347,7 @@ class DocumentSelector:
         # Start with base queryset
         queryset = Document.objects.filter(
             status='ready',
+            is_available=True,
             visibility='public',
         ).exclude(id=document.id).select_related(
             'category',

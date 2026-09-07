@@ -427,6 +427,7 @@ class NotificationObject(models.Model):
         ('PINCH', 'Pinch'),
         ('INVITE', 'Invite'),
         ('SHARE', 'Share'),
+        ('DOCUMENT_SHARED', 'Document Shared'),
     ]
     notification_type = models.CharField(
         max_length=20,

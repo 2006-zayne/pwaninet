@@ -490,7 +490,7 @@
     </div>
 
     {% with post_obj=post.repost_of|default:post %}
-        {% if post_obj.gradient_class != 'none' and not post_obj.images.exists and not post_obj.video and not post_obj.docs and not post_obj.audio %}
+        {% if post_obj.gradient_class != 'none' and not post_obj.images.exists and not post_obj.video and not post_obj.docs and not post_obj.audio and not post_obj.shared_document %}
     <div class="{{ post_obj.gradient_class }} gradient-intel-bg text-center {% if post_obj.has_signature %}signature-overlay{% endif %}"
          {% if post_obj.gradient_class == 'bg-username-pattern' %}
              style="background: linear-gradient(135deg, {{ post_obj.custom_gradient_color1|default:'#141E30' }} 0%, {{ post_obj.custom_gradient_color2|default:'#243B55' }} 100%); color: {{ post_obj.custom_gradient_text_color|default:'#ffffff' }};"

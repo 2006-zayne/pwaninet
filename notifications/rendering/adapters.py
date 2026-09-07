@@ -175,9 +175,11 @@ class NotificationObjectAdapter(PayloadAdapter):
                             actor_id = event.actor.id
                             # Check if this actor is already in the list to avoid duplicates
                             if not any(a.id == actor_id for a in actors):
+                                full_name = (event.actor.get_full_name() or '').strip()
+                                actor_name = full_name if full_name and full_name != 'None None' else event.actor.username
                                 actors.append(NotificationActor(
                                     id=actor_id,
-                                    name=event.actor.get_full_name() or event.actor.username,
+                                    name=actor_name,
                                     username=event.actor.username or '',
                                     avatar=system_avatar if is_system_notification else (event.actor.profile_pic.url if event.actor.profile_pic else None),
                                     verified=getattr(event.actor, 'is_verified', False),
@@ -201,9 +203,11 @@ class NotificationObjectAdapter(PayloadAdapter):
                     user = User.objects.get(id=actor_id)
                     # Try to get timestamp from notification metadata or use created_at
                     actor_timestamp = notification.metadata.get('actor_timestamp') or notification.created_at
+                    full_name = (user.get_full_name() or '').strip()
+                    actor_name = full_name if full_name and full_name != 'None None' else user.username
                     actors.append(NotificationActor(
                         id=user.id,
-                        name=user.get_full_name() or user.username,
+                        name=actor_name,
                         username=user.username or '',
                         avatar=system_avatar if is_system_notification else (user.profile_pic.url if user.profile_pic else None),
                         verified=getattr(user, 'is_verified', False),

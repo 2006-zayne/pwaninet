@@ -113,6 +113,13 @@
     </h2>
     
     <div class="doc-recent-grid" 
+         {% if has_processing_uploads %}
+         hx-get="{% url 'documents:my_library' %}"
+         hx-trigger="every 4s"
+         hx-select=".doc-recent-grid"
+         hx-target="this"
+         hx-swap="outerHTML"
+         {% endif %}
          style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
         {% for doc in recent_uploads %}
             {% include 'documents/partials/document_card.html' with document=doc %}

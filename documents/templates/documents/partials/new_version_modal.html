@@ -1,0 +1,169 @@
+{% load static %}
+<div class="modal fade" id="newVersionModal-{{ document.id }}" tabindex="-1" aria-labelledby="newVersionModalLabel-{{ document.id }}" aria-hidden="true" style="z-index: 1060;">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 16px; border: 1px solid var(--border); background: var(--card-bg);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border); padding: 16px 20px;">
+                <h5 class="modal-title" id="newVersionModalLabel-{{ document.id }}" style="font-weight: 600; font-size: 1.1rem; color: var(--text-dark); margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <i class="bi bi-cloud-arrow-up" style="color: var(--primary);"></i>
+                    Upload New Version
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="newVersionForm-{{ document.id }}" 
+                  enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body" style="padding: 20px;">
+                    <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 16px;">
+                        Uploading a new file will increment the document version, replace the active preview with the new version, and preserve historical versions in the version history log.
+                    </p>
+
+                    <!-- File Input -->
+                    <div class="mb-3">
+                        <label for="version-file-{{ document.id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
+                            Select Document File <span class="text-danger">*</span>
+                        </label>
+                        <input type="file" 
+                               class="form-control" 
+                               id="version-file-{{ document.id }}" 
+                               name="file" 
+                               accept=".pdf,.docx,.doc,.pptx,.ppt,.zip,.rar" 
+                               required
+                               style="border-radius: 10px; border-color: var(--border); background: var(--input-bg); color: var(--text-dark);">
+                        <small class="text-muted" style="font-size: 0.8rem; margin-top: 4px; display: block;">
+                            Supported: PDF, DOCX, DOC, PPTX, PPT, ZIP, RAR (Max 50MB)
+                        </small>
+                    </div>
+
+                    <!-- Changelog / Notes -->
+                    <div class="mb-3">
+                        <label for="version-notes-{{ document.id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
+                            Version Change Notes
+                        </label>
+                        <textarea class="form-control" 
+                                  id="version-notes-{{ document.id }}" 
+                                  name="change_notes" 
+                                  rows="3" 
+                                  placeholder="e.g. Added chapter 5 questions, corrected lecture 3 formulas..."
+                                  style="border-radius: 10px; border-color: var(--border); background: var(--input-bg); color: var(--text-dark); resize: vertical;"></textarea>
+                    </div>
+
+                    <div id="newVersionError-{{ document.id }}" class="alert alert-danger d-none" style="border-radius: 10px; font-size: 0.875rem; padding: 10px 14px;"></div>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid var(--border); padding: 16px 20px;">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="border-radius: 10px; font-weight: 500;">
+                        Cancel
+                    </button>
+                    <button type="button" 
+                            id="submitNewVersionBtn-{{ document.id }}" 
+                            class="btn btn-primary" 
+                            onclick="handleNewVersionUpload({{ document.id }})"
+                            style="border-radius: 10px; font-weight: 600; padding: 8px 20px;">
+                        <i class="bi bi-cloud-arrow-up me-1"></i> Upload Version
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const modalEl = document.getElementById('newVersionModal-{{ document.id }}');
+    if (modalEl) {
+        const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+})();
+
+function handleNewVersionUpload(docId) {
+    const fileInput = document.getElementById('version-file-' + docId);
+    const errorAlert = document.getElementById('newVersionError-' + docId);
+    const submitBtn = document.getElementById('submitNewVersionBtn-' + docId);
+    const form = document.getElementById('newVersionForm-' + docId);
+
+    errorAlert.classList.add('d-none');
+    errorAlert.textContent = '';
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        errorAlert.textContent = 'Please select a document file to upload.';
+        errorAlert.classList.remove('d-none');
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const formData = new FormData(form);
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Uploading...';
+
+    // Show persistent upload banner if available
+    if (window.uploadUI && typeof window.uploadUI.show === 'function') {
+        window.uploadUI.setHeaderTitle('NEW VERSION UPLOAD');
+        window.uploadUI.setTitle(file.name);
+        window.uploadUI.setSubtitle('Uploading replacement version...');
+        window.uploadUI.show();
+    }
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/documents/document/' + docId + '/new-version/', true);
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+    xhr.upload.onprogress = function(e) {
+        if (e.lengthComputable && window.uploadUI) {
+            window.uploadUI.handleUploadProgress(e.loaded, e.total);
+        }
+    };
+
+    xhr.onload = function() {
+        if (xhr.status >= 200 && xhr.status < 300) {
+            const data = JSON.parse(xhr.responseText);
+            if (data.success) {
+                // Close modal
+                const modalEl = document.getElementById('newVersionModal-' + docId);
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+
+                if (window.uploadUI) {
+                    window.uploadUI.setHeaderTitle('PROCESSING NEW VERSION');
+                    window.uploadUI.setSubtitle('Generating previews and search indexes...');
+                }
+
+                // Refresh current view using HTMX or location reload
+                if (window.htmx) {
+                    htmx.ajax('GET', window.location.pathname, '#page-content-target');
+                } else {
+                    window.location.reload();
+                }
+            } else {
+                errorAlert.textContent = data.error || 'Upload failed';
+                errorAlert.classList.remove('d-none');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-cloud-arrow-up me-1"></i> Upload Version';
+                if (window.uploadUI) window.uploadUI.showError(data.error || 'Upload failed');
+            }
+        } else {
+            let errorMsg = 'Upload failed with status ' + xhr.status;
+            try {
+                const res = JSON.parse(xhr.responseText);
+                if (res.error) errorMsg = res.error;
+            } catch(err) {}
+            errorAlert.textContent = errorMsg;
+            errorAlert.classList.remove('d-none');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-cloud-arrow-up me-1"></i> Upload Version';
+            if (window.uploadUI) window.uploadUI.showError(errorMsg);
+        }
+    };
+
+    xhr.onerror = function() {
+        errorAlert.textContent = 'Network error during upload. Please try again.';
+        errorAlert.classList.remove('d-none');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-cloud-arrow-up me-1"></i> Upload Version';
+        if (window.uploadUI) window.uploadUI.showError('Network error');
+    };
+
+    xhr.send(formData);
+}
+</script>
+

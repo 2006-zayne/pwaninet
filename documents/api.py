@@ -3,9 +3,11 @@
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAuthenticatedOrReadOnly
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q, Count
+from users.models import GlobalRole
+from .permissions import IsDocumentUploaderOrAdmin
 
 from .models import (
     # Academic Domain
@@ -123,12 +125,20 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
 
 class DocumentViewSet(viewsets.ModelViewSet):
     """API endpoint for documents."""
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticatedOrReadOnly, IsDocumentUploaderOrAdmin]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['category', 'visibility', 'status', 'language']
     search_fields = ['title', 'description']
     ordering_fields = ['created_at', 'updated_at', 'published_at', 'title']
     ordering = ['-created_at']
+    
+    def get_permissions(self):
+        """Dynamic permissions based on action."""
+        if self.action in ['view', 'download', 'stats']:
+            return [AllowAny()]
+        elif self.action in ['bookmark', 'rate']:
+            return [IsAuthenticated()]
+        return [IsAuthenticatedOrReadOnly(), IsDocumentUploaderOrAdmin()]
     
     def get_queryset(self):
         """Filter queryset based on user and status."""
@@ -139,19 +149,36 @@ class DocumentViewSet(viewsets.ModelViewSet):
             'document_tags__tag',
         )
         
-        # Filter by status - only show ready documents publicly
-        if not self.request.user.is_authenticated:
-            queryset = queryset.filter(
+        user = self.request.user
+        if not user.is_authenticated:
+            return queryset.filter(
                 status='ready',
                 visibility='public'
             )
-        else:
-            # Authenticated users can see their own drafts
-            queryset = queryset.filter(
-                Q(status='ready') | Q(uploaded_by=self.request.user)
-            )
         
-        return queryset
+        # Staff, superusers, and executive student leaders can view all documents
+        if user.is_staff or user.is_superuser or getattr(user, 'global_role', None) in [GlobalRole.PRESIDENT, GlobalRole.DELEGATE]:
+            return queryset
+        
+        # Authenticated users can see ready public documents or their own uploads
+        return queryset.filter(
+            Q(status='ready', visibility='public') | Q(uploaded_by=user)
+        )
+    
+    def perform_create(self, serializer):
+        """Set uploaded_by on document creation."""
+        serializer.save(uploaded_by=self.request.user)
+
+    def perform_destroy(self, instance):
+        """
+        Soft-delete document by archiving unless hard_delete=true is requested by staff.
+        """
+        hard_delete = self.request.query_params.get('hard_delete', 'false').lower() == 'true'
+        if hard_delete and (self.request.user.is_staff or self.request.user.is_superuser):
+            instance.delete()
+        else:
+            instance.status = 'archived'
+            instance.save(update_fields=['status'])
     
     def get_serializer_class(self):
         """Return appropriate serializer based on action."""

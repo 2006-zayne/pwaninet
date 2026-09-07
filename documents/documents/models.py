@@ -178,6 +178,11 @@ class Document(models.Model):
         default='draft',
         help_text="Document processing status"
     )
+    is_available = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Whether this document is available for viewing/downloading"
+    )
     
     # Metadata
     uploaded_by = models.ForeignKey(
@@ -201,6 +206,7 @@ class Document(models.Model):
         indexes = [
             models.Index(fields=['slug']),
             models.Index(fields=['status']),
+            models.Index(fields=['is_available']),
             models.Index(fields=['visibility']),
             models.Index(fields=['category']),
             models.Index(fields=['uploaded_by']),
@@ -216,6 +222,22 @@ class Document(models.Model):
             self.slug = slugify(self.title)
         super().save(*args, **kwargs)
     
+    def archive(self):
+        """Soft-delete document by marking as archived."""
+        self.status = 'archived'
+        self.save(update_fields=['status'])
+
+    def toggle_availability(self):
+        """Toggle the availability of the document."""
+        self.is_available = not self.is_available
+        self.save(update_fields=['is_available'])
+        return self.is_available
+
+    @property
+    def is_processing(self) -> bool:
+        """Check if the document is currently in processing state."""
+        return self.status == 'processing'
+
     @property
     def latest_version(self):
         """Get the latest version of this document."""

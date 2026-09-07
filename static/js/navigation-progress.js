@@ -151,82 +151,131 @@
         console.log('[NavigationProgress] Cancelled');
     }
 
-    // Intercept navigation to start progress bar
+    // Intercept navigation to start progress bar.
+    // Only fires for genuine full-page navigations (href links NOT managed by HTMX).
+    // HTMX-managed navigation is handled separately via htmx events.
     function interceptNavigation() {
         document.addEventListener('click', function(event) {
             const link = event.target.closest('a');
             if (!link) return;
-            
+
             const href = link.getAttribute('href');
-            
-            // Skip if: external, anchor, HTMX, JS, target blank
-            if (!href || 
-                href.startsWith('http') && !href.startsWith(window.location.origin) ||
+
+            // Skip non-navigating links
+            if (!href ||
                 href.startsWith('#') ||
-                link.hasAttribute('hx-get') || 
-                link.hasAttribute('hx-post') ||
                 href.startsWith('javascript:') ||
-                link.getAttribute('target') === '_blank') {
+                link.getAttribute('target') === '_blank' ||
+                link.getAttribute('target') === 'pwaninet-download-target' ||
+                link.hasAttribute('download') ||
+                link.dataset.apkDownload) {
                 return;
             }
-            
-            // Check if this is a back navigation (browser history)
+
+            // Skip HTMX-enhanced links — htmx:beforeRequest handles those
+            if (link.hasAttribute('hx-get') ||
+                link.hasAttribute('hx-post') ||
+                link.hasAttribute('hx-put') ||
+                link.hasAttribute('hx-delete') ||
+                link.hasAttribute('hx-patch') ||
+                link.closest('[hx-boost="true"]') ||
+                link.closest('[data-hx-boost="true"]')) {
+                return;
+            }
+
+            // Skip modifier keys (open in new tab, etc.)
             if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
                 return;
             }
-            
-            const isSameOrigin = href.startsWith(window.location.origin) || href.startsWith('/');
-            
-            if (isSameOrigin) {
-                console.log('[NavigationProgress] Navigation detected to:', href);
+
+            // Skip external links
+            const isSameOrigin = href.startsWith('/') || href.startsWith(window.location.origin);
+            if (!isSameOrigin) return;
+
+            console.log('[NavigationProgress] Full-page navigation detected to:', href);
+            startNavigationProgress();
+        });
+    }
+
+    // Hook HTMX lifecycle — this is the primary path for HTMX SPA navigation
+    function hookHtmxEvents() {
+        // Start bar when any HTMX request kicks off
+        document.addEventListener('htmx:beforeRequest', function(evt) {
+            // Only show for main page-content swaps, not small partial fetches
+            const target = evt.detail && evt.detail.target;
+            const isPageNav = target && (
+                target.id === 'page-content-target' ||
+                target.id === 'main-content' ||
+                target.id === 'content'
+            );
+            if (isPageNav) {
+                console.log('[NavigationProgress] HTMX request starting');
                 startNavigationProgress();
             }
         });
-    }
 
-    // Handle browser navigation
-    function handleBrowserNavigation() {
-        // Handle popstate (back/forward buttons)
-        window.addEventListener('popstate', function() {
-            console.log('[NavigationProgress] Popstate detected, cancelling progress bar');
+        // Complete bar on successful HTMX swap
+        document.addEventListener('htmx:afterSwap', function(evt) {
+            const target = evt.detail && evt.detail.target;
+            const isPageNav = target && (
+                target.id === 'page-content-target' ||
+                target.id === 'main-content' ||
+                target.id === 'content'
+            );
+            if (isPageNav) {
+                console.log('[NavigationProgress] HTMX swap completed');
+                completeNavigationProgress();
+            }
+        });
+
+        // Cancel bar on HTMX errors
+        document.addEventListener('htmx:responseError', function() {
+            console.warn('[NavigationProgress] HTMX response error, cancelling progress');
             cancelNavigationProgress();
         });
+
+        document.addEventListener('htmx:sendError', function() {
+            console.warn('[NavigationProgress] HTMX send error, cancelling progress');
+            cancelNavigationProgress();
+        });
+
+        // Complete bar on HTMX history restore
+        document.addEventListener('htmx:historyRestore', function() {
+            console.log('[NavigationProgress] HTMX history restore');
+            completeNavigationProgress();
+        });
     }
 
-    // Monitor page load to complete progress bar
-    function monitorPageLoad() {
-        window.addEventListener('load', function() {
-            console.log('[NavigationProgress] Window load event fired');
-            
-            // Check if this is a navigation (not initial load)
-            const navigationEntries = performance.getEntriesByType('navigation');
-            const isNavigation = navigationEntries.length > 0 && 
-                               (navigationEntries[0].type === 'navigate' || 
-                                navigationEntries[0].type === 'reload');
-            
-            if (isNavigation) {
-                console.log('[NavigationProgress] Page load detected, completing progress bar');
-                completeNavigationProgress();
-            }
+    // Handle browser back/forward buttons
+    function handleBrowserNavigation() {
+        window.addEventListener('popstate', function() {
+            // popstate fires immediately on back/forward; complete bar quickly
+            completeNavigationProgress();
         });
-        
-        // Failsafe: ensure progress bar doesn't get stuck
-        setTimeout(function() {
+    }
+
+    // Failsafe: complete the bar if it's been stuck for more than 8s
+    function installFailsafe() {
+        setInterval(function() {
             const progressContainer = document.getElementById('navigation-progress');
             if (progressContainer && progressContainer.classList.contains('active')) {
-                console.warn('[NavigationProgress] Force completing progress bar after timeout');
-                completeNavigationProgress();
+                const elapsed = progressStartTime ? Date.now() - progressStartTime : 0;
+                if (elapsed > 8000) {
+                    console.warn('[NavigationProgress] Failsafe: force-completing stuck progress bar after', elapsed, 'ms');
+                    completeNavigationProgress();
+                }
             }
-        }, 5000); // 5 second failsafe
+        }, 2000);
     }
 
     // Initialize
     function init() {
         console.log('[NavigationProgress] Initializing navigation progress bar');
-        
+
         interceptNavigation();
+        hookHtmxEvents();
         handleBrowserNavigation();
-        monitorPageLoad();
+        installFailsafe();
     }
 
     // Public API
@@ -240,3 +289,4 @@
     init();
 
 })();
+

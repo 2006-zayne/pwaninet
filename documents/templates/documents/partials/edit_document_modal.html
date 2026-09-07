@@ -1,0 +1,136 @@
+{% load static %}
+<div class="modal fade" id="editDocumentModal-{{ document.id }}" tabindex="-1" aria-labelledby="editDocumentModalLabel-{{ document.id }}" aria-hidden="true" style="z-index: 1060;">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content" style="border-radius: 16px; border: 1px solid var(--border); background: var(--card-bg);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border); padding: 16px 24px;">
+                <h5 class="modal-title" id="editDocumentModalLabel-{{ document.id }}" style="font-weight: 600; font-size: 1.15rem; color: var(--text-dark); margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <i class="bi bi-pencil-square" style="color: var(--primary);"></i>
+                    Edit Document Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{% url 'documents:edit_document' document.id %}" 
+                  method="post"
+                  hx-post="{% url 'documents:edit_document' document.id %}"
+                  hx-target="#page-content-target"
+                  hx-swap="innerHTML"
+                  onsubmit="const m = bootstrap.Modal.getInstance(document.getElementById('editDocumentModal-{{ document.id }}')); if (m) m.hide();">
+                {% csrf_token %}
+                <div class="modal-body" style="padding: 24px; max-height: 70vh; overflow-y: auto;">
+                    <!-- Title -->
+                    <div class="mb-3">
+                        <label for="edit-title-{{ document.id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
+                            Document Title <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="edit-title-{{ document.id }}" 
+                               name="title" 
+                               value="{{ document.title }}" 
+                               required
+                               style="border-radius: 10px; border-color: var(--border); background: var(--input-bg); color: var(--text-dark);">
+                    </div>
+
+                    <!-- Category & Visibility Row -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="edit-category-{{ document.id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
+                                Category <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" 
+                                    id="edit-category-{{ document.id }}" 
+                                    name="category" 
+                                    required
+                                    style="border-radius: 10px; border-color: var(--border); background: var(--input-bg); color: var(--text-dark);">
+                                {% for cat in categories %}
+                                    <option value="{{ cat.id }}" {% if cat.id == document.category.id %}selected{% endif %}>
+                                        {{ cat.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit-visibility-{{ document.id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
+                                Visibility
+                            </label>
+                            <select class="form-select" 
+                                    id="edit-visibility-{{ document.id }}" 
+                                    name="visibility"
+                                    style="border-radius: 10px; border-color: var(--border); background: var(--input-bg); color: var(--text-dark);">
+                                <option value="public" {% if document.visibility == 'public' %}selected{% endif %}>Public (All Students)</option>
+                                <option value="private" {% if document.visibility == 'private' %}selected{% endif %}>Private (Only Me)</option>
+                                <option value="restricted" {% if document.visibility == 'restricted' %}selected{% endif %}>Restricted (Course Only)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Academic Unit & Language Row -->
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label for="edit-unit-{{ document.id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
+                                Academic Unit / Course Code
+                            </label>
+                            <select class="form-select" 
+                                    id="edit-unit-{{ document.id }}" 
+                                    name="academic_unit"
+                                    style="border-radius: 10px; border-color: var(--border); background: var(--input-bg); color: var(--text-dark);">
+                                <option value="">-- Select Academic Unit --</option>
+                                {% for unit in academic_units %}
+                                    <option value="{{ unit.id }}" {% if primary_academic_unit and primary_academic_unit.academic_unit.id == unit.id %}selected{% endif %}>
+                                        {{ unit.code }} - {{ unit.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="edit-lang-{{ document.id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
+                                Language
+                            </label>
+                            <select class="form-select" 
+                                    id="edit-lang-{{ document.id }}" 
+                                    name="language"
+                                    style="border-radius: 10px; border-color: var(--border); background: var(--input-bg); color: var(--text-dark);">
+                                <option value="en" {% if document.language == 'en' %}selected{% endif %}>English</option>
+                                <option value="sw" {% if document.language == 'sw' %}selected{% endif %}>Swahili</option>
+                                <option value="fr" {% if document.language == 'fr' %}selected{% endif %}>French</option>
+                                <option value="other" {% if document.language == 'other' %}selected{% endif %}>Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="mb-3">
+                        <label for="edit-desc-{{ document.id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
+                            Description
+                        </label>
+                        <textarea class="form-control" 
+                                  id="edit-desc-{{ document.id }}" 
+                                  name="description" 
+                                  rows="4" 
+                                  placeholder="Describe the content, chapters covered, syllabus week, or tips for peers..."
+                                  style="border-radius: 10px; border-color: var(--border); background: var(--input-bg); color: var(--text-dark); resize: vertical;">{{ document.description }}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid var(--border); padding: 16px 24px;">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="border-radius: 10px; font-weight: 500;">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary" style="border-radius: 10px; font-weight: 600; padding: 8px 24px;">
+                        <i class="bi bi-check2 me-1"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const modalEl = document.getElementById('editDocumentModal-{{ document.id }}');
+    if (modalEl) {
+        const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+})();
+</script>
+

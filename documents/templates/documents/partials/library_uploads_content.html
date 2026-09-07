@@ -34,7 +34,15 @@
 {% include 'documents/partials/library_tabs.html' with active_tab='uploads' %}
 
 <!-- Uploads Grid -->
-<div class="doc-uploads-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+<div class="doc-uploads-grid" 
+     {% if has_processing_uploads %}
+     hx-get="{% url 'documents:my_uploads' %}"
+     hx-trigger="every 4s"
+     hx-select=".doc-uploads-grid"
+     hx-target="this"
+     hx-swap="outerHTML"
+     {% endif %}
+     style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
     {% for document in documents %}
         {% include 'documents/partials/document_card.html' %}
     {% empty %}

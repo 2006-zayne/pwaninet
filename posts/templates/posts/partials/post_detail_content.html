@@ -278,17 +278,17 @@
             </div>
         </div>
 
-        <div class="{% if post.gradient_class != 'none' %}{{ post.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %} {% if post.has_signature %}signature-overlay{% endif %}"
-             {% if post.gradient_class == 'bg-username-pattern' %}
+        <div class="{% if post.gradient_class != 'none' and not post.shared_document %}{{ post.gradient_class }} gradient-intel-bg text-center{% else %}px-3 pb-3{% endif %} {% if post.has_signature %}signature-overlay{% endif %}"
+             {% if post.gradient_class == 'bg-username-pattern' and not post.shared_document %}
                  style="background: linear-gradient(135deg, {{ post.custom_gradient_color1|default:'#141E30' }} 0%, {{ post.custom_gradient_color2|default:'#243B55' }} 100%); color: {{ post.custom_gradient_text_color|default:'#ffffff' }};"
              {% endif %}>
-            {% if post.gradient_class == 'bg-username-pattern' %}
+            {% if post.gradient_class == 'bg-username-pattern' and not post.shared_document %}
                 {% include "posts/partials/username_pattern_svg.html" with author_name=post.custom_gradient_text|default:post.author.username color1=post.custom_gradient_color1 color2=post.custom_gradient_color2 text_color=post.custom_gradient_text_color %}
-            {% elif post.has_signature %}
+            {% elif post.has_signature and not post.shared_document %}
                 {% include "posts/partials/signature_svg.html" with author_name=post.author.username %}
             {% endif %}
-            <p class="mb-0 {% if post.gradient_class != 'none' %}text-white fw-bold fs-3{% else %}text-dark{% endif %}"
-               style="{% if post.gradient_class == 'none' %}font-size: 15px;{% endif %} line-height: 1.5; position: relative; z-index: 1;">
+            <p class="mb-0 {% if post.gradient_class != 'none' and not post.shared_document %}text-white fw-bold fs-3{% else %}text-dark{% endif %}"
+               style="{% if post.gradient_class == 'none' or post.shared_document %}font-size: 15px;{% endif %} line-height: 1.5; position: relative; z-index: 1;">
                 {{ post.content }}
             </p>
         </div>

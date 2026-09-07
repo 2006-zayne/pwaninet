@@ -217,6 +217,22 @@ class NotificationMessageEngine:
                 "HISTORICAL": "{actors} posted new updates.",
                 "SUMMARY": "New posts from people you follow",
             },
+            "DOCUMENT_SHARED": {
+                "SINGLE": "{actor} shared a document to view: {document_title}.",
+                "DUAL": "{actor1} and {actor2} shared documents to view.",
+                "FEW": "{actors} and {others} others shared documents to view.",
+                "MANY": "{actors} and {others} others shared documents to view.",
+                "HISTORICAL": "{actors} shared documents to view.",
+                "SUMMARY": "New documents from people you follow",
+            },
+            "POST_DOCUMENT_SHARED": {
+                "SINGLE": "{actor} shared a document to view: {document_title}.",
+                "DUAL": "{actor1} and {actor2} shared documents to view.",
+                "FEW": "{actors} and {others} others shared documents to view.",
+                "MANY": "{actors} and {others} others shared documents to view.",
+                "HISTORICAL": "{actors} shared documents to view.",
+                "SUMMARY": "New documents from people you follow",
+            },
             "POST_REPOSTED": {
                 "SINGLE": "{actor} reposted your post.",
                 "DUAL": "{actor1} and {actor2} reposted your post.",
@@ -361,10 +377,15 @@ class NotificationMessageEngine:
             context["document"] = "a document"
             context["post"] = "a post"
             context["title"] = ""
+            context["document_title"] = "a document"
             if resource_data:
                 context["document"] = resource_data.get('title') or "a document"
                 context["post"] = resource_data.get('title') or "a post"
                 context["title"] = resource_data.get('title') or ""
+                context["document_title"] = context["document"]
+            if payload.get('raw_data', {}).get('document_title'):
+                context["document_title"] = payload['raw_data']['document_title']
+                context["document"] = context["document_title"]
             
             # Generate the message
             message = template.format(**context)
@@ -445,10 +466,12 @@ class NotificationMessageEngine:
         context["document"] = "a document"
         context["post"] = "a post"
         context["title"] = ""
+        context["document_title"] = "a document"
         if payload.resource:
             context["document"] = payload.resource.title or "a document"
             context["post"] = payload.resource.title or "a post"
             context["title"] = payload.resource.title or ""
+            context["document_title"] = context["document"]
         
         # Add additional variables from payload
         context.update(variables)
@@ -456,6 +479,9 @@ class NotificationMessageEngine:
         # Add raw_data variables (contains event metadata like version for releases)
         if payload.raw_data:
             context.update(payload.raw_data)
+            if payload.raw_data.get('document_title'):
+                context["document_title"] = payload.raw_data.get('document_title')
+                context["document"] = context["document_title"]
         
         # Add metadata variables for release notifications
         if payload.metadata:

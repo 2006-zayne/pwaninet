@@ -164,23 +164,40 @@ def post_created(sender, instance, created, **kwargs):
         
         # Get thumbnail URL for notification preview
         thumbnail_url = None
-        if instance.thumbnail:
-            thumbnail_url = instance.thumbnail.url
+        if instance.shared_document:
+            try:
+                thumbnail_url = instance.shared_document.thumbnail_url or instance.shared_document.preview_url
+                if not thumbnail_url and instance.shared_document.latest_version:
+                    first_file = instance.shared_document.latest_version.files.first()
+                    if first_file:
+                        thumbnail_url = first_file.thumbnail_url or first_file.preview_url
+            except Exception:
+                pass
+        elif instance.thumbnail:
+            try:
+                thumbnail_url = instance.thumbnail.url
+            except Exception:
+                thumbnail_url = str(instance.thumbnail)
         elif instance.images.exists():
             thumbnail_url = instance.images.first().get_thumbnail_url('400')
         elif instance.video_poster:
             thumbnail_url = instance.video_poster.url
-        elif instance.shared_document:
-            try:
-                from documents.models import DocumentFile
-                if instance.shared_document.latest_version:
-                    first_file = instance.shared_document.latest_version.files.first()
-                    if first_file and first_file.preview_path:
-                        thumbnail_url = f"/media/{first_file.preview_path}"
-            except:
-                pass
         
         logger.info(f'[post_created] Publishing event for new post by {instance.author.username}')
+        
+        metadata = {
+            'actor_username': instance.author.username,
+            'post_content': instance.content[:100] if instance.content else '',
+            'thumbnail_url': thumbnail_url,
+            'resource_type': 'POST',
+            'target_type': 'Post',
+            'target_id': str(instance.id),
+            'group_id': str(instance.group.id) if instance.group else None,
+        }
+        if instance.shared_document:
+            metadata['is_document_share'] = True
+            metadata['shared_document_id'] = str(instance.shared_document.id)
+            metadata['document_title'] = instance.shared_document.title
         
         publish_event(
             event_type=EventTypes.POSTS_POST_CREATED.value,
@@ -189,15 +206,9 @@ def post_created(sender, instance, created, **kwargs):
             actor=instance.author,
             target_type='Post',
             target_id=str(instance.id),
-            context_type='POST',
-            context_id=str(instance.id),
-            metadata={
-                'actor_username': instance.author.username,
-                'post_content': instance.content[:100] if instance.content else '',
-                'thumbnail_url': thumbnail_url,
-                'resource_type': 'POST',
-                'group_id': str(instance.group.id) if instance.group else None,
-            }
+            context_type='GROUP' if instance.group else 'POST',
+            context_id=str(instance.group.id) if instance.group else str(instance.id),
+            metadata=metadata
         )
         
         logger.info(f'[post_created] Event published successfully')

@@ -441,7 +441,11 @@ class UnifiedSearchService:
         from documents.search.models import DocumentSearchIndex
 
         filters = filters or {}
-        base_qs = DocumentSearchIndex.objects.filter(document__status='ready')
+        base_qs = DocumentSearchIndex.objects.filter(
+            document__status='ready',
+            document__is_available=True,
+            document__visibility='public'
+        )
 
         # Academic, category, and metadata filters
         category = filters.get('category')
@@ -631,7 +635,11 @@ class UnifiedSearchService:
         from django.contrib.postgres.search import TrigramWordSimilarity
         from documents.search.models import DocumentSearchIndex
         try:
-            suggestions = DocumentSearchIndex.objects.filter(document__status='ready').annotate(
+            suggestions = DocumentSearchIndex.objects.filter(
+                document__status='ready',
+                document__is_available=True,
+                document__visibility='public'
+            ).annotate(
                 similarity=TrigramWordSimilarity(Value(query), 'title')
             ).filter(similarity__gte=0.22).order_by('-similarity')[:limit]
             results = []
@@ -645,12 +653,22 @@ class UnifiedSearchService:
                 if t and t not in results:
                     results.append(t)
             if not results:
-                raw_matches = list(DocumentSearchIndex.objects.filter(title__icontains=query).values_list('title', flat=True)[:limit])
+                raw_matches = list(DocumentSearchIndex.objects.filter(
+                    document__status='ready',
+                    document__is_available=True,
+                    document__visibility='public',
+                    title__icontains=query
+                ).values_list('title', flat=True)[:limit])
                 results = [re.sub(r'[_\-]+', ' ', m).strip() for m in raw_matches]
             return results
         except Exception as exc:
             logger.warning("get_document_suggestions error: %s", exc)
-            return list(DocumentSearchIndex.objects.filter(title__icontains=query).values_list('title', flat=True)[:limit])
+            return list(DocumentSearchIndex.objects.filter(
+                document__status='ready',
+                document__is_available=True,
+                document__visibility='public',
+                title__icontains=query
+            ).values_list('title', flat=True)[:limit])
 
     def get_document_did_you_mean(self, query: str) -> Optional[str]:
         """Get spelling correction suggestion for document searches using fuzzy matching."""
@@ -661,12 +679,20 @@ class UnifiedSearchService:
         from django.contrib.postgres.search import TrigramWordSimilarity
         from documents.search.models import DocumentSearchIndex
         try:
-            best = DocumentSearchIndex.objects.filter(document__status='ready').annotate(
+            best = DocumentSearchIndex.objects.filter(
+                document__status='ready',
+                document__is_available=True,
+                document__visibility='public'
+            ).annotate(
                 sim=TrigramWordSimilarity(Value(query), 'title')
             ).filter(sim__gte=0.22).order_by('-sim').first()
 
             if not best:
-                best = DocumentSearchIndex.objects.filter(document__status='ready').annotate(
+                best = DocumentSearchIndex.objects.filter(
+                    document__status='ready',
+                    document__is_available=True,
+                    document__visibility='public'
+                ).annotate(
                     sim=TrigramWordSimilarity(Value(query), 'searchable_text')
                 ).filter(sim__gte=0.25).order_by('-sim').first()
 

@@ -1174,6 +1174,20 @@ class UploadUI {
     getBanner() {
         return this.banner;
     }
+
+    // Direct proxy methods to inner banner
+    show() { return this.banner.show(); }
+    hide() { return this.banner.hide(); }
+    reset() { return this.banner.reset(); }
+    setHeaderTitle(text, phaseClass) { return this.banner.setHeaderTitle(text, phaseClass); }
+    setTitle(text) { return this.banner.setTitle(text); }
+    setSubtitle(text) { return this.banner.setSubtitle(text); }
+    updateProgress(percent) { return this.banner.updateProgress(percent); }
+    setProgressFillClass(className) { return this.banner.setProgressFillClass(className); }
+    updateMiniText(text) { return this.banner.updateMiniText(text); }
+    showError(message, canRetry) { return this.banner.showError(message, canRetry); }
+    showCompletion() { return this.banner.showCompletion(); }
+    handleUploadProgress(data) { return this.banner.handleUploadProgress(data); }
 }
 
 // Global upload UI instance

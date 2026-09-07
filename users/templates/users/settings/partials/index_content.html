@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n static %}
 
 <div class="page-header">
   <a href="{% url 'users:profile' request.user.username %}" class="back-link" hx-get="{% url 'users:profile' request.user.username %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true">
@@ -22,11 +22,256 @@
   {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_about' icon_class='bi-info-circle' title='About PwaniNet' subtitle='Version, support, licenses...' is_htmx=True %}
 </div>
 
+<!-- Mobile App Download Card (hidden inside native container) -->
+<div class="settings-app-download-card apk-download-card native-app-hidden" id="settings-apk-download-card">
+  <div class="settings-app-download-inner">
+    <div class="settings-app-download-icon">
+      <img src="{% static 'images/pwaninet-app-icon.png' %}" alt="PwaniNet" width="48" height="48" style="border-radius:12px; object-fit: cover;" />
+    </div>
+    <div class="settings-app-download-content">
+      <div class="settings-app-download-title">
+        <span>{% trans "Download PwaniNet Mobile App" %}</span>
+        <span class="settings-app-badge">APK</span>
+      </div>
+      <p class="settings-app-download-desc">
+        {% trans "Install the official native Android app for faster performance, smoother animations, and instant background push notifications." %}
+      </p>
+      <div class="settings-app-download-meta">
+        <span><i class="bi bi-check2-circle text-primary me-1"></i>{% trans "Version" %} {{ app_version|default:"1.0.0" }}</span>
+        <span>•</span>
+        <span>{% trans "Direct APK Download" %}</span>
+      </div>
+    </div>
+    <div class="settings-app-download-action">
+      <!-- Mobile: Direct APK Download Link (targets hidden iframe for zero page reload) -->
+      <a href="{% url 'download_android_apk' %}" target="pwaninet-download-target" data-apk-download="true" class="btn btn-primary btn-sm d-inline-flex d-md-none align-items-center" download="pwaninet.apk" hx-boost="false">
+        <i class="bi bi-download me-1"></i> {% trans "Download APK" %}
+      </a>
+      <!-- Desktop: Install on your phone Modal Trigger -->
+      <button type="button" class="btn btn-primary btn-sm d-none d-md-inline-flex align-items-center" data-bs-toggle="modal" data-bs-target="#qrInstallModal" onclick="if (typeof window.renderDesktopQRCode === 'function') window.renderDesktopQRCode();">
+        <i class="bi bi-qr-code-scan me-1"></i> {% trans "Install on your phone" %}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden download target iframe to prevent top-level page reloads on 302 downloads -->
+<iframe name="pwaninet-download-target" id="pwaninet-download-target" style="display:none; width:0; height:0; border:0;" aria-hidden="true"></iframe>
+
+<!-- Desktop QR Install Modal -->
+<div class="modal fade" id="qrInstallModal" tabindex="-1" aria-labelledby="qrInstallModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+      <div class="modal-header border-0 pb-0 pt-4 px-4 align-items-center">
+        <h5 class="modal-title fw-bold" id="qrInstallModalTitle">
+          <i class="bi bi-phone text-primary me-2"></i>{% trans "Install PwaniNet on Android" %}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+      </div>
+      <div class="modal-body px-4 py-3 text-center">
+        <!-- QR Code — pure white card so dark-mode never inverts the modules -->
+        <div class="d-inline-flex flex-column align-items-center justify-content-center p-3 my-2 rounded-3 shadow-sm"
+             style="background: #ffffff !important; border: 1px solid #e2e8f0; width: 200px; height: 200px; margin: 0 auto;">
+          <img src="{% url 'qr_code_svg' %}"
+               alt="{% trans 'PwaniNet APK QR Code' %}"
+               width="176"
+               height="176"
+               style="display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #ffffff;"
+               loading="lazy">
+        </div>
+        <p class="text-muted small mt-2 mb-3">
+          {% trans "Point your phone's camera or QR scanner at the code above." %}
+        </p>
+
+        <!-- 3-Step Sideloading Instructions -->
+        <div class="qr-steps text-start p-3 rounded-3 mb-3" style="background: var(--bg-tertiary, #f8fafc); border: 1px solid var(--border, #e2e8f0);">
+          <div class="d-flex align-items-start mb-2">
+            <span class="badge rounded-circle bg-primary text-white me-2" style="width: 22px; height: 22px; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">1</span>
+            <span class="small text-secondary">{% trans "Scan the QR code and tap Download APK." %}</span>
+          </div>
+          <div class="d-flex align-items-start mb-2">
+            <span class="badge rounded-circle bg-primary text-white me-2" style="width: 22px; height: 22px; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">2</span>
+            <span class="small text-secondary">{% trans "If prompted by Chrome, select Download anyway." %}</span>
+          </div>
+          <div class="d-flex align-items-start">
+            <span class="badge rounded-circle bg-primary text-white me-2" style="width: 22px; height: 22px; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">3</span>
+            <span class="small text-secondary">{% trans "Open the downloaded file and tap Install." %}</span>
+          </div>
+        </div>
+
+        <!-- Copyable Link Input -->
+        <div class="input-group mb-2">
+          <span class="input-group-text bg-transparent border-end-0 text-muted">
+            <i class="bi bi-link-45deg"></i>
+          </span>
+          <input type="text" id="qr-modal-link-input" class="form-control border-start-0 border-end-0 small" value="https://pwaninet.app/apk/" readonly style="font-size: 0.85rem; background: transparent;">
+          <button class="btn btn-outline-primary btn-sm px-3" type="button" id="qr-modal-copy-btn">
+            <i class="bi bi-clipboard me-1"></i>{% trans "Copy" %}
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0 pb-4 px-4 justify-content-center">
+        <span class="text-muted small">
+          {% trans "Downloading on this device?" %} 
+          <a href="{% url 'download_android_apk' %}" target="pwaninet-download-target" data-apk-download="true" class="text-primary text-decoration-none fw-semibold" hx-boost="false">
+            {% trans "Download directly on your computer" %}
+          </a>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <style>
   .settings-list-container {
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     overflow: hidden;
+  }
+
+  .settings-app-download-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 12px);
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .settings-app-download-inner {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  .settings-app-download-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: var(--primary-light, #dbeafe);
+    color: var(--primary, #2563eb);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    flex-shrink: 0;
+  }
+
+  [data-theme="dark"] .settings-app-download-icon {
+    background: var(--primary-light, #312e81);
+    color: #a5b4fc;
+  }
+
+  .settings-app-download-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .settings-app-download-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary, var(--text-dark));
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .settings-app-badge {
+    background: var(--primary-light, #dbeafe);
+    color: var(--primary, #2563eb);
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  [data-theme="dark"] .settings-app-badge {
+    background: var(--primary-light, #312e81);
+    color: #a5b4fc;
+  }
+
+  .settings-app-download-desc {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+  }
+
+  .settings-app-download-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .settings-app-download-action {
+    flex-shrink: 0;
+  }
+
+  .settings-app-download-action .btn {
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 576px) {
+    .settings-app-download-inner {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+    .settings-app-download-action {
+      width: 100%;
+    }
+    .settings-app-download-action .btn {
+      width: 100%;
+    }
+  }
+
+  /* Automatically hide if user is running inside native app container */
+  .is-native-app .native-app-hidden,
+  .is-capacitor .native-app-hidden {
+    display: none !important;
+  }
+
+  /* Desktop QR Install Modal Dark Theme */
+  [data-theme="dark"] #qrInstallModal .modal-content {
+    background-color: var(--card-bg, #1e293b);
+    border: 1px solid var(--border, #334155);
+    color: var(--text-primary, #f8fafc);
+  }
+
+  [data-theme="dark"] #qrInstallModal .modal-title {
+    color: var(--text-primary, #f8fafc) !important;
+  }
+
+  [data-theme="dark"] #qrInstallModal .qr-steps {
+    background: var(--bg-secondary, #0f172a) !important;
+    border-color: var(--border, #334155) !important;
+  }
+
+  [data-theme="dark"] #qrInstallModal .qr-steps .text-secondary {
+    color: var(--text-secondary, #cbd5e1) !important;
+  }
+
+  [data-theme="dark"] #qrInstallModal .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+  }
+
+  [data-theme="dark"] #qrInstallModal #qr-modal-link-input {
+    color: var(--text-primary, #f8fafc);
+    border-color: var(--border, #334155);
+  }
+
+  [data-theme="dark"] #qrInstallModal .input-group-text {
+    border-color: var(--border, #334155);
+    color: var(--text-muted, #94a3b8);
   }
 </style>

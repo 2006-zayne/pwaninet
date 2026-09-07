@@ -31,6 +31,13 @@ urlpatterns = [
     # Document Details
     path('document/<int:document_id>/', views.document_detail, name='document_detail'),
     
+    # Document Management
+    path('document/<int:document_id>/edit/', views.edit_document, name='edit_document'),
+    path('document/<int:document_id>/delete/', views.delete_document, name='delete_document'),
+    path('document/<int:document_id>/toggle-availability/', views.toggle_document_availability, name='toggle_availability'),
+    path('document/<int:document_id>/new-version/', views.upload_new_version, name='new_version'),
+    path('document/<int:document_id>/delete-modal/', views.delete_document_modal, name='delete_document_modal'),
+    
     # Upload Flow
     path('upload/', views.upload_document, name='upload'),
     path('upload/progress/', views.upload_progress, name='upload_progress'),
@@ -49,6 +56,7 @@ urlpatterns = [
     path('document/<int:document_id>/download/', views.track_download, name='track_download'),
     path('document/<int:document_id>/share/', views.share_document, name='share_document'),
     path('document/<int:document_id>/stats/', views.document_stats, name='document_stats'),
+    path('user-groups/', views.user_groups_for_sharing, name='user_groups_for_sharing'),
     
     # Academic HTMX Endpoints
     path('academic/', include('documents.academic.urls')),

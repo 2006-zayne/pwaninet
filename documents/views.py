@@ -1,12 +1,16 @@
-from django.shortcuts import render, get_object_or_404
+import logging
+from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.views.generic import TemplateView
 from django.contrib.auth.decorators import login_required
 from django.db import models
 from django.core.cache import cache
 from django.utils import timezone
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     Category,
@@ -304,6 +308,8 @@ def document_detail(request, document_id):
     
     # Get or create analytics
     analytics, _ = DocumentAnalytics.objects.get_or_create(document=document)
+    can_manage = user_can_manage_document(request.user, document)
+    versions = document.versions.prefetch_related('files').order_by('-version_number')
     
     context = {
         'page_title': document.title,
@@ -313,6 +319,8 @@ def document_detail(request, document_id):
         'is_bookmarked': is_bookmarked,
         'user_rating': user_rating,
         'analytics': analytics,
+        'can_manage': can_manage,
+        'versions': versions,
         'document_content_partial': 'documents/partials/document_detail_content.html',
         'show_library_button': True,
         'show_upload_button': False,
@@ -322,11 +330,245 @@ def document_detail(request, document_id):
     return render(request, 'documents/document_detail.html', context)
 
 
+def user_can_manage_document(user, document) -> bool:
+    """Check if the user has permission to edit, delete, or manage the document."""
+    if not user or not user.is_authenticated:
+        return False
+    if document.uploaded_by_id == user.id:
+        return True
+    if user.is_staff or user.is_superuser:
+        return True
+    from users.models import GlobalRole
+    if getattr(user, 'global_role', None) in [GlobalRole.PRESIDENT, GlobalRole.DELEGATE]:
+        return True
+    return False
+
+
+@login_required
+def edit_document(request, document_id):
+    """Edit document metadata (title, description, category, academic unit, visibility, language)."""
+    document = Document.objects.filter(id=document_id).first()
+    if not document:
+        return JsonResponse({'success': False, 'error': 'Document not found'}, status=404)
+
+    if not user_can_manage_document(request.user, document):
+        return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+
+    from .academic.models import AcademicUnit, Programme
+    from .models import DocumentAcademicUnit
+
+    if request.method == 'GET':
+        categories = Category.objects.filter(is_active=True).order_by('name')
+        programmes = Programme.objects.filter(is_active=True).order_by('name')
+        academic_units = AcademicUnit.objects.filter(is_active=True).order_by('name')
+        primary_academic_unit = document.academic_units.filter(is_primary=True).first()
+
+        context = {
+            'document': document,
+            'categories': categories,
+            'programmes': programmes,
+            'academic_units': academic_units,
+            'primary_academic_unit': primary_academic_unit,
+        }
+        return render(request, 'documents/partials/edit_document_modal.html', context)
+
+    # POST update
+    title = request.POST.get('title', '').strip()
+    if not title:
+        return JsonResponse({'success': False, 'error': 'Title is required'}, status=400)
+
+    description = request.POST.get('description', '').strip()
+    category_id = request.POST.get('category')
+    visibility = request.POST.get('visibility', document.visibility)
+    language = request.POST.get('language', document.language)
+    academic_unit_id = request.POST.get('academic_unit')
+
+    if category_id:
+        try:
+            document.category = Category.objects.get(id=category_id)
+        except Category.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Invalid category'}, status=400)
+
+    document.title = title
+    document.description = description
+    if visibility in ['public', 'private', 'restricted']:
+        document.visibility = visibility
+    if language in ['en', 'sw', 'fr', 'other']:
+        document.language = language
+    document.save()
+
+    # Update academic unit
+    if academic_unit_id:
+        try:
+            unit = AcademicUnit.objects.get(id=academic_unit_id)
+            doc_unit = document.academic_units.filter(is_primary=True).first()
+            if doc_unit:
+                doc_unit.academic_unit = unit
+                doc_unit.save(update_fields=['academic_unit'])
+            else:
+                from .academic.models import Semester, AcademicYear as AcadYear
+                current_semester = Semester.objects.filter(is_current=True).first()
+                current_year = AcadYear.objects.filter(is_current=True).first()
+                if current_semester and current_year:
+                    DocumentAcademicUnit.objects.create(
+                        document=document,
+                        academic_unit=unit,
+                        semester=current_semester,
+                        academic_year=current_year,
+                        is_primary=True
+                    )
+                else:
+                    logger.warning(
+                        f"Cannot create DocumentAcademicUnit for document {document.id}: "
+                        "no current semester or academic year configured"
+                    )
+        except AcademicUnit.DoesNotExist:
+            pass
+
+    # Update search index
+    try:
+        from documents.services.search_service import SearchService
+        SearchService().index_document(document)
+    except Exception as e:
+        logger.warning(f"Error re-indexing document {document.id} after edit: {e}")
+
+    if request.headers.get('HX-Request'):
+        response = HttpResponse(status=200)
+        response['HX-Refresh'] = 'true'
+        return response
+
+    from django.contrib import messages
+    messages.success(request, 'Document updated successfully.')
+    return redirect('documents:document_detail', document_id=document.id)
+
+
+@login_required
+def delete_document_modal(request, document_id):
+    """Return confirmation modal HTML for document deletion."""
+    document = Document.objects.filter(id=document_id).first()
+    if not document:
+        return JsonResponse({'success': False, 'error': 'Document not found'}, status=404)
+
+    if not user_can_manage_document(request.user, document):
+        return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+
+    return render(request, 'documents/partials/delete_document_modal.html', {'document': document})
+
+
+@login_required
+def delete_document(request, document_id):
+    """Soft-delete a document (archive)."""
+    document = Document.objects.filter(id=document_id).first()
+    if not document:
+        return JsonResponse({'success': False, 'error': 'Document not found'}, status=404)
+
+    if not user_can_manage_document(request.user, document):
+        return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+
+    if request.method == 'POST':
+        document.archive()
+
+        # Remove from search index
+        try:
+            from documents.search.models import DocumentSearchIndex
+            DocumentSearchIndex.objects.filter(document=document).delete()
+        except Exception as e:
+            logger.warning(f"Error removing document {document.id} from search index: {e}")
+
+        from django.contrib import messages
+        messages.success(request, 'Document has been deleted.')
+
+        if request.headers.get('HX-Request'):
+            referer = request.META.get('HTTP_REFERER', '')
+            if f'/document/{document_id}' in referer:
+                return htmx_location_response(request.build_absolute_uri(reverse('documents:my_library')))
+            return HttpResponse(status=200)
+
+        return redirect('documents:my_library')
+
+    return JsonResponse({'error': 'POST required'}, status=405)
+
+
+@login_required
+def toggle_document_availability(request, document_id):
+    """Toggle document availability (mark unavailable / available)."""
+    document = Document.objects.filter(id=document_id).first()
+    if not document:
+        return JsonResponse({'success': False, 'error': 'Document not found'}, status=404)
+
+    if not user_can_manage_document(request.user, document):
+        return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+
+    if request.method == 'POST':
+        new_avail = document.toggle_availability()
+
+        try:
+            from documents.services.search_service import SearchService
+            SearchService().index_document(document)
+        except Exception as e:
+            logger.warning(f"Error updating search index after availability toggle for {document.id}: {e}")
+
+        msg = "Document is now available to students." if new_avail else "Document marked unavailable."
+        from django.contrib import messages
+        messages.success(request, msg)
+
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=200)
+            response['HX-Refresh'] = 'true'
+            return response
+
+        return redirect('documents:document_detail', document_id=document.id)
+
+    return JsonResponse({'error': 'POST required'}, status=405)
+
+
+@login_required
+def upload_new_version(request, document_id):
+    """Upload a new version of an existing document."""
+    document = Document.objects.filter(id=document_id).first()
+    if not document:
+        return JsonResponse({'success': False, 'error': 'Document not found'}, status=404)
+
+    if not user_can_manage_document(request.user, document):
+        return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+
+    if request.method == 'GET':
+        return render(request, 'documents/partials/new_version_modal.html', {'document': document})
+
+    # POST
+    new_file = request.FILES.get('file')
+    if not new_file:
+        return JsonResponse({'success': False, 'error': 'No file uploaded'}, status=400)
+
+    change_notes = request.POST.get('change_notes', '').strip()
+
+    from documents.services.upload_service import UploadService
+    service = UploadService()
+
+    try:
+        version = service.create_document_version(
+            document=document,
+            file=new_file,
+            user=request.user,
+            change_notes=change_notes,
+        )
+        return JsonResponse({
+            'success': True,
+            'message': f'Version {version.version_number} uploaded successfully and is being processed.',
+            'version_number': version.version_number,
+        })
+    except ValueError as ve:
+        return JsonResponse({'success': False, 'error': str(ve)}, status=400)
+    except Exception as e:
+        logger.error(f"Error uploading new version for document {document.id}: {e}", exc_info=True)
+        return JsonResponse({'success': False, 'error': f'Upload failed: {str(e)}'}, status=500)
+
+
+
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 
-@csrf_exempt
 @require_http_methods(["GET", "POST"])
 @login_required
 def upload_document(request):
@@ -351,6 +593,14 @@ def upload_document(request):
             from django.http import JsonResponse
             return JsonResponse({'success': False, 'error': 'Category is required'}, status=400)
         
+        from .services.upload_service import UploadService
+        upload_service = UploadService()
+        for file in files:
+            is_valid, error_msg = upload_service.validate_file(file)
+            if not is_valid:
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': f"{file.name}: {error_msg}"}, status=400)
+
         try:
             # Create documents with status 'processing'
             from .models import Document, DocumentFile, DocumentVersion, DocumentAcademicUnit, DocumentTag, Tag
@@ -361,18 +611,19 @@ def upload_document(request):
             
             for index, file in enumerate(files):
                 # Get individual file metadata if provided
-                title = request.POST.get(f'file_{index}_title', file.name.replace('.pdf', '').replace('.docx', '').replace('.pptx', ''))
+                raw_title = request.POST.get(f'file_{index}_title')
+                if raw_title and raw_title.strip():
+                    title = raw_title.strip()
+                else:
+                    title = file.name.rsplit('.', 1)[0] if '.' in file.name else file.name
                 description = request.POST.get(f'file_{index}_description', '')
                 
-                # Check if document with same title already exists for this user
-                existing_doc = Document.objects.filter(
-                    title=title,
-                    uploaded_by=request.user
-                ).first()
-                
-                if existing_doc:
-                    skipped_documents.append(title)
-                    continue
+                # Check if document with same title already exists for this user; ensure unique title
+                base_title = title
+                counter = 1
+                while Document.objects.filter(title=title, uploaded_by=request.user).exists():
+                    title = f"{base_title} ({counter})"
+                    counter += 1
                 
                 # Create document (without academic unit/year/semester - those go in junction table)
                 document = Document.objects.create(
@@ -527,14 +778,24 @@ def my_library(request):
     user = request.user
     
     # Get statistics
-    upload_count = Document.objects.filter(uploaded_by=user).count()
+    upload_count = Document.objects.filter(uploaded_by=user).exclude(status='archived').count()
     bookmark_count = DocumentBookmark.objects.filter(user=user).count()
     download_count = DocumentDownload.objects.filter(user=user).count()
     view_count = DocumentView.objects.filter(user=user).count()
     
     # Get recent activity
-    recent_uploads = Document.objects.filter(uploaded_by=user)[:5]
+    recent_uploads = list(Document.objects.filter(
+        uploaded_by=user
+    ).exclude(
+        status='archived'
+    ).select_related(
+        'category'
+    ).prefetch_related(
+        'versions__files',
+        'academic_units__academic_unit'
+    ).order_by('-created_at')[:5])
     recent_bookmarks = DocumentBookmark.objects.filter(user=user).select_related('document')[:5]
+    has_processing_uploads = any(doc.is_processing for doc in recent_uploads)
     
     context = {
         'page_title': 'My Library',
@@ -544,6 +805,7 @@ def my_library(request):
         'view_count': view_count,
         'recent_uploads': recent_uploads,
         'recent_bookmarks': recent_bookmarks,
+        'has_processing_uploads': has_processing_uploads,
         'document_content_partial': 'documents/partials/my_library_content.html',
         'show_library_button': False,
         'show_upload_button': True,
@@ -573,15 +835,17 @@ def my_uploads(request):
     """
     User's uploaded documents.
     """
-    documents = DocumentSelector.list_documents_for_user(
+    documents = list(DocumentSelector.list_documents_for_user(
         user_id=request.user.id,
         document_type='uploads',
         limit=50
-    )
+    ))
+    has_processing_uploads = any(doc.is_processing for doc in documents)
     
     context = {
         'page_title': 'My Uploads',
         'documents': documents,
+        'has_processing_uploads': has_processing_uploads,
         'document_content_partial': 'documents/partials/library_uploads_content.html',
         'show_library_button': False,
         'show_upload_button': True,
@@ -819,14 +1083,19 @@ def share_document(request, document_id):
         elif share_type == 'profile':
             # Share to user's profile feed
             from posts.models import Post
-            from posts.services.post_service import create_post_for_user
-            from posts.forms import PostForm
             
-            # Create a simple post with document reference
+            course = getattr(request.user, 'course', None)
+            doc_thumbnail = None
+            if document.latest_version:
+                first_file = document.latest_version.files.first()
+                if first_file and (first_file.thumbnail_path or first_file.preview_path):
+                    doc_thumbnail = first_file.thumbnail_path or first_file.preview_path
+            
             post = Post.objects.create(
                 author=request.user,
-                course=request.user.course,
-                year=request.user.year,
+                course=course,
+                gradient_class='none',
+                thumbnail=doc_thumbnail,
                 content=f"Shared a document: {document.title}",
                 shared_document=document
             )
@@ -835,7 +1104,7 @@ def share_document(request, document_id):
             DocumentShare.objects.create(
                 document=document,
                 user=request.user,
-                platform='other'  # Internal share
+                platform='profile'
             )
             
             # Trigger analytics update asynchronously
@@ -853,32 +1122,46 @@ def share_document(request, document_id):
             if not group_id:
                 return JsonResponse({'error': 'Group ID required'}, status=400)
             
-            from groups.models import Group, GroupPost
+            from groups.models import Group, Membership, MembershipStatus
             from posts.models import Post
             
-            # Check if user is member of the group
-            group = Group.objects.get(id=group_id)
-            if not group.members.filter(id=request.user.id).exists():
-                return JsonResponse({'error': 'Not a member of this group'}, status=403)
+            try:
+                group = Group.objects.get(id=group_id)
+            except Group.DoesNotExist:
+                return JsonResponse({'error': 'Group not found'}, status=404)
+            
+            # Check if user is an approved member of the group, group creator, or staff
+            is_member = Membership.objects.filter(
+                group=group,
+                user=request.user,
+                status=MembershipStatus.APPROVED
+            ).exists()
+            
+            if not is_member and group.created_by != request.user and not request.user.is_staff:
+                return JsonResponse({'error': 'Not an approved member of this group'}, status=403)
+            
+            doc_thumbnail = None
+            if document.latest_version:
+                first_file = document.latest_version.files.first()
+                if first_file and (first_file.thumbnail_path or first_file.preview_path):
+                    doc_thumbnail = first_file.thumbnail_path or first_file.preview_path
             
             # Create post in group
             post = Post.objects.create(
-                user=request.user,
+                author=request.user,
+                group=group,
+                course=group.course,
+                gradient_class='none',
+                thumbnail=doc_thumbnail,
                 content=f"Shared a document: {document.title}",
                 shared_document=document
-            )
-            
-            # Create group post
-            GroupPost.objects.create(
-                group=group,
-                post=post
             )
             
             # Track the share
             DocumentShare.objects.create(
                 document=document,
                 user=request.user,
-                platform='other'  # Internal share
+                platform='group'
             )
             
             # Trigger analytics update asynchronously
@@ -897,6 +1180,28 @@ def share_document(request, document_id):
         return JsonResponse({'error': 'Document not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def user_groups_for_sharing(request):
+    """
+    Return JSON list of groups the authenticated user is an approved member of.
+    """
+    from groups.models import Membership, MembershipStatus
+    memberships = Membership.objects.filter(
+        user=request.user,
+        status=MembershipStatus.APPROVED
+    ).select_related('group').order_by('group__name')
+    
+    groups_data = [
+        {
+            'id': m.group.id,
+            'name': m.group.name,
+            'description': m.group.description or '',
+        }
+        for m in memberships
+    ]
+    return JsonResponse({'groups': groups_data})
 
 
 @csrf_exempt

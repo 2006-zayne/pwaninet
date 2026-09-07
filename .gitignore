@@ -83,3 +83,9 @@ android/.kotlin/
 android/**/build/
 android/**/.cxx/
 android/**/captures/
+
+# Android Signing & Keystores
+*.jks
+*.keystore
+*.signing.properties
+release.jks

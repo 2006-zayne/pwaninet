@@ -35,14 +35,22 @@ class UploadService:
     
     def validate_file(self, file: UploadedFile) -> tuple[bool, str]:
         """Validate an uploaded file."""
+        if not file or not getattr(file, 'name', None):
+            return False, "Invalid file"
+
+        # Check empty file
+        if getattr(file, 'size', 0) == 0:
+            return False, "File is empty"
+
         # Check file size
         if file.size > self.max_file_size:
-            return False, f"File size exceeds maximum of {self.max_file_size / (1024*1024)}MB"
+            max_mb = int(self.max_file_size / (1024 * 1024))
+            return False, f"File size exceeds maximum of {max_mb}MB"
         
         # Check file extension
-        extension = file.name.split('.')[-1].lower()
-        if extension not in self.allowed_extensions:
-            return False, f"File type '{extension}' is not allowed"
+        extension = file.name.split('.')[-1].lower() if '.' in file.name else ''
+        if not extension or extension not in self.allowed_extensions:
+            return False, f"File type '{extension}' is not allowed. Supported formats: {', '.join(self.allowed_extensions).upper()}"
         
         return True, ""
     
@@ -215,9 +223,61 @@ class UploadService:
         document.status = 'processing'
         document.save(update_fields=['status'])
         
-        # Queue processing tasks (would call Celery here)
-        # from ..tasks.processing import process_document
-        # process_document.delay(document.id)
-        
         logger.info(f"Completed upload for document {document.id}, queued processing")
         return document
+
+    @transaction.atomic
+    def create_document_version(
+        self,
+        document: Document,
+        file: UploadedFile,
+        user,
+        change_notes: str = ''
+    ) -> DocumentVersion:
+        """Create a new version for an existing document with the provided file."""
+        is_valid, err = self.validate_file(file)
+        if not is_valid:
+            raise ValueError(err)
+
+        next_version_num = document.versions.count() + 1
+        
+        # Unmark previous latest versions
+        document.versions.filter(is_latest=True).update(is_latest=False)
+
+        version = DocumentVersion.objects.create(
+            document=document,
+            version_number=next_version_num,
+            change_notes=change_notes,
+            created_by=user,
+            is_latest=True
+        )
+
+        extension = file.name.split('.')[-1].lower() if '.' in file.name else ''
+        mime_type = getattr(file, 'content_type', None) or self._get_mime_type(extension)
+
+        DocumentFile.objects.create(
+            document_version=version,
+            file=file,
+            original_filename=file.name,
+            storage_path=f"documents/{document.id}/{version.id}/{file.name}",
+            mime_type=mime_type,
+            extension=extension,
+            size_bytes=file.size,
+            storage_provider='local',
+            processing_status='pending',
+            uploaded_by=user,
+        )
+
+        # Update document status to processing
+        document.status = 'processing'
+        document.save(update_fields=['status'])
+
+        # Trigger Celery processing
+        from ..tasks.processing import process_document
+        process_document.delay(document.id)
+
+        logger.info(
+            f"Created version {next_version_num} for document {document.id}, queued processing"
+        )
+        return version
+

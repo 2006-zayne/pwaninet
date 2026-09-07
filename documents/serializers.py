@@ -241,9 +241,11 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
         fields = [
-            'title', 'description', 'category', 'visibility', 'language',
-            'tags', 'academic_unit_ids', 'semester_id', 'academic_year_id'
+            'id', 'title', 'description', 'category', 'visibility', 'language',
+            'tags', 'academic_unit_ids', 'semester_id', 'academic_year_id',
+            'uploaded_by', 'status'
         ]
+        read_only_fields = ['id', 'uploaded_by', 'status']
     
     def create(self, validated_data):
         tags = validated_data.pop('tags', [])
@@ -251,6 +253,9 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
         semester_id = validated_data.pop('semester_id')
         academic_year_id = validated_data.pop('academic_year_id')
         
+        if 'uploaded_by' not in validated_data and 'request' in self.context:
+            validated_data['uploaded_by'] = self.context['request'].user
+            
         document = Document.objects.create(**validated_data)
         
         # Add academic units

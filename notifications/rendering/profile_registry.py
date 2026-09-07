@@ -166,6 +166,20 @@ class RenderingProfileRegistry:
             expansion_strategy=ExpansionStrategy(expandable=True, data_source="actors")
         )
         
+        # DOCUMENT_SHARED
+        self._profiles["DOCUMENT_SHARED"] = RenderingProfile(
+            id="DOCUMENT_SHARED", category=ProfileCategory.SOCIAL, intent=ProfileIntent.ACTIVITY,
+            message_strategy=MessageStrategy(template="DOCUMENT_SHARED", supported_states=["SINGLE", "DUAL", "FEW", "MANY"]),
+            component_visibility=ComponentVisibilityConfig(actor_stack=True, preview=True),
+            preview_strategy=PreviewStrategy(enabled=True, preview_type="POST"),
+            navigation_strategy=NavigationStrategy(
+                primary=NavigationConfig(target="POST_DETAIL", resource_id_field="resource.id")
+            ),
+            aggregation_strategy=AggregationStrategy(enabled=True, scope="PER_POST"),
+            expansion_strategy=ExpansionStrategy(expandable=True, data_source="actors")
+        )
+        self._profiles["POST_DOCUMENT_SHARED"] = self._profiles["DOCUMENT_SHARED"]
+        
         # POST_REPOSTED
         self._profiles["POST_REPOSTED"] = RenderingProfile(
             id="POST_REPOSTED", category=ProfileCategory.SOCIAL, intent=ProfileIntent.ACTIVITY,

@@ -251,6 +251,35 @@ class GroupRejectedRenderer(NotificationRenderer):
         return []  # No actions for rejection notifications
 
 
+class DocumentSharedRenderer(NotificationRenderer):
+    """Renderer for DOCUMENT_SHARED notifications."""
+    
+    notification_type = 'DOCUMENT_SHARED'
+    template = 'notifications/components/notification_card.html'
+    priority = 85
+    
+    def get_context(self, notification: Any) -> Dict[str, Any]:
+        """Build context for document shared notifications."""
+        return {
+            'icon': 'file-earmark-text',
+            'icon_color': 'primary',
+            'action_verb': 'shared a document to view'
+        }
+    
+    def get_actions(self, notification: Any) -> list:
+        """Get actions for document shared notifications."""
+        actions = []
+        if notification.resource and notification.resource.get('url'):
+            actions.append({
+                'label': 'View Document',
+                'icon': 'arrow-right',
+                'url': notification.resource['url'],
+                'type': 'link',
+                'style': 'primary'
+            })
+        return actions
+
+
 class PostSharedRenderer(NotificationRenderer):
     """Renderer for POST_SHARED notifications."""
     
@@ -368,6 +397,7 @@ register_renderer(GroupApprovedRenderer())
 register_renderer(GroupRejectedRenderer())
 register_renderer(PostSharedRenderer())
 register_renderer(PostSharedToGroupRenderer())
+register_renderer(DocumentSharedRenderer())
 register_renderer(PinchRenderer())
 register_renderer(AlertRenderer())
 
@@ -381,5 +411,6 @@ register_profile('GROUP_APPROVED', 'group')
 register_profile('GROUP_REJECTED', 'group')
 register_profile('POST_SHARED', 'social')
 register_profile('POST_SHARED_TO_GROUP', 'group')
+register_profile('DOCUMENT_SHARED', 'social')
 register_profile('PINCH', 'social')
 register_profile('ALERTE', 'system')

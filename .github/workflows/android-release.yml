@@ -1,0 +1,103 @@
+name: Build & Release Android APK
+
+'on':
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Version name (e.g. 1.0.0 or v1.0.0)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Release Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install npm dependencies & sync Capacitor
+        run: |
+          npm ci
+          npx cap sync android
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x android/gradlew
+
+      - name: Determine Version Name & Code
+        id: versioning
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version_name }}" ]; then
+            INPUT_VER="${{ github.event.inputs.version_name }}"
+            RAW_VER="${INPUT_VER#v}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            RAW_VER="${GITHUB_REF_NAME#v}"
+          else
+            RAW_VER="1.0.0"
+          fi
+
+          TAG="v${RAW_VER}"
+          RUN_NUM="${{ github.run_number }}"
+
+          echo "VERSION_NAME=${RAW_VER}" >> $GITHUB_ENV
+          echo "VERSION_CODE=${RUN_NUM}" >> $GITHUB_ENV
+          echo "TAG_NAME=${TAG}" >> $GITHUB_ENV
+          echo "Resolved VERSION_NAME=${RAW_VER}, VERSION_CODE=${RUN_NUM}, TAG_NAME=${TAG}"
+
+      - name: Decode Release Keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/release.jks
+
+      - name: Build Android Release APK
+        working-directory: android
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/android/release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          VERSION_CODE: ${{ env.VERSION_CODE }}
+          VERSION_NAME: ${{ env.VERSION_NAME }}
+        run: |
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Prepare Release Asset
+        run: |
+          mkdir -p output
+          cp android/app/build/outputs/apk/release/app-release.apk output/pwaninet.apk
+
+      - name: Clean Up Keystore
+        if: always()
+        run: |
+          rm -f android/release.jks
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: PwaniNet Release ${{ env.TAG_NAME }}
+          files: output/pwaninet.apk
+          generate_release_notes: true
+          draft: false
+          prerelease: false

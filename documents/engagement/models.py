@@ -220,6 +220,8 @@ class DocumentShare(models.Model):
         ('facebook', 'Facebook'),
         ('linkedin', 'LinkedIn'),
         ('copy_link', 'Copy Link'),
+        ('profile', 'Profile'),
+        ('group', 'Group'),
         ('other', 'Other'),
     ]
     

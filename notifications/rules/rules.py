@@ -162,7 +162,8 @@ def _followed_user_recipient(event_data: Dict[str, Any]) -> List[int]:
 def _followers_of_author_recipient(event_data: Dict[str, Any]) -> List[int]:
     """Recipient: Users who follow the post author (for new post notifications)."""
     actor_id = event_data.get('actor_id')
-    group_id = event_data.get('context_id')  # This will be set if post is in a group
+    context_type = event_data.get('context_type')
+    group_id = event_data.get('context_id') if context_type == 'GROUP' else event_data.get('metadata', {}).get('group_id')
     
     if not actor_id:
         return []
@@ -178,11 +179,12 @@ def _followers_of_author_recipient(event_data: Dict[str, Any]) -> List[int]:
                 status=MembershipStatus.APPROVED
             ).exclude(user_id=actor_id).values_list('user_id', flat=True))
         else:
-            # For global posts, send to users who follow the author
-            # following_relationships are relationships where the user is the follower
-            return list(User.objects.filter(
-                following_relationships__followed=author
-            ).exclude(id=actor_id).values_list('id', flat=True))
+            # For global posts, send to friends (followers and following) of the author
+            from users.models import Follow
+            followers = set(Follow.objects.filter(followed=author).values_list('follower_id', flat=True))
+            following = set(Follow.objects.filter(follower=author).values_list('followed_id', flat=True))
+            recipients = (followers | following) - {author.id}
+            return list(recipients)
     except User.DoesNotExist:
         return []
 
@@ -542,7 +544,7 @@ POST_REPOSTED_RULE = NotificationRule(
 POST_CREATED_RULE = NotificationRule(
     name="post_created",
     trigger="posts.post.created",
-    condition=None,
+    condition=lambda event: not bool(event.get('metadata', {}).get('is_document_share')),
     notification_type="POST_CREATED",
     category="SOCIAL",
     priority="NORMAL",
@@ -551,6 +553,20 @@ POST_CREATED_RULE = NotificationRule(
     recipients=_followers_of_author_recipient,
     title_template="{actor_username} posted a new update",
     summary_template="New post from someone you follow"
+)
+
+POST_DOCUMENT_SHARED_RULE = NotificationRule(
+    name="post_document_shared",
+    trigger="posts.post.created",
+    condition=lambda event: bool(event.get('metadata', {}).get('is_document_share')),
+    notification_type="DOCUMENT_SHARED",
+    category="SOCIAL",
+    priority="NORMAL",
+    delivery_policy="IMMEDIATE",
+    aggregation_policy="ALLOWED",
+    recipients=_followers_of_author_recipient,
+    title_template="{actor_username} shared a document to view: {document_title}",
+    summary_template="{actor_username} shared '{document_title}'. Tap to view."
 )
 
 # Groups Rules
@@ -867,6 +883,7 @@ RULES_REGISTRY = [
     POST_REPORTED_RULE,
     POST_REPOSTED_RULE,
     POST_CREATED_RULE,
+    POST_DOCUMENT_SHARED_RULE,
     GROUP_INVITE_RULE,
     GROUP_REQUEST_RULE,
     GROUP_APPROVED_RULE,

@@ -14,6 +14,7 @@ import android.view.Window;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
@@ -193,6 +194,13 @@ public class MainActivity extends BridgeActivity {
         setupNetworkMonitoring();
         setupCustomWebViewClient();
         setupWebViewCaching();
+
+        // Ensure custom user agent identifier is appended
+        if (this.bridge != null && this.bridge.getWebView() != null) {
+            WebSettings settings = this.bridge.getWebView().getSettings();
+            String defaultUserAgent = settings.getUserAgentString();
+            settings.setUserAgentString(defaultUserAgent + " PwaniNetApp/Android");
+        }
         
         // Restore WebView state if available
         if (savedInstanceState != null) {

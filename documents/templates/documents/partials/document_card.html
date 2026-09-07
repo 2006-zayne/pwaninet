@@ -6,9 +6,11 @@
    hx-swap="innerHTML"
    hx-push-url="true"
    hx-history="true"
+   id="doc-card-wrapper-{{ document.id }}"
    class="doc-card-link"
    style="text-decoration: none;">
 <div class="doc-card" 
+     id="doc-card-{{ document.id }}"
      style="background: var(--card-bg); 
             border: 1px solid var(--border); 
             border-radius: 16px; 
@@ -84,18 +86,118 @@
                 PDF
             </span>
         {% endif %}
+
+        {% if document.status == 'processing' or document.is_processing %}
+            <!-- Processing Spinner Overlay -->
+            <div class="doc-processing-overlay"
+                 style="position: absolute; inset: 0;
+                        background: rgba(15, 23, 42, 0.65);
+                        backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+                        display: flex; flex-direction: column; align-items: center; justify-content: center;
+                        gap: 8px; z-index: 5; color: #ffffff;">
+                <div class="spinner-border text-light" role="status" style="width: 2rem; height: 2rem; border-width: 2.5px;">
+                    <span class="visually-hidden">Processing...</span>
+                </div>
+                <span style="font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; background: rgba(0, 0, 0, 0.45); padding: 3px 10px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.25);">
+                    Processing...
+                </span>
+            </div>
+        {% endif %}
     </div>
     
     <!-- Card Content -->
     <div class="doc-card-content" style="padding: 16px;">
-        <!-- Category Badge -->
-        <span class="doc-category-badge"
-              style="display: inline-block; background: var(--primary-light);
-                     color: var(--primary); padding: 4px 12px;
-                     border-radius: 20px; font-size: 0.75rem; font-weight: 600; margin-bottom: 8px;
-                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">
-            {{ document.category_name|default:"Lecture Notes" }}
-        </span>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0;">
+                <!-- Category Badge -->
+                <span class="doc-category-badge"
+                      style="display: inline-block; background: var(--primary-light);
+                             color: var(--primary); padding: 4px 12px;
+                             border-radius: 20px; font-size: 0.75rem; font-weight: 600;
+                             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">
+                    {{ document.category_name|default:"Lecture Notes" }}
+                </span>
+                {% if document.status == 'processing' or document.is_processing %}
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle doc-processing-badge" 
+                          style="font-size: 0.7rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px;">
+                        <span class="spinner-border spinner-border-sm" style="width: 0.65rem; height: 0.65rem; border-width: 1.5px;" role="status"></span>
+                        Processing
+                    </span>
+                {% endif %}
+                {% if not document.is_available %}
+                    <span class="badge bg-secondary text-white doc-unavailable-badge" 
+                          style="font-size: 0.7rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px;">
+                        <i class="bi bi-eye-slash" style="font-size: 0.7rem;"></i>
+                        Unavailable
+                    </span>
+                {% endif %}
+            </div>
+
+            {% if request.user.is_authenticated %}
+                {% if request.user == document.uploaded_by or request.user.is_staff or request.user.is_superuser or request.user.global_role == 'PRESIDENT' or request.user.global_role == 'DELEGATE' %}
+                    <div class="dropdown doc-card-options" onclick="event.stopPropagation();">
+                        <button class="btn btn-sm btn-link text-muted p-0 border-0" 
+                                type="button" 
+                                data-bs-toggle="dropdown" 
+                                aria-expanded="false" 
+                                style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; text-decoration: none;"
+                                title="Manage document">
+                            <i class="bi bi-three-dots-vertical fs-6"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="border-radius: 12px; min-width: 175px; padding: 6px; z-index: 1050;">
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-2"
+                                        hx-get="{% url 'documents:edit_document' document.id %}"
+                                        hx-target="#document-modal-container"
+                                        hx-swap="innerHTML"
+                                        style="border-radius: 8px; font-size: 0.85rem;">
+                                    <i class="bi bi-pencil" style="color: var(--primary);"></i>
+                                    Edit Details
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-2"
+                                        hx-get="{% url 'documents:new_version' document.id %}"
+                                        hx-target="#document-modal-container"
+                                        hx-swap="innerHTML"
+                                        style="border-radius: 8px; font-size: 0.85rem;">
+                                    <i class="bi bi-cloud-arrow-up" style="color: #0ea5e9;"></i>
+                                    New Version
+                                </button>
+                            </li>
+                            <li>
+                                <form action="{% url 'documents:toggle_availability' document.id %}" method="post"
+                                      hx-post="{% url 'documents:toggle_availability' document.id %}"
+                                      style="margin: 0;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item d-flex align-items-center gap-2 py-2"
+                                            style="border-radius: 8px; font-size: 0.85rem;">
+                                        {% if document.is_available %}
+                                            <i class="bi bi-eye-slash" style="color: #f59e0b;"></i>
+                                            Mark Unavailable
+                                        {% else %}
+                                            <i class="bi bi-eye" style="color: #10b981;"></i>
+                                            Make Available
+                                        {% endif %}
+                                    </button>
+                                </form>
+                            </li>
+                            <li><hr class="dropdown-divider my-1"></li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-2 text-danger"
+                                        hx-get="{% url 'documents:delete_document_modal' document.id %}"
+                                        hx-target="#document-modal-container"
+                                        hx-swap="innerHTML"
+                                        style="border-radius: 8px; font-size: 0.85rem;">
+                                    <i class="bi bi-trash"></i>
+                                    Delete Document
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                {% endif %}
+            {% endif %}
+        </div>
 
         <!-- Document Title -->
         <h3 class="doc-title"
