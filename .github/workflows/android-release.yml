@@ -4,7 +4,12 @@ on:
   push:
     branches:
       - main          # auto-release on every push to main
-  workflow_dispatch:  # keep manual trigger for emergencies
+  workflow_dispatch:  # manual trigger
+    inputs:
+      tag_name:
+        description: 'Tag name to build APK for (e.g. v1.0.0). Leave empty to calculate next version automatically.'
+        required: false
+        default: ''
 
 permissions:
   contents: write     # needed to push tags and create releases
@@ -22,6 +27,7 @@ jobs:
   version:
     name: Determine Next Version
     runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch' || inputs.tag_name == ''
     outputs:
       new_release_published: ${{ steps.semver.outputs.new_release_published }}
       new_release_version:   ${{ steps.semver.outputs.new_release_version }}
@@ -41,33 +47,44 @@ jobs:
 
       - name: Run semantic-release
         id: semver
+        uses: cycjimmy/semantic-release-action@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          npx --yes semantic-release
+        with:
+          extra_plugins: |
+            @semantic-release/commit-analyzer
+            @semantic-release/release-notes-generator
+            @semantic-release/github
 
   # ─────────────────────────────────────────────────────────────────────────
-  # Step 2: Build & sign APK — only runs when a new version was published
+  # Step 2: Build & sign APK — runs when a new version is published or manual tag specified
   # ─────────────────────────────────────────────────────────────────────────
   build-and-release:
     name: Build & Upload Android APK
     needs: version
-    if: needs.version.outputs.new_release_published == 'true'
+    if: always() && (needs.version.outputs.new_release_published == 'true' || (github.event_name == 'workflow_dispatch' && inputs.tag_name != ''))
     runs-on: ubuntu-latest
 
-    env:
-      VERSION_NAME: ${{ needs.version.outputs.new_release_version }}
-      TAG_NAME:     ${{ needs.version.outputs.new_release_git_tag }}
-
     steps:
-      - name: Checkout repository at new tag
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.version.outputs.new_release_git_tag }}
           fetch-depth: 0
 
-      - name: Set VERSION_CODE from run number
-        run: echo "VERSION_CODE=${{ github.run_number }}" >> $GITHUB_ENV
+      - name: Resolve Version and Checkout Target
+        run: |
+          if [ -n "${{ inputs.tag_name }}" ]; then
+            TAG="${{ inputs.tag_name }}"
+            RAW="${TAG#v}"
+          else
+            TAG="${{ needs.version.outputs.new_release_git_tag }}"
+            RAW="${{ needs.version.outputs.new_release_version }}"
+          fi
+          echo "TAG_NAME=${TAG}" >> $GITHUB_ENV
+          echo "VERSION_NAME=${RAW}" >> $GITHUB_ENV
+          echo "VERSION_CODE=${{ github.run_number }}" >> $GITHUB_ENV
+          echo "Building APK for Tag: ${TAG}, Version: ${RAW}"
+          git checkout "${TAG}"
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
@@ -92,7 +109,12 @@ jobs:
 
       - name: Decode Release Keystore
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/release.jks
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/release.jks
+            echo "Keystore decoded successfully."
+          else
+            echo "Warning: ANDROID_KEYSTORE_BASE64 not set, Gradle will build unsigned APK."
+          fi
 
       - name: Build Android Release APK
         working-directory: android
@@ -101,13 +123,23 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS:         ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD:      ${{ secrets.ANDROID_KEY_PASSWORD }}
+          VERSION_CODE:      ${{ env.VERSION_CODE }}
+          VERSION_NAME:      ${{ env.VERSION_NAME }}
         run: |
           ./gradlew assembleRelease --stacktrace
 
       - name: Prepare Release Asset
         run: |
           mkdir -p output
-          cp android/app/build/outputs/apk/release/app-release.apk output/pwaninet.apk
+          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk output/pwaninet.apk
+          elif [ -f android/app/build/outputs/apk/release/app-release-unsigned.apk ]; then
+            cp android/app/build/outputs/apk/release/app-release-unsigned.apk output/pwaninet.apk
+          else
+            echo "Error: No release APK found in build outputs!"
+            find android/app/build/outputs/ -name "*.apk"
+            exit 1
+          fi
 
       - name: Clean Up Keystore
         if: always()
