@@ -257,6 +257,8 @@ class NotificationObjectAdapter(PayloadAdapter):
         if notification.metadata:
             actor_id = notification.metadata.get('actor_id')
             actor_username = notification.metadata.get('actor_username')
+            actor_name = notification.metadata.get('actor_name')
+            actor_avatar = notification.metadata.get('actor_avatar')
             
             if actor_id:
                 try:
@@ -264,27 +266,37 @@ class NotificationObjectAdapter(PayloadAdapter):
                     # Try to get timestamp from notification metadata or use created_at
                     actor_timestamp = notification.metadata.get('actor_timestamp') or notification.created_at
                     full_name = (user.get_full_name() or '').strip()
-                    actor_name = full_name if full_name and full_name != 'None None' else user.username
+                    resolved_name = full_name if full_name and full_name != 'None None' else user.username
                     actors.append(NotificationActor(
                         id=user.id,
-                        name=actor_name,
+                        name=resolved_name,
                         username=user.username or '',
-                        avatar=system_avatar if is_system_notification else (user.profile_pic.url if user.profile_pic else None),
+                        avatar=system_avatar if is_system_notification else (user.profile_pic.url if user.profile_pic else actor_avatar),
                         verified=getattr(user, 'is_verified', False),
                         timestamp=actor_timestamp
                     ))
                     return actors
-                except User.DoesNotExist:
+                except (User.DoesNotExist, ValueError):
                     # Return minimal actor info from metadata
                     actors.append(NotificationActor(
-                        id=int(actor_id),
-                        name=actor_username or 'Unknown',
+                        id=int(actor_id) if str(actor_id).isdigit() else 0,
+                        name=actor_name or actor_username or 'Unknown',
                         username=actor_username or '',
-                        avatar=system_avatar if is_system_notification else None,
+                        avatar=system_avatar if is_system_notification else actor_avatar,
                         verified=False,
                         timestamp=notification.created_at
                     ))
                     return actors
+            elif actor_name or actor_username:
+                actors.append(NotificationActor(
+                    id=0,
+                    name=actor_name or actor_username or 'Unknown',
+                    username=actor_username or '',
+                    avatar=system_avatar if is_system_notification else actor_avatar,
+                    verified=False,
+                    timestamp=notification.created_at
+                ))
+                return actors
         
         # Fallback: try to resolve from source_events
         if notification.source_events:

@@ -586,3 +586,152 @@ class PushAPITests(TestCase):
         sub.refresh_from_db()
         self.assertFalse(sub.is_active)
 
+
+class PushContentCustomizationTests(TestCase):
+    """Test push content resolution, smart tagging, and channel routing."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='custom_test_user',
+            email='custom@example.com',
+            password='testpass123'
+        )
+        self.adapter = PushAdapter()
+
+    def test_resolve_push_content_with_message_engine(self):
+        """Test that push body uses NotificationMessageEngine for rich conversational text."""
+        notification = NotificationObject.objects.create(
+            recipient=self.user,
+            notification_type='PINCH',
+            category='SOCIAL',
+            priority='NORMAL',
+            title='Profile Pinched',
+            summary='Your profile was pinched',
+            metadata={
+                'actor_id': 99,
+                'actor_name': 'Grace Student',
+                'actor_avatar': 'https://example.com/avatar.jpg',
+                'url': '/users/profile/grace'
+            }
+        )
+
+        content = self.adapter._resolve_push_content(notification)
+        self.assertEqual(content['title'], 'PwaniNet')
+        self.assertIn('Grace Student pinched you', content['body'])
+        self.assertEqual(content['icon'], 'https://example.com/avatar.jpg')
+        self.assertEqual(content['channel_id'], 'pwaninet_social')
+        self.assertEqual(content['tag'], 'pwaninet-social-pinch')
+        self.assertEqual(content['target_url'], '/users/profile/grace')
+
+    def test_resolve_push_content_smart_tagging_aggregation(self):
+        """Test that aggregation key takes precedence in smart tagging."""
+        notification = NotificationObject.objects.create(
+            recipient=self.user,
+            notification_type='LIKE',
+            category='SOCIAL',
+            priority='NORMAL',
+            aggregation_key='post_likes_88'
+        )
+
+        content = self.adapter._resolve_push_content(notification)
+        self.assertEqual(content['tag'], 'pwaninet-post_likes_88')
+
+    def test_resolve_push_content_smart_tagging_context(self):
+        """Test that context type and ID are used when aggregation key is absent."""
+        notification = NotificationObject.objects.create(
+            recipient=self.user,
+            notification_type='COMMENT',
+            category='SOCIAL',
+            priority='NORMAL',
+            context_type='POST',
+            context_id=456
+        )
+
+        content = self.adapter._resolve_push_content(notification)
+        self.assertEqual(content['tag'], 'pwaninet-post-456')
+
+    def test_resolve_push_content_messaging_channel(self):
+        """Test that messaging category maps to pwaninet_messages channel."""
+        notification = NotificationObject.objects.create(
+            recipient=self.user,
+            notification_type='MESSAGE',
+            category='MESSAGING',
+            priority='HIGH'
+        )
+
+        content = self.adapter._resolve_push_content(notification)
+        self.assertEqual(content['channel_id'], 'pwaninet_messages')
+
+    @patch('pywebpush.webpush')
+    def test_webpush_payload_includes_tag_and_renotify(self, mock_webpush):
+        """Test that webpush payload JSON contains tag and renotify: True."""
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_webpush.return_value = mock_response
+
+        PushSubscription.objects.create(
+            user=self.user,
+            endpoint='https://updates.push.services.mozilla.com/wpush/v2/custom',
+            p256dh='test_p256dh',
+            auth='test_auth',
+            token_type='VAPID',
+            platform='WEB',
+            is_active=True
+        )
+
+        notification = NotificationObject.objects.create(
+            recipient=self.user,
+            notification_type='PINCH',
+            category='SOCIAL',
+            priority='NORMAL',
+            metadata={'actor_name': 'Grace Student'}
+        )
+
+        with patch('django.conf.settings.VAPID_PRIVATE_KEY', 'dummy_key'):
+            self.adapter.deliver(notification)
+
+        mock_webpush.assert_called_once()
+        call_kwargs = mock_webpush.call_args[1]
+        sent_data = json.loads(call_kwargs['data'])
+
+        self.assertEqual(sent_data['title'], 'PwaniNet')
+        self.assertIn('Grace Student pinched you', sent_data['body'])
+        self.assertTrue(sent_data['renotify'])
+        self.assertEqual(sent_data['tag'], 'pwaninet-social-pinch')
+
+    @patch('notifications.delivery.adapters.get_firebase_app')
+    @patch('firebase_admin.messaging.send')
+    def test_fcm_payload_includes_android_config(self, mock_send, mock_get_app):
+        """Test that FCM message contains AndroidConfig with channel, color, and collapse key."""
+        mock_get_app.return_value = MagicMock()
+        mock_send.return_value = 'projects/test/messages/msg_fcm_custom'
+
+        PushSubscription.objects.create(
+            user=self.user,
+            fcm_token='test_fcm_token_123',
+            token_type='FCM',
+            platform='ANDROID_NATIVE',
+            is_active=True
+        )
+
+        notification = NotificationObject.objects.create(
+            recipient=self.user,
+            notification_type='PINCH',
+            category='SOCIAL',
+            priority='NORMAL',
+            metadata={'actor_name': 'Grace Student'}
+        )
+
+        self.adapter.deliver(notification)
+
+        mock_send.assert_called_once()
+        sent_message = mock_send.call_args[0][0]
+
+        self.assertEqual(sent_message.notification.title, 'PwaniNet')
+        self.assertIn('Grace Student pinched you', sent_message.notification.body)
+        self.assertIsNotNone(sent_message.android)
+        self.assertEqual(sent_message.android.notification.channel_id, 'pwaninet_social')
+        self.assertEqual(sent_message.android.notification.color, '#2563eb')
+        self.assertEqual(sent_message.android.collapse_key, 'pwaninet-social-pinch')
+
+
