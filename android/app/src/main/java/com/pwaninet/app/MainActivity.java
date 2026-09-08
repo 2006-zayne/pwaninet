@@ -32,7 +32,6 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 import com.getcapacitor.WebViewListener;
-import com.capacitorjs.plugins.share.SharePlugin;
 
 import android.os.Handler;
 import android.os.Looper;
@@ -188,7 +187,6 @@ public class MainActivity extends BridgeActivity {
         }, SPLASH_WATCHDOG_TIMEOUT_MS);
 
         registerPlugin(NavigationBarPlugin.class);
-        registerPlugin(SharePlugin.class);
 
         // Configure edge-to-edge once at Activity creation
         EdgeToEdge.enable(this,
