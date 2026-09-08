@@ -6,5 +6,11 @@ class NotificationsConfig(AppConfig):
     name = 'notifications'
 
     def ready(self):
-        import notifications.signals
-        import notifications.event_processor
+        import logging
+        from importlib import import_module
+        logger = logging.getLogger(__name__)
+        try:
+            import_module('notifications.signals')
+            import_module('notifications.event_processor')
+        except Exception as exc:
+            logger.error(f"Failed to import notification modules in ready(): {exc}")

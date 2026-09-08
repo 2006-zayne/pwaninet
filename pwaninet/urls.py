@@ -60,38 +60,56 @@ def redirect_messaging(request):
 GITHUB_RELEASE_APK_URL = 'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk'
 
 
+from django.core.signing import TimestampSigner, BadSignature
+from django.http import FileResponse, HttpResponseForbidden, HttpResponseRedirect
+import logging
+
+logger = logging.getLogger(__name__)
+
 @require_http_methods(["GET", "HEAD"])
 def download_android_apk(request):
     """
-    Direct Android APK download endpoint.
-    Issues an immediate HTTP 302 redirect directly to the GitHub Release asset URL
-    for all standard and production requests, avoiding streaming large binaries
-    through Django/WSGI workers.
-    Keeps a local file streaming fallback only when DEBUG=True and a local APK file exists.
+    Version-agnostic mobile download controller.
+    Abstracts storage paths, records request telemetry, resolves the latest production release,
+    and gates access via signed tokens if marked private or beta.
     """
-    github_url = getattr(settings, 'APK_DOWNLOAD_URL', GITHUB_RELEASE_APK_URL)
-
-    # Local file streaming fallback only when DEBUG=True and explicitly requested (?local=1) or configured
-    if getattr(settings, 'DEBUG', False) and (
-        request.GET.get('local') == '1' or
-        request.GET.get('fallback') == '1' or
-        not getattr(settings, 'REDIRECT_APK_TO_GITHUB', True)
-    ):
-        import os
-        local_candidates = [
-            os.path.join(settings.BASE_DIR, 'media', 'downloads', 'pwaninet.apk'),
-            os.path.join(settings.BASE_DIR, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk'),
-            os.path.join(settings.BASE_DIR, 'android', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk'),
-        ]
-        for apk_path in local_candidates:
-            if os.path.exists(apk_path) and os.path.getsize(apk_path) > 0:
-                return FileResponse(
-                    open(apk_path, 'rb'),
-                    as_attachment=True,
-                    filename='pwaninet.apk',
-                    content_type='application/vnd.android.package-archive'
-                )
-
+    # Telemetry logging
+    ip_address = request.META.get('REMOTE_ADDR')
+    user_agent = request.META.get('HTTP_USER_AGENT', '')
+    logger.info(f"Mobile app download requested by IP: {ip_address}, User-Agent: {user_agent}")
+    
+    is_beta_or_private = getattr(settings, 'APK_IS_BETA', False)
+    
+    if is_beta_or_private:
+        token = request.GET.get('token')
+        if not token:
+            return HttpResponseForbidden("This is a private/beta release. Download token required.")
+        signer = TimestampSigner()
+        try:
+            # Token expires in 1 hour
+            data = signer.unsign_object(token, max_age=3600)
+        except BadSignature:
+            return HttpResponseForbidden("Invalid or expired download token.")
+    
+    github_url = getattr(settings, 'APK_DOWNLOAD_URL', 'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk')
+    
+    if getattr(settings, 'REDIRECT_APK_TO_GITHUB', True) and not getattr(settings, 'DEBUG', False):
+        return HttpResponseRedirect(github_url)
+    
+    import os
+    local_candidates = [
+        os.path.join(settings.BASE_DIR, 'media', 'downloads', 'pwaninet.apk'),
+        os.path.join(settings.BASE_DIR, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk'),
+    ]
+    for apk_path in local_candidates:
+        if os.path.exists(apk_path) and os.path.getsize(apk_path) > 0:
+            return FileResponse(
+                open(apk_path, 'rb'),
+                as_attachment=True,
+                filename='pwaninet.apk',
+                content_type='application/vnd.android.package-archive'
+            )
+            
     return HttpResponseRedirect(github_url)
 
 
@@ -149,7 +167,7 @@ urlpatterns = [
     path('manifest.webmanifest', serve_manifest, name='manifest'),
     path('service-worker.js', serve_service_worker, name='service_worker'),
     # Direct Android APK download routes (permanent endpoints for social sharing & settings)
-    path('download/android/', download_android_apk, name='download_android_apk'),
+    path('download/app/latest/', download_android_apk, name='download_android_apk'),
     path('apk/', download_android_apk, name='download_apk_short'),
     path('apk/qr/', qr_code_svg, name='qr_code_svg'),
     # PWA Test Pages

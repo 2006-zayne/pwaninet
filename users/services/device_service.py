@@ -13,14 +13,23 @@ def generate_device_id():
 
 def get_or_create_device_id(request):
     """
-    Get device ID from request headers or generate a new one.
-    The device ID should be sent in the X-Device-ID header by the frontend.
+    Get device ID from request attribute, headers, POST, GET, or generate a new one.
+    The device ID should ideally be sent in the X-Device-ID header or query/form params by the frontend.
     """
-    device_id = request.headers.get('X-Device-ID')
+    device_id = getattr(request, 'device_id', None)
     if not device_id:
-        # If no device ID in headers, generate one (should be set by frontend)
+        device_id = request.headers.get('X-Device-ID')
+    if not device_id:
+        if hasattr(request, 'POST'):
+            device_id = request.POST.get('device_id')
+    if not device_id:
+        if hasattr(request, 'GET'):
+            device_id = request.GET.get('device_id')
+    if not device_id:
+        # If no device ID found, generate one
         device_id = generate_device_id()
     return device_id
+
 
 
 def hash_device_id(device_id):

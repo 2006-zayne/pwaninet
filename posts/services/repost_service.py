@@ -77,6 +77,7 @@ def delete_repost(user, post, group=None):
             {
                 'type': 'post_repost_update',
                 'post_id': post.id,
+                'share_id': str(post.share_id),
                 'repost_count': post.reposts.count(),
                 'is_reposted': False,
                 'user_id': user.id

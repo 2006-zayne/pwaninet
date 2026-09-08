@@ -16,9 +16,11 @@ from notifications.services.notification_service import (
     get_cached_unread_count,
     invalidate_unread_count_cache,
     mark_single_notification_as_read,
+    mark_all_user_notifications_as_read,
     delete_single_notification,
     delete_all_user_notifications,
-    delete_user_read_notifications
+    delete_user_read_notifications,
+    broadcast_unread_count
 )
 from notifications.services.preference_service import NotificationPreferenceService
 from .serializers import (
@@ -219,6 +221,9 @@ def notifications_list(request):
 
 @login_required
 def unread_notification_count(request):
+    count = get_cached_unread_count(request.user)
+    if request.GET.get('format') == 'json' or 'application/json' in request.headers.get('Accept', ''):
+        return JsonResponse({'unread_count': count, 'count': count})
     html = build_unread_notification_html(request.user)
     return HttpResponse(html)
 
@@ -252,16 +257,7 @@ def resource_preview(request, notif_id):
 
 @login_required
 def mark_notification_as_read(request, notif_id):
-    try:
-        notification = NotificationObject.objects.get(
-            notification_id=notif_id,
-            recipient=request.user
-        )
-        notification.status = NotificationStatuses.READ.value
-        notification.save(update_fields=['status'])
-        invalidate_unread_count_cache(request.user.id)
-    except NotificationObject.DoesNotExist:
-        pass
+    notification = mark_single_notification_as_read(request.user, notif_id)
 
     # Return updated notification item
     context = {
@@ -274,71 +270,199 @@ def mark_notification_as_read(request, notif_id):
 
 
 @login_required
+@require_http_methods(["POST"])
+def follow_back_from_notification(request, notif_id):
+    try:
+        notification = NotificationObject.objects.get(
+            notification_id=notif_id,
+            recipient=request.user
+        )
+    except NotificationObject.DoesNotExist:
+        return HttpResponse('')
+
+    metadata = notification.metadata or {}
+    actor_id = metadata.get('actor_id')
+    target_user = None
+    if actor_id:
+        from users.models import User
+        target_user = User.objects.filter(id=actor_id).first()
+    if not target_user:
+        actor_username = metadata.get('actor_username')
+        if actor_username:
+            from users.models import User
+            target_user = User.objects.filter(username=actor_username).first()
+
+    if target_user and target_user != request.user:
+        from users.models import Follow
+        Follow.objects.get_or_create(follower=request.user, followed=target_user)
+        invalidate_unread_count_cache(target_user.id)
+        from users.services.friend_suggestion_service import invalidate_friend_suggestions_cache
+        invalidate_friend_suggestions_cache(request.user.id)
+
+    # Mark notification as read and broadcast
+    if notification.status != NotificationStatuses.READ.value:
+        notification = mark_single_notification_as_read(request.user, notif_id)
+
+    rendered_html = render_notification(notification)
+    response = HttpResponse(rendered_html)
+    response['HX-Trigger'] = 'updateUnreadCount'
+    return response
+
+
+@login_required
+@require_http_methods(["POST"])
+def pinch_from_notification(request, notif_id):
+    try:
+        notification = NotificationObject.objects.get(
+            notification_id=notif_id,
+            recipient=request.user
+        )
+    except NotificationObject.DoesNotExist:
+        return HttpResponse('')
+
+    metadata = notification.metadata or {}
+    actor_id = metadata.get('actor_id')
+    target_user = None
+    if actor_id:
+        from users.models import User
+        target_user = User.objects.filter(id=actor_id).first()
+    if not target_user:
+        actor_username = metadata.get('actor_username')
+        if actor_username:
+            from users.models import User
+            target_user = User.objects.filter(username=actor_username).first()
+
+    if target_user and target_user != request.user:
+        from users.models import Pinch
+        can_pinch, error_msg = Pinch.can_pinch(request.user, target_user)
+        if can_pinch:
+            Pinch.objects.create(pinch_user=request.user, pinched_user=target_user)
+            invalidate_unread_count_cache(target_user.id)
+
+    # Mark notification as read and broadcast
+    if notification.status != NotificationStatuses.READ.value:
+        notification = mark_single_notification_as_read(request.user, notif_id)
+
+    rendered_html = render_notification(notification)
+    response = HttpResponse(rendered_html)
+    response['HX-Trigger'] = 'updateUnreadCount'
+    return response
+
+
+@login_required
 def mark_all_as_read(request):
     if request.method == 'POST':
-        NotificationObject.objects.filter(
-            recipient=request.user,
-            status=NotificationStatuses.CREATED.value
-        ).update(status=NotificationStatuses.READ.value)
-        invalidate_unread_count_cache(request.user.id)
-    return HttpResponse('')
+        mark_all_user_notifications_as_read(request.user)
+    from notifications.queries.notification_queries import get_notifications_by_time_periods
+    time_grouped, next_cursor = get_notifications_by_time_periods(request.user)
+    context = {
+        'time_grouped': time_grouped,
+        'time_filter': 'all',
+        'unread_notifications_count': 0,
+        'next_cursor': next_cursor
+    }
+    response = render(request, 'notifications/partials/notification_list_time_grouped.html', context)
+    response['HX-Trigger'] = 'updateUnreadCount'
+    return response
 
 
 @login_required
 def delete_notification(request, notif_id):
     if request.method == 'POST':
-        try:
-            notification = NotificationObject.objects.get(
-                notification_id=notif_id,
-                recipient=request.user
-            )
-            notification.delete()
-            invalidate_unread_count_cache(request.user.id)
-        except NotificationObject.DoesNotExist:
-            pass
+        delete_single_notification(request.user, notif_id)
 
-        notification_type = request.GET.get('type')
-        is_read_param = request.GET.get('read')
-        page = request.GET.get('page', 1)
+    notification_type = request.GET.get('type')
+    is_read_param = request.GET.get('read')
+    page = request.GET.get('page', 1)
 
-        context = build_notifications_context(
-            request.user,
-            mark_read=False,
-            notification_type=notification_type,
-            is_read=True if is_read_param == 'true' else (False if is_read_param == 'false' else None)
-        )
+    context = build_notifications_context(
+        request.user,
+        mark_read=False,
+        notification_type=notification_type,
+        is_read=True if is_read_param == 'true' else (False if is_read_param == 'false' else None)
+    )
 
-        paginator = Paginator(context['notifications'], 20)
-        notifications_page = paginator.get_page(page)
+    paginator = Paginator(context['notifications'], 20)
+    notifications_page = paginator.get_page(page)
 
-        context['notifications'] = notifications_page
-        context['unread_notifications_count'] = get_cached_unread_count(request.user)
-        context['current_filter_type'] = notification_type
-        context['current_filter_read'] = is_read_param
+    context['notifications'] = notifications_page
+    context['unread_notifications_count'] = get_cached_unread_count(request.user)
+    context['current_filter_type'] = notification_type
+    context['current_filter_read'] = is_read_param
 
-        response = render(request, 'notifications/partials/notification_list_items.html', context)
-        response['HX-Trigger'] = 'updateUnreadCount'
-        return response
-    return HttpResponse('')
+    response = render(request, 'notifications/partials/notification_list_items.html', context)
+    response['HX-Trigger'] = 'updateUnreadCount'
+    return response
 
 
 @login_required
 def delete_all_notifications(request):
     if request.method == 'POST':
-        NotificationObject.objects.filter(recipient=request.user).delete()
-        invalidate_unread_count_cache(request.user.id)
-    return HttpResponse('')
+        delete_all_user_notifications(request.user)
+    context = {
+        'time_grouped': {},
+        'notifications': [],
+        'unread_notifications_count': 0,
+        'next_cursor': None,
+    }
+    response = render(request, 'notifications/partials/notification_list_time_grouped.html', context)
+    response['HX-Trigger'] = 'updateUnreadCount'
+    return response
 
 
 @login_required
 def delete_read_notifications(request):
     if request.method == 'POST':
-        NotificationObject.objects.filter(
-            recipient=request.user,
-            status=NotificationStatuses.READ.value
-        ).delete()
+        delete_user_read_notifications(request.user)
+    from notifications.queries.notification_queries import get_notifications_by_time_periods
+    time_grouped, next_cursor = get_notifications_by_time_periods(request.user)
+    context = {
+        'time_grouped': time_grouped,
+        'time_filter': 'all',
+        'unread_notifications_count': get_cached_unread_count(request.user),
+        'next_cursor': next_cursor
+    }
+    response = render(request, 'notifications/partials/notification_list_time_grouped.html', context)
+    response['HX-Trigger'] = 'updateUnreadCount'
+    return response
+
+
+@login_required
+@require_http_methods(["POST"])
+def bulk_action(request):
+    """Handle bulk actions from selection mode: mark_read, delete"""
+    import json
+    try:
+        data = json.loads(request.body)
+    except Exception:
+        data = request.POST
+
+    action = data.get('action')
+    notification_ids = data.get('notification_ids', [])
+
+    if not notification_ids:
+        return JsonResponse({'success': False, 'error': 'No notifications selected'}, status=400)
+
+    queryset = NotificationObject.objects.filter(
+        recipient=request.user,
+        notification_id__in=notification_ids
+    )
+    count = queryset.count()
+
+    if action == 'mark_read':
+        queryset.exclude(
+            status__in=[NotificationStatuses.READ.value, NotificationStatuses.ARCHIVED.value, NotificationStatuses.EXPIRED.value]
+        ).update(status=NotificationStatuses.READ.value)
         invalidate_unread_count_cache(request.user.id)
-    return HttpResponse('')
+        broadcast_unread_count(request.user.id)
+        return JsonResponse({'success': True, 'action': 'mark_read', 'marked_read': count, 'count': count})
+    elif action == 'delete':
+        queryset.delete()
+        invalidate_unread_count_cache(request.user.id)
+        broadcast_unread_count(request.user.id)
+        return JsonResponse({'success': True, 'action': 'delete', 'deleted': count, 'count': count})
+    else:
+        return JsonResponse({'success': False, 'error': 'Invalid action'}, status=400)
 
 
 @login_required
@@ -491,18 +615,21 @@ class NotificationViewSet(viewsets.ModelViewSet):
             if action_type == 'mark_read':
                 queryset.update(status=NotificationStatuses.READ.value)
                 invalidate_unread_count_cache(request.user.id)
-                return Response({'marked_read': count})
+                broadcast_unread_count(request.user.id)
+                return Response({'success': True, 'marked_read': count, 'count': count})
             elif action_type == 'mark_unread':
                 queryset.update(status=NotificationStatuses.CREATED.value)
                 invalidate_unread_count_cache(request.user.id)
-                return Response({'marked_unread': count})
+                broadcast_unread_count(request.user.id)
+                return Response({'success': True, 'marked_unread': count, 'count': count})
             elif action_type == 'delete':
                 queryset.delete()
                 invalidate_unread_count_cache(request.user.id)
-                return Response({'deleted': count})
+                broadcast_unread_count(request.user.id)
+                return Response({'success': True, 'deleted': count, 'count': count})
             else:
                 return Response(
-                    {'error': 'Invalid action'},
+                    {'success': False, 'error': 'Invalid action'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 

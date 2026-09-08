@@ -1,8 +1,8 @@
 {% load static %}
 <button 
     class="btn btn-outline-secondary bookmark-btn"
-    hx-post="{% url 'documents:toggle_bookmark' document.id %}"
-    hx-target="#bookmark-button-{{ document.id }}"
+    hx-post="{% url 'documents:toggle_bookmark' document.share_id %}"
+    hx-target="#bookmark-button-{{ document.share_id }}"
     hx-swap="outerHTML"
     style="flex: 1; padding: 12px; border-radius: 12px; font-weight: 500; {% if is_bookmarked %}background-color: var(--primary); color: white; border-color: var(--primary);{% endif %}">
     <i class="bi bi-bookmark{% if is_bookmarked %}-fill{% endif %}"></i>

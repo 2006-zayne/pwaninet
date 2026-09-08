@@ -132,21 +132,17 @@ def build_home_feed_context(user, cursor=None, limit=10):
     }
     
     if is_initial_load:
-        # Cache suggested groups for 5 minutes
-        suggested_groups_cache_key = f'feed:suggested_groups:{user.id}'
-        suggested_groups = cache.get(suggested_groups_cache_key)
-        if suggested_groups is None:
-            suggested_groups = get_suggested_groups(user, following_ids)
-            cache.set(suggested_groups_cache_key, list(suggested_groups), timeout=300)
+        from recommendations.services.engine import UnifiedRecommendationEngine
+        suggested_groups = UnifiedRecommendationEngine.get_recommended_groups(
+            user, limit=5, context='feed'
+        )
         context['suggested_groups'] = suggested_groups
-    
+
     # Friend suggestions appear in feed on all loads (initial and paginated)
-    # Cache user suggestions for 5 minutes
-    user_suggestions_cache_key = f'feed:user_suggestions:{user.id}'
-    user_suggestions = cache.get(user_suggestions_cache_key)
-    if user_suggestions is None:
-        user_suggestions = get_user_suggestions_from_groups(user)
-        cache.set(user_suggestions_cache_key, list(user_suggestions), timeout=300)
+    from recommendations.services.engine import UnifiedRecommendationEngine
+    user_suggestions = UnifiedRecommendationEngine.get_recommended_users(
+        user, limit=5, context='feed'
+    )
     
     context['suggested_users'] = user_suggestions
     context['following_ids'] = following_ids

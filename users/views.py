@@ -133,7 +133,12 @@ def profile_view(request, username):
     posts_page = paginator.get_page(page)
 
     # Get liked post IDs for the current user
-    liked_post_ids = set(Like.objects.filter(user=request.user, post__in=posts_queryset).values_list('post_id', flat=True))
+    liked_post_ids = set()
+    if request.user.is_authenticated:
+        for pid, sid in Like.objects.filter(user=request.user, post__in=posts_page).values_list('post_id', 'post__share_id'):
+            liked_post_ids.add(pid)
+            liked_post_ids.add(sid)
+            liked_post_ids.add(str(sid))
 
     is_following = Follow.objects.filter(follower=request.user, followed=profile_user).exists()
 
@@ -404,6 +409,8 @@ def toggle_follow(request, username):
             template = 'users/partials/follow_button_recruit.html'
         elif request.GET.get('source') == 'search':
             template = 'users/partials/follow_button_search.html'
+        elif request.GET.get('source') == 'onboarding':
+            template = 'users/partials/follow_button_onboarding.html'
 
         return render(request, template, {
             'profile_user': target,
@@ -1097,8 +1104,124 @@ def mark_onboarding_complete(request):
     Mark the current user's onboarding as completed.
     """
     request.user.has_completed_onboarding = True
-    request.user.save()
+    request.user.save(update_fields=['has_completed_onboarding'])
     return JsonResponse({'status': 'success'})
+
+
+@login_required
+def onboarding_wizard_view(request):
+    """
+    Dedicated pre-feed onboarding view.
+    Presents classmates to follow and groups to join before reaching the home feed.
+    """
+    from recommendations.services.engine import UnifiedRecommendationEngine
+    from groups.models import Membership, MembershipStatus
+
+    # If already completed and not explicitly restarting, go straight to feed
+    if request.user.has_completed_onboarding and not request.GET.get('restart'):
+        return redirect('posts:home')
+
+    data = UnifiedRecommendationEngine.get_onboarding_data(request.user)
+
+    following_ids = set(
+        Follow.objects.filter(follower=request.user).values_list('followed_id', flat=True)
+    )
+    joined_group_ids = set(
+        Membership.objects.filter(
+            user=request.user,
+            status__in=[MembershipStatus.APPROVED, MembershipStatus.PENDING]
+        ).values_list('group_id', flat=True)
+    )
+
+    context = {
+        'classmates': data['classmates'],
+        'recommended_groups': data['recommended_groups'],
+        'official_groups': data['official_groups'],
+        'following_ids': following_ids,
+        'joined_group_ids': joined_group_ids,
+    }
+    return render(request, 'users/onboarding/wizard.html', context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def batch_follow_view(request):
+    """
+    1-click Follow All Suggested classmates during onboarding.
+    """
+    import json
+    from recommendations.services.engine import UnifiedRecommendationEngine
+
+    user_ids = request.POST.getlist('user_ids')
+    if not user_ids and request.body:
+        try:
+            body = json.loads(request.body)
+            user_ids = body.get('user_ids', [])
+        except Exception:
+            pass
+
+    if not user_ids:
+        # Default: follow all top suggestions
+        suggestions = UnifiedRecommendationEngine.get_recommended_users(
+            request.user, limit=12, use_cache=False, context='onboarding'
+        )
+        user_ids = [u.id for u in suggestions]
+
+    user_ids = [int(uid) for uid in user_ids if str(uid).isdigit() and int(uid) != request.user.id]
+
+    new_follows = []
+    for uid in user_ids:
+        if not Follow.objects.filter(follower=request.user, followed_id=uid).exists():
+            new_follows.append(Follow(follower=request.user, followed_id=uid))
+
+    if new_follows:
+        Follow.objects.bulk_create(new_follows, ignore_conflicts=True)
+
+    UnifiedRecommendationEngine.invalidate_all_user_caches(request.user.id)
+
+    if request.headers.get('HX-Request'):
+        data = UnifiedRecommendationEngine.get_onboarding_data(request.user)
+        following_ids = set(
+            Follow.objects.filter(follower=request.user).values_list('followed_id', flat=True)
+        )
+        return render(request, 'users/onboarding/partials/step_classmates.html', {
+            'classmates': data['classmates'],
+            'following_ids': following_ids,
+            'all_followed': True,
+        })
+
+    return JsonResponse({'status': 'success', 'followed_count': len(new_follows)})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def complete_onboarding_view(request):
+    """
+    Mark onboarding as complete, set session flag for feed welcome banner,
+    and redirect user to their populated home feed.
+    """
+    from recommendations.services.engine import UnifiedRecommendationEngine
+    from django.core.cache import cache
+    request.user.has_completed_onboarding = True
+    request.user.save(update_fields=['has_completed_onboarding'])
+
+    UnifiedRecommendationEngine.invalidate_all_user_caches(request.user.id)
+    cache.delete(f'feed:user_suggestions:{request.user.id}')
+    cache.delete(f'feed:following_ids:{request.user.id}')
+    cache.delete(f'feed:suggested_groups:{request.user.id}')
+
+    request.session['just_onboarded'] = True
+    messages.success(request, "Welcome to PwaniNet! You're connected with your campus network.")
+    return redirect('posts:home')
+
+
+@login_required
+@require_http_methods(["POST"])
+def dismiss_welcome_banner_view(request):
+    """Dismiss the feed welcome banner for the current session."""
+    if 'just_onboarded' in request.session:
+        del request.session['just_onboarded']
+    return JsonResponse({'status': 'dismissed'})
 
 
 @login_required
@@ -1106,17 +1229,29 @@ def switch_account_view(request, user_id):
     """
     Switch to a different account that is associated with the current device.
     """
-    # Try to get device ID from headers first (HTMX requests)
-    device_id = request.headers.get('X-Device-ID')
+    from django.urls import reverse
+    from django.utils.http import url_has_allowed_host_and_scheme
 
-    # Fallback to query parameter (link clicks)
+    # Try to get device ID from attribute, headers, POST, or query params
+    device_id = getattr(request, 'device_id', None)
     if not device_id:
+        device_id = request.headers.get('X-Device-ID')
+    if not device_id and hasattr(request, 'POST'):
+        device_id = request.POST.get('device_id')
+    if not device_id and hasattr(request, 'GET'):
         device_id = request.GET.get('device_id')
 
     if not device_id:
         messages.error(request, 'Unable to identify device. Please refresh the page.')
+        target_url = reverse('posts:home')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=200)
+            response['HX-Redirect'] = target_url
+            return response
         return redirect('posts:home')
 
+    # Propagate device_id onto request object so signals use it accurately
+    request.device_id = device_id
     hashed_device_id = hash_device_id(device_id)
 
     # Verify the target account is associated with this device
@@ -1128,20 +1263,92 @@ def switch_account_view(request, user_id):
         target_user = device_account.user
     except DeviceAccount.DoesNotExist:
         messages.error(request, 'Account not found on this device.')
+        target_url = reverse('posts:home')
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=200)
+            response['HX-Redirect'] = target_url
+            return response
         return redirect('posts:home')
 
-    # Logout current user
-    logout(request)
+    import time
+    from django.utils import timezone
+    from django.utils.http import http_date
+    from django.conf import settings
+    from django.contrib.sessions.backends.db import SessionStore
+    from django.contrib.auth import SESSION_KEY, BACKEND_SESSION_KEY, HASH_SESSION_KEY
 
-    # Login as target user
-    login(request, target_user, backend='django.contrib.auth.backends.ModelBackend')
+    # 1. Save current user's session in DeviceAccount so it stays persistent on this device
+    if request.user.is_authenticated and hasattr(request, 'session') and request.session.session_key:
+        current_da = DeviceAccount.objects.filter(
+            user=request.user,
+            device_id=hashed_device_id
+        ).first()
+        if current_da:
+            current_da.session_key = request.session.session_key
+            current_da.last_used = timezone.now()
+            current_da.save(update_fields=['session_key', 'last_used'])
 
-    # Update the device account record
-    device_account.session_key = request.session.session_key
-    device_account.save()
+    # 2. Check if target user has an existing valid session in django_session
+    target_session = None
+    if device_account.session_key:
+        store = SessionStore(session_key=device_account.session_key)
+        if store.exists(device_account.session_key):
+            session_data = store.load()
+            if session_data.get(SESSION_KEY) == str(target_user.pk):
+                target_session = store
 
-    messages.success(request, f'Switched to {target_user.username}')
-    return redirect('posts:home')
+    # 3. If no existing valid session, create a new session directly for target_user
+    if not target_session:
+        target_session = SessionStore()
+        target_session[SESSION_KEY] = target_user._meta.pk.value_to_string(target_user)
+        target_session[BACKEND_SESSION_KEY] = 'django.contrib.auth.backends.ModelBackend'
+        target_session[HASH_SESSION_KEY] = target_user.get_session_auth_hash()
+        target_session.save()
+
+    # 4. Update the target device account with the persistent session key
+    target_session.modified = True
+    target_session.save()
+    device_account.session_key = target_session.session_key
+    device_account.last_used = timezone.now()
+    device_account.save(update_fields=['session_key', 'last_used'])
+
+    # 5. Attach target user and target session to request
+    request.user = target_user
+    request.session = target_session
+
+    messages.success(request, f'Switched to {target_user.get_full_name() or target_user.username}')
+
+    # Determine target URL
+    next_url = request.GET.get('next') or request.POST.get('next')
+    if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        target_url = next_url
+    else:
+        target_url = reverse('posts:home')
+
+    # For HTMX requests, issue HX-Redirect to force a clean full-page reload
+    if request.headers.get('HX-Request'):
+        response = HttpResponse(status=200)
+        response['HX-Redirect'] = target_url
+    else:
+        response = redirect(target_url)
+
+    # 6. Explicitly set session cookie on response to switch the browser session directly
+    max_age = target_session.get_expiry_age()
+    expires_time = time.time() + max_age
+    response.set_cookie(
+        settings.SESSION_COOKIE_NAME,
+        target_session.session_key,
+        max_age=max_age,
+        expires=http_date(expires_time),
+        domain=settings.SESSION_COOKIE_DOMAIN,
+        path=settings.SESSION_COOKIE_PATH,
+        secure=settings.SESSION_COOKIE_SECURE or None,
+        httponly=settings.SESSION_COOKIE_HTTPONLY or None,
+        samesite=settings.SESSION_COOKIE_SAMESITE,
+    )
+
+    return response
+
 
 
 @login_required
@@ -1211,14 +1418,22 @@ def remove_account_from_device_view(request, user_id):
     Remove an account from the current device's account list.
     Does not delete the user account, just removes the device association.
     """
-    # Try to get device ID from headers first (HTMX requests)
+    # Try to get device ID from headers first (HTMX/fetch requests)
     device_id = request.headers.get('X-Device-ID')
 
-    # Fallback to query parameter (link clicks)
+    # Fallback to POST or GET parameters
     if not device_id:
-        device_id = request.GET.get('device_id')
+        device_id = request.POST.get('device_id') or request.GET.get('device_id')
+
+    is_json = (
+        request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
+        request.headers.get('HX-Request') == 'true' or
+        'application/json' in request.headers.get('Accept', '')
+    )
 
     if not device_id:
+        if is_json:
+            return JsonResponse({'status': 'error', 'message': 'Unable to identify device.'}, status=400)
         messages.error(request, 'Unable to identify device.')
         return redirect('posts:home')
 
@@ -1226,6 +1441,8 @@ def remove_account_from_device_view(request, user_id):
 
     # Prevent removing the current account
     if user_id == request.user.id:
+        if is_json:
+            return JsonResponse({'status': 'error', 'message': 'Cannot remove the currently active account.'}, status=400)
         messages.error(request, 'Cannot remove the currently active account.')
         return redirect('posts:home')
 
@@ -1235,11 +1452,16 @@ def remove_account_from_device_view(request, user_id):
             device_id=hashed_device_id
         )
         device_account.delete()
+        if is_json:
+            return JsonResponse({'status': 'success', 'message': 'Account removed from device.'})
         messages.success(request, 'Account removed from device.')
     except DeviceAccount.DoesNotExist:
+        if is_json:
+            return JsonResponse({'status': 'error', 'message': 'Account not found on this device.'}, status=404)
         messages.error(request, 'Account not found on this device.')
 
     return redirect('posts:home')
+
 
 
 @login_required

@@ -278,3 +278,34 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
             'message_id': event['message_id'],
             'reaction': event['reaction']
         })
+
+    async def member_evicted(self, event):
+        """Handle eviction of a member from group chat."""
+        if str(event.get('user_id')) == str(self.user_id):
+            await self.send_json({
+                'type': 'evicted',
+                'reason': event.get('reason', 'You are no longer a member of this group.')
+            })
+            await self.close(code=4003)
+
+
+def evict_group_member_socket(group_id, user_id, reason="Removed from group"):
+    """
+    Broadcast eviction message to group channel layer to disconnect evicted member.
+    """
+    try:
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f'group_{group_id}',
+                {
+                    'type': 'member_evicted',
+                    'user_id': user_id,
+                    'reason': reason,
+                }
+            )
+    except Exception as e:
+        print(f"Error evicting socket for user {user_id}: {e}")
+

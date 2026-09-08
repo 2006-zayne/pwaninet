@@ -141,8 +141,12 @@ function markSenderGroupAsRead(senderId, event) {
 
 function updateUnreadCounts() {
   fetch('/notifications/unread-count/')
-    .then(function(r) { return r.text(); })
+    .then(function(r) {
+      if (!r.ok || r.redirected || (r.url && r.url.includes('/accounts/login'))) return null;
+      return r.text();
+    })
     .then(function(html) {
+      if (!html || html.includes('<!DOCTYPE') || html.includes('<html')) return;
       const badge = document.getElementById('unread-count-badge');
       if (badge) badge.outerHTML = html;
     });

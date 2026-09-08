@@ -124,6 +124,7 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class DocumentViewSet(viewsets.ModelViewSet):
+    lookup_field = "share_id"
     """API endpoint for documents."""
     permission_classes = [IsAuthenticatedOrReadOnly, IsDocumentUploaderOrAdmin]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -320,6 +321,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
 
 class UserDocumentViewSet(viewsets.ReadOnlyModelViewSet):
+    lookup_field = "share_id"
     """API endpoint for user's documents."""
     permission_classes = [IsAuthenticated]
     serializer_class = DocumentListSerializer

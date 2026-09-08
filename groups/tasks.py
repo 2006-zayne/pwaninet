@@ -28,32 +28,45 @@ def auto_join_course_group_task(self, user_id):
         
         user = User.objects.get(id=user_id)
         
-        # Only proceed if user has course and year information
-        if not user.course or not user.year:
-            logger.info(f"User {user_id} has no course/year information, skipping auto-group join")
+        # Check if user has academic information
+        has_academic_info = bool(
+            (user.programme and user.academic_level) or
+            (user.course and user.year)
+        )
+        if not has_academic_info:
+            logger.info(f"User {user_id} has no course/year or programme/level information, skipping auto-group join")
             return
         
         # Try the new service-based approach first
         enrolled_groups = enroll_user_in_academic_groups(user)
         
-        # Fallback: if no auto-join groups exist, use the old naming convention approach
-        # This ensures backwards compatibility while transitioning to the new system
+        # Fallback: if no auto-join groups exist, use standardized naming convention approach
         if not enrolled_groups:
-            # Standardize the naming convention for official groups
-            # e.g., "Computer Science - Year 1"
-            target_group_name = f"{user.course.name} - Year {user.year.level}"
-            
-            # Logic: Search for the group. If it doesn't exist, create it.
-            # 'get_or_create' returns a tuple: (object, created_bool)
-            group, created_group = Group.objects.get_or_create(
-                name=target_group_name,
-                defaults={
+            if user.programme and user.academic_level:
+                target_group_name = f"{user.programme.name} - {user.academic_level.name}"
+                defaults = {
                     'description': f"Official academic hub for {target_group_name} students.",
                     'is_official': True,
-                    'auto_join_on_signup': True,  # Enable auto-join for backwards compatibility
+                    'auto_join_on_signup': True,
+                    'programme': user.programme,
+                    'academic_level': user.academic_level,
                     'course': user.course,
                     'year': user.year
                 }
+            else:
+                target_group_name = f"{user.course.name} - Year {user.year.level}"
+                defaults = {
+                    'description': f"Official academic hub for {target_group_name} students.",
+                    'is_official': True,
+                    'auto_join_on_signup': True,
+                    'course': user.course,
+                    'year': user.year
+                }
+            
+            # Logic: Search for the group. If it doesn't exist, create it.
+            group, created_group = Group.objects.get_or_create(
+                name=target_group_name,
+                defaults=defaults
             )
             
             if created_group:

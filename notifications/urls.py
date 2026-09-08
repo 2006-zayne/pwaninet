@@ -30,7 +30,10 @@ urlpatterns = [
     path('delete/<uuid:notif_id>/', views.delete_notification, name='delete_notification'),
     path('delete-all/', views.delete_all_notifications, name='delete_all_notifications'),
     path('delete-read/', views.delete_read_notifications, name='delete_read_notifications'),
+    path('bulk-action/', views.bulk_action, name='bulk_action'),
     path('expand/<uuid:notif_id>/', views.expand_notification, name='expand_notification'),
+    path('follow-back/<uuid:notif_id>/', views.follow_back_from_notification, name='follow_back'),
+    path('pinch/<uuid:notif_id>/', views.pinch_from_notification, name='pinch'),
     
     # Notification preference routes
     path('set-dnd/', views.set_do_not_disturb, name='set_do_not_disturb'),

@@ -535,85 +535,94 @@ document.addEventListener('DOMContentLoaded', function () {
     
     function handlePostLikeUpdate(data) {
         console.log('[Feed Metrics] Handling like update:', data);
-        
-        // Find all post cards with this post ID
-        const postCards = document.querySelectorAll(`[data-post-id="${data.post_id}"]`);
-        
-        postCards.forEach(card => {
-            // Update like count
-            const likeCountElement = card.querySelector('.like-count');
-            if (likeCountElement) {
+        const shareId = data.share_id;
+        const postId = data.post_id;
+        const currentUserId = document.body.dataset.userId;
+        const isCurrentUser = Boolean(data.user_id && currentUserId && String(data.user_id) === String(currentUserId));
+
+        const selectors = [];
+        if (shareId) {
+            selectors.push(`.like-button[data-share-id="${shareId}"]`, `#post-card-${shareId} .like-button`, `#like-section-${shareId} .like-button`);
+        }
+        if (postId) {
+            selectors.push(`.like-button[data-post-id="${postId}"]`);
+        }
+        const likeButtons = document.querySelectorAll(selectors.join(', '));
+
+        likeButtons.forEach(likeButton => {
+            const likeCountElement = likeButton.querySelector('.like-count');
+            if (likeCountElement && data.like_count !== undefined) {
                 likeCountElement.textContent = data.like_count;
             }
-            
-            // Update like button icon
-            const likeButton = card.querySelector('.like-button');
-            if (likeButton) {
+            if (isCurrentUser && data.is_liked !== undefined) {
                 const icon = likeButton.querySelector('i');
-                if (icon) {
-                    if (data.is_liked) {
-                        icon.classList.remove('bi-heart');
-                        icon.classList.add('bi-heart-fill');
-                        likeButton.classList.add('text-danger');
-                        likeButton.classList.remove('text-muted');
-                    } else {
-                        icon.classList.remove('bi-heart-fill');
-                        icon.classList.add('bi-heart');
-                        likeButton.classList.remove('text-danger');
-                        likeButton.classList.add('text-muted');
+                if (data.is_liked) {
+                    likeButton.classList.add('text-danger');
+                    likeButton.classList.remove('text-muted');
+                    likeButton.setAttribute('aria-label', 'Unlike');
+                    if (icon) {
+                        icon.className = 'bi bi-heart-fill fs-5';
+                    }
+                } else {
+                    likeButton.classList.remove('text-danger');
+                    likeButton.classList.add('text-muted');
+                    likeButton.setAttribute('aria-label', 'Like');
+                    if (icon) {
+                        icon.className = 'bi bi-heart fs-5';
                     }
                 }
             }
         });
     }
-    
+
     function handlePostRepostUpdate(data) {
         console.log('[Feed Metrics] Handling repost update:', data);
-        
-        // Find all post cards with this post ID
-        const postCards = document.querySelectorAll(`[data-post-id="${data.post_id}"]`);
-        
-        postCards.forEach(card => {
-            // Update repost count
-            const repostCountElement = card.querySelector('.repost-count');
-            if (repostCountElement) {
+        const shareId = data.share_id;
+        const postId = data.post_id;
+        const currentUserId = document.body.dataset.userId;
+        const isCurrentUser = Boolean(data.user_id && currentUserId && String(data.user_id) === String(currentUserId));
+
+        const selectors = [];
+        if (shareId) {
+            selectors.push(`#repost-btn-${shareId}`, `#post-card-${shareId} .repost-button`);
+        }
+        if (postId) {
+            selectors.push(`[data-post-id="${postId}"] .repost-button`);
+        }
+        const repostButtons = document.querySelectorAll(selectors.join(', '));
+
+        repostButtons.forEach(repostButton => {
+            const repostCountElement = repostButton.querySelector('.repost-count') || repostButton.querySelector('span');
+            if (repostCountElement && data.repost_count !== undefined) {
                 repostCountElement.textContent = data.repost_count;
             }
-            
-            // Update repost button icon
-            const repostButton = card.querySelector('.repost-button');
-            if (repostButton) {
+            if (isCurrentUser && data.is_reposted !== undefined) {
                 const icon = repostButton.querySelector('i');
-                if (icon) {
-                    if (data.is_reposted) {
-                        icon.classList.remove('bi-repeat');
-                        icon.classList.add('bi-repeat-fill');
-                        repostButton.classList.add('text-primary');
-                        repostButton.classList.remove('text-muted');
-                    } else {
-                        icon.classList.remove('bi-repeat-fill');
-                        icon.classList.add('bi-repeat');
-                        repostButton.classList.remove('text-primary');
-                        repostButton.classList.add('text-muted');
-                    }
+                if (data.is_reposted) {
+                    if (icon) icon.className = 'bi bi-repeat-fill fs-5';
+                    repostButton.classList.add('text-primary');
+                    repostButton.classList.remove('text-muted');
+                } else {
+                    if (icon) icon.className = 'bi bi-repeat fs-5';
+                    repostButton.classList.remove('text-primary');
+                    repostButton.classList.add('text-muted');
                 }
             }
         });
     }
-    
+
     function handlePostCommentUpdate(data) {
         console.log('[Feed Metrics] Handling comment update:', data);
-        
-        // Find all post cards with this post ID
-        const postCards = document.querySelectorAll(`[data-post-id="${data.post_id}"]`);
-        
-        postCards.forEach(card => {
-            // Update comment count
-            const commentCountElement = card.querySelector('.comment-count');
-            if (commentCountElement) {
+        const shareId = data.share_id;
+        if (!shareId) return;
+
+        const card = document.getElementById(`post-card-${shareId}`);
+        if (card) {
+            const commentCountElement = card.querySelector('.comment-count') || card.querySelector('a[href*="/post/"] span');
+            if (commentCountElement && data.comment_count !== undefined) {
                 commentCountElement.textContent = data.comment_count;
             }
-        });
+        }
     }
     
     // Initialize WebSocket connection

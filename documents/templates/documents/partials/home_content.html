@@ -20,6 +20,40 @@
     {% include 'documents/partials/category_pills.html' with categories=categories %}
 </div>
 
+<!-- For You / Personalized Recommendations -->
+{% if for_you_documents %}
+<div class="doc-section for-you-section" style="margin-bottom: 48px;">
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <h2 class="doc-section-title" style="font-size: 1.4rem; font-weight: 700; margin: 0; color: var(--text-dark); display: flex; align-items: center; gap: 8px;">
+                <i class="bi bi-stars text-primary"></i> For You
+            </h2>
+            {% if request.user.programme %}
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-20 rounded-pill px-2 py-1 small">
+                    {{ request.user.programme.code }}
+                </span>
+            {% endif %}
+            {% if request.user.academic_level %}
+                <span class="badge bg-light text-secondary rounded-pill px-2 py-1 small">
+                    {{ request.user.academic_level.name }}
+                </span>
+            {% endif %}
+        </div>
+        {% if request.user.programme %}
+            <a href="/documents/search/?my_programme=true" class="text-primary text-decoration-none small fw-semibold">
+                View all curriculum materials <i class="bi bi-arrow-right"></i>
+            </a>
+        {% endif %}
+    </div>
+
+    <div class="doc-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+        {% for document in for_you_documents %}
+            {% include 'documents/partials/document_card.html' %}
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Trending Documents -->
 <div class="doc-section" style="margin-bottom: 48px;">
     {% include 'documents/partials/section_header.html' with title='Trending Documents' show_view_all=True view_all_url='/documents/search/?sort=downloads' %}

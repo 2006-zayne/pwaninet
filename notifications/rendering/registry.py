@@ -7,16 +7,23 @@ from typing import Dict, Type, Callable, Any
 from dataclasses import dataclass
 
 
-@dataclass
 class NotificationRenderer:
     """
     Base class for notification renderers.
     Each renderer knows how to render a specific notification type.
     """
     
-    notification_type: str
-    template: str
+    notification_type: str = ""
+    template: str = ""
     priority: int = 100  # Lower priority = higher precedence
+    
+    def __init__(self, notification_type: str = None, template: str = None, priority: int = None):
+        if notification_type is not None:
+            self.notification_type = notification_type
+        if template is not None:
+            self.template = template
+        if priority is not None:
+            self.priority = priority
     
     def get_context(self, notification: Any) -> Dict[str, Any]:
         """

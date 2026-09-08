@@ -83,6 +83,9 @@ class InAppAdapter(DeliveryAdapter):
                 # Use existing NotificationConsumer group naming: notifications_{user_id}
                 group_name = f"notifications_{notification.recipient.id}"
                 
+                from notifications.queries.notification_queries import get_unread_count
+                unread_count = get_unread_count(notification.recipient)
+
                 # Serialize notification data
                 notification_data = {
                     'notification_id': str(notification.notification_id),
@@ -94,6 +97,7 @@ class InAppAdapter(DeliveryAdapter):
                     'context_type': notification.context_type,
                     'context_id': notification.context_id,
                     'created_at': notification.created_at.isoformat(),
+                    'unread_count': unread_count,
                     'metadata': notification.metadata
                 }
                 
@@ -101,7 +105,8 @@ class InAppAdapter(DeliveryAdapter):
                     group_name,
                     {
                         'type': 'notification',
-                        'notification': notification_data
+                        'notification': notification_data,
+                        'unread_count': unread_count
                     }
                 )
             

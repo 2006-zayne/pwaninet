@@ -174,7 +174,7 @@ class RoleAssignmentSerializer(serializers.Serializer):
             raise serializers.ValidationError("User is not an approved member of this group.")
         
         # Enforce max 5 admins constraint
-        if role == MembershipRole.ADMIN:
+        if role == MembershipRole.ADMIN and membership.role != MembershipRole.ADMIN:
             current_admin_count = Membership.objects.filter(
                 group_id=group_id,
                 role=MembershipRole.ADMIN,

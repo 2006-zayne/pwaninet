@@ -54,6 +54,7 @@ class EventTypes(Enum):
     GROUPS_MEMBER_JOINED = "groups.member.joined"
     GROUPS_MEMBER_LEFT = "groups.member.left"
     GROUPS_MEMBER_REMOVED = "groups.member.removed"
+    GROUPS_ANNOUNCEMENT_CREATED = "groups.announcement.created"
     
     # Users Events
     USERS_USER_FOLLOWED = "users.user.followed"

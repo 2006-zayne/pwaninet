@@ -1,3 +1,4 @@
+import uuid
 """Document domain models.
 
 These models represent academic content and are designed to be lightweight,
@@ -111,6 +112,7 @@ class Tag(models.Model):
 
 
 class Document(models.Model):
+    share_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     """Core document model representing academic content only.
     
     This model contains only metadata. Files, storage, analytics, and processing

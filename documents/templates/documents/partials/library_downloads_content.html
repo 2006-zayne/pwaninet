@@ -48,8 +48,8 @@
                 <i class="bi bi-file-earmark-{{ download.document_file.extension|default:'pdf' }}" style="font-size: 1.5rem; color: var(--primary);"></i>
             </div>
             <div style="flex: 1;">
-                <a href="{% url 'documents:document_detail' download.document.id %}"
-                   hx-get="{% url 'documents:document_detail' download.document.id %}"
+                <a href="{% url 'documents:document_detail' download.document.share_id %}"
+                   hx-get="{% url 'documents:document_detail' download.document.share_id %}"
                    hx-target="#page-content-target"
                    hx-swap="innerHTML"
                    hx-push-url="true"

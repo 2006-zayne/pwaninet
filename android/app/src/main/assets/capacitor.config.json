@@ -5,10 +5,7 @@
 	"server": {
 		"url": "https://pwaninet.app",
 		"cleartext": false,
-		"errorPath": "/offline.html",
-		"allowNavigation": [
-			"*"
-		]
+		"errorPath": "/offline.html"
 	},
 	"plugins": {
 		"SplashScreen": {

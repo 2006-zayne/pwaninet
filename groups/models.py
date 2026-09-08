@@ -58,6 +58,8 @@ class Group(models.Model):
     )
     course = models.ForeignKey('courses.Course', on_delete=models.SET_NULL, null=True, blank=True)
     year = models.ForeignKey('courses.Year', on_delete=models.SET_NULL, null=True, blank=True)
+    programme = models.ForeignKey('documents.Programme', on_delete=models.SET_NULL, null=True, blank=True, related_name='groups')
+    academic_level = models.ForeignKey('documents.AcademicLevel', on_delete=models.SET_NULL, null=True, blank=True, related_name='groups')
     created_at = models.DateTimeField(auto_now_add=True)
     search_vector = SearchVectorField(null=True, blank=True)
 
@@ -108,7 +110,7 @@ class Membership(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='group_memberships', db_index=True)
     group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='memberships', db_index=True)
     role = models.CharField(max_length=20, choices=MembershipRole.choices, default=MembershipRole.MEMBER, db_index=True)
-    status = models.CharField(max_length=20, choices=MembershipStatus.choices, default=MembershipStatus.PENDING, db_index=True)
+    status = models.CharField(max_length=20, choices=MembershipStatus.choices, default=MembershipStatus.APPROVED, db_index=True)
     joined_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
@@ -117,6 +119,78 @@ class Membership(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.group.name} ({self.role})"
+
+
+# Clean domain alias
+GroupMember = Membership
+
+
+class JoinRequestStatus(models.TextChoices):
+    PENDING = 'PENDING', 'Pending'
+    APPROVED = 'APPROVED', 'Approved'
+    REJECTED = 'REJECTED', 'Rejected'
+    CANCELLED = 'CANCELLED', 'Cancelled'
+
+
+class GroupJoinRequest(models.Model):
+    """Inbound request from a user to join a group requiring approval"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='group_join_requests', db_index=True)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='join_requests', db_index=True)
+    status = models.CharField(max_length=20, choices=JoinRequestStatus.choices, default=JoinRequestStatus.PENDING, db_index=True)
+    message = models.TextField(blank=True, default='')
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_group_requests')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'group'],
+                condition=models.Q(status='PENDING'),
+                name='unique_pending_group_join_request'
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} -> {self.group.name} ({self.status})"
+
+
+class InvitationStatus(models.TextChoices):
+    PENDING = 'PENDING', 'Pending'
+    ACCEPTED = 'ACCEPTED', 'Accepted'
+    DECLINED = 'DECLINED', 'Declined'
+    REVOKED = 'REVOKED', 'Revoked'
+    EXPIRED = 'EXPIRED', 'Expired'
+
+
+class GroupInvitation(models.Model):
+    """Outbound invitation for a user to join a group"""
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='invitations', db_index=True)
+    inviter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sent_group_invitations', db_index=True)
+    invitee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='received_group_invitations', db_index=True)
+    status = models.CharField(max_length=20, choices=InvitationStatus.choices, default=InvitationStatus.PENDING, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['group', 'invitee'],
+                condition=models.Q(status='PENDING'),
+                name='unique_pending_group_invitation'
+            )
+        ]
+
+    def __str__(self):
+        return f"Invite: {self.inviter.username} -> {self.invitee.username} for {self.group.name} ({self.status})"
+
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        return self.expires_at < timezone.now()
 
 
 class AnnouncementPriority(models.TextChoices):

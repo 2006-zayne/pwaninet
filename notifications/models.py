@@ -423,11 +423,16 @@ class NotificationObject(models.Model):
         ('SYSTEM', 'System'),
         ('AI', 'AI'),
         ('GROUP', 'Group'),
+        ('GROUP_REQUEST', 'Group Join Request'),
+        ('GROUP_APPROVED', 'Group Request Approved'),
+        ('GROUP_REJECTED', 'Group Request Rejected'),
+        ('GROUP_ANNOUNCEMENT', 'Group Announcement'),
         ('FOLLOW', 'Follow'),
         ('PINCH', 'Pinch'),
         ('INVITE', 'Invite'),
         ('SHARE', 'Share'),
         ('DOCUMENT_SHARED', 'Document Shared'),
+        ('POST_CREATED', 'Post Created'),
     ]
     notification_type = models.CharField(
         max_length=20,
@@ -435,6 +440,11 @@ class NotificationObject(models.Model):
         db_index=True,
         help_text="Semantic type of the notification"
     )
+
+    @property
+    def id(self):
+        """Property alias for notification_id to maintain compatibility."""
+        return self.notification_id
     
     # Category - broader grouping for preference management
     CATEGORY_CHOICES = [

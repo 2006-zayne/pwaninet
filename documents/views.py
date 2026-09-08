@@ -51,13 +51,23 @@ def repository_home(request):
         limit=10,
         user=request.user if request.user.is_authenticated else None
     )
-    
+
+    # Get personalized "For You" documents from recommendation engine
+    from recommendations.services.engine import UnifiedRecommendationEngine
+    for_you_documents = []
+    if request.user.is_authenticated:
+        for_you_documents = UnifiedRecommendationEngine.get_for_you_documents(
+            user=request.user,
+            limit=8
+        )
+
     # Get recent searches from session (simpler approach)
     recent_searches = request.session.get('recent_searches', [])
-    
+
     context = {
         'page_title': 'Document Repository',
         'categories': categories,
+        'for_you_documents': for_you_documents,
         'trending_documents': trending_documents,
         'recent_documents': recent_documents,
         'popular_documents': popular_documents,
@@ -231,18 +241,18 @@ def search_suggestions_view(request):
     return JsonResponse({'suggestions': suggestions})
 
 
-def document_detail(request, document_id):
+def document_detail(request, share_id):
     """
     Individual document detail page with preview and metadata.
     """
-    document = DocumentSelector.get_document_with_relations(document_id)
+    document = DocumentSelector.get_document_with_relations(share_id)
     
     if not document:
         from django.http import Http404
         raise Http404("Document not found")
     
     # Record view asynchronously with caching
-    cache_key = f'doc_view_{document_id}_{request.session.session_key or request.META.get("REMOTE_ADDR")}'
+    cache_key = f'doc_view_{share_id}_{request.session.session_key or request.META.get("REMOTE_ADDR")}'
     if not cache.get(cache_key):
         # Create view record
         if request.user.is_authenticated:
@@ -263,7 +273,7 @@ def document_detail(request, document_id):
         cache.set(cache_key, True, 300)
     
     # Get cached view count or fetch from database
-    view_count_cache_key = f'doc_view_count_{document_id}'
+    view_count_cache_key = f'doc_view_count_{share_id}'
     cached_view_count = cache.get(view_count_cache_key)
     if cached_view_count is None:
         # Cache view count for 10 minutes
@@ -271,7 +281,7 @@ def document_detail(request, document_id):
         cache.set(view_count_cache_key, cached_view_count, 600)
     
     # Get cached download count
-    download_count_cache_key = f'doc_download_count_{document_id}'
+    download_count_cache_key = f'doc_download_count_{share_id}'
     cached_download_count = cache.get(download_count_cache_key)
     if cached_download_count is None:
         # Cache download count for 10 minutes
@@ -279,7 +289,7 @@ def document_detail(request, document_id):
         cache.set(download_count_cache_key, cached_download_count, 600)
     
     # Get cached bookmark count
-    bookmark_count_cache_key = f'doc_bookmark_count_{document_id}'
+    bookmark_count_cache_key = f'doc_bookmark_count_{share_id}'
     cached_bookmark_count = cache.get(bookmark_count_cache_key)
     if cached_bookmark_count is None:
         # Cache bookmark count for 10 minutes
@@ -311,8 +321,16 @@ def document_detail(request, document_id):
     can_manage = user_can_manage_document(request.user, document)
     versions = document.versions.prefetch_related('files').order_by('-version_number')
     
+    
+    # Generate download token
+    from django.core.signing import TimestampSigner
+    signer = TimestampSigner()
+    download_token = signer.sign_object(str(document.share_id))
+    
     context = {
         'page_title': document.title,
+        'download_token': download_token,
+
         'document': document,
         'related_documents': related_documents,
         'primary_unit': primary_unit,
@@ -345,9 +363,9 @@ def user_can_manage_document(user, document) -> bool:
 
 
 @login_required
-def edit_document(request, document_id):
+def edit_document(request, share_id):
     """Edit document metadata (title, description, category, academic unit, visibility, language)."""
-    document = Document.objects.filter(id=document_id).first()
+    document = Document.objects.filter(share_id=share_id).first()
     if not document:
         return JsonResponse({'success': False, 'error': 'Document not found'}, status=404)
 
@@ -439,13 +457,13 @@ def edit_document(request, document_id):
 
     from django.contrib import messages
     messages.success(request, 'Document updated successfully.')
-    return redirect('documents:document_detail', document_id=document.id)
+    return redirect('documents:document_detail', share_id=document.id)
 
 
 @login_required
-def delete_document_modal(request, document_id):
+def delete_document_modal(request, share_id):
     """Return confirmation modal HTML for document deletion."""
-    document = Document.objects.filter(id=document_id).first()
+    document = Document.objects.filter(share_id=share_id).first()
     if not document:
         return JsonResponse({'success': False, 'error': 'Document not found'}, status=404)
 
@@ -456,9 +474,9 @@ def delete_document_modal(request, document_id):
 
 
 @login_required
-def delete_document(request, document_id):
+def delete_document(request, share_id):
     """Soft-delete a document (archive)."""
-    document = Document.objects.filter(id=document_id).first()
+    document = Document.objects.filter(share_id=share_id).first()
     if not document:
         return JsonResponse({'success': False, 'error': 'Document not found'}, status=404)
 
@@ -480,7 +498,7 @@ def delete_document(request, document_id):
 
         if request.headers.get('HX-Request'):
             referer = request.META.get('HTTP_REFERER', '')
-            if f'/document/{document_id}' in referer:
+            if f'/document/{share_id}' in referer:
                 return htmx_location_response(request.build_absolute_uri(reverse('documents:my_library')))
             return HttpResponse(status=200)
 
@@ -490,9 +508,9 @@ def delete_document(request, document_id):
 
 
 @login_required
-def toggle_document_availability(request, document_id):
+def toggle_document_availability(request, share_id):
     """Toggle document availability (mark unavailable / available)."""
-    document = Document.objects.filter(id=document_id).first()
+    document = Document.objects.filter(share_id=share_id).first()
     if not document:
         return JsonResponse({'success': False, 'error': 'Document not found'}, status=404)
 
@@ -517,15 +535,15 @@ def toggle_document_availability(request, document_id):
             response['HX-Refresh'] = 'true'
             return response
 
-        return redirect('documents:document_detail', document_id=document.id)
+        return redirect('documents:document_detail', share_id=document.id)
 
     return JsonResponse({'error': 'POST required'}, status=405)
 
 
 @login_required
-def upload_new_version(request, document_id):
+def upload_new_version(request, share_id):
     """Upload a new version of an existing document."""
-    document = Document.objects.filter(id=document_id).first()
+    document = Document.objects.filter(share_id=share_id).first()
     if not document:
         return JsonResponse({'success': False, 'error': 'Document not found'}, status=404)
 
@@ -746,12 +764,12 @@ def upload_progress(request):
             from django.http import JsonResponse
             return JsonResponse({'error': str(e)}, status=500)
     
-    document_id = request.GET.get('document_id')
+    share_id = request.GET.get('share_id')
     
-    if document_id:
+    if share_id:
         from .models import Document, DocumentFile
         try:
-            document = Document.objects.get(id=document_id)
+            document = Document.objects.get(share_id=share_id)
             document_file = DocumentFile.objects.filter(
                 document_version__document=document
             ).first()
@@ -923,12 +941,12 @@ def my_history(request):
 @csrf_exempt
 @require_POST
 @login_required
-def toggle_bookmark(request, document_id):
+def toggle_bookmark(request, share_id):
     """
     Toggle bookmark status for a document via HTMX.
     """
     try:
-        document = Document.objects.get(id=document_id)
+        document = Document.objects.get(share_id=share_id)
         bookmark, created = DocumentBookmark.objects.get_or_create(
             document=document,
             user=request.user
@@ -943,7 +961,7 @@ def toggle_bookmark(request, document_id):
         
         # Trigger analytics update asynchronously
         from .tasks.processing import update_document_analytics
-        update_document_analytics.delay(document_id)
+        update_document_analytics.delay(document.id)
         
         # Return partial HTML response
         context = {
@@ -960,12 +978,12 @@ def toggle_bookmark(request, document_id):
 @csrf_exempt
 @require_POST
 @login_required
-def rate_document(request, document_id):
+def rate_document(request, share_id):
     """
     Rate a document with thumbs up/down via HTMX.
     """
     try:
-        document = Document.objects.get(id=document_id)
+        document = Document.objects.get(share_id=share_id)
         rating_value = int(request.POST.get('rating', 0))
         
         if rating_value not in [1, -1]:
@@ -985,7 +1003,7 @@ def rate_document(request, document_id):
         
         # Trigger analytics update asynchronously
         from .tasks.processing import update_document_analytics
-        update_document_analytics.delay(document_id)
+        update_document_analytics.delay(document.id)
         
         # Get updated analytics
         analytics, _ = DocumentAnalytics.objects.get_or_create(document=document)
@@ -1002,64 +1020,72 @@ def rate_document(request, document_id):
         return JsonResponse({'error': 'Document not found'}, status=404)
 
 
-@csrf_exempt
-@require_POST
-@login_required
-def track_download(request, document_id):
+from django.core.signing import TimestampSigner, BadSignature
+from django.http import FileResponse, HttpResponseForbidden, HttpResponseNotFound
+
+def serve_download(request, share_id):
     """
-    HTMX endpoint for tracking document downloads.
+    Endpoint for secure, token-gated document downloads.
     """
+    token = request.GET.get('t')
+    if not token:
+        return HttpResponseForbidden("Missing download token.")
+        
+    signer = TimestampSigner()
     try:
-        document = Document.objects.get(id=document_id)
-        file_id = request.POST.get('file_id')
+        # Verify token, expires in 24 hours (86400 seconds)
+        data = signer.unsign_object(token, max_age=86400)
+    except BadSignature:
+        return HttpResponseForbidden("Invalid or expired download token.")
+        
+    try:
+        document = Document.objects.get(share_id=share_id)
         
         from .engagement.models import DocumentDownload
         from .models import DocumentFile
         
+        file_id = request.GET.get('file_id')
         document_file = DocumentFile.objects.get(id=file_id) if file_id else document.latest_version.files.first()
         
-        # Create download record - signal handler will update analytics
+        if not document_file:
+            return HttpResponseNotFound("File not found.")
+            
+        # Create download record
         DocumentDownload.objects.create(
             document=document,
             document_file=document_file,
-            user=request.user,
+            user=request.user if request.user.is_authenticated else None,
             ip_address=request.META.get('REMOTE_ADDR'),
             user_agent=request.META.get('HTTP_USER_AGENT', '')[:500]
         )
         
-        # Invalidate download count cache
+        # Invalidate cache
         from django.core.cache import cache
-        download_count_cache_key = f'doc_download_count_{document_id}'
-        cache.delete(download_count_cache_key)
+        cache.delete(f'doc_download_count_{share_id}')
         
-        # Get updated analytics (signal handler should have updated it)
-        from .engagement.models import DocumentAnalytics
-        analytics, created = DocumentAnalytics.objects.get_or_create(document=document)
-        
-        # Trigger analytics update asynchronously for full recalculation
-        from .tasks.processing import update_document_analytics
-        update_document_analytics.delay(document_id)
-        
-        return JsonResponse({
-            'success': True,
-            'download_count': analytics.download_count
-        })
+        # Stream file securely
+        import mimetypes
+        content_type, _ = mimetypes.guess_type(document_file.file.name)
+        response = FileResponse(document_file.file.open('rb'), content_type=content_type or 'application/octet-stream')
+        filename = f"{document.title}.{document_file.extension}"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
         
     except Document.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Document not found'}, status=404)
+        return HttpResponseNotFound("Document not found")
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        return HttpResponseForbidden(f"Download failed: {str(e)}")
 
 
 @csrf_exempt
 @require_POST
 @login_required
-def share_document(request, document_id):
+def share_document(request, share_id):
     """
     Share a document to profile or group via HTMX.
     """
     try:
-        document = Document.objects.get(id=document_id)
+        document = Document.objects.get(share_id=share_id)
         share_type = request.POST.get('share_type')  # 'profile', 'group', or 'copy_link'
         
         if share_type == 'copy_link':
@@ -1072,12 +1098,12 @@ def share_document(request, document_id):
             
             # Trigger analytics update asynchronously
             from .tasks.processing import update_document_analytics
-            update_document_analytics.delay(document_id)
+            update_document_analytics.delay(document.id)
             
             return JsonResponse({
                 'success': True,
                 'message': 'Link copied to clipboard',
-                'url': request.build_absolute_uri(f"/documents/document/{document_id}/")
+                'url': request.build_absolute_uri(f"/documents/document/{share_id}/")
             })
         
         elif share_type == 'profile':
@@ -1109,7 +1135,7 @@ def share_document(request, document_id):
             
             # Trigger analytics update asynchronously
             from .tasks.processing import update_document_analytics
-            update_document_analytics.delay(document_id)
+            update_document_analytics.delay(document.id)
             
             return JsonResponse({
                 'success': True,
@@ -1166,7 +1192,7 @@ def share_document(request, document_id):
             
             # Trigger analytics update asynchronously
             from .tasks.processing import update_document_analytics
-            update_document_analytics.delay(document_id)
+            update_document_analytics.delay(document.id)
             
             return JsonResponse({
                 'success': True,
@@ -1206,12 +1232,12 @@ def user_groups_for_sharing(request):
 
 @csrf_exempt
 @login_required
-def document_stats(request, document_id):
+def document_stats(request, share_id):
     """
     Get cached document statistics via HTMX.
     """
     try:
-        document = Document.objects.get(id=document_id)
+        document = Document.objects.get(share_id=share_id)
         
         # Get or create analytics
         analytics, _ = DocumentAnalytics.objects.get_or_create(document=document)
@@ -1221,7 +1247,7 @@ def document_stats(request, document_id):
         from datetime import timedelta
         if analytics.last_updated < timezone.now() - timedelta(minutes=5):
             from .tasks.processing import update_document_analytics
-            update_document_analytics.delay(document_id)
+            update_document_analytics.delay(document.id)
         
         return JsonResponse({
             'view_count': analytics.view_count,

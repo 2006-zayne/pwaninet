@@ -255,6 +255,44 @@ class NotificationPayload:
     raw_data: Dict[str, Any] = field(default_factory=dict)
     capabilities: NotificationCapabilities = field(default_factory=NotificationCapabilities)
 
+    def __getitem__(self, key: str) -> Any:
+        """Allow dictionary-style access for backwards compatibility with tests and callers."""
+        if key == 'id':
+            return self.identity.notification_id
+        elif key == 'actor':
+            return {
+                'id': str(self.actors[0].id) if self.actors else None,
+                'username': self.actors[0].username if self.actors else None,
+                'name': self.actors[0].name if self.actors else None,
+                'avatar': self.actors[0].avatar if self.actors else None,
+            } if self.actors else None
+        elif key == 'read':
+            return self.metadata.read
+        elif key == 'priority':
+            return self.metadata.priority
+        elif key == 'created_at':
+            return self.timestamps.created_at if self.timestamps else None
+        elif key == 'timestamps':
+            return self.timestamps
+        elif key == 'resource':
+            return self.resource
+        elif key == 'status':
+            return self.lifecycle.state.value
+        elif key == 'content':
+            return self.message.variables.get('title', '') if self.message else ''
+        elif key == 'rendering_hints':
+            return {}
+        d = self.to_dict()
+        if key in d:
+            return d[key]
+        raise KeyError(key)
+
+    def __contains__(self, key: str) -> bool:
+        """Allow 'in' operator for dictionary-style compatibility."""
+        if key in ('id', 'type', 'created_at', 'read', 'priority', 'actor', 'content', 'metadata', 'status', 'rendering_hints'):
+            return True
+        return key in self.to_dict()
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
         return {
@@ -297,6 +335,7 @@ class NotificationPayload:
                 'url': self.resource.url,
                 'title': self.resource.title,
                 'image_url': self.resource.image_url,
+                'content': self.resource.content,
             } if self.resource else None,
             'message': {
                 'template': self.message.template,

@@ -1,8 +1,6 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from posts.models import Like, Comment, CommentLike
-from users.models import Follow, Pinch
-from groups.models import Membership, MembershipStatus
 from notifications.models import NotificationObject
 from notifications.events import publish_event, EventTypes, EventSources, EventActions
 
@@ -81,97 +79,3 @@ def create_comment_like_notification(sender, instance, created, **kwargs):
             )
 
 
-@receiver(post_save, sender=Follow)
-def create_follow_notification(sender, instance, created, **kwargs):
-    if created:
-        follower = instance.follower
-        followed = instance.followed
-        
-        # Emit event for new notification engine
-        publish_event(
-            event_type=EventTypes.USERS_USER_FOLLOWED.value,
-            source=EventSources.USERS.value,
-            action=EventActions.FOLLOWED.value,
-            actor=follower,
-            target_type='User',
-            target_id=str(followed.id),
-            metadata={
-                'follower_username': follower.username,
-                'followed_username': followed.username
-            }
-        )
-
-
-@receiver(post_save, sender=Pinch)
-def create_pinch_notification(sender, instance, created, **kwargs):
-    if created:
-        pinch_user = instance.pinch_user
-        pinched_user = instance.pinched_user
-        
-        # Emit event for new notification engine
-        publish_event(
-            event_type=EventTypes.USERS_USER_PINCHED.value,
-            source=EventSources.USERS.value,
-            action=EventActions.PINCHED.value,
-            actor=pinch_user,
-            target_type='User',
-            target_id=str(pinched_user.id),
-            metadata={
-                'pinch_username': pinch_user.username,
-                'pinched_username': pinched_user.username
-            }
-        )
-
-
-@receiver(post_save, sender=Membership)
-def create_membership_notification(sender, instance, created, **kwargs):
-    """Handle membership changes (join requests, approvals, invites)."""
-    if created:
-        # New membership request
-        if instance.status == MembershipStatus.PENDING:
-            publish_event(
-                event_type=EventTypes.GROUPS_MEMBER_REQUESTED.value,
-                source=EventSources.GROUPS.value,
-                action=EventActions.REQUESTED.value,
-                actor=instance.user,
-                target_type='Group',
-                target_id=str(instance.group.id),
-                metadata={
-                    'group_name': instance.group.name,
-                    'user_username': instance.user.username
-                }
-            )
-        
-        # Membership approved
-        elif instance.status == MembershipStatus.APPROVED:
-            publish_event(
-                event_type=EventTypes.GROUPS_MEMBER_APPROVED.value,
-                source=EventSources.GROUPS.value,
-                action=EventActions.APPROVED.value,
-                target_type='Group',
-                target_id=str(instance.group.id),
-                actor=instance.group.created_by if instance.group.created_by else None,
-                context_type='User',
-                context_id=str(instance.user.id),
-                metadata={
-                    'group_name': instance.group.name,
-                    'user_username': instance.user.username
-                }
-            )
-        
-        # Membership rejected
-        elif instance.status == MembershipStatus.REJECTED:
-            publish_event(
-                event_type=EventTypes.GROUPS_MEMBER_REJECTED.value,
-                source=EventSources.GROUPS.value,
-                action=EventActions.REJECTED.value,
-                target_type='Group',
-                target_id=str(instance.group.id),
-                actor=instance.group.created_by if instance.group.created_by else None,
-                context_type='User',
-                context_id=str(instance.user.id),
-                metadata={
-                    'group_name': instance.group.name,
-                    'user_username': instance.user.username
-                }
-            )

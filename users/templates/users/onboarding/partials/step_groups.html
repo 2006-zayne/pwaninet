@@ -1,0 +1,124 @@
+{% load static %}
+
+<div class="step-content animate-fade-in" id="step-groups-container">
+  <div class="mb-4">
+    <h3 class="fw-bold mb-1">Explore campus communities & study squads</h3>
+    <p class="text-muted small mb-0">Join academic circles, tech clubs, and student communities to collaborate and share resources.</p>
+  </div>
+
+  <!-- Official Enrolled Groups -->
+  {% if official_groups %}
+    <div class="mb-4">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-2 py-1 small">
+          <i class="bi bi-patch-check-fill me-1"></i>Official Cohort
+        </span>
+        <span class="text-muted small">Automatically enrolled based on your programme</span>
+      </div>
+
+      <div class="row g-3">
+        {% for group in official_groups %}
+          <div class="col-12 col-md-6">
+            <div class="card h-100 border border-success border-opacity-25 rounded-4 p-3 shadow-sm bg-success bg-opacity-10">
+              <div class="d-flex align-items-start gap-3">
+                <div class="rounded-circle bg-white text-success d-flex align-items-center justify-content-center shadow-xs flex-shrink-0"
+                     style="width: 50px; height: 50px; font-size: 1.4rem;">
+                  <i class="bi bi-mortarboard-fill"></i>
+                </div>
+                <div class="flex-grow-1 min-w-0">
+                  <div class="d-flex align-items-center justify-content-between gap-2">
+                    <h6 class="fw-bold mb-0 text-truncate text-dark">{{ group.name }}</h6>
+                    <span class="badge bg-success rounded-pill px-2 py-1 small flex-shrink-0">
+                      <i class="bi bi-check2"></i> Enrolled
+                    </span>
+                  </div>
+                  <p class="text-muted small mb-1 mt-1 text-truncate" style="font-size: 0.8rem;">
+                    {{ group.description|default:"Your official class collaboration group." }}
+                  </p>
+                  <span class="text-muted small" style="font-size: 0.75rem;">
+                    <i class="bi bi-people-fill me-1"></i>{{ group.memberships.count }} classmate{{ group.memberships.count|pluralize }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Recommended Groups to Join -->
+  <div>
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <h6 class="fw-bold text-uppercase text-muted small mb-0" style="letter-spacing: 0.05em;">Recommended for You</h6>
+    </div>
+
+    {% if recommended_groups %}
+      <div class="row g-3">
+        {% for group in recommended_groups %}
+          <div class="col-12 col-md-6">
+            <div class="card h-100 border rounded-4 p-3 shadow-sm hover-lift group-card">
+              <div class="d-flex align-items-start gap-3">
+                {% if group.group_pic and group.group_pic.url %}
+                  <img src="{{ group.group_pic.url }}"
+                       alt="{{ group.name }}"
+                       class="rounded-4 object-fit-cover shadow-xs flex-shrink-0"
+                       style="width: 50px; height: 50px;">
+                {% else %}
+                  <div class="rounded-4 bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center fw-bold shadow-xs flex-shrink-0"
+                       style="width: 50px; height: 50px; font-size: 1.3rem;">
+                    <i class="bi bi-people-fill"></i>
+                  </div>
+                {% endif %}
+
+                <div class="flex-grow-1 min-w-0">
+                  <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                    <h6 class="fw-bold mb-0 text-truncate text-dark">{{ group.name }}</h6>
+                    <div class="flex-shrink-0">
+                      {% if group.id in joined_group_ids %}
+                        <button class="btn btn-sm btn-outline-success rounded-pill px-3 fw-bold"
+                                id="onboarding-group-btn-{{ group.id }}"
+                                disabled>
+                          <i class="bi bi-check2"></i> Joined
+                        </button>
+                      {% else %}
+                        <button class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold"
+                                id="onboarding-group-btn-{{ group.id }}"
+                                hx-post="{% url 'groups:toggle_membership' group.id %}?source=onboarding"
+                                hx-target="#onboarding-group-btn-{{ group.id }}"
+                                hx-swap="outerHTML">
+                          <i class="bi bi-plus-lg"></i> Join
+                        </button>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+                    <span class="badge bg-secondary bg-opacity-10 text-secondary rounded-pill px-2 py-1 small" style="font-size: 0.72rem;">
+                      {{ group.recommendation_reason }}
+                    </span>
+                    <span class="text-muted small" style="font-size: 0.75rem;">
+                      <i class="bi bi-people-fill me-1"></i>{{ group.member_count|default:0 }} member{{ group.member_count|pluralize }}
+                    </span>
+                  </div>
+
+                  {% if group.description %}
+                    <p class="text-muted small text-truncate mb-0" style="font-size: 0.8rem;">
+                      {{ group.description }}
+                    </p>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-center py-4 border rounded-4 bg-light p-3">
+        <i class="bi bi-people text-muted display-6"></i>
+        <h6 class="fw-bold mt-2 mb-1">You're all set!</h6>
+        <p class="text-muted small mb-0">You're enrolled in your primary cohort. Continue to the feed to explore more.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>

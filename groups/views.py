@@ -10,8 +10,11 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.urls import reverse
 from django.db.models import Q, Count
-from django.db import transaction
-from django.views.decorators.http import require_http_methods
+from django.db import transaction, IntegrityError
+from django.utils import timezone
+import datetime
+import logging
+from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.csrf import csrf_exempt
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -19,8 +22,10 @@ from asgiref.sync import async_to_sync
 from .models import (
     Group, Membership, MembershipRole, MembershipStatus, JoinPolicy,
     EditPermission, InvitePermission, Announcement,
-    GroupMessage, GroupMessageAttachment, GroupMessageReaction
+    GroupMessage, GroupMessageAttachment, GroupMessageReaction,
+    GroupJoinRequest, GroupInvitation
 )
+from .consumers import evict_group_member_socket
 from .serializers import (
     GroupSerializer, GroupCreateSerializer, MembershipSerializer,
     MembershipCreateSerializer, MembershipActionSerializer, RoleAssignmentSerializer,
@@ -34,7 +39,7 @@ from .permissions import (
     CanEditAnnouncement, CanDeleteAnnouncement
 )
 from posts.models import Post, Like
-from users.models import User
+from users.models import User, Follow
 from groups.forms import GroupForm, GroupDetailsForm, RoleAssignmentForm, GroupPrivacyForm
 from groups.services.group_notification_service import (
     send_group_join_request_notification,
@@ -43,15 +48,57 @@ from groups.services.group_notification_service import (
     send_group_welcome_notification,
     send_group_invite_notification
 )
-from notifications.services.notification_service import get_cached_unread_count, get_group_unread_counts
+from notifications.services.notification_service import (
+    get_cached_unread_count, get_group_unread_counts, invalidate_unread_count_cache
+)
+from notifications.queries.notification_queries import get_unread_count_by_user_id
 from notifications.models import NotificationObject
-from django.http import JsonResponse
 from django.core.paginator import Paginator
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
 import json
-from users.models import Follow
 from pwaninet.utils.htmx import htmx_location_response
+from notifications.events import publish_event, EventSources
+
+logger = logging.getLogger(__name__)
+
+
+def _archive_group_request_notifications(group_id, requesting_user_id=None):
+    """
+    Archive pending join request notifications for admins of this group,
+    and broadcast updated unread counts via WebSocket.
+    """
+    try:
+        notifs = NotificationObject.objects.filter(
+            context_type='GROUP',
+            context_id=str(group_id)
+        ).exclude(status__in=['READ', 'ARCHIVED'])
+
+        channel_layer = get_channel_layer()
+        affected_recipients = set()
+
+        for notif in notifs:
+            notif_user_id = notif.metadata.get('user_id') if notif.metadata else None
+            if requesting_user_id is None or not notif_user_id or str(notif_user_id) == str(requesting_user_id):
+                notif.status = 'ARCHIVED'
+                notif.save(update_fields=['status'])
+                affected_recipients.add(notif.recipient_id)
+
+        for recipient_id in affected_recipients:
+            invalidate_unread_count_cache(recipient_id)
+            if channel_layer:
+                try:
+                    count = get_unread_count_by_user_id(recipient_id)
+                    async_to_sync(channel_layer.group_send)(
+                        f"notifications_{recipient_id}",
+                        {
+                            'type': 'unread_count_update',
+                            'count': count
+                        }
+                    )
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.warning(f"Error archiving group request notifications: {e}")
+
 
 
 class GroupViewSet(viewsets.ModelViewSet):
@@ -77,51 +124,84 @@ class GroupViewSet(viewsets.ModelViewSet):
         POST /groups/{id}/join/
         Request to join a group.
         """
-        group = self.get_object()
+        with transaction.atomic():
+            group = Group.objects.select_for_update().get(id=pk)
 
-        # Check official group restrictions
-        if group.is_official and group.course and group.year:
-            if request.user.course != group.course or request.user.year != group.year:
+            # Check official group restrictions
+            grp_prog = group.programme or group.course
+            grp_level = group.academic_level or group.year
+            if group.is_official and grp_prog and grp_level:
+                user_prog = getattr(request.user, 'programme', None) or getattr(request.user, 'course', None)
+                user_level = getattr(request.user, 'academic_level', None) or getattr(request.user, 'year', None)
+                if user_prog != grp_prog or user_level != grp_level:
+                    return Response(
+                        {'detail': 'You can only join official groups that match your course and year.'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+
+            # Check if already has approved membership
+            if Membership.objects.filter(user=request.user, group=group, status=MembershipStatus.APPROVED).exists():
                 return Response(
-                    {'detail': 'You can only join official groups that match your course and year.'},
+                    {'detail': 'You are already a member of this group.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if has pending join request
+            if GroupJoinRequest.objects.filter(user=request.user, group=group, status='PENDING').exists():
+                return Response(
+                    {'detail': 'You already have a pending join request for this group.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Determine status based on join policy
+            if group.join_policy == JoinPolicy.OPEN:
+                membership = Membership.objects.filter(user=request.user, group=group).first()
+                if not membership:
+                    membership = Membership(
+                        user=request.user,
+                        group=group,
+                        role=MembershipRole.MEMBER,
+                        status=MembershipStatus.APPROVED
+                    )
+                    membership._skip_signal_notification = True
+                    membership.save()
+                elif membership.status != MembershipStatus.APPROVED:
+                    membership.status = MembershipStatus.APPROVED
+                    membership._skip_signal_notification = True
+                    membership.save()
+                send_group_welcome_notification(request.user, group)
+                return Response({
+                    'status': MembershipStatus.APPROVED,
+                    'message': 'Joined successfully'
+                }, status=status.HTTP_200_OK)
+
+            elif group.join_policy == JoinPolicy.INVITE_ONLY:
+                return Response(
+                    {'detail': 'This group is invite-only.'},
                     status=status.HTTP_403_FORBIDDEN
                 )
 
-        # Check if already has membership
-        if Membership.objects.filter(user=request.user, group=group).exists():
-            return Response(
-                {'detail': 'You already have a membership request for this group.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            else:
+                # APPROVAL policy
+                GroupJoinRequest.objects.get_or_create(
+                    user=request.user,
+                    group=group,
+                    defaults={'status': 'PENDING'}
+                )
+                try:
+                    Membership.objects.get_or_create(
+                        user=request.user,
+                        group=group,
+                        defaults={'role': MembershipRole.MEMBER, 'status': MembershipStatus.PENDING}
+                    )
+                except IntegrityError:
+                    pass
 
-        # Determine status based on join policy
-        if group.join_policy == JoinPolicy.OPEN:
-            membership_status = MembershipStatus.APPROVED
-        elif group.join_policy == JoinPolicy.APPROVAL:
-            membership_status = MembershipStatus.PENDING
-        elif group.join_policy == JoinPolicy.INVITE_ONLY:
-            return Response(
-                {'detail': 'This group is invite-only.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        else:
-            membership_status = MembershipStatus.PENDING
-
-        membership = Membership.objects.create(
-            user=request.user,
-            group=group,
-            role=MembershipRole.MEMBER,
-            status=membership_status
-        )
-
-        # Send admin notifications for pending requests
-        if membership_status == MembershipStatus.PENDING:
-            send_group_join_request_notification(request.user, group)
-
-        return Response({
-            'status': membership_status,
-            'message': 'Join request sent' if membership_status == MembershipStatus.PENDING else 'Joined successfully'
-        }, status=status.HTTP_201_CREATED)
+                send_group_join_request_notification(request.user, group)
+                return Response({
+                    'status': MembershipStatus.PENDING,
+                    'message': 'Join request sent'
+                }, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'], url_path='approve/(?P<user_id>[^/.]+)')
     def approve(self, request, pk=None, user_id=None):
@@ -129,45 +209,70 @@ class GroupViewSet(viewsets.ModelViewSet):
         POST /groups/{id}/approve/{user_id}/
         Approve a join request (admin only).
         """
-        group = self.get_object()
+        with transaction.atomic():
+            group = Group.objects.select_for_update().get(id=pk)
 
-        # Check if user is admin
-        try:
-            admin_membership = Membership.objects.get(
+            # Check if user is admin
+            if not Membership.objects.filter(
                 user=request.user,
                 group=group,
                 role=MembershipRole.ADMIN,
                 status=MembershipStatus.APPROVED
-            )
-        except Membership.DoesNotExist:
-            return Response(
-                {'detail': 'Only admins can approve join requests.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
+            ).exists():
+                return Response(
+                    {'detail': 'Only group admins can approve requests.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
-        # Get the membership to approve
-        try:
-            membership = Membership.objects.get(
-                user_id=user_id,
+            join_request = GroupJoinRequest.objects.filter(
                 group=group,
-                status=MembershipStatus.PENDING
-            )
-        except Membership.DoesNotExist:
+                user_id=user_id,
+                status='PENDING'
+            ).first()
+
+            membership = Membership.objects.filter(
+                user_id=user_id,
+                group=group
+            ).first()
+
+            if not join_request and (not membership or membership.status != MembershipStatus.PENDING):
+                return Response(
+                    {'detail': 'No pending membership request found for this user.'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            if join_request:
+                join_request.status = 'APPROVED'
+                join_request.reviewed_by = request.user
+                join_request.reviewed_at = timezone.now()
+                join_request.save()
+
+            if membership:
+                membership.status = MembershipStatus.APPROVED
+                membership.role = MembershipRole.MEMBER
+                membership._skip_signal_notification = True
+                membership.save()
+            else:
+                target_user = get_object_or_404(User, id=user_id)
+                membership = Membership(
+                    user=target_user,
+                    group=group,
+                    role=MembershipRole.MEMBER,
+                    status=MembershipStatus.APPROVED
+                )
+                membership._skip_signal_notification = True
+                membership.save()
+
+            # Send welcome notification to the approved user
+            send_group_approved_notification(membership.user, group, request.user)
+
+            # Clean up pending request notifications for this group
+            _archive_group_request_notifications(group.id, user_id)
+
             return Response(
-                {'detail': 'No pending membership request found for this user.'},
-                status=status.HTTP_404_NOT_FOUND
+                MembershipSerializer(membership).data,
+                status=status.HTTP_200_OK
             )
-
-        membership.status = MembershipStatus.APPROVED
-        membership.save()
-
-        # Send welcome notification to the approved user
-        send_group_approved_notification(membership.user, group, request.user)
-
-        return Response(
-            MembershipSerializer(membership).data,
-            status=status.HTTP_200_OK
-        )
 
     @action(detail=True, methods=['post'], url_path='reject/(?P<user_id>[^/.]+)')
     def reject(self, request, pk=None, user_id=None):
@@ -175,92 +280,120 @@ class GroupViewSet(viewsets.ModelViewSet):
         POST /groups/{id}/reject/{user_id}/
         Reject a join request (admin only).
         """
-        group = self.get_object()
+        with transaction.atomic():
+            group = Group.objects.select_for_update().get(id=pk)
 
-        # Check if user is admin
-        try:
-            admin_membership = Membership.objects.get(
+            # Check if user is admin
+            if not Membership.objects.filter(
                 user=request.user,
                 group=group,
                 role=MembershipRole.ADMIN,
                 status=MembershipStatus.APPROVED
-            )
-        except Membership.DoesNotExist:
-            return Response(
-                {'detail': 'Only admins can reject join requests.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
+            ).exists():
+                return Response(
+                    {'detail': 'Only admins can reject join requests.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
-        # Get the membership to reject
-        try:
-            membership = Membership.objects.get(
-                user_id=user_id,
+            join_request = GroupJoinRequest.objects.filter(
                 group=group,
-                status=MembershipStatus.PENDING
-            )
-        except Membership.DoesNotExist:
+                user_id=user_id,
+                status='PENDING'
+            ).first()
+
+            membership = Membership.objects.filter(
+                user_id=user_id,
+                group=group
+            ).first()
+
+            if not join_request and (not membership or membership.status != MembershipStatus.PENDING):
+                return Response(
+                    {'detail': 'No pending membership request found for this user.'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            if join_request:
+                join_request.status = 'REJECTED'
+                join_request.reviewed_by = request.user
+                join_request.reviewed_at = timezone.now()
+                join_request.save()
+
+            target_user = None
+            if membership:
+                target_user = membership.user
+                membership.status = MembershipStatus.REJECTED
+                membership.save()
+            else:
+                target_user = get_object_or_404(User, id=user_id)
+
+            # Send rejection notification to the user
+            send_group_rejected_notification(target_user, group, request.user)
+
+            # Clean up pending request notifications for this group
+            _archive_group_request_notifications(group.id, user_id)
+
             return Response(
-                {'detail': 'No pending membership request found for this user.'},
-                status=status.HTTP_404_NOT_FOUND
+                MembershipSerializer(membership).data if membership else {'status': 'REJECTED'},
+                status=status.HTTP_200_OK
             )
-
-        membership.status = MembershipStatus.REJECTED
-        membership.save()
-
-        # Send rejection notification to the user
-        send_group_rejected_notification(membership.user, group, request.user)
-
-        return Response(
-            MembershipSerializer(membership).data,
-            status=status.HTTP_200_OK
-        )
 
     @action(detail=True, methods=['post'], url_path='assign-role')
     def assign_role(self, request, pk=None):
         """
         POST /groups/{id}/assign-role/
         Assign a role to a member (admin only).
-        Enforces max 5 admins per group constraint.
+        Enforces max 5 admins per group constraint under row lock.
         """
-        group = self.get_object()
+        with transaction.atomic():
+            group = Group.objects.select_for_update().get(id=pk)
 
-        # Check if user is admin
-        try:
-            admin_membership = Membership.objects.get(
+            # Check if caller is admin
+            if not Membership.objects.filter(
                 user=request.user,
                 group=group,
                 role=MembershipRole.ADMIN,
                 status=MembershipStatus.APPROVED
+            ).exists():
+                return Response(
+                    {'detail': 'Only admins can assign roles.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            serializer = RoleAssignmentSerializer(
+                data=request.data,
+                context={'request': request, 'group_id': group.id}
             )
-        except Membership.DoesNotExist:
+            serializer.is_valid(raise_exception=True)
+
+            membership = serializer.validated_data['membership']
+            new_role = serializer.validated_data['role']
+
+            # Cannot demote yourself from admin
+            if membership.user == request.user and membership.role == MembershipRole.ADMIN and new_role != MembershipRole.ADMIN:
+                return Response(
+                    {'detail': 'You cannot change your own admin role.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if new_role == MembershipRole.ADMIN and membership.role != MembershipRole.ADMIN:
+                admin_count = Membership.objects.filter(
+                    group=group,
+                    role=MembershipRole.ADMIN,
+                    status=MembershipStatus.APPROVED
+                ).count()
+                if admin_count >= 5:
+                    return Response(
+                        {'detail': 'Maximum of 5 admins allowed per group.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            membership.role = new_role
+            membership.save()
+
             return Response(
-                {'detail': 'Only admins can assign roles.'},
-                status=status.HTTP_403_FORBIDDEN
+                MembershipSerializer(membership).data,
+                status=status.HTTP_200_OK
             )
-
-        serializer = RoleAssignmentSerializer(
-            data=request.data,
-            context={'request': request, 'group_id': group.id}
-        )
-        serializer.is_valid(raise_exception=True)
-
-        membership = serializer.validated_data['membership']
-        new_role = serializer.validated_data['role']
-
-        # Cannot demote yourself from admin
-        if membership.user == request.user and membership.role == MembershipRole.ADMIN:
-            return Response(
-                {'detail': 'You cannot change your own admin role.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        membership.role = new_role
-        membership.save()
-
-        return Response(
-            MembershipSerializer(membership).data,
-            status=status.HTTP_200_OK
-        )
 
     @action(detail=True, methods=['get'], url_path='members')
     def members(self, request, pk=None):
@@ -279,72 +412,75 @@ class GroupViewSet(viewsets.ModelViewSet):
         POST /groups/{id}/leave/
         Leave a group.
         """
-        group = self.get_object()
+        with transaction.atomic():
+            group = Group.objects.select_for_update().get(id=pk)
 
-        try:
-            membership = Membership.objects.get(
-                user=request.user,
-                group=group,
-                status=MembershipStatus.APPROVED
-            )
-        except Membership.DoesNotExist:
+            try:
+                membership = Membership.objects.get(
+                    user=request.user,
+                    group=group,
+                    status=MembershipStatus.APPROVED
+                )
+            except Membership.DoesNotExist:
+                return Response(
+                    {'detail': 'You are not an approved member of this group.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if user is the last admin
+            if membership.role == MembershipRole.ADMIN:
+                admin_count = Membership.objects.filter(
+                    group=group,
+                    role=MembershipRole.ADMIN,
+                    status=MembershipStatus.APPROVED
+                ).count()
+
+                if admin_count == 1:
+                    # Find potential successors
+                    moderators = Membership.objects.filter(
+                        group=group,
+                        role=MembershipRole.MODERATOR,
+                        status=MembershipStatus.APPROVED
+                    ).select_related('user')[:3]
+
+                    members = Membership.objects.filter(
+                        group=group,
+                        role=MembershipRole.MEMBER,
+                        status=MembershipStatus.APPROVED
+                    ).select_related('user').order_by('-id')[:5]
+
+                    successors = []
+                    for mod in moderators:
+                        successors.append({
+                            'id': mod.user.id,
+                            'username': mod.user.username,
+                            'name': f"{mod.user.first_name or ''} {mod.user.last_name or ''}".strip(),
+                            'role': 'MODERATOR',
+                            'priority': 1
+                        })
+
+                    for mem in members:
+                        successors.append({
+                            'id': mem.user.id,
+                            'username': mem.user.username,
+                            'name': f"{mem.user.first_name or ''} {mem.user.last_name or ''}".strip(),
+                            'role': 'MEMBER',
+                            'priority': 2
+                        })
+
+                    return Response({
+                        'is_last_admin': True,
+                        'detail': 'You are the last admin. Please assign a successor before leaving.',
+                        'successors': successors
+                    }, status=status.HTTP_403_FORBIDDEN)
+
+            membership.delete()
+            evict_group_member_socket(group.id, request.user.id, reason="You left the group.")
             return Response(
-                {'detail': 'You are not an approved member of this group.'},
-                status=status.HTTP_400_BAD_REQUEST
+                {'detail': 'You have left the group.'},
+                status=status.HTTP_200_OK
             )
 
-        # Check if user is the last admin
-        if membership.role == MembershipRole.ADMIN:
-            admin_count = Membership.objects.filter(
-                group=group,
-                role=MembershipRole.ADMIN,
-                status=MembershipStatus.APPROVED
-            ).count()
-
-            if admin_count == 1:
-                # Find potential successors
-                moderators = Membership.objects.filter(
-                    group=group,
-                    role=MembershipRole.MODERATOR,
-                    status=MembershipStatus.APPROVED
-                ).select_related('user')[:3]
-
-                members = Membership.objects.filter(
-                    group=group,
-                    role=MembershipRole.MEMBER,
-                    status=MembershipStatus.APPROVED
-                ).select_related('user').order_by('-id')[:5]
-
-                successors = []
-                for mod in moderators:
-                    successors.append({
-                        'id': mod.user.id,
-                        'username': mod.user.username,
-                        'name': f"{mod.user.first_name or ''} {mod.user.last_name or ''}".strip(),
-                        'role': 'MODERATOR',
-                        'priority': 1
-                    })
-
-                for mem in members:
-                    successors.append({
-                        'id': mem.user.id,
-                        'username': mem.user.username,
-                        'name': f"{mem.user.first_name or ''} {mem.user.last_name or ''}".strip(),
-                        'role': 'MEMBER',
-                        'priority': 2
-                    })
-
-                return Response({
-                    'is_last_admin': True,
-                    'detail': 'You are the last admin. Please assign a successor before leaving.',
-                    'successors': successors
-                }, status=status.HTTP_403_FORBIDDEN)
-
-        membership.delete()
-        return Response(
-            {'detail': 'You have left the group.'},
-            status=status.HTTP_200_OK
-        )
 
     @action(detail=True, methods=['post'], url_path='photos/(?P<photo_type>[^/.]+)/like')
     def photo_like(self, request, pk=None, photo_type=None):
@@ -536,6 +672,25 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
             )
 
         self.perform_create(serializer)
+        announcement = serializer.instance
+        group = announcement.group
+        transaction.on_commit(lambda: publish_event(
+            event_type='groups.announcement.created',
+            source=EventSources.GROUPS.value,
+            action='created',
+            actor=request.user,
+            target_type='Announcement',
+            target_id=str(announcement.id),
+            context_type='GROUP',
+            context_id=str(group.id),
+            metadata={
+                'group_name': group.name,
+                'group_id': group.id,
+                'announcement_id': announcement.id,
+                'announcement_title': announcement.title,
+                'title': announcement.title,
+            }
+        ))
 
         # Return HTML for HTMX requests
         if request.headers.get('HX-Request'):
@@ -802,15 +957,10 @@ def groups_dashboard(request):
         )
         display_groups = matched_groups
     else:
-        # Get suggested groups based on who user follows
-        following_ids = get_following_ids(request.user)
-        suggested_groups = Group.objects.filter(
-            memberships__user_id__in=following_ids,
-            memberships__status=MembershipStatus.APPROVED
-        ).exclude(memberships__user=request.user).annotate(
-            member_count=Count('memberships', filter=Q(memberships__status=MembershipStatus.APPROVED))
-        ).order_by('-member_count')[:20]
-        display_groups = list(suggested_groups)
+        from recommendations.services.engine import UnifiedRecommendationEngine
+        display_groups = UnifiedRecommendationEngine.get_recommended_groups(
+            request.user, limit=20, context='dashboard'
+        )
 
     user_group_ids = set(user_groups.values_list('id', flat=True))
     pending_group_ids = set(pending_groups.values_list('id', flat=True))
@@ -847,7 +997,12 @@ def groups_detail_view(request, group_id):
     query = request.GET.get('search_user', '')
     page = int(request.GET.get('page', 1))
     context = build_group_detail_context(request.user, group, query, page)
-    liked_post_ids = set(Like.objects.filter(user=request.user, post__in=context['posts']).values_list('post_id', flat=True))
+    liked_post_ids = set()
+    if request.user.is_authenticated and context.get('posts'):
+        for pid, sid in Like.objects.filter(user=request.user, post__in=context['posts']).values_list('post_id', 'post__share_id'):
+            liked_post_ids.add(pid)
+            liked_post_ids.add(sid)
+            liked_post_ids.add(str(sid))
     context['liked_post_ids'] = liked_post_ids
     context['unread_notifications_count'] = get_cached_unread_count(request.user)
 
@@ -877,7 +1032,9 @@ def create_group_view(request):
             group = form.save(commit=False)
             group.created_by = request.user
             group.save()
-            Membership.objects.create(group=group, user=request.user, role=MembershipRole.ADMIN, status=MembershipStatus.APPROVED)
+            admin_mem = Membership(group=group, user=request.user, role=MembershipRole.ADMIN, status=MembershipStatus.APPROVED)
+            admin_mem._skip_signal_notification = True
+            admin_mem.save()
             messages.success(request, f'Squad "{group.name}" created successfully.')
             if is_htmx:
                 return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group.id}))
@@ -1183,12 +1340,17 @@ def group_chat_view(request, group_id):
 
 @login_required
 @require_http_methods(["POST"])
+@transaction.atomic
 def toggle_group_membership(request, group_id):
-    group = get_object_or_404(Group, id=group_id)
+    group = Group.objects.select_for_update().get(id=group_id)
 
     # Check official group restrictions
-    if group.is_official and group.course and group.year:
-        if request.user.course != group.course or request.user.year != group.year:
+    grp_prog = group.programme or group.course
+    grp_level = group.academic_level or group.year
+    if group.is_official and grp_prog and grp_level:
+        user_prog = getattr(request.user, 'programme', None) or getattr(request.user, 'course', None)
+        user_level = getattr(request.user, 'academic_level', None) or getattr(request.user, 'year', None)
+        if user_prog != grp_prog or user_level != grp_level:
             messages.error(request, 'You can only join official groups that match your course and year.')
             if request.headers.get('HX-Request'):
                 return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group_id}))
@@ -1198,34 +1360,81 @@ def toggle_group_membership(request, group_id):
     existing_membership = Membership.objects.filter(group=group, user=request.user).first()
 
     if existing_membership:
+        # Sole admin protection
+        if existing_membership.role == MembershipRole.ADMIN and existing_membership.status == MembershipStatus.APPROVED:
+            other_admins = Membership.objects.filter(
+                group=group,
+                role=MembershipRole.ADMIN,
+                status=MembershipStatus.APPROVED
+            ).exclude(id=existing_membership.id).exists()
+            if not other_admins:
+                messages.error(request, 'You cannot leave the group as you are the sole administrator. Promote another member to admin first.')
+                if request.headers.get('HX-Request'):
+                    return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group_id}))
+                return redirect('groups:groups_detail', group_id=group_id)
+
         existing_membership.delete()
+        evict_group_member_socket(group.id, request.user.id, reason="You left the group.")
         messages.success(request, f'You left {group.name}.')
     else:
         # Determine status based on join policy
         if group.join_policy == JoinPolicy.OPEN:
-            membership_status = MembershipStatus.APPROVED
+            membership = Membership.objects.filter(group=group, user=request.user).first()
+            if not membership:
+                membership = Membership(
+                    group=group,
+                    user=request.user,
+                    role=MembershipRole.MEMBER,
+                    status=MembershipStatus.APPROVED
+                )
+                membership._skip_signal_notification = True
+                membership.save()
+            elif membership.status != MembershipStatus.APPROVED:
+                membership.status = MembershipStatus.APPROVED
+                membership._skip_signal_notification = True
+                membership.save()
+            messages.success(request, f'You joined {group.name}!')
+            send_group_welcome_notification(request.user, group)
         elif group.join_policy == JoinPolicy.APPROVAL:
-            membership_status = MembershipStatus.PENDING
+            # Check if pending request exists
+            join_req, created = GroupJoinRequest.objects.get_or_create(
+                group=group,
+                user=request.user,
+                defaults={'status': 'PENDING'}
+            )
+            try:
+                Membership.objects.get_or_create(
+                    group=group,
+                    user=request.user,
+                    defaults={'status': MembershipStatus.PENDING, 'role': MembershipRole.MEMBER}
+                )
+            except IntegrityError:
+                pass
+
+            if created:
+                messages.info(request, f'Your request to join {group.name} is pending approval.')
+                send_group_join_request_notification(request.user, group)
+            else:
+                messages.info(request, f'Your request to join {group.name} is already pending approval.')
         elif group.join_policy == JoinPolicy.INVITE_ONLY:
             messages.error(request, 'This group is invite-only.')
-            if request.headers.get('HX-Request'):
-                return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group_id}))
-            return redirect('groups:groups_detail', group_id=group_id)
-        else:
-            membership_status = MembershipStatus.PENDING
-
-        membership = Membership.objects.create(group=group, user=request.user, status=membership_status)
-
-        if membership_status == MembershipStatus.APPROVED:
-            messages.success(request, f'You joined {group.name}!')
-            # Send welcome notification
-            send_group_welcome_notification(request.user, group)
         else:
             messages.info(request, f'Your request to join {group.name} is pending approval.')
-            # Send admin notifications for pending requests
-            send_group_join_request_notification(request.user, group)
+
+    # Invalidate recommendation caches
+    from recommendations.services.engine import UnifiedRecommendationEngine
+    UnifiedRecommendationEngine.invalidate_all_user_caches(request.user.id)
 
     if request.headers.get('HX-Request'):
+        if request.GET.get('source') == 'onboarding':
+            membership = Membership.objects.filter(group=group, user=request.user).first()
+            is_member = membership and membership.status == MembershipStatus.APPROVED
+            is_pending = membership and membership.status == MembershipStatus.PENDING
+            return render(request, 'groups/partials/join_button_onboarding.html', {
+                'group': group,
+                'is_member': is_member,
+                'is_pending': is_pending,
+            })
         return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group_id}))
     return redirect('groups:groups_detail', group_id=group_id)
 
@@ -1262,107 +1471,196 @@ def edit_group(request, group_id):
 
 
 @login_required
+@transaction.atomic
 def invite_to_group(request, group_id, user_id):
     group = get_object_or_404(Group, id=group_id)
     target = get_object_or_404(User, id=user_id)
-    if not Membership.objects.filter(group=group, user=target).exists():
-        send_group_invite_notification(target, request.user, group)
-        messages.success(request, f'Invite sent to {target.username}.')
+
+    # Check caller is member
+    try:
+        caller_membership = Membership.objects.get(
+            user=request.user,
+            group=group,
+            status=MembershipStatus.APPROVED
+        )
+    except Membership.DoesNotExist:
+        messages.error(request, 'You must be a member to invite users.')
+        if request.headers.get('HX-Request'):
+            return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group_id}))
+        return redirect('groups:groups_detail', group_id=group_id)
+
+    if group.invite_permission == InvitePermission.ADMINS_ONLY and caller_membership.role != MembershipRole.ADMIN:
+        messages.error(request, 'Only admins can invite users to this group.')
+        if request.headers.get('HX-Request'):
+            return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group_id}))
+        return redirect('groups:groups_detail', group_id=group_id)
+
+    # Check if target is already a member
+    if Membership.objects.filter(group=group, user=target, status=MembershipStatus.APPROVED).exists():
+        messages.info(request, f'{target.username} is already a member.')
+    else:
+        expires = timezone.now() + datetime.timedelta(days=7)
+        invitation, created = GroupInvitation.objects.get_or_create(
+            group=group,
+            invitee=target,
+            status='PENDING',
+            defaults={'inviter': request.user, 'expires_at': expires}
+        )
+        if created:
+            try:
+                Membership.objects.get_or_create(
+                    group=group,
+                    user=target,
+                    defaults={'status': MembershipStatus.PENDING, 'role': MembershipRole.MEMBER}
+                )
+            except IntegrityError:
+                pass
+            send_group_invite_notification(target, request.user, group)
+            messages.success(request, f'Invite sent to {target.username}.')
+        else:
+            messages.info(request, f'An invitation for {target.username} is already pending.')
+
     if request.headers.get('HX-Request'):
         return htmx_location_response(reverse('groups:groups_detail', kwargs={'group_id': group_id}))
     return redirect('groups:groups_detail', group_id=group_id)
 
 
 @login_required
+@transaction.atomic
 def respond_to_invite(request, notif_id, action):
-    notif = get_object_or_404(Notifications, id=notif_id, recipient=request.user)
-    if notif.group:
-        if action == 'accept':
-            # Update existing PENDING membership to APPROVED
-            membership = Membership.objects.filter(
-                group=notif.group,
-                user=request.user,
-                status=MembershipStatus.PENDING
-            ).first()
+    notif = get_object_or_404(NotificationObject, notification_id=notif_id, recipient=request.user)
+    group_id = notif.context_id or (notif.metadata and notif.metadata.get('group_id'))
+    if not group_id:
+        messages.error(request, 'Invalid invitation: group not found.')
+        return redirect('notifications:notifications')
 
-            if membership:
-                membership.status = MembershipStatus.APPROVED
-                membership.save()
-                messages.success(request, f'You joined {notif.group.name}!')
-            else:
-                # Fallback: create new membership if PENDING doesn't exist
-                Membership.objects.create(
-                    group=notif.group,
-                    user=request.user,
-                    status=MembershipStatus.APPROVED
-                )
-                messages.success(request, f'You joined {notif.group.name}!')
-        else:
-            # Delete PENDING membership when declined
-            membership = Membership.objects.filter(
-                group=notif.group,
-                user=request.user,
-                status=MembershipStatus.PENDING
-            ).first()
+    group = get_object_or_404(Group, id=group_id)
 
-            if membership:
-                membership.delete()
-                messages.info(request, 'Invite declined.')
-            else:
-                messages.info(request, 'Invite declined.')
-    notif.delete()
+    invitation = GroupInvitation.objects.filter(
+        group=group,
+        invitee=request.user,
+        status='PENDING'
+    ).order_by('-created_at').first()
+
+    if action == 'accept':
+        if invitation and invitation.expires_at and invitation.expires_at < timezone.now():
+            invitation.status = 'EXPIRED'
+            invitation.save()
+            notif.status = 'EXPIRED'
+            notif.save(update_fields=['status'])
+            messages.error(request, 'This invitation has expired.')
+            if request.headers.get('HX-Request'):
+                return HttpResponse('')
+            return redirect('notifications:notifications')
+
+        if invitation:
+            invitation.status = 'ACCEPTED'
+            invitation.save()
+
+        membership = Membership.objects.filter(group=group, user=request.user).first()
+        if not membership:
+            membership = Membership(
+                group=group,
+                user=request.user,
+                role=MembershipRole.MEMBER,
+                status=MembershipStatus.APPROVED
+            )
+            membership._skip_signal_notification = True
+            membership.save()
+        elif membership.status != MembershipStatus.APPROVED:
+            membership.status = MembershipStatus.APPROVED
+            membership._skip_signal_notification = True
+            membership.save()
+
+        messages.success(request, f'You joined {group.name}!')
+    else:
+        # decline / reject
+        if invitation:
+            invitation.status = 'DECLINED'
+            invitation.save()
+
+        Membership.objects.filter(
+            group=group,
+            user=request.user,
+            status=MembershipStatus.PENDING
+        ).delete()
+        messages.info(request, 'Invite declined.')
+
+    notif.status = 'ARCHIVED'
+    notif.save(update_fields=['status'])
+    invalidate_unread_count_cache(request.user.id)
+
+    if request.headers.get('HX-Request'):
+        response = HttpResponse('')
+        response['HX-Trigger'] = 'updateUnreadCount'
+        return response
     return redirect('notifications:notifications')
 
 
 @login_required
+@transaction.atomic
 def approve_from_notification(request, group_id, user_id):
     """Approve a group join request from notification"""
-    group = get_object_or_404(Group, id=group_id)
+    group = Group.objects.select_for_update().get(id=group_id)
 
     # Check if user is admin
-    try:
-        admin_membership = Membership.objects.get(
-            user=request.user,
-            group=group,
-            role=MembershipRole.ADMIN,
-            status=MembershipStatus.APPROVED
-        )
-    except Membership.DoesNotExist:
+    if not Membership.objects.filter(
+        user=request.user,
+        group=group,
+        role=MembershipRole.ADMIN,
+        status=MembershipStatus.APPROVED
+    ).exists():
         messages.error(request, 'Only admins can approve join requests.')
         return redirect('notifications:notifications')
 
-    # Get the membership to approve
-    try:
-        membership = Membership.objects.get(
-            user_id=user_id,
-            group=group,
-            status=MembershipStatus.PENDING
-        )
-    except Membership.DoesNotExist:
-        messages.error(request, f'No pending membership request found for user_id={user_id} in group={group.name}.')
+    join_req = GroupJoinRequest.objects.filter(
+        group=group,
+        user_id=user_id,
+        status='PENDING'
+    ).first()
+
+    membership = Membership.objects.filter(
+        user_id=user_id,
+        group=group
+    ).first()
+
+    if not join_req and (not membership or membership.status != MembershipStatus.PENDING):
+        messages.error(request, f'No pending membership request found for this user in {group.name}.')
         return redirect('notifications:notifications')
 
-    membership.status = MembershipStatus.APPROVED
-    membership.role = MembershipRole.MEMBER
-    membership.save()
+    if join_req:
+        join_req.status = 'APPROVED'
+        join_req.reviewed_by = request.user
+        join_req.reviewed_at = timezone.now()
+        join_req.save()
+
+    if membership:
+        membership.status = MembershipStatus.APPROVED
+        membership.role = MembershipRole.MEMBER
+        membership._skip_signal_notification = True
+        membership.save()
+    else:
+        target_user = get_object_or_404(User, id=user_id)
+        membership = Membership(
+            user=target_user,
+            group=group,
+            role=MembershipRole.MEMBER,
+            status=MembershipStatus.APPROVED
+        )
+        membership._skip_signal_notification = True
+        membership.save()
 
     # Send welcome notification to the approved user
     send_group_approved_notification(membership.user, group, request.user)
 
-    # Delete the request notification
-    try:
-        notification = NotificationObject.objects.filter(
-            recipient=request.user,
-            context_type='GROUP',
-            context_id=str(group.id),
-            notification_type='GROUP_REQUEST'
-        ).first()
-        if notification:
-            notification.delete()
-    except Exception:
-        pass  # Notification may have already been deleted
+    # Peer admin notification archival & WebSocket broadcast
+    _archive_group_request_notifications(group.id, user_id)
 
     messages.success(request, f'{membership.user.username} has been approved to join {group.name}.')
+    if request.headers.get('HX-Request'):
+        response = HttpResponse('')
+        response['HX-Trigger'] = 'updateUnreadCount'
+        return response
     return redirect('notifications:notifications')
 
 
@@ -1370,52 +1668,61 @@ def approve_from_notification(request, group_id, user_id):
 @transaction.atomic
 def reject_from_notification(request, group_id, user_id):
     """Reject a group join request from notification"""
-    group = get_object_or_404(Group, id=group_id)
+    group = Group.objects.select_for_update().get(id=group_id)
 
     # Check if user is admin
-    try:
-        admin_membership = Membership.objects.get(
-            user=request.user,
-            group=group,
-            role=MembershipRole.ADMIN,
-            status=MembershipStatus.APPROVED
-        )
-    except Membership.DoesNotExist:
+    if not Membership.objects.filter(
+        user=request.user,
+        group=group,
+        role=MembershipRole.ADMIN,
+        status=MembershipStatus.APPROVED
+    ).exists():
         messages.error(request, 'Only admins can reject join requests.')
         return redirect('notifications:notifications')
 
-    # Get the membership to reject
-    try:
-        membership = Membership.objects.get(
-            user_id=user_id,
-            group=group,
-            status=MembershipStatus.PENDING
-        )
-    except Membership.DoesNotExist:
+    join_req = GroupJoinRequest.objects.filter(
+        group=group,
+        user_id=user_id,
+        status='PENDING'
+    ).first()
+
+    membership = Membership.objects.filter(
+        user_id=user_id,
+        group=group
+    ).first()
+
+    if not join_req and (not membership or membership.status != MembershipStatus.PENDING):
         messages.error(request, 'No pending membership request found for this user.')
         return redirect('notifications:notifications')
 
-    membership.status = MembershipStatus.REJECTED
-    membership.save()
+    if join_req:
+        join_req.status = 'REJECTED'
+        join_req.reviewed_by = request.user
+        join_req.reviewed_at = timezone.now()
+        join_req.save()
+
+    target_user = None
+    if membership:
+        target_user = membership.user
+        membership.status = MembershipStatus.REJECTED
+        membership._skip_signal_notification = True
+        membership.save()
+    else:
+        target_user = get_object_or_404(User, id=user_id)
 
     # Send rejection notification to the user
-    send_group_rejected_notification(membership.user, group, request.user)
+    send_group_rejected_notification(target_user, group, request.user)
 
-    # Delete the request notification
-    try:
-        notification = NotificationObject.objects.filter(
-            recipient=request.user,
-            context_type='GROUP',
-            context_id=str(group.id),
-            notification_type='GROUP_REQUEST'
-        ).first()
-        if notification:
-            notification.delete()
-    except Exception:
-        pass  # Notification may have already been deleted
+    # Peer admin notification archival & WebSocket broadcast
+    _archive_group_request_notifications(group.id, user_id)
 
-    messages.info(request, f'{membership.user.username}\'s request to join {group.name} was rejected.')
+    messages.info(request, f'{target_user.username}\'s request to join {group.name} was rejected.')
+    if request.headers.get('HX-Request'):
+        response = HttpResponse('')
+        response['HX-Trigger'] = 'updateUnreadCount'
+        return response
     return redirect('notifications:notifications')
+
 
 
 @login_required
@@ -1798,65 +2105,75 @@ def group_settings_members_view(request, group_id):
 
         if action == 'assign_role' and user_id:
             try:
-                target_membership = Membership.objects.get(
-                    user_id=user_id,
-                    group=group,
-                    status=MembershipStatus.APPROVED
-                )
-                new_role = request.POST.get('role')
+                with transaction.atomic():
+                    locked_group = Group.objects.select_for_update().get(id=group.id)
+                    target_membership = Membership.objects.get(
+                        user_id=user_id,
+                        group=locked_group,
+                        status=MembershipStatus.APPROVED
+                    )
+                    new_role = request.POST.get('role')
 
-                # Cannot demote yourself from admin
-                if target_membership.user == request.user and target_membership.role == MembershipRole.ADMIN:
-                    messages.error(request, 'You cannot change your own admin role.')
-                else:
-                    # Check max admin constraint
-                    if new_role == MembershipRole.ADMIN:
-                        admin_count = Membership.objects.filter(
-                            group=group,
-                            role=MembershipRole.ADMIN,
-                            status=MembershipStatus.APPROVED
-                        ).count()
-                        if admin_count >= 5:
-                            messages.error(request, 'Maximum of 5 admins allowed per group.')
+                    # Cannot demote yourself from admin
+                    if target_membership.user == request.user and target_membership.role == MembershipRole.ADMIN and new_role != MembershipRole.ADMIN:
+                        messages.error(request, 'You cannot change your own admin role.')
+                    else:
+                        # Check max admin constraint
+                        if new_role == MembershipRole.ADMIN and target_membership.role != MembershipRole.ADMIN:
+                            admin_count = Membership.objects.filter(
+                                group=locked_group,
+                                role=MembershipRole.ADMIN,
+                                status=MembershipStatus.APPROVED
+                            ).count()
+                            if admin_count >= 5:
+                                messages.error(request, 'Maximum of 5 admins allowed per group.')
+                            else:
+                                target_membership.role = new_role
+                                target_membership.save()
+                                messages.success(request, f'Role updated for {target_membership.user.username}.')
                         else:
                             target_membership.role = new_role
                             target_membership.save()
                             messages.success(request, f'Role updated for {target_membership.user.username}.')
-                    else:
-                        target_membership.role = new_role
-                        target_membership.save()
-                        messages.success(request, f'Role updated for {target_membership.user.username}.')
             except Membership.DoesNotExist:
                 messages.error(request, 'Member not found.')
 
         elif action == 'remove_member' and user_id:
             try:
-                target_membership = Membership.objects.get(
-                    user_id=user_id,
-                    group=group,
-                    status=MembershipStatus.APPROVED
-                )
-
-                # Cannot remove yourself if you're the last admin
-                if target_membership.user == request.user:
-                    admin_count = Membership.objects.filter(
-                        group=group,
-                        role=MembershipRole.ADMIN,
+                with transaction.atomic():
+                    locked_group = Group.objects.select_for_update().get(id=group.id)
+                    target_membership = Membership.objects.get(
+                        user_id=user_id,
+                        group=locked_group,
                         status=MembershipStatus.APPROVED
-                    ).count()
-                    if admin_count == 1:
-                        messages.error(request, 'You cannot leave as the last admin. Assign a successor first.')
+                    )
+
+                    # Cannot remove yourself if you're the last admin
+                    if target_membership.role == MembershipRole.ADMIN:
+                        admin_count = Membership.objects.filter(
+                            group=locked_group,
+                            role=MembershipRole.ADMIN,
+                            status=MembershipStatus.APPROVED
+                        ).count()
+                        if admin_count == 1:
+                            messages.error(request, 'You cannot leave as the last admin. Assign a successor first.' if target_membership.user == request.user else 'Cannot remove the last admin.')
+                        else:
+                            target_user = target_membership.user
+                            target_membership.delete()
+                            evict_group_member_socket(group.id, target_user.id, reason="Removed from group.")
+                            messages.success(request, f'{target_user.username} removed from group.')
+                            if target_user == request.user:
+                                if request.headers.get('HX-Request'):
+                                    return htmx_location_response(reverse('groups:group_settings_members', kwargs={'group_id': group.id}))
+                                return redirect('groups:group_settings_members', group_id=group.id)
                     else:
+                        target_user = target_membership.user
                         target_membership.delete()
-                        messages.success(request, f'{target_membership.user.username} removed from group.')
-                        if request.headers.get('HX-Request'):
-                            return htmx_location_response(reverse('groups:group_settings_members', kwargs={'group_id': group.id}))
-                        return redirect('groups:group_settings_members', group_id=group.id)
-                else:
-                    target_membership.delete()
-                    messages.success(request, f'{target_membership.user.username} removed from group.')
+                        evict_group_member_socket(group.id, target_user.id, reason="Removed from group.")
+                        messages.success(request, f'{target_user.username} removed from group.')
             except Membership.DoesNotExist:
                 messages.error(request, 'Member not found.')
+
 
         if request.headers.get('HX-Request'):
             return htmx_location_response(reverse('groups:group_settings_members', kwargs={'group_id': group.id}))
@@ -1989,40 +2306,55 @@ def send_group_invites_api(request, group_id):
             try:
                 user = User.objects.get(id=user_id)
 
-                # Check if user is already a member (APPROVED) or already invited (PENDING)
-                existing_membership = Membership.objects.filter(user=user, group=group).first()
-                if existing_membership:
-                    if existing_membership.status == MembershipStatus.APPROVED:
-                        print(f"DEBUG: User {user.username} (ID: {user_id}) already a member, skipping")
-                        skipped_count += 1
-                        errors.append(f"{user.username} is already a member")
-                        continue
-                    elif existing_membership.status == MembershipStatus.PENDING:
-                        print(f"DEBUG: User {user.username} (ID: {user_id}) already invited, skipping")
-                        skipped_count += 1
-                        errors.append(f"{user.username} is already invited")
-                        continue
+                # Check if user is already an approved member
+                if Membership.objects.filter(user=user, group=group, status=MembershipStatus.APPROVED).exists():
+                    skipped_count += 1
+                    errors.append(f"{user.username} is already a member")
+                    continue
 
-                # Create pending membership
-                Membership.objects.create(
-                    user=user,
+                # Check if an active invitation is already pending
+                if GroupInvitation.objects.filter(
                     group=group,
-                    status=MembershipStatus.PENDING,
-                    role=MembershipRole.MEMBER
+                    invitee=user,
+                    status='PENDING',
+                    expires_at__gt=timezone.now()
+                ).exists():
+                    skipped_count += 1
+                    errors.append(f"{user.username} is already invited")
+                    continue
+
+                # Create GroupInvitation with 7 days expiration
+                expires = timezone.now() + datetime.timedelta(days=7)
+                GroupInvitation.objects.create(
+                    group=group,
+                    inviter=request.user,
+                    invitee=user,
+                    status='PENDING',
+                    expires_at=expires
                 )
+
+                # Create pending membership for backwards compatibility
+                try:
+                    Membership.objects.get_or_create(
+                        user=user,
+                        group=group,
+                        defaults={
+                            'status': MembershipStatus.PENDING,
+                            'role': MembershipRole.MEMBER
+                        }
+                    )
+                except IntegrityError:
+                    pass
 
                 # Send notification
                 send_group_invite_notification(user, request.user, group)
                 sent_count += 1
-                print(f"DEBUG: Successfully invited {user.username} (ID: {user_id})")
 
             except User.DoesNotExist:
-                print(f"DEBUG: User with id {user_id} does not exist")
                 not_found_count += 1
                 errors.append(f"User ID {user_id} not found")
                 continue
             except Exception as e:
-                print(f"DEBUG: Error inviting user {user_id}: {str(e)}")
                 errors.append(f"Error inviting user {user_id}: {str(e)}")
                 continue
 

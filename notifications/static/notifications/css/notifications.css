@@ -237,6 +237,186 @@ body { background: var(--page-bg); color: var(--text-primary); }
 }
 .notif-item.unread:hover { background: #e0e7ff; }
 
+/* ── Profile-Driven Notification Card Layout ── */
+.notif-item > .d-flex {
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 100%;
+}
+
+.notif-avatar-col {
+  flex-shrink: 0;
+  width: 56px;
+}
+
+.notif-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.notif-preview-col {
+  flex-shrink: 0;
+  margin-left: auto;
+  align-self: flex-start;
+}
+
+.resource-preview {
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  overflow: hidden;
+  background-color: var(--bg-secondary, #f1f5f9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.18s var(--ease), border-color 0.18s var(--ease);
+}
+
+.resource-preview:hover {
+  transform: scale(1.04);
+  border-color: var(--brand);
+}
+
+[data-theme="dark"] .resource-preview {
+  background-color: var(--card-bg, #242526);
+  border-color: var(--border, #3a3b3c);
+}
+
+.notif-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.35;
+  margin-bottom: 0.25rem;
+}
+
+/* ── Comment Content Preview ── */
+.notif-comment-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 0.45rem 0.75rem;
+  margin-top: 0.35rem;
+  margin-bottom: 0.5rem;
+  border-radius: 8px;
+  background-color: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-left: 3.5px solid var(--brand, #2563eb);
+  line-height: 1.45;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.notif-comment-preview .notif-quote-icon {
+  font-size: 0.85rem;
+  color: var(--brand, #2563eb);
+  margin-top: 2px;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.notif-comment-preview .notif-comment-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.83rem;
+  font-weight: 500;
+  color: #1e293b;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+
+/* Light mode unread card */
+.unread-notification .notif-comment-preview {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(37, 99, 235, 0.25);
+  border-left: 3.5px solid var(--brand, #2563eb);
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.1);
+}
+
+.unread-notification .notif-comment-preview .notif-comment-text {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+/* Hover state on light mode cards */
+.notif-item:hover .notif-comment-preview {
+  border-color: #cbd5e1;
+  border-left-color: var(--brand, #2563eb);
+}
+
+.unread-notification:hover .notif-comment-preview {
+  background-color: #ffffff;
+  border-color: rgba(37, 99, 235, 0.35);
+  border-left-color: var(--brand, #2563eb);
+}
+
+/* ── Dark Mode Comment Preview ── */
+[data-theme="dark"] .notif-comment-preview {
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-left: 3.5px solid var(--brand, #6366f1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="dark"] .notif-comment-preview .notif-quote-icon {
+  color: #818cf8;
+  opacity: 1;
+}
+
+[data-theme="dark"] .notif-comment-preview .notif-comment-text {
+  color: #f1f5f9;
+  font-weight: 500;
+}
+
+/* Dark mode unread card */
+[data-theme="dark"] .unread-notification .notif-comment-preview {
+  background-color: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-left: 3.5px solid #818cf8;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="dark"] .unread-notification .notif-comment-preview .notif-quote-icon {
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .unread-notification .notif-comment-preview .notif-comment-text {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Dark mode hover */
+[data-theme="dark"] .notif-item:hover .notif-comment-preview {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+  border-left-color: var(--brand, #6366f1);
+}
+
+[data-theme="dark"] .unread-notification:hover .notif-comment-preview {
+  background-color: rgba(15, 23, 42, 0.75);
+  border-color: rgba(255, 255, 255, 0.28);
+  border-left-color: #93c5fd;
+}
+
+.notif-timestamp {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+}
+
+.notif-footer {
+  width: 100%;
+}
+
 .notif-avatar {
   width: 48px; height: 48px;
   border-radius: 50%;

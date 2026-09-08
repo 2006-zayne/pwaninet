@@ -657,32 +657,85 @@ class NativePWAInstallManager {
         // QR code is now a server-rendered SVG served at /apk/qr/ and embedded
         // as a plain <img> tag in the modal — no canvas or JS QR generation needed.
 
-        // Copy button handler for #qr-modal-copy-btn
+        // Delegated copy button handler for #qr-modal-copy-btn
         document.addEventListener('click', (e) => {
             const copyBtn = e.target.closest('#qr-modal-copy-btn');
             if (!copyBtn) return;
 
-            const input = document.getElementById('qr-modal-link-input');
-            const textToCopy = input ? input.value : 'https://pwaninet.app/apk/';
+            if (typeof window.copyApkLink === 'function') {
+                window.copyApkLink(copyBtn);
+                return;
+            }
 
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(textToCopy).then(() => {
-                    const originalHtml = copyBtn.innerHTML;
-                    copyBtn.innerHTML = '<i class="bi bi-check2 me-1"></i>Copied!';
-                    copyBtn.classList.replace('btn-outline-primary', 'btn-success');
-                    setTimeout(() => {
-                        copyBtn.innerHTML = originalHtml;
-                        copyBtn.classList.replace('btn-success', 'btn-outline-primary');
-                    }, 2000);
-                }).catch(() => {
-                    if (input) {
+            if (copyBtn.dataset.copying === 'true') return;
+            copyBtn.dataset.copying = 'true';
+
+            const input = document.getElementById('qr-modal-link-input');
+            const textToCopy = (input && input.value) ? input.value : 'https://pwaninet.app/apk/';
+
+            const originalHtml = copyBtn.getAttribute('data-original-html') || copyBtn.innerHTML;
+            if (!copyBtn.getAttribute('data-original-html')) {
+                copyBtn.setAttribute('data-original-html', originalHtml);
+            }
+
+            const showSuccess = () => {
+                copyBtn.innerHTML = '<i class="bi bi-check2 me-1"></i>Copied!';
+                copyBtn.classList.remove('btn-outline-primary');
+                copyBtn.classList.add('btn-success');
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalHtml;
+                    copyBtn.classList.remove('btn-success');
+                    copyBtn.classList.add('btn-outline-primary');
+                    delete copyBtn.dataset.copying;
+                }, 2000);
+            };
+
+            const fallbackCopy = () => {
+                let copied = false;
+                try {
+                    const temp = document.createElement('textarea');
+                    temp.value = textToCopy;
+                    temp.style.position = 'fixed';
+                    temp.style.top = '0';
+                    temp.style.left = '0';
+                    temp.style.width = '2em';
+                    temp.style.height = '2em';
+                    temp.style.padding = '0';
+                    temp.style.border = 'none';
+                    temp.style.outline = 'none';
+                    temp.style.boxShadow = 'none';
+                    temp.style.background = 'transparent';
+                    temp.setAttribute('readonly', '');
+                    document.body.appendChild(temp);
+                    temp.focus();
+                    temp.select();
+                    temp.setSelectionRange(0, textToCopy.length);
+                    copied = document.execCommand('copy');
+                    document.body.removeChild(temp);
+                } catch (err) {
+                    console.warn('[Clipboard] fallback textarea error:', err);
+                }
+
+                if (!copied && input) {
+                    try {
+                        input.focus();
                         input.select();
-                        document.execCommand('copy');
+                        input.setSelectionRange(0, 99999);
+                        copied = document.execCommand('copy');
+                    } catch (e) {
+                        console.warn('[Clipboard] fallback input error:', e);
                     }
-                });
-            } else if (input) {
-                input.select();
-                document.execCommand('copy');
+                }
+
+                showSuccess();
+            };
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(textToCopy)
+                    .then(() => showSuccess())
+                    .catch(() => fallbackCopy());
+            } else {
+                fallbackCopy();
             }
         });
     }

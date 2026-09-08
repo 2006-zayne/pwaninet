@@ -29,14 +29,14 @@ urlpatterns = [
     path('search-suggestions/', views.search_suggestions_view, name='search_suggestions'),
     
     # Document Details
-    path('document/<int:document_id>/', views.document_detail, name='document_detail'),
+    path('document/<uuid:share_id>/', views.document_detail, name='document_detail'),
     
     # Document Management
-    path('document/<int:document_id>/edit/', views.edit_document, name='edit_document'),
-    path('document/<int:document_id>/delete/', views.delete_document, name='delete_document'),
-    path('document/<int:document_id>/toggle-availability/', views.toggle_document_availability, name='toggle_availability'),
-    path('document/<int:document_id>/new-version/', views.upload_new_version, name='new_version'),
-    path('document/<int:document_id>/delete-modal/', views.delete_document_modal, name='delete_document_modal'),
+    path('document/<uuid:share_id>/edit/', views.edit_document, name='edit_document'),
+    path('document/<uuid:share_id>/delete/', views.delete_document, name='delete_document'),
+    path('document/<uuid:share_id>/toggle-availability/', views.toggle_document_availability, name='toggle_availability'),
+    path('document/<uuid:share_id>/new-version/', views.upload_new_version, name='new_version'),
+    path('document/<uuid:share_id>/delete-modal/', views.delete_document_modal, name='delete_document_modal'),
     
     # Upload Flow
     path('upload/', views.upload_document, name='upload'),
@@ -51,11 +51,11 @@ urlpatterns = [
     path('library/clear-history/', views.clear_history, name='clear_history'),
     
     # Engagement HTMX Endpoints
-    path('document/<int:document_id>/bookmark/', views.toggle_bookmark, name='toggle_bookmark'),
-    path('document/<int:document_id>/rate/', views.rate_document, name='rate_document'),
-    path('document/<int:document_id>/download/', views.track_download, name='track_download'),
-    path('document/<int:document_id>/share/', views.share_document, name='share_document'),
-    path('document/<int:document_id>/stats/', views.document_stats, name='document_stats'),
+    path('document/<uuid:share_id>/bookmark/', views.toggle_bookmark, name='toggle_bookmark'),
+    path('document/<uuid:share_id>/rate/', views.rate_document, name='rate_document'),
+    path('document/<uuid:share_id>/download/', views.serve_download, name='serve_download'),
+    path('document/<uuid:share_id>/share/', views.share_document, name='share_document'),
+    path('document/<uuid:share_id>/stats/', views.document_stats, name='document_stats'),
     path('user-groups/', views.user_groups_for_sharing, name='user_groups_for_sharing'),
     
     # Academic HTMX Endpoints

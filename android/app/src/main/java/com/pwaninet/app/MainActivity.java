@@ -1,12 +1,14 @@
 package com.pwaninet.app;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -30,6 +32,7 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 import com.getcapacitor.WebViewListener;
+import com.capacitorjs.plugins.share.SharePlugin;
 
 import android.os.Handler;
 import android.os.Looper;
@@ -68,6 +71,14 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public void setNavigationBarTheme(String theme) {
             setSystemBarTheme(theme);
+        }
+
+        @JavascriptInterface
+        public void openExternalUrl(String url) {
+            MainActivity activity = activityRef.get();
+            if (activity != null) {
+                activity.openExternalUrl(url);
+            }
         }
     }
 
@@ -177,6 +188,7 @@ public class MainActivity extends BridgeActivity {
         }, SPLASH_WATCHDOG_TIMEOUT_MS);
 
         registerPlugin(NavigationBarPlugin.class);
+        registerPlugin(SharePlugin.class);
 
         // Configure edge-to-edge once at Activity creation
         EdgeToEdge.enable(this,
@@ -281,9 +293,99 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    public void openExternalUrl(String url) {
+        if (url == null || url.trim().isEmpty()) return;
+        runOnUiThread(() -> {
+            try {
+                Uri uri = Uri.parse(url.trim());
+                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                intent.addCategory(Intent.CATEGORY_BROWSABLE);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    private boolean isInternalHost(String host) {
+        if (host == null) return true;
+        host = host.toLowerCase(Locale.US);
+
+        if (getBridge() != null && getBridge().getServerUrl() != null) {
+            try {
+                Uri serverUri = Uri.parse(getBridge().getServerUrl());
+                if (serverUri != null && serverUri.getHost() != null && host.equalsIgnoreCase(serverUri.getHost())) {
+                    return true;
+                }
+            } catch (Exception ignored) {}
+        }
+
+        return host.equals("pwaninet.app") ||
+               host.endsWith(".pwaninet.app") ||
+               host.equals("localhost") ||
+               host.equals("127.0.0.1") ||
+               host.equals("10.0.2.2") ||
+               host.startsWith("192.168.");
+    }
+
+    private boolean handleExternalUri(Uri uri) {
+        if (uri == null) return false;
+        String scheme = uri.getScheme();
+        if (scheme == null) return false;
+        scheme = scheme.toLowerCase(Locale.US);
+
+        // Allow WebView to handle internal data/blob/about/javascript
+        if (scheme.equals("data") || scheme.equals("blob") || scheme.equals("about") || scheme.equals("javascript")) {
+            return false;
+        }
+
+        // Custom protocols (e.g., tel:, mailto:, sms:, whatsapp:, market:)
+        if (!scheme.equals("http") && !scheme.equals("https")) {
+            try {
+                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+                return true;
+            } catch (Exception e) {
+                e.printStackTrace();
+                return true;
+            }
+        }
+
+        // For http/https, if host is external, launch via native Intent
+        String host = uri.getHost();
+        if (host != null && !isInternalHost(host)) {
+            openExternalUrl(uri.toString());
+            return true;
+        }
+
+        return false;
+    }
+
     private void setupCustomWebViewClient() {
         if (getBridge() != null) {
             getBridge().setWebViewClient(new BridgeWebViewClient(getBridge()) {
+                @Override
+                public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                    if (request != null && request.getUrl() != null) {
+                        if (handleExternalUri(request.getUrl())) {
+                            return true;
+                        }
+                    }
+                    return super.shouldOverrideUrlLoading(view, request);
+                }
+
+                @Override
+                public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                    if (url != null) {
+                        if (handleExternalUri(Uri.parse(url))) {
+                            return true;
+                        }
+                    }
+                    return super.shouldOverrideUrlLoading(view, url);
+                }
+
                 @Override
                 public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                     super.onReceivedError(view, request, error);

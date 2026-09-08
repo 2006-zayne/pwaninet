@@ -27,7 +27,7 @@
     border-color: var(--border) !important;
   }
 </style>
-<div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
             <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title fw-bold">Switch Account</h5>
@@ -41,7 +41,7 @@
                 </div>
             </div>
             <div class="modal-footer border-0">
-                <form action="{% url 'users:logout' %}" method="POST" class="m-0">
+                <form action="{% url 'users:logout' %}" method="POST" class="m-0 w-100">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-outline-secondary w-100">
                         <i class="bi bi-plus-circle me-2"></i>Add New Account
@@ -65,6 +65,89 @@
             localStorage.setItem(DEVICE_ID_KEY, deviceId);
         }
         return deviceId;
+    }
+
+    function getCsrfToken() {
+        const cookie = document.cookie.split('; ').find(row => row.startsWith('csrftoken='));
+        if (cookie) return cookie.split('=')[1];
+        const input = document.querySelector('[name=csrfmiddlewaretoken]');
+        return input ? input.value : '';
+    }
+
+    function switchAccount(userId, btn) {
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+        }
+
+        // Hide modal cleanly
+        const modalEl = document.getElementById('accountSwitcherModal');
+        if (modalEl && window.bootstrap && window.bootstrap.Modal) {
+            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+        }
+        // Defensive cleanup of any remaining modal artifacts
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
+
+        // Clean client-side cache and user-specific session storage
+        try {
+            localStorage.removeItem('htmx-history-cache');
+        } catch (e) {}
+
+        try {
+            sessionStorage.removeItem('username');
+            sessionStorage.removeItem('profileCompletionDismissed');
+            sessionStorage.removeItem('home_feed_scroll_y');
+        } catch (e) {}
+
+        // Full window navigation to switch endpoint ensures clean session & layout reload
+        const deviceId = getOrCreateDeviceId();
+        window.location.href = `/users/accounts/switch/${userId}/?device_id=${encodeURIComponent(deviceId)}`;
+    }
+
+    async function removeAccount(userId, username, btn) {
+        if (!confirm(`Remove @${username} from this device?`)) {
+            return;
+        }
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm text-danger" role="status"></span>';
+        }
+
+        const deviceId = getOrCreateDeviceId();
+        const csrfToken = getCsrfToken();
+        const removeUrl = `/users/accounts/remove/${userId}/?device_id=${encodeURIComponent(deviceId)}`;
+
+        try {
+            const response = await fetch(removeUrl, {
+                method: 'POST',
+                headers: {
+                    'X-Device-ID': deviceId,
+                    'X-CSRFToken': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                credentials: 'same-origin'
+            });
+
+            const modal = document.getElementById('accountSwitcherModal');
+            if (modal) {
+                loadAccounts(modal);
+            }
+        } catch (error) {
+            console.error('[Account Switcher] Error removing account:', error);
+            alert('Failed to remove account. Please try again.');
+            const modal = document.getElementById('accountSwitcherModal');
+            if (modal) {
+                loadAccounts(modal);
+            }
+        }
     }
 
     async function loadAccounts(modalElement) {
@@ -110,19 +193,24 @@
                              class="rounded-circle me-3" 
                              style="width: 48px; height: 48px; object-fit: cover;"
                              onerror="this.src='/static/images/default_pic1.jpg'">
-                        <div class="flex-grow-1">
-                            <div class="fw-bold">${account.full_name || account.username}</div>
-                            <div class="text-muted small">@${account.username}</div>
+                        <div class="flex-grow-1 min-w-0 me-2">
+                            <div class="fw-bold text-truncate">${account.full_name || account.username}</div>
+                            <div class="text-muted small text-truncate">@${account.username}</div>
                         </div>
                         ${account.is_current 
-                            ? '<span class="badge bg-primary">Current</span>'
-                            : `<a href="/users/accounts/switch/${account.id}/?device_id=${encodeURIComponent(deviceId)}" 
-                                  class="btn btn-sm btn-primary rounded-pill px-3">Switch</a>`
+                            ? '<span class="badge bg-primary flex-shrink-0">Current</span>'
+                            : `<button type="button" 
+                                       class="btn btn-sm btn-primary rounded-pill px-3 switch-account-btn flex-shrink-0" 
+                                       data-user-id="${account.id}">Switch</button>`
                         }
                         ${!account.is_current 
-                            ? `<a href="/users/accounts/remove/${account.id}/?device_id=${encodeURIComponent(deviceId)}" 
-                                  class="btn btn-sm btn-link text-muted ms-2" title="Remove from device">
-                                  <i class="bi bi-x-circle"></i></a>`
+                            ? `<button type="button" 
+                                       class="btn btn-sm btn-link text-muted ms-2 remove-account-btn flex-shrink-0" 
+                                       data-user-id="${account.id}" 
+                                       data-username="${account.username}" 
+                                       title="Remove from device">
+                                   <i class="bi bi-x-circle"></i>
+                               </button>`
                             : ''
                         }
                     </div>
@@ -152,21 +240,35 @@
         }
     }
 
-    // Document-level listener handles modals opened via full page load, HTMX navigation, or dynamic insert
-    document.addEventListener('show.bs.modal', function(e) {
-        if (e.target && e.target.id === 'accountSwitcherModal') {
-            loadAccounts(e.target);
-        }
-    });
-
-    // Also listen for button clicks to immediately start loading without waiting for modal transition
+    // Delegated click handlers for Switch and Remove buttons
     document.addEventListener('click', function(e) {
+        const switchBtn = e.target.closest('.switch-account-btn');
+        if (switchBtn && switchBtn.dataset.userId) {
+            e.preventDefault();
+            switchAccount(switchBtn.dataset.userId, switchBtn);
+            return;
+        }
+
+        const removeBtn = e.target.closest('.remove-account-btn');
+        if (removeBtn && removeBtn.dataset.userId) {
+            e.preventDefault();
+            removeAccount(removeBtn.dataset.userId, removeBtn.dataset.username || '', removeBtn);
+            return;
+        }
+
         const trigger = e.target.closest('[data-bs-target="#accountSwitcherModal"]');
         if (trigger) {
             const modal = document.getElementById('accountSwitcherModal');
             if (modal) {
                 loadAccounts(modal);
             }
+        }
+    });
+
+    // Document-level listener handles modals opened via full page load or Bootstrap events
+    document.addEventListener('show.bs.modal', function(e) {
+        if (e.target && e.target.id === 'accountSwitcherModal') {
+            loadAccounts(e.target);
         }
     });
 })();

@@ -315,8 +315,8 @@
 </style>
 
 <div class="fullscreen-container" id="fullscreenContainer">
-  <a href="{% url 'posts:post_details' post.id %}" class="close-btn"
-     hx-get="{% url 'posts:post_details' post.id %}"
+  <a href="{% url 'posts:post_details' post.share_id %}" class="close-btn"
+     hx-get="{% url 'posts:post_details' post.share_id %}"
      hx-target="#page-content-target"
      hx-swap="innerHTML"
      hx-push-url="true"
@@ -325,13 +325,13 @@
     <i class="bi bi-x-lg"></i>
   </a>
 
-  <button class="download-btn" data-image-url="{{ post_image.image.url }}" data-filename="{{ post_image.image.name|default:'image.jpg' }}" data-post-id="{{ post.id }}" aria-label="Download image">
+  <button class="download-btn" data-image-url="{{ post_image.image.url }}" data-filename="{{ post_image.image.name|default:'image.jpg' }}" data-post.share_id="{{ post.share_id }}" aria-label="Download image">
     <i class="bi bi-download"></i>
   </button>
 
   {% if has_prev %}
-  <a href="{% url 'posts:view_image_fullscreen' post.id prev_index %}" class="nav-btn prev" id="prevBtn"
-     hx-get="{% url 'posts:view_image_fullscreen' post.id prev_index %}"
+  <a href="{% url 'posts:view_image_fullscreen' post.share_id prev_index %}" class="nav-btn prev" id="prevBtn"
+     hx-get="{% url 'posts:view_image_fullscreen' post.share_id prev_index %}"
      hx-target="#page-content-target"
      hx-swap="innerHTML"
      hx-push-url="true"
@@ -344,8 +344,8 @@
   <img src="{{ post_image.image.url }}" class="fullscreen-image" alt="Image {{ current_index|add:1 }}" id="fullscreenImage">
 
   {% if has_next %}
-  <a href="{% url 'posts:view_image_fullscreen' post.id next_index %}" class="nav-btn next" id="nextBtn"
-     hx-get="{% url 'posts:view_image_fullscreen' post.id next_index %}"
+  <a href="{% url 'posts:view_image_fullscreen' post.share_id next_index %}" class="nav-btn next" id="nextBtn"
+     hx-get="{% url 'posts:view_image_fullscreen' post.share_id next_index %}"
      hx-target="#page-content-target"
      hx-swap="innerHTML"
      hx-push-url="true"
@@ -383,11 +383,11 @@
   <!-- Bottom Action Bar -->
   <div class="bottom-action-bar">
     <div class="action-buttons">
-      <button class="action-btn like-btn {% if is_liked %}liked{% endif %}" data-image-id="{{ post_image.id }}" data-post-id="{{ post.id }}" aria-label="Like image">
+      <button class="action-btn like-btn {% if is_liked %}liked{% endif %}" data-image-id="{{ post_image.id }}" data-post.share_id="{{ post.share_id }}" aria-label="Like image">
         <i class="bi bi-heart{% if is_liked %}-fill{% endif %}"></i>
         <span class="like-count">{{ total_likes }}</span>
       </button>
-      <button class="action-btn comment-btn" data-image-id="{{ post_image.id }}" data-post-id="{{ post.id }}" aria-label="Comment on image">
+      <button class="action-btn comment-btn" data-image-id="{{ post_image.id }}" data-post.share_id="{{ post.share_id }}" aria-label="Comment on image">
         <i class="bi bi-chat"></i>
       </button>
     </div>
@@ -396,7 +396,7 @@
         <i class="bi bi-three-dots"></i>
       </button>
       <div class="menu-dropdown">
-        <a href="#" class="menu-item download-btn" data-image-url="{{ post_image.image.url }}" data-filename="{{ post_image.image.name|default:'image.jpg' }}" data-post-id="{{ post.id }}">
+        <a href="#" class="menu-item download-btn" data-image-url="{{ post_image.image.url }}" data-filename="{{ post_image.image.name|default:'image.jpg' }}" data-post.share_id="{{ post.share_id }}">
           <i class="bi bi-download"></i> Download
         </a>
         <a href="#" class="menu-item hide-btn">
@@ -469,7 +469,7 @@
         e.preventDefault();
         const imageUrl = this.getAttribute('data-image-url');
         const filename = this.getAttribute('data-filename');
-        const postId = this.getAttribute('data-post-id');
+        const postId = this.getAttribute('data-post.share_id');
         try {
           const module = await import('/static/js/storage/downloads_manager.js');
           const downloadsManager = module.downloadsManager;
@@ -509,7 +509,7 @@
       likeBtn.addEventListener('click', async function(e) {
         e.preventDefault();
         const imageId = this.getAttribute('data-image-id');
-        const postId = this.getAttribute('data-post-id');
+        const postId = this.getAttribute('data-post.share_id');
         try {
           const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : '';
           const response = await fetch(`/api/posts/${postId}/images/${imageId}/like/`, {
@@ -543,7 +543,7 @@
       commentBtn.addEventListener('click', function(e) {
         e.preventDefault();
         const imageId = this.getAttribute('data-image-id');
-        const postId = this.getAttribute('data-post-id');
+        const postId = this.getAttribute('data-post.share_id');
         const commentsModal = document.getElementById('commentsModal');
         if (commentsModal && typeof bootstrap !== 'undefined') {
           const modal = new bootstrap.Modal(commentsModal);

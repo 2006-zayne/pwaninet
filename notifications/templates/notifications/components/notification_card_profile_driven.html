@@ -3,216 +3,260 @@
 {# Uses the canonical NotificationPayload structure #}
 {# Args: payload (NotificationPayload object), profile, message, components, preview, actions, status, interactions, navigation, expansion, aggregation #}
 
-<div class="list-group-item list-group-item-action border-bottom py-4 px-4 transition-all {% if not payload.metadata.read %}unread-notification{% else %}read-notification{% endif %}"
+<div class="list-group-item list-group-item-action notif-item border-bottom py-3 px-3 py-sm-3 px-sm-4 transition-all {% if not payload.metadata.read %}unread-notification{% else %}read-notification{% endif %}"
      data-notification-id="{{ payload.identity.notification_id }}"
      data-notification-type="{{ payload.type }}"
      id="notification-{{ payload.identity.notification_id }}"
      {% if not payload.metadata.read %}
      hx-post="{% url 'notifications:mark_notification_as_read' payload.identity.notification_id %}"
+     hx-trigger="click[!document.getElementById('selection-mode-bar')?.classList.contains('active')]"
      hx-target="#notification-{{ payload.identity.notification_id }}"
      hx-swap="outerHTML"
      style="cursor: pointer;"
      {% else %}
      style="cursor: default;"
-     {% endif %}>
+     {% endif %}
+     onclick="if (document.getElementById('selection-mode-bar')?.classList.contains('active')) { const cb = this.querySelector('.notification-checkbox'); if (cb) { cb.checked = !cb.checked; toggleSelection('{{ payload.identity.notification_id }}'); } }">
   
-  <div class="d-flex gap-2" style="align-items: flex-start;">
-    {# Actor Stack - shown based on component visibility #}
-    {% if components.actor_stack and payload.actors %}
-      {% if payload.actors|length > 1 %}
-        {# Aggregated actors #}
-        <div class="actor-stack flex-shrink-0" style="position: relative; width: 72px; height: 72px; margin-left: -16px;">
-          {% for actor in payload.actors|slice:":3" %}
+  <div class="d-flex align-items-start gap-3 w-100" style="width: 100%; min-width: 0;">
+    {# Selection Checkbox #}
+    <input type="checkbox"
+           class="notification-checkbox form-check-input align-self-center me-1 flex-shrink-0"
+           id="select-{{ payload.identity.notification_id }}"
+           data-notification-id="{{ payload.identity.notification_id }}"
+           onchange="toggleSelection('{{ payload.identity.notification_id }}')"
+           onclick="event.stopPropagation()"
+           style="display: none;">
+
+    {# Actor Stack / Avatar Column #}
+    <div class="notif-avatar-col flex-shrink-0">
+      {% if components.actor_stack and payload.actors %}
+        {% if payload.actors|length > 1 %}
+          {# Aggregated actors #}
+          <div class="actor-stack" style="position: relative; width: 56px; height: 48px;">
+            {% for actor in payload.actors|slice:":3" %}
+              <a href="{% url 'users:profile' actor.username %}"
+                 hx-get="{% url 'users:profile' actor.username %}"
+                 hx-target="#page-content-target"
+                 hx-swap="innerHTML"
+                 hx-push-url="true"
+                 hx-history="true"
+                 class="rounded-circle border position-absolute"
+                 style="{% if forloop.first %}left: 0px;{% elif forloop.counter == 2 %}left: 12px;{% else %}left: 24px;{% endif %} width: 40px; height: 40px; background-color: var(--bg-secondary); z-index: {{ 3|add:forloop.counter0 }}; top: 4px; text-decoration: none;"
+                 onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
+                {% if actor.avatar %}
+                  <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
+                {% else %}
+                  <div class="d-flex align-items-center justify-content-center h-100">
+                    <i class="bi bi-person" style="color: var(--text-secondary);"></i>
+                  </div>
+                {% endif %}
+              </a>
+            {% endfor %}
+            {% if payload.actors|length > 3 %}
+              <div class="rounded-circle border position-absolute d-flex align-items-center justify-content-center"
+                   style="width: 40px; height: 40px; background-color: rgba(0, 0, 0, 0.6); color: white; z-index: 6; left: 28px; top: 4px; font-size: 0.8rem; font-weight: bold;">
+                +{{ payload.actors|length|add:-3 }}
+              </div>
+            {% endif %}
+          </div>
+        {% else %}
+          {# Single actor or context avatar for group invitations #}
+          {% if payload.context and payload.context.type.value == 'GROUP' %}
+            {% if payload.type == 'INVITE' or payload.type == 'GROUP_INVITE' %}
+              {# Group invitation: rounded rectangle group avatar with inviter avatar in bottom right #}
+              <div style="position: relative; width: 56px; height: 56px;">
+                <a href="{% if navigation.primary and navigation.primary.url %}{{ navigation.primary.url }}{% endif %}"
+                   class="border d-flex align-items-center justify-content-center"
+                   style="width: 56px; height: 56px; background-color: var(--bg-secondary); border-radius: 12px; overflow: hidden; text-decoration: none;"
+                   onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
+                  {% if payload.context.avatar_url %}
+                    <img src="{{ payload.context.avatar_url }}" alt="{{ payload.context.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+                  {% else %}
+                    <i class="bi bi-people" style="font-size: 1.75rem; color: var(--text-secondary);"></i>
+                  {% endif %}
+                </a>
+                {% if payload.actors and payload.actors.0 %}
+                  {% with actor=payload.actors.0 %}
+                  <a href="{% url 'users:profile' actor.username %}"
+                     class="rounded-circle border position-absolute d-flex align-items-center justify-content-center"
+                     style="width: 24px; height: 24px; background-color: var(--bg-secondary); right: -3px; bottom: -3px; z-index: 10; text-decoration: none;"
+                     onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
+                    {% if actor.avatar %}
+                      <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
+                    {% else %}
+                      <i class="bi bi-person" style="font-size: 0.85rem; color: var(--text-secondary);"></i>
+                    {% endif %}
+                  </a>
+                  {% endwith %}
+                {% endif %}
+              </div>
+            {% elif payload.context.avatar_url %}
+              <a href="{% if navigation.primary and navigation.primary.url %}{{ navigation.primary.url }}{% endif %}"
+                 class="rounded-circle border d-flex align-items-center justify-content-center"
+                 style="width: 56px; height: 56px; background-color: var(--bg-secondary); text-decoration: none;"
+                 onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
+                <img src="{{ payload.context.avatar_url }}" alt="{{ payload.context.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
+              </a>
+            {% else %}
+              {% with actor=payload.actors.0 %}
+              <a href="{% url 'users:profile' actor.username %}"
+                 class="rounded-circle border d-flex align-items-center justify-content-center"
+                 style="width: 56px; height: 56px; background-color: var(--bg-secondary); text-decoration: none;"
+                 onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
+                {% if actor.avatar %}
+                  <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
+                {% else %}
+                  <i class="bi bi-person" style="font-size: 1.75rem; color: var(--text-secondary);"></i>
+                {% endif %}
+              </a>
+              {% endwith %}
+            {% endif %}
+          {% elif payload.type == 'RELEASE' %}
+            <div style="position: relative; width: 56px; height: 56px;">
+              <div class="rounded-circle border d-flex align-items-center justify-content-center overflow-hidden"
+                   style="width: 56px; height: 56px; background-color: var(--bg-secondary);">
+                <img src="{% static 'images/web-app-manifest-192x192.png' %}" alt="PwaniNet" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
+              </div>
+              {% if payload.actors and payload.actors.0 %}
+                {% with actor=payload.actors.0 %}
+                <a href="{% url 'users:profile' actor.username %}"
+                   class="rounded-circle border position-absolute d-flex align-items-center justify-content-center"
+                   style="width: 24px; height: 24px; background-color: var(--bg-secondary); right: -3px; bottom: -3px; z-index: 10; text-decoration: none;"
+                   onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
+                  {% if actor.avatar %}
+                    <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
+                  {% else %}
+                    <i class="bi bi-person" style="font-size: 0.85rem; color: var(--text-secondary);"></i>
+                  {% endif %}
+                </a>
+                {% endwith %}
+              {% endif %}
+            </div>
+          {% else %}
+            {% with actor=payload.actors.0 %}
             <a href="{% url 'users:profile' actor.username %}"
                hx-get="{% url 'users:profile' actor.username %}"
                hx-target="#page-content-target"
                hx-swap="innerHTML"
                hx-push-url="true"
                hx-history="true"
-               class="rounded-circle border position-absolute"
-               style="{% if forloop.first %}left: 0px;{% elif forloop.counter == 2 %}left: 14px;{% else %}left: 28px;{% endif %} width: 48px; height: 48px; background-color: var(--bg-secondary); z-index: {{ 3|add:forloop.counter0 }}; top: 12px; text-decoration: none;"
+               class="rounded-circle border d-flex align-items-center justify-content-center"
+               style="width: 56px; height: 56px; background-color: var(--bg-secondary); text-decoration: none;"
                onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
               {% if actor.avatar %}
                 <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
               {% else %}
-                <div class="d-flex align-items-center justify-content-center h-100">
-                  <i class="bi bi-person" style="color: var(--text-secondary);"></i>
-                </div>
-              {% endif %}
-            </a>
-          {% endfor %}
-          {% if payload.actors|length > 3 %}
-            <div class="rounded-circle border position-absolute d-flex align-items-center justify-content-center"
-                 style="width: 48px; height: 48px; background-color: rgba(0, 0, 0, 0.6); color: white; z-index: 6; left: 42px; top: 12px; font-size: 1rem; font-weight: bold;">
-              +{{ payload.actors|length|add:-3 }}
-            </div>
-          {% endif %}
-        </div>
-      {% else %}
-        {# Single actor or context avatar for group invitations #}
-        {% if payload.context and payload.context.type.value == 'GROUP' %}
-          {% if payload.type == 'INVITE' or payload.type == 'GROUP_INVITE' %}
-            {# Group invitation: large rounded group avatar with inviter avatar in bottom right #}
-            <div style="position: relative; width: 72px; height: 72px; margin-left: -16px;">
-              {# Group avatar - rounded rectangle #}
-              <a href="{% if navigation.primary and navigation.primary.url %}{{ navigation.primary.url }}{% endif %}"
-                 class="border d-flex align-items-center justify-content-center"
-                 style="width: 72px; height: 72px; background-color: var(--bg-secondary); border-radius: 12px; overflow: hidden; text-decoration: none;"
-                 onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
-                {% if payload.context.avatar_url %}
-                  <img src="{{ payload.context.avatar_url }}" alt="{{ payload.context.name }}" style="width: 100%; height: 100%; object-fit: cover;">
-                {% else %}
-                  <i class="bi bi-people" style="font-size: 2rem; color: var(--text-secondary);"></i>
-                {% endif %}
-              </a>
-              {# Inviter avatar - small circle in bottom right #}
-              {% if payload.actors and payload.actors.0 %}
-                {% with actor=payload.actors.0 %}
-                <a href="{% url 'users:profile' actor.username %}"
-                   class="rounded-circle border position-absolute d-flex align-items-center justify-content-center"
-                   style="width: 28px; height: 28px; background-color: var(--bg-secondary); right: -4px; bottom: -4px; z-index: 10; text-decoration: none;"
-                   onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
-                  {% if actor.avatar %}
-                    <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
-                  {% else %}
-                    <i class="bi bi-person" style="font-size: 1rem; color: var(--text-secondary);"></i>
-                  {% endif %}
-                </a>
-                {% endwith %}
-              {% endif %}
-            </div>
-          {% elif payload.context.avatar_url %}
-            {# Show group avatar for other group-related notifications #}
-            <a href="{% if navigation.primary and navigation.primary.url %}{{ navigation.primary.url }}{% endif %}"
-               class="rounded-circle border d-flex align-items-center justify-content-center"
-               style="width: 72px; height: 72px; background-color: var(--bg-secondary); text-decoration: none; margin-left: -16px;"
-               onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
-              <img src="{{ payload.context.avatar_url }}" alt="{{ payload.context.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
-            </a>
-          {% else %}
-            {# Show actor avatar for group notifications without avatar #}
-            {% with actor=payload.actors.0 %}
-            <a href="{% url 'users:profile' actor.username %}"
-               class="rounded-circle border d-flex align-items-center justify-content-center"
-               style="width: 72px; height: 72px; background-color: var(--bg-secondary); text-decoration: none; margin-left: -16px;"
-               onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
-              {% if actor.avatar %}
-                <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
-              {% else %}
-                <i class="bi bi-person" style="font-size: 2.25rem; color: var(--text-secondary);"></i>
+                <i class="bi bi-person" style="font-size: 1.75rem; color: var(--text-secondary);"></i>
               {% endif %}
             </a>
             {% endwith %}
           {% endif %}
-        {% elif payload.type == 'RELEASE' %}
-          {# Release notification: PwaniNet icon with actor avatar in bottom right #}
-          <div style="position: relative; width: 72px; height: 72px; margin-left: -16px;">
-            {# PwaniNet icon - main avatar #}
-            <div class="rounded-circle border d-flex align-items-center justify-content-center overflow-hidden"
-                 style="width: 72px; height: 72px; background-color: var(--bg-secondary);">
-              <img src="{% static 'images/web-app-manifest-192x192.png' %}" alt="PwaniNet" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
-            </div>
-            {# Actor avatar - small circle in bottom right #}
-            {% if payload.actors and payload.actors.0 %}
-              {% with actor=payload.actors.0 %}
-              <a href="{% url 'users:profile' actor.username %}"
-                 class="rounded-circle border position-absolute d-flex align-items-center justify-content-center"
-                 style="width: 28px; height: 28px; background-color: var(--bg-secondary); right: -4px; bottom: -4px; z-index: 10; text-decoration: none;"
-                 onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
-                {% if actor.avatar %}
-                  <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
-                {% else %}
-                  <i class="bi bi-person" style="font-size: 1rem; color: var(--text-secondary);"></i>
-                {% endif %}
-              </a>
-              {% endwith %}
-            {% endif %}
-          </div>
-        {% else %}
-          {# Show actor avatar for other notifications #}
-          {% with actor=payload.actors.0 %}
-          <a href="{% url 'users:profile' actor.username %}"
-             hx-get="{% url 'users:profile' actor.username %}"
-             hx-target="#page-content-target"
-             hx-swap="innerHTML"
-             hx-push-url="true"
-             hx-history="true"
-             class="rounded-circle border d-flex align-items-center justify-content-center"
-             style="width: 72px; height: 72px; background-color: var(--bg-secondary); text-decoration: none; margin-left: -16px;"
-             onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
-            {% if actor.avatar %}
-              <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
-            {% else %}
-              <i class="bi bi-person" style="font-size: 2.25rem; color: var(--text-secondary);"></i>
-            {% endif %}
-          </a>
-          {% endwith %}
         {% endif %}
+      {% else %}
+        <div class="rounded-circle border d-flex align-items-center justify-content-center"
+             style="width: 56px; height: 56px; background-color: var(--bg-secondary);">
+          <i class="bi bi-bell" style="font-size: 1.75rem; color: var(--text-secondary);"></i>
+        </div>
       {% endif %}
-    {% else %}
-      <div class="rounded-circle border d-flex align-items-center justify-content-center"
-           style="width: 72px; height: 72px; background-color: var(--bg-secondary); margin-left: -16px;">
-        <i class="bi bi-bell" style="font-size: 2.25rem; color: var(--text-secondary);"></i>
-      </div>
-    {% endif %}
-  
-    {# Notification Content #}
-    <div class="flex-grow-1 d-flex gap-3">
-      <div class="flex-grow-1">
-        <div class="d-flex justify-content-between align-items-start mb-1">
-          {# Summary Header - engaging title like "You have a new follower" #}
-          {% if summary %}
-            <h6 class="mb-0 fw-bold" style="font-size: 0.9rem; color: var(--text-primary);">
-              {{ summary }}
-            </h6>
+    </div>
+
+    {# Middle: Notification Content Body #}
+    <div class="notif-body flex-grow-1" style="min-width: 0;">
+      {# Notification Title / Summary (Full width, not squeezed by timestamp) #}
+      {% if summary %}
+        <h6 class="mb-1 fw-bold text-break notif-title" style="font-size: 0.9rem; color: var(--text-primary); line-height: 1.35;">
+          {{ summary }}
+        </h6>
+      {% endif %}
+      
+      {# Profile-Driven Message #}
+      {% if components.content and message %}
+        <p class="mb-1 text-break notif-message" style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">
+          {{ message }}
+        </p>
+      {% endif %}
+      
+      {# Comment Content Preview with Truncation #}
+      {% if payload.resource.content %}
+        <div class="notif-comment-preview text-break mb-2" title="{{ payload.resource.content }}">
+          <i class="bi bi-chat-left-quote-fill notif-quote-icon flex-shrink-0"></i>
+          <span class="notif-comment-text">“{{ payload.resource.content|truncatechars:120 }}”</span>
+        </div>
+      {% endif %}
+      
+      {# Context Header #}
+      {% if components.context_header and payload.context %}
+        <div class="context-header d-flex align-items-center gap-2 mb-1"
+             style="font-size: 0.82rem; color: var(--text-muted);">
+          {% if payload.context.icon %}
+            <i class="bi bi-{{ payload.context.icon }}"></i>
+          {% endif %}
+          {% if interactions.context_header.behavior == 'OPEN_CONTEXT' %}
+            <span style="cursor: pointer;">{{ payload.context.name }}</span>
+          {% else %}
+            <span>{{ payload.context.name }}</span>
           {% endif %}
         </div>
-        
-        {# Profile-Driven Message - includes actor names and action #}
-        {% if components.content and message %}
-          <p class="mb-1" style="font-size: 0.85rem; color: var(--text-secondary);">
-            {{ message }}
-          </p>
-        {% endif %}
-        
-        {# Comment Content - shown for comment notifications #}
-        {% if payload.resource.content %}
-          <p class="mb-1" style="font-size: 0.8rem; color: var(--text-muted); font-style: italic;">
-            "{{ payload.resource.content }}"
-          </p>
-        {% endif %}
-        
-        {# Context Header - shown based on component visibility #}
-        {% if components.context_header and payload.context %}
-          <div class="context-header d-flex align-items-center gap-2 mb-2"
-               style="font-size: 0.85rem; color: var(--text-muted);">
-            {% if payload.context.icon %}
-              <i class="bi bi-{{ payload.context.icon }}"></i>
-            {% endif %}
-            {% if interactions.context_header.behavior == 'OPEN_CONTEXT' %}
-              <span style="cursor: pointer;">{{ payload.context.name }}</span>
-            {% else %}
-              <span>{{ payload.context.name }}</span>
+      {% endif %}
+      
+      {# Status Indicator #}
+      {% if components.status and status %}
+        <div class="status-indicator mb-2"
+             style="font-size: 0.78rem; padding: 2px 8px; border-radius: 4px; background-color: var(--bg-secondary); display: inline-block;">
+          {% if status.state and status.state == 'PENDING' %}🟡 Pending
+          {% elif status.state and status.state == 'APPROVED' %}🟢 Approved
+          {% elif status.state and status.state == 'REJECTED' %}🔴 Rejected
+          {% elif status.state and status.state == 'COMPLETED' %}✅ Completed
+          {% else %}{{ status.state|default:'' }}
+          {% endif %}
+        </div>
+      {% endif %}
+      
+      {# Expandable Actor List - shown when expanded for aggregated notifications #}
+      {% if payload.actors|length > 1 %}
+        <div id="expanded-actors-{{ payload.identity.notification_id }}" class="expanded-actors mt-2" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out, opacity 0.3s ease-out; opacity: 0;">
+          <div class="d-flex flex-column gap-2 py-2">
+            {% for actor in payload.actors|slice:":5" %}
+              <a href="{% url 'users:profile' actor.username %}"
+                 hx-get="{% url 'users:profile' actor.username %}"
+                 hx-target="#page-content-target"
+                 hx-swap="innerHTML"
+                 hx-push-url="true"
+                 hx-history="true"
+                 class="d-flex align-items-center gap-2 p-2 rounded"
+                 style="text-decoration: none; color: var(--text-primary); background-color: var(--bg-secondary);"
+                 onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
+                <div class="rounded-circle d-flex align-items-center justify-content-center"
+                     style="width: 32px; height: 32px; background-color: var(--bg-tertiary); overflow: hidden;">
+                  {% if actor.avatar %}
+                    <img src="{{ actor.avatar }}" alt="{{ actor.name }}" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
+                  {% else %}
+                    <i class="bi bi-person" style="font-size: 1rem; color: var(--text-secondary);"></i>
+                  {% endif %}
+                </div>
+                <div class="d-flex flex-column">
+                  <span style="font-size: 0.85rem;">{{ actor.name }}</span>
+                  {% if actor.timestamp %}
+                    <small class="text-muted" style="font-size: 0.75rem;">{{ actor.timestamp|timesince }}</small>
+                  {% endif %}
+                </div>
+              </a>
+            {% endfor %}
+            {% if payload.actors|length > 5 %}
+              <div class="d-flex align-items-center justify-content-center p-2 rounded"
+                   style="color: var(--text-secondary); background-color: var(--bg-tertiary);">
+                <span style="font-size: 0.85rem;">and {{ payload.actors|length|add:-5 }} more</span>
+              </div>
             {% endif %}
           </div>
-        {% endif %}
-        
-        {# Status Indicator - shown based on status strategy #}
-        {% if components.status and status %}
-          <div class="status-indicator mb-2"
-               style="font-size: 0.8rem; padding: 4px 8px; border-radius: 4px; background-color: var(--bg-secondary); display: inline-block;">
-            {% if status.state and status.state == 'PENDING' %}🟡 Pending
-            {% elif status.state and status.state == 'APPROVED' %}🟢 Approved
-            {% elif status.state and status.state == 'REJECTED' %}🔴 Rejected
-            {% elif status.state and status.state == 'COMPLETED' %}✅ Completed
-            {% else %}{{ status.state|default:'' }}
-            {% endif %}
-          </div>
-        {% endif %}
-        
-        {# Action Bar - shown based on component visibility #}
+        </div>
+      {% endif %}
+
+      {# Card Footer: Actions (Left), Chevron (Center if aggregated), Timestamp (Bottom Right Corner) #}
+      <div class="notif-footer d-flex align-items-center justify-content-between flex-wrap gap-2 mt-2 pt-1">
         {% if components.action_bar and actions %}
-          <div class="action-bar d-flex gap-2 mt-2">
+          <div class="action-bar d-flex flex-wrap gap-2">
             {% for action in actions %}
               {% if action.url %}
                 {% if action.method == 'POST' %}
@@ -221,6 +265,7 @@
                           hx-post="{{ action.url }}"
                           hx-target="closest .list-group-item"
                           hx-swap="outerHTML"
+                          onclick="event.stopPropagation();"
                           {% if not action.enabled %}disabled{% endif %}>
                     {% if action.icon %}<i class="bi bi-{{ action.icon }}"></i>{% endif %}
                     {{ action.label }}
@@ -236,7 +281,7 @@
                      {% endif %}
                      class="btn btn-sm"
                      style="background-color: {% if action.style == 'primary' %}var(--brand){% elif action.style == 'danger' %}var(--danger){% elif action.style == 'success' %}var(--success){% else %}var(--bg-secondary){% endif %}; color: {% if action.style in 'primary danger success' %}white{% else %}var(--text-primary){% endif %}; text-decoration: none; border-radius: 20px;"
-                     onclick="{% if action.id == 'SEE_WHATS_NEW' %}event.preventDefault(); event.stopPropagation(); console.log('Opening modal for release:', '{{ payload.raw_data.target_id }}'); console.log('Function check:', typeof window.openWhatsNewModal); if (typeof window.openWhatsNewModal === 'function') { window.openWhatsNewModal('{{ payload.raw_data.target_id }}', event); } else { console.error('openWhatsNewModal function not found on window object'); console.log('Available window functions:', Object.keys(window).filter(k => k.includes('whats') || k.includes('Whats'))); }{% else %}event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this);{% endif %}"
+                     onclick="{% if action.id == 'SEE_WHATS_NEW' %}event.preventDefault(); event.stopPropagation(); if (typeof window.openWhatsNewModal === 'function') { window.openWhatsNewModal('{{ payload.raw_data.target_id }}', event); }{% else %}event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this);{% endif %}"
                      {% if not action.enabled %}style="opacity: 0.5; pointer-events: none;"{% endif %}>
                     {% if action.icon %}<i class="bi bi-{{ action.icon }}"></i>{% endif %}
                     {{ action.label }}
@@ -246,183 +291,129 @@
             {% endfor %}
           </div>
         {% endif %}
-        
-        {# Timestamp - positioned at bottom right #}
-        <div class="d-flex justify-content-end mt-2" style="margin-right: -16px;">
-          <small class="text-muted" style="font-size: 0.75rem; white-space: nowrap;">
-            {% if payload.timestamps %}
-              {% if payload.timestamps.created_at %}
-                {{ payload.timestamps.created_at|timesince }}
-              {% endif %}
+
+        {% if payload.actors|length > 1 %}
+          <button class="btn btn-sm p-0 {% if not components.action_bar or not actions %}me-auto{% else %}mx-auto{% endif %}"
+                  style="background: none; border: none; color: var(--text-secondary);"
+                  onclick="event.stopPropagation(); toggleExpand('{{ payload.identity.notification_id }}', this);"
+                  title="Show more">
+            <i class="bi bi-chevron-down" style="font-size: 1rem;"></i>
+          </button>
+        {% endif %}
+
+        {% if payload.timestamps %}
+          <small class="text-muted text-nowrap ms-auto notif-timestamp" style="font-size: 0.72rem;">
+            <i class="bi bi-clock me-1"></i>
+            {% if payload.timestamps.updated_at %}
+              {{ payload.timestamps.updated_at|timesince }} ago
+            {% elif payload.timestamps.created_at %}
+              {{ payload.timestamps.created_at|timesince }} ago
             {% endif %}
           </small>
-        </div>
-        
-        {# Expandable Actor List - shown when expanded for aggregated notifications #}
-        {% if payload.actors|length > 1 %}
-          <div id="expanded-actors-{{ payload.identity.notification_id }}" class="expanded-actors mt-3" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out, opacity 0.3s ease-out; opacity: 0;">
-            <div class="d-flex flex-column gap-2 py-2">
-              {% for actor in payload.actors|slice:":5" %}
-                <a href="{% url 'users:profile' actor.username %}"
-                   hx-get="{% url 'users:profile' actor.username %}"
-                   hx-target="#page-content-target"
-                   hx-swap="innerHTML"
-                   hx-push-url="true"
-                   hx-history="true"
-                   class="d-flex align-items-center gap-2 p-2 rounded"
-                   style="text-decoration: none; color: var(--text-primary); background-color: var(--bg-secondary);"
-                   onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
-                  <div class="rounded-circle d-flex align-items-center justify-content-center"
-                       style="width: 32px; height: 32px; background-color: var(--bg-tertiary); overflow: hidden;">
-                    {% if actor.avatar %}
-                      <img src="{{ actor.avatar }}" alt="{{ actor.name }}" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
-                    {% else %}
-                      <i class="bi bi-person" style="font-size: 1rem; color: var(--text-secondary);"></i>
-                    {% endif %}
-                  </div>
-                  <div class="d-flex flex-column">
-                    <span style="font-size: 0.85rem;">{{ actor.name }}</span>
-                    {% if actor.timestamp %}
-                      <small class="text-muted" style="font-size: 0.75rem;">{{ actor.timestamp|timesince }}</small>
-                    {% endif %}
-                  </div>
-                </a>
-              {% endfor %}
-              {% if payload.actors|length > 5 %}
-                <div class="d-flex align-items-center justify-content-center p-2 rounded"
-                     style="color: var(--text-secondary); background-color: var(--bg-tertiary);">
-                  <span style="font-size: 0.85rem;">and {{ payload.actors|length|add:-5 }} more</span>
-                </div>
-              {% endif %}
-            </div>
-          </div>
-          
-          {# Expand button at bottom center of card #}
-          <div class="d-flex justify-content-center mt-3">
-            <button class="btn btn-sm p-0"
-                    style="background: none; border: none; color: var(--text-secondary);"
-                    onclick="toggleExpand('{{ payload.identity.notification_id }}', this)">
-              <i class="bi bi-chevron-down" style="font-size: 1rem;"></i>
-            </button>
-          </div>
         {% endif %}
-        
-        <script>
-        function toggleExpand(notificationId, button) {
-          const expandedDiv = document.getElementById('expanded-actors-' + notificationId);
-          const icon = button.querySelector('i');
-          
-          if (expandedDiv.style.maxHeight === '0px') {
-            expandedDiv.style.maxHeight = expandedDiv.scrollHeight + 'px';
-            expandedDiv.style.opacity = '1';
-            icon.classList.remove('bi-chevron-down');
-            icon.classList.add('bi-chevron-up');
-          } else {
-            expandedDiv.style.maxHeight = '0px';
-            expandedDiv.style.opacity = '0';
-            icon.classList.remove('bi-chevron-up');
-            icon.classList.add('bi-chevron-down');
-          }
-        }
-        
-        function markAsRead(notificationId, element) {
-          const notificationCard = document.getElementById('notification-' + notificationId);
-          if (notificationCard && notificationCard.classList.contains('unread-notification')) {
-            fetch('/notifications/read/' + notificationId + '/', {
-              method: 'POST',
-              headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'Content-Type': 'application/json',
-              },
-            }).then(response => {
-              if (response.ok) {
-                notificationCard.classList.remove('unread-notification');
-                notificationCard.classList.add('read-notification');
-                notificationCard.style.cursor = 'default';
-                notificationCard.removeAttribute('hx-post');
-              }
-            });
-          }
-        }
-        
-        function getCookie(name) {
-          let cookieValue = null;
-          if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-              const cookie = cookies[i].trim();
-              if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-              }
-            }
-          }
-          return cookieValue;
-        }
-        </script>
       </div>
-      
-      {# Resource Preview - shown on right side as small box #}
-      {% if components.preview and preview.enabled and payload.resource %}
-        {% if payload.resource.url %}
-        <a href="{{ payload.resource.url }}"
-           hx-get="{{ payload.resource.url }}"
-           hx-target="#page-content-target"
-           hx-swap="innerHTML"
-           hx-push-url="true"
-           hx-history="true"
-           class="resource-preview flex-shrink-0"
-           style="width: 60px; height: 60px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background-color: var(--bg-secondary); text-decoration: none; margin-right: -16px;"
-           onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
-        {% else %}
-        <div class="resource-preview flex-shrink-0"
-             style="width: 60px; height: 60px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background-color: var(--bg-secondary); margin-right: -16px;">
-        {% endif %}
-          {% if payload.resource.type.value == 'POST' %}
-            {% if payload.resource.image_url %}
-              <img src="{{ payload.resource.image_url }}" 
-                   style="width: 100%; height: 100%; object-fit: cover;" 
-                   alt="Post preview"
-                   loading="lazy"
-                   onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-              <div style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center;">
-                <i class="bi bi-chat-text" style="color: var(--text-secondary); font-size: 1.5rem;"></i>
-              </div>
-            {% else %}
-              <div class="d-flex align-items-center justify-content-center h-100">
-                <i class="bi bi-chat-text" style="color: var(--text-secondary); font-size: 1.5rem;"></i>
-              </div>
-            {% endif %}
-          {% elif payload.resource.type.value == 'DOCUMENT' %}
-            {% if payload.resource.image_url %}
-              <img src="{{ payload.resource.image_url }}" 
-                   style="width: 100%; height: 100%; object-fit: cover;" 
-                   alt="Document preview"
-                   loading="lazy"
-                   onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-              <div style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center;">
-                <i class="bi bi-file-earmark-text" style="color: var(--text-secondary); font-size: 1.5rem;"></i>
-              </div>
-            {% else %}
-              <div class="d-flex align-items-center justify-content-center h-100">
-                <i class="bi bi-file-earmark-text" style="color: var(--text-secondary); font-size: 1.5rem;"></i>
-              </div>
-            {% endif %}
-          {% elif payload.resource.type.value == 'GROUP' %}
-            <div class="d-flex align-items-center justify-content-center h-100">
-              <i class="bi bi-people" style="color: var(--text-secondary); font-size: 1.5rem;"></i>
-            </div>
-          {% else %}
-            <div class="d-flex align-items-center justify-content-center h-100">
-              <i class="bi bi-file-earmark" style="color: var(--text-secondary); font-size: 1.5rem;"></i>
-            </div>
-          {% endif %}
-        {% if payload.resource.url %}
-        </a>
-        {% else %}
-        </div>
-        {% endif %}
-      {% endif %}
     </div>
+
+    {# Right End: Resource Preview Thumbnail #}
+    {% if payload.resource %}
+      {% if payload.resource.image_url or components.preview and preview.enabled %}
+        <div class="notif-preview-col flex-shrink-0 ms-auto align-self-start">
+          {% if payload.resource.url %}
+          <a href="{{ payload.resource.url }}"
+             hx-get="{{ payload.resource.url }}"
+             hx-target="#page-content-target"
+             hx-swap="innerHTML"
+             hx-push-url="true"
+             hx-history="true"
+             class="resource-preview"
+             style="width: 56px; height: 56px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background-color: var(--bg-secondary); text-decoration: none; display: flex; align-items: center; justify-content: center;"
+             onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
+          {% else %}
+          <div class="resource-preview"
+               style="width: 56px; height: 56px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background-color: var(--bg-secondary); display: flex; align-items: center; justify-content: center;">
+          {% endif %}
+            {% if payload.resource.image_url %}
+              <img src="{{ payload.resource.image_url }}" 
+                   style="width: 100%; height: 100%; object-fit: cover;" 
+                   alt="Preview"
+                   loading="lazy"
+                   onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+              <div style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center;">
+                {% if payload.resource.type.value == 'DOCUMENT' or payload.resource.type == 'DOCUMENT' or payload.type in 'DOCUMENT_SHARED POST_DOCUMENT_SHARED' %}
+                  <i class="bi bi-file-earmark-text" style="color: var(--text-secondary); font-size: 1.35rem;"></i>
+                {% elif payload.resource.type.value == 'POST' or payload.resource.type == 'POST' or payload.resource.type.value == 'COMMENT' or payload.resource.type == 'COMMENT' %}
+                  <i class="bi bi-chat-text" style="color: var(--text-secondary); font-size: 1.35rem;"></i>
+                {% elif payload.resource.type.value == 'GROUP' or payload.resource.type == 'GROUP' %}
+                  <i class="bi bi-people" style="color: var(--text-secondary); font-size: 1.35rem;"></i>
+                {% else %}
+                  <i class="bi bi-file-earmark" style="color: var(--text-secondary); font-size: 1.35rem;"></i>
+                {% endif %}
+              </div>
+            {% elif payload.resource.type.value == 'DOCUMENT' or payload.resource.type == 'DOCUMENT' or payload.type in 'DOCUMENT_SHARED POST_DOCUMENT_SHARED' %}
+              <div class="d-flex align-items-center justify-content-center h-100">
+                <i class="bi bi-file-earmark-text" style="color: var(--text-secondary); font-size: 1.35rem;"></i>
+              </div>
+            {% elif payload.resource.type.value == 'POST' or payload.resource.type == 'POST' or payload.resource.type.value == 'COMMENT' or payload.resource.type == 'COMMENT' %}
+              <div class="d-flex align-items-center justify-content-center h-100">
+                <i class="bi bi-chat-text" style="color: var(--text-secondary); font-size: 1.35rem;"></i>
+              </div>
+            {% elif payload.resource.type.value == 'GROUP' or payload.resource.type == 'GROUP' %}
+              <div class="d-flex align-items-center justify-content-center h-100">
+                <i class="bi bi-people" style="color: var(--text-secondary); font-size: 1.35rem;"></i>
+              </div>
+            {% else %}
+              <div class="d-flex align-items-center justify-content-center h-100">
+                <i class="bi bi-file-earmark" style="color: var(--text-secondary); font-size: 1.35rem;"></i>
+              </div>
+            {% endif %}
+          {% if payload.resource.url %}
+          </a>
+          {% else %}
+          </div>
+          {% endif %}
+        </div>
+      {% endif %}
+    {% endif %}
   </div>
 </div>
+
+<script>
+if (typeof window.toggleExpand !== 'function') {
+  window.toggleExpand = function(notificationId, button) {
+    const expandedDiv = document.getElementById('expanded-actors-' + notificationId);
+    if (!expandedDiv) return;
+    const icon = button.querySelector('i');
+    if (expandedDiv.style.maxHeight === '0px' || !expandedDiv.style.maxHeight) {
+      expandedDiv.style.maxHeight = expandedDiv.scrollHeight + 'px';
+      expandedDiv.style.opacity = '1';
+      if (icon) { icon.classList.remove('bi-chevron-down'); icon.classList.add('bi-chevron-up'); }
+    } else {
+      expandedDiv.style.maxHeight = '0px';
+      expandedDiv.style.opacity = '0';
+      if (icon) { icon.classList.remove('bi-chevron-up'); icon.classList.add('bi-chevron-down'); }
+    }
+  };
+}
+if (typeof window.markAsRead !== 'function') {
+  window.markAsRead = function(notificationId, element) {
+    const notificationCard = document.getElementById('notification-' + notificationId);
+    if (notificationCard && notificationCard.classList.contains('unread-notification')) {
+      const token = (document.cookie.split('; ').find(r => r.startsWith('csrftoken=')) || '').split('=')[1];
+      fetch('/notifications/read/' + notificationId + '/', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': token || '',
+          'Content-Type': 'application/json',
+        },
+      }).then(response => {
+        if (response.ok) {
+          notificationCard.classList.remove('unread-notification');
+          notificationCard.classList.add('read-notification');
+          notificationCard.style.cursor = 'default';
+          notificationCard.removeAttribute('hx-post');
+        }
+      });
+    }
+  };
+}
+</script>

@@ -55,13 +55,13 @@
                         
                         {% if shared_post.message %}
                         <div class="px-3 py-2 bg-light border-bottom">
-                            <p class="mb-0 small text-muted fst-italic">"{{ shared_post.message }}"</p>
+                            <p class="mb-0 small text-muted fst-italic">"{{ shared_post.message|urlize|linebreaksbr }}"</p>
                         </div>
                         {% endif %}
                         
                         <div class="p-3">
-                            <a href="{% url 'posts:post_details' shared_post.original_post.id %}"
-                               hx-get="{% url 'posts:post_details' shared_post.original_post.id %}"
+                            <a href="{% url 'posts:post_details' shared_post.original_post.share_id %}"
+                               hx-get="{% url 'posts:post_details' shared_post.original_post.share_id %}"
                                hx-target="#page-content-target"
                                hx-swap="innerHTML"
                                hx-push-url="true"
@@ -94,8 +94,8 @@
                         </div>
                         
                         <div class="px-3 py-2 border-top">
-                            <a href="{% url 'posts:post_details' shared_post.original_post.id %}"
-                               hx-get="{% url 'posts:post_details' shared_post.original_post.id %}"
+                            <a href="{% url 'posts:post_details' shared_post.original_post.share_id %}"
+                               hx-get="{% url 'posts:post_details' shared_post.original_post.share_id %}"
                                hx-target="#page-content-target"
                                hx-swap="innerHTML"
                                hx-push-url="true"

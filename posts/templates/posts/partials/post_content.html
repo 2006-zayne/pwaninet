@@ -1,14 +1,14 @@
 {% load static %}
-<div class="post-content-wrapper" data-post-id="{{ post.id }}">
+<div class="post-content-wrapper" data-post-id="{{ post.share_id }}" data-post.share_id="{{ post.share_id }}">
     <p class="mb-0 text-dark post-content-text" style="font-size: 16px; line-height: 1.5;">
         {% if post.repost_of %}
-            {% if post.content %}<p class="mb-2 text-dark" style="font-size: 16px;">{{ post.content }}</p>{% endif %}
-            <span class="post-content-full">{{ post.repost_of.content }}</span>
-            <span class="post-content-truncated" style="display: none;"></span>
+            {% if post.content %}<p class="mb-2 text-dark" style="font-size: 16px;">{{ post.content|urlize|linebreaksbr }}</p>{% endif %}
+            <span class="post-content-full">{{ post.repost_of.content|urlize|linebreaksbr }}</span>
+            <span class="post-content-truncated" style="display: none;">{{ post.repost_of.content|truncatechars:200|urlize|linebreaksbr }}</span>
         {% else %}
-            <span class="post-content-full">{{ post.content }}</span>
-            <span class="post-content-truncated" style="display: none;"></span>
+            <span class="post-content-full">{{ post.content|urlize|linebreaksbr }}</span>
+            <span class="post-content-truncated" style="display: none;">{{ post.content|truncatechars:200|urlize|linebreaksbr }}</span>
         {% endif %}
     </p>
-    <button class="btn btn-link p-0 text-primary see-more-btn" style="font-size: 14px; display: none;" data-post-id="{{ post.id }}">See more</button>
+    <button class="btn btn-link p-0 text-primary see-more-btn" style="font-size: 14px; display: none;" data-post-id="{{ post.share_id }}" data-post.share_id="{{ post.share_id }}">See more</button>
 </div>

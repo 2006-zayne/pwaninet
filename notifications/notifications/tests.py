@@ -295,9 +295,21 @@ class NotificationObjectTests(TestCase):
             title='Second notification'
         )
         
+        from datetime import timedelta
+        from django.utils import timezone
+        now = timezone.now()
+        NotificationObject.objects.filter(pk=notification1.pk).update(
+            created_at=now - timedelta(seconds=10),
+            updated_at=now - timedelta(seconds=10)
+        )
+        NotificationObject.objects.filter(pk=notification2.pk).update(
+            created_at=now,
+            updated_at=now
+        )
+        
         notifications = list(NotificationObject.objects.all())
-        self.assertEqual(notifications[0], notification2)  # Most recent first
-        self.assertEqual(notifications[1], notification1)
+        self.assertEqual(notifications[0].notification_id, notification2.notification_id)  # Most recent first
+        self.assertEqual(notifications[1].notification_id, notification1.notification_id)
     
     def test_critical_priority_notification(self):
         """Test creating a critical priority notification."""

@@ -1,0 +1,21 @@
+{% if is_member %}
+  <button class="btn btn-sm btn-outline-success rounded-pill px-3 fw-bold"
+          id="onboarding-group-btn-{{ group.id }}"
+          disabled>
+    <i class="bi bi-check2"></i> Joined
+  </button>
+{% elif is_pending %}
+  <button class="btn btn-sm btn-outline-warning rounded-pill px-3 fw-bold"
+          id="onboarding-group-btn-{{ group.id }}"
+          disabled>
+    <i class="bi bi-clock"></i> Requested
+  </button>
+{% else %}
+  <button class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold"
+          id="onboarding-group-btn-{{ group.id }}"
+          hx-post="{% url 'groups:toggle_membership' group.id %}?source=onboarding"
+          hx-target="#onboarding-group-btn-{{ group.id }}"
+          hx-swap="outerHTML">
+    <i class="bi bi-plus-lg"></i> Join
+  </button>
+{% endif %}

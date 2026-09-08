@@ -41,6 +41,12 @@ const CORE_ASSETS = [
     '/offline.html',
     '/static/css/bootstrap.min.css',
     '/static/css/bootstrap-icons.css',
+    '/static/css/custom.css',
+    '/static/css/fonts.css',
+    '/static/css/profile.css',
+    '/static/css/comments.css',
+    '/static/css/people-modal.css',
+    '/static/notifications/css/notifications.css',
     '/static/js/bootstrap.bundle.min.js',
     '/static/images/favicon.ico',
     '/static/images/favicon-96x96.png',
@@ -77,17 +83,17 @@ self.addEventListener('install', (event) => {
                 return cache.addAll(CORE_ASSETS);
             })
             .then(() => {
-                console.log('Service Worker: Core assets cached');
-                // DO NOT call skipWaiting() - wait for user approval
-                // The service worker will remain in 'waiting' state
+                console.log('Service Worker: Core assets cached, activating immediately');
+                return self.skipWaiting();
             })
             .catch((error) => {
                 console.error('Service Worker: Failed to cache core assets:', error);
+                return self.skipWaiting();
             })
     );
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up old caches and take control
 self.addEventListener('activate', (event) => {
     console.log('Service Worker: Activating...');
     
@@ -104,9 +110,19 @@ self.addEventListener('activate', (event) => {
                 );
             })
             .then(() => {
-                console.log('Service Worker: Activated');
-                // DO NOT call clients.claim() - wait for user approval
-                // The service worker will not claim clients until explicitly told
+                console.log('Service Worker: Activated and claiming clients');
+                return self.clients.claim();
+            })
+            .then(() => {
+                return self.clients.matchAll({ type: 'window' }).then((clients) => {
+                    clients.forEach((client) => {
+                        client.postMessage({
+                            type: 'NEW_VERSION_ACTIVATED',
+                            version: CACHE_VERSION,
+                            build: CACHE_BUILD
+                        });
+                    });
+                });
             })
     );
 });
@@ -253,8 +269,9 @@ async function handleNavigationRequest(request) {
         // Try network first directly
         const networkResponse = await fetch(request);
         
-        // Cache successful responses
-        if (networkResponse && networkResponse.ok) {
+        // Cache successful responses ONLY if NOT an HTMX request
+        const isHtmx = request.headers.get('HX-Request') === 'true';
+        if (networkResponse && networkResponse.ok && !isHtmx) {
             const cache = await caches.open(CACHE_NAME);
             cache.put(request, networkResponse.clone());
         }
@@ -293,6 +310,7 @@ async function handleStaticAssetRequest(request) {
             if (cachedResponse) {
                 return cachedResponse;
             }
+            return await getOfflineAsset(request);
         }
     }
     
@@ -389,8 +407,9 @@ async function networkFirst(request) {
     try {
         const networkResponse = await fetch(request);
         
-        // Cache successful responses
-        if (networkResponse.ok) {
+        // Cache successful responses ONLY if not an HTMX request
+        const isHtmx = request.headers.get('HX-Request') === 'true';
+        if (networkResponse.ok && !isHtmx) {
             const cache = await caches.open(CACHE_NAME);
             cache.put(request, networkResponse.clone());
         }
@@ -526,16 +545,18 @@ async function getOfflineAsset(request) {
     const url = new URL(request.url);
     
     if (url.pathname.includes('.css')) {
-        return new Response('/* Offline */', {
-            status: 200,
-            headers: { 'Content-Type': 'text/css' }
+        return new Response('/* CSS asset unavailable offline */', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'text/plain' }
         });
     }
     
     if (url.pathname.includes('.js')) {
-        return new Response('// Offline', {
-            status: 200,
-            headers: { 'Content-Type': 'application/javascript' }
+        return new Response('/* JavaScript asset unavailable offline */', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'text/plain' }
         });
     }
     

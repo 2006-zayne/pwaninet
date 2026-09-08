@@ -26,6 +26,7 @@ class UnitSerializer(serializers.ModelSerializer):
 
 
 class PostSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(source="share_id", read_only=True)
     author = UserMinimalSerializer(read_only=True)
     group = GroupSerializer(read_only=True)
     course = CourseSerializer(read_only=True)
@@ -81,6 +82,7 @@ class PostSerializer(serializers.ModelSerializer):
 
 
 class PostCreateSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(source="share_id", read_only=True)
     """Serializer for creating posts"""
     images = serializers.ListField(
         child=serializers.ImageField(),
@@ -385,95 +387,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
             except Exception:
                 pass
                 
-            from users.models import User
-            from groups.models import MembershipStatus
-            
-            if post.group:
-                recipients = User.objects.filter(
-                    group_memberships__group=post.group,
-                    group_memberships__status=MembershipStatus.APPROVED
-                ).exclude(id=author.id)
-                msg_text = f"posted in the {post.group.name} squad."
-            else:
-                # Send to users who follow the author (people who should see their posts)
-                # following_relationships are relationships where the user is the follower
-                recipients = User.objects.filter(
-                    following_relationships__followed=author
-                ).exclude(id=author.id)
-                msg_text = "posted a new update."
 
-            if recipients.exists():
-                notification_type = NotificationTypes.GROUP.value if post.group else NotificationTypes.POST_CREATED.value
-                
-                # Get thumbnail URL for notification preview
-                thumbnail_url = None
-                if post.thumbnail:
-                    thumbnail_url = post.thumbnail.url
-                elif post.images.exists():
-                    thumbnail_url = post.images.first().get_thumbnail_url('400')
-                elif post.video_poster:
-                    thumbnail_url = post.video_poster.url
-                elif post.shared_document:
-                    # For shared documents, try to get document preview
-                    try:
-                        from documents.models import DocumentFile
-                        if post.shared_document.latest_version:
-                            first_file = post.shared_document.latest_version.files.first()
-                            if first_file and first_file.preview_path:
-                                thumbnail_url = f"/media/{first_file.preview_path}"
-                    except:
-                        pass
-                
-                from django.utils import timezone
-                from notifications.services.notification_service import invalidate_unread_count_cache, get_unread_count
-                from channels.layers import get_channel_layer
-                from asgiref.sync import async_to_sync
-                
-                created_notifications = NotificationObject.objects.bulk_create([
-                    NotificationObject(
-                        recipient=recipient,
-                        notification_type=notification_type,
-                        category=NotificationCategories.SOCIAL.value,
-                        title=f"{author.username} {msg_text}",
-                        summary=f"{author.username} {msg_text}",
-                        context_type='Post',
-                        context_id=str(post.id),
-                        metadata={
-                            'actor_id': str(author.id),
-                            'actor_username': author.username,
-                            'post_id': str(post.id),
-                            'thumbnail_url': thumbnail_url,
-                            'resource_type': 'POST',
-                            'target_type': 'Post',
-                            'target_id': str(post.id),
-                            'post_content': post.content[:100] if post.content else '',
-                        },
-                        priority='NORMAL',
-                        updated_at=timezone.now(),
-                    )
-                    for recipient in recipients
-                ])
-                
-                # Invalidate unread count cache for all recipients and broadcast updates
-                channel_layer = get_channel_layer()
-                for notification in created_notifications:
-                    recipient_id = notification.recipient_id
-                    invalidate_unread_count_cache(recipient_id)
-                    
-                    # Get the actual count
-                    count = get_unread_count(recipient_id)
-                    logger.info(f'[PostCreateSerializer] Broadcasting unread count update to user {recipient_id}: count={count}')
-                    
-                    # Broadcast unread count update via WebSocket
-                    async_to_sync(channel_layer.group_send)(
-                        f"notifications_{recipient_id}",
-                        {
-                            'type': 'unread_count_update',
-                            'count': count
-                        }
-                    )
-                    logger.info(f'[PostCreateSerializer] Successfully sent WebSocket broadcast to notifications_{recipient_id}')
-        
         # Trigger thumbnail generation for gradient/text posts
         if not post.images.exists() and not post.video and not post.shared_document:
             logger.info('[PostCreateSerializer] Triggering thumbnail generation for post %s', post.id)
@@ -600,6 +514,7 @@ class LikeSerializer(serializers.ModelSerializer):
 
 
 class RepostSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(source="share_id", read_only=True)
     original_post = PostSerializer(read_only=True)
     reposter = UserMinimalSerializer(read_only=True)
     group = GroupSerializer(read_only=True)

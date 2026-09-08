@@ -304,6 +304,9 @@
     <!-- Native App Enhancements (Capacitor-specific) -->
     <script src="{% static 'js/native-app.js' %}"></script>
 
+    <!-- Share Manager — unified share logic for Capacitor, Web Share API, and platform links -->
+    <script src="{% static 'js/share-manager.js' %}"></script>
+
     <!-- Lazy Image Loader for performance -->
     <script src="{% static 'js/lazy-load-images.js' %}"></script>
 
@@ -366,6 +369,8 @@
             --nav-bg: rgba(255, 255, 255, 0.9);
             --mobile-nav-bg: #fff;
             --font-scale: 1.00;
+            --search-bg: #e9ecef;
+            --search-bg-focus: #fff;
         }
 
         /* Dark theme variables */
@@ -382,6 +387,8 @@
             --text-secondary: #e4e6eb;
             --text-muted: #e4e6eb;
             --font-scale: 1.00;
+            --search-bg: #3a3b3c;
+            --search-bg-focus: #4e4f50;
         }
 
         [data-theme="dark"] .text-muted {
@@ -852,26 +859,26 @@
             width: 44px;
             height: 44px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.94);
-            color: #0f172a;
-            border: 1px solid rgba(0, 0, 0, 0.08);
+            background: var(--mobile-nav-bg, #ffffff);
+            color: var(--text-dark, #0f172a);
+            border: 1px solid var(--border, #e2e8f0);
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.04);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
             z-index: 9990; /* Above regular content, below bottom-nav (9999) & upload-banner (9995) */
             cursor: pointer;
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
             transform: translateY(12px) scale(0.9);
-            transition: opacity 0.25s ease, transform 0.25s ease, bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.25s ease, background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+            transition: opacity 0.25s ease, transform 0.25s ease, bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.25s ease, background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
         [data-theme="dark"] .back-to-top-btn {
-            background: rgba(30, 41, 59, 0.92);
-            color: #f8fafc;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+            background: var(--mobile-nav-bg, #242526);
+            color: var(--text-dark, #e4e6eb);
+            border: 1px solid var(--border, #3a3b3c);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.15);
         }
 
         .back-to-top-btn.visible {
@@ -883,17 +890,19 @@
 
         .back-to-top-btn:hover {
             transform: translateY(-2px) scale(1.06);
-            color: #2563eb;
+            color: var(--primary, #2563eb);
+            border-color: var(--primary, #2563eb);
             box-shadow: 0 6px 20px rgba(37, 99, 235, 0.25);
         }
 
         [data-theme="dark"] .back-to-top-btn:hover {
-            color: #818cf8;
-            box-shadow: 0 6px 20px rgba(129, 140, 248, 0.3);
+            color: var(--primary, #818cf8);
+            border-color: var(--primary, #818cf8);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
         }
 
         .back-to-top-btn:active {
-            transform: translateY(0) scale(0.96);
+            transform: translateY(0) scale(0.94);
         }
 
         .back-to-top-btn i {
@@ -927,9 +936,22 @@
             }
         }
 
-        /* Hide when modals are open */
-        body.modal-open .back-to-top-btn {
-            display: none !important;
+        /* Like button styling & animations */
+        .like-button.text-danger,
+        .like-button.text-danger i {
+            color: #ef4444 !important;
+        }
+        [data-theme="dark"] .like-button.text-danger,
+        [data-theme="dark"] .like-button.text-danger i {
+            color: #ef4444 !important;
+        }
+        @keyframes heartPop {
+            0% { transform: scale(1); }
+            45% { transform: scale(1.35); }
+            100% { transform: scale(1); }
+        }
+        .heart-pop {
+            animation: heartPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
     </style>
 </head>
@@ -1121,6 +1143,9 @@
                 </div>
             </div>
         </div>
+        {% if request.user.is_authenticated %}
+            {% include 'users/partials/account_switcher_modal.html' %}
+        {% endif %}
     {% endblock %}
 
     {% block mobile_bottom_nav %}
@@ -1575,6 +1600,19 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         // Handle general notifications
                         console.log('[GLOBAL] Handling notification type:', data.type);
                         showNotification(data.notification);
+                        // Update unread count badge in realtime
+                        if (typeof data.unread_count !== 'undefined') {
+                            updateNotificationCount(data.unread_count);
+                        } else if (data.notification && typeof data.notification.unread_count !== 'undefined') {
+                            updateNotificationCount(data.notification.unread_count);
+                        } else {
+                            const badge = document.querySelector('.notification-badge');
+                            let current = 0;
+                            if (badge && badge.style.display !== 'none') {
+                                current = parseInt(badge.textContent) || 0;
+                            }
+                            updateNotificationCount(current + 1);
+                        }
                     } else if (data.type === 'unread_count') {
                         // Handle unread notification count update
                         console.log('[GLOBAL] Handling unread_count update:', data.count);
@@ -1639,34 +1677,56 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
         // Update notification icon badges in navigation (both desktop and mobile)
         const notificationBadges = document.querySelectorAll('.notification-badge');
-        console.log('[GLOBAL] Found notification badges:', notificationBadges.length);
-
         notificationBadges.forEach(badge => {
             if (count > 0) {
                 badge.textContent = count > 99 ? '99+' : count;
                 badge.style.display = 'flex';
-                console.log('[GLOBAL] Updated badge to show:', count);
             } else {
+                badge.textContent = '0';
                 badge.style.display = 'none';
-                console.log('[GLOBAL] Hid badge (count is 0)');
             }
         });
+
+        // Update in-page unread badge on notifications page
+        const pageBadge = document.getElementById('unread-count-badge');
+        if (pageBadge) {
+            if (count > 0) {
+                pageBadge.textContent = `${count} unread`;
+                pageBadge.style.display = 'inline-block';
+            } else {
+                pageBadge.style.display = 'none';
+            }
+        }
     }
 
-    function pollNotificationCount() {
-        // Poll notification count every 5 seconds as fallback
-        fetch('/notifications/unread-count/')
-            .then(r => r.text())
-            .then(html => {
-                const badge = document.getElementById('unread-count-badge');
-                if (badge) badge.outerHTML = html;
+    // Listen for HTMX updateUnreadCount event
+    document.body.addEventListener('updateUnreadCount', function(e) {
+        fetch('/notifications/unread-count/?format=json', {
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data && typeof data.unread_count !== 'undefined') {
+                    updateNotificationCount(data.unread_count);
+                }
+            })
+            .catch(() => {});
+    });
 
-                // Also update navigation badges
-                const navBadges = document.querySelectorAll('.notification-badge');
-                const countMatch = html.match(/(\d+)/);
-                if (countMatch) {
-                    const count = parseInt(countMatch[1]);
-                    updateNotificationCount(count);
+    function pollNotificationCount() {
+        // Poll notification count as JSON fallback
+        fetch('/notifications/unread-count/?format=json', {
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(r => {
+                if (!r.ok || r.redirected || (r.url && (r.url.includes('/accounts/login') || r.url.includes('/users/login')))) {
+                    return null;
+                }
+                return r.json();
+            })
+            .then(data => {
+                if (data && typeof data.unread_count !== 'undefined') {
+                    updateNotificationCount(data.unread_count);
                 }
             })
             .catch(error => {
@@ -2018,6 +2078,31 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 document.body.classList.remove('modal-open');
                 document.body.style.removeProperty('overflow');
                 document.body.style.removeProperty('padding-right');
+
+                // If redirected to login or response indicates login required, do full page redirect
+                const responseUrl = evt.detail.xhr && evt.detail.xhr.responseURL ? evt.detail.xhr.responseURL : '';
+                if (responseUrl && (responseUrl.includes('/accounts/login') || responseUrl.includes('/users/login'))) {
+                    evt.detail.shouldSwap = false;
+                    window.location.href = responseUrl;
+                    return;
+                }
+
+                // If response is a full HTML document (e.g. redirected to /accounts/login/ or error page),
+                // do NOT swap full document into inner container; perform a clean top-level navigation instead.
+                const responseText = evt.detail.xhr && evt.detail.xhr.responseText ? evt.detail.xhr.responseText.trim() : '';
+                if (responseText.startsWith('<!DOCTYPE') || responseText.startsWith('<html') || responseText.includes('<html lang=')) {
+                    evt.detail.shouldSwap = false;
+                    const destination = responseUrl || window.location.href;
+                    window.location.href = destination;
+                }
+            }
+        });
+
+        // Redirect to login if an unauthorized response occurs during HTMX requests
+        document.body.addEventListener('htmx:responseError', function(evt) {
+            const status = evt.detail.xhr ? evt.detail.xhr.status : 0;
+            if (status === 401 || status === 403) {
+                window.location.href = '/accounts/login/';
             }
         });
 
@@ -2096,5 +2181,129 @@ window.addEventListener('beforeinstallprompt', (e) => {
         </div>
     </footer>
 
+
+    <script>
+    function copyLinkToClipboard(url) {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(url).then(function() {
+                // Show a toast or alert
+                let toast = document.createElement('div');
+                toast.textContent = 'Link copied to clipboard!';
+                toast.style.position = 'fixed';
+                toast.style.bottom = '20px';
+                toast.style.left = '50%';
+                toast.style.transform = 'translateX(-50%)';
+                toast.style.backgroundColor = 'rgba(0,0,0,0.8)';
+                toast.style.color = 'white';
+                toast.style.padding = '10px 20px';
+                toast.style.borderRadius = '5px';
+                toast.style.zIndex = '9999';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 2500);
+            });
+        } else {
+            // Fallback
+            let input = document.createElement('input');
+            input.value = url;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand('copy');
+            document.body.removeChild(input);
+            alert('Link copied to clipboard!');
+        }
+    }
+
+    // Instant Optimistic Like Button Interaction
+    (function() {
+        function updateButtonVisual(btn, isLiked, count, shouldAnimate) {
+            const icon = btn.querySelector('i');
+            const countEl = btn.querySelector('.like-count');
+            if (isLiked) {
+                btn.classList.add('text-danger');
+                btn.classList.remove('text-muted');
+                btn.setAttribute('aria-label', 'Unlike');
+                if (icon) {
+                    icon.className = 'bi bi-heart-fill fs-5' + (shouldAnimate ? ' heart-pop' : '');
+                }
+            } else {
+                btn.classList.remove('text-danger');
+                btn.classList.add('text-muted');
+                btn.setAttribute('aria-label', 'Like');
+                if (icon) {
+                    icon.className = 'bi bi-heart fs-5';
+                }
+            }
+            if (countEl && count !== undefined && count !== null) {
+                countEl.textContent = count;
+            }
+        }
+
+        function toggleLikeOptimistic(btn, event) {
+            if (!btn) return;
+            if (btn.dataset.pending === 'true') {
+                if (event) {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                }
+                return;
+            }
+
+            btn.dataset.pending = 'true';
+
+            const countEl = btn.querySelector('.like-count');
+            const isLiked = btn.classList.contains('text-danger');
+
+            btn.dataset.prevLiked = isLiked ? 'true' : 'false';
+            const currentCount = parseInt(countEl ? countEl.textContent.trim() : '0', 10) || 0;
+            btn.dataset.prevCount = currentCount;
+
+            const newLiked = !isLiked;
+            const newCount = newLiked ? currentCount + 1 : Math.max(0, currentCount - 1);
+
+            // Immediate 0ms visual update
+            updateButtonVisual(btn, newLiked, newCount, true);
+
+            // Sync any duplicate buttons for the same post on page
+            const shareId = btn.dataset.shareId;
+            if (shareId) {
+                const siblings = document.querySelectorAll(`.like-button[data-share-id="${shareId}"]`);
+                siblings.forEach(s => {
+                    if (s !== btn) {
+                        updateButtonVisual(s, newLiked, newCount, false);
+                    }
+                });
+            }
+        }
+
+        function revertLikeOptimistic(btn) {
+            if (!btn || btn.dataset.prevLiked === undefined) return;
+            const wasLiked = btn.dataset.prevLiked === 'true';
+            const prevCount = parseInt(btn.dataset.prevCount, 10) || 0;
+            delete btn.dataset.pending;
+            delete btn.dataset.prevLiked;
+            delete btn.dataset.prevCount;
+            updateButtonVisual(btn, wasLiked, prevCount, false);
+        }
+
+        // Global capture-phase click handler so visual update runs instantly before HTMX
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.like-button');
+            if (btn) {
+                toggleLikeOptimistic(btn, e);
+            }
+        }, true);
+
+        // Revert optimistic update on HTMX error
+        document.addEventListener('htmx:responseError', function(e) {
+            const btn = (e.detail && e.detail.elt && e.detail.elt.matches && e.detail.elt.matches('.like-button')) ? e.detail.elt : null;
+            if (btn) revertLikeOptimistic(btn);
+        });
+        document.addEventListener('htmx:sendError', function(e) {
+            const btn = (e.detail && e.detail.elt && e.detail.elt.matches && e.detail.elt.matches('.like-button')) ? e.detail.elt : null;
+            if (btn) revertLikeOptimistic(btn);
+        });
+    })();
+    </script>
 </body>
+
 </html>

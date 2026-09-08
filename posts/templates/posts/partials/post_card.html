@@ -255,12 +255,23 @@
     border-color: #2563eb !important;
   }
 
-  /* Ensure liked button shows red color in dark mode */
-  [data-theme="dark"] .like-button.text-danger {
+  /* Ensure liked button shows red color in all modes */
+  .like-button.text-danger,
+  .like-button.text-danger i {
     color: #ef4444 !important;
   }
+  [data-theme="dark"] .like-button.text-danger,
   [data-theme="dark"] .like-button.text-danger i {
     color: #ef4444 !important;
+  }
+
+  @keyframes heartPop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.35); }
+    100% { transform: scale(1); }
+  }
+  .heart-pop {
+    animation: heartPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   }
 
   /* Engagement button pills */
@@ -290,7 +301,7 @@
     margin-bottom: 0.125rem !important; /* Half of mb-1 (4px -> 2px) */
   }
 </style>
-<div id="post-card-{{ post.id }}" class="post-card shadow-sm mb-1 bg-white rounded-3 overflow-hidden border-0">
+<div id="post-card-{{ post.share_id }}" class="post-card shadow-sm mb-1 bg-white rounded-3 overflow-hidden border-0">
     {% if post.repost_of %}
     <!-- Repost Header -->
     <div class="d-flex align-items-center p-2 border-bottom bg-light">
@@ -428,14 +439,14 @@
             <ul class="dropdown-menu dropdown-menu-end shadow">
                 <li>
                     <button class="dropdown-item d-flex align-items-center gap-2"
-                            data-bs-toggle="modal" data-bs-target="#repostModal-{{ post.id }}">
+                            data-bs-toggle="modal" data-bs-target="#repostModal-{{ post.share_id }}">
                         <i class="bi bi-repeat"></i> Repost
                     </button>
                 </li>
                 <li>
                     <button class="dropdown-item d-flex align-items-center gap-2"
-                            hx-post="/api/posts/{{ post.id }}/hide/"
-                            hx-target="#post-card-{{ post.id }}"
+                            hx-post="/api/posts/{{ post.share_id }}/hide/"
+                            hx-target="#post-card-{{ post.share_id }}"
                             hx-swap="outerHTML">
                         <i class="bi bi-eye-slash"></i> Hide post
                     </button>
@@ -451,13 +462,20 @@
                 </li>
                 <li>
                     <button class="dropdown-item d-flex align-items-center gap-2"
-                            data-bs-toggle="modal" data-bs-target="#shareModal-{{ post.id }}">
+                            data-bs-toggle="modal" data-bs-target="#shareModal-{{ post.share_id }}">
                         <i class="bi bi-share"></i> {% trans "Share to profile" %}
                     </button>
                 </li>
+                
                 <li>
                     <button class="dropdown-item d-flex align-items-center gap-2"
-                            data-bs-toggle="modal" data-bs-target="#reportModal-{{ post.id }}">
+                            onclick="copyLinkToClipboard(window.location.origin + '{% url 'posts:post_details' post.share_id %}')">
+                        <i class="bi bi-link-45deg"></i> Copy Link
+                    </button>
+                </li>
+<li>
+                    <button class="dropdown-item d-flex align-items-center gap-2"
+                            data-bs-toggle="modal" data-bs-target="#reportModal-{{ post.share_id }}">
                         <i class="bi bi-flag"></i> {% trans "Report post" %}
                     </button>
                 </li>
@@ -466,7 +484,7 @@
                 <li><hr class="dropdown-divider"></li>
                 <li>
                     <button class="dropdown-item d-flex align-items-center gap-2 download-media-btn"
-                            data-post-id="{{ post.id }}"
+                            data-post.share_id="{{ post.share_id }}"
                             data-post-type="{% if post_obj.images.exists %}image{% elif post_obj.video %}video{% elif post_obj.docs %}document{% elif post_obj.audio %}audio{% elif post_obj.get_intel_file %}file{% endif %}">
                         <i class="bi bi-download"></i> Download
                     </button>
@@ -477,9 +495,9 @@
                 <li><hr class="dropdown-divider"></li>
                 <li>
                     <button class="dropdown-item d-flex align-items-center gap-2 text-danger"
-                            hx-delete="/api/posts/{{ post.id }}/"
+                            hx-delete="/api/posts/{{ post.share_id }}/"
                             hx-confirm="{% trans 'Are you sure you want to delete this post?' %}"
-                            hx-target="#post-card-{{ post.id }}"
+                            hx-target="#post-card-{{ post.share_id }}"
                             hx-swap="outerHTML">
                         <i class="bi bi-trash"></i> {% trans "Delete post" %}
                     </button>
@@ -502,10 +520,10 @@
         {% endif %}
         <p class="mb-0 text-white fw-bold fs-3" style="line-height: 1.5; position: relative; z-index: 1;">
             {% if post.repost_of %}
-                {% if post.content %}<p class="mb-2 text-dark" style="font-size: 14px;">{{ post.content }}</p>{% endif %}
-                {{ post.repost_of.content }}
+                {% if post.content %}<p class="mb-2 text-dark" style="font-size: 14px;">{{ post.content|urlize|linebreaksbr }}</p>{% endif %}
+                {{ post.repost_of.content|urlize|linebreaksbr }}
             {% else %}
-                {{ post.content }}
+                {{ post.content|urlize|linebreaksbr }}
             {% endif %}
         </p>
     </div>
@@ -517,8 +535,8 @@
     {% endwith %}
 
     {% if post.audio %}
-    <div class="post-media border-top border-bottom bg-light position-relative" data-media-type="audio" data-post-id="{{ post.id }}">
-        <button class="media-download-btn" data-post-id="{{ post.id }}" data-media-type="audio" data-url="{{ post.audio.url }}" title="Download">
+    <div class="post-media border-top border-bottom bg-light position-relative" data-media-type="audio" data-post.share_id="{{ post.share_id }}">
+        <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="audio" data-url="{{ post.audio.url }}" title="Download">
             <i class="bi bi-download"></i>
         </button>
         <div class="p-3 d-flex align-items-center gap-3">
@@ -529,7 +547,7 @@
                 <h6 class="mb-0 fw-bold small">Music/Audio</h6>
                 <small class="text-muted">Attached audio</small>
             </div>
-            <audio id="audio-{{ post.id }}" class="w-100" style="max-width: 300px;" controls muted loop>
+            <audio id="audio-{{ post.share_id }}" class="w-100" style="max-width: 300px;" controls muted loop>
                 <source src="{{ post.audio.url }}" type="audio/mpeg">
                 Your browser does not support the audio element.
             </audio>
@@ -538,17 +556,17 @@
     {% endif %}
 
     {% if post.images.exists %}
-    <a href="{% url 'posts:post_details' post.id %}"
-       hx-get="{% url 'posts:post_details' post.id %}"
+    <a href="{% url 'posts:post_details' post.share_id %}"
+       hx-get="{% url 'posts:post_details' post.share_id %}"
        hx-target="#page-content-target"
        hx-swap="innerHTML"
        hx-push-url="true"
        hx-history="true">
-        <div class="post-media border-top border-bottom bg-light" data-post-id="{{ post.id }}" data-media-type="image">
-            <button class="media-download-btn" data-post-id="{{ post.id }}" data-media-type="image" data-url="{{ post.images.first.image.url }}" title="Download">
+        <div class="post-media border-top border-bottom bg-light" data-post.share_id="{{ post.share_id }}" data-media-type="image">
+            <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="image" data-url="{{ post.images.first.image.url }}" title="Download">
                 <i class="bi bi-download"></i>
             </button>
-            <div class="image-grid-{{ post.id }}" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px; max-height: 400px;">
+            <div class="image-grid-{{ post.share_id }}" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px; max-height: 400px;">
                 {% for post_image in post.images.all|slice:":3" %}
                     <div class="image-grid-item position-relative overflow-hidden" style="{% if forloop.counter == 1 %}grid-column: span 2; grid-row: span 2; aspect-ratio: 2/1;{% elif forloop.counter == 2 %}aspect-ratio: 1/1;{% else %}aspect-ratio: 1/1;{% endif %}">
                         <img src="{{ post_image.get_thumbnail_url }}" loading="lazy" class="w-100 h-100" style="object-fit: cover;" alt="Post image">
@@ -563,8 +581,8 @@
         </div>
     </a>
     {% elif post.get_intel_file and not post.shared_document %}
-    <a href="{% url 'posts:post_details' post.id %}"
-       hx-get="{% url 'posts:post_details' post.id %}"
+    <a href="{% url 'posts:post_details' post.share_id %}"
+       hx-get="{% url 'posts:post_details' post.share_id %}"
        hx-target="#page-content-target"
        hx-swap="innerHTML"
        hx-push-url="true"
@@ -572,20 +590,20 @@
         <div class="post-media border-top border-bottom bg-light">
             {% with f_url=post.get_intel_file.url|lower %}
                 {% if ".jpg" in f_url or ".png" in f_url or ".jpeg" in f_url or ".webp" in f_url %}
-                    <button class="media-download-btn" data-post-id="{{ post.id }}" data-media-type="image" data-url="{{ post.get_intel_file.url }}" title="Download">
+                    <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="image" data-url="{{ post.get_intel_file.url }}" title="Download">
                         <i class="bi bi-download"></i>
                     </button>
                     <img src="{{ post.get_intel_file.url }}" loading="lazy" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;" alt="Post image">
                 {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
-                    <button class="media-download-btn" data-post-id="{{ post.id }}" data-media-type="video" data-url="{{ post.get_video_for_feed.url }}" title="Download">
+                    <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="video" data-url="{{ post.get_video_for_feed.url }}" title="Download">
                         <i class="bi bi-download"></i>
                     </button>
-                    <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post-id="{{ post.id }}">
-                        <video id="video-{{ post.id }}"
+                    <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post.share_id="{{ post.share_id }}">
+                        <video id="video-{{ post.share_id }}"
                                preload="metadata"
                                class="w-100 h-100 {% if not disable_autoplay and not in_search %}feed-video{% endif %}"
                                muted loop playsinline controls
-                               data-post-id="{{ post.id }}"
+                               data-post.share_id="{{ post.share_id }}"
                                {% if disable_autoplay or in_search %}
                                data-autoplay="false"
                                data-disable-autoplay="true"
@@ -617,10 +635,10 @@
                     </div>
 
                 {% elif ".mp3" in f_url or ".wav" in f_url or ".ogg" in f_url or ".m4a" in f_url %}
-                    <button class="media-download-btn" data-post-id="{{ post.id }}" data-media-type="audio" data-url="{{ post.get_intel_file.url }}" title="Download">
+                    <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="audio" data-url="{{ post.get_intel_file.url }}" title="Download">
                         <i class="bi bi-download"></i>
                     </button>
-                    <div class="p-3 d-flex align-items-center justify-content-between" style="background: transparent;" data-media-type="audio" data-post-id="{{ post.id }}">
+                    <div class="p-3 d-flex align-items-center justify-content-between" style="background: transparent;" data-media-type="audio" data-post.share_id="{{ post.share_id }}">
                         <div class="d-flex align-items-center flex-grow-1">
                             <div class="me-2">
                                 <i class="bi bi-music-note-fill text-muted fs-4"></i>
@@ -630,7 +648,7 @@
                                 <small class="text-muted">MUSIC/AUDIO</small>
                             </div>
                         </div>
-                        <audio id="audio-{{ post.id }}" controls preload="metadata" class="w-100" style="max-width: 200px; background: transparent; background-color: transparent;" muted loop {% if not disable_autoplay and not in_search %}autoplay{% endif %}>
+                        <audio id="audio-{{ post.share_id }}" controls preload="metadata" class="w-100" style="max-width: 200px; background: transparent; background-color: transparent;" muted loop {% if not disable_autoplay and not in_search %}autoplay{% endif %}>
                             <source src="{{ post.get_intel_file.url }}" type="audio/mpeg">
                             Your browser does not support the audio element.
                         </audio>
@@ -638,7 +656,7 @@
                 {% elif ".pdf" in f_url %}
                     <a href="{{ post.get_intel_file.url }}" target="_blank" class="text-decoration-none">
                         <div class="p-4 d-flex align-items-center justify-content-between bg-white position-relative">
-                            <button class="media-download-btn" data-post-id="{{ post.id }}" data-media-type="document" data-url="{{ post.get_intel_file.url }}" title="Download">
+                            <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="document" data-url="{{ post.get_intel_file.url }}" title="Download">
                                 <i class="bi bi-download"></i>
                             </button>
                             <div class="d-flex align-items-center">
@@ -664,8 +682,8 @@
     {% endif %}
 
     {% if post.shared_document %}
-    <a href="{% url 'documents:document_detail' post.shared_document.id %}"
-       hx-get="{% url 'documents:document_detail' post.shared_document.id %}"
+    <a href="{% url 'documents:document_detail' post.shared_document.share_id %}"
+       hx-get="{% url 'documents:document_detail' post.shared_document.share_id %}"
        hx-target="#page-content-target"
        hx-swap="innerHTML"
        hx-push-url="true"
@@ -679,11 +697,11 @@
 
     <div class="d-flex align-items-center justify-content-between px-3 py-2 border-top">
         <div class="d-flex align-items-center gap-2">
-            <div id="like-section-{{ post.id }}">
+            <div id="like-section-{{ post.share_id }}">
                 {% include "posts/partials/like_button.html" with post=post %}
             </div>
-            <a href="{% url 'posts:post_details' post.id %}"
-               hx-get="{% url 'posts:post_details' post.id %}"
+            <a href="{% url 'posts:post_details' post.share_id %}"
+               hx-get="{% url 'posts:post_details' post.share_id %}"
                hx-target="#page-content-target"
                hx-swap="innerHTML"
                hx-push-url="true"
@@ -692,13 +710,13 @@
                 <i class="bi bi-chat-dots fs-5"></i>
                 <span class="fw-bold">{{ post.comments.count }}</span>
             </a>
-            <button id="repost-btn-{{ post.id }}" class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button"
-                    data-bs-toggle="modal" data-bs-target="#repostModal-{{ post.id }}">
+            <button id="repost-btn-{{ post.share_id }}" class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button"
+                    data-bs-toggle="modal" data-bs-target="#repostModal-{{ post.share_id }}">
                 <i class="bi bi-repeat fs-5"></i>
                 <span class="fw-bold">{{ post.repost_count }}</span>
             </button>
             <button class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button"
-                    data-bs-toggle="modal" data-bs-target="#shareModal-{{ post.id }}">
+                    data-bs-toggle="modal" data-bs-target="#shareModal-{{ post.share_id }}">
                 <i class="bi bi-share fs-5"></i>
                 <span class="fw-bold">{% trans "Share" %}</span>
             </button>
@@ -717,7 +735,7 @@
 
     <!-- Inline comment input -->
     <div class="px-3 pb-3 pt-1 border-top bg-white">
-        <form hx-post="{% url 'posts:add_comment' post.id %}?from_card=1"
+        <form hx-post="{% url 'posts:add_comment' post.share_id %}?from_card=1"
               hx-swap="none"
               class="d-flex align-items-center gap-2"
               hx-on::after-request="if(event.detail.successful) this.reset();">
@@ -738,7 +756,7 @@
 </div>
 
 <!-- Repost Modal -->
-<div class="modal fade" id="repostModal-{{ post.id }}" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="repostModal-{{ post.share_id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -746,10 +764,10 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form hx-post="/api/posts/{{ post.id }}/repost/"
-                      hx-target="#post-card-{{ post.id }}"
+                <form hx-post="/api/posts/{{ post.share_id }}/repost/"
+                      hx-target="#post-card-{{ post.share_id }}"
                       hx-swap="outerHTML"
-                      hx-on::after-request="bootstrap.Modal.getInstance(document.getElementById('repostModal-{{ post.id }}')).hide()">
+                      hx-on::after-request="bootstrap.Modal.getInstance(document.getElementById('repostModal-{{ post.share_id }}')).hide()">
                     {% csrf_token %}
                     <div class="mb-3">
                         <label class="form-label">{% trans "Add a comment (optional)" %}</label>
@@ -763,7 +781,7 @@
 </div>
 
 <!-- Share Modal -->
-<div class="modal fade" id="shareModal-{{ post.id }}" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="shareModal-{{ post.share_id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -771,18 +789,59 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <ul class="nav nav-tabs mb-3" id="shareTabs-{{ post.id }}" role="tablist">
+                
+                <div class="mb-3 d-grid">
+                    <button type="button" class="btn btn-outline-primary"
+                            onclick="copyLinkToClipboard(window.location.origin + '{% url 'posts:post_details' post.share_id %}')">
+                        <i class="bi bi-link-45deg"></i> Copy Link to Clipboard
+                    </button>
+                </div>
+
+                <!-- External / Native Share -->
+                <div class="mb-3" id="external-share-{{ post.share_id }}">
+                    <!-- Native share button: shown when navigator.share or Capacitor.Plugins.Share is available -->
+                    <button type="button"
+                            class="btn btn-outline-secondary w-100 mb-2 d-none"
+                            id="native-share-btn-{{ post.share_id }}"
+                            onclick="window.pwaniShare('{% url 'posts:post_details' post.share_id %}', '{{ post.content|truncatechars:80|escapejs }}')">
+                        <i class="bi bi-share-fill me-1"></i> {% trans "Share to Other Apps" %}
+                    </button>
+                    <!-- Fallback platform links: shown on desktop where no share API exists -->
+                    <div id="platform-share-links-{{ post.share_id }}" class="d-flex gap-2 flex-wrap justify-content-center d-none">
+                        <a href="#" target="_blank" rel="noopener noreferrer"
+                           class="btn btn-sm btn-outline-success platform-share-btn"
+                           data-platform="whatsapp"
+                           data-share-url="{{ request.scheme }}://{{ request.get_host }}{% url 'posts:post_details' post.share_id %}">
+                            <i class="bi bi-whatsapp me-1"></i>WhatsApp
+                        </a>
+                        <a href="#" target="_blank" rel="noopener noreferrer"
+                           class="btn btn-sm btn-outline-primary platform-share-btn"
+                           data-platform="telegram"
+                           data-share-url="{{ request.scheme }}://{{ request.get_host }}{% url 'posts:post_details' post.share_id %}">
+                            <i class="bi bi-telegram me-1"></i>Telegram
+                        </a>
+                        <a href="#" target="_blank" rel="noopener noreferrer"
+                           class="btn btn-sm btn-outline-dark platform-share-btn"
+                           data-platform="twitter"
+                           data-share-url="{{ request.scheme }}://{{ request.get_host }}{% url 'posts:post_details' post.share_id %}">
+                            <i class="bi bi-twitter-x me-1"></i>X
+                        </a>
+                    </div>
+                </div>
+
+                <hr>
+<ul class="nav nav-tabs mb-3" id="shareTabs-{{ post.share_id }}" role="tablist">
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="user-tab-{{ post.id }}" data-bs-toggle="tab" data-bs-target="#user-share-{{ post.id }}" type="button" role="tab">{% trans "Share to Users" %}</button>
+                        <button class="nav-link active" id="user-tab-{{ post.share_id }}" data-bs-toggle="tab" data-bs-target="#user-share-{{ post.share_id }}" type="button" role="tab">{% trans "Share to Users" %}</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="group-tab-{{ post.id }}" data-bs-toggle="tab" data-bs-target="#group-share-{{ post.id }}" type="button" role="tab">{% trans "Share to Groups" %}</button>
+                        <button class="nav-link" id="group-tab-{{ post.share_id }}" data-bs-toggle="tab" data-bs-target="#group-share-{{ post.share_id }}" type="button" role="tab">{% trans "Share to Groups" %}</button>
                     </li>
                 </ul>
-                <div class="tab-content" id="shareTabContent-{{ post.id }}">
+                <div class="tab-content" id="shareTabContent-{{ post.share_id }}">
                     <!-- Share to Users Tab -->
-                    <div class="tab-pane fade show active" id="user-share-{{ post.id }}" role="tabpanel">
-                        <form id="share-user-form-{{ post.id }}" hx-post="{% url 'posts:share_post' post.id %}" hx-target="#share-result-{{ post.id }}" hx-swap="innerHTML">
+                    <div class="tab-pane fade show active" id="user-share-{{ post.share_id }}" role="tabpanel">
+                        <form id="share-user-form-{{ post.share_id }}" hx-post="{% url 'posts:share_post' post.share_id %}" hx-target="#share-result-{{ post.share_id }}" hx-swap="innerHTML">
                             {% csrf_token %}
                             <input type="hidden" name="share_type" value="user">
                             <div class="mb-3">
@@ -791,39 +850,39 @@
                                        placeholder="{% trans 'Search users you follow...' %}"
                                        name="user_search"
                                        hx-get="{% url 'posts:search_following_users' %}"
-                                       hx-target="#user-results-{{ post.id }}"
+                                       hx-target="#user-results-{{ post.share_id }}"
                                        hx-trigger="keyup changed delay:300ms">
                                 <!-- HTMX indicator disabled to prevent continuous loading spinners -->
                                 <!--
-                                <span id="user-search-indicator-{{ post.id }}" class="htmx-indicator">
+                                <span id="user-search-indicator-{{ post.share_id }}" class="htmx-indicator">
                                     <span class="spinner-border spinner-border-sm" role="status"></span>
                                 </span>
                                 -->
                             </div>
-                            <div id="user-results-{{ post.id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
+                            <div id="user-results-{{ post.share_id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
                                 <div class="p-3 text-center text-muted">
                                     <small>{% trans "Start typing to search users you follow" %}</small>
                                 </div>
                             </div>
-                            <div id="selected-users-{{ post.id }}" class="mb-3">
+                            <div id="selected-users-{{ post.share_id }}" class="mb-3">
                                 <small class="text-muted">{% trans "Selected users will appear here" %}</small>
                             </div>
-                            <input type="hidden" name="shared_to_usernames" id="shared-to-usernames-{{ post.id }}">
+                            <input type="hidden" name="shared_to_usernames" id="shared-to-usernames-{{ post.share_id }}">
                             <div class="mb-3">
                                 <label class="form-label">{% trans "Add a message (optional)" %}</label>
                                 <textarea name="message" class="form-control" rows="3" placeholder="{% trans 'Check this out!' %}"></textarea>
                             </div>
                             <button type="submit"
                                     class="btn btn-primary w-100"
-                                    hx-on::after-request="if(this.closest('form').querySelector('.alert-success')) { const modal = bootstrap.Modal.getInstance(document.getElementById('shareModal-{{ post.id }}')); if(modal) modal.hide(); this.closest('form').querySelector('.alert-success').remove(); }">
+                                    hx-on::after-request="if(this.closest('form').querySelector('.alert-success')) { const modal = bootstrap.Modal.getInstance(document.getElementById('shareModal-{{ post.share_id }}')); if(modal) modal.hide(); this.closest('form').querySelector('.alert-success').remove(); }">
                                 {% trans "Share to Selected Users" %}
                             </button>
-                            <div id="share-result-{{ post.id }}"></div>
+                            <div id="share-result-{{ post.share_id }}"></div>
                         </form>
                     </div>
                     <!-- Share to Groups Tab -->
-                    <div class="tab-pane fade" id="group-share-{{ post.id }}" role="tabpanel">
-                        <form id="share-group-form-{{ post.id }}" hx-post="{% url 'posts:share_post' post.id %}" hx-target="#share-result-group-{{ post.id }}" hx-swap="innerHTML" onsubmit="updateSelectedGroups{{ post.id }}()">
+                    <div class="tab-pane fade" id="group-share-{{ post.share_id }}" role="tabpanel">
+                        <form id="share-group-form-{{ post.share_id }}" hx-post="{% url 'posts:share_post' post.share_id %}" hx-target="#share-result-group-{{ post.share_id }}" hx-swap="innerHTML">
                             {% csrf_token %}
                             <input type="hidden" name="share_type" value="group">
                             <div class="mb-3">
@@ -832,34 +891,34 @@
                                        placeholder="Search your groups..." 
                                        name="group_search"
                                        hx-get="{% url 'posts:search_user_groups' %}"
-                                       hx-target="#group-results-{{ post.id }}"
+                                       hx-target="#group-results-{{ post.share_id }}"
                                        hx-trigger="keyup changed delay:300ms">
                                 <!-- HTMX indicator disabled to prevent continuous loading spinners -->
                                 <!--
-                                <span id="group-search-indicator-{{ post.id }}" class="htmx-indicator">
+                                <span id="group-search-indicator-{{ post.share_id }}" class="htmx-indicator">
                                     <span class="spinner-border spinner-border-sm" role="status"></span>
                                 </span>
                                 -->
                             </div>
-                            <div id="group-results-{{ post.id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
+                            <div id="group-results-{{ post.share_id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
                                 <div class="p-3 text-center text-muted">
                                     <small>Start typing to search your groups</small>
                                 </div>
                             </div>
-                            <div id="selected-groups-{{ post.id }}" class="mb-3">
+                            <div id="selected-groups-{{ post.share_id }}" class="mb-3">
                                 <small class="text-muted">Selected groups will appear here</small>
                             </div>
-                            <input type="hidden" name="shared_to_group_ids" id="shared-to-group-ids-{{ post.id }}">
+                            <input type="hidden" name="shared_to_group_ids" id="shared-to-group-ids-{{ post.share_id }}">
                             <div class="mb-3">
                                 <label class="form-label">Add a message (optional)</label>
                                 <textarea name="message" class="form-control" rows="3" placeholder="Check this out!"></textarea>
                             </div>
                             <button type="submit" 
                                     class="btn btn-primary w-100"
-                                    hx-on::after-request="if(this.closest('form').querySelector('.alert-success')) { const modal = bootstrap.Modal.getInstance(document.getElementById('shareModal-{{ post.id }}')); if(modal) modal.hide(); this.closest('form').querySelector('.alert-success').remove(); }">
+                                    hx-on::after-request="if(this.closest('form').querySelector('.alert-success')) { const modal = bootstrap.Modal.getInstance(document.getElementById('shareModal-{{ post.share_id }}')); if(modal) modal.hide(); this.closest('form').querySelector('.alert-success').remove(); }">
                                 Share to Selected Groups
                             </button>
-                            <div id="share-result-group-{{ post.id }}"></div>
+                            <div id="share-result-group-{{ post.share_id }}"></div>
                         </form>
                     </div>
                 </div>
@@ -869,104 +928,114 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const modal = document.getElementById('shareModal-{{ post.id }}');
-    if (!modal) return;
-    
-    const selectedUsers = new Set();
-    const selectedGroups = new Set();
-    
-    // Handle user checkbox changes
-    modal.addEventListener('change', function(e) {
-        if (e.target.classList.contains('user-checkbox')) {
-            const username = e.target.value;
+{% with sid=post.share_id|cut:"-" %}
+(function () {
+    var modalId = 'shareModal-{{ post.share_id }}';
+    var selectedUsers = new Set();
+    var selectedGroups = new Set();
 
-            if (e.target.checked) {
-                selectedUsers.add(username);
-            } else {
-                selectedUsers.delete(username);
-            }
-            updateSelectedUsers();
-        }
-
-        if (e.target.classList.contains('group-checkbox')) {
-            const groupId = e.target.value;
-
-            if (e.target.checked) {
-                selectedGroups.add(groupId);
-            } else {
-                selectedGroups.delete(groupId);
-            }
-            updateSelectedGroups();
-        }
-    });
-
-    // Also handle click events for better reliability
-    modal.addEventListener('click', function(e) {
-        if (e.target.classList.contains('group-checkbox') || e.target.closest('.group-checkbox')) {
-            const checkbox = e.target.classList.contains('group-checkbox') ? e.target : e.target.closest('.group-checkbox');
-            setTimeout(() => {
-                const groupId = checkbox.value;
-                if (checkbox.checked) {
-                    selectedGroups.add(groupId);
-                } else {
-                    selectedGroups.delete(groupId);
-                }
-                updateSelectedGroups();
-            }, 10);
-        }
-    });
-    
+    /* ── Sync hidden inputs ─────────────────────────────────────────── */
     function updateSelectedUsers() {
-        const container = document.getElementById('selected-users-{{ post.id }}');
-        const input = document.getElementById('shared-to-usernames-{{ post.id }}');
-        
+        var container = document.getElementById('selected-users-{{ post.share_id }}');
+        var input = document.getElementById('shared-to-usernames-{{ post.share_id }}');
+        if (!container || !input) return;
+
         if (selectedUsers.size === 0) {
             container.innerHTML = '<small class="text-muted">Selected users will appear here</small>';
             input.value = '';
         } else {
-            container.innerHTML = Array.from(selectedUsers).map(username => 
-                `<span class="badge bg-primary me-1 mb-1">${username} <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.5rem;" onclick="removeUser{{ post.id }}('${username}')">&times;</button></span>`
-            ).join('');
+            container.innerHTML = Array.from(selectedUsers).map(function (u) {
+                return '<span class="badge bg-primary me-1 mb-1">' + u +
+                    ' <button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.5rem" ' +
+                    'onclick="window[\'removeUser_{{ sid }}\'](\'' + u + '\')">&times;</button></span>';
+            }).join('');
             input.value = Array.from(selectedUsers).join(',');
         }
     }
-    
+
     function updateSelectedGroups() {
-        const container = document.getElementById('selected-groups-{{ post.id }}');
-        const input = document.getElementById('shared-to-group-ids-{{ post.id }}');
+        var container = document.getElementById('selected-groups-{{ post.share_id }}');
+        var input = document.getElementById('shared-to-group-ids-{{ post.share_id }}');
+        if (!container || !input) return;
 
         if (selectedGroups.size === 0) {
             container.innerHTML = '<small class="text-muted">Selected groups will appear here</small>';
             input.value = '';
         } else {
-            container.innerHTML = Array.from(selectedGroups).map(groupId => {
-                const label = document.querySelector(`#group-${groupId}`);
-                const boldElement = label ? label.querySelector('.fw-bold') : null;
-                const groupName = boldElement ? boldElement.textContent : groupId;
-                return `<span class="badge bg-success me-1 mb-1">${groupName} <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.5rem;" onclick="removeGroup{{ post.id }}('${groupId}')">&times;</button></span>`;
+            container.innerHTML = Array.from(selectedGroups).map(function (gid) {
+                var label = document.querySelector('#group-' + gid);
+                var bold = label ? label.querySelector('.fw-bold') : null;
+                var name = bold ? bold.textContent : gid;
+                return '<span class="badge bg-success me-1 mb-1">' + name +
+                    ' <button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.5rem" ' +
+                    'onclick="window[\'removeGroup_{{ sid }}\'](\'' + gid + '\')">&times;</button></span>';
             }).join('');
             input.value = Array.from(selectedGroups).join(',');
         }
     }
 
-    // Expose globally for onsubmit handler
-    window['updateSelectedGroups' + {{ post.id }}] = updateSelectedGroups;
-    
-    window['removeUser' + {{ post.id }}] = function(username) {
+    /* ── Document-level event delegation (works for HTMX-injected cards) ─ */
+    document.addEventListener('change', function (e) {
+        if (!e.target.closest('#' + modalId)) return;
+
+        if (e.target.classList.contains('user-checkbox')) {
+            e.target.checked ? selectedUsers.add(e.target.value) : selectedUsers.delete(e.target.value);
+            updateSelectedUsers();
+        }
+        if (e.target.classList.contains('group-checkbox')) {
+            e.target.checked ? selectedGroups.add(e.target.value) : selectedGroups.delete(e.target.value);
+            updateSelectedGroups();
+        }
+    });
+
+    // Click fallback for mobile reliability
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest || !e.target.closest('#' + modalId)) return;
+        var cb = e.target.classList.contains('group-checkbox')
+            ? e.target
+            : (e.target.closest && e.target.closest('.group-checkbox'));
+        if (!cb) return;
+        setTimeout(function () {
+            cb.checked ? selectedGroups.add(cb.value) : selectedGroups.delete(cb.value);
+            updateSelectedGroups();
+        }, 10);
+    });
+
+    /* ── Sync hidden inputs BEFORE HTMX serialises the form ─────────── */
+    // Capture phase fires before HTMX's bubble-phase listener
+    document.addEventListener('submit', function (e) {
+        if (e.target.id === 'share-user-form-{{ post.share_id }}') updateSelectedUsers();
+        if (e.target.id === 'share-group-form-{{ post.share_id }}') updateSelectedGroups();
+    }, true);
+
+    // Belt-and-suspenders: also sync on htmx:configRequest
+    document.addEventListener('htmx:configRequest', function (e) {
+        var elt = e.detail && e.detail.elt;
+        if (!elt) return;
+        var fid = elt.id || (elt.closest && elt.closest('form') && elt.closest('form').id) || '';
+        if (fid === 'share-user-form-{{ post.share_id }}') updateSelectedUsers();
+        if (fid === 'share-group-form-{{ post.share_id }}') updateSelectedGroups();
+    });
+
+    /* ── Expose globals with valid JS-identifier-safe keys ─────────── */
+    window['updateSelectedUsers_{{ sid }}'] = updateSelectedUsers;
+    window['updateSelectedGroups_{{ sid }}'] = updateSelectedGroups;
+
+    window['removeUser_{{ sid }}'] = function (username) {
         selectedUsers.delete(username);
-        const checkbox = document.querySelector(`.user-checkbox[value="${username}"]`);
-        if (checkbox) checkbox.checked = false;
+        var cb = document.querySelector('.user-checkbox[value="' + username + '"]');
+        if (cb) cb.checked = false;
         updateSelectedUsers();
     };
-    
-    window['removeGroup' + {{ post.id }}] = function(groupId) {
+
+    window['removeGroup_{{ sid }}'] = function (groupId) {
         selectedGroups.delete(groupId);
-        const checkbox = document.querySelector(`.group-checkbox[value="${groupId}"]`);
-        if (checkbox) checkbox.checked = false;
+        var cb = document.querySelector('.group-checkbox[value="' + groupId + '"]');
+        if (cb) cb.checked = false;
         updateSelectedGroups();
     };
-});
+})();
+{% endwith %}
 </script>
 
 <script type="module">
@@ -1023,7 +1092,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script>
 (function() {
     // Enhanced post card interactions
-    const postCard = document.getElementById('post-card-{{ post.id }}');
+    const postCard = document.getElementById('post-card-{{ post.share_id }}');
     if (!postCard) return;
 
     // Touch feedback for mobile
@@ -1040,7 +1109,7 @@ document.addEventListener('DOMContentLoaded', function() {
     buttons.forEach(button => {
         button.addEventListener('click', function() {
             if (this.classList.contains('start-conversation') || 
-                this.id === 'repost-btn-{{ post.id }}' ||
+                this.id === 'repost-btn-{{ post.share_id }}' ||
                 this.closest('[data-bs-toggle="modal"]')) {
                 return;
             }
@@ -1083,7 +1152,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             e.stopPropagation();
             
-            const postId = this.getAttribute('data-post-id');
+            const postId = this.getAttribute('data-post.share_id');
             const mediaType = this.getAttribute('data-media-type');
             const mediaUrl = this.getAttribute('data-url');
             
@@ -1133,7 +1202,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <!-- Report Modal -->
-<div class="modal fade" id="reportModal-{{ post.id }}" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="reportModal-{{ post.share_id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -1142,11 +1211,11 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="modal-body">
                 <form hx-post="/api/reports/"
-                      hx-target="#post-card-{{ post.id }}"
+                      hx-target="#post-card-{{ post.share_id }}"
                       hx-swap="outerHTML"
-                      hx-on::after-request="bootstrap.Modal.getInstance(document.getElementById('reportModal-{{ post.id }}')).hide()">
+                      hx-on::after-request="bootstrap.Modal.getInstance(document.getElementById('reportModal-{{ post.share_id }}')).hide()">
                     {% csrf_token %}
-                    <input type="hidden" name="post" value="{{ post.id }}">
+                    <input type="hidden" name="post" value="{{ post.share_id }}">
                     <div class="mb-3">
                         <label class="form-label">Reason for reporting</label>
                         <select name="reason" class="form-select" required>

@@ -81,10 +81,11 @@ class NotificationConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection."""
         # Leave user's notification group
-        await self.channel_layer.group_discard(
-            self.user_group_name,
-            self.channel_name
-        )
+        if hasattr(self, 'user_group_name'):
+            await self.channel_layer.group_discard(
+                self.user_group_name,
+                self.channel_name
+            )
 
         # Remove connection from presence tracking - FROZEN FOR MVP
         # PresenceService.remove_connection(self.user.id, self.channel_name)

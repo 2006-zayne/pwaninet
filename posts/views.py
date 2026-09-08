@@ -36,6 +36,7 @@ from pwaninet.utils.htmx import htmx_location_response
 
 
 class PostViewSet(viewsets.ModelViewSet):
+    lookup_field = "share_id"
     """
     ViewSet for managing posts.
     """
@@ -74,10 +75,10 @@ class PostViewSet(viewsets.ModelViewSet):
             logger.info('[PostViewSet.create] Response data: %s', response.data)
             # Mark this as a new post in session for back button logic
             request.session['is_new_post'] = True
-            post_id = response.data.get('id') or response.data.get('pk')
-            if post_id:
-                request.session['new_post_id'] = post_id
-                logger.info('[PostViewSet.create] Session flags set for new post ID: %s', post_id)
+            share_id = response.data.get('id') or response.data.get('pk')
+            if share_id:
+                request.session['new_share_id'] = share_id
+                logger.info('[PostViewSet.create] Session flags set for new post ID: %s', share_id)
             else:
                 logger.warning('[PostViewSet.create] No post ID found in response data')
             return response
@@ -778,18 +779,22 @@ class SharedPostViewSet(viewsets.ReadOnlyModelViewSet):
 
 @login_required
 def home_view(request):
+    # Enforce onboarding before landing on feed
+    if not getattr(request.user, 'has_completed_onboarding', True):
+        if request.headers.get('HX-Request'):
+            return htmx_location_response(reverse('users:onboarding'))
+        return redirect('users:onboarding')
+
     cursor = request.GET.get('cursor')
     context = build_home_feed_context(request.user, cursor=cursor)
 
     # Add explore_groups for initial page load and HTMX navigation (no cursor)
     # Exclude for infinite scroll (has cursor) and search (has query)
     if cursor is None and not request.GET.get('q'):
-        from groups.models import Group, Membership, MembershipStatus
-        user_group_ids = set(Group.objects.filter(
-            memberships__user=request.user,
-            memberships__status=MembershipStatus.APPROVED
-        ).values_list('id', flat=True))
-        explore_groups = Group.objects.exclude(id__in=user_group_ids).order_by('-created_at')[:8]
+        from recommendations.services.engine import UnifiedRecommendationEngine
+        explore_groups = UnifiedRecommendationEngine.get_recommended_groups(
+            request.user, limit=8, context='explore'
+        )
         context['explore_groups'] = explore_groups
 
     # HTMX Navigation Request: Return full navigation partial for page navigation
@@ -846,10 +851,10 @@ def create_post_view(request):
             messages.success(request, 'Post created successfully.')
             # Mark this as a new post in session for back button logic
             request.session['is_new_post'] = True
-            request.session['new_post_id'] = post.id
+            request.session['new_share_id'] = str(post.share_id)
             if is_htmx:
-                return htmx_location_response(reverse('posts:post_details', kwargs={'post_id': post.id}))
-            return redirect('posts:post_details', post_id=post.id)
+                return htmx_location_response(reverse('posts:post_details', kwargs={'share_id': post.share_id}))
+            return redirect('posts:post_details', share_id=post.share_id)
     else:
         form = PostForm(user=request.user)
 
@@ -870,8 +875,8 @@ def offline_media_viewer_view(request):
 
 
 @login_required
-def post_detail_view(request, post_id):
-    post = get_object_or_404(Post, id=post_id)
+def post_detail_view(request, share_id):
+    post = get_object_or_404(Post, share_id=share_id)
     show_all = request.GET.get('show_all') == '1'
     context = build_comments_context(post, request.user, show_all_comments=show_all)
     context['is_liked'] = post.is_liked_by(request.user)
@@ -879,13 +884,13 @@ def post_detail_view(request, post_id):
 
     # Track previous page for back button logic
     is_new_post = request.session.pop('is_new_post', False)
-    new_post_id = request.session.pop('new_post_id', None)
+    new_share_id = request.session.pop('new_share_id', None)
 
     # If not a new post, save the referring URL for back button
     if not is_new_post and request.META.get('HTTP_REFERER'):
         # Only save if it's not already the post detail page
         referer = request.META.get('HTTP_REFERER')
-        if str(post_id) not in referer:
+        if str(share_id) not in referer:
             request.session['previous_page'] = referer
 
     context['is_new_post'] = is_new_post
@@ -903,8 +908,8 @@ def post_detail_view(request, post_id):
 
 
 @login_required
-def add_comment(request, post_id):
-    post = get_object_or_404(Post, id=post_id)
+def add_comment(request, share_id):
+    post = get_object_or_404(Post, share_id=share_id)
     if request.method == 'POST':
         handle_add_comment_request(request, post)
         if request.headers.get('HX-Request'):
@@ -913,7 +918,7 @@ def add_comment(request, post_id):
             context = build_comments_context(post, request.user, show_all_comments=True)
             context['post'] = post
             return render(request, 'posts/partials/comments_section.html', context)
-    return redirect('posts:post_details', post_id=post_id)
+    return redirect('posts:post_details', share_share_id=share_id)
 
 
 @login_required
@@ -928,8 +933,8 @@ def toggle_comment_like(request, comment_id):
 
 
 @login_required
-def toggle_like(request, post_id):
-    post = get_object_or_404(Post, id=post_id)
+def toggle_like(request, share_id):
+    post = get_object_or_404(Post, share_id=share_id)
     result = toggle_post_like_for_user(post, request.user)
     return render(request, 'posts/partials/like_button.html', {
         'post': result['post'],
@@ -939,9 +944,9 @@ def toggle_like(request, post_id):
 
 
 @login_required
-def post_likers_list(request, post_id):
+def post_likers_list(request, share_id):
     from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-    post = get_object_or_404(Post, id=post_id)
+    post = get_object_or_404(Post, share_id=share_id)
     likers = User.objects.filter(id__in=post.likes.values_list("user_id", flat=True)).order_by('username')
 
     page = request.GET.get('page', 1)
@@ -966,7 +971,12 @@ def post_likers_list(request, post_id):
 def unit_posts_view(request, unit_id):
     unit = get_object_or_404(Unit, id=unit_id)
     posts = Post.objects.filter(unit=unit).select_related('author', 'unit').order_by('-created_at')
-    liked_post_ids = set(Like.objects.filter(user=request.user, post__in=posts).values_list('post_id', flat=True))
+    liked_post_ids = set()
+    if request.user.is_authenticated:
+        for pid, sid in Like.objects.filter(user=request.user, post__in=posts).values_list('post_id', 'post__share_id'):
+            liked_post_ids.add(pid)
+            liked_post_ids.add(sid)
+            liked_post_ids.add(str(sid))
     context = {
         'unit': unit,
         'posts': posts,
@@ -1007,8 +1017,8 @@ def search_view(request):
 
 
 @login_required
-def view_image_fullscreen(request, post_id, image_index):
-    post = get_object_or_404(Post, id=post_id)
+def view_image_fullscreen(request, share_id, image_index):
+    post = get_object_or_404(Post, share_id=share_id)
     all_images = list(post.images.all())
 
     # Handle both index and ID (for backward compatibility with existing links)
@@ -1058,10 +1068,10 @@ def view_image_fullscreen(request, post_id, image_index):
 
 
 @login_required
-def share_post_view(request, post_id):
+def share_post_view(request, share_id):
     """Django view to handle post sharing to multiple users or groups"""
     if request.method == 'POST':
-        post = get_object_or_404(Post, id=post_id)
+        post = get_object_or_404(Post, share_id=share_id)
         share_type = request.POST.get('share_type')  # 'user' or 'group'
         message = request.POST.get('message', '')
 
@@ -1150,7 +1160,7 @@ def share_post_view(request, post_id):
 
     # Only redirect if not an HTMX request
     if not request.headers.get('HX-Request'):
-        return redirect('posts:post_details', post_id=post_id)
+        return redirect('posts:post_details', share_share_id=share_id)
     return HttpResponse('')
 
 
@@ -1172,17 +1182,29 @@ def shared_posts_view(request):
 
 @login_required
 def search_following_users(request):
-    """HTMX search endpoint for users the current user is following"""
+    """HTMX search endpoint for users the current user is following — uses unified search engine"""
     query = request.GET.get('user_search', '') or request.GET.get('q', '')
 
-    from users.models import Follow
-    following_ids = Follow.objects.filter(follower=request.user).values_list('followed_id', flat=True)
-
-    users = User.objects.filter(
-        id__in=following_ids
-    ).filter(
-        username__icontains=query
-    )[:10]
+    try:
+        from search.services.unified_search_service import UnifiedSearchService
+        service = UnifiedSearchService()
+        users_page, _, _, _, _, _ = service.search_people_models(
+            query=query,
+            user=request.user,
+            connection_type='following',
+            profile_username=request.user.username,
+            page=1,
+            page_size=10,
+        )
+        users = list(users_page)
+    except Exception:
+        # Fallback to simple filter if unified search is unavailable
+        from users.models import Follow
+        following_ids = Follow.objects.filter(follower=request.user).values_list('followed_id', flat=True)
+        qs = User.objects.filter(id__in=following_ids)
+        if query:
+            qs = qs.filter(username__icontains=query)
+        users = list(qs[:10])
 
     return render(request, 'posts/partials/share_user_results.html', {'users': users})
 
@@ -1192,19 +1214,25 @@ def search_user_groups(request):
     """HTMX search endpoint for groups the current user is a member of"""
     query = request.GET.get('group_search', '') or request.GET.get('q', '')
 
-    from groups.models import Membership, MembershipStatus
+    from groups.models import Membership, MembershipStatus, Group
+    from django.db.models import Q
+
     group_ids = Membership.objects.filter(
         user=request.user,
         status=MembershipStatus.APPROVED
     ).values_list('group_id', flat=True)
 
-    from groups.models import Group
     groups = Group.objects.filter(id__in=group_ids)
 
     if query:
-        groups = groups.filter(name__icontains=query)
+        groups = groups.filter(
+            Q(name__icontains=query) | Q(description__icontains=query)
+        )
+
+    groups = groups.order_by('name')[:15]
 
     return render(request, 'posts/partials/share_group_results.html', {'groups': groups})
+
 
 
 @login_required

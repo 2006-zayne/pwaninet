@@ -146,6 +146,7 @@ class DocumentAcademicUnitSerializer(serializers.ModelSerializer):
 
 
 class DocumentListSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(source="share_id", read_only=True)
     """Lightweight serializer for document lists."""
     category_name = serializers.CharField(source='category.name', read_only=True)
     category_icon = serializers.CharField(source='category.icon', read_only=True)
@@ -181,6 +182,7 @@ class DocumentListSerializer(serializers.ModelSerializer):
 
 
 class DocumentDetailSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(source="share_id", read_only=True)
     """Detailed serializer for single document view."""
     category = CategorySerializer(read_only=True)
     uploaded_by = serializers.SerializerMethodField()
@@ -232,6 +234,7 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
 
 
 class DocumentCreateSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(source="share_id", read_only=True)
     """Serializer for creating documents."""
     tags = serializers.ListField(child=serializers.CharField(), write_only=True, required=False)
     academic_unit_ids = serializers.ListField(child=serializers.IntegerField(), write_only=True)

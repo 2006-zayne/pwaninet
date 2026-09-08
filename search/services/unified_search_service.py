@@ -893,7 +893,7 @@ class UnifiedSearchService:
                 "like_count": l_cnt,
                 "comment_count": c_cnt,
                 "created_at": p.created_at.strftime('%b %d, %Y') if p.created_at else '',
-                "detail_url": f"/post/{p.id}/",
+                "detail_url": f"/post/{p.share_id}/",
                 "relevance_rank": float(score),
                 "obj": p,
             })

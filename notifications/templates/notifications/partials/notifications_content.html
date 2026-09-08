@@ -13,11 +13,9 @@
       </div>
       <h1 class="page-title">Notifications</h1>
     </div>
-    {% if notifications %}
-      <span id="unread-count-badge" style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); background: var(--border); padding: 6px 14px; border-radius: var(--radius-pill); text-transform: uppercase; letter-spacing: 0.06em;">
+      <span id="unread-count-badge" style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); background: var(--border); padding: 6px 14px; border-radius: var(--radius-pill); text-transform: uppercase; letter-spacing: 0.06em; {% if not unread_notifications_count or unread_notifications_count == 0 %}display: none;{% endif %}">
         {{ unread_notifications_count }} unread
       </span>
-    {% endif %}
   </div>
 
   <!-- ── Search and Filter Bar ── -->
@@ -161,7 +159,7 @@
   </div>
 
   <!-- Lazy Loading Trigger for Infinite Scroll -->
-  <div id="load-more-trigger" data-cursor="{{ next_cursor|default:'' }}" data-loading="false" style="height: 20px; margin-top: 2rem;"></div>
+  <div id="load-more-trigger" data-cursor="{{ next_cursor|default:'' }}" data-loading="false" style="height: 20px; margin-top: 2rem;{% if not next_cursor %} display: none;{% endif %}"></div>
 
   <!-- Loading Indicator -->
   <div id="loading-indicator" style="display: none; text-align: center; padding: 1rem;">

@@ -356,6 +356,30 @@
                 });
             }
 
+            // Listen for messages from service worker
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'NEW_VERSION_ACTIVATED') {
+                    console.log('[UpdateManager] New version activated:', event.data.version, 'build', event.data.build);
+                    try {
+                        localStorage.removeItem('htmx-history-cache');
+                    } catch (e) {}
+                    window.location.reload();
+                }
+            });
+
+            // Reload when new service worker takes control so fresh HTML is served
+            let isRefreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!isRefreshing) {
+                    isRefreshing = true;
+                    console.log('[UpdateManager] New controller active - refreshing for fresh HTML');
+                    try {
+                        localStorage.removeItem('htmx-history-cache');
+                    } catch (e) {}
+                    window.location.reload();
+                }
+            });
+
             // Listen for service worker updates
             serviceWorkerRegistration.addEventListener('updatefound', () => {
                 const newWorker = serviceWorkerRegistration.installing;
@@ -363,8 +387,7 @@
                 
                 newWorker.addEventListener('statechange', () => {
                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        console.log('[UpdateManager] New service worker installed and waiting');
-                        // Don't activate automatically - wait for user approval
+                        console.log('[UpdateManager] New service worker installed');
                     }
                 });
             });

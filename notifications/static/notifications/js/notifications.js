@@ -115,38 +115,59 @@ export function toggleOlderNotifications() {
  * Handles unread count updates after HTMX swaps
  */
 export function initHtmxListeners() {
-  document.body.addEventListener('htmx:afterSwap', function(evt) {
-    if (evt.detail.triggerSpec?.trigger === 'updateUnreadCount') {
-      // Update unread count badge
-      fetch('/notifications/unread-count/')
-        .then(r => r.text())
-        .then(html => {
+  const updateCountsHandler = function() {
+    fetch('/notifications/unread-count/?format=json', {
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data && typeof data.unread_count !== 'undefined') {
           const badge = document.getElementById('unread-count-badge');
-          if (badge) badge.outerHTML = html;
-        });
-      
-      // Update group unread badges via API
-      fetch('/groups/api/unread-counts/')
-        .then(r => r.json())
-        .then(counts => {
-          document.querySelectorAll('.unread-badge').forEach(badge => {
-            const groupId = badge.getAttribute('data-group-id');
-            if (groupId && counts[groupId] !== undefined) {
-              const count = counts[groupId];
-              if (count > 0) {
-                badge.textContent = count;
-                badge.style.display = 'inline-flex';
-                // Add pulse animation
-                badge.classList.add('pulsing');
-                setTimeout(() => badge.classList.remove('pulsing'), 600);
-              } else {
-                badge.style.display = 'none';
-              }
+          if (badge) {
+            if (data.unread_count > 0) {
+              badge.textContent = `${data.unread_count} unread`;
+              badge.style.display = 'inline-block';
+            } else {
+              badge.style.display = 'none';
+            }
+          }
+          const navBadges = document.querySelectorAll('.notification-badge');
+          navBadges.forEach(nb => {
+            if (data.unread_count > 0) {
+              nb.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
+              nb.style.display = 'flex';
+            } else {
+              nb.textContent = '0';
+              nb.style.display = 'none';
             }
           });
+        }
+      })
+      .catch(() => {});
+      
+    // Update group unread badges via API
+    fetch('/groups/api/unread-counts/')
+      .then(r => r.json())
+      .then(counts => {
+        document.querySelectorAll('.unread-badge').forEach(badge => {
+          const groupId = badge.getAttribute('data-group-id');
+          if (groupId && counts[groupId] !== undefined) {
+            const count = counts[groupId];
+            if (count > 0) {
+              badge.textContent = count;
+              badge.style.display = 'inline-flex';
+              badge.classList.add('pulsing');
+              setTimeout(() => badge.classList.remove('pulsing'), 600);
+            } else {
+              badge.style.display = 'none';
+            }
+          }
         });
-    }
-  });
+      })
+      .catch(() => {});
+  };
+
+  document.body.addEventListener('updateUnreadCount', updateCountsHandler);
   
   // Add arrival animation to new notifications
   document.body.addEventListener('htmx:afterSwap', function(evt) {
@@ -212,10 +233,10 @@ export function initNotificationCenter() {
 export function initLazyLoading() {
   const loadMoreTrigger = document.getElementById('load-more-trigger');
   
-  if (loadMoreTrigger) {
+  if (loadMoreTrigger && loadMoreTrigger.dataset.cursor) {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
-        if (entry.isIntersecting && loadMoreTrigger.dataset.loading !== 'true') {
+        if (entry.isIntersecting && loadMoreTrigger.dataset.loading !== 'true' && loadMoreTrigger.dataset.cursor) {
           loadMoreNotifications();
         }
       });
@@ -225,6 +246,8 @@ export function initLazyLoading() {
     });
     
     observer.observe(loadMoreTrigger);
+  } else if (loadMoreTrigger) {
+    loadMoreTrigger.style.display = 'none';
   }
 }
 
@@ -233,7 +256,14 @@ export function initLazyLoading() {
  */
 export function loadMoreNotifications() {
   const loadMoreTrigger = document.getElementById('load-more-trigger');
+  if (!loadMoreTrigger) return;
   const currentCursor = loadMoreTrigger.dataset.cursor || '';
+  
+  // Do not request more if there is no cursor
+  if (!currentCursor) {
+    loadMoreTrigger.style.display = 'none';
+    return;
+  }
   
   // Prevent duplicate requests
   if (loadMoreTrigger.dataset.loading === 'true') {
@@ -250,9 +280,7 @@ export function loadMoreNotifications() {
   
   // Get current URL parameters
   const url = new URL(window.location);
-  if (currentCursor) {
-    url.searchParams.set('cursor', currentCursor);
-  }
+  url.searchParams.set('cursor', currentCursor);
   url.searchParams.set('partial', 'true');
   url.searchParams.set('limit', '10');
   
@@ -286,6 +314,10 @@ export function loadMoreNotifications() {
               // Append only the notification items, not the section header
               const newItems = newSection.querySelectorAll('.list-group-item');
               newItems.forEach(item => {
+                const notifId = item.dataset.notificationId;
+                if (notifId && cardBody.querySelector(`[data-notification-id="${notifId}"]`)) {
+                  return; // Skip duplicate notification
+                }
                 item.classList.add('arriving');
                 setTimeout(() => item.classList.remove('arriving'), 400);
                 existingSection.appendChild(item);
@@ -294,14 +326,23 @@ export function loadMoreNotifications() {
             }
           });
           
-          // If section doesn't exist, append the whole section
+          // If section doesn't exist, append the section with deduplicated items
           if (shouldAppend) {
             const newItems = newSection.querySelectorAll('.list-group-item');
-            newItems.forEach((item, index) => {
-              item.classList.add('arriving');
-              setTimeout(() => item.classList.remove('arriving'), 400);
+            let hasNewItems = false;
+            newItems.forEach(item => {
+              const notifId = item.dataset.notificationId;
+              if (notifId && cardBody.querySelector(`[data-notification-id="${notifId}"]`)) {
+                item.remove();
+              } else {
+                hasNewItems = true;
+                item.classList.add('arriving');
+                setTimeout(() => item.classList.remove('arriving'), 400);
+              }
             });
-            cardBody.appendChild(newSection);
+            if (hasNewItems) {
+              cardBody.appendChild(newSection);
+            }
           }
         });
         
@@ -386,11 +427,9 @@ export function updateBulkActionButtons() {
   const bulkActionBar = document.getElementById('selection-mode-bar');
   
   if (bulkActionBar) {
-    if (selectedCount > 0) {
-      bulkActionBar.classList.add('active');
-      bulkActionBar.querySelector('.selected-count').textContent = `${selectedCount} selected`;
-    } else {
-      bulkActionBar.classList.remove('active');
+    const countEl = bulkActionBar.querySelector('.selected-count');
+    if (countEl) {
+      countEl.textContent = `${selectedCount} selected`;
     }
   }
 }
@@ -402,7 +441,7 @@ export function toggleSelectionMode() {
   const selectionBar = document.getElementById('selection-mode-bar');
   const checkboxes = document.querySelectorAll('.notification-checkbox');
   
-  if (selectionBar.classList.contains('active')) {
+  if (selectionBar && selectionBar.classList.contains('active')) {
     // Exit selection mode
     selectionBar.classList.remove('active');
     checkboxes.forEach(cb => {
@@ -411,12 +450,14 @@ export function toggleSelectionMode() {
       const card = cb.closest('.notif-item');
       if (card) card.classList.remove('selected');
     });
-  } else {
+    updateBulkActionButtons();
+  } else if (selectionBar) {
     // Enter selection mode
     selectionBar.classList.add('active');
     checkboxes.forEach(cb => {
-      cb.style.display = 'block';
+      cb.style.display = 'inline-block';
     });
+    updateBulkActionButtons();
   }
 }
 
@@ -426,7 +467,9 @@ export function toggleSelectionMode() {
 export function markSelectedAsRead() {
   const selectedIds = [];
   document.querySelectorAll('.notification-checkbox:checked').forEach(checkbox => {
-    selectedIds.push(checkbox.dataset.notificationId);
+    if (checkbox.dataset.notificationId) {
+      selectedIds.push(checkbox.dataset.notificationId);
+    }
   });
   
   if (selectedIds.length === 0) return;
@@ -445,8 +488,15 @@ export function markSelectedAsRead() {
   }).then(response => response.json())
     .then(data => {
       if (data.success) {
-        // Reload page to show updated state
-        window.location.reload();
+        toggleSelectionMode();
+        if (window.htmx) {
+          htmx.ajax('GET', window.location.pathname + window.location.search, {
+            target: '#page-content-target',
+            swap: 'innerHTML'
+          });
+        } else {
+          window.location.reload();
+        }
       }
     });
 }
@@ -457,7 +507,9 @@ export function markSelectedAsRead() {
 export function deleteSelected() {
   const selectedIds = [];
   document.querySelectorAll('.notification-checkbox:checked').forEach(checkbox => {
-    selectedIds.push(checkbox.dataset.notificationId);
+    if (checkbox.dataset.notificationId) {
+      selectedIds.push(checkbox.dataset.notificationId);
+    }
   });
   
   if (selectedIds.length === 0) return;
@@ -478,8 +530,15 @@ export function deleteSelected() {
   }).then(response => response.json())
     .then(data => {
       if (data.success) {
-        // Reload page to show updated state
-        window.location.reload();
+        toggleSelectionMode();
+        if (window.htmx) {
+          htmx.ajax('GET', window.location.pathname + window.location.search, {
+            target: '#page-content-target',
+            swap: 'innerHTML'
+          });
+        } else {
+          window.location.reload();
+        }
       }
     });
 }

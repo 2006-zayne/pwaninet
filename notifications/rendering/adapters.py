@@ -22,7 +22,67 @@ from .payload_models import (
 User = get_user_model()
 
 
+def _post_share_id(post_pk):
+    """Return the UUID share_id for a post given its integer PK, or None on failure."""
+    if not post_pk:
+        return None
+    try:
+        from posts.models import Post
+        return Post.objects.values_list('share_id', flat=True).get(pk=post_pk)
+    except Exception:
+        return None
+
+
+def _get_post_safely(val):
+    """Safely fetch a Post by either integer PK or UUID share_id without throwing ValueError or DB error."""
+    if not val:
+        return None
+    from posts.models import Post
+    import uuid
+    # Try as UUID
+    try:
+        u = uuid.UUID(str(val))
+        p = Post.objects.filter(share_id=u).first()
+        if p:
+            return p
+    except Exception:
+        pass
+    # Try as integer PK
+    try:
+        p = Post.objects.filter(id=int(val)).first()
+        if p:
+            return p
+    except Exception:
+        pass
+    return None
+
+
+def _clean_media_url(url: Optional[str]) -> Optional[str]:
+    """Clean and normalize a media URL so it is guaranteed to be a valid absolute or relative URL."""
+    if not url:
+        return None
+    url_str = str(url).strip()
+    if not url_str or url_str in ('None', 'null', 'undefined'):
+        return None
+    # Fully qualified or data URI
+    if url_str.startswith(('http://', 'https://', 'data:', '//')):
+        return url_str
+    # Normalize path
+    clean = url_str.lstrip('/')
+    from django.conf import settings
+    media_url = getattr(settings, 'MEDIA_URL', '/media/')
+    path = clean
+    if path.startswith('media/'):
+        path = path[6:]
+    elif path.startswith('static/'):
+        return f'/{clean}'
+    if media_url and media_url.startswith(('http://', 'https://', '//')):
+        return f'{media_url.rstrip("/")}/{path.lstrip("/")}'
+    return f'/media/{path.lstrip("/")}'
+
+
 class PayloadAdapter:
+
     """
     Base class for payload adapters.
     Converts notification data to the standardized payload format.
@@ -78,7 +138,7 @@ class NotificationObjectAdapter(PayloadAdapter):
         message = self._build_message(notification, message_state)
         
         # Build components visibility
-        components = self._build_components(notification)
+        components = self._build_components(notification, resource)
         
         # Build preview
         preview = self._build_preview(notification, resource)
@@ -87,7 +147,7 @@ class NotificationObjectAdapter(PayloadAdapter):
         metadata = NotificationMetadata(
             read=notification.status == 'READ',
             priority=notification.priority,
-            pinned=notification.metadata.get('pinned', False),
+            pinned=(notification.metadata or {}).get('pinned', False),
             aggregated=notification.event_count > 1
         )
         
@@ -267,8 +327,11 @@ class NotificationObjectAdapter(PayloadAdapter):
                 # Include group avatar if available
                 if hasattr(group, 'group_pic') and group.group_pic:
                     context_avatar_url = group.group_pic.url
-            except Group.DoesNotExist:
-                pass
+            except (Group.DoesNotExist, ValueError):
+                if notification.metadata and notification.metadata.get('group_name'):
+                    context_name = notification.metadata.get('group_name')
+            if str(context_name).isdigit() and notification.metadata and notification.metadata.get('group_name'):
+                context_name = notification.metadata.get('group_name')
         elif notification.context_type == 'WORKSPACE':
             context_icon = 'grid-3x3'
         elif notification.context_type == 'COURSE':
@@ -296,129 +359,265 @@ class NotificationObjectAdapter(PayloadAdapter):
     
     def _resolve_resource(self, notification) -> Optional[NotificationResource]:
         """Resolve resource from metadata or related models as NotificationResource."""
-        # First check metadata for thumbnail_url (priority for notification previews)
-        thumbnail_url = notification.metadata.get('thumbnail_url')
-        resource_type_str = notification.metadata.get('resource_type')
+        metadata = notification.metadata or {}
+        thumbnail_url = _clean_media_url(metadata.get('thumbnail_url'))
         
-        # First check metadata
-        resource_data = notification.metadata.get('resource')
-        if resource_data:
+        # 1. Check if resource is directly specified in metadata
+        resource_data = metadata.get('resource')
+        if resource_data and isinstance(resource_data, dict):
             resource_type_enum = None
             try:
                 resource_type_enum = ResourceType[resource_data.get('type', 'SYSTEM')]
             except KeyError:
                 resource_type_enum = ResourceType.SYSTEM
             
+            # Fix old integer-ID post URLs in stored resource data
+            resource_url = resource_data.get('url')
+            if resource_url:
+                import re
+                m = re.match(r'^/post/(\d+)(/.*)?$', resource_url)
+                if m:
+                    sid = _post_share_id(int(m.group(1)))
+                    if sid:
+                        resource_url = f'/post/{sid}/{m.group(2) or ""}'.replace('//', '/')
+            
+            image_url = thumbnail_url or _clean_media_url(resource_data.get('image_url'))
+            if not image_url:
+                post = _get_post_safely(resource_data.get('id') or metadata.get('target_id') or notification.context_id)
+                if post:
+                    image_url = self._get_post_image_url(post)
+            
             return NotificationResource(
                 type=resource_type_enum,
                 id=int(resource_data.get('id', 0)),
-                url=resource_data.get('url'),
+                url=resource_url,
                 title=resource_data.get('title'),
-                image_url=thumbnail_url or resource_data.get('image_url')
+                image_url=image_url
             )
         
-        # Try to resolve from target_type and target_id in metadata
-        target_type = notification.metadata.get('target_type')
-        target_id = notification.metadata.get('target_id')
+        # Resolve post robustly from metadata, context, aggregation_key, or source_events
+        target_type = str(metadata.get('target_type') or '').upper()
+        target_id = metadata.get('target_id') or metadata.get('post_id')
+        context_type = str(notification.context_type or '').upper()
+        context_id = notification.context_id
         
-        if target_type == 'Post' and target_id:
-            from posts.models import Post
+        # Check aggregation_key for target info (format: <notification_type>:<target_type>:<target_id>)
+        if not target_id and notification.aggregation_key:
+            parts = str(notification.aggregation_key).split(':')
+            if len(parts) >= 3:
+                agg_type = parts[1].upper()
+                if agg_type in ['POST', 'POSTS']:
+                    target_type = 'POST'
+                    target_id = parts[2]
+                elif agg_type == 'COMMENT':
+                    target_type = 'COMMENT'
+                    target_id = parts[2]
+        
+        # Check source_events if target_id or thumbnail_url is still missing
+        if (not target_id or not thumbnail_url) and notification.source_events:
             try:
-                post = Post.objects.get(id=target_id)
-                # Use thumbnail_url from metadata if available, otherwise get from post
-                image_url = thumbnail_url
-                if not image_url:
-                    image_url = self._get_post_image_url(post)
-                
-                return NotificationResource(
-                    type=ResourceType.POST,
-                    id=post.id,
-                    url=f'/post/{post.id}',
-                    title=post.content[:100] if post.content else 'Post',
-                    image_url=image_url
-                )
-            except Post.DoesNotExist:
+                from notifications.models import PlatformEvent
+                event = PlatformEvent.objects.filter(event_id__in=notification.source_events).first()
+                if event:
+                    if not target_id and event.target_id:
+                        target_id = event.target_id
+                        target_type = str(event.target_type or '').upper()
+                    if not thumbnail_url and event.metadata:
+                        thumbnail_url = _clean_media_url(event.metadata.get('thumbnail_url'))
+            except Exception:
                 pass
         
-        # Fallback: try to resolve from context if it's a post
-        if notification.context_type == 'POST' and notification.context_id:
-            from posts.models import Post
-            try:
-                post = Post.objects.get(id=notification.context_id)
-                # Use thumbnail_url from metadata if available, otherwise get from post
-                image_url = thumbnail_url
-                if not image_url:
-                    image_url = self._get_post_image_url(post)
-                
-                # For comment notifications, link to the specific comment
-                if notification.notification_type in ['COMMENT', 'COMMENT_REPLY', 'COMMENT_LIKE']:
-                    # Try to get target_id from metadata (for COMMENT and COMMENT_LIKE)
-                    # or from the notification's target_id field (for COMMENT_REPLY)
-                    target_id = notification.metadata.get('target_id') or notification.metadata.get('comment_id')
-                    
-                    # For COMMENT_REPLY, the target_id might be stored differently
-                    if not target_id and notification.notification_type == 'COMMENT_REPLY':
-                        target_id = notification.metadata.get('parent_comment_id')
-                    
-                    if target_id:
-                        url = f'/post/{post.id}/#comment-{target_id}'
-                    else:
-                        url = f'/post/{post.id}'
-                    # Get comment content for display
-                    comment_content = notification.metadata.get('comment_content', '')
+        post = None
+        if target_type in ['POST', 'POSTS'] and target_id:
+            post = _get_post_safely(target_id)
+        if not post and context_type in ['POST', 'POSTS'] and context_id:
+            post = _get_post_safely(context_id)
+        if not post and notification.notification_type in [
+            'LIKE', 'POST_LIKE', 'POST_COMMENT', 'COMMENT', 'COMMENT_REPLY',
+            'COMMENT_LIKE', 'SHARE', 'POST_SHARE', 'POST_SHARED', 'POST_REPOSTED',
+            'POST_CREATED', 'DOCUMENT_SHARED', 'POST_DOCUMENT_SHARED'
+        ]:
+            post = _get_post_safely(target_id) or _get_post_safely(context_id)
+        
+        # Resolve comment to parent post
+        if not post and (target_type == 'COMMENT' or notification.notification_type in ['COMMENT', 'COMMENT_REPLY', 'COMMENT_LIKE']):
+            comment_pk = target_id or metadata.get('comment_id') or metadata.get('parent_comment_id')
+            if comment_pk:
+                try:
+                    from posts.models import Comment
+                    c = Comment.objects.filter(id=int(comment_pk)).select_related('post').first()
+                    if c:
+                        post = c.post
+                except Exception:
+                    pass
+        
+        if post:
+            image_url = self._get_post_image_url(post) or thumbnail_url
+            comment_content = None
+            
+            # For comment notifications, link to the specific comment
+            if notification.notification_type in ['COMMENT', 'COMMENT_REPLY', 'COMMENT_LIKE', 'POST_COMMENT', 'POST_COMMENT_REPLY', 'POST_COMMENTED', 'DOCUMENT_COMMENT']:
+                cid = metadata.get('target_id') or metadata.get('comment_id')
+                if not cid and notification.notification_type in ['COMMENT_REPLY', 'POST_COMMENT_REPLY']:
+                    cid = metadata.get('parent_comment_id')
+                if cid:
+                    url = f'/post/{post.share_id}/#comment-{cid}'
                 else:
-                    url = f'/post/{post.id}'
-                    comment_content = None
+                    url = f'/post/{post.share_id}/'
+                comment_content = metadata.get('comment_content', '')
+                if not comment_content and cid:
+                    try:
+                        from posts.models import Comment
+                        c_obj = Comment.objects.filter(id=int(cid)).first()
+                        if c_obj and c_obj.content:
+                            comment_content = c_obj.content
+                    except Exception:
+                        pass
+            elif notification.notification_type in ['DOCUMENT_SHARED', 'POST_DOCUMENT_SHARED'] or metadata.get('is_document_share'):
+                doc = getattr(post, 'shared_document', None)
+                doc_id = getattr(doc, 'id', None) or metadata.get('shared_document_id') or metadata.get('document_id')
+                doc_share_id = getattr(doc, 'share_id', None)
+                doc_title = (doc.title if doc else None) or metadata.get('document_title') or 'Document'
+                if not doc_share_id and doc_id:
+                    try:
+                        from documents.models import Document
+                        d_obj = Document.objects.filter(id=int(doc_id)).first()
+                        if d_obj:
+                            doc_share_id = d_obj.share_id
+                            doc_title = d_obj.title
+                    except Exception:
+                        pass
                 
+                doc_url = f'/documents/document/{doc_share_id}/' if doc_share_id else f'/post/{post.share_id}/'
                 return NotificationResource(
-                    type=ResourceType.POST,
-                    id=post.id,
-                    url=url,
-                    title=post.content[:100] if post.content else 'Post',
-                    image_url=image_url,
+                    type=ResourceType.DOCUMENT,
+                    id=doc_id or post.id,
+                    url=doc_url,
+                    title=doc_title,
+                    image_url=image_url or _clean_media_url(thumbnail_url),
                     content=comment_content
                 )
-            except Post.DoesNotExist:
-                pass
+            else:
+                url = f'/post/{post.share_id}/'
+            
+            return NotificationResource(
+                type=ResourceType.POST,
+                id=post.id,
+                url=url,
+                title=post.content[:100] if post.content else 'Post',
+                image_url=image_url,
+                content=comment_content
+            )
         
-        # Fallback: try to resolve from context if it's a document
-        if notification.context_type == 'DOCUMENT' and notification.context_id:
+        # Fallback 1: try to resolve from context, target, or metadata if it's a document
+        doc_id = None
+        if context_type == 'DOCUMENT' and context_id:
+            doc_id = context_id
+        elif target_type == 'DOCUMENT' and target_id:
+            doc_id = target_id
+        elif notification.notification_type in ['DOCUMENT_SHARED', 'POST_DOCUMENT_SHARED']:
+            doc_id = metadata.get('shared_document_id') or metadata.get('document_id')
+        
+        if doc_id:
             from documents.models import Document
             try:
-                document = Document.objects.get(id=notification.context_id)
+                document = Document.objects.get(id=int(doc_id))
+                doc_thumb = None
+                if hasattr(document, 'latest_version') and document.latest_version:
+                    first_file = document.latest_version.files.first()
+                    if first_file:
+                        doc_thumb = first_file.thumbnail_path or first_file.preview_path
+                if not doc_thumb and hasattr(document, 'thumbnail') and document.thumbnail:
+                    doc_thumb = document.thumbnail.url
                 return NotificationResource(
                     type=ResourceType.DOCUMENT,
                     id=document.id,
-                    url=f'/documents/{document.id}',
+                    url=f'/documents/document/{document.share_id}/' if document.share_id else f'/documents/{document.id}',
                     title=document.title,
-                    image_url=thumbnail_url
+                    image_url=_clean_media_url(doc_thumb) or _clean_media_url(thumbnail_url)
                 )
-            except Document.DoesNotExist:
+            except (Document.DoesNotExist, ValueError):
                 pass
+
+        # Fallback 2: If post lookup failed or post was deleted, BUT thumbnail_url exists, STILL return NotificationResource
+        if thumbnail_url:
+            target_url = '#'
+            res_id = 0
+            if target_id:
+                sid = _post_share_id(target_id) or target_id
+                target_url = f'/post/{sid}/'
+                if str(target_id).isdigit():
+                    res_id = int(target_id)
+            elif context_id and context_type in ['POST', 'POSTS']:
+                sid = _post_share_id(context_id) or context_id
+                target_url = f'/post/{sid}/'
+                if str(context_id).isdigit():
+                    res_id = int(context_id)
+            
+            return NotificationResource(
+                type=ResourceType.POST,
+                id=res_id,
+                url=target_url,
+                title=metadata.get('post_content', 'Post') or 'Post',
+                image_url=_clean_media_url(thumbnail_url)
+            )
         
         return None
     
     def _get_post_image_url(self, post) -> Optional[str]:
         """Get image URL from post based on content type."""
-        # Priority 1: Post images
-        if post.images.exists():
-            return post.images.first().get_thumbnail_url('400') if hasattr(post.images.first(), 'get_thumbnail_url') else post.images.first().image.url
-        
-        # Priority 2: Video poster
-        elif post.video_poster:
-            return post.video_poster.url
-        
-        # Priority 3: Shared document preview
-        elif post.shared_document and post.shared_document.latest_version:
-            first_file = post.shared_document.latest_version.files.first()
-            if first_file and first_file.preview_path:
-                return f"/media/{first_file.preview_path}"
-            elif first_file and first_file.thumbnail_path:
-                return f"/media/{first_file.thumbnail_path}"
-        
-        # Priority 4: Post thumbnail (for gradient/text posts)
-        elif post.thumbnail:
-            return post.thumbnail.url
+        try:
+            # Priority 1: Post images
+            if post.images.exists():
+                first_img = post.images.first()
+                if first_img:
+                    if hasattr(first_img, 'get_thumbnail_url'):
+                        url = first_img.get_thumbnail_url('400')
+                        if url:
+                            return _clean_media_url(url)
+                    if hasattr(first_img, 'image') and first_img.image:
+                        return _clean_media_url(first_img.image.url)
+            
+            # Priority 2: Video poster
+            if post.video_poster:
+                return _clean_media_url(post.video_poster.url)
+            elif hasattr(post, 'get_video_poster') and post.get_video_poster:
+                return _clean_media_url(post.get_video_poster)
+            
+            # Priority 3: Shared document preview
+            if post.shared_document:
+                doc = post.shared_document
+                if hasattr(doc, 'latest_version') and doc.latest_version:
+                    first_file = doc.latest_version.files.first()
+                    if first_file:
+                        thumb = first_file.thumbnail_path or first_file.preview_path
+                        if thumb:
+                            return _clean_media_url(thumb)
+                if hasattr(doc, 'thumbnail') and doc.thumbnail:
+                    return _clean_media_url(doc.thumbnail.url)
+            
+            # Priority 4: Post thumbnail (for gradient/text posts)
+            if post.thumbnail:
+                return _clean_media_url(post.thumbnail.url)
+            
+            # Priority 5: If this is a repost, check original post
+            if getattr(post, 'repost_of', None):
+                repost_img = self._get_post_image_url(post.repost_of)
+                if repost_img:
+                    return repost_img
+            
+            # Priority 6: Fallback to get_intel_file if it's an image
+            if hasattr(post, 'get_intel_file') and post.get_intel_file:
+                try:
+                    intel = post.get_intel_file
+                    if hasattr(intel, 'url') and intel.url:
+                        f_url = intel.url.lower()
+                        if any(f_url.endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif']):
+                            return _clean_media_url(intel.url)
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.warning(f"Error resolving post image URL: {e}")
         
         return None
     
@@ -439,6 +638,15 @@ class NotificationObjectAdapter(PayloadAdapter):
                     url = action.url
                     if action.action_type == 'VIEW_POST' and url and url.startswith('/posts/'):
                         url = url.replace('/posts/', '/post/')
+                    
+                    # Fix old integer-ID post URLs → UUID share_id
+                    if url:
+                        import re
+                        m = re.match(r'^/post/(\d+)(/.*)?$', url)
+                        if m:
+                            share_id = _post_share_id(int(m.group(1)))
+                            if share_id:
+                                url = f'/post/{share_id}/{m.group(2) or ""}'.replace('//', '/')
                     
                     actions.append(PayloadNotificationAction(
                         id=action.action_type,  # Use action_type instead of database ID
@@ -465,7 +673,7 @@ class NotificationObjectAdapter(PayloadAdapter):
         
         # For FOLLOW notifications, check if user already follows the actor
         if notification.notification_type == 'FOLLOW' and not is_aggregated:
-            actor_id = notification.metadata.get('actor_id')
+            actor_id = (notification.metadata or {}).get('actor_id')
             if actor_id:
                 # Check if recipient already follows the actor using the Follow model
                 from users.models import Follow
@@ -483,8 +691,8 @@ class NotificationObjectAdapter(PayloadAdapter):
         # Build actions based on profile's available_actions
         seen_action_ids = set()
         for action_id in action_strategy.available_actions:
-            # Skip FOLLOW_BACK for aggregated notifications
-            if is_aggregated and action_id == 'FOLLOW_BACK':
+            # Skip FOLLOW_BACK and PINCH for aggregated notifications
+            if is_aggregated and action_id in ('FOLLOW_BACK', 'PINCH'):
                 continue
             
             # For aggregated notifications, only show one instance of each action type
@@ -505,37 +713,37 @@ class NotificationObjectAdapter(PayloadAdapter):
             'ACCEPT': {
                 'label': 'Accept',
                 'style': 'primary',
-                'url_builder': lambda n: f'/groups/invite/respond/{n.id}/accept/' if n.id else None,
+                'url_builder': lambda n: f'/groups/invite/respond/{getattr(n, "notification_id", getattr(n, "id", None))}/accept/' if getattr(n, "notification_id", getattr(n, "id", None)) else None,
                 'method': 'POST'
             },
             'DECLINE': {
                 'label': 'Decline',
                 'style': 'danger',
-                'url_builder': lambda n: f'/groups/invite/respond/{n.id}/decline/' if n.id else None,
+                'url_builder': lambda n: f'/groups/invite/respond/{getattr(n, "notification_id", getattr(n, "id", None))}/decline/' if getattr(n, "notification_id", getattr(n, "id", None)) else None,
                 'method': 'POST'
             },
             'APPROVE': {
                 'label': 'Approve',
                 'style': 'primary',
-                'url_builder': lambda n: f'/groups/{n.context_id}/approve/{n.metadata.get("user_id")}/' if n.context_type == 'GROUP' and n.context_id and n.metadata.get('user_id') else None,
+                'url_builder': lambda n: f'/groups/{n.context_id}/approve/{(n.metadata or {}).get("user_id")}/' if n.context_type == 'GROUP' and n.context_id and (n.metadata or {}).get('user_id') else None,
                 'method': 'POST'
             },
             'REJECT': {
                 'label': 'Reject',
                 'style': 'danger',
-                'url_builder': lambda n: f'/groups/{n.context_id}/reject/{n.metadata.get("user_id")}/' if n.context_type == 'GROUP' and n.context_id and n.metadata.get('user_id') else None,
+                'url_builder': lambda n: f'/groups/{n.context_id}/reject/{(n.metadata or {}).get("user_id")}/' if n.context_type == 'GROUP' and n.context_id and (n.metadata or {}).get('user_id') else None,
                 'method': 'POST'
             },
             'VIEW_POST': {
                 'label': 'View Post',
                 'style': 'primary',
-                'url_builder': lambda n: f'/post/{n.context_id}/' if n.context_type == 'POST' and n.context_id else None,
+                'url_builder': lambda n: f'/post/{_post_share_id(n.context_id)}/' if n.context_type == 'POST' and n.context_id and _post_share_id(n.context_id) else None,
                 'method': 'GET'
             },
             'VIEW_COMMENT': {
                 'label': 'View Comment',
                 'style': 'primary',
-                'url_builder': lambda n: f'/post/{n.context_id}/#comment-{n.metadata.get("target_id")}' if n.context_type == 'POST' and n.context_id and n.metadata.get('target_id') else None,
+                'url_builder': lambda n: f'/post/{_post_share_id(n.context_id)}/#comment-{(n.metadata or {}).get("target_id")}' if n.context_type == 'POST' and n.context_id and (n.metadata or {}).get('target_id') and _post_share_id(n.context_id) else None,
                 'method': 'GET'
             },
             'VIEW_ASSIGNMENT': {
@@ -547,33 +755,46 @@ class NotificationObjectAdapter(PayloadAdapter):
             'VIEW_GROUP': {
                 'label': 'View Group',
                 'style': 'secondary',
-                'url_builder': lambda n: f'/groups/{n.context_id}' if n.context_type == 'GROUP' and n.context_id else None,
+                'url_builder': lambda n: f'/groups/{n.context_id}/' if n.context_type == 'GROUP' and n.context_id else None,
+                'method': 'GET'
+            },
+            'VIEW_ANNOUNCEMENT': {
+                'label': 'Read Announcement',
+                'style': 'primary',
+                'url_builder': lambda n: f'/groups/{n.context_id}/#announcements' if n.context_id else None,
                 'method': 'GET'
             },
             'FOLLOW_BACK': {
                 'label': 'Follow Back',
                 'style': 'primary',
-                'url_builder': lambda n: f'/users/{n.metadata.get("actor_id")}/follow/' if n.metadata.get('actor_id') else None,
+                'url_builder': lambda n: f'/notifications/follow-back/{getattr(n, "notification_id", getattr(n, "id", None))}/' if getattr(n, "notification_id", getattr(n, "id", None)) else None,
                 'method': 'POST'
             },
             'VIEW_PROFILE': {
                 'label': 'View Profile',
                 'style': 'secondary',
-                'url_builder': lambda n: f'/users/{n.metadata.get("actor_username")}/' if n.metadata.get('actor_username') else None,
+                'url_builder': lambda n: f'/users/user/{(n.metadata or {}).get("actor_username")}/' if (n.metadata or {}).get('actor_username') else None,
                 'method': 'GET'
             },
             'PINCH': {
                 'label': 'Pinch',
                 'style': 'secondary',
-                'url_builder': lambda n: f'/users/{n.metadata.get("actor_id")}/pinch/' if n.metadata.get('actor_id') else None,
+                'url_builder': lambda n: f'/notifications/pinch/{getattr(n, "notification_id", getattr(n, "id", None))}/' if getattr(n, "notification_id", getattr(n, "id", None)) else None,
                 'method': 'POST'
             },
             'SEE_WHATS_NEW': {
                 'label': "See What's New",
                 'style': 'primary',
-                'url_builder': lambda n: f'/system/releases/{n.metadata.get("target_id")}/' if n.metadata.get('target_id') else None,
+                'url_builder': lambda n: f'/system/releases/{(n.metadata or {}).get("target_id")}/' if (n.metadata or {}).get('target_id') else None,
                 'method': 'GET',
-                'data_attrs': {'data-release-id': lambda n: n.metadata.get('target_id')}
+                'data_attrs': {'data-release-id': lambda n: (n.metadata or {}).get('target_id')}
+            },
+            'VIEW_DOCUMENT': {
+                'label': 'View Document',
+                'style': 'primary',
+                'icon': 'file-earmark-text',
+                'url_builder': lambda n: self._build_document_view_url(n),
+                'method': 'GET'
             },
         }
         
@@ -584,16 +805,67 @@ class NotificationObjectAdapter(PayloadAdapter):
         url = config['url_builder'](notification)
         if not url:
             return None
+
+        enabled = True
+        label = config['label']
+        if action_id == 'PINCH':
+            actor_id = notification.metadata.get('actor_id') if notification.metadata else None
+            if actor_id and hasattr(notification, 'recipient') and notification.recipient:
+                from users.models import Pinch
+                from django.utils import timezone
+                try:
+                    pinched_id = int(actor_id)
+                except (ValueError, TypeError):
+                    pinched_id = None
+                if pinched_id and Pinch.objects.filter(
+                    pinch_user=notification.recipient,
+                    pinched_user_id=pinched_id,
+                    created_at__date=timezone.now().date()
+                ).exists():
+                    enabled = False
+                    label = 'Pinched'
         
         return PayloadNotificationAction(
             id=action_id,
-            label=config['label'],
+            label=label,
             style=config['style'],
-            enabled=True,
+            enabled=enabled,
             url=url,
             method=config['method'],
             payload={}
         )
+    
+    def _build_document_view_url(self, n) -> Optional[str]:
+        """Build URL to view document for document notifications."""
+        meta = n.metadata or {}
+        doc_id = meta.get('shared_document_id') or meta.get('document_id')
+        if doc_id:
+            try:
+                from documents.models import Document
+                doc = Document.objects.filter(id=int(doc_id)).first()
+                if doc and doc.share_id:
+                    return f"/documents/document/{doc.share_id}/"
+            except Exception:
+                pass
+
+        if str(n.context_type or '').upper() == 'DOCUMENT' and n.context_id:
+            try:
+                from documents.models import Document
+                doc = Document.objects.filter(id=int(n.context_id)).first()
+                if doc and doc.share_id:
+                    return f"/documents/document/{doc.share_id}/"
+            except Exception:
+                pass
+
+        post_id = meta.get('target_id') or meta.get('post_id')
+        if not post_id and str(n.context_type or '').upper() in ['POST', 'POSTS']:
+            post_id = n.context_id
+        if post_id:
+            post = _get_post_safely(post_id)
+            if post and post.shared_document and post.shared_document.share_id:
+                return f"/documents/document/{post.shared_document.share_id}/"
+
+        return None
     
     def _determine_intent(self, notification_type: str) -> NotificationIntent:
         """Determine notification intent based on type."""
@@ -603,6 +875,11 @@ class NotificationObjectAdapter(PayloadAdapter):
             'FOLLOW': NotificationIntent.ACTIVITY,
             'INVITE': NotificationIntent.WORKFLOW,
             'GROUP_REQUEST': NotificationIntent.WORKFLOW,
+            'GROUP_JOIN_REQUEST': NotificationIntent.WORKFLOW,
+            'GROUP_APPROVED': NotificationIntent.WORKFLOW,
+            'GROUP_REJECTED': NotificationIntent.WORKFLOW,
+            'GROUP_ANNOUNCEMENT': NotificationIntent.ANNOUNCEMENT,
+            'POST_CREATED': NotificationIntent.ACTIVITY,
             'GROUP': NotificationIntent.WORKFLOW,
             'ASSIGNMENT': NotificationIntent.AWARENESS,
             'DOCUMENT': NotificationIntent.ACTIVITY,
@@ -648,9 +925,10 @@ class NotificationObjectAdapter(PayloadAdapter):
         # Use the profile's message strategy configuration
         message_strategy = profile.message_strategy
         
+        metadata = notification.metadata or {}
         variables = {
-            'actor_username': notification.metadata.get('actor_username', 'Someone'),
-            'group_name': notification.metadata.get('group_name', ''),
+            'actor_username': metadata.get('actor_username', 'Someone'),
+            'group_name': metadata.get('group_name', ''),
             'title': notification.title,
             'summary': notification.summary
         }
@@ -660,7 +938,7 @@ class NotificationObjectAdapter(PayloadAdapter):
             variables=variables
         )
     
-    def _build_components(self, notification) -> NotificationComponents:
+    def _build_components(self, notification, resource: Optional[NotificationResource] = None) -> NotificationComponents:
         """Build component visibility configuration using profile registry."""
         from .profile_registry import profile_registry
         
@@ -668,16 +946,20 @@ class NotificationObjectAdapter(PayloadAdapter):
         profile = profile_registry.get_profile(notification.notification_type)
         
         # Use the profile's component visibility configuration
-        visibility_config = profile.component_visibility
+        visibility_config = profile.component_visibility if profile else None
+        
+        # If resource has an image or thumbnail, ensure preview is visible
+        has_preview_image = bool(resource and (resource.image_url or getattr(resource, 'thumbnail_url', None)))
+        preview_visible = (visibility_config.preview if visibility_config else False) or has_preview_image
         
         return NotificationComponents(
-            context_header=visibility_config.context_header,
-            actor_stack=visibility_config.actor_stack,
-            content=visibility_config.content,
-            preview=visibility_config.preview,
-            metadata=visibility_config.metadata,
-            action_bar=visibility_config.action_bar,
-            status=visibility_config.status
+            context_header=visibility_config.context_header if visibility_config else False,
+            actor_stack=visibility_config.actor_stack if visibility_config else True,
+            content=visibility_config.content if visibility_config else True,
+            preview=preview_visible,
+            metadata=visibility_config.metadata if visibility_config else True,
+            action_bar=visibility_config.action_bar if visibility_config else False,
+            status=visibility_config.status if visibility_config else False
         )
     
     def _build_preview(self, notification, resource: Optional[NotificationResource]) -> NotificationPreview:
@@ -688,19 +970,26 @@ class NotificationObjectAdapter(PayloadAdapter):
         profile = profile_registry.get_profile(notification.notification_type)
         
         # Use the profile's preview strategy configuration
-        preview_strategy = profile.preview_strategy
+        preview_strategy = profile.preview_strategy if profile else None
         
         # Map preview_type string to PreviewType enum
         preview_type_enum = PreviewType.NONE
-        if preview_strategy.preview_type == "POST":
+        has_image = bool(resource and (resource.image_url or getattr(resource, 'thumbnail_url', None)))
+        
+        if preview_strategy:
+            if preview_strategy.preview_type == "POST":
+                preview_type_enum = PreviewType.POST
+            elif preview_strategy.preview_type == "DOCUMENT":
+                preview_type_enum = PreviewType.DOCUMENT
+            elif preview_strategy.preview_type == "GROUP":
+                preview_type_enum = PreviewType.GROUP
+        elif has_image:
             preview_type_enum = PreviewType.POST
-        elif preview_strategy.preview_type == "DOCUMENT":
-            preview_type_enum = PreviewType.DOCUMENT
-        elif preview_strategy.preview_type == "GROUP":
-            preview_type_enum = PreviewType.GROUP
+        
+        enabled = (preview_strategy.enabled if preview_strategy else False) or has_image
         
         return NotificationPreview(
-            enabled=preview_strategy.enabled,
+            enabled=enabled,
             type=preview_type_enum,
             resource_id=resource.id if resource else None
         )

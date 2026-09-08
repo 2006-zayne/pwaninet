@@ -105,11 +105,88 @@
             <i class="bi bi-link-45deg"></i>
           </span>
           <input type="text" id="qr-modal-link-input" class="form-control border-start-0 border-end-0 small" value="https://pwaninet.app/apk/" readonly style="font-size: 0.85rem; background: transparent;">
-          <button class="btn btn-outline-primary btn-sm px-3" type="button" id="qr-modal-copy-btn">
+          <button class="btn btn-outline-primary btn-sm px-3" type="button" id="qr-modal-copy-btn" onclick="if (typeof copyApkLink === 'function') copyApkLink(this);">
             <i class="bi bi-clipboard me-1"></i>{% trans "Copy" %}
           </button>
         </div>
       </div>
+      <script>
+        function copyApkLink(btn) {
+          const button = btn || document.getElementById('qr-modal-copy-btn');
+          if (!button) return;
+          if (button.dataset.copying === 'true') return;
+          button.dataset.copying = 'true';
+
+          const input = document.getElementById('qr-modal-link-input');
+          const textToCopy = (input && input.value) ? input.value : 'https://pwaninet.app/apk/';
+
+          const originalHtml = button.getAttribute('data-original-html') || button.innerHTML;
+          if (!button.getAttribute('data-original-html')) {
+            button.setAttribute('data-original-html', originalHtml);
+          }
+
+          function showSuccess() {
+            button.innerHTML = '<i class="bi bi-check2 me-1"></i>{% trans "Copied!" %}';
+            button.classList.remove('btn-outline-primary');
+            button.classList.add('btn-success');
+            setTimeout(() => {
+              button.innerHTML = originalHtml;
+              button.classList.remove('btn-success');
+              button.classList.add('btn-outline-primary');
+              delete button.dataset.copying;
+            }, 2000);
+          }
+
+          function fallbackCopy() {
+            let copied = false;
+            try {
+              const temp = document.createElement('textarea');
+              temp.value = textToCopy;
+              temp.style.position = 'fixed';
+              temp.style.top = '0';
+              temp.style.left = '0';
+              temp.style.width = '2em';
+              temp.style.height = '2em';
+              temp.style.padding = '0';
+              temp.style.border = 'none';
+              temp.style.outline = 'none';
+              temp.style.boxShadow = 'none';
+              temp.style.background = 'transparent';
+              temp.setAttribute('readonly', '');
+              document.body.appendChild(temp);
+              temp.focus();
+              temp.select();
+              temp.setSelectionRange(0, textToCopy.length);
+              copied = document.execCommand('copy');
+              document.body.removeChild(temp);
+            } catch (err) {
+              console.warn('[Clipboard] fallback textarea error:', err);
+            }
+
+            if (!copied && input) {
+              try {
+                input.focus();
+                input.select();
+                input.setSelectionRange(0, 99999);
+                copied = document.execCommand('copy');
+              } catch (e) {
+                console.warn('[Clipboard] fallback input error:', e);
+              }
+            }
+
+            showSuccess();
+          }
+
+          if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(textToCopy)
+              .then(() => showSuccess())
+              .catch(() => fallbackCopy());
+          } else {
+            fallbackCopy();
+          }
+        }
+        window.copyApkLink = copyApkLink;
+      </script>
       <div class="modal-footer border-0 pt-0 pb-4 px-4 justify-content-center">
         <span class="text-muted small">
           {% trans "Downloading on this device?" %} 

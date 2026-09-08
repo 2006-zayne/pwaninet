@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="onboarding-wrapper py-4 py-md-5">
+  <div class="container" style="max-width: 860px;">
+
+    <!-- Wizard Header -->
+    <div class="text-center mb-4 mb-md-5">
+      <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3" style="width: 60px; height: 60px;">
+        <i class="bi bi-compass-fill fs-2"></i>
+      </div>
+      <h2 class="fw-bold display-6 mb-2">Welcome to PwaniNet, {{ request.user.first_name|default:request.user.username }}!</h2>
+      <p class="text-muted mx-auto" style="max-width: 520px;">
+        Let's personalize your academic network so your feed is populated with classmates, discussions, and course notes right from day one.
+      </p>
+
+      <!-- Stepper Indicator -->
+      <div class="stepper-nav d-flex align-items-center justify-content-center gap-3 mt-4">
+        <button type="button"
+                id="tab-btn-1"
+                class="btn rounded-pill px-4 py-2 fw-bold d-flex align-items-center gap-2 stepper-tab active-tab"
+                onclick="goToStep(1)">
+          <span class="step-num-badge">1</span> Find Classmates
+        </button>
+        <i class="bi bi-chevron-right text-muted small"></i>
+        <button type="button"
+                id="tab-btn-2"
+                class="btn rounded-pill px-4 py-2 fw-bold d-flex align-items-center gap-2 stepper-tab text-muted"
+                onclick="goToStep(2)">
+          <span class="step-num-badge">2</span> Join Communities
+        </button>
+      </div>
+    </div>
+
+    <!-- Wizard Cards Container -->
+    <div class="card border-0 shadow-lg rounded-5 overflow-hidden p-4 p-md-5 bg-white position-relative">
+      
+      <!-- Step 1 Pane -->
+      <div id="step-pane-1" class="wizard-pane">
+        {% include 'users/onboarding/partials/step_classmates.html' %}
+        
+        <div class="d-flex align-items-center justify-content-between pt-4 mt-4 border-top flex-wrap gap-2">
+          <a href="{% url 'users:onboarding_complete' %}" class="btn btn-link text-muted text-decoration-none px-2 fw-semibold">
+            Skip for now
+          </a>
+          <button type="button" class="btn btn-primary rounded-pill px-4 py-2 fw-bold shadow-sm d-flex align-items-center gap-2" onclick="goToStep(2)">
+            Continue to Groups <i class="bi bi-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2 Pane -->
+      <div id="step-pane-2" class="wizard-pane d-none">
+        {% include 'users/onboarding/partials/step_groups.html' %}
+        
+        <div class="d-flex align-items-center justify-content-between pt-4 mt-4 border-top flex-wrap gap-2">
+          <button type="button" class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-semibold" onclick="goToStep(1)">
+            <i class="bi bi-arrow-left"></i> Back
+          </button>
+          <a href="{% url 'users:onboarding_complete' %}" class="btn btn-success rounded-pill px-4 py-2 fw-bold shadow-sm d-flex align-items-center gap-2">
+            Finish & Go to Feed <i class="bi bi-check2-circle"></i>
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<style>
+  .onboarding-wrapper {
+    background: linear-gradient(180deg, rgba(37, 99, 235, 0.04) 0%, rgba(248, 250, 252, 1) 100%);
+    min-height: calc(100vh - 70px);
+  }
+  .stepper-tab {
+    background: #f1f5f9;
+    color: #64748b;
+    border: none;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+  }
+  .stepper-tab.active-tab {
+    background: #2563eb;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  }
+  .step-num-badge {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+  }
+  .active-tab .step-num-badge {
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+  }
+  .hover-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06) !important;
+  }
+  .animate-fade-in {
+    animation: fadeIn 0.25s ease-in-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+
+<script>
+  function goToStep(stepNumber) {
+    const pane1 = document.getElementById('step-pane-1');
+    const pane2 = document.getElementById('step-pane-2');
+    const tab1 = document.getElementById('tab-btn-1');
+    const tab2 = document.getElementById('tab-btn-2');
+
+    if (stepNumber === 1) {
+      pane1.classList.remove('d-none');
+      pane2.classList.add('d-none');
+      tab1.classList.add('active-tab');
+      tab1.classList.remove('text-muted');
+      tab2.classList.remove('active-tab');
+      tab2.classList.add('text-muted');
+    } else {
+      pane1.classList.add('d-none');
+      pane2.classList.remove('d-none');
+      tab2.classList.add('active-tab');
+      tab2.classList.remove('text-muted');
+      tab1.classList.remove('active-tab');
+      tab1.classList.add('text-muted');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>
+{% endblock %}

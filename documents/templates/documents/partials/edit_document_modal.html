@@ -1,30 +1,30 @@
 {% load static %}
-<div class="modal fade" id="editDocumentModal-{{ document.id }}" tabindex="-1" aria-labelledby="editDocumentModalLabel-{{ document.id }}" aria-hidden="true" style="z-index: 1060;">
+<div class="modal fade" id="editDocumentModal-{{ document.share_id }}" tabindex="-1" aria-labelledby="editDocumentModalLabel-{{ document.share_id }}" aria-hidden="true" style="z-index: 1060;">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content" style="border-radius: 16px; border: 1px solid var(--border); background: var(--card-bg);">
             <div class="modal-header" style="border-bottom: 1px solid var(--border); padding: 16px 24px;">
-                <h5 class="modal-title" id="editDocumentModalLabel-{{ document.id }}" style="font-weight: 600; font-size: 1.15rem; color: var(--text-dark); margin: 0; display: flex; align-items: center; gap: 8px;">
+                <h5 class="modal-title" id="editDocumentModalLabel-{{ document.share_id }}" style="font-weight: 600; font-size: 1.15rem; color: var(--text-dark); margin: 0; display: flex; align-items: center; gap: 8px;">
                     <i class="bi bi-pencil-square" style="color: var(--primary);"></i>
                     Edit Document Details
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="{% url 'documents:edit_document' document.id %}" 
+            <form action="{% url 'documents:edit_document' document.share_id %}" 
                   method="post"
-                  hx-post="{% url 'documents:edit_document' document.id %}"
+                  hx-post="{% url 'documents:edit_document' document.share_id %}"
                   hx-target="#page-content-target"
                   hx-swap="innerHTML"
-                  onsubmit="const m = bootstrap.Modal.getInstance(document.getElementById('editDocumentModal-{{ document.id }}')); if (m) m.hide();">
+                  onsubmit="const m = bootstrap.Modal.getInstance(document.getElementById('editDocumentModal-{{ document.share_id }}')); if (m) m.hide();">
                 {% csrf_token %}
                 <div class="modal-body" style="padding: 24px; max-height: 70vh; overflow-y: auto;">
                     <!-- Title -->
                     <div class="mb-3">
-                        <label for="edit-title-{{ document.id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
+                        <label for="edit-title-{{ document.share_id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
                             Document Title <span class="text-danger">*</span>
                         </label>
                         <input type="text" 
                                class="form-control" 
-                               id="edit-title-{{ document.id }}" 
+                               id="edit-title-{{ document.share_id }}" 
                                name="title" 
                                value="{{ document.title }}" 
                                required
@@ -34,11 +34,11 @@
                     <!-- Category & Visibility Row -->
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label for="edit-category-{{ document.id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
+                            <label for="edit-category-{{ document.share_id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
                                 Category <span class="text-danger">*</span>
                             </label>
                             <select class="form-select" 
-                                    id="edit-category-{{ document.id }}" 
+                                    id="edit-category-{{ document.share_id }}" 
                                     name="category" 
                                     required
                                     style="border-radius: 10px; border-color: var(--border); background: var(--input-bg); color: var(--text-dark);">
@@ -50,11 +50,11 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label for="edit-visibility-{{ document.id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
+                            <label for="edit-visibility-{{ document.share_id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
                                 Visibility
                             </label>
                             <select class="form-select" 
-                                    id="edit-visibility-{{ document.id }}" 
+                                    id="edit-visibility-{{ document.share_id }}" 
                                     name="visibility"
                                     style="border-radius: 10px; border-color: var(--border); background: var(--input-bg); color: var(--text-dark);">
                                 <option value="public" {% if document.visibility == 'public' %}selected{% endif %}>Public (All Students)</option>
@@ -67,11 +67,11 @@
                     <!-- Academic Unit & Language Row -->
                     <div class="row mb-3">
                         <div class="col-md-8">
-                            <label for="edit-unit-{{ document.id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
+                            <label for="edit-unit-{{ document.share_id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
                                 Academic Unit / Course Code
                             </label>
                             <select class="form-select" 
-                                    id="edit-unit-{{ document.id }}" 
+                                    id="edit-unit-{{ document.share_id }}" 
                                     name="academic_unit"
                                     style="border-radius: 10px; border-color: var(--border); background: var(--input-bg); color: var(--text-dark);">
                                 <option value="">-- Select Academic Unit --</option>
@@ -83,11 +83,11 @@
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label for="edit-lang-{{ document.id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
+                            <label for="edit-lang-{{ document.share_id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
                                 Language
                             </label>
                             <select class="form-select" 
-                                    id="edit-lang-{{ document.id }}" 
+                                    id="edit-lang-{{ document.share_id }}" 
                                     name="language"
                                     style="border-radius: 10px; border-color: var(--border); background: var(--input-bg); color: var(--text-dark);">
                                 <option value="en" {% if document.language == 'en' %}selected{% endif %}>English</option>
@@ -100,11 +100,11 @@
 
                     <!-- Description -->
                     <div class="mb-3">
-                        <label for="edit-desc-{{ document.id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
+                        <label for="edit-desc-{{ document.share_id }}" class="form-label" style="font-weight: 600; font-size: 0.9rem; color: var(--text-dark);">
                             Description
                         </label>
                         <textarea class="form-control" 
-                                  id="edit-desc-{{ document.id }}" 
+                                  id="edit-desc-{{ document.share_id }}" 
                                   name="description" 
                                   rows="4" 
                                   placeholder="Describe the content, chapters covered, syllabus week, or tips for peers..."
@@ -126,7 +126,7 @@
 
 <script>
 (function() {
-    const modalEl = document.getElementById('editDocumentModal-{{ document.id }}');
+    const modalEl = document.getElementById('editDocumentModal-{{ document.share_id }}');
     if (modalEl) {
         const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
         modal.show();

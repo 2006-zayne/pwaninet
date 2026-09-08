@@ -1,16 +1,16 @@
 {% load static %}
 {% load humanize %}
-<a href="{% url 'documents:document_detail' document.id %}"
-   hx-get="{% url 'documents:document_detail' document.id %}"
+<a href="{% url 'documents:document_detail' document.share_id %}"
+   hx-get="{% url 'documents:document_detail' document.share_id %}"
    hx-target="#page-content-target"
    hx-swap="innerHTML"
    hx-push-url="true"
    hx-history="true"
-   id="doc-card-wrapper-{{ document.id }}"
+   id="doc-card-wrapper-{{ document.share_id }}"
    class="doc-card-link"
    style="text-decoration: none;">
 <div class="doc-card" 
-     id="doc-card-{{ document.id }}"
+     id="doc-card-{{ document.share_id }}"
      style="background: var(--card-bg); 
             border: 1px solid var(--border); 
             border-radius: 16px; 
@@ -117,6 +117,12 @@
                              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">
                     {{ document.category_name|default:"Lecture Notes" }}
                 </span>
+                {% if document.matching_badge %}
+                    <span class="badge bg-success-subtle text-success border border-success-subtle"
+                          style="font-size: 0.7rem; font-weight: 600; padding: 3px 8px; border-radius: 12px; white-space: nowrap;">
+                        <i class="bi bi-patch-check-fill me-1"></i>{{ document.matching_badge }}
+                    </span>
+                {% endif %}
                 {% if document.status == 'processing' or document.is_processing %}
                     <span class="badge bg-warning-subtle text-warning border border-warning-subtle doc-processing-badge" 
                           style="font-size: 0.7rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px;">
@@ -147,7 +153,7 @@
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="border-radius: 12px; min-width: 175px; padding: 6px; z-index: 1050;">
                             <li>
                                 <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-2"
-                                        hx-get="{% url 'documents:edit_document' document.id %}"
+                                        hx-get="{% url 'documents:edit_document' document.share_id %}"
                                         hx-target="#document-modal-container"
                                         hx-swap="innerHTML"
                                         style="border-radius: 8px; font-size: 0.85rem;">
@@ -157,7 +163,7 @@
                             </li>
                             <li>
                                 <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-2"
-                                        hx-get="{% url 'documents:new_version' document.id %}"
+                                        hx-get="{% url 'documents:new_version' document.share_id %}"
                                         hx-target="#document-modal-container"
                                         hx-swap="innerHTML"
                                         style="border-radius: 8px; font-size: 0.85rem;">
@@ -166,8 +172,8 @@
                                 </button>
                             </li>
                             <li>
-                                <form action="{% url 'documents:toggle_availability' document.id %}" method="post"
-                                      hx-post="{% url 'documents:toggle_availability' document.id %}"
+                                <form action="{% url 'documents:toggle_availability' document.share_id %}" method="post"
+                                      hx-post="{% url 'documents:toggle_availability' document.share_id %}"
                                       style="margin: 0;">
                                     {% csrf_token %}
                                     <button type="submit" class="dropdown-item d-flex align-items-center gap-2 py-2"
@@ -185,7 +191,7 @@
                             <li><hr class="dropdown-divider my-1"></li>
                             <li>
                                 <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-2 text-danger"
-                                        hx-get="{% url 'documents:delete_document_modal' document.id %}"
+                                        hx-get="{% url 'documents:delete_document_modal' document.share_id %}"
                                         hx-target="#document-modal-container"
                                         hx-swap="innerHTML"
                                         style="border-radius: 8px; font-size: 0.85rem;">

@@ -140,7 +140,7 @@ class AggregationEngine:
                 notification.category,
                 notification.context_type or '',
                 notification.context_id or '',
-                notification.aggregation_key or notification.notification_id  # Use notification_id if no aggregation key
+                str(notification.aggregation_key or notification.notification_id)  # Use notification_id if no aggregation key
             ]
             key = '|'.join(key_parts)
             

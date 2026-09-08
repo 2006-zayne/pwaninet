@@ -51,6 +51,7 @@ class EventValidator:
         'groups.member.joined': ['joined'],
         'groups.member.left': ['left'],
         'groups.member.removed': ['removed'],
+        'groups.announcement.created': ['created', 'published'],
         
         # Users events
         'users.user.followed': ['followed'],

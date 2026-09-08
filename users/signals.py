@@ -12,37 +12,22 @@ def track_device_on_login(sender, request, user, **kwargs):
     Automatically create or update DeviceAccount when a user logs in.
     This tracks which accounts have been used on which devices.
     """
-    # Try to get device ID from headers first (HTMX requests)
-    device_id = request.headers.get('X-Device-ID')
-    
-    # Fallback to POST data (regular form submissions)
-    if not device_id:
-        device_id = request.POST.get('device_id')
-    
+    if not request or not user:
+        return
+
+    device_id = get_or_create_device_id(request)
     if device_id:
-        # Hash the device ID before storing
         hashed_device_id = hash_device_id(device_id)
-        
-        # Create or update the DeviceAccount record
+        session_key = getattr(request.session, 'session_key', None) if hasattr(request, 'session') else None
+
         DeviceAccount.objects.update_or_create(
             user=user,
             device_id=hashed_device_id,
             defaults={
-                'session_key': request.session.session_key
+                'session_key': session_key
             }
         )
-    else:
-        # If no device ID, generate one and store it
-        from .services.device_service import generate_device_id
-        device_id = generate_device_id()
-        hashed_device_id = hash_device_id(device_id)
-        DeviceAccount.objects.update_or_create(
-            user=user,
-            device_id=hashed_device_id,
-            defaults={
-                'session_key': request.session.session_key
-            }
-        )
+
 
 
 @receiver(user_logged_out)
@@ -63,17 +48,18 @@ def clear_session_on_logout(sender, request, user, **kwargs):
 @receiver(post_save, sender=User)
 def auto_join_course_group(sender, instance, created, **kwargs):
     """
-    Automatically enrolls new users in official academic groups based on their course and year.
-
-    This function now uses an asynchronous Celery task to prevent blocking the main thread
-    and causing timeouts during user signup. The task runs in the background and handles
-    both the service-based approach (database flags) and the fallback naming convention.
+    Automatically enrolls users in official academic groups based on their
+    programme & academic_level (modern) or course & year (legacy).
     """
-    # Only execute for NEW users who have completed their profile intel
-    if created and instance.course and instance.year:
-        # Dispatch the async task to prevent blocking
+    has_academic_info = bool(
+        (instance.programme and instance.academic_level) or
+        (instance.course and instance.year)
+    )
+    if has_academic_info:
         from groups.tasks import auto_join_course_group_task
-        auto_join_course_group_task.delay(instance.id)
+        from django.db import transaction
+        transaction.on_commit(lambda: auto_join_course_group_task.delay(instance.id))
+
 
 
 @receiver(post_save, sender=Follow)

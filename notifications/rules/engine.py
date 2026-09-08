@@ -193,17 +193,53 @@ class RulesEngine:
                     # Update summary
                     existing.summary = AggregationEngine._generate_aggregated_summary(existing)
                     
-                    # Update timestamp to the event's timestamp (not current time)
-                    # This ensures the notification moves up based on when the last action occurred
-                    existing.updated_at = event.timestamp
+                    # Update timestamp to move notification to the top
+                    now = timezone.now()
+                    existing.updated_at = event.timestamp if event.timestamp and event.timestamp > (existing.updated_at or existing.created_at) else now
+                    
+                    update_fields = ['source_events', 'event_count', 'latest_event_time', 'summary', 'updated_at']
+                    
+                    # If existing notification was already read, reset to DELIVERED so user sees new activity
+                    if existing.status == NotificationStatuses.READ.value:
+                        existing.status = NotificationStatuses.DELIVERED.value
+                        update_fields.append('status')
+                    
+                    # Update metadata if target info is missing
+                    meta = existing.metadata or {}
+                    if not meta.get('target_id') and event.target_id:
+                        meta['target_type'] = event.target_type
+                        meta['target_id'] = str(event.target_id)
+                        if event.metadata and event.metadata.get('thumbnail_url') and not meta.get('thumbnail_url'):
+                            meta['thumbnail_url'] = event.metadata.get('thumbnail_url')
+                        existing.metadata = meta
+                        update_fields.append('metadata')
                     
                     # Save the changes
-                    existing.save(update_fields=[
-                        'source_events', 'event_count', 'latest_event_time', 
-                        'summary', 'updated_at'
-                    ])
+                    existing.save(update_fields=update_fields)
                     
                     return existing
+
+        # Deduplication check for non-aggregated notifications (e.g. rapid duplicate approvals)
+        if rule.aggregation_policy == "NEVER":
+            from datetime import timedelta
+            from django.utils import timezone
+            dedup_window = timezone.now() - timedelta(minutes=2)
+            existing_duplicate = NotificationObject.objects.filter(
+                recipient_id=recipient_id,
+                notification_type=rule.notification_type,
+                context_type=event.context_type,
+                context_id=event.context_id,
+                created_at__gte=dedup_window
+            ).order_by('-created_at').first()
+            if existing_duplicate:
+                logger.info(
+                    f"Deduplicating notification {existing_duplicate.notification_id} for recipient {recipient_id} "
+                    f"(event {event.event_id}, type {rule.notification_type})"
+                )
+                if event.event_id and str(event.event_id) not in (existing_duplicate.source_events or []):
+                    existing_duplicate.source_events = list(set((existing_duplicate.source_events or []) + [str(event.event_id)]))
+                    existing_duplicate.save(update_fields=['source_events'])
+                return existing_duplicate
         
         # Generate title with safe formatting
         if rule.title_template:
@@ -252,6 +288,8 @@ class RulesEngine:
                 'actor_id': str(event.actor.id) if event.actor else None,
                 'actor_username': event.actor.username if event.actor else None,
                 'actor_avatar': actor_avatar,
+                'target_type': event.target_type,
+                'target_id': str(event.target_id) if event.target_id else None,
                 **(event.metadata or {})
             }
         )

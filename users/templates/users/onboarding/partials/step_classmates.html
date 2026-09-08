@@ -1,0 +1,115 @@
+{% load static %}
+
+<div class="step-content animate-fade-in" id="step-classmates-container">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h3 class="fw-bold mb-1">Find your classmates & peers</h3>
+      <p class="text-muted small mb-0">Follow people from your course and year to see their discussions, questions, and notes.</p>
+    </div>
+    {% if classmates %}
+      <button type="button"
+              class="btn btn-outline-primary rounded-pill px-3 py-1 btn-sm fw-semibold d-inline-flex align-items-center gap-2"
+              id="followAllBtn"
+              hx-post="{% url 'users:onboarding_batch_follow' %}"
+              hx-target="#step-classmates-container"
+              hx-swap="outerHTML">
+        <i class="bi bi-people-fill"></i> Follow All Suggested
+      </button>
+    {% endif %}
+  </div>
+
+  {% if all_followed %}
+    <div class="alert alert-success border-0 rounded-4 p-3 mb-4 d-flex align-items-center gap-3">
+      <i class="bi bi-check-circle-fill fs-4 text-success"></i>
+      <div>
+        <div class="fw-bold">Awesome! You've connected with your classmates.</div>
+        <div class="small text-muted">Their updates will appear in your feed. Proceed to Step 2 to explore groups.</div>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if classmates %}
+    <div class="row g-3" id="classmates-grid">
+      {% for classmate in classmates %}
+        <div class="col-12 col-md-6">
+          <div class="card h-100 border rounded-4 p-3 shadow-sm hover-lift classmate-card">
+            <div class="d-flex align-items-start gap-3">
+              <a href="{% url 'users:profile' classmate.username %}" target="_blank" class="text-decoration-none">
+                <div class="position-relative">
+                  {% if classmate.profile_pic and classmate.profile_pic.url %}
+                    <img src="{{ classmate.profile_pic.url }}"
+                         alt="{{ classmate.username }}"
+                         class="rounded-circle object-fit-cover shadow-xs"
+                         style="width: 52px; height: 52px;">
+                  {% else %}
+                    <div class="rounded-circle bg-light text-primary d-flex align-items-center justify-content-center fw-bold shadow-xs"
+                         style="width: 52px; height: 52px; font-size: 1.1rem;">
+                      {{ classmate.first_name|first|default:classmate.username|first|upper }}
+                    </div>
+                  {% endif %}
+                </div>
+              </a>
+
+              <div class="flex-grow-1 min-w-0">
+                <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                  <div class="text-truncate">
+                    <a href="{% url 'users:profile' classmate.username %}" target="_blank" class="text-decoration-none text-dark fw-bold text-truncate d-block">
+                      {{ classmate.get_full_name|default:classmate.username }}
+                    </a>
+                    <span class="text-muted small">@{{ classmate.username }}</span>
+                  </div>
+                  <div class="flex-shrink-0">
+                    {% if classmate.id in following_ids or all_followed %}
+                      <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold onboarding-follow-btn"
+                              id="onboarding-follow-btn-{{ classmate.id }}"
+                              hx-post="{% url 'users:toggle_follow' classmate.username %}?source=onboarding"
+                              hx-target="#onboarding-follow-btn-{{ classmate.id }}"
+                              hx-swap="outerHTML">
+                        <i class="bi bi-check2"></i> Following
+                      </button>
+                    {% else %}
+                      <button class="btn btn-sm btn-primary rounded-pill px-3 fw-bold onboarding-follow-btn"
+                              id="onboarding-follow-btn-{{ classmate.id }}"
+                              hx-post="{% url 'users:toggle_follow' classmate.username %}?source=onboarding"
+                              hx-target="#onboarding-follow-btn-{{ classmate.id }}"
+                              hx-swap="outerHTML">
+                        <i class="bi bi-person-plus-fill"></i> Follow
+                      </button>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2 flex-wrap mt-2">
+                  <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-20 rounded-pill px-2 py-1 small" style="font-size: 0.72rem;">
+                    <i class="bi bi-mortarboard-fill me-1"></i>{{ classmate.recommendation_reason }}
+                  </span>
+                  {% if classmate.academic_level %}
+                    <span class="badge bg-light text-secondary rounded-pill px-2 py-1 small" style="font-size: 0.72rem;">
+                      {{ classmate.academic_level.name }}
+                    </span>
+                  {% endif %}
+                </div>
+
+                {% if classmate.headline %}
+                  <p class="text-muted small text-truncate mb-0 mt-2" style="font-size: 0.8rem;">
+                    {{ classmate.headline }}
+                  </p>
+                {% elif classmate.bio %}
+                  <p class="text-muted small text-truncate mb-0 mt-2" style="font-size: 0.8rem;">
+                    {{ classmate.bio }}
+                  </p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-center py-5 border rounded-4 bg-light p-4">
+      <i class="bi bi-mortarboard text-muted display-5"></i>
+      <h5 class="fw-bold mt-3 mb-1">No classmates found yet</h5>
+      <p class="text-muted small mb-3">You're one of the first students from your course to join! You can explore groups in the next step.</p>
+    </div>
+  {% endif %}
+</div>

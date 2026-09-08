@@ -25,7 +25,7 @@
            class="fw-bold small text-dark text-decoration-none">
             {{ comment.author.get_full_name|default:comment.author.username }}
         </a>
-        <p class="mb-0 small comment-text" style="font-size: 14px; line-height: 1.5;" data-full-text="{{ comment.content }}" data-truncated-length="100">{{ comment.content }}</p>
+        <p class="mb-0 small comment-text" style="font-size: 14px; line-height: 1.5;" data-full-text="{{ comment.content|urlize }}" data-truncated-length="100">{{ comment.content|urlize }}</p>
             <button class="btn btn-sm border-0 p-0 {% if comment.id in liked_comment_ids %}text-danger{% else %}text-muted{% endif %}"
                     hx-post="{% url 'posts:toggle_comment_like' comment.id %}"
                     hx-target="#comment-{{ comment.id }}"

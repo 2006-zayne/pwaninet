@@ -2,9 +2,6 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from groups.models import Group, Membership, MembershipStatus
 from posts.models import Like, Post, PostImage
-from users.models import User
-from notifications.models import NotificationObject
-from notifications.events import publish_event, EventTypes, EventSources, EventActions
 from users.services.feed_service import invalidate_home_feed_context
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -206,39 +203,12 @@ def create_post_for_user(form, user, files, group_id=None):
     # Invalidate feeds (outside transaction)
     invalidate_home_feed_context(user.id)
 
-    # Notifications (outside transaction)
-    if post.group:
-        recipients = User.objects.filter(
-            group_memberships__group=post.group,
-            group_memberships__status=MembershipStatus.APPROVED
-        ).exclude(id=user.id)
-        msg_text = f"posted in the {post.group.name} squad."
-    else:
-        # Send to users who follow the author (people who should see their posts)
-        # following_relationships are relationships where the user is the follower
-        recipients = User.objects.filter(
-            following_relationships__followed=user
-        ).exclude(id=user.id)
-        msg_text = "posted a new update."
+    # NOTE: Do NOT publish POSTS_POST_CREATED here.
+    # The post_save signal in posts/signals.py already handles this event
+    # with richer metadata (thumbnail_url, group_name, group_id, etc.).
+    # Publishing it here as well causes duplicate PlatformEvents and
+    # results in every follower receiving 2 notifications per post.
 
-    # Emit single event - the rules engine will determine recipients
-    publish_event(
-        event_type=EventTypes.POSTS_POST_CREATED.value,
-        source=EventSources.POSTS.value,
-        action=EventActions.CREATED.value,
-        actor=user,
-        target_type='Post',
-        target_id=str(post.id),
-        context_type='GROUP' if post.group else 'Post',
-        context_id=str(post.group.id) if post.group else str(post.id),
-        metadata={
-            'actor_id': str(user.id),
-            'actor_username': user.username,
-            'post_content': post.content[:100] if post.content else '',
-            'resource_type': 'POST',
-        }
-    )
-    
     return post
    
 
@@ -260,21 +230,29 @@ def toggle_post_like_for_user(post, user):
     if post.author_id != user.id:
         invalidate_home_feed_context(post.author_id)
     
+    like_count = post.likes.count()
+
     # Broadcast like update via WebSocket
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        "feed_updates",
-        {
-            'type': 'post_like_update',
-            'post_id': post.id,
-            'like_count': post.likes.count(),
-            'is_liked': is_liked,
-            'user_id': user.id
-        }
-    )
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                "feed_updates",
+                {
+                    'type': 'post_like_update',
+                    'post_id': post.id,
+                    'share_id': str(post.share_id),
+                    'like_count': like_count,
+                    'is_liked': is_liked,
+                    'user_id': user.id
+                }
+            )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Error broadcasting like update via WebSocket: {e}")
 
     return {
         "post": post,
         "is_liked": is_liked,
-        "like_count": post.likes.count()
+        "like_count": like_count
     }

@@ -702,12 +702,12 @@ class UploadUI {
             .upload-banner {
                 position: fixed;
                 z-index: 9995;
-                background: rgba(18, 20, 26, 0.88);
-                backdrop-filter: blur(18px) saturate(180%);
-                -webkit-backdrop-filter: blur(18px) saturate(180%);
-                border: 1px solid rgba(255, 255, 255, 0.12);
-                border-radius: 18px;
-                box-shadow: 0 16px 40px -4px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.15);
+                background: var(--mobile-nav-bg, #242526);
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
+                border: 1px solid var(--border, #3a3b3c);
+                border-radius: 20px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.15);
                 overflow: hidden;
                 opacity: 0;
                 pointer-events: none;
@@ -715,23 +715,33 @@ class UploadUI {
                             transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
                             width 0.25s ease;
                 font-family: inherit;
+                color: var(--text-dark, #e4e6eb);
             }
 
             /* Light theme support */
             [data-theme="light"] .upload-banner {
-                background: rgba(255, 255, 255, 0.92);
-                border-color: rgba(0, 0, 0, 0.1);
-                box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.05);
+                background: var(--mobile-nav-bg, #ffffff);
+                border-color: var(--border, #e2e8f0);
+                color: var(--text-dark, #0f172a);
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
+            }
+
+            [data-theme="dark"] .upload-banner {
+                background: var(--mobile-nav-bg, #242526);
+                border-color: var(--border, #3a3b3c);
+                color: var(--text-dark, #e4e6eb);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.2);
             }
 
             /* Mobile positioning: centered floating pill right above bottom navigation bar */
             @media (max-width: 767.98px) {
                 .upload-banner {
-                    bottom: calc(82px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                    bottom: calc(80px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
                     left: 50%;
                     transform: translateX(-50%) translateY(24px) scale(0.96);
-                    width: calc(100% - 24px);
+                    width: 95%;
                     max-width: 420px;
+                    border-radius: 20px;
                 }
                 .upload-banner.visible {
                     opacity: 1;
@@ -756,6 +766,7 @@ class UploadUI {
                     transform: translateY(24px) scale(0.96);
                     width: 380px;
                     max-width: 380px;
+                    border-radius: 20px;
                 }
                 .upload-banner.visible {
                     opacity: 1;
@@ -828,11 +839,11 @@ class UploadUI {
                 font-weight: 700;
                 letter-spacing: 0.08em;
                 text-transform: uppercase;
-                color: rgba(255, 255, 255, 0.65);
+                color: var(--text-muted, #b0b3b8);
             }
 
             [data-theme="light"] .upload-header-title {
-                color: rgba(0, 0, 0, 0.55);
+                color: var(--text-muted, #64748b);
             }
 
             .upload-header-actions {
@@ -844,10 +855,10 @@ class UploadUI {
             .upload-action-btn {
                 background: transparent;
                 border: none;
-                color: rgba(255, 255, 255, 0.65);
+                color: var(--text-muted, #b0b3b8);
                 width: 26px;
                 height: 26px;
-                border-radius: 6px;
+                border-radius: 8px;
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
@@ -857,16 +868,16 @@ class UploadUI {
             }
 
             .upload-action-btn:hover {
-                background: rgba(255, 255, 255, 0.12);
-                color: #ffffff;
+                background: var(--border, #3a3b3c);
+                color: var(--text-dark, #e4e6eb);
             }
 
             [data-theme="light"] .upload-action-btn {
-                color: rgba(0, 0, 0, 0.55);
+                color: var(--text-muted, #64748b);
             }
             [data-theme="light"] .upload-action-btn:hover {
-                background: rgba(0, 0, 0, 0.06);
-                color: #000000;
+                background: var(--border, #e2e8f0);
+                color: var(--text-dark, #0f172a);
             }
 
             /* Body */
@@ -884,9 +895,9 @@ class UploadUI {
             }
 
             .upload-banner-thumb {
-                border-radius: 9px;
-                background: rgba(255, 255, 255, 0.06);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                background: var(--background, #18191a);
+                border: 1px solid var(--border, #3a3b3c);
                 overflow: hidden;
                 display: flex;
                 align-items: center;
@@ -895,8 +906,8 @@ class UploadUI {
             }
 
             [data-theme="light"] .upload-banner-thumb {
-                background: rgba(0, 0, 0, 0.04);
-                border-color: rgba(0, 0, 0, 0.08);
+                background: var(--background, #f1f5f9);
+                border-color: var(--border, #e2e8f0);
             }
 
             .upload-thumb-media {
@@ -908,11 +919,11 @@ class UploadUI {
 
             .upload-thumb-icon {
                 font-size: 18px;
-                color: rgba(255, 255, 255, 0.6);
+                color: var(--text-muted, #b0b3b8);
             }
 
             [data-theme="light"] .upload-thumb-icon {
-                color: rgba(0, 0, 0, 0.5);
+                color: var(--text-muted, #64748b);
             }
 
             .upload-thumb-play-icon {
@@ -960,37 +971,37 @@ class UploadUI {
             .upload-primary-title {
                 font-size: 13.5px;
                 font-weight: 600;
-                color: #ffffff;
+                color: var(--text-dark, #e4e6eb);
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
             }
 
             [data-theme="light"] .upload-primary-title {
-                color: #111827;
+                color: var(--text-dark, #0f172a);
             }
 
             .upload-progress-number {
                 font-size: 12px;
                 font-weight: 700;
-                color: rgba(255, 255, 255, 0.9);
+                color: var(--text-dark, #e4e6eb);
                 font-variant-numeric: tabular-nums;
             }
 
             [data-theme="light"] .upload-progress-number {
-                color: #374151;
+                color: var(--text-dark, #0f172a);
             }
 
             .upload-banner-sub-row {
                 font-size: 11.5px;
-                color: rgba(255, 255, 255, 0.65);
+                color: var(--text-muted, #b0b3b8);
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
             }
 
             [data-theme="light"] .upload-banner-sub-row {
-                color: #6b7280;
+                color: var(--text-muted, #64748b);
             }
 
             /* Quality Pills */
@@ -1006,16 +1017,16 @@ class UploadUI {
                 font-weight: 600;
                 padding: 1px 6px;
                 border-radius: 4px;
-                background: rgba(255, 255, 255, 0.08);
-                color: rgba(255, 255, 255, 0.5);
-                border: 1px solid rgba(255, 255, 255, 0.08);
+                background: var(--background, #18191a);
+                color: var(--text-muted, #b0b3b8);
+                border: 1px solid var(--border, #3a3b3c);
                 transition: background 0.2s, color 0.2s;
             }
 
             [data-theme="light"] .quality-pill {
-                background: rgba(0, 0, 0, 0.04);
-                color: rgba(0, 0, 0, 0.45);
-                border-color: rgba(0, 0, 0, 0.06);
+                background: var(--background, #f1f5f9);
+                color: var(--text-muted, #64748b);
+                border-color: var(--border, #e2e8f0);
             }
 
             .quality-pill.encoding {
@@ -1040,13 +1051,13 @@ class UploadUI {
             /* Progress Bar */
             .upload-banner-progress-track {
                 height: 3px;
-                background: rgba(255, 255, 255, 0.1);
+                background: var(--border, #3a3b3c);
                 position: relative;
                 width: 100%;
             }
 
             [data-theme="light"] .upload-banner-progress-track {
-                background: rgba(0, 0, 0, 0.08);
+                background: var(--border, #e2e8f0);
             }
 
             .upload-banner-progress-fill {
@@ -1117,11 +1128,11 @@ class UploadUI {
             .upload-mini-text {
                 font-size: 12.5px;
                 font-weight: 600;
-                color: #ffffff;
+                color: var(--text-dark, #e4e6eb);
             }
 
             [data-theme="light"] .upload-mini-text {
-                color: #111827;
+                color: var(--text-dark, #0f172a);
             }
 
             .upload-mini-expand-btn {

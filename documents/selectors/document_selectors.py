@@ -17,7 +17,7 @@ class DocumentSelector:
     """Selector for optimized document queries."""
     
     @staticmethod
-    def get_document_with_relations(document_id: int) -> Optional[Document]:
+    def get_document_with_relations(share_id) -> Optional[Document]:
         """Get a document with all related data in a single query."""
         return Document.objects.select_related(
             'category',
@@ -56,7 +56,7 @@ class DocumentSelector:
                 'authors',
                 queryset=DocumentAuthor.objects.only('name', 'author_type')
             ),
-        ).filter(id=document_id).first()
+        ).filter(share_id=share_id).first()
     
     @staticmethod
     def list_documents_for_home(
@@ -289,11 +289,11 @@ class DocumentSelector:
         return documents
     
     @staticmethod
-    def get_document_statistics(document_id: int) -> dict:
+    def get_document_statistics(share_id) -> dict:
         """Get engagement statistics for a document using cached analytics."""
         from ..engagement.models import DocumentAnalytics
         
-        document = Document.objects.filter(id=document_id).first()
+        document = Document.objects.filter(share_id=share_id).first()
         if not document:
             return {}
         

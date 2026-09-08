@@ -17,6 +17,7 @@ from notifications.delivery.engine import DeliveryEngine
 from notifications.services.notification_service import invalidate_unread_count_cache
 from notifications.queries.notification_queries import get_unread_count_by_user_id
 from channels.layers import get_channel_layer
+from django.db import transaction
 from asgiref.sync import async_to_sync
 
 User = get_user_model()
@@ -24,58 +25,46 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-@receiver(post_save, sender=PlatformEvent)
-def process_platform_event(sender, instance, created, **kwargs):
+def run_event_pipeline(instance):
     """
-    Process a PlatformEvent through the notification pipeline.
-    
-    Pipeline:
-    1. Rules Engine: Create NotificationObjects from events
-    2. Preference Engine: Filter based on user preferences
-    3. Aggregation Engine: Combine related notifications
-    4. Delivery Engine: Deliver through appropriate channels
-    
-    Args:
-        sender: PlatformEvent model
-        instance: The PlatformEvent instance
-        created: Whether this is a new instance
+    Run PlatformEvent through Rules, Preferences, Aggregation, and Delivery engines.
     """
-    if not created:
-        # Only process new events
-        return
-    
     logger.info(f"Processing PlatformEvent: {instance.event_type} (ID: {instance.event_id})")
-    
+
     try:
         # Step 1: Rules Engine - Create NotificationObjects
         notifications = RulesEngine.process_event(instance)
-        
+
         if not notifications:
             logger.info(f"No notifications created for event {instance.event_id}")
             return
-        
+
         logger.info(f"Created {len(notifications)} NotificationObjects for event {instance.event_id}")
-        
+
         # Invalidate unread count cache for all recipients and broadcast updates
         channel_layer = get_channel_layer()
         for notification in notifications:
             recipient_id = notification.recipient_id
             invalidate_unread_count_cache(recipient_id)
-            
+
             # Get the actual count
             count = get_unread_count_by_user_id(recipient_id)
             logger.info(f"Broadcasting unread count update to user {recipient_id}: count={count}")
-            
+
             # Broadcast unread count update via WebSocket
-            async_to_sync(channel_layer.group_send)(
-                f"notifications_{recipient_id}",
-                {
-                    'type': 'unread_count_update',
-                    'count': count
-                }
-            )
-            logger.info(f"Successfully sent WebSocket broadcast to notifications_{recipient_id}")
-        
+            if channel_layer:
+                try:
+                    async_to_sync(channel_layer.group_send)(
+                        f"notifications_{recipient_id}",
+                        {
+                            'type': 'unread_count_update',
+                            'count': count
+                        }
+                    )
+                    logger.info(f"Successfully sent WebSocket broadcast to notifications_{recipient_id}")
+                except Exception as ws_err:
+                    logger.warning(f"Failed to send WebSocket broadcast: {ws_err}")
+
         # Step 2-4: Process each notification through the pipeline
         for notification in notifications:
             try:
@@ -83,26 +72,55 @@ def process_platform_event(sender, instance, created, **kwargs):
                 allowed, allowed_channels = PreferenceEngine.evaluate_notification(
                     notification, channel='IN_APP'
                 )
-                
+
                 if not allowed:
                     logger.info(f"Notification {notification.notification_id} filtered by preferences")
                     notification.status = 'ARCHIVED'
                     notification.save()
                     continue
-                
-                # Step 3: Aggregation Engine - Combine with related notifications
-                # Note: Aggregation is now handled at creation time in the Rules Engine
-                # to prevent duplicate notifications. The AggregationEngine is still
-                # available for manual aggregation operations if needed.
-                
+
                 # Step 4: Delivery Engine - Deliver through allowed channels
                 if allowed_channels:
                     DeliveryEngine.deliver_notification(notification, allowed_channels)
                     logger.info(f"Notification {notification.notification_id} delivered via {allowed_channels}")
-                
+
             except Exception as e:
                 logger.error(f"Failed to process notification {notification.notification_id}: {e}", exc_info=True)
                 continue
-    
+
     except Exception as e:
         logger.error(f"Failed to process event {instance.event_id}: {e}", exc_info=True)
+
+
+@receiver(post_save, sender=PlatformEvent)
+def process_platform_event(sender, instance, created, **kwargs):
+    """
+    Handle post-save of PlatformEvent by deferring pipeline execution to transaction commit.
+    Dispatches to Celery task if available, with synchronous fallback.
+    """
+    if not created:
+        return
+
+    import sys
+    from django.conf import settings
+    if getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False) or getattr(settings, 'TESTING', False) or 'test' in sys.argv:
+        run_event_pipeline(instance)
+        return
+
+    def _dispatch():
+        try:
+            # Check if Celery worker is active; if not, execute synchronously
+            from pwaninet.celery import app as celery_app
+            inspector = celery_app.control.inspect(timeout=0.15)
+            ping = inspector.ping() if inspector else None
+            if not ping:
+                run_event_pipeline(instance)
+                return
+
+            from notifications.tasks import process_platform_event_task
+            process_platform_event_task.delay(str(instance.event_id))
+        except Exception:
+            run_event_pipeline(instance)
+
+    transaction.on_commit(_dispatch)
+

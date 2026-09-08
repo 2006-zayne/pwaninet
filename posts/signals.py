@@ -193,6 +193,7 @@ def post_created(sender, instance, created, **kwargs):
             'target_type': 'Post',
             'target_id': str(instance.id),
             'group_id': str(instance.group.id) if instance.group else None,
+            'group_name': instance.group.name if instance.group else None,
         }
         if instance.shared_document:
             metadata['is_document_share'] = True

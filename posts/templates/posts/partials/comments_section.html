@@ -86,8 +86,8 @@
 
     {% if has_more_comments and not show_all_comments %}
     <div class="text-center py-3">
-        <a href="{% url 'posts:post_details' post.id %}?show_all=1"
-           hx-get="{% url 'posts:post_details' post.id %}?show_all=1"
+        <a href="{% url 'posts:post_details' post.share_id %}?show_all=1"
+           hx-get="{% url 'posts:post_details' post.share_id %}?show_all=1"
            hx-target="#comments-section"
            hx-swap="outerHTML"
            class="btn btn-sm btn-outline-secondary rounded-pill px-4 fw-bold" style="font-size: 12px;">

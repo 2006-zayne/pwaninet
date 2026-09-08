@@ -20,7 +20,7 @@
 <!-- Document Detail Container -->
 <div class="doc-detail-container"
      {% if document.status == 'processing' or document.is_processing %}
-     hx-get="{% url 'documents:document_detail' document.id %}"
+     hx-get="{% url 'documents:document_detail' document.share_id %}"
      hx-trigger="every 5s"
      hx-target="#page-content-target"
      hx-swap="innerHTML"
@@ -57,7 +57,7 @@
                          data-file-url="{{ first_file.file.url }}"
                          data-file-type="{{ first_file.extension }}"
                          data-file-name="{{ document.title }}.{{ first_file.extension }}"
-                         data-document-id="{{ document.id }}"
+                         data-document.share_id="{{ document.share_id }}"
                          data-file-id="{{ first_file.id }}"
                          style="min-height: 70vh; height: 70vh;"></div>
                 {% else %}
@@ -186,7 +186,7 @@
                         <ul class="dropdown-menu w-100 shadow border-0" style="border-radius: 12px; padding: 8px; z-index: 1050;">
                             <li>
                                 <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-2"
-                                        hx-get="{% url 'documents:edit_document' document.id %}"
+                                        hx-get="{% url 'documents:edit_document' document.share_id %}"
                                         hx-target="#document-modal-container"
                                         hx-swap="innerHTML"
                                         style="border-radius: 8px; font-weight: 500;">
@@ -196,7 +196,7 @@
                             </li>
                             <li>
                                 <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-2"
-                                        hx-get="{% url 'documents:new_version' document.id %}"
+                                        hx-get="{% url 'documents:new_version' document.share_id %}"
                                         hx-target="#document-modal-container"
                                         hx-swap="innerHTML"
                                         style="border-radius: 8px; font-weight: 500;">
@@ -205,8 +205,8 @@
                                 </button>
                             </li>
                             <li>
-                                <form action="{% url 'documents:toggle_availability' document.id %}" method="post"
-                                      hx-post="{% url 'documents:toggle_availability' document.id %}"
+                                <form action="{% url 'documents:toggle_availability' document.share_id %}" method="post"
+                                      hx-post="{% url 'documents:toggle_availability' document.share_id %}"
                                       style="margin: 0;">
                                     {% csrf_token %}
                                     <button type="submit" class="dropdown-item d-flex align-items-center gap-2 py-2"
@@ -224,7 +224,7 @@
                             <li><hr class="dropdown-divider my-1"></li>
                             <li>
                                 <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-2 text-danger"
-                                        hx-get="{% url 'documents:delete_document_modal' document.id %}"
+                                        hx-get="{% url 'documents:delete_document_modal' document.share_id %}"
                                         hx-target="#document-modal-container"
                                         hx-swap="innerHTML"
                                         style="border-radius: 8px; font-weight: 500;">
@@ -238,9 +238,9 @@
                 
                 {% if document.latest_version %}
                     {% with first_file=document.latest_version.files.first %}
-                        <a href="{{ first_file.file.url }}" 
+                        <a href="{% url 'documents:serve_download' document.share_id %}?t={{ download_token }}" 
                            download="{{ document.title }}.{{ first_file.extension }}"
-                           onclick="trackAndDownload(event, {{ document.id }}, {{ first_file.id }})"
+                           onclick="trackAndDownload(event, '{{ document.share_id }}', {{ first_file.id }})"
                            class="btn btn-primary" 
                            style="padding: 14px 24px; border-radius: 12px; font-weight: 600; font-size: 1rem; text-decoration: none; display: inline-block; text-align: center;">
                             <i class="bi bi-download" style="margin-right: 8px;"></i>
@@ -257,7 +257,7 @@
                 
                 <div style="display: flex; gap: 12px;">
                     {% if request.user.is_authenticated %}
-                        <div id="bookmark-button-{{ document.id }}">
+                        <div id="bookmark-button-{{ document.share_id }}">
                             {% include 'documents/partials/bookmark_button.html' with document=document is_bookmarked=is_bookmarked bookmark_count=document.bookmarks.count %}
                         </div>
                     {% else %}
@@ -281,16 +281,16 @@
                 <!-- Share Dropdown -->
                 <div id="share-dropdown" class="share-dropdown" style="display: none; position: relative; margin-top: 8px;">
                     <div style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                        <button onclick="copyLink({{ document.id }})" style="width: 100%; padding: 10px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+                        <button onclick="copyLink('{{ document.share_id }}')" style="width: 100%; padding: 10px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
                             <i class="bi bi-link-45deg"></i>
                             <span>Copy Link</span>
                         </button>
                         {% if request.user.is_authenticated %}
-                            <button onclick="shareToProfile({{ document.id }})" style="width: 100%; padding: 10px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                            <button onclick="shareToProfile('{{ document.share_id }}')" style="width: 100%; padding: 10px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 4px;">
                                 <i class="bi bi-person"></i>
                                 <span>Share to Profile</span>
                             </button>
-                            <button onclick="shareToGroup({{ document.id }})" style="width: 100%; padding: 10px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                            <button onclick="shareToGroup('{{ document.share_id }}')" style="width: 100%; padding: 10px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 4px;">
                                 <i class="bi bi-people"></i>
                                 <span>Share to Group</span>
                             </button>
@@ -387,7 +387,7 @@
                         {% if can_manage %}
                             <button type="button" 
                                     class="btn btn-sm btn-outline-primary"
-                                    hx-get="{% url 'documents:new_version' document.id %}"
+                                    hx-get="{% url 'documents:new_version' document.share_id %}"
                                     hx-target="#document-modal-container"
                                     hx-swap="innerHTML"
                                     style="border-radius: 8px; font-size: 0.75rem; padding: 2px 8px; font-weight: 600;">
@@ -418,7 +418,7 @@
                                     {% if vfile and vfile.file %}
                                         <div style="margin-top: 6px; display: flex; justify-content: space-between; align-items: center;">
                                             <span style="color: var(--text-secondary); font-size: 0.75rem;">{{ vfile.size_mb }} MB &bull; {{ vfile.extension|upper }}</span>
-                                            <a href="{{ vfile.file.url }}" download="{{ document.title }}_v{{ ver.version_number }}.{{ vfile.extension }}" class="text-primary text-decoration-none" style="font-size: 0.75rem; font-weight: 500;">
+                                            <a href="{% url 'documents:serve_download' document.share_id %}?t={{ download_token }}&file_id={{ vfile.id }}" download="{{ document.title }}_v{{ ver.version_number }}.{{ vfile.extension }}" class="text-primary text-decoration-none" style="font-size: 0.75rem; font-weight: 500;">
                                                 <i class="bi bi-download me-1"></i>Download
                                             </a>
                                         </div>
@@ -480,7 +480,7 @@
             }
         }
         
-        const documentId = "{{ document.id }}";
+        const documentId = "{{ document.share_id }}";
         const viewCountElement = document.querySelector('.doc-stats div:nth-child(2) p:first-child');
         const downloadCountElement = document.querySelector('.doc-stats div:nth-child(1) p:first-child');
         const bookmarkCountElement = document.querySelector('.doc-stats div:nth-child(3) p:first-child');
@@ -519,29 +519,7 @@ function toggleShareDropdown() {
 }
 
 function trackAndDownload(event, documentId, fileId) {
-    // Track the download via HTMX endpoint (async, don't block the download)
-    fetch('/documents/document/' + documentId + '/download/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: 'file_id=' + fileId
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Update download count in UI
-            const downloadCountElement = document.querySelector('.doc-stats div:nth-child(1) p:first-child');
-            if (downloadCountElement) {
-                downloadCountElement.textContent = data.download_count;
-            }
-        }
-    })
-    .catch(error => {
-        console.error('Error tracking download:', error);
-    });
-    // Let the default link behavior proceed (download the file)
+    // Tracking is now handled by the secure backend download view.
 }
 
 function copyLink(documentId) {
@@ -637,7 +615,7 @@ function shareToGroup(documentId) {
                             <p style="font-weight: 600; font-size: 0.95rem; margin: 0; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${group.name}</p>
                             ${group.description ? `<p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${group.description}</p>` : ''}
                         </div>
-                        <button class="btn btn-sm btn-primary" onclick="executeGroupShare(${documentId}, ${group.id}, this)" style="border-radius: 8px; font-weight: 500; font-size: 0.85rem; padding: 6px 14px; flex-shrink: 0;">
+                        <button class="btn btn-sm btn-primary" onclick="executeGroupShare('${documentId}', ${group.id}, this)" style="border-radius: 8px; font-weight: 500; font-size: 0.85rem; padding: 6px 14px; flex-shrink: 0;">
                             Share
                         </button>
                     `;

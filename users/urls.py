@@ -16,6 +16,12 @@ urlpatterns = [
     # Registration
     path('register/', views.register_view, name='register'),
     
+    # Onboarding Flow
+    path('onboarding/', views.onboarding_wizard_view, name='onboarding'),
+    path('onboarding/batch-follow/', views.batch_follow_view, name='onboarding_batch_follow'),
+    path('onboarding/complete/', views.complete_onboarding_view, name='onboarding_complete'),
+    path('onboarding/dismiss-welcome/', views.dismiss_welcome_banner_view, name='onboarding_dismiss_welcome'),
+    
     # HTMX endpoints for registration form
     path('academic/load-levels/', views.load_academic_levels, name='load_academic_levels'),
     path('academic/load-years/', views.load_academic_years, name='load_academic_years'),

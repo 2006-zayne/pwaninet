@@ -170,10 +170,11 @@ class RenderingProfileRegistry:
         self._profiles["DOCUMENT_SHARED"] = RenderingProfile(
             id="DOCUMENT_SHARED", category=ProfileCategory.SOCIAL, intent=ProfileIntent.ACTIVITY,
             message_strategy=MessageStrategy(template="DOCUMENT_SHARED", supported_states=["SINGLE", "DUAL", "FEW", "MANY"]),
-            component_visibility=ComponentVisibilityConfig(actor_stack=True, preview=True),
-            preview_strategy=PreviewStrategy(enabled=True, preview_type="POST"),
+            component_visibility=ComponentVisibilityConfig(actor_stack=True, preview=True, action_bar=True),
+            preview_strategy=PreviewStrategy(enabled=True, preview_type="DOCUMENT"),
+            action_strategy=ActionStrategy(available_actions=["VIEW_DOCUMENT"], primary_actions=["VIEW_DOCUMENT"]),
             navigation_strategy=NavigationStrategy(
-                primary=NavigationConfig(target="POST_DETAIL", resource_id_field="resource.id")
+                primary=NavigationConfig(target="DOCUMENT_DETAIL", resource_id_field="resource.id")
             ),
             aggregation_strategy=AggregationStrategy(enabled=True, scope="PER_POST"),
             expansion_strategy=ExpansionStrategy(expandable=True, data_source="actors")
@@ -197,7 +198,8 @@ class RenderingProfileRegistry:
         self._profiles["PINCH"] = RenderingProfile(
             id="PINCH", category=ProfileCategory.SOCIAL, intent=ProfileIntent.ACTIVITY,
             message_strategy=MessageStrategy(template="PINCH", supported_states=["SINGLE", "DUAL", "FEW", "MANY"]),
-            component_visibility=ComponentVisibilityConfig(actor_stack=True),
+            component_visibility=ComponentVisibilityConfig(actor_stack=True, action_bar=True),
+            action_strategy=ActionStrategy(available_actions=["PINCH", "VIEW_PROFILE"], primary_actions=["PINCH"]),
             navigation_strategy=NavigationStrategy(
                 primary=NavigationConfig(target="USER_PROFILE", resource_id_field="actors.0.id")
             ),
@@ -269,7 +271,7 @@ class RenderingProfileRegistry:
     
     def _register_group_profiles(self):
         """Register group notification profiles"""
-        # GROUP_INVITE (group invitation to user)
+        # INVITE (group invitation to user)
         self._profiles["INVITE"] = RenderingProfile(
             id="INVITE", category=ProfileCategory.GROUP, intent=ProfileIntent.WORKFLOW,
             message_strategy=MessageStrategy(template="INVITE", supported_states=["SINGLE"]),
@@ -280,8 +282,9 @@ class RenderingProfileRegistry:
                 primary=NavigationConfig(target="GROUP_DETAIL", resource_id_field="context.id")
             )
         )
+        self._profiles["GROUP_INVITE"] = self._profiles["INVITE"]
         
-        # GROUP_REQUEST (user requesting to join group)
+        # GROUP_REQUEST (user requesting to join group - sent to admins)
         self._profiles["GROUP_REQUEST"] = RenderingProfile(
             id="GROUP_REQUEST", category=ProfileCategory.GROUP, intent=ProfileIntent.WORKFLOW,
             message_strategy=MessageStrategy(template="GROUP_REQUEST", supported_states=["SINGLE"]),
@@ -292,46 +295,52 @@ class RenderingProfileRegistry:
                 primary=NavigationConfig(target="GROUP_DETAIL", resource_id_field="context.id")
             )
         )
+        self._profiles["GROUP_JOIN_REQUEST"] = self._profiles["GROUP_REQUEST"]
         
-        # GROUP_JOIN_REQUEST
-        self._profiles["GROUP_JOIN_REQUEST"] = RenderingProfile(
-            id="GROUP_JOIN_REQUEST", category=ProfileCategory.GROUP, intent=ProfileIntent.WORKFLOW,
-            message_strategy=MessageStrategy(template="GROUP_JOIN_REQUEST", supported_states=["SINGLE"]),
+        # GROUP_APPROVED (user approved or welcomed to group)
+        self._profiles["GROUP_APPROVED"] = RenderingProfile(
+            id="GROUP_APPROVED", category=ProfileCategory.GROUP, intent=ProfileIntent.WORKFLOW,
+            message_strategy=MessageStrategy(template="GROUP_APPROVED", supported_states=["SINGLE"]),
             component_visibility=ComponentVisibilityConfig(context_header=True, action_bar=True, status=True),
-            action_strategy=ActionStrategy(available_actions=["APPROVE", "REJECT"], primary_actions=["APPROVE"]),
-            status_strategy=StatusStrategy(display_status=True, status_mapping={"PENDING": "🟡 Pending", "APPROVED": "🟢 Approved", "REJECTED": "🔴 Rejected"}),
+            action_strategy=ActionStrategy(available_actions=["VIEW_GROUP"], primary_actions=["VIEW_GROUP"]),
+            status_strategy=StatusStrategy(display_status=True, status_mapping={"COMPLETED": "✅ Approved", "APPROVED": "✅ Approved"}),
             navigation_strategy=NavigationStrategy(
                 primary=NavigationConfig(target="GROUP_DETAIL", resource_id_field="context.id")
             )
         )
+        self._profiles["GROUP_JOIN_REQUEST_APPROVED"] = self._profiles["GROUP_APPROVED"]
+        self._profiles["GROUP_JOIN_APPROVED"] = self._profiles["GROUP_APPROVED"]
         
-        # GROUP_JOIN_REQUEST_APPROVED
-        self._profiles["GROUP_JOIN_REQUEST_APPROVED"] = RenderingProfile(
-            id="GROUP_JOIN_REQUEST_APPROVED", category=ProfileCategory.GROUP, intent=ProfileIntent.WORKFLOW,
-            message_strategy=MessageStrategy(template="GROUP_JOIN_REQUEST_APPROVED", supported_states=["SINGLE"]),
-            component_visibility=ComponentVisibilityConfig(context_header=True, action_bar=True, status=True),
-            status_strategy=StatusStrategy(display_status=True, status_mapping={"COMPLETED": "✅ Approved"}),
-            navigation_strategy=NavigationStrategy(
-                primary=NavigationConfig(target="GROUP_DETAIL", resource_id_field="context.id")
-            )
-        )
-        
-        # GROUP_JOIN_REQUEST_REJECTED
-        self._profiles["GROUP_JOIN_REQUEST_REJECTED"] = RenderingProfile(
-            id="GROUP_JOIN_REQUEST_REJECTED", category=ProfileCategory.GROUP, intent=ProfileIntent.WORKFLOW,
-            message_strategy=MessageStrategy(template="GROUP_JOIN_REQUEST_REJECTED", supported_states=["SINGLE"]),
-            component_visibility=ComponentVisibilityConfig(context_header=True, action_bar=True, status=True),
-            status_strategy=StatusStrategy(display_status=True, status_mapping={"COMPLETED": "🔴 Rejected"}),
+        # GROUP_REJECTED (user join request declined)
+        self._profiles["GROUP_REJECTED"] = RenderingProfile(
+            id="GROUP_REJECTED", category=ProfileCategory.GROUP, intent=ProfileIntent.WORKFLOW,
+            message_strategy=MessageStrategy(template="GROUP_REJECTED", supported_states=["SINGLE"]),
+            component_visibility=ComponentVisibilityConfig(context_header=True, action_bar=False, status=True),
+            status_strategy=StatusStrategy(display_status=True, status_mapping={"COMPLETED": "🔴 Rejected", "REJECTED": "🔴 Rejected"}),
             navigation_strategy=NavigationStrategy(
                 primary=NavigationConfig(target="USER_PROFILE", resource_id_field="actors.0.id")
             )
         )
+        self._profiles["GROUP_JOIN_REQUEST_REJECTED"] = self._profiles["GROUP_REJECTED"]
+        self._profiles["GROUP_JOIN_REJECTED"] = self._profiles["GROUP_REJECTED"]
+
+        # GROUP_ANNOUNCEMENT (new announcement in group)
+        self._profiles["GROUP_ANNOUNCEMENT"] = RenderingProfile(
+            id="GROUP_ANNOUNCEMENT", category=ProfileCategory.GROUP, intent=ProfileIntent.ANNOUNCEMENT,
+            message_strategy=MessageStrategy(template="GROUP_ANNOUNCEMENT", supported_states=["SINGLE"]),
+            component_visibility=ComponentVisibilityConfig(context_header=True, action_bar=True, status=False),
+            action_strategy=ActionStrategy(available_actions=["VIEW_ANNOUNCEMENT"], primary_actions=["VIEW_ANNOUNCEMENT"]),
+            navigation_strategy=NavigationStrategy(
+                primary=NavigationConfig(target="GROUP_DETAIL", resource_id_field="context.id")
+            )
+        )
         
-        # GROUP (added to group)
+        # GROUP (direct addition to group)
         self._profiles["GROUP"] = RenderingProfile(
             id="GROUP", category=ProfileCategory.GROUP, intent=ProfileIntent.WORKFLOW,
             message_strategy=MessageStrategy(template="GROUP", supported_states=["SINGLE", "DUAL", "FEW", "MANY"]),
-            component_visibility=ComponentVisibilityConfig(context_header=True, actor_stack=True),
+            component_visibility=ComponentVisibilityConfig(context_header=True, actor_stack=True, action_bar=True),
+            action_strategy=ActionStrategy(available_actions=["VIEW_GROUP"], primary_actions=["VIEW_GROUP"]),
             navigation_strategy=NavigationStrategy(
                 primary=NavigationConfig(target="GROUP_DETAIL", resource_id_field="context.id")
             ),

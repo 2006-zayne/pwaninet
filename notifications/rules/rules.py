@@ -12,6 +12,18 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
+def _post_url(post_pk, anchor=''):
+    """Return the canonical post URL using UUID share_id for the given integer PK."""
+    if not post_pk:
+        return f'/post/{post_pk}/'
+    try:
+        from posts.models import Post
+        share_id = Post.objects.values_list('share_id', flat=True).get(pk=post_pk)
+        return f'/post/{share_id}/{anchor}'
+    except Exception:
+        return f'/post/{post_pk}/'
+
+
 class AggregationPolicy(Enum):
     """Aggregation policy for notifications."""
     NEVER = "NEVER"
@@ -115,35 +127,96 @@ def _parent_comment_author_recipient(event_data: Dict[str, Any]) -> List[int]:
 
 
 def _group_admins_recipient(event_data: Dict[str, Any]) -> List[int]:
-    """Recipient: Group admins."""
+    """Recipient: Group admins (excluding the actor)."""
     from groups.models import Membership, MembershipRole, MembershipStatus
     
-    target_id = event_data.get('target_id')
+    target_id = (
+        event_data.get('target_id') or 
+        event_data.get('context_id') or 
+        (event_data.get('metadata') or {}).get('group_id')
+    )
     if not target_id:
         return []
     
+    actor_id = event_data.get('actor_id')
     try:
         admin_memberships = Membership.objects.filter(
             group_id=target_id,
             role=MembershipRole.ADMIN,
             status=MembershipStatus.APPROVED
         ).select_related('user')
-        return [m.user.id for m in admin_memberships]
+        admin_ids = [m.user.id for m in admin_memberships]
+        if actor_id:
+            admin_ids = [uid for uid in admin_ids if str(uid) != str(actor_id)]
+        return admin_ids
+    except Exception:
+        return []
+
+
+def _group_members_recipient(event_data: Dict[str, Any]) -> List[int]:
+    """Recipient: All approved group members except actor."""
+    from groups.models import Membership, MembershipStatus
+    group_id = (
+        event_data.get('context_id') or 
+        event_data.get('target_id') or 
+        (event_data.get('metadata') or {}).get('group_id')
+    )
+    actor_id = event_data.get('actor_id')
+    if not group_id:
+        return []
+    try:
+        memberships = Membership.objects.filter(
+            group_id=group_id,
+            status=MembershipStatus.APPROVED
+        )
+        if actor_id:
+            memberships = memberships.exclude(user_id=actor_id)
+        return list(memberships.values_list('user_id', flat=True))
     except Exception:
         return []
 
 
 def _group_member_recipient(event_data: Dict[str, Any]) -> List[int]:
-    """Recipient: Specific group member from context."""
-    context_id = event_data.get('context_id')
-    if not context_id:
-        return []
-    
-    try:
-        user = User.objects.get(id=context_id)
-        return [user.id]
-    except User.DoesNotExist:
-        return []
+    """Recipient: Specific group member or target user."""
+    # Check explicit recipient_id or user_id in event or metadata
+    metadata = event_data.get('metadata') or {}
+    recipient_id = (
+        event_data.get('recipient_id') or 
+        metadata.get('recipient_id') or 
+        metadata.get('user_id') or 
+        event_data.get('user_id')
+    )
+    if recipient_id:
+        try:
+            user = User.objects.get(id=recipient_id)
+            return [user.id]
+        except (User.DoesNotExist, ValueError):
+            pass
+
+    # Check context_id if context_type is User/USER
+    context_type = str(event_data.get('context_type') or '').upper()
+    if context_type == 'USER':
+        context_id = event_data.get('context_id')
+        if context_id:
+            try:
+                user = User.objects.get(id=context_id)
+                return [user.id]
+            except (User.DoesNotExist, ValueError):
+                pass
+
+    # Check target_id if target_type is User/USER
+    target_type = str(event_data.get('target_type') or '').upper()
+    if target_type == 'USER':
+        target_id = event_data.get('target_id')
+        if target_id:
+            try:
+                user = User.objects.get(id=target_id)
+                return [user.id]
+            except (User.DoesNotExist, ValueError):
+                pass
+
+    return []
+
 
 
 def _followed_user_recipient(event_data: Dict[str, Any]) -> List[int]:
@@ -413,8 +486,24 @@ def _post_author_not_self_condition(event_data: Dict[str, Any]) -> bool:
 def _actor_not_recipient_condition(event_data: Dict[str, Any]) -> bool:
     """Condition: Actor is not the recipient."""
     actor_id = event_data.get('actor_id')
+    if not actor_id:
+        return True
+    
+    metadata = event_data.get('metadata') or {}
+    recipient_id = (
+        event_data.get('recipient_id') or 
+        metadata.get('recipient_id') or 
+        metadata.get('user_id') or 
+        event_data.get('user_id')
+    )
+    if recipient_id and str(actor_id) == str(recipient_id):
+        return False
+        
     recipient_ids = event_data.get('recipient_user_ids', [])
-    return actor_id not in recipient_ids
+    if recipient_ids and any(str(actor_id) == str(r) for r in recipient_ids):
+        return False
+        
+    return True
 
 
 # Posts Rules
@@ -434,7 +523,7 @@ POST_LIKE_RULE = NotificationRule(
         {
             'action_type': 'VIEW',
             'label': 'View Post',
-            'url': f"/post/{event.get('target_id')}",
+            'url': _post_url(event.get('target_id')),
             'method': 'GET',
             'is_primary': True,
             'order': 0,
@@ -573,7 +662,7 @@ POST_DOCUMENT_SHARED_RULE = NotificationRule(
 GROUP_INVITE_RULE = NotificationRule(
     name="group_invite",
     trigger="groups.member.invited",
-    condition=None,
+    condition=_actor_not_recipient_condition,
     notification_type="INVITE",
     category="WORKSPACE",
     priority="HIGH",
@@ -581,7 +670,7 @@ GROUP_INVITE_RULE = NotificationRule(
     aggregation_policy="NEVER",
     recipients=_group_member_recipient,
     title_template="You have been invited to join {group_name}",
-    summary_template="Group invitation pending",
+    summary_template="Group invitation",
     actions=lambda event: [
         {
             'action_type': 'ACCEPT',
@@ -606,22 +695,30 @@ GROUP_REQUEST_RULE = NotificationRule(
     name="group_request",
     trigger="groups.member.requested",
     condition=None,
-    notification_type="GROUP",
+    notification_type="GROUP_REQUEST",
     category="WORKSPACE",
     priority="HIGH",
     delivery_policy="IMMEDIATE",
     aggregation_policy="ALLOWED",
     recipients=_group_admins_recipient,
     title_template="{actor_username} requested to join {group_name}",
-    summary_template="New group join request",
+    summary_template="Group join request",
     actions=lambda event: [
         {
-            'action_type': 'REVIEW',
-            'label': 'Review Request',
-            'url': f"/groups/{event.get('group_id')}/requests",
-            'method': 'GET',
+            'action_type': 'APPROVE',
+            'label': 'Approve',
+            'url': f"/groups/{event.get('target_id') or event.get('group_id')}/approve/{event.get('user_id') or event.get('actor_id')}/",
+            'method': 'POST',
             'is_primary': True,
             'order': 0
+        },
+        {
+            'action_type': 'REJECT',
+            'label': 'Reject',
+            'url': f"/groups/{event.get('target_id') or event.get('group_id')}/reject/{event.get('user_id') or event.get('actor_id')}/",
+            'method': 'POST',
+            'is_primary': False,
+            'order': 1
         }
     ]
 )
@@ -629,29 +726,63 @@ GROUP_REQUEST_RULE = NotificationRule(
 GROUP_APPROVED_RULE = NotificationRule(
     name="group_approved",
     trigger="groups.member.approved",
-    condition=None,
-    notification_type="GROUP",
+    condition=_actor_not_recipient_condition,
+    notification_type="GROUP_APPROVED",
     category="WORKSPACE",
     priority="HIGH",
     delivery_policy="IMMEDIATE",
     aggregation_policy="NEVER",
     recipients=_group_member_recipient,
     title_template="You have been approved to join {group_name}",
-    summary_template="Group membership approved"
+    summary_template="Group request approved",
+    actions=lambda event: [
+        {
+            'action_type': 'VIEW_GROUP',
+            'label': 'View Group',
+            'url': f"/groups/{event.get('target_id') or event.get('group_id')}/",
+            'method': 'GET',
+            'is_primary': True,
+            'order': 0
+        }
+    ]
 )
 
 GROUP_REJECTED_RULE = NotificationRule(
     name="group_rejected",
     trigger="groups.member.rejected",
-    condition=None,
-    notification_type="GROUP",
+    condition=_actor_not_recipient_condition,
+    notification_type="GROUP_REJECTED",
     category="WORKSPACE",
     priority="NORMAL",
     delivery_policy="IMMEDIATE",
     aggregation_policy="NEVER",
     recipients=_group_member_recipient,
     title_template="Your request to join {group_name} was declined",
-    summary_template="Group membership request declined"
+    summary_template="Group request rejected"
+)
+
+GROUP_ANNOUNCEMENT_RULE = NotificationRule(
+    name="group_announcement",
+    trigger="groups.announcement.created",
+    condition=None,
+    notification_type="GROUP_ANNOUNCEMENT",
+    category="WORKSPACE",
+    priority="HIGH",
+    delivery_policy="IMMEDIATE",
+    aggregation_policy="ALLOWED",
+    recipients=_group_members_recipient,
+    title_template="New announcement in {group_name}",
+    summary_template="Group Announcement",
+    actions=lambda event: [
+        {
+            'action_type': 'VIEW_ANNOUNCEMENT',
+            'label': 'Read Announcement',
+            'url': f"/groups/{event.get('context_id') or event.get('group_id')}/#announcements",
+            'method': 'GET',
+            'is_primary': True,
+            'order': 0
+        }
+    ]
 )
 
 # Users Rules
@@ -888,6 +1019,7 @@ RULES_REGISTRY = [
     GROUP_REQUEST_RULE,
     GROUP_APPROVED_RULE,
     GROUP_REJECTED_RULE,
+    GROUP_ANNOUNCEMENT_RULE,
     USER_FOLLOW_RULE,
     USER_PINCH_RULE,
     DOCUMENT_UPLOADED_RULE,

@@ -120,9 +120,21 @@ class NotificationMessageEngine:
                 "SINGLE": "Your request to join {group} was approved.",
                 "SUMMARY": "Group request approved",
             },
+            "GROUP_APPROVED": {
+                "SINGLE": "Your request to join {group} was approved.",
+                "SUMMARY": "Group request approved",
+            },
             "GROUP_JOIN_REQUEST_REJECTED": {
                 "SINGLE": "Your request to join {group} was rejected.",
                 "SUMMARY": "Group request rejected",
+            },
+            "GROUP_REJECTED": {
+                "SINGLE": "Your request to join {group} was rejected.",
+                "SUMMARY": "Group request rejected",
+            },
+            "GROUP_ANNOUNCEMENT": {
+                "SINGLE": "{actor} posted an announcement: {title}",
+                "SUMMARY": "Group Announcement",
             },
             "INVITE": {
                 "SINGLE": "{actor} invited you to join {group}.",
@@ -190,10 +202,10 @@ class NotificationMessageEngine:
             },
             "GROUP": {
                 "SINGLE": "{actor} added you to {group}.",
-                "DUAL": "{actor1} and {actor2} added you to groups.",
-                "FEW": "{actors} added you to groups.",
-                "MANY": "{actors} added you to groups.",
-                "HISTORICAL": "{actors} added you to groups.",
+                "DUAL": "{actor1} and {actor2} added you to squads.",
+                "FEW": "{actors} added you to squads.",
+                "MANY": "{actors} added you to squads.",
+                "HISTORICAL": "{actors} added you to squads.",
             },
             "PINCH": {
                 "SINGLE": "{actor} pinched you.",
@@ -372,6 +384,14 @@ class NotificationMessageEngine:
             if context_data:
                 context["group"] = context_data.get('name', '')
                 context["repository"] = context_data.get('name', '')
+            if not context["group"] or str(context["group"]).isdigit():
+                raw_meta = payload.get('raw_data', {}) if isinstance(payload, dict) else (getattr(payload, 'raw_data', {}) or {})
+                if raw_meta.get('group_name'):
+                    context["group"] = raw_meta['group_name']
+                elif payload.get('metadata', {}).get('group_name'):
+                    context["group"] = payload['metadata']['group_name']
+                else:
+                    context["group"] = "the squad"
             
             # Add resource (document, post title, etc.)
             context["document"] = "a document"
@@ -461,6 +481,13 @@ class NotificationMessageEngine:
         if payload.context:
             context["group"] = payload.context.name
             context["repository"] = payload.context.name
+        if not context["group"] or str(context["group"]).isdigit():
+            if payload.raw_data and payload.raw_data.get('group_name'):
+                context["group"] = payload.raw_data['group_name']
+            elif hasattr(payload, 'metadata') and isinstance(payload.metadata, dict) and payload.metadata.get('group_name'):
+                context["group"] = payload.metadata['group_name']
+            else:
+                context["group"] = "the squad"
         
         # Add resource (document, post title, etc.)
         context["document"] = "a document"

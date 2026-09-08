@@ -93,7 +93,7 @@ class DocumentSharingTests(TestCase):
         """Sharing via copy link records DocumentShare and returns URL."""
         self.client.force_login(self.user)
         response = self.client.post(
-            reverse('documents:share_document', kwargs={'document_id': self.document.id}),
+            reverse('documents:share_document', kwargs={'share_id': self.document.share_id}),
             {'share_type': 'copy_link'}
         )
         self.assertEqual(response.status_code, 200)
@@ -107,7 +107,7 @@ class DocumentSharingTests(TestCase):
         from notifications.models import NotificationObject
         self.client.force_login(self.user)
         response = self.client.post(
-            reverse('documents:share_document', kwargs={'document_id': self.document.id}),
+            reverse('documents:share_document', kwargs={'share_id': self.document.share_id}),
             {'share_type': 'profile'}
         )
         self.assertEqual(response.status_code, 200)
@@ -145,7 +145,7 @@ class DocumentSharingTests(TestCase):
         """Approved member can share document to group, creating group Post."""
         self.client.force_login(self.user)
         response = self.client.post(
-            reverse('documents:share_document', kwargs={'document_id': self.document.id}),
+            reverse('documents:share_document', kwargs={'share_id': self.document.share_id}),
             {'share_type': 'group', 'group_id': self.group.id}
         )
         self.assertEqual(response.status_code, 200)
@@ -176,7 +176,7 @@ class DocumentSharingTests(TestCase):
         """Non-member cannot share document to group (returns 403 Forbidden)."""
         self.client.force_login(self.non_member)
         response = self.client.post(
-            reverse('documents:share_document', kwargs={'document_id': self.document.id}),
+            reverse('documents:share_document', kwargs={'share_id': self.document.share_id}),
             {'share_type': 'group', 'group_id': self.group.id}
         )
         self.assertEqual(response.status_code, 403)
@@ -186,7 +186,7 @@ class DocumentSharingTests(TestCase):
         """Sharing to non-existent group returns 404 Not Found."""
         self.client.force_login(self.user)
         response = self.client.post(
-            reverse('documents:share_document', kwargs={'document_id': self.document.id}),
+            reverse('documents:share_document', kwargs={'share_id': self.document.share_id}),
             {'share_type': 'group', 'group_id': 99999}
         )
         self.assertEqual(response.status_code, 404)
@@ -195,7 +195,7 @@ class DocumentSharingTests(TestCase):
         """Invalid share_type returns 400 Bad Request."""
         self.client.force_login(self.user)
         response = self.client.post(
-            reverse('documents:share_document', kwargs={'document_id': self.document.id}),
+            reverse('documents:share_document', kwargs={'share_id': self.document.share_id}),
             {'share_type': 'invalid_type'}
         )
         self.assertEqual(response.status_code, 400)

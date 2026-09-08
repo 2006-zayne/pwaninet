@@ -26,16 +26,27 @@ class ComponentVisibilityResolver:
         Returns:
             Dict mapping component names to visibility booleans
         """
-        visibility = profile.component_visibility
+        visibility = profile.component_visibility if profile else None
+        
+        # Check if resource has an image or thumbnail
+        has_resource_image = False
+        if isinstance(payload, dict):
+            resource = payload.get('resource')
+            if isinstance(resource, dict):
+                has_resource_image = bool(resource.get('image_url') or resource.get('thumbnail_url'))
+            elif resource:
+                has_resource_image = bool(getattr(resource, 'image_url', None) or getattr(resource, 'thumbnail_url', None))
+        elif payload and hasattr(payload, 'resource') and payload.resource:
+            has_resource_image = bool(payload.resource.image_url or getattr(payload.resource, 'thumbnail_url', None))
         
         return {
-            'context_header': visibility.context_header,
-            'actor_stack': visibility.actor_stack,
-            'content': visibility.content,
-            'preview': visibility.preview,
-            'metadata': visibility.metadata,
-            'action_bar': visibility.action_bar,
-            'status': visibility.status,
+            'context_header': visibility.context_header if visibility else False,
+            'actor_stack': visibility.actor_stack if visibility else True,
+            'content': visibility.content if visibility else True,
+            'preview': (visibility.preview if visibility else False) or has_resource_image,
+            'metadata': visibility.metadata if visibility else True,
+            'action_bar': visibility.action_bar if visibility else False,
+            'status': visibility.status if visibility else False,
         }
 
 
@@ -56,28 +67,45 @@ class PreviewResolver:
         Returns:
             Dict with preview configuration
         """
-        preview_strategy = profile.preview_strategy
+        preview_strategy = profile.preview_strategy if profile else None
+        
+        # Check if resource has an image or thumbnail
+        has_resource_image = False
+        resource_id = None
+        if isinstance(payload, dict):
+            preview_data = payload.get('preview', {})
+            resource_id = preview_data.get('resource_id') if preview_data else None
+            resource = payload.get('resource')
+            if isinstance(resource, dict):
+                has_resource_image = bool(resource.get('image_url') or resource.get('thumbnail_url'))
+                if not resource_id and resource.get('id'):
+                    resource_id = resource.get('id')
+            elif resource:
+                has_resource_image = bool(getattr(resource, 'image_url', None) or getattr(resource, 'thumbnail_url', None))
+                if not resource_id and getattr(resource, 'id', None):
+                    resource_id = getattr(resource, 'id', None)
+        else:
+            resource_id = payload.preview.resource_id if (payload and payload.preview) else None
+            if payload and hasattr(payload, 'resource') and payload.resource:
+                has_resource_image = bool(payload.resource.image_url or getattr(payload.resource, 'thumbnail_url', None))
+                if not resource_id and payload.resource.id:
+                    resource_id = payload.resource.id
         
         # Handle case where preview_strategy is None
         if preview_strategy is None:
             return {
-                'enabled': False,
-                'type': None,
-                'component': None,
-                'resource_id': None,
+                'enabled': has_resource_image,
+                'type': 'POST' if has_resource_image else None,
+                'component': 'post_preview' if has_resource_image else None,
+                'resource_id': resource_id,
             }
         
-        # Handle both dict and object payloads
-        if isinstance(payload, dict):
-            preview_data = payload.get('preview', {})
-            resource_id = preview_data.get('resource_id') if preview_data else None
-        else:
-            resource_id = payload.preview.resource_id if payload.preview else None
+        enabled = preview_strategy.enabled or has_resource_image
         
         return {
-            'enabled': preview_strategy.enabled,
-            'type': preview_strategy.preview_type,
-            'component': preview_strategy.component,
+            'enabled': enabled,
+            'type': preview_strategy.preview_type or ('POST' if has_resource_image else None),
+            'component': preview_strategy.component or ('post_preview' if has_resource_image else None),
             'resource_id': resource_id,
         }
 

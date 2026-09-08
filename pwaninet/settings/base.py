@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'releases',
     'messaging',
     'search',
+    'recommendations',
 ]
 
 MIDDLEWARE = [
@@ -289,6 +290,7 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
+CELERY_IMPORTS = ('notifications.tasks',)
 
 CELERY_TASK_DEFAULT_QUEUE = 'default'
 

@@ -77,13 +77,12 @@
               
               <!-- Activity Links -->
               {% if notif.post %}
-                <a href="{% url 'posts:post_details' notif.post.id %}" 
-                   hx-get="{% url 'posts:post_details' notif.post.id %}"
+                <a href="{% url 'posts:post_details' notif.post.share_id %}"
+                   hx-get="{% url 'posts:post_details' notif.post.share_id %}"
                    hx-target="#page-content-target"
                    hx-swap="innerHTML"
                    hx-push-url="true"
                    hx-history="true"
-                   class="activity-link"
                    onclick="markActivityAsRead({{ notif.id }}, event)">
                   View post
                 </a>
@@ -151,8 +150,8 @@
   {% elif item.display_mode == 'activity_grouped' %}
     <!-- Render as activity-grouped -->
     {% if item.post %}
-      <a href="{% url 'posts:post_details' item.post.id %}" 
-         hx-get="{% url 'posts:post_details' item.post.id %}"
+      <a href="{% url 'posts:post_details' item.post.share_id %}" 
+         hx-get="{% url 'posts:post_details' item.post.share_id %}" 
          hx-target="#page-content-target"
          hx-swap="innerHTML"
          hx-push-url="true"
@@ -409,6 +408,10 @@ function markSenderGroupAsRead(senderId, event) {
 
 function markGroupAsRead(notifId, event) {
   event.preventDefault();
+  event.stopPropagation();
+  
+  var link = event.currentTarget;
+  var targetUrl = link.getAttribute('href');
   
   fetch('/notifications/read/' + notifId + '/', {
     method: 'POST',
@@ -418,15 +421,25 @@ function markGroupAsRead(notifId, event) {
     }
   }).then(function(response) {
     if (response.ok) {
-      window.location.href = event.currentTarget.href;
+      // Use HTMX navigation if available, otherwise fallback
+      if (typeof htmx !== 'undefined') {
+        htmx.ajax('GET', targetUrl, {target: '#page-content-target', swap: 'innerHTML'});
+        history.pushState({}, '', targetUrl);
+      } else {
+        window.location.href = targetUrl;
+      }
     }
   });
 }
 
 function updateUnreadCounts() {
   fetch('/notifications/unread-count/')
-    .then(function(r) { return r.text(); })
+    .then(function(r) {
+      if (!r.ok || r.redirected || (r.url && r.url.includes('/accounts/login'))) return null;
+      return r.text();
+    })
     .then(function(html) {
+      if (!html || html.includes('<!DOCTYPE') || html.includes('<html')) return;
       const badge = document.getElementById('unread-count-badge');
       if (badge) badge.outerHTML = html;
     });

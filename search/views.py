@@ -42,7 +42,10 @@ def search_suggest_view(request):
         ]
         post_ids = [pid for pid in post_ids if pid]
         if post_ids:
-            liked_post_ids = set(Like.objects.filter(user=request.user, post_id__in=post_ids).values_list('post_id', flat=True))
+            for pid, sid in Like.objects.filter(user=request.user, post_id__in=post_ids).values_list('post_id', 'post__share_id'):
+                liked_post_ids.add(pid)
+                liked_post_ids.add(sid)
+                liked_post_ids.add(str(sid))
 
     context = {
         'query': query,
@@ -96,7 +99,10 @@ def unified_search_view(request):
         ]
         post_ids = [pid for pid in post_ids if pid]
         if post_ids:
-            liked_post_ids = set(Like.objects.filter(user=user, post_id__in=post_ids).values_list('post_id', flat=True))
+            for pid, sid in Like.objects.filter(user=user, post_id__in=post_ids).values_list('post_id', 'post__share_id'):
+                liked_post_ids.add(pid)
+                liked_post_ids.add(sid)
+                liked_post_ids.add(str(sid))
 
         try:
             from notifications.services.notification_service import get_cached_unread_count

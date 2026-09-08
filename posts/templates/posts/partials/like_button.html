@@ -1,8 +1,13 @@
-<button class="like-button btn {% if is_liked or post.id in liked_post_ids %}text-danger{% else %}text-muted{% endif %} btn-sm border-0 d-flex align-items-center engagement-button"
-        hx-post="{% url 'posts:toggle_like' post.id %}"
+{% load post_filters %}
+{% check_is_liked post as user_has_liked %}
+<button class="like-button btn {% if user_has_liked %}text-danger{% else %}text-muted{% endif %} btn-sm border-0 d-flex align-items-center engagement-button"
+        hx-post="{% url 'posts:toggle_like' post.share_id %}"
         hx-target="this"
-        hx-swap="outerHTML">
+        hx-swap="outerHTML"
+        data-share-id="{{ post.share_id }}"
+        data-post-id="{{ post.id }}"
+        aria-label="{% if user_has_liked %}Unlike{% else %}Like{% endif %}">
     
-    <i class="bi {% if is_liked or post.id in liked_post_ids %}bi-heart-fill{% else %}bi-heart{% endif %} fs-5"></i>
+    <i class="bi {% if user_has_liked %}bi-heart-fill{% else %}bi-heart{% endif %} fs-5"></i>
     <span class="like-count ms-2 fw-bold">{{ like_count|default:post.like_count }}</span>
 </button>

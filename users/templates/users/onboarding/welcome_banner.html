@@ -1,0 +1,54 @@
+{% if request.session.just_onboarded %}
+<div class="welcome-tour-banner alert alert-light border shadow-sm rounded-4 p-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3 animate-fade-in"
+     id="welcomeTourBanner"
+     style="background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%); border-color: #bfdbfe !important;">
+  <div class="d-flex align-items-center gap-3 min-w-0">
+    <div class="rounded-circle bg-primary bg-opacity-10 text-primary p-2 d-flex align-items-center justify-content-center flex-shrink-0"
+         style="width: 44px; height: 44px;">
+      <i class="bi bi-stars fs-4"></i>
+    </div>
+    <div>
+      <h6 class="mb-1 fw-bold text-dark">You're all set, {{ request.user.first_name|default:request.user.username }}! 🎉</h6>
+      <p class="text-muted small mb-0">Your feed is populated with classmates and groups. Want a quick 30-second tour of PwaniNet features?</p>
+    </div>
+  </div>
+  <div class="d-flex align-items-center gap-2 flex-shrink-0">
+    <button type="button"
+            class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-semibold"
+            onclick="dismissWelcomeBanner()">
+      Dismiss
+    </button>
+    <button type="button"
+            class="btn btn-sm btn-primary rounded-pill px-3 fw-bold shadow-xs"
+            onclick="startTourFromBanner()">
+      <i class="bi bi-play-circle-fill me-1"></i> Take Tour
+    </button>
+  </div>
+</div>
+
+<script>
+  function dismissWelcomeBanner() {
+    const banner = document.getElementById('welcomeTourBanner');
+    if (banner) {
+      banner.style.transition = 'all 0.3s ease';
+      banner.style.opacity = '0';
+      banner.style.transform = 'translateY(-10px)';
+      setTimeout(() => banner.remove(), 300);
+    }
+    fetch('/users/onboarding/dismiss-welcome/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    });
+  }
+
+  function startTourFromBanner() {
+    dismissWelcomeBanner();
+    if (typeof window.startOnboardingTour === 'function') {
+      window.startOnboardingTour();
+    }
+  }
+</script>
+{% endif %}

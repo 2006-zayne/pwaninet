@@ -3,7 +3,13 @@
     <div class="d-flex align-items-center p-2 border-bottom user-item" data-username="{{ user.username }}">
         <input type="checkbox" class="form-check-input me-3 user-checkbox" value="{{ user.username }}" id="user-{{ user.id }}">
         <label for="user-{{ user.id }}" class="d-flex align-items-center flex-grow-1 cursor-pointer" style="cursor: pointer;">
-            <img src="{{ user.profile_pic.url }}" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+            {% if user.profile_pic %}
+            <img src="{{ user.profile_pic.url }}" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;" onerror="this.src='/static/images/default_avatar.png'">
+            {% else %}
+            <div class="rounded-circle me-2 bg-secondary d-flex align-items-center justify-content-center text-white fw-bold" style="width: 40px; height: 40px; font-size: 1rem;">
+                {{ user.username|first|upper }}
+            </div>
+            {% endif %}
             <div>
                 <div class="fw-bold small">{{ user.get_full_name|default:user.username }}</div>
                 <div class="text-muted small">@{{ user.username }}</div>

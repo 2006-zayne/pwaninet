@@ -94,7 +94,7 @@
             {% if page_obj.has_previous %}
             <li class="page-item">
                 <a class="page-link" 
-                   hx-get="{% url 'posts:post_likers_list' post.id %}?page={{ page_obj.previous_page_number }}"
+                   hx-get="{% url 'posts:post_likers_list' post.share_id %}?page={{ page_obj.previous_page_number }}"
                    hx-target="#modal-content-target"
                    href="#">
                     <i class="bi bi-chevron-left"></i>
@@ -114,7 +114,7 @@
                 {% elif page_num <= page_obj.number|add:3 and page_num >= page_obj.number|add:-3 %}
                 <li class="page-item">
                     <a class="page-link" 
-                       hx-get="{% url 'posts:post_likers_list' post.id %}?page={{ page_num }}"
+                       hx-get="{% url 'posts:post_likers_list' post.share_id %}?page={{ page_num }}"
                        hx-target="#modal-content-target"
                        href="#">{{ page_num }}</a>
                 </li>
@@ -124,7 +124,7 @@
             {% if page_obj.has_next %}
             <li class="page-item">
                 <a class="page-link" 
-                   hx-get="{% url 'posts:post_likers_list' post.id %}?page={{ page_obj.next_page_number }}"
+                   hx-get="{% url 'posts:post_likers_list' post.share_id %}?page={{ page_obj.next_page_number }}"
                    hx-target="#modal-content-target"
                    href="#">
                     <i class="bi bi-chevron-right"></i>

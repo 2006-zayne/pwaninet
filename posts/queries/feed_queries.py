@@ -88,7 +88,15 @@ def get_prioritized_feed_posts(user, following_ids, user_group_ids, limit = 15):
 
 
 def get_liked_post_ids_for_user(user, post_ids):
-    return set(Like.objects.filter(user = user, post_id__in = post_ids).values_list('post_id', flat = True))
+    if not user or not user.is_authenticated or not post_ids:
+        return set()
+    likes = Like.objects.filter(user=user, post_id__in=post_ids).values_list('post_id', 'post__share_id')
+    liked_ids = set()
+    for pid, share_id in likes:
+        liked_ids.add(pid)
+        liked_ids.add(share_id)
+        liked_ids.add(str(share_id))
+    return liked_ids
 
 
 def get_suggested_groups(user, following_ids, limit = 5):

@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.conf import settings
 from django.contrib.postgres.search import SearchVectorField
@@ -36,6 +37,7 @@ GRADIENT_CHOICES = [
 
 
 class Post(models.Model):
+    share_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     group = models.ForeignKey('groups.Group', on_delete=models.CASCADE, null=True, blank=True, related_name='posts')
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='posts')
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE, null=True, blank=True)
