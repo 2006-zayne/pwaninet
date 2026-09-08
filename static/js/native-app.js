@@ -1214,8 +1214,27 @@ async function initNativePush() {
             }
         }
 
-        // Register with native push service (APNS / FCM)
-        await PushNotifications.register();
+        // Guard: On Android, Firebase FCM crashes fatally if google-services.json is missing.
+        // We strictly require explicit positive confirmation from native bridge before registering.
+        const platformName = (window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || '';
+        const isAndroid = platformName === 'android' || navigator.userAgent.includes('Android');
+
+        if (isAndroid) {
+            const bridge = window.AndroidBridge || window.PwaninetBridge;
+            const isPushReady = bridge && typeof bridge.isPushNotificationsAvailable === 'function' && bridge.isPushNotificationsAvailable();
+            if (!isPushReady) {
+                console.warn('[PWANINET-NATIVE] Native push / Firebase is not initialized on this Android build (google-services.json missing). Push registration skipped to protect app stability.');
+                return;
+            }
+        }
+
+        // Register with native push service (APNS on iOS / FCM on Android)
+        try {
+            await PushNotifications.register();
+        } catch (regErr) {
+            console.warn('[PWANINET-NATIVE] Push registration call failed gracefully:', regErr);
+            return;
+        }
 
         // Listen for successful registration
         PushNotifications.addListener('registration', async function(token) {

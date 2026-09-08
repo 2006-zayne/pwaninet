@@ -30,6 +30,13 @@
     }
 
     function isSupported() {
+        if (isNativeApp()) {
+            return (
+                typeof window.Capacitor !== 'undefined' &&
+                window.Capacitor.Plugins &&
+                !!window.Capacitor.Plugins.PushNotifications
+            );
+        }
         return (
             'Notification' in window &&
             'serviceWorker' in navigator &&
@@ -37,32 +44,41 @@
         );
     }
 
-    function isEligible() {
-        // 1. Don't show in Capacitor native shell (handled by native OS on boot)
-        if (isNativeApp()) {
-            return false;
-        }
-
-        // 2. Browser feature support
+    async function isEligible() {
+        // 1. Feature support check
         if (!isSupported()) {
             return false;
         }
 
-        // 3. Only show if permission is 'default' (not granted, not denied)
-        if (Notification.permission !== 'default') {
-            return false;
-        }
-
-        // 4. Check if already marked subscribed
+        // 2. Check if already marked subscribed
         if (localStorage.getItem(STORAGE_KEY_SUBSCRIBED) === 'true') {
             return false;
         }
 
-        // 5. Check cooldown from previous dismissal
+        // 3. Check cooldown from previous dismissal
         const dismissedAt = localStorage.getItem(STORAGE_KEY_DISMISSED);
         if (dismissedAt) {
             const timeSinceDismiss = Date.now() - parseInt(dismissedAt, 10);
             if (timeSinceDismiss < COOLDOWN_MS) {
+                return false;
+            }
+        }
+
+        // 4. Permission check
+        if (isNativeApp()) {
+            try {
+                const PushNotifications = window.Capacitor.Plugins.PushNotifications;
+                const status = await PushNotifications.checkPermissions();
+                if (status.receive === 'denied') {
+                    return false;
+                }
+                return true;
+            } catch (e) {
+                return false;
+            }
+        } else {
+            // Only show if permission is 'default' (not granted, not denied)
+            if (Notification.permission !== 'default') {
                 return false;
             }
         }
@@ -117,21 +133,46 @@
             if (btnSpinner) btnSpinner.classList.remove('d-none');
             enableBtn.disabled = true;
 
-            if (typeof PushSubscriptionManager === 'undefined') {
-                throw new Error('PushSubscriptionManager not loaded');
-            }
+            if (isNativeApp()) {
+                const PushNotifications = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications;
+                if (!PushNotifications) {
+                    throw new Error('PushNotifications plugin not available');
+                }
 
-            const manager = new PushSubscriptionManager();
-            const success = await manager.subscribe();
+                let permStatus = await PushNotifications.checkPermissions();
+                if (permStatus.receive === 'prompt') {
+                    permStatus = await PushNotifications.requestPermissions();
+                }
 
-            if (success) {
-                localStorage.setItem(STORAGE_KEY_SUBSCRIBED, 'true');
-                console.log('[PUSH-SHEET] Push subscription successful');
-                showToast('Notifications enabled successfully!');
-                hideSheet(false);
+                if (permStatus.receive === 'granted') {
+                    if (typeof window.initNativePush === 'function') {
+                        await window.initNativePush();
+                    }
+                    localStorage.setItem(STORAGE_KEY_SUBSCRIBED, 'true');
+                    console.log('[PUSH-SHEET] Native push permission granted and subscribed');
+                    showToast('Notifications enabled successfully!');
+                    hideSheet(false);
+                } else {
+                    console.warn('[PUSH-SHEET] Native push permission not granted:', permStatus.receive);
+                    hideSheet(true);
+                }
             } else {
-                console.warn('[PUSH-SHEET] Push permission not granted or cancelled');
-                hideSheet(true);
+                if (typeof PushSubscriptionManager === 'undefined') {
+                    throw new Error('PushSubscriptionManager not loaded');
+                }
+
+                const manager = new PushSubscriptionManager();
+                const success = await manager.subscribe();
+
+                if (success) {
+                    localStorage.setItem(STORAGE_KEY_SUBSCRIBED, 'true');
+                    console.log('[PUSH-SHEET] Push subscription successful');
+                    showToast('Notifications enabled successfully!');
+                    hideSheet(false);
+                } else {
+                    console.warn('[PUSH-SHEET] Push permission not granted or cancelled');
+                    hideSheet(true);
+                }
             }
         } catch (err) {
             console.error('[PUSH-SHEET] Error subscribing to push:', err);
@@ -202,9 +243,11 @@
         isInitialized = true;
 
         // Check eligibility and schedule presentation
-        if (isEligible()) {
-            setTimeout(showSheet, SHOW_DELAY_MS);
-        }
+        Promise.resolve(isEligible()).then(function(eligible) {
+            if (eligible) {
+                setTimeout(showSheet, SHOW_DELAY_MS);
+            }
+        });
     }
 
     // Expose programmatic trigger on window

@@ -146,6 +146,26 @@ public class MainActivity extends BridgeActivity {
             }
             return "{}";
         }
+
+        @JavascriptInterface
+        public boolean isPushNotificationsAvailable() {
+            MainActivity activity = activityRef.get();
+            if (activity != null) {
+                return MainActivity.isFirebaseInitialized(activity);
+            }
+            return false;
+        }
+    }
+
+    public static boolean isFirebaseInitialized(Context context) {
+        try {
+            Class<?> clazz = Class.forName("com.google.firebase.FirebaseApp");
+            java.lang.reflect.Method getAppsMethod = clazz.getMethod("getApps", Context.class);
+            java.util.List<?> apps = (java.util.List<?>) getAppsMethod.invoke(null, context);
+            return apps != null && !apps.isEmpty();
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     public void applySystemBarTheme(boolean isLight) {
@@ -244,6 +264,41 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Crash Guard: intercept uninitialized FirebaseApp crashes on background threads gracefully
+        final Thread.UncaughtExceptionHandler defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+            boolean isFirebaseMissing = false;
+            Throwable current = throwable;
+            while (current != null) {
+                String msg = current.getMessage();
+                if (msg != null && (msg.contains("Default FirebaseApp is not initialized") || msg.contains("FirebaseApp.initializeApp"))) {
+                    isFirebaseMissing = true;
+                    break;
+                }
+                current = current.getCause();
+            }
+
+            if (isFirebaseMissing) {
+                System.err.println("[MainActivity] Gracefully suppressed uninitialized FirebaseApp crash on thread '" + (thread != null ? thread.getName() : "unknown") + "'");
+                return;
+            }
+
+            if (defaultHandler != null) {
+                defaultHandler.uncaughtException(thread, throwable);
+            }
+        });
+
+        // Initialize Firebase safely if google-services.json was packaged or credentials exist
+        try {
+            Class<?> clazz = Class.forName("com.google.firebase.FirebaseApp");
+            java.lang.reflect.Method getAppsMethod = clazz.getMethod("getApps", Context.class);
+            java.util.List<?> apps = (java.util.List<?>) getAppsMethod.invoke(null, this);
+            if (apps != null && apps.isEmpty()) {
+                java.lang.reflect.Method initMethod = clazz.getMethod("initializeApp", Context.class);
+                initMethod.invoke(null, this);
+            }
+        } catch (Throwable ignored) {}
+
         // Keep splash screen on screen until WebView renders initial page content
         SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
         splashScreen.setKeepOnScreenCondition(() -> !isPageReady);
