@@ -230,11 +230,32 @@ class ReleaseService:
         Ensures the Git version exists in the DB, then returns it.
         Falls back to any is_current_release=True if DB sync fails.
         """
-        release = ReleaseService.ensure_git_release_in_db()
-        if release:
-            return release
-        return Release.objects.filter(is_current_release=True).first()
+        try:
+            release = ReleaseService.ensure_git_release_in_db()
+            if release:
+                return release
+            return Release.objects.filter(is_current_release=True).first()
+        except Exception:
+            return None
     
+    @staticmethod
+    def get_latest_release() -> Optional[Release]:
+        """
+        Get the latest published release.
+        Looks up published releases ordered by build_number desc.
+        Falls back to current release if no published release is found.
+        """
+        try:
+            latest = Release.objects.filter(
+                status='PUBLISHED',
+                published=True
+            ).order_by('-build_number').first()
+            if latest:
+                return latest
+        except Exception:
+            pass
+        return ReleaseService.get_current_release()
+
     @staticmethod
     def get_latest_stable() -> Optional[Release]:
         """

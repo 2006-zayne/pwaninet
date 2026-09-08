@@ -16,28 +16,30 @@
         <span class="text-muted small">Automatically enrolled based on your programme</span>
       </div>
 
-      <div class="row g-3">
+      <div class="row g-2 g-md-3">
         {% for group in official_groups %}
           <div class="col-12 col-md-6">
-            <div class="card h-100 border border-success border-opacity-25 rounded-4 p-3 shadow-sm bg-success bg-opacity-10">
+            <div class="card h-100 border border-success border-opacity-25 rounded-4 p-3 shadow-xs bg-success bg-opacity-10 w-100">
               <div class="d-flex align-items-start gap-3">
                 <div class="rounded-circle bg-white text-success d-flex align-items-center justify-content-center shadow-xs flex-shrink-0"
-                     style="width: 50px; height: 50px; font-size: 1.4rem;">
+                     style="width: 52px; height: 52px; font-size: 1.4rem;">
                   <i class="bi bi-mortarboard-fill"></i>
                 </div>
                 <div class="flex-grow-1 min-w-0">
-                  <div class="d-flex align-items-center justify-content-between gap-2">
-                    <h6 class="fw-bold mb-0 text-truncate text-dark">{{ group.name }}</h6>
-                    <span class="badge bg-success rounded-pill px-2 py-1 small flex-shrink-0">
+                  <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                    <h6 class="fw-bold mb-0 text-truncate text-dark" style="font-size: 0.95rem;">{{ group.name }}</h6>
+                    <span class="badge bg-success rounded-pill px-2 py-1 small flex-shrink-0" style="font-size: 0.72rem;">
                       <i class="bi bi-check2"></i> Enrolled
                     </span>
                   </div>
-                  <p class="text-muted small mb-1 mt-1 text-truncate" style="font-size: 0.8rem;">
+                  <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                    <span class="text-muted small" style="font-size: 0.75rem;">
+                      <i class="bi bi-people-fill me-1 text-success"></i>{{ group.memberships.count }} classmate{{ group.memberships.count|pluralize }}
+                    </span>
+                  </div>
+                  <p class="text-muted small mb-0 mt-1" style="font-size: 0.82rem; line-height: 1.35;">
                     {{ group.description|default:"Your official class collaboration group." }}
                   </p>
-                  <span class="text-muted small" style="font-size: 0.75rem;">
-                    <i class="bi bi-people-fill me-1"></i>{{ group.memberships.count }} classmate{{ group.memberships.count|pluralize }}
-                  </span>
                 </div>
               </div>
             </div>
@@ -54,35 +56,35 @@
     </div>
 
     {% if recommended_groups %}
-      <div class="row g-3">
+      <div class="row g-2 g-md-3">
         {% for group in recommended_groups %}
           <div class="col-12 col-md-6">
-            <div class="card h-100 border rounded-4 p-3 shadow-sm hover-lift group-card">
+            <div class="card h-100 border rounded-4 p-3 shadow-xs hover-lift group-card w-100">
               <div class="d-flex align-items-start gap-3">
                 {% if group.group_pic and group.group_pic.url %}
                   <img src="{{ group.group_pic.url }}"
                        alt="{{ group.name }}"
                        class="rounded-4 object-fit-cover shadow-xs flex-shrink-0"
-                       style="width: 50px; height: 50px;">
+                       style="width: 52px; height: 52px;">
                 {% else %}
                   <div class="rounded-4 bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center fw-bold shadow-xs flex-shrink-0"
-                       style="width: 50px; height: 50px; font-size: 1.3rem;">
+                       style="width: 52px; height: 52px; font-size: 1.3rem;">
                     <i class="bi bi-people-fill"></i>
                   </div>
                 {% endif %}
 
                 <div class="flex-grow-1 min-w-0">
                   <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
-                    <h6 class="fw-bold mb-0 text-truncate text-dark">{{ group.name }}</h6>
+                    <h6 class="fw-bold mb-0 text-truncate text-dark" style="font-size: 0.95rem;">{{ group.name }}</h6>
                     <div class="flex-shrink-0">
                       {% if group.id in joined_group_ids %}
-                        <button class="btn btn-sm btn-outline-success rounded-pill px-3 fw-bold"
+                        <button class="btn btn-sm btn-outline-success rounded-pill px-3 py-1 fw-bold"
                                 id="onboarding-group-btn-{{ group.id }}"
                                 disabled>
                           <i class="bi bi-check2"></i> Joined
                         </button>
                       {% else %}
-                        <button class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold"
+                        <button class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 fw-bold"
                                 id="onboarding-group-btn-{{ group.id }}"
                                 hx-post="{% url 'groups:toggle_membership' group.id %}?source=onboarding"
                                 hx-target="#onboarding-group-btn-{{ group.id }}"
@@ -93,8 +95,8 @@
                     </div>
                   </div>
 
-                  <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
-                    <span class="badge bg-secondary bg-opacity-10 text-secondary rounded-pill px-2 py-1 small" style="font-size: 0.72rem;">
+                  <div class="d-flex align-items-center gap-1 gap-sm-2 flex-wrap mb-2">
+                    <span class="badge bg-secondary bg-opacity-10 text-secondary rounded-pill px-2 py-1" style="font-size: 0.72rem;">
                       {{ group.recommendation_reason }}
                     </span>
                     <span class="text-muted small" style="font-size: 0.75rem;">
@@ -103,7 +105,7 @@
                   </div>
 
                   {% if group.description %}
-                    <p class="text-muted small text-truncate mb-0" style="font-size: 0.8rem;">
+                    <p class="text-muted small mb-0 card-bio-text" style="font-size: 0.82rem; line-height: 1.35;">
                       {{ group.description }}
                     </p>
                   {% endif %}

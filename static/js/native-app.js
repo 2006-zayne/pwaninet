@@ -189,6 +189,9 @@ function initNativeAppEnhancements() {
     // Initialize theme synchronization
     initThemeSync();
 
+    // Initialize native app update checks
+    initNativeAppUpdates();
+
     window._pwaninet_native_initialized = true;
 
     const endTime = performance.now();
@@ -426,6 +429,453 @@ function dismissActiveOverlays() {
     });
 
     return dismissed;
+}
+
+/**
+ * Native App Update Notification & Version Management
+ */
+function injectNativeUpdateStyles() {
+    if (document.getElementById('pwaninet-native-update-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'pwaninet-native-update-styles';
+    style.textContent = `
+        #pwaninet-native-update-banner {
+            position: fixed;
+            right: 16px;
+            left: 16px;
+            max-width: 420px;
+            margin: 0 auto;
+            bottom: calc(84px + var(--pwaninet-safe-area-bottom, 0px));
+            z-index: 10002;
+            background: var(--card-bg, #ffffff);
+            color: var(--text-dark, #0f172a);
+            border: 1px solid var(--border, #e2e8f0);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+            overflow: hidden;
+            animation: pwaninet-banner-fade-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        [data-theme="dark"] #pwaninet-native-update-banner {
+            background: var(--card-bg, #1e293b);
+            color: var(--text-primary, #f8fafc);
+            border-color: var(--border, #334155);
+        }
+        .pwaninet-native-update-inner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+        }
+        .pwaninet-native-update-icon {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+        }
+        .pwaninet-native-update-content {
+            flex: 1;
+            min-width: 0;
+        }
+        .pwaninet-native-update-title {
+            font-weight: 700;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            line-height: 1.2;
+            color: var(--text-dark, #0f172a);
+        }
+        [data-theme="dark"] .pwaninet-native-update-title {
+            color: var(--text-primary, #f8fafc);
+        }
+        .pwaninet-native-update-badge {
+            background: var(--primary-light, #dbeafe);
+            color: var(--primary, #2563eb);
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 6px;
+            letter-spacing: 0.5px;
+        }
+        [data-theme="dark"] .pwaninet-native-update-badge {
+            background: #312e81;
+            color: #a5b4fc;
+        }
+        .pwaninet-native-update-sub {
+            font-size: 12px;
+            color: var(--text-secondary, #64748b);
+            margin-top: 3px;
+            line-height: 1.3;
+        }
+        .pwaninet-native-update-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .pwaninet-native-later-btn {
+            background: transparent;
+            border: none;
+            padding: 0;
+            font-size: 11px;
+            color: var(--text-secondary, #64748b);
+            cursor: pointer;
+            text-align: center;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .pwaninet-native-later-btn:hover {
+            color: var(--text-primary, #0f172a);
+        }
+        [data-theme="dark"] .pwaninet-native-later-btn:hover {
+            color: #ffffff;
+        }
+        #pwaninet-mandatory-modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 100000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .pwaninet-mandatory-modal {
+            background: var(--card-bg, #ffffff);
+            border-radius: 20px;
+            padding: 28px 24px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border, #e2e8f0);
+        }
+        [data-theme="dark"] .pwaninet-mandatory-modal {
+            background: var(--card-bg, #1e293b);
+            color: var(--text-primary, #f8fafc);
+            border-color: var(--border, #334155);
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+async function getInstalledAppVersion() {
+    var bridge = window.AndroidBridge || window.PwaninetBridge;
+    if (bridge && typeof bridge.getAppVersionInfo === 'function') {
+        try {
+            var info = JSON.parse(bridge.getAppVersionInfo());
+            if (info && (info.versionName || info.versionCode)) {
+                return {
+                    version: info.versionName || '1.0.0',
+                    build: parseInt(info.versionCode || '1', 10)
+                };
+            }
+        } catch (e) {
+            console.warn('[NativeApp] getAppVersionInfo parse error:', e);
+        }
+    }
+
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+        try {
+            var appInfo = await window.Capacitor.Plugins.App.getInfo();
+            if (appInfo) {
+                return {
+                    version: appInfo.version || '1.0.0',
+                    build: parseInt(appInfo.build || '1', 10)
+                };
+            }
+        } catch (e) {
+            console.warn('[NativeApp] Capacitor App.getInfo error:', e);
+        }
+    }
+
+    var cachedVer = localStorage.getItem('pwaninet_installed_apk_version') || '1.0.0';
+    var cachedBuild = parseInt(localStorage.getItem('pwaninet_installed_apk_build') || '1', 10);
+    return { version: cachedVer, build: cachedBuild };
+}
+
+function triggerNativeApkDownload(apkUrl) {
+    var url = apkUrl || '/download/app/latest/';
+    if (!url.startsWith('http')) {
+        url = window.location.origin + (url.startsWith('/') ? '' : '/') + url;
+    }
+    var bridge = window.AndroidBridge || window.PwaninetBridge;
+    if (bridge && typeof bridge.openExternalUrl === 'function') {
+        bridge.openExternalUrl(url);
+    } else {
+        window.open(url, '_blank');
+    }
+}
+
+function semverCompare(v1, v2) {
+    if (!v1 || !v2) return 0;
+    var p1 = v1.replace(/^v/, '').split('.').map(Number);
+    var p2 = v2.replace(/^v/, '').split('.').map(Number);
+    for (var i = 0; i < Math.max(p1.length, p2.length); i++) {
+        var num1 = p1[i] || 0;
+        var num2 = p2[i] || 0;
+        if (num1 > num2) return 1;
+        if (num1 < num2) return -1;
+    }
+    return 0;
+}
+
+async function checkNativeAppUpdates(manual) {
+    try {
+        var installed = await getInstalledAppVersion();
+        if (installed && installed.version) {
+            localStorage.setItem('pwaninet_installed_apk_version', installed.version);
+            localStorage.setItem('pwaninet_installed_apk_build', String(installed.build));
+            document.cookie = 'pwaninet_native_version=' + encodeURIComponent(installed.version) + '; path=/; max-age=31536000; SameSite=Lax';
+        }
+
+        var res = await fetch('/api/releases/version_check/?installed_build=' + installed.build + '&installed_version=' + encodeURIComponent(installed.version));
+        var data = res.ok ? await res.json() : {
+            update_available: false,
+            latest_version: installed.version,
+            latest_apk_version: installed.version,
+            running_version: installed.version
+        };
+
+        // Real-time GitHub Releases API check fallback
+        try {
+            var ghRes = await fetch('https://api.github.com/repos/2006-zayne/pwaninet/releases/latest');
+            if (ghRes.ok) {
+                var ghData = await ghRes.json();
+                var ghTag = (ghData.tag_name || '').replace(/^v/, '').trim();
+                var hasApk = ghData.assets && ghData.assets.some(function(a) {
+                    return (a.name || '').endsWith('.apk');
+                });
+
+                if (ghTag && (!data.latest_version || semverCompare(ghTag, data.latest_version) > 0)) {
+                    data.latest_version = ghTag;
+                    if (hasApk) {
+                        data.latest_apk_version = ghTag;
+                        if (semverCompare(ghTag, installed.version) > 0) {
+                            data.update_available = true;
+                            data.running_version = installed.version; // STICKS!
+                        }
+                    } else if (!data.update_available) {
+                        // Web-only release
+                        data.running_version = ghTag; // UPDATES!
+                    }
+                }
+            }
+        } catch (ghErr) {
+            // Ignore offline or rate limits
+        }
+
+        // Strict semver safety check: if installed native version >= latest_apk_version, no APK update is needed
+        var targetApkVer = data.latest_apk_version || data.latest_version;
+        if (installed && installed.version && targetApkVer) {
+            if (semverCompare(installed.version, targetApkVer) >= 0) {
+                data.update_available = false;
+                data.running_version = data.latest_version; // Web OTA update active
+                var existingBanner = document.getElementById('pwaninet-native-update-banner');
+                if (existingBanner) existingBanner.remove();
+                var existingModal = document.getElementById('pwaninet-mandatory-modal-backdrop');
+                if (existingModal) existingModal.remove();
+            }
+        }
+
+        // Hydrate running version in DOM (footer, about page, updates page)
+        var effectiveVer = data.running_version || (data.update_available ? installed.version : data.latest_version);
+        var curVerElements = document.querySelectorAll('.app-current-version, #current-version');
+        curVerElements.forEach(function(el) {
+            if (el.id === 'footer-app-version') {
+                el.textContent = 'Version ' + effectiveVer;
+            } else {
+                el.textContent = effectiveVer;
+            }
+        });
+
+        // Check if Settings page native update card is present in DOM
+        var card = document.getElementById('settings-native-update-card');
+        if (card) {
+            var installedVerSpan = document.getElementById('native-installed-version');
+            if (installedVerSpan) installedVerSpan.textContent = 'v' + installed.version;
+
+            var latestVerSpan = document.getElementById('native-latest-version-meta');
+            if (latestVerSpan) latestVerSpan.textContent = 'Latest v' + (data.latest_apk_version || data.latest_version);
+
+            var badge = document.getElementById('native-app-status-badge');
+            var desc = document.getElementById('native-app-update-desc');
+            var updateBtn = document.getElementById('native-app-download-update-btn');
+            var checkBtn = document.getElementById('native-app-check-update-btn');
+
+            if (data.update_available) {
+                if (badge) {
+                    badge.textContent = 'Update Available';
+                    badge.style.background = '#fef3c7';
+                    badge.style.color = '#d97706';
+                }
+                if (desc) {
+                    desc.textContent = 'Version ' + (data.latest_apk_version || data.latest_version) + ' is available with native enhancements. Please install the new APK build.';
+                }
+                if (updateBtn) {
+                    updateBtn.classList.remove('d-none');
+                    updateBtn.classList.add('d-inline-flex');
+                }
+                if (checkBtn) {
+                    checkBtn.classList.add('btn-outline-secondary');
+                    checkBtn.classList.remove('btn-outline-primary');
+                }
+            } else {
+                if (badge) {
+                    badge.textContent = 'Up to date';
+                    badge.style.background = '#dcfce7';
+                    badge.style.color = '#15803d';
+                }
+                if (desc) {
+                    desc.textContent = 'You have the latest version of the native Android app installed (v' + effectiveVer + ').';
+                }
+                if (updateBtn) {
+                    updateBtn.classList.add('d-none');
+                    updateBtn.classList.remove('d-inline-flex');
+                }
+                if (checkBtn) {
+                    checkBtn.classList.remove('btn-outline-secondary');
+                    checkBtn.classList.add('btn-outline-primary');
+                }
+            }
+        }
+
+        if (manual && !data.update_available) {
+            alert('PwaniNet is up to date! You are running version ' + effectiveVer + '.');
+            return;
+        }
+
+        if (data.update_available) {
+            // Check for mandatory update
+            if (data.mandatory_update) {
+                showMandatoryUpdateModal(data);
+                return;
+            }
+
+            // Check snooze for standard optional prompt
+            var snoozedUntil = parseInt(localStorage.getItem('pwaninet_native_update_snooze') || '0', 10);
+            if (!manual && snoozedUntil && Date.now() < snoozedUntil) {
+                return;
+            }
+
+            showNativeUpdateBanner(data);
+        }
+    } catch (e) {
+        console.warn('[NativeApp] Update check failed:', e);
+        if (manual) {
+            alert('Unable to check for updates. Please verify your internet connection.');
+        }
+    }
+}
+
+function showNativeUpdateBanner(data) {
+    if (document.getElementById('pwaninet-native-update-banner')) return;
+    injectNativeUpdateStyles();
+
+    var banner = document.createElement('div');
+    banner.id = 'pwaninet-native-update-banner';
+    banner.innerHTML = `
+        <div class="pwaninet-native-update-inner">
+            <div class="pwaninet-native-update-icon">
+                <img src="/static/images/pwaninet-app-icon.png" alt="PwaniNet" width="42" height="42" style="border-radius:10px;"/>
+            </div>
+            <div class="pwaninet-native-update-content">
+                <div class="pwaninet-native-update-title">
+                    <span>PwaniNet Update</span>
+                    <span class="pwaninet-native-update-badge">v${data.latest_version}</span>
+                </div>
+                <div class="pwaninet-native-update-sub">
+                    ${data.release_title || 'New update available with performance enhancements.'}
+                </div>
+            </div>
+            <div class="pwaninet-native-update-actions">
+                <button type="button" class="btn btn-primary btn-sm" id="pwaninet-native-update-download-btn">
+                    <i class="bi bi-download me-1"></i>Update
+                </button>
+                <button type="button" class="pwaninet-native-later-btn" id="pwaninet-native-update-later-btn">
+                    Later
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(banner);
+
+    var dlBtn = document.getElementById('pwaninet-native-update-download-btn');
+    if (dlBtn) {
+        dlBtn.addEventListener('click', function() {
+            triggerNativeApkDownload(data.apk_url || '/download/app/latest/');
+            banner.remove();
+        });
+    }
+
+    var laterBtn = document.getElementById('pwaninet-native-update-later-btn');
+    if (laterBtn) {
+        laterBtn.addEventListener('click', function() {
+            banner.remove();
+            // Snooze for 24 hours
+            localStorage.setItem('pwaninet_native_update_snooze', String(Date.now() + 86400000));
+        });
+    }
+}
+
+function showMandatoryUpdateModal(data) {
+    if (document.getElementById('pwaninet-mandatory-modal-backdrop')) return;
+    injectNativeUpdateStyles();
+
+    var backdrop = document.createElement('div');
+    backdrop.id = 'pwaninet-mandatory-modal-backdrop';
+    backdrop.innerHTML = `
+        <div class="pwaninet-mandatory-modal">
+            <img src="/static/images/pwaninet-app-icon.png" alt="PwaniNet" width="56" height="56" style="border-radius:14px; margin-bottom: 16px;"/>
+            <h4 style="font-weight: 700; margin-bottom: 8px;">Update Required</h4>
+            <p style="font-size: 14px; color: var(--text-secondary, #64748b); margin-bottom: 20px;">
+                A critical update (v${data.latest_version}) is required to continue using PwaniNet. Please download and install the latest APK.
+            </p>
+            <button type="button" class="btn btn-primary w-100 py-2" id="pwaninet-mandatory-download-btn" style="font-weight: 600;">
+                <i class="bi bi-download me-2"></i>Download & Install Update
+            </button>
+        </div>
+    `;
+    document.body.appendChild(backdrop);
+
+    var btn = document.getElementById('pwaninet-mandatory-download-btn');
+    if (btn) {
+        btn.addEventListener('click', function() {
+            triggerNativeApkDownload(data.apk_url || '/download/app/latest/');
+        });
+    }
+}
+
+function initNativeAppUpdates() {
+    // Expose globally
+    window.checkNativeAppUpdates = checkNativeAppUpdates;
+    window.triggerNativeApkDownload = triggerNativeApkDownload;
+    window.getInstalledAppVersion = getInstalledAppVersion;
+
+    // Delay initial check slightly after app boot
+    setTimeout(function() {
+        checkNativeAppUpdates(false);
+    }, 2000);
+
+    // Re-check when app returns from background
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+        window.Capacitor.Plugins.App.addListener('appStateChange', function(state) {
+            if (state && state.isActive) {
+                checkNativeAppUpdates(false);
+            }
+        });
+    }
+
+    // Re-evaluate Settings card on HTMX page swaps
+    document.addEventListener('htmx:afterSwap', function() {
+        if (document.getElementById('settings-native-update-card')) {
+            checkNativeAppUpdates(false);
+        }
+    });
 }
 
 // Initialize when DOM is ready

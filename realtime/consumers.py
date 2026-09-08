@@ -289,6 +289,7 @@ class FeedConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type':     'video_progress',
             'post_id':  event.get('post_id'),
+            'share_id': event.get('share_id'),
             'status':   event.get('status'),
             'progress': event.get('progress', 0),
             'message':  event.get('message', ''),

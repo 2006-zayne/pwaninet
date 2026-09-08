@@ -335,6 +335,77 @@
 
 <script>
 (function() {
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  window.markAnnouncementAsRead = function(announcementId) {
+    const card = document.getElementById('announcement-card-' + announcementId);
+    if (!card) return;
+
+    if (!card.classList.contains('unread-notification') && !card.classList.contains('unread-announcement')) {
+      return;
+    }
+
+    // Immediately remove unread classes and add bg-white for instant visual feedback
+    card.classList.remove('unread-notification', 'unread-announcement');
+    card.classList.add('bg-white');
+
+    const csrfToken = getCookie('csrftoken') || (document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : '');
+
+    fetch('/groups/api/announcements/' + announcementId + '/mark-read/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken,
+        'Accept': 'application/json'
+      }
+    })
+    .then(function(response) {
+      if (!response.ok) {
+        throw new Error('Failed to mark announcement as read');
+      }
+      return response.json();
+    })
+    .then(function(data) {
+      if (typeof refreshGroupNavDot === 'function') {
+        refreshGroupNavDot();
+      }
+      document.body.dispatchEvent(new CustomEvent('updateGroupActivity'));
+      document.body.dispatchEvent(new CustomEvent('updateUnreadCount'));
+    })
+    .catch(function(err) {
+      console.warn('Could not mark announcement as read:', err);
+    });
+  };
+
+  window.handleAnnouncementCardClick = function(announcementId, event) {
+    window.markAnnouncementAsRead(announcementId);
+
+    // If user clicked on a non-interactive element, toggle expansion if collapsed
+    if (event && event.target) {
+      const interactive = event.target.closest('a, button, input, textarea, select, .dropdown, [data-bs-toggle]');
+      if (!interactive) {
+        const contentDiv = document.getElementById('announcement-content-' + announcementId);
+        if (contentDiv && !contentDiv.classList.contains('expanded')) {
+          const expandBtn = document.getElementById('expand-btn-' + announcementId);
+          window.toggleAnnouncementExpand(announcementId, expandBtn);
+        }
+      }
+    }
+  };
+
   window.toggleAnnouncementExpand = function(announcementId, button) {
     const contentDiv = document.getElementById('announcement-content-' + announcementId);
     if (!contentDiv) return;
@@ -361,6 +432,7 @@
         button.setAttribute('aria-expanded', 'true');
         button.setAttribute('aria-label', 'Collapse announcement');
       }
+      window.markAnnouncementAsRead(announcementId);
     }
   };
 

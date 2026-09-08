@@ -207,7 +207,7 @@ class UploadManager {
 
             if (hasVideo && postId) {
                 this.transitionState(uploadId, UploadState.SERVER_PROCESSING, { hasVideo: true, postId });
-                await this.waitForServerProcessing(uploadId, postId, hasVideo);
+                await this.waitForServerProcessing(uploadId, postId, hasVideo, response);
                 tracker.completeServerProcessing();
             } else {
                 tracker.updateServerProcessingProgress(100, 100, 'Published!');
@@ -250,16 +250,18 @@ class UploadManager {
      * Wait for the server to finish processing a post.
      *
      * For video posts we listen to the feed WebSocket for ``video_progress``
-     * messages emitted by the Celery HLS transcoding task.  For image / text
-     * posts (or when no WebSocket is available) we fall back to a fast
-     * two-step synthetic update so the banner disappears promptly.
+     * messages emitted by the Celery HLS transcoding task. For resilience,
+     * we also run a lightweight polling fallback (/api/posts/<id>/status/)
+     * every 2.5s so client-side WebSocket disconnects or drops never cause
+     * the banner to lag or hang.
      *
      * @param {string} uploadId
-     * @param {number|string|null} postId   – returned by the API (null for non-video)
+     * @param {number|string|null} postId – returned by the API
      * @param {boolean} hasVideo
+     * @param {object} [responseData={}]
      * @returns {Promise<void>}
      */
-    async waitForServerProcessing(uploadId, postId, hasVideo) {
+    async waitForServerProcessing(uploadId, postId, hasVideo, responseData = {}) {
         const tracker = progressManager.getTracker(uploadId);
         if (!tracker) return;
 
@@ -274,29 +276,45 @@ class UploadManager {
         }
 
         // ----------------------------------------------------------------
-        // Video posts: subscribe to live Celery progress via feed WS.
+        // Video posts: subscribe to live Celery progress + polling fallback
         // ----------------------------------------------------------------
-        const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes hard cap
+        const TIMEOUT_MS = 3.5 * 60 * 1000; // 3.5 minutes safety cap
+
+        // Collect all potential post identifiers (numeric pk or UUID share_id)
+        const targetIds = new Set(
+            [postId, responseData?.id, responseData?.post_id, responseData?.share_id]
+                .filter(Boolean)
+                .map(String)
+        );
 
         return new Promise((resolve) => {
             let resolved = false;
+            let pollInterval = null;
+
             const finish = () => {
                 if (resolved) return;
                 resolved = true;
+                if (pollInterval) clearInterval(pollInterval);
+                clearTimeout(timeoutHandle);
                 window.removeEventListener('feedVideoProgress', onProgress);
                 resolve();
             };
 
             const timeoutHandle = setTimeout(() => {
-                tracker.updateServerProcessingProgress(100, 100, 'Processing…');
+                tracker.updateServerProcessingProgress(100, 100, 'Video ready!');
                 finish();
             }, TIMEOUT_MS);
 
             const onProgress = (evt) => {
-                const { post_id, status, progress, message } = evt.detail;
-                // Only handle messages for this specific post
-                if (String(post_id) !== String(postId)) return;
+                const detail = evt?.detail || {};
+                const evtPostId = detail.post_id != null ? String(detail.post_id) : '';
+                const evtShareId = detail.share_id != null ? String(detail.share_id) : '';
 
+                // Only handle messages matching this specific post (by integer pk or UUID share_id)
+                const isMatch = (evtPostId && targetIds.has(evtPostId)) || (evtShareId && targetIds.has(evtShareId));
+                if (!isMatch) return;
+
+                const { status, progress, message } = detail;
                 tracker.updateServerProcessingProgress(
                     progress ?? 0,
                     100,
@@ -304,16 +322,46 @@ class UploadManager {
                 );
 
                 if (status === 'ready' || status === 'failed') {
-                    clearTimeout(timeoutHandle);
                     finish();
                 }
             };
 
-            // feedVideoProgress is dispatched by base.html's feed WS handler
+            // 1. Listen for real-time Django Channels WebSocket progress
             window.addEventListener('feedVideoProgress', onProgress);
 
+            // 2. Active polling fallback every 2.5 seconds to query /status/ endpoint
+            const pollLookupId = responseData?.share_id || postId;
+            if (pollLookupId) {
+                const pollUrl = `/api/posts/${pollLookupId}/status/`;
+                pollInterval = setInterval(async () => {
+                    if (resolved) {
+                        clearInterval(pollInterval);
+                        return;
+                    }
+                    try {
+                        const res = await fetch(pollUrl, {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            credentials: 'same-origin',
+                        });
+                        if (!res.ok) return;
+                        const data = await res.json();
+                        if (data.video_status === 'ready' || data.is_ready === true) {
+                            tracker.updateServerProcessingProgress(100, 100, 'Video ready in HD!');
+                            finish();
+                        } else if (data.video_status === 'failed') {
+                            finish();
+                        }
+                    } catch (e) {
+                        // Ignore transient network errors during background poll
+                    }
+                }, 2500);
+            }
+
             // Seed the UI immediately so the banner doesn't sit blank
-            tracker.updateServerProcessingProgress(5, 100, 'Video received — starting transcoding…');
+            tracker.updateServerProcessingProgress(10, 100, 'Starting video transcoding…');
         });
     }
 

@@ -36,16 +36,22 @@ class PostSerializer(serializers.ModelSerializer):
     repost_count = serializers.ReadOnlyField()
     is_reposted = serializers.SerializerMethodField()
     repost_of = serializers.PrimaryKeyRelatedField(read_only=True)
+    post_id = serializers.IntegerField(source="id", read_only=True)
+    share_id = serializers.UUIDField(read_only=True)
+    video_status = serializers.CharField(read_only=True)
+    video_duration = serializers.IntegerField(read_only=True)
+    hls_playlist = serializers.CharField(read_only=True)
 
     class Meta:
         model = Post
         fields = [
-            'id', 'author', 'group', 'course', 'unit', 'content',
+            'id', 'post_id', 'share_id', 'author', 'group', 'course', 'unit', 'content',
             'video', 'docs', 'audio', 'gradient_class', 'has_signature',
+            'video_status', 'video_duration', 'hls_playlist',
             'created_at', 'updated_at', 'like_count', 'is_liked',
             'repost_count', 'is_reposted', 'repost_of'
         ]
-        read_only_fields = ['author', 'created_at', 'updated_at']
+        read_only_fields = ['author', 'created_at', 'updated_at', 'post_id', 'share_id', 'video_status', 'video_duration', 'hls_playlist']
 
     def get_is_liked(self, obj):
         request = self.context.get('request')
@@ -83,6 +89,9 @@ class PostSerializer(serializers.ModelSerializer):
 
 class PostCreateSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source="share_id", read_only=True)
+    post_id = serializers.IntegerField(source="id", read_only=True)
+    share_id = serializers.UUIDField(read_only=True)
+    video_status = serializers.CharField(read_only=True)
     """Serializer for creating posts"""
     images = serializers.ListField(
         child=serializers.ImageField(),
@@ -96,11 +105,12 @@ class PostCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = [
-            'id', 'author', 'group', 'course', 'unit', 'content',
+            'id', 'post_id', 'share_id', 'author', 'group', 'course', 'unit', 'content',
             'images', 'video', 'docs', 'audio', 'gradient_class', 'has_signature',
+            'video_status',
             'custom_gradient_text', 'custom_gradient_color1', 'custom_gradient_color2', 'custom_gradient_text_color'
         ]
-        read_only_fields = ['id', 'author']
+        read_only_fields = ['id', 'post_id', 'share_id', 'video_status', 'author']
 
     def validate_content(self, value):
         if value and len(value) > 2500:

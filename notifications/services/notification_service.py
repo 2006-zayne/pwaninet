@@ -14,7 +14,9 @@ from notifications.queries.notification_queries import (
     get_unread_counts_for_groups,
     get_unread_group_activity_by_type,
     has_any_unread_group_activity,
-    mark_group_notifications_as_read
+    mark_group_notifications_as_read,
+    get_unread_announcement_ids_for_user,
+    mark_announcement_as_read
 )
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -199,13 +201,27 @@ def check_any_unread_group_activity(user):
     return has_any
 
 
-def mark_group_notifications_as_read_and_invalidate(user, group_id):
+def mark_group_notifications_as_read_and_invalidate(user, group_id, exclude_types=None):
     """
-    Mark all unread notifications for a group as read and clear caches.
+    Mark unread notifications for a group as read and clear caches,
+    optionally excluding specific notification types (e.g. GROUP_ANNOUNCEMENT).
     """
     if not user or not user.is_authenticated or not group_id:
         return 0
-    updated = mark_group_notifications_as_read(user, group_id)
+    updated = mark_group_notifications_as_read(user, group_id, exclude_types=exclude_types)
+    invalidate_unread_count_cache(user.id)
+    invalidate_group_unread_cache(user.id)
+    broadcast_unread_count(user.id)
+    return updated
+
+
+def mark_announcement_as_read_and_invalidate(user, announcement_id, group_id=None):
+    """
+    Mark unread announcement notification as read and clear caches.
+    """
+    if not user or not user.is_authenticated or not announcement_id:
+        return 0
+    updated = mark_announcement_as_read(user, announcement_id, group_id=group_id)
     invalidate_unread_count_cache(user.id)
     invalidate_group_unread_cache(user.id)
     broadcast_unread_count(user.id)

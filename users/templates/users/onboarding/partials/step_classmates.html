@@ -29,12 +29,12 @@
   {% endif %}
 
   {% if classmates %}
-    <div class="row g-3" id="classmates-grid">
+    <div class="row g-2 g-md-3" id="classmates-grid">
       {% for classmate in classmates %}
         <div class="col-12 col-md-6">
-          <div class="card h-100 border rounded-4 p-3 shadow-sm hover-lift classmate-card">
+          <div class="card h-100 border rounded-4 p-3 shadow-xs hover-lift classmate-card w-100">
             <div class="d-flex align-items-start gap-3">
-              <a href="{% url 'users:profile' classmate.username %}" target="_blank" class="text-decoration-none">
+              <a href="{% url 'users:profile' classmate.username %}" target="_blank" class="text-decoration-none flex-shrink-0">
                 <div class="position-relative">
                   {% if classmate.profile_pic and classmate.profile_pic.url %}
                     <img src="{{ classmate.profile_pic.url }}"
@@ -43,7 +43,7 @@
                          style="width: 52px; height: 52px;">
                   {% else %}
                     <div class="rounded-circle bg-light text-primary d-flex align-items-center justify-content-center fw-bold shadow-xs"
-                         style="width: 52px; height: 52px; font-size: 1.1rem;">
+                         style="width: 52px; height: 52px; font-size: 1.15rem;">
                       {{ classmate.first_name|first|default:classmate.username|first|upper }}
                     </div>
                   {% endif %}
@@ -52,15 +52,15 @@
 
               <div class="flex-grow-1 min-w-0">
                 <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
-                  <div class="text-truncate">
-                    <a href="{% url 'users:profile' classmate.username %}" target="_blank" class="text-decoration-none text-dark fw-bold text-truncate d-block">
+                  <div class="min-w-0 flex-grow-1 pe-1">
+                    <a href="{% url 'users:profile' classmate.username %}" target="_blank" class="text-decoration-none text-dark fw-bold text-truncate d-block" style="font-size: 0.95rem;">
                       {{ classmate.get_full_name|default:classmate.username }}
                     </a>
-                    <span class="text-muted small">@{{ classmate.username }}</span>
+                    <span class="text-muted small d-block text-truncate" style="font-size: 0.78rem;">@{{ classmate.username }}</span>
                   </div>
                   <div class="flex-shrink-0">
                     {% if classmate.id in following_ids or all_followed %}
-                      <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold onboarding-follow-btn"
+                      <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 fw-bold onboarding-follow-btn"
                               id="onboarding-follow-btn-{{ classmate.id }}"
                               hx-post="{% url 'users:toggle_follow' classmate.username %}?source=onboarding"
                               hx-target="#onboarding-follow-btn-{{ classmate.id }}"
@@ -68,7 +68,7 @@
                         <i class="bi bi-check2"></i> Following
                       </button>
                     {% else %}
-                      <button class="btn btn-sm btn-primary rounded-pill px-3 fw-bold onboarding-follow-btn"
+                      <button class="btn btn-sm btn-primary rounded-pill px-3 py-1 fw-bold onboarding-follow-btn shadow-xs"
                               id="onboarding-follow-btn-{{ classmate.id }}"
                               hx-post="{% url 'users:toggle_follow' classmate.username %}?source=onboarding"
                               hx-target="#onboarding-follow-btn-{{ classmate.id }}"
@@ -79,23 +79,23 @@
                   </div>
                 </div>
 
-                <div class="d-flex align-items-center gap-2 flex-wrap mt-2">
-                  <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-20 rounded-pill px-2 py-1 small" style="font-size: 0.72rem;">
+                <div class="d-flex align-items-center gap-1 gap-sm-2 flex-wrap mt-2">
+                  <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-20 rounded-pill px-2 py-1" style="font-size: 0.72rem;">
                     <i class="bi bi-mortarboard-fill me-1"></i>{{ classmate.recommendation_reason }}
                   </span>
                   {% if classmate.academic_level %}
-                    <span class="badge bg-light text-secondary rounded-pill px-2 py-1 small" style="font-size: 0.72rem;">
+                    <span class="badge bg-light text-secondary rounded-pill px-2 py-1" style="font-size: 0.72rem;">
                       {{ classmate.academic_level.name }}
                     </span>
                   {% endif %}
                 </div>
 
                 {% if classmate.headline %}
-                  <p class="text-muted small text-truncate mb-0 mt-2" style="font-size: 0.8rem;">
+                  <p class="text-muted small mb-0 mt-2 card-bio-text" style="font-size: 0.82rem; line-height: 1.35;">
                     {{ classmate.headline }}
                   </p>
                 {% elif classmate.bio %}
-                  <p class="text-muted small text-truncate mb-0 mt-2" style="font-size: 0.8rem;">
+                  <p class="text-muted small mb-0 mt-2 card-bio-text" style="font-size: 0.82rem; line-height: 1.35;">
                     {{ classmate.bio }}
                   </p>
                 {% endif %}

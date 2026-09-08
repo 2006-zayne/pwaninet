@@ -316,7 +316,7 @@ def get_unread_group_activity_by_type(user, group_ids):
     ).exclude(
         status__in=[NotificationStatuses.READ.value, NotificationStatuses.ARCHIVED.value, NotificationStatuses.EXPIRED.value]
     ).values('context_id', 'notification_type').annotate(
-        count=Count('target_id', distinct=True)
+        count=Count('notification_id')
     )
     
     for item in counts:
@@ -371,20 +371,92 @@ def has_any_unread_group_activity(user):
     ).exists()
 
 
-def mark_group_notifications_as_read(user, group_id):
+def mark_group_notifications_as_read(user, group_id, exclude_types=None):
     """
-    Mark all unread notifications for a specific group as READ for this user.
+    Mark all unread notifications for a specific group as READ for this user,
+    optionally excluding specific notification types (e.g. GROUP_ANNOUNCEMENT).
     """
     if not user or not user.is_authenticated or not group_id:
         return 0
     str_gid = str(group_id)
-    return NotificationObject.objects.filter(
+    qs = NotificationObject.objects.filter(
         recipient=user,
         context_type='GROUP',
         context_id__in=[group_id, str_gid]
     ).exclude(
         status__in=[NotificationStatuses.READ.value, NotificationStatuses.ARCHIVED.value, NotificationStatuses.EXPIRED.value]
-    ).update(status=NotificationStatuses.READ.value)
+    )
+    if exclude_types:
+        qs = qs.exclude(notification_type__in=exclude_types)
+    return qs.update(status=NotificationStatuses.READ.value)
+
+
+def get_unread_announcement_ids_for_user(user, group_id):
+    """
+    Returns a set of announcement IDs that are unread for this user in this group.
+    """
+    if not user or not user.is_authenticated or not group_id:
+        return set()
+    
+    str_gid = str(group_id)
+    notifs = NotificationObject.objects.filter(
+        recipient=user,
+        context_type='GROUP',
+        context_id__in=[group_id, str_gid],
+        notification_type='GROUP_ANNOUNCEMENT'
+    ).exclude(
+        status__in=[NotificationStatuses.READ.value, NotificationStatuses.ARCHIVED.value, NotificationStatuses.EXPIRED.value]
+    ).values_list('metadata', flat=True)
+    
+    unread_ids = set()
+    for meta in notifs:
+        if isinstance(meta, dict):
+            aid = meta.get('announcement_id') or meta.get('target_id')
+            if aid is not None:
+                try:
+                    unread_ids.add(int(aid))
+                except (ValueError, TypeError):
+                    unread_ids.add(str(aid))
+    return unread_ids
+
+
+def mark_announcement_as_read(user, announcement_id, group_id=None):
+    """
+    Mark unread GROUP_ANNOUNCEMENT notifications for this announcement as READ.
+    """
+    if not user or not user.is_authenticated or not announcement_id:
+        return 0
+        
+    query = NotificationObject.objects.filter(
+        recipient=user,
+        notification_type='GROUP_ANNOUNCEMENT'
+    ).exclude(
+        status__in=[NotificationStatuses.READ.value, NotificationStatuses.ARCHIVED.value, NotificationStatuses.EXPIRED.value]
+    )
+    if group_id:
+        query = query.filter(context_type='GROUP', context_id__in=[group_id, str(group_id)])
+        
+    str_aid = str(announcement_id)
+    int_aid = int(announcement_id) if str_aid.isdigit() else None
+    
+    matching_ids = []
+    for notif in query:
+        meta = notif.metadata or {}
+        aid = meta.get('announcement_id') or meta.get('target_id')
+        if aid == announcement_id or str(aid) == str_aid or (int_aid is not None and aid == int_aid):
+            matching_ids.append(notif.notification_id)
+            
+    # Fallback: if single unread announcement notification in group, match it
+    if not matching_ids and group_id:
+        if query.count() == 1:
+            matching_ids = list(query.values_list('notification_id', flat=True))
+            
+    if matching_ids:
+        return NotificationObject.objects.filter(notification_id__in=matching_ids).update(
+            status=NotificationStatuses.READ.value
+        )
+        
+    return 0
 
 
 

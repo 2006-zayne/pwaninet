@@ -1,250 +1,522 @@
-<!-- Onboarding Tour Modals for each step -->
-{# Step IDs skip 3 (messaging frozen for MVP) #}
+<!-- Interactive PwaniNet Spotlight Tour -->
+<style>
+  /* ── Tour Overlay & Spotlight ── */
+  #pwaninet-tour-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    pointer-events: auto;
+    opacity: 0;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  #pwaninet-tour-overlay.tour-active {
+    opacity: 1;
+  }
 
-<!-- Step 1: Home Feed -->
-<div class="modal fade" id="tourStep1" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-  <div class="modal-dialog modal-dialog-centered modal-sm">
-    <div class="modal-content">
-      <div class="modal-body p-4">
-        <div class="d-flex align-items-center mb-3">
-          <div class="flex-shrink-0">
-            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: bold;">1</div>
-          </div>
-          <div class="flex-grow-1 ms-3">
-            <h6 class="mb-0 fw-bold">Your Personalized Feed</h6>
-          </div>
-        </div>
-        <p class="text-muted small mb-3">See updates from classmates, academic groups, and people you follow. Your feed is personalized based on your course and connections.</p>
-        <p class="text-muted small mb-4"><strong>Tip:</strong> Follow classmates to see more relevant posts in your feed.</p>
-        <div class="d-flex justify-content-between">
-          <button type="button" class="btn btn-sm btn-link text-muted" id="exitTour1">Exit Tour</button>
-          <button type="button" class="btn btn-sm btn-primary" id="nextStep1">Continue</button>
-        </div>
+  /* Spotlight Cutout Frame */
+  #pwaninet-tour-spotlight {
+    position: fixed;
+    z-index: 10051;
+    pointer-events: none;
+    border-radius: 16px;
+    box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.78),
+                0 0 0 3px rgba(37, 99, 235, 0.9),
+                0 0 24px rgba(37, 99, 235, 0.45);
+    transition: top 0.35s cubic-bezier(0.25, 1, 0.5, 1),
+                left 0.35s cubic-bezier(0.25, 1, 0.5, 1),
+                width 0.35s cubic-bezier(0.25, 1, 0.5, 1),
+                height 0.35s cubic-bezier(0.25, 1, 0.5, 1),
+                border-radius 0.35s ease;
+    animation: tourPulse 2.2s infinite ease-in-out;
+  }
+
+  @keyframes tourPulse {
+    0%, 100% {
+      box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.78),
+                  0 0 0 3px rgba(37, 99, 235, 0.9),
+                  0 0 16px rgba(37, 99, 235, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.82),
+                  0 0 0 4px rgba(59, 130, 246, 1),
+                  0 0 28px rgba(59, 130, 246, 0.75);
+    }
+  }
+
+  /* ── Interactive Tour Popover Card ── */
+  #pwaninet-tour-card {
+    position: fixed;
+    z-index: 10055;
+    background: #ffffff;
+    color: #0f172a;
+    border-radius: 20px;
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.35),
+                0 0 0 1px rgba(0, 0, 0, 0.08);
+    width: 380px;
+    max-width: calc(100vw - 32px);
+    padding: 22px 20px 18px;
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+    transition: opacity 0.28s ease,
+                transform 0.28s ease,
+                top 0.35s cubic-bezier(0.25, 1, 0.5, 1),
+                left 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+    pointer-events: auto;
+  }
+  #pwaninet-tour-card.card-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  [data-theme="dark"] #pwaninet-tour-card {
+    background: #1e293b;
+    color: #f8fafc;
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6),
+                0 0 0 1px rgba(255, 255, 255, 0.1);
+  }
+
+  .tour-badge-pill {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.1);
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  [data-theme="dark"] .tour-badge-pill {
+    color: #818cf8;
+    background: rgba(129, 140, 248, 0.15);
+  }
+
+  .tour-tip-box {
+    background: #f8fafc;
+    border-left: 3px solid #2563eb;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    color: #475569;
+    margin-top: 12px;
+  }
+  [data-theme="dark"] .tour-tip-box {
+    background: #0f172a;
+    border-color: #818cf8;
+    color: #94a3b8;
+  }
+
+  /* Step dots indicator */
+  .tour-step-dots {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .tour-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #cbd5e1;
+    transition: all 0.25s ease;
+  }
+  [data-theme="dark"] .tour-dot {
+    background: #475569;
+  }
+  .tour-dot.active-dot {
+    width: 20px;
+    border-radius: 999px;
+    background: #2563eb;
+  }
+  [data-theme="dark"] .tour-dot.active-dot {
+    background: #818cf8;
+  }
+
+  /* Responsive bottom-sheet positioning on mobile */
+  @media (max-width: 767px) {
+    #pwaninet-tour-card {
+      width: calc(100vw - 24px) !important;
+      left: 12px !important;
+      right: 12px !important;
+      max-width: none !important;
+      border-radius: 22px;
+      padding: 18px 16px 14px;
+    }
+  }
+</style>
+
+<!-- Tour Markup Container (Hidden by default) -->
+<div id="pwaninet-tour-overlay" class="d-none" aria-live="polite" role="dialog" aria-modal="true">
+  <!-- Dynamic Spotlight Frame -->
+  <div id="pwaninet-tour-spotlight"></div>
+
+  <!-- Interactive Popover Card -->
+  <div id="pwaninet-tour-card">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <div class="d-flex align-items-center gap-2">
+        <span class="tour-badge-pill" id="tourStepBadge">Step 1 of 5</span>
+      </div>
+      <button type="button"
+              class="btn-close btn-close-sm"
+              onclick="window.exitTour()"
+              aria-label="Close tour"
+              style="font-size: 0.75rem;"></button>
+    </div>
+
+    <div class="d-flex align-items-start gap-3 mt-3">
+      <div class="rounded-circle bg-primary bg-opacity-10 text-primary p-2 d-flex align-items-center justify-content-center flex-shrink-0"
+           style="width: 44px; height: 44px;" id="tourStepIconBox">
+        <i class="bi bi-compass-fill fs-4" id="tourStepIcon"></i>
+      </div>
+      <div class="flex-grow-1 min-w-0">
+        <h6 class="fw-bold mb-1" id="tourStepTitle" style="font-size: 1.05rem;">Campus Feed & Search</h6>
+        <p class="small text-muted mb-0" id="tourStepBody" style="line-height: 1.4; font-size: 0.85rem;">
+          Your personalized feed brings together classmate posts, campus announcements, and group discussions.
+        </p>
+      </div>
+    </div>
+
+    <!-- Pro Tip Callout -->
+    <div class="tour-tip-box" id="tourStepTipContainer">
+      <strong class="text-primary me-1"><i class="bi bi-lightbulb-fill"></i> Tip:</strong>
+      <span id="tourStepTip">Use the search bar above to look up classmates or unit codes.</span>
+    </div>
+
+    <!-- Card Navigation Footer -->
+    <div class="d-flex align-items-center justify-content-between mt-3 pt-2 border-top">
+      <div class="tour-step-dots" id="tourStepDots">
+        <span class="tour-dot active-dot"></span>
+        <span class="tour-dot"></span>
+        <span class="tour-dot"></span>
+        <span class="tour-dot"></span>
+        <span class="tour-dot"></span>
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <button type="button"
+                class="btn btn-sm btn-link text-muted text-decoration-none px-2 py-1 fw-semibold"
+                id="tourPrevBtn"
+                onclick="window.prevTourStep()">
+          <i class="bi bi-arrow-left"></i> Back
+        </button>
+        <button type="button"
+                class="btn btn-sm btn-primary rounded-pill px-3 py-1 fw-bold shadow-xs d-flex align-items-center gap-1"
+                id="tourNextBtn"
+                onclick="window.nextTourStep()">
+          <span>Next</span> <i class="bi bi-arrow-right"></i>
+        </button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Step 2: Groups -->
-<div class="modal fade" id="tourStep2" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-  <div class="modal-dialog modal-dialog-centered modal-sm">
-    <div class="modal-content">
-      <div class="modal-body p-4">
-        <div class="d-flex align-items-center mb-3">
-          <div class="flex-shrink-0">
-            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: bold;">2</div>
-          </div>
-          <div class="flex-grow-1 ms-3">
-            <h6 class="mb-0 fw-bold">Academic Groups</h6>
-          </div>
-        </div>
-        <p class="text-muted small mb-3">You're automatically enrolled in your official course and year groups. Join more groups to connect with classmates who share your interests.</p>
-        <p class="text-muted small mb-4"><strong>Tip:</strong> Check your groups for course announcements, study materials, and collaboration opportunities.</p>
-        <div class="d-flex justify-content-between">
-          <button type="button" class="btn btn-sm btn-link text-muted" id="exitTour2">Exit Tour</button>
-          <button type="button" class="btn btn-sm btn-primary" id="nextStep2">Continue</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Step 3: Document Repository -->
-<div class="modal fade" id="tourStep3" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-  <div class="modal-dialog modal-dialog-centered modal-sm">
-    <div class="modal-content">
-      <div class="modal-body p-4">
-        <div class="d-flex align-items-center mb-3">
-          <div class="flex-shrink-0">
-            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: bold;">3</div>
-          </div>
-          <div class="flex-grow-1 ms-3">
-            <h6 class="mb-0 fw-bold">Document Repository</h6>
-          </div>
-        </div>
-        <p class="text-muted small mb-3">Access a comprehensive library of academic resources including lecture notes, past papers, and study materials shared by your peers.</p>
-        <p class="text-muted small mb-4"><strong>Tip:</strong> Upload your own notes to help others and bookmark useful documents for quick access later.</p>
-        <div class="d-flex justify-content-between">
-          <button type="button" class="btn btn-sm btn-link text-muted" id="exitTour3">Exit Tour</button>
-          <button type="button" class="btn btn-sm btn-primary" id="nextStep3">Continue</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Step 4: Create Post (was step 4) -->
-<div class="modal fade" id="tourStep4" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-  <div class="modal-dialog modal-dialog-centered modal-sm">
-    <div class="modal-content">
-      <div class="modal-body p-4">
-        <div class="d-flex align-items-center mb-3">
-          <div class="flex-shrink-0">
-            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: bold;">4</div>
-          </div>
-          <div class="flex-grow-1 ms-3">
-            <h6 class="mb-0 fw-bold">Share Updates</h6>
-          </div>
-        </div>
-        <p class="text-muted small mb-3">Share questions, announcements, or interesting content with your academic network. Posts can include text, images, and more.</p>
-        <p class="text-muted small mb-4"><strong>Tip:</strong> Share relevant course content or ask questions to help your classmates learn.</p>
-        <div class="d-flex justify-content-between">
-          <button type="button" class="btn btn-sm btn-link text-muted" id="exitTour4">Exit Tour</button>
-          <button type="button" class="btn btn-sm btn-primary" id="nextStep4">Continue</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Step 5: Profile (was step 5) -->
-<div class="modal fade" id="tourStep5" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-  <div class="modal-dialog modal-dialog-centered modal-sm">
-    <div class="modal-content">
-      <div class="modal-body p-4">
-        <div class="d-flex align-items-center mb-3">
-          <div class="flex-shrink-0">
-            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: bold;">5</div>
-          </div>
-          <div class="flex-grow-1 ms-3">
-            <h6 class="mb-0 fw-bold">Your Profile</h6>
-          </div>
-        </div>
-        <p class="text-muted small mb-3">Your profile helps classmates discover your skills and interests. A complete profile improves collaboration opportunities.</p>
-        <p class="text-muted small mb-4"><strong>Tip:</strong> Add your skills, projects, and collaboration status to connect with the right people.</p>
-        <div class="d-flex justify-content-between">
-          <button type="button" class="btn btn-sm btn-link text-muted" id="skipTour5">Skip Tour</button>
-          <button type="button" class="btn btn-sm btn-primary" id="finishTour">Finish Tour</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-{# CSRF for tour API calls on pages without a form (e.g. home feed) #}
 <input type="hidden" name="csrfmiddlewaretoken" id="onboarding-csrf-token" value="{{ csrf_token }}">
 
 <script>
-(function () {
-    'use strict';
+(function() {
+  'use strict';
 
-    // Modal element IDs in tour order (step 3 messaging removed, now documents)
-    const TOUR_STEP_IDS = [1, 2, 3, 4, 5];
-    let currentTourIndex = 0;
-
-    function getCsrfToken() {
-        const el = document.querySelector('[name=csrfmiddlewaretoken]');
-        return el ? el.value : '';
+  const TOUR_STEPS = [
+    {
+      title: "Campus Feed & Search",
+      icon: "bi-search",
+      body: "Your home feed displays real-time posts, questions, and course updates from your classmates and academic groups. Use the search bar anytime to find friends, notes, or groups.",
+      tip: "Search for unit codes like CSC101 or classmate names to find discussions instantly.",
+      targets: ['.search-header', '.search-inner', '#main-content-area'],
+      positionDesktop: 'bottom'
+    },
+    {
+      title: "Academic Groups & Cohorts",
+      icon: "bi-people-fill",
+      body: "Connect with course squads and campus societies. You are automatically enrolled in your official class group based on your degree and academic year!",
+      tip: "Check your group chats for exam tips, timetable changes, and shared study materials.",
+      targets: ['.groups-explore-section', 'a.nav-chip[aria-label="Groups"]', 'a[href*="groups_dashboard"]', '.groups-explore-list'],
+      positionDesktop: 'bottom'
+    },
+    {
+      title: "Document Repository",
+      icon: "bi-file-earmark-text-fill",
+      body: "Access peer-reviewed lecture notes, exam revisions, and past papers tailored to your semester curriculum. Bookmark documents for quick offline reference.",
+      tip: "Browse the 'For You' section to find documents matching your current semester units.",
+      targets: ['.search-input', '#main-content-area', '.feed-sector'],
+      positionDesktop: 'bottom'
+    },
+    {
+      title: "Ask & Share with Peers",
+      icon: "bi-plus-circle-fill",
+      body: "Have a question about coursework or campus life? Post questions and updates to your classmates with photos, documents, and code snippets.",
+      tip: "Tag your specific programme group so classmates in your course can answer quickly.",
+      targets: ['a.nav-chip[aria-label="Create Post"]', '.navbar-top a[href*="create_post"]', 'a[href*="create_post"]'],
+      positionDesktop: 'top'
+    },
+    {
+      title: "Notifications & Profile",
+      icon: "bi-bell-fill",
+      body: "Stay updated on replies, likes, and course announcements. Complete your profile with your skills, year, and bio so classmates can discover you.",
+      tip: "Tap your avatar anytime to view your profile and toggle dark/light theme preferences.",
+      targets: ['#notification-badge-container', '#notification-badge-container-desktop', '.avatar-link', 'a.nav-chip[aria-label="Notifications"]'],
+      positionDesktop: 'top'
     }
+  ];
 
-    function hideAllTourModals() {
-        TOUR_STEP_IDS.forEach(function (stepId) {
-            const modal = document.getElementById('tourStep' + stepId);
-            if (!modal) return;
-            const inst = bootstrap.Modal.getInstance(modal);
-            if (inst) {
-                inst.hide();
-            }
-        });
-        document.querySelectorAll('.modal-backdrop').forEach(function (el) {
-            el.remove();
-        });
-        document.body.classList.remove('modal-open');
-        document.body.style.removeProperty('overflow');
-        document.body.style.removeProperty('padding-right');
+  let currentStepIndex = 0;
+  let activeTargetElement = null;
+  let isTourRunning = false;
+  let repositionRaf = null;
+
+  function getCsrfToken() {
+    const el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+  }
+
+  function resolveTarget(step) {
+    for (const sel of step.targets) {
+      const el = document.querySelector(sel);
+      if (el && el.offsetParent !== null) {
+        return el;
+      }
     }
+    // Fallback if none found
+    return document.querySelector('#main-content-area') || document.body;
+  }
 
-    function showTourStepByIndex(index) {
-        hideAllTourModals();
-
-        const stepId = TOUR_STEP_IDS[index];
-        const currentModal = document.getElementById('tourStep' + stepId);
-        if (!currentModal) {
-            console.warn('Tour step modal not found: tourStep' + stepId);
-            return;
-        }
-
-        setTimeout(function () {
-            bootstrap.Modal.getOrCreateInstance(currentModal, {
-                backdrop: 'static',
-                keyboard: false,
-            }).show();
-        }, 150);
-    }
-
-    window.startOnboardingTour = function () {
-        currentTourIndex = 0;
-        showTourStepByIndex(0);
-    };
-
-    window.nextTourStep = function () {
-        if (currentTourIndex < TOUR_STEP_IDS.length - 1) {
-            currentTourIndex += 1;
-            showTourStepByIndex(currentTourIndex);
-        }
-    };
-
-    window.exitTour = function () {
-        hideAllTourModals();
-        window.markOnboardingCompleted();
-        if (typeof window.showProfileCompletionPrompt === 'function') {
-            window.showProfileCompletionPrompt();
-        }
-    };
-
-    window.finishTour = function () {
-        hideAllTourModals();
-        window.markOnboardingCompleted();
-        if (typeof window.showProfileCompletionPrompt === 'function') {
-            window.showProfileCompletionPrompt();
-        }
-    };
-
-    window.markOnboardingCompleted = function () {
-        fetch('/users/mark-onboarding-complete/', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCsrfToken(),
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({}),
-        }).catch(function (error) {
-            console.error('Error marking onboarding as completed:', error);
-        });
-    };
-
-    window.showProfileCompletionPrompt = function () {
-        const profileModal = document.getElementById('profileCompletionModal');
-        if (profileModal) {
-            bootstrap.Modal.getOrCreateInstance(profileModal).show();
-        }
-    };
-
-    document.addEventListener('DOMContentLoaded', function () {
-        const nextStep1 = document.getElementById('nextStep1');
-        const exitTour1 = document.getElementById('exitTour1');
-        if (nextStep1) nextStep1.addEventListener('click', window.nextTourStep);
-        if (exitTour1) exitTour1.addEventListener('click', window.exitTour);
-
-        const nextStep2 = document.getElementById('nextStep2');
-        const exitTour2 = document.getElementById('exitTour2');
-        if (nextStep2) nextStep2.addEventListener('click', window.nextTourStep);
-        if (exitTour2) exitTour2.addEventListener('click', window.exitTour);
-
-        const nextStep3 = document.getElementById('nextStep3');
-        const exitTour3 = document.getElementById('exitTour3');
-        if (nextStep3) nextStep3.addEventListener('click', window.nextTourStep);
-        if (exitTour3) exitTour3.addEventListener('click', window.exitTour);
-
-        const nextStep4 = document.getElementById('nextStep4');
-        const exitTour4 = document.getElementById('exitTour4');
-        if (nextStep4) nextStep4.addEventListener('click', window.nextTourStep);
-        if (exitTour4) exitTour4.addEventListener('click', window.exitTour);
-
-        const finishTourBtn = document.getElementById('finishTour');
-        const skipTour5 = document.getElementById('skipTour5');
-        if (finishTourBtn) finishTourBtn.addEventListener('click', window.finishTour);
-        if (skipTour5) skipTour5.addEventListener('click', window.exitTour);
+  function updateDots() {
+    const dotsContainer = document.getElementById('tourStepDots');
+    if (!dotsContainer) return;
+    const dots = dotsContainer.querySelectorAll('.tour-dot');
+    dots.forEach((dot, idx) => {
+      if (idx === currentStepIndex) {
+        dot.classList.add('active-dot');
+      } else {
+        dot.classList.remove('active-dot');
+      }
     });
+  }
+
+  function renderStep(index) {
+    const step = TOUR_STEPS[index];
+    if (!step) return;
+
+    currentStepIndex = index;
+    const target = resolveTarget(step);
+    activeTargetElement = target;
+
+    // Update UI elements
+    const badge = document.getElementById('tourStepBadge');
+    const title = document.getElementById('tourStepTitle');
+    const body = document.getElementById('tourStepBody');
+    const tip = document.getElementById('tourStepTip');
+    const icon = document.getElementById('tourStepIcon');
+    const prevBtn = document.getElementById('tourPrevBtn');
+    const nextBtn = document.getElementById('tourNextBtn');
+
+    if (badge) badge.textContent = `Step ${index + 1} of ${TOUR_STEPS.length}`;
+    if (title) title.textContent = step.title;
+    if (body) body.textContent = step.body;
+    if (tip) tip.textContent = step.tip;
+    if (icon) {
+      icon.className = `bi ${step.icon} fs-4`;
+    }
+
+    // Prev button state
+    if (prevBtn) {
+      if (index === 0) {
+        prevBtn.style.visibility = 'hidden';
+      } else {
+        prevBtn.style.visibility = 'visible';
+      }
+    }
+
+    // Next button state
+    if (nextBtn) {
+      if (index === TOUR_STEPS.length - 1) {
+        nextBtn.innerHTML = '<span>Finish</span> <i class="bi bi-check2-circle"></i>';
+        nextBtn.classList.remove('btn-primary');
+        nextBtn.classList.add('btn-success');
+      } else {
+        nextBtn.innerHTML = '<span>Next</span> <i class="bi bi-arrow-right"></i>';
+        nextBtn.classList.remove('btn-success');
+        nextBtn.classList.add('btn-primary');
+      }
+    }
+
+    updateDots();
+
+    // Smooth scroll element into view if not on screen
+    if (target && target !== document.body) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    }
+
+    // Position spotlight & card after slight delay for smooth scroll
+    setTimeout(repositionSpotlight, 120);
+  }
+
+  function repositionSpotlight() {
+    if (!isTourRunning || !activeTargetElement) return;
+
+    const spotlight = document.getElementById('pwaninet-tour-spotlight');
+    const card = document.getElementById('pwaninet-tour-card');
+    if (!spotlight || !card) return;
+
+    const rect = activeTargetElement.getBoundingClientRect();
+    const isMobile = window.innerWidth < 768;
+    const padding = 8;
+
+    // Clamp spotlight inside viewport
+    const left = Math.max(4, rect.left - padding);
+    const top = Math.max(4, rect.top - padding);
+    const width = Math.min(window.innerWidth - left - 4, rect.width + padding * 2);
+    const height = Math.min(window.innerHeight - top - 4, rect.height + padding * 2);
+
+    spotlight.style.left = `${left}px`;
+    spotlight.style.top = `${top}px`;
+    spotlight.style.width = `${width}px`;
+    spotlight.style.height = `${height}px`;
+
+    // Position Card
+    if (isMobile) {
+      // On mobile: ergonomic bottom sheet
+      // If target is in the bottom bar (bottom nav), place card above it
+      if (rect.bottom > window.innerHeight - 90) {
+        card.style.top = 'auto';
+        card.style.bottom = '85px';
+      } else {
+        card.style.top = 'auto';
+        card.style.bottom = '20px';
+      }
+      card.style.left = '12px';
+      card.style.right = '12px';
+    } else {
+      // On desktop: intelligently place next to element
+      card.style.right = 'auto';
+      card.style.bottom = 'auto';
+
+      const cardHeight = card.offsetHeight || 220;
+      const cardWidth = 380;
+
+      let cardTop = rect.bottom + 16;
+      let cardLeft = rect.left;
+
+      // If bottom placement overflows viewport, place above
+      if (cardTop + cardHeight > window.innerHeight - 20) {
+        cardTop = Math.max(20, rect.top - cardHeight - 16);
+      }
+
+      // Clamp horizontal
+      if (cardLeft + cardWidth > window.innerWidth - 20) {
+        cardLeft = window.innerWidth - cardWidth - 20;
+      }
+      cardLeft = Math.max(20, cardLeft);
+
+      card.style.top = `${cardTop}px`;
+      card.style.left = `${cardLeft}px`;
+    }
+
+    card.classList.add('card-visible');
+  }
+
+  function handleResizeOrScroll() {
+    if (!isTourRunning) return;
+    if (repositionRaf) cancelAnimationFrame(repositionRaf);
+    repositionRaf = requestAnimationFrame(repositionSpotlight);
+  }
+
+  function handleKeydown(e) {
+    if (!isTourRunning) return;
+    if (e.key === 'Escape') {
+      window.exitTour();
+    } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
+      window.nextTourStep();
+    } else if (e.key === 'ArrowLeft') {
+      window.prevTourStep();
+    }
+  }
+
+  window.startOnboardingTour = function() {
+    const overlay = document.getElementById('pwaninet-tour-overlay');
+    if (!overlay) return;
+
+    isTourRunning = true;
+    overlay.classList.remove('d-none');
+    requestAnimationFrame(() => {
+      overlay.classList.add('tour-active');
+    });
+
+    currentStepIndex = 0;
+    renderStep(0);
+
+    window.addEventListener('resize', handleResizeOrScroll);
+    window.addEventListener('scroll', handleResizeOrScroll, { passive: true });
+    window.addEventListener('keydown', handleKeydown);
+  };
+
+  window.nextTourStep = function() {
+    if (currentStepIndex < TOUR_STEPS.length - 1) {
+      renderStep(currentStepIndex + 1);
+    } else {
+      window.finishTour();
+    }
+  };
+
+  window.prevTourStep = function() {
+    if (currentStepIndex > 0) {
+      renderStep(currentStepIndex - 1);
+    }
+  };
+
+  window.finishTour = function() {
+    closeTour();
+    window.markOnboardingCompleted();
+    if (typeof window.showProfileCompletionPrompt === 'function') {
+      window.showProfileCompletionPrompt();
+    }
+  };
+
+  window.exitTour = function() {
+    closeTour();
+    window.markOnboardingCompleted();
+  };
+
+  function closeTour() {
+    isTourRunning = false;
+    const overlay = document.getElementById('pwaninet-tour-overlay');
+    const card = document.getElementById('pwaninet-tour-card');
+
+    if (card) card.classList.remove('card-visible');
+    if (overlay) {
+      overlay.classList.remove('tour-active');
+      setTimeout(() => {
+        overlay.classList.add('d-none');
+      }, 300);
+    }
+
+    window.removeEventListener('resize', handleResizeOrScroll);
+    window.removeEventListener('scroll', handleResizeOrScroll);
+    window.removeEventListener('keydown', handleKeydown);
+
+    // Also dismiss welcome banner if present
+    if (typeof window.dismissWelcomeBanner === 'function') {
+      window.dismissWelcomeBanner();
+    }
+  }
+
+  window.markOnboardingCompleted = function() {
+    fetch('/users/mark-onboarding-complete/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': getCsrfToken(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    }).catch(function(err) {
+      console.warn('Could not persist tour completion:', err);
+    });
+  };
+
+  window.showProfileCompletionPrompt = function() {
+    const profileModal = document.getElementById('profileCompletionModal');
+    if (profileModal && typeof bootstrap !== 'undefined') {
+      bootstrap.Modal.getOrCreateInstance(profileModal).show();
+    }
+  };
+
 })();
 </script>

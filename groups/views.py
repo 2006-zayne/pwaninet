@@ -53,9 +53,13 @@ from notifications.services.notification_service import (
     get_group_unread_counts,
     get_group_activity_by_type,
     mark_group_notifications_as_read_and_invalidate,
+    mark_announcement_as_read_and_invalidate,
     invalidate_unread_count_cache
 )
-from notifications.queries.notification_queries import get_unread_count_by_user_id
+from notifications.queries.notification_queries import (
+    get_unread_count_by_user_id,
+    get_unread_announcement_ids_for_user
+)
 from notifications.models import NotificationObject
 from django.core.paginator import Paginator
 import json
@@ -722,6 +726,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
                 'pinned_announcements': pinned_announcements,
                 'all_announcements': all_announcements,
                 'is_admin': is_admin,
+                'unread_announcement_ids': get_unread_announcement_ids_for_user(request.user, group.id),
             })
             return HttpResponse(html, content_type='text/html')
 
@@ -781,6 +786,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
                 'pinned_announcements': pinned_announcements,
                 'all_announcements': all_announcements,
                 'is_admin': is_admin,
+                'unread_announcement_ids': get_unread_announcement_ids_for_user(request.user, group.id),
             })
             return HttpResponse(html, content_type='text/html')
 
@@ -818,6 +824,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
                 'pinned_announcements': pinned_announcements,
                 'all_announcements': all_announcements,
                 'is_admin': is_admin,
+                'unread_announcement_ids': get_unread_announcement_ids_for_user(request.user, group.id),
             })
             return HttpResponse(html, content_type='text/html')
 
@@ -866,6 +873,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
                 'pinned_announcements': pinned_announcements,
                 'all_announcements': all_announcements,
                 'is_admin': is_admin,
+                'unread_announcement_ids': get_unread_announcement_ids_for_user(request.user, group.id),
             })
             return HttpResponse(html, content_type='text/html')
 
@@ -917,6 +925,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
                 'pinned_announcements': pinned_announcements,
                 'all_announcements': all_announcements,
                 'is_admin': is_admin,
+                'unread_announcement_ids': get_unread_announcement_ids_for_user(request.user, group.id),
             })
             return HttpResponse(html, content_type='text/html')
 
@@ -924,6 +933,19 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
             AnnouncementSerializer(announcement).data,
             status=status.HTTP_200_OK
         )
+
+    @action(detail=True, methods=['post'], url_path='mark-read')
+    def mark_read(self, request, pk=None, group_id=None):
+        """
+        Mark an announcement notification as read for the current user.
+        """
+        announcement = self.get_object()
+        mark_announcement_as_read_and_invalidate(request.user, announcement.id, group_id=announcement.group_id)
+        return Response({
+            'status': 'success',
+            'announcement_id': announcement.id,
+            'group_id': announcement.group_id
+        }, status=status.HTTP_200_OK)
 
 
 # ============================================================================
@@ -1000,7 +1022,7 @@ def groups_dashboard(request):
 @login_required
 def groups_detail_view(request, group_id):
     from groups.services.group_service import build_group_detail_context
-    mark_group_notifications_as_read_and_invalidate(request.user, group_id)
+    mark_group_notifications_as_read_and_invalidate(request.user, group_id, exclude_types=['GROUP_ANNOUNCEMENT'])
     group = get_object_or_404(Group.objects.annotate(member_count=Count('memberships', filter=Q(memberships__status=MembershipStatus.APPROVED))), id=group_id)
     query = request.GET.get('search_user', '')
     page = int(request.GET.get('page', 1))
@@ -1944,7 +1966,6 @@ def group_members_search(request, group_id):
 def group_announcements_view(request, group_id):
     """View group announcements page"""
     group = get_object_or_404(Group, id=group_id)
-    mark_group_notifications_as_read_and_invalidate(request.user, group_id)
 
     # Check if user is a member
     try:
@@ -1969,17 +1990,19 @@ def group_announcements_view(request, group_id):
     pinned_announcements = [a for a in announcements if a.is_pinned]
     all_announcements = [a for a in announcements if not a.is_pinned]
 
+    unread_announcement_ids = get_unread_announcement_ids_for_user(request.user, group.id)
+
     context = {
         'group': group,
         'pinned_announcements': pinned_announcements,
         'all_announcements': all_announcements,
         'announcements': announcements,
         'is_admin': is_admin,
+        'unread_announcement_ids': unread_announcement_ids,
     }
 
     if request.headers.get('HX-Request'):
         response = render(request, 'groups/partials/group_announcements_navigation_partial.html', context)
-        response['HX-Trigger'] = 'updateGroupActivity'
         return response
 
     return render(request, 'groups/group_announcements.html', context)
@@ -2530,3 +2553,27 @@ def group_settings_about_view(request, group_id):
     if request.headers.get('HX-Request'):
         return render(request, 'groups/settings/partials/group_settings_subpage_navigation_partial.html', context)
     return render(request, 'groups/settings/group_settings_about.html', context)
+
+
+@login_required
+@require_POST
+def mark_announcement_read_api(request, announcement_id):
+    """API endpoint to mark an announcement notification as read"""
+    announcement = get_object_or_404(Announcement, id=announcement_id)
+
+    # Check if user is a member of the group
+    is_member = Membership.objects.filter(
+        user=request.user,
+        group=announcement.group,
+        status=MembershipStatus.APPROVED
+    ).exists()
+    if not is_member and not request.user.is_superuser:
+        return JsonResponse({'error': 'You must be a member of this group'}, status=403)
+
+    mark_announcement_as_read_and_invalidate(request.user, announcement.id, group_id=announcement.group_id)
+    return JsonResponse({
+        'status': 'success',
+        'announcement_id': announcement.id,
+        'group_id': announcement.group_id
+    })
+

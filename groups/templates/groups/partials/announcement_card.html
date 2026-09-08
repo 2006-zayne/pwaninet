@@ -1,6 +1,9 @@
 {% load static %}
 {% load humanize %}
-<div id="announcement-card-{{ announcement.id }}" class="announcement-card shadow-sm mb-3 bg-white rounded-3 overflow-hidden border-0">
+<div id="announcement-card-{{ announcement.id }}"
+     data-announcement-id="{{ announcement.id }}"
+     class="announcement-card shadow-sm mb-3 {% if unread_announcement_ids and announcement.id in unread_announcement_ids %}unread-notification unread-announcement{% else %}bg-white{% endif %} rounded-3 overflow-hidden border-0"
+     onclick="handleAnnouncementCardClick('{{ announcement.id }}', event)">
     {% include 'groups/partials/announcement_header.html' %}
     
     {% include 'groups/partials/announcement_content.html' %}
@@ -9,6 +12,24 @@
 </div>
 
 <style>
+.announcement-card.unread-notification {
+    background-color: var(--primary-light, #e0e7ff) !important;
+    border-left: 4px solid var(--primary, var(--brand, #2563eb)) !important;
+}
+
+[data-theme="dark"] .announcement-card.unread-notification {
+    background-color: #37474f !important;
+    border-left: 4px solid #0084ff !important;
+}
+
+.announcement-card.unread-notification:hover {
+    background-color: var(--brand-light, #dbeafe) !important;
+}
+
+[data-theme="dark"] .announcement-card.unread-notification:hover {
+    background-color: #4a5568 !important;
+}
+
 [data-theme="dark"] .announcement-card {
     background-color: var(--card-bg) !important;
     border-color: var(--border) !important;
@@ -41,6 +62,7 @@
 }
 
 .announcement-card {
+    cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 

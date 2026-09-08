@@ -44,6 +44,8 @@ urlpatterns = [
     path('api/groups/<int:group_id>/announcements/<int:pk>/', views.AnnouncementViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='group_announcement_detail_api'),
     path('api/groups/<int:group_id>/announcements/<int:pk>/pin/', views.AnnouncementViewSet.as_view({'post': 'pin'}), name='group_announcement_pin_api'),
     path('api/groups/<int:group_id>/announcements/<int:pk>/unpin/', views.AnnouncementViewSet.as_view({'post': 'unpin'}), name='group_announcement_unpin_api'),
+    path('api/groups/<int:group_id>/announcements/<int:pk>/mark-read/', views.AnnouncementViewSet.as_view({'post': 'mark_read'}), name='group_announcement_mark_read_api'),
+    path('api/announcements/<int:announcement_id>/mark-read/', views.mark_announcement_read_api, name='mark_announcement_read_api'),
     # Group invite API endpoints
     path('api/groups/<int:group_id>/mutual-friends/', views.get_mutual_friends_api, name='get_mutual_friends_api'),
     path('api/groups/<int:group_id>/send-invites/', views.send_group_invites_api, name='send_group_invites_api'),

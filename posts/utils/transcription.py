@@ -117,8 +117,9 @@ def transcribe_audio_file(audio_path: str, model_size: str = "tiny") -> str:
         return ""
 
     try:
-        logger.info("Initializing faster-whisper model '%s' on CPU (int8)...", model_size)
-        model = WhisperModel(model_size, device="cpu", compute_type="int8")
+        cpu_threads = min(2, max(1, (os.cpu_count() or 1) // 2))
+        logger.info("Initializing faster-whisper model '%s' on CPU (int8, %d threads)...", model_size, cpu_threads)
+        model = WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=cpu_threads)
         
         segments, info = model.transcribe(audio_path, beam_size=1)
         

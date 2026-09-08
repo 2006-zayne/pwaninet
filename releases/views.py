@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -22,6 +22,7 @@ class ReleaseViewSet(viewsets.ReadOnlyModelViewSet):
     ViewSet for Release model.
     Provides endpoints for accessing release information.
     """
+    permission_classes = [permissions.AllowAny]
     queryset = Release.objects.all()
     serializer_class = ReleaseSerializer
     lookup_field = 'id'
@@ -92,69 +93,118 @@ class ReleaseViewSet(viewsets.ReadOnlyModelViewSet):
         """
         Lightweight endpoint for periodic polling to check for updates.
         Returns current version, latest version, and update status.
+        Supports client query parameters:
+            - installed_build: Build number of client app
+            - installed_version: Semantic version of client app
         Uses current Release model as source of truth.
         Endpoint: GET /api/releases/version_check/
         """
         from .services import ReleaseService
+        from pwaninet import version as app_version_module
         
-        # Get current release (source of truth)
-        current_release = ReleaseService.get_current_release()
+        # Get current release (source of truth for server)
+        try:
+            current_release = ReleaseService.get_current_release()
+        except Exception:
+            current_release = None
         
         if current_release:
             current_version = current_release.version
             current_build_number = current_release.build_number
         else:
-            # Fallback to version.py if no current release
-            try:
-                from pwaninet import version
-                current_version = version.__version__
-                current_build_number = version.__build_number__
-            except ImportError:
-                current_version = '0.0.0'
-                current_build_number = 0
+            current_version = app_version_module.resolve_version()
+            current_build_number = app_version_module.resolve_build_number()
         
-        # Get latest published release
-        cache_key = 'releases:version_check'
+        # Client installed version params (if provided by Capacitor app)
+        client_installed_build = request.GET.get('installed_build') or request.GET.get('build')
+        client_installed_version = request.GET.get('installed_version') or request.GET.get('version')
+        
+        cache_key = f'releases:version_check:{client_installed_version or "none"}:{client_installed_build or "none"}'
         cached_data = cache.get(cache_key)
-        
         if cached_data:
             return Response(cached_data)
         
-        latest_release = self.get_queryset().order_by('-build_number').first()
+        try:
+            latest_release = ReleaseService.get_latest_release()
+        except Exception:
+            latest_release = None
         
-        if not latest_release:
-            # No releases published yet
-            data = {
-                'current_version': current_version,
-                'current_build_number': current_build_number,
-                'latest_version': current_version,
-                'latest_build_number': current_build_number,
-                'update_available': False,
-                'mandatory_update': False,
-                'minimum_supported_version': None,
-                'release_date': None,
-                'release_title': 'No releases published',
-                'release_summary': '',
-                'release_url': None
-            }
-            return Response(data)
-        
-        # Determine if update is available
-        update_available = latest_release.build_number > current_build_number
+        if latest_release:
+            latest_version = latest_release.version
+            latest_build_number = latest_release.build_number
+            mandatory_update = latest_release.mandatory_update
+            minimum_supported_version = latest_release.minimum_supported_version
+            release_date = latest_release.release_date
+            release_title = latest_release.release_title
+            release_summary = latest_release.release_summary
+            release_url = f'/system/releases/{latest_release.id}/'
+            is_current = latest_release.is_current_release
+        else:
+            fallback_latest_ver = getattr(app_version_module, 'resolve_latest_version', app_version_module.resolve_version)()
+            latest_version = fallback_latest_ver
+            latest_build_number = current_build_number
+            mandatory_update = False
+            minimum_supported_version = None
+            release_date = None
+            release_title = f'Release {fallback_latest_ver}'
+            release_summary = ''
+            release_url = None
+            is_current = True
+
+        latest_apk_version = getattr(app_version_module, 'resolve_latest_apk_version', app_version_module.resolve_latest_version)()
+
+        # Determine if update is available and calculate effective running version
+        # If client provides installed version string:
+        # 1. An APK update is ONLY needed if latest_apk_version is strictly higher than client_installed_version.
+        # 2. If an APK update is needed (native changes exist), running_version STICKS to client_installed_version.
+        # 3. If no APK update is needed (Django-only changes), running_version UPDATES to latest_version (instant OTA).
+        has_native_changes = False
+        if client_installed_version:
+            try:
+                from releases.utils import parse_version
+                client_v = parse_version(client_installed_version)
+                latest_apk_v = parse_version(latest_apk_version)
+                latest_v = parse_version(latest_version)
+
+                update_available = client_v < latest_apk_v
+                has_native_changes = getattr(app_version_module, 'has_native_changes', lambda f, t: False)(client_installed_version, latest_version)
+                
+                if update_available:
+                    running_version = client_installed_version
+                else:
+                    running_version = latest_version
+            except Exception:
+                update_available = False
+                running_version = latest_version
+        elif client_installed_build:
+            try:
+                check_build = int(client_installed_build)
+                update_available = latest_build_number > check_build
+                running_version = current_version
+            except (ValueError, TypeError):
+                update_available = False
+                running_version = current_version
+        else:
+            update_available = False
+            running_version = latest_version
         
         data = {
             'current_version': current_version,
             'current_build_number': current_build_number,
-            'latest_version': latest_release.version,
-            'latest_build_number': latest_release.build_number,
+            'latest_version': latest_version,
+            'latest_build_number': latest_build_number,
+            'latest_apk_version': latest_apk_version,
+            'running_version': running_version,
+            'has_native_changes': has_native_changes,
             'update_available': update_available,
-            'mandatory_update': latest_release.mandatory_update,
-            'minimum_supported_version': latest_release.minimum_supported_version,
-            'release_date': latest_release.release_date,
-            'release_title': latest_release.release_title,
-            'release_summary': latest_release.release_summary,
-            'release_url': f'/system/releases/{latest_release.id}/',
-            'is_current': latest_release.is_current_release
+            'mandatory_update': mandatory_update,
+            'minimum_supported_version': minimum_supported_version,
+            'release_date': release_date,
+            'release_title': release_title,
+            'release_summary': release_summary,
+            'release_url': release_url,
+            'apk_url': '/download/app/latest/',
+            'is_current': is_current
         }
         
         # Cache for 1 minute (lightweight polling)

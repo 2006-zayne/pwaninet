@@ -154,7 +154,7 @@
   </div>
   <div class="update-info-item">
     <div class="update-info-label">Latest Version</div>
-    <div class="update-info-value" id="latest-version">{{ app_version }}</div>
+    <div class="update-info-value" id="latest-version">{{ latest_app_version|default:app_version }}</div>
   </div>
 </div>
 
@@ -195,11 +195,32 @@
     btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Checking...';
 
     try {
-      const response = await fetch('/api/releases/version_check/');
+      let query = '';
+      if (typeof window.getInstalledAppVersion === 'function') {
+        const inst = await window.getInstalledAppVersion();
+        if (inst && inst.version) {
+          query = '?installed_version=' + encodeURIComponent(inst.version) + '&installed_build=' + encodeURIComponent(inst.build);
+        }
+      } else {
+        const cachedVer = localStorage.getItem('pwaninet_installed_apk_version');
+        const cachedBuild = localStorage.getItem('pwaninet_installed_apk_build');
+        if (cachedVer) {
+          query = '?installed_version=' + encodeURIComponent(cachedVer) + '&installed_build=' + encodeURIComponent(cachedBuild || 1);
+        }
+      }
+
+      const response = await fetch('/api/releases/version_check/' + query);
       const data = await response.json();
 
-      // Update latest version display
-      document.getElementById('latest-version').textContent = data.latest_version;
+      // Update current and latest version displays
+      const curVerEl = document.getElementById('current-version');
+      if (curVerEl && data.running_version) {
+        curVerEl.textContent = data.running_version;
+      }
+      const latestVerEl = document.getElementById('latest-version');
+      if (latestVerEl && data.latest_version) {
+        latestVerEl.textContent = data.latest_version;
+      }
 
       // Update status
       const statusDot = document.getElementById('update-status-dot');
@@ -207,15 +228,19 @@
 
       if (data.update_available) {
         statusDot.style.background = '#f59e0b';
-        statusText.textContent = 'Update available';
+        statusText.textContent = 'Update available (v' + (data.latest_apk_version || data.latest_version) + ')';
         statusText.style.color = '#f59e0b';
 
         // Show update notification
         if (data.mandatory_update) {
           alert(`MANDATORY UPDATE: Version ${data.latest_version} is available. You must update to continue using the app.`);
-          window.location.href = '/system/releases/';
-        } else if (confirm(`New version ${data.latest_version} is available. Would you like to visit the Release Center?`)) {
-          window.location.href = '/system/releases/';
+          window.location.href = data.apk_url || '/download/app/latest/';
+        } else if (confirm(`New version ${data.latest_version} is available. Would you like to download the update?`)) {
+          if (typeof window.triggerNativeApkDownload === 'function') {
+            window.triggerNativeApkDownload(data.apk_url || '/download/app/latest/');
+          } else {
+            window.location.href = data.apk_url || '/download/app/latest/';
+          }
         }
       } else {
         statusDot.style.background = '#22c55e';

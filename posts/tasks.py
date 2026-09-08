@@ -213,12 +213,15 @@ def process_large_video(self, post_id):
             logger.info('[HLS] Post %s has no video, skipping', post_id)
             return
 
+        share_id_str = str(post.share_id) if hasattr(post, 'share_id') and post.share_id else str(post_id)
+
         # Mark as transcoding
         Post.objects.filter(id=post_id).update(video_status=Post.VIDEO_STATUS_TRANSCODING)
         _emit(user_id, {
             'post_id':  post_id,
+            'share_id': share_id_str,
             'status':   'transcoding',
-            'progress': 0,
+            'progress': 5,
             'message':  'Starting video transcoding…',
         })
 
@@ -261,11 +264,13 @@ def process_large_video(self, post_id):
 
         total_steps = len(eligible)
         for step, (label, target_h, video_kbps, audio_kbps) in enumerate(eligible, start=1):
+            start_pct = int((step - 1) / total_steps * 80) + 10
             _emit(user_id, {
                 'post_id':  post_id,
+                'share_id': share_id_str,
                 'status':   'transcoding',
-                'progress': int((step - 1) / total_steps * 90),
-                'message':  f'Encoding {label}…',
+                'progress': start_pct,
+                'message':  f'Encoding {label} stream…',
             })
 
             out_dir      = os.path.join(hls_abs_dir, label)
@@ -317,6 +322,15 @@ def process_large_video(self, post_id):
             produced.append((label, target_h, (video_kbps + audio_kbps) * 1000, playlist_rel))
             logger.info('[HLS] Post %s: %s done', post_id, label)
 
+            done_pct = int(step / total_steps * 80) + 10
+            _emit(user_id, {
+                'post_id':  post_id,
+                'share_id': share_id_str,
+                'status':   'transcoding',
+                'progress': done_pct,
+                'message':  f'{label} stream ready',
+            })
+
         # ------------------------------------------------------------------
         # Write master playlist
         # ------------------------------------------------------------------
@@ -343,11 +357,28 @@ def process_large_video(self, post_id):
                 f.write(f'{playlist_name}\n')
 
         # ------------------------------------------------------------------
+        # Pre-extract audio track for transcription while source is local
+        # ------------------------------------------------------------------
+        extracted_audio_path = None
+        try:
+            from posts.utils.transcription import extract_audio_from_video
+            temp_audio_dir = tempfile.gettempdir()
+            extracted_audio_path = os.path.join(temp_audio_dir, f'pwani_audio_{post_id}_{int(duration or 0)}.wav')
+            if extract_audio_from_video(source_path, extracted_audio_path):
+                logger.info('[HLS] Pre-extracted audio for transcription: %s', extracted_audio_path)
+            else:
+                extracted_audio_path = None
+        except Exception as audio_err:
+            logger.warning('[HLS] Could not pre-extract audio for transcription: %s', audio_err)
+            extracted_audio_path = None
+
+        # ------------------------------------------------------------------
         # Upload HLS files to Cloudflare R2 if cloud storage is active
         # ------------------------------------------------------------------
         if getattr(settings, 'USE_S3', False):
             _emit(user_id, {
                 'post_id':  post_id,
+                'share_id': share_id_str,
                 'status':   'transcoding',
                 'progress': 95,
                 'message':  'Uploading video streams to CDN…',
@@ -401,16 +432,17 @@ def process_large_video(self, post_id):
         final_hls_url = f"{settings.MEDIA_URL.rstrip('/')}/{master_rel.lstrip('/')}"
         _emit(user_id, {
             'post_id':    post_id,
+            'share_id':   share_id_str,
             'status':     'ready',
             'progress':   100,
-            'message':    'Video is ready!',
+            'message':    'Video is ready in HD!',
             'hls_url':    final_hls_url,
         })
         logger.info('[HLS] Post %s: all renditions complete → %s', post_id, master_rel)
 
-        # Dispatch speech-to-text audio transcription in background
+        # Dispatch speech-to-text audio transcription in background (isolated on search_queue)
         try:
-            extract_video_transcript.delay(post_id)
+            extract_video_transcript.delay(post_id, audio_path=extracted_audio_path)
             logger.info('[HLS] Dispatched extract_video_transcript for post %s', post_id)
         except Exception as transcript_err:
             logger.warning('[HLS] Could not dispatch extract_video_transcript for post %s: %s', post_id, transcript_err)
@@ -425,6 +457,7 @@ def process_large_video(self, post_id):
             try:
                 _emit(post.author_id, {
                     'post_id':  post_id,
+                    'share_id': share_id_str,
                     'status':   'failed',
                     'progress': 0,
                     'message':  'Video processing failed.',
@@ -438,8 +471,8 @@ def process_large_video(self, post_id):
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-@shared_task(bind=True, queue='media_queue', max_retries=2, default_retry_delay=60)
-def extract_video_transcript(self, post_id: int):
+@shared_task(bind=True, queue='search_queue', max_retries=2, default_retry_delay=60)
+def extract_video_transcript(self, post_id: int, audio_path: str = None):
     """Extract audio track and transcribe speech from post video.
     
     Runs asynchronously on media_queue after video transcoding is complete.
@@ -454,46 +487,44 @@ def extract_video_transcript(self, post_id: int):
 
     post = None
     tmp_dir = None
-    audio_path = None
+    resolved_audio_path = audio_path if (audio_path and os.path.exists(audio_path)) else None
     try:
         post = Post.objects.get(id=post_id)
         if not post.video:
             logger.info("Post %s has no video, skipping transcript extraction", post_id)
             return
 
-        logger.info("Starting audio extraction and transcription for post %s", post_id)
+        logger.info("Starting audio transcription for post %s", post_id)
 
-        # ------------------------------------------------------------------
-        # Resolve source video path (local filesystem or cloud storage)
-        # ------------------------------------------------------------------
-        source_path = None
-        try:
-            source_path = post.video.path
-            if not os.path.exists(source_path):
-                source_path = None
-        except (NotImplementedError, ValueError, AttributeError):
-            pass
+        # If audio track wasn't pre-extracted, resolve source and extract now
+        if not resolved_audio_path:
+            source_path = None
+            try:
+                source_path = post.video.path
+                if not os.path.exists(source_path):
+                    source_path = None
+            except (NotImplementedError, ValueError, AttributeError):
+                pass
 
-        if not source_path:
-            tmp_dir = tempfile.mkdtemp(prefix=f'pwani_transcribe_{post_id}_')
-            ext = os.path.splitext(post.video.name)[1] or '.mp4'
-            source_path = os.path.join(tmp_dir, f'video{ext}')
-            with post.video.open('rb') as src, open(source_path, 'wb') as dst:
-                shutil.copyfileobj(src, dst)
+            if not source_path:
+                tmp_dir = tempfile.mkdtemp(prefix=f'pwani_transcribe_{post_id}_')
+                ext = os.path.splitext(post.video.name)[1] or '.mp4'
+                source_path = os.path.join(tmp_dir, f'video{ext}')
+                with post.video.open('rb') as src, open(source_path, 'wb') as dst:
+                    shutil.copyfileobj(src, dst)
 
-        # Temporary audio file
-        if not tmp_dir:
-            tmp_dir = tempfile.mkdtemp(prefix=f'pwani_transcribe_{post_id}_')
-        audio_path = os.path.join(tmp_dir, 'audio.wav')
+            if not tmp_dir:
+                tmp_dir = tempfile.mkdtemp(prefix=f'pwani_transcribe_{post_id}_')
+            resolved_audio_path = os.path.join(tmp_dir, 'audio.wav')
 
-        # Extract 16kHz mono audio
-        success = extract_audio_from_video(source_path, audio_path)
-        if not success:
-            logger.warning("Failed to extract audio track for post %s", post_id)
-            return
+            # Extract 16kHz mono audio
+            success = extract_audio_from_video(source_path, resolved_audio_path)
+            if not success:
+                logger.warning("Failed to extract audio track for post %s", post_id)
+                return
 
         # Transcribe audio file
-        transcript = transcribe_audio_file(audio_path)
+        transcript = transcribe_audio_file(resolved_audio_path)
         if transcript:
             Post.objects.filter(id=post_id).update(video_transcript=transcript)
             update_post_search_vector(post_id)
@@ -509,6 +540,11 @@ def extract_video_transcript(self, post_id: int):
     finally:
         if tmp_dir and os.path.isdir(tmp_dir):
             shutil.rmtree(tmp_dir, ignore_errors=True)
+        if resolved_audio_path and os.path.exists(resolved_audio_path):
+            try:
+                os.remove(resolved_audio_path)
+            except Exception:
+                pass
 
 
 @shared_task

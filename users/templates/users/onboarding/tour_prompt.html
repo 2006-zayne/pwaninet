@@ -26,10 +26,18 @@ document.addEventListener('DOMContentLoaded', function() {
   const tourModal = bootstrap.Modal.getOrCreateInstance(promptEl);
   const hasCompletedOnboarding = {% if request.user.has_completed_onboarding %}true{% else %}false{% endif %};
   
-  if (!hasCompletedOnboarding) {
+  // Expose global function to trigger tour prompt manually
+  window.showOnboardingTourPrompt = function() {
+    tourModal.show();
+  };
+
+  // Only auto-show if user hasn't completed onboarding and welcome banner is NOT present
+  if (!hasCompletedOnboarding && !document.getElementById('welcomeTourBanner')) {
     setTimeout(function() {
-      tourModal.show();
-    }, 1500);
+      if (!document.getElementById('welcomeTourBanner')) {
+        tourModal.show();
+      }
+    }, 2000);
   }
   
   document.getElementById('skipTourBtn').addEventListener('click', function() {

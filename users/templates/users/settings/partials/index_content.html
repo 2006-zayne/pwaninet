@@ -37,7 +37,7 @@
         {% trans "Install the official native Android app for faster performance, smoother animations, and instant background push notifications." %}
       </p>
       <div class="settings-app-download-meta">
-        <span><i class="bi bi-check2-circle text-primary me-1"></i>{% trans "Version" %} {{ app_version|default:"1.0.0" }}</span>
+        <span id="settings-apk-version-label"><i class="bi bi-check2-circle text-primary me-1"></i>{% trans "Latest Version" %} {{ latest_app_version|default:app_version|default:"1.0.0" }}</span>
         <span>•</span>
         <span>{% trans "Direct APK Download" %}</span>
       </div>
@@ -50,6 +50,37 @@
       <!-- Desktop: Install on your phone Modal Trigger -->
       <button type="button" class="btn btn-primary btn-sm d-none d-md-inline-flex align-items-center" data-bs-toggle="modal" data-bs-target="#qrInstallModal" onclick="if (typeof window.renderDesktopQRCode === 'function') window.renderDesktopQRCode();">
         <i class="bi bi-qr-code-scan me-1"></i> {% trans "Install on your phone" %}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Native App Updates Card (visible ONLY inside native container) -->
+<div class="settings-app-download-card apk-download-card native-app-only" id="settings-native-update-card">
+  <div class="settings-app-download-inner">
+    <div class="settings-app-download-icon">
+      <img src="{% static 'images/pwaninet-app-icon.png' %}" alt="PwaniNet" width="48" height="48" style="border-radius:12px; object-fit: cover;" />
+    </div>
+    <div class="settings-app-download-content">
+      <div class="settings-app-download-title">
+        <span>{% trans "PwaniNet for Android" %}</span>
+        <span class="settings-app-badge" id="native-app-status-badge">{% trans "Installed" %}</span>
+      </div>
+      <p class="settings-app-download-desc" id="native-app-update-desc">
+        {% trans "Running the official native Android app." %}
+      </p>
+      <div class="settings-app-download-meta">
+        <span><i class="bi bi-phone text-primary me-1"></i>{% trans "Installed" %} <span id="native-installed-version">v{{ app_version|default:"1.0.0" }}</span></span>
+        <span>•</span>
+        <span id="native-latest-version-meta"><i class="bi bi-cloud-arrow-down text-primary me-1"></i>{% trans "Latest" %} v{{ latest_app_version|default:app_version|default:"1.0.0" }}</span>
+      </div>
+    </div>
+    <div class="settings-app-download-action" id="native-app-update-action">
+      <a href="{% url 'download_android_apk' %}" target="_blank" id="native-app-download-update-btn" class="btn btn-primary btn-sm d-none align-items-center" onclick="if (typeof window.triggerNativeApkDownload === 'function') { window.triggerNativeApkDownload(this.href); return false; }">
+        <i class="bi bi-arrow-up-circle me-1"></i> {% trans "Download Update" %}
+      </a>
+      <button type="button" class="btn btn-outline-primary btn-sm d-inline-flex align-items-center" id="native-app-check-update-btn" onclick="if (typeof window.checkNativeAppUpdates === 'function') window.checkNativeAppUpdates(true);">
+        <i class="bi bi-arrow-clockwise me-1"></i> {% trans "Check for Updates" %}
       </button>
     </div>
   </div>
@@ -187,6 +218,49 @@
         }
         window.copyApkLink = copyApkLink;
       </script>
+      <script>
+        (function() {
+          async function syncLatestReleaseFromGitHub() {
+            try {
+              const cached = sessionStorage.getItem('pwaninet_gh_latest');
+              const cachedTime = parseInt(sessionStorage.getItem('pwaninet_gh_latest_time') || '0', 10);
+              let tag = (cached && Date.now() - cachedTime < 300000) ? cached : null;
+
+              if (!tag) {
+                const res = await fetch('https://api.github.com/repos/2006-zayne/pwaninet/releases/latest');
+                if (res.ok) {
+                  const data = await res.json();
+                  tag = (data.tag_name || '').replace(/^v/, '').trim();
+                  if (tag) {
+                    sessionStorage.setItem('pwaninet_gh_latest', tag);
+                    sessionStorage.setItem('pwaninet_gh_latest_time', String(Date.now()));
+                  }
+                }
+              }
+
+              if (tag) {
+                const apkLabel = document.getElementById('settings-apk-version-label');
+                if (apkLabel) {
+                  apkLabel.innerHTML = '<i class="bi bi-check2-circle text-primary me-1"></i>{% trans "Latest Version" %} ' + tag;
+                }
+                const nativeMeta = document.getElementById('native-latest-version-meta');
+                if (nativeMeta) {
+                  nativeMeta.innerHTML = '<i class="bi bi-cloud-arrow-down text-primary me-1"></i>{% trans "Latest" %} v' + tag;
+                }
+              }
+            } catch (e) {
+              console.warn('[PwaniNet] GitHub release sync error:', e);
+            }
+          }
+
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', syncLatestReleaseFromGitHub);
+          } else {
+            syncLatestReleaseFromGitHub();
+          }
+          document.addEventListener('htmx:afterSwap', syncLatestReleaseFromGitHub);
+        })();
+      </script>
       <div class="modal-footer border-0 pt-0 pb-4 px-4 justify-content-center">
         <span class="text-muted small">
           {% trans "Downloading on this device?" %} 
@@ -316,6 +390,15 @@
   .is-native-app .native-app-hidden,
   .is-capacitor .native-app-hidden {
     display: none !important;
+  }
+
+  /* Automatically show native update card only inside native app container */
+  .native-app-only {
+    display: none !important;
+  }
+  .is-native-app .native-app-only,
+  .is-capacitor .native-app-only {
+    display: block !important;
   }
 
   /* Desktop QR Install Modal Dark Theme */

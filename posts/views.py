@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.urls import reverse
+from django.conf import settings
 from celery.result import AsyncResult
 
 from .models import Post, Comment, Report, Like, Repost, HiddenPost, AuthorPreference, SharedPost, PostImage, PostImageLike, PostImageComment
@@ -88,6 +89,26 @@ class PostViewSet(viewsets.ModelViewSet):
             import traceback
             logger.error('[PostViewSet.create] Traceback: %s', traceback.format_exc())
             raise
+
+    @action(detail=True, methods=['get'], url_path='status')
+    def status_detail(self, request, share_id=None):
+        """
+        GET /api/posts/<share_id>/status/
+        Fast, lightweight status endpoint for polling post and video processing readiness.
+        """
+        post = self.get_object()
+        hls_url = ''
+        if post.hls_playlist:
+            hls_url = f"{settings.MEDIA_URL.rstrip('/')}/{post.hls_playlist.lstrip('/')}"
+        return Response({
+            'id': str(post.share_id),
+            'post_id': post.id,
+            'share_id': str(post.share_id),
+            'video_status': post.video_status,
+            'is_ready': post.video_status == Post.VIDEO_STATUS_READY,
+            'hls_url': hls_url,
+            'video_duration': post.video_duration,
+        })
 
     @action(detail=True, methods=['post'], url_path='report')
     def report(self, request, pk=None):

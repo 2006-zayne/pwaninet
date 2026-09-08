@@ -408,16 +408,18 @@ class UploadBanner {
                 this.hide();
             }, 2600);
         } else {
-            // Video post: show Published badge for 1.8s then transition to HD transcoding telemetry
+            // Video post: show Published badge for 1.2s then transition to HD transcoding telemetry
             if (this.phaseTransitionTimer) clearTimeout(this.phaseTransitionTimer);
             this.phaseTransitionTimer = setTimeout(() => {
                 this.setHeaderTitle('OPTIMIZING VIDEO', 'phase-transcoding');
                 this.setTitle('Processing HD video…');
-                this.setSubtitle('Preparing multi-bitrate HLS streams…');
+                if (this.currentProgress <= 10) {
+                    this.setSubtitle('Preparing multi-bitrate HLS streams…');
+                    this.updateProgress(10);
+                }
                 this.setProgressFillClass('phase-transcoding');
                 this.showQualityPills(true);
-                this.updateProgress(5);
-            }, 1800);
+            }, 1200);
         }
     }
 

@@ -2,31 +2,31 @@
 {% load static %}
 
 {% block content %}
-<div class="onboarding-wrapper py-4 py-md-5">
-  <div class="container" style="max-width: 860px;">
+<div class="onboarding-wrapper py-3 py-md-5 px-1 px-sm-2 px-md-0">
+  <div class="container px-2 px-md-3" style="max-width: 860px;">
 
     <!-- Wizard Header -->
-    <div class="text-center mb-4 mb-md-5">
-      <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3" style="width: 60px; height: 60px;">
-        <i class="bi bi-compass-fill fs-2"></i>
+    <div class="text-center mb-3 mb-md-5">
+      <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-2 mb-md-3" style="width: 52px; height: 52px;">
+        <i class="bi bi-compass-fill fs-3"></i>
       </div>
-      <h2 class="fw-bold display-6 mb-2">Welcome to PwaniNet, {{ request.user.first_name|default:request.user.username }}!</h2>
-      <p class="text-muted mx-auto" style="max-width: 520px;">
+      <h2 class="fw-bold display-6 mb-2 wizard-header-title">Welcome to PwaniNet, {{ request.user.first_name|default:request.user.username }}!</h2>
+      <p class="text-muted mx-auto px-2" style="max-width: 520px; font-size: 0.95rem;">
         Let's personalize your academic network so your feed is populated with classmates, discussions, and course notes right from day one.
       </p>
 
       <!-- Stepper Indicator -->
-      <div class="stepper-nav d-flex align-items-center justify-content-center gap-3 mt-4">
+      <div class="stepper-nav d-flex align-items-center justify-content-center gap-2 gap-md-3 mt-3 mt-md-4 flex-wrap">
         <button type="button"
                 id="tab-btn-1"
-                class="btn rounded-pill px-4 py-2 fw-bold d-flex align-items-center gap-2 stepper-tab active-tab"
+                class="btn rounded-pill px-3 px-md-4 py-2 fw-bold d-flex align-items-center gap-2 stepper-tab active-tab"
                 onclick="goToStep(1)">
           <span class="step-num-badge">1</span> Find Classmates
         </button>
-        <i class="bi bi-chevron-right text-muted small"></i>
+        <i class="bi bi-chevron-right text-muted small d-none d-sm-inline-block"></i>
         <button type="button"
                 id="tab-btn-2"
-                class="btn rounded-pill px-4 py-2 fw-bold d-flex align-items-center gap-2 stepper-tab text-muted"
+                class="btn rounded-pill px-3 px-md-4 py-2 fw-bold d-flex align-items-center gap-2 stepper-tab text-muted"
                 onclick="goToStep(2)">
           <span class="step-num-badge">2</span> Join Communities
         </button>
@@ -34,7 +34,7 @@
     </div>
 
     <!-- Wizard Cards Container -->
-    <div class="card border-0 shadow-lg rounded-5 overflow-hidden p-4 p-md-5 bg-white position-relative">
+    <div class="card border-0 shadow-sm shadow-md-lg rounded-4 rounded-md-5 overflow-hidden p-3 p-sm-4 p-md-5 bg-white position-relative wizard-card-container">
       
       <!-- Step 1 Pane -->
       <div id="step-pane-1" class="wizard-pane">
@@ -113,6 +113,24 @@
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 767px) {
+    .onboarding-wrapper {
+      padding-top: 12px !important;
+      padding-bottom: 28px !important;
+    }
+    .wizard-header-title {
+      font-size: 1.45rem !important;
+    }
+    .wizard-card-container {
+      padding: 16px 12px !important;
+      border-radius: 20px !important;
+    }
+    .stepper-tab {
+      font-size: 0.85rem !important;
+      padding: 6px 14px !important;
+    }
   }
 </style>
 

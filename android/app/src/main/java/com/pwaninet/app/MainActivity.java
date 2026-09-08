@@ -2,6 +2,7 @@ package com.pwaninet.app;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.net.ConnectivityManager;
@@ -78,6 +79,27 @@ public class MainActivity extends BridgeActivity {
             if (activity != null) {
                 activity.openExternalUrl(url);
             }
+        }
+
+        @JavascriptInterface
+        public String getAppVersionInfo() {
+            MainActivity activity = activityRef.get();
+            if (activity != null) {
+                try {
+                    PackageInfo pInfo = activity.getPackageManager().getPackageInfo(activity.getPackageName(), 0);
+                    String versionName = pInfo.versionName != null ? pInfo.versionName : "1.0.0";
+                    long versionCode = 1;
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        versionCode = pInfo.getLongVersionCode();
+                    } else {
+                        versionCode = pInfo.versionCode;
+                    }
+                    return "{\"versionName\":\"" + versionName + "\",\"versionCode\":" + versionCode + "}";
+                } catch (Exception e) {
+                    return "{\"versionName\":\"1.0.0\",\"versionCode\":1}";
+                }
+            }
+            return "{}";
         }
     }
 
@@ -205,11 +227,24 @@ public class MainActivity extends BridgeActivity {
         setupCustomWebViewClient();
         setupWebViewCaching();
 
-        // Ensure custom user agent identifier is appended
+        // Ensure custom user agent identifier with version and build is appended
         if (this.bridge != null && this.bridge.getWebView() != null) {
             WebSettings settings = this.bridge.getWebView().getSettings();
             String defaultUserAgent = settings.getUserAgentString();
-            settings.setUserAgentString(defaultUserAgent + " PwaniNetApp/Android");
+            String appVersion = "1.0.0";
+            long appCode = 1;
+            try {
+                PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+                if (pInfo.versionName != null) {
+                    appVersion = pInfo.versionName;
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    appCode = pInfo.getLongVersionCode();
+                } else {
+                    appCode = pInfo.versionCode;
+                }
+            } catch (Exception ignored) {}
+            settings.setUserAgentString(defaultUserAgent + " PwaniNetApp/Android/" + appVersion + " (Build/" + appCode + ")");
         }
         
         // Restore WebView state if available

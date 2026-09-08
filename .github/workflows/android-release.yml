@@ -3,7 +3,13 @@ name: Build & Release Android APK
 on:
   push:
     branches:
-      - main          # auto-release on every push to main
+      - main          # auto-release when Android native code changes
+    paths:
+      - 'android/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'capacitor.config.json'
+      - '.github/workflows/android-release.yml'
   workflow_dispatch:  # manual trigger
     inputs:
       tag_name:

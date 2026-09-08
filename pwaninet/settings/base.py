@@ -303,9 +303,11 @@ CELERY_TASK_QUEUES = {
 }
 
 CELERY_TASK_ROUTES = {
-    # Heavy video processing & future speech/transcription tasks
+    # Heavy video processing
     'posts.tasks.process_large_video': {'queue': 'media_queue'},
-    'posts.tasks.extract_video_transcript': {'queue': 'media_queue'},
+    
+    # Background speech/transcription tasks (routed to search_queue so media_queue stays fast & responsive)
+    'posts.tasks.extract_video_transcript': {'queue': 'search_queue'},
     
     # Document extraction & rendering pipelines
     'documents.tasks.processing.process_document': {'queue': 'docs_queue'},
