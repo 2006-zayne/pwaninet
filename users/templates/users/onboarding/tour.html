@@ -54,7 +54,7 @@
                 0 0 0 1px rgba(0, 0, 0, 0.08);
     width: 380px;
     max-width: calc(100vw - 32px);
-    padding: 22px 20px 18px;
+    padding: 20px 18px 16px;
     opacity: 0;
     transform: translateY(8px) scale(0.97);
     transition: opacity 0.28s ease,
@@ -97,7 +97,7 @@
     padding: 8px 12px;
     font-size: 0.8rem;
     color: #475569;
-    margin-top: 12px;
+    margin-top: 10px;
   }
   [data-theme="dark"] .tour-tip-box {
     background: #0f172a;
@@ -130,15 +130,15 @@
     background: #818cf8;
   }
 
-  /* Responsive bottom-sheet positioning on mobile */
+  /* Responsive positioning on mobile: Lifted cleanly above mobile bottom nav */
   @media (max-width: 767px) {
     #pwaninet-tour-card {
       width: calc(100vw - 24px) !important;
       left: 12px !important;
       right: 12px !important;
       max-width: none !important;
-      border-radius: 22px;
-      padding: 18px 16px 14px;
+      border-radius: 20px;
+      padding: 16px 14px 12px;
     }
   }
 </style>
@@ -161,14 +161,14 @@
               style="font-size: 0.75rem;"></button>
     </div>
 
-    <div class="d-flex align-items-start gap-3 mt-3">
+    <div class="d-flex align-items-start gap-3 mt-2">
       <div class="rounded-circle bg-primary bg-opacity-10 text-primary p-2 d-flex align-items-center justify-content-center flex-shrink-0"
-           style="width: 44px; height: 44px;" id="tourStepIconBox">
+           style="width: 42px; height: 42px;" id="tourStepIconBox">
         <i class="bi bi-compass-fill fs-4" id="tourStepIcon"></i>
       </div>
       <div class="flex-grow-1 min-w-0">
-        <h6 class="fw-bold mb-1" id="tourStepTitle" style="font-size: 1.05rem;">Campus Feed & Search</h6>
-        <p class="small text-muted mb-0" id="tourStepBody" style="line-height: 1.4; font-size: 0.85rem;">
+        <h6 class="fw-bold mb-1" id="tourStepTitle" style="font-size: 1rem;">Campus Feed & Search</h6>
+        <p class="small text-muted mb-0" id="tourStepBody" style="line-height: 1.4; font-size: 0.83rem;">
           Your personalized feed brings together classmate posts, campus announcements, and group discussions.
         </p>
       </div>
@@ -214,6 +214,9 @@
 (function() {
   'use strict';
 
+  const PROFILE_URL = "{% url 'users:profile' request.user.username %}";
+  const HOME_URL = "{% url 'posts:home' %}";
+
   const TOUR_STEPS = [
     {
       title: "Campus Feed & Search",
@@ -221,39 +224,55 @@
       body: "Your home feed displays real-time posts, questions, and course updates from your classmates and academic groups. Use the search bar anytime to find friends, notes, or groups.",
       tip: "Search for unit codes like CSC101 or classmate names to find discussions instantly.",
       targets: ['.search-header', '.search-inner', '#main-content-area'],
-      positionDesktop: 'bottom'
+      isProfileTarget: false
     },
     {
       title: "Academic Groups & Cohorts",
       icon: "bi-people-fill",
-      body: "Connect with course squads and campus societies. You are automatically enrolled in your official class group based on your degree and academic year!",
-      tip: "Check your group chats for exam tips, timetable changes, and shared study materials.",
-      targets: ['.groups-explore-section', 'a.nav-chip[aria-label="Groups"]', 'a[href*="groups_dashboard"]', '.groups-explore-list'],
-      positionDesktop: 'bottom'
+      body: "Tap the Groups icon to explore course cohorts, revision squads, and campus societies. You are automatically enrolled in your official class group based on your year and degree!",
+      tip: "Check your group chats for exam tips, timetable updates, and shared study materials.",
+      targets: [
+        '.mobile-bottom-nav a[aria-label="Groups"]',
+        '.mobile-bottom-nav a[href*="groups_dashboard"]',
+        '.navbar-top a[href*="groups_dashboard"]',
+        '.navbar-top a[href*="groups"]',
+        '.groups-explore-section'
+      ],
+      isProfileTarget: false
     },
     {
-      title: "Document Repository",
-      icon: "bi-file-earmark-text-fill",
-      body: "Access peer-reviewed lecture notes, exam revisions, and past papers tailored to your semester curriculum. Bookmark documents for quick offline reference.",
-      tip: "Browse the 'For You' section to find documents matching your current semester units.",
-      targets: ['.search-input', '#main-content-area', '.feed-sector'],
-      positionDesktop: 'bottom'
+      title: "Document Repository Shortcut",
+      icon: "bi-folder-fill",
+      body: "We've navigated to your profile! Tap this floating Documents button anytime to access lecture notes, summaries, and past papers tailored to your semester curriculum.",
+      tip: "Notes matching your active units have a 'Matches Unit' badge and can be saved for offline study.",
+      targets: ['#documents-btn', '.floating-btn[href*="documents"]', '#profile-floating-actions'],
+      isProfileTarget: true
     },
     {
-      title: "Ask & Share with Peers",
+      title: "Ask & Share (Create Post)",
       icon: "bi-plus-circle-fill",
-      body: "Have a question about coursework or campus life? Post questions and updates to your classmates with photos, documents, and code snippets.",
-      tip: "Tag your specific programme group so classmates in your course can answer quickly.",
-      targets: ['a.nav-chip[aria-label="Create Post"]', '.navbar-top a[href*="create_post"]', 'a[href*="create_post"]'],
-      positionDesktop: 'top'
+      body: "Got an assignment question or campus update? Tap the Post button to share with your classmates. You can attach images, PDFs, links, and poll the community.",
+      tip: "Tag your specific course group so classmates in the same unit get notified right away.",
+      targets: [
+        '.mobile-bottom-nav a[aria-label="Create Post"]',
+        '.mobile-bottom-nav a[href*="create_post"]',
+        '.navbar-top a[href*="create_post"]',
+        'a[href*="create_post"]'
+      ],
+      isProfileTarget: false
     },
     {
-      title: "Notifications & Profile",
+      title: "Notifications & Alerts",
       icon: "bi-bell-fill",
-      body: "Stay updated on replies, likes, and course announcements. Complete your profile with your skills, year, and bio so classmates can discover you.",
-      tip: "Tap your avatar anytime to view your profile and toggle dark/light theme preferences.",
-      targets: ['#notification-badge-container', '#notification-badge-container-desktop', '.avatar-link', 'a.nav-chip[aria-label="Notifications"]'],
-      positionDesktop: 'top'
+      body: "Keep track of assignment replies, likes, mentions, and course announcements right here in Notifications. You're ready to make the most of PwaniNet!",
+      tip: "Check your notification settings in your profile to customize alert sounds and push updates.",
+      targets: [
+        '#notification-badge-container',
+        '.mobile-bottom-nav a[aria-label="Notifications"]',
+        '#notification-badge-container-desktop',
+        '.navbar-top a[href*="notifications"]'
+      ],
+      isProfileTarget: false
     }
   ];
 
@@ -274,7 +293,6 @@
         return el;
       }
     }
-    // Fallback if none found
     return document.querySelector('#main-content-area') || document.body;
   }
 
@@ -296,10 +314,80 @@
     if (!step) return;
 
     currentStepIndex = index;
-    const target = resolveTarget(step);
+
+    // Handle profile page navigation for Document Repository step
+    if (step.isProfileTarget) {
+      const existingBtn = document.getElementById('documents-btn');
+      if (!existingBtn || existingBtn.offsetParent === null) {
+        // Navigate to profile using HTMX or window.location
+        if (window.htmx) {
+          htmx.ajax('GET', PROFILE_URL, { target: '#page-content-target', swap: 'innerHTML' });
+        } else {
+          const profileChip = document.querySelector('a.nav-chip[aria-label="Profile"]') || document.querySelector('a[href*="/profile/"]');
+          if (profileChip) profileChip.click();
+        }
+
+        // Wait for profile content and documents button to mount
+        let attempts = 0;
+        const checkInterval = setInterval(() => {
+          attempts++;
+          const btn = document.getElementById('documents-btn');
+          if (btn && btn.offsetParent !== null) {
+            clearInterval(checkInterval);
+            proceedWithTarget(step, index, btn);
+          } else if (attempts > 30) {
+            clearInterval(checkInterval);
+            proceedWithTarget(step, index, resolveTarget(step));
+          }
+        }, 80);
+        return;
+      } else {
+        proceedWithTarget(step, index, existingBtn);
+        return;
+      }
+    } else if (index === 0) {
+      // If moving back to Step 1 and we're still on profile, navigate back to feed
+      const searchHeader = document.querySelector('.search-header');
+      if (!searchHeader && window.htmx) {
+        htmx.ajax('GET', HOME_URL, { target: '#page-content-target', swap: 'innerHTML' });
+        setTimeout(() => {
+          proceedWithTarget(step, index, resolveTarget(step));
+        }, 150);
+        return;
+      }
+    }
+
+    proceedWithTarget(step, index, resolveTarget(step));
+  }
+
+  function proceedWithTarget(step, index, target) {
+    // Reset previous target styling
+    if (activeTargetElement) {
+      if (activeTargetElement.id === 'documents-btn') {
+        activeTargetElement.classList.remove('expanded');
+        activeTargetElement.style.removeProperty('z-index');
+      }
+    }
+
     activeTargetElement = target;
 
-    // Update UI elements
+    // Handle Documents floating button expansion
+    if (target && target.id === 'documents-btn') {
+      target.classList.add('expanded');
+      target.style.zIndex = '10053';
+    }
+
+    // Handle Mobile Bottom Nav elevation when targeting nav chips
+    const mobileNav = document.querySelector('.mobile-bottom-nav');
+    if (mobileNav) {
+      if (target && target.closest('.mobile-bottom-nav')) {
+        mobileNav.style.zIndex = '10053';
+      } else {
+        mobileNav.style.removeProperty('z-index');
+      }
+    }
+
+    // Update UI text & icons
     const badge = document.getElementById('tourStepBadge');
     const title = document.getElementById('tourStepTitle');
     const body = document.getElementById('tourStepBody');
@@ -318,11 +406,7 @@
 
     // Prev button state
     if (prevBtn) {
-      if (index === 0) {
-        prevBtn.style.visibility = 'hidden';
-      } else {
-        prevBtn.style.visibility = 'visible';
-      }
+      prevBtn.style.visibility = index === 0 ? 'hidden' : 'visible';
     }
 
     // Next button state
@@ -340,12 +424,11 @@
 
     updateDots();
 
-    // Smooth scroll element into view if not on screen
-    if (target && target !== document.body) {
+    // Smooth scroll if element is not visible
+    if (target && target !== document.body && !target.closest('.mobile-bottom-nav')) {
       target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
     }
 
-    // Position spotlight & card after slight delay for smooth scroll
     setTimeout(repositionSpotlight, 120);
   }
 
@@ -373,19 +456,23 @@
 
     // Position Card
     if (isMobile) {
-      // On mobile: ergonomic bottom sheet
-      // If target is in the bottom bar (bottom nav), place card above it
-      if (rect.bottom > window.innerHeight - 90) {
-        card.style.top = 'auto';
-        card.style.bottom = '85px';
+      // On mobile: if target is near bottom (e.g. floating documents button at bottom 110px),
+      // place dialogue at top to avoid covering it!
+      const isNearBottomAction = activeTargetElement.id === 'documents-btn' ||
+                                (rect.top > window.innerHeight * 0.48 && rect.bottom < window.innerHeight - 80);
+
+      if (isNearBottomAction) {
+        card.style.top = 'calc(24px + var(--pwaninet-safe-area-top, 0px))';
+        card.style.bottom = 'auto';
       } else {
+        // Otherwise lift card cleanly ABOVE the mobile bottom nav bar (60px + 12px = 72px)
         card.style.top = 'auto';
-        card.style.bottom = '20px';
+        card.style.bottom = 'calc(88px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)))';
       }
       card.style.left = '12px';
       card.style.right = '12px';
     } else {
-      // On desktop: intelligently place next to element
+      // On desktop: intelligently place card next to element
       card.style.right = 'auto';
       card.style.bottom = 'auto';
 
@@ -400,7 +487,7 @@
         cardTop = Math.max(20, rect.top - cardHeight - 16);
       }
 
-      // Clamp horizontal
+      // Clamp horizontal position
       if (cardLeft + cardWidth > window.innerWidth - 20) {
         cardLeft = window.innerWidth - cardWidth - 20;
       }
@@ -479,6 +566,16 @@
     isTourRunning = false;
     const overlay = document.getElementById('pwaninet-tour-overlay');
     const card = document.getElementById('pwaninet-tour-card');
+    const mobileNav = document.querySelector('.mobile-bottom-nav');
+    const docsBtn = document.getElementById('documents-btn');
+
+    if (docsBtn) {
+      docsBtn.classList.remove('expanded');
+      docsBtn.style.removeProperty('z-index');
+    }
+    if (mobileNav) {
+      mobileNav.style.removeProperty('z-index');
+    }
 
     if (card) card.classList.remove('card-visible');
     if (overlay) {
@@ -492,7 +589,6 @@
     window.removeEventListener('scroll', handleResizeOrScroll);
     window.removeEventListener('keydown', handleKeydown);
 
-    // Also dismiss welcome banner if present
     if (typeof window.dismissWelcomeBanner === 'function') {
       window.dismissWelcomeBanner();
     }

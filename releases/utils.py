@@ -5,10 +5,12 @@ Provides reusable helpers for version parsing, comparison, and generation.
 Follows semantic versioning specification (semver.org).
 """
 import re
+from functools import total_ordering
 from typing import Tuple, Optional, Dict
 from dataclasses import dataclass
 
 
+@total_ordering
 @dataclass
 class Version:
     """

@@ -10,8 +10,8 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-DEFAULT_VERSION = "1.0.1"
-DEFAULT_BUILD = 64
+DEFAULT_VERSION = "1.2.0"
+DEFAULT_BUILD = 70
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -38,7 +38,7 @@ def _run_git_command(args):
 @functools.lru_cache(maxsize=1)
 def resolve_version():
     """
-    Resolve semantic version string (e.g. '1.0.1').
+    Resolve semantic version string (e.g. '1.2.0').
     Priority:
     1. Environment variable APP_VERSION or VERSION_NAME
     2. Git tag via git describe --tags --abbrev=0 (stripping leading 'v')
@@ -50,7 +50,15 @@ def resolve_version():
 
     git_tag = _run_git_command(["describe", "--tags", "--abbrev=0"])
     if git_tag:
-        return git_tag.lstrip('v').strip()
+        tag_clean = git_tag.lstrip('v').strip()
+        # Ensure we don't return an outdated git tag if DEFAULT_VERSION is higher
+        try:
+            from releases.utils import parse_version
+            if parse_version(tag_clean) < parse_version(DEFAULT_VERSION):
+                return DEFAULT_VERSION
+        except Exception:
+            pass
+        return tag_clean
 
     return DEFAULT_VERSION
 
@@ -60,8 +68,8 @@ _latest_version_cache = {"version": None, "timestamp": 0}
 
 def fetch_github_latest_release(repo="2006-zayne/pwaninet", timeout=3):
     """
-    Fetch the latest release tag from GitHub Releases API.
-    Cached for 10 minutes to respect GitHub rate limits.
+    Fetch the latest release tag from GitHub Releases API or web redirect.
+    Cached for 60 seconds to respect GitHub rate limits.
     """
     try:
         from django.core.cache import cache
@@ -71,12 +79,48 @@ def fetch_github_latest_release(repo="2006-zayne/pwaninet", timeout=3):
     except Exception:
         cache = None
 
+    # Method 1: Web redirect (HTTP 302 /releases/latest -> /releases/tag/vX.Y.Z) - no rate limits
+    try:
+        import urllib.request
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                return None
+
+        opener = urllib.request.build_opener(NoRedirect)
+        req = urllib.request.Request(
+            f'https://github.com/{repo}/releases/latest',
+            headers={'User-Agent': 'Mozilla/5.0 (compatible; PwaniNetServer/1.0)'}
+        )
+        try:
+            with opener.open(req, timeout=timeout) as resp:
+                pass
+        except urllib.error.HTTPError as e:
+            if e.code in (301, 302, 307, 308):
+                loc = e.headers.get('Location', '')
+                if '/releases/tag/' in loc:
+                    tag = loc.split('/releases/tag/')[-1].lstrip('v').strip()
+                    if tag:
+                        if cache:
+                            try:
+                                cache.set(f'github_latest_release:{repo}', tag, timeout=60)
+                            except Exception:
+                                pass
+                        return tag
+    except Exception:
+        pass
+
+    # Method 2: GitHub API with optional GITHUB_TOKEN
     try:
         import urllib.request
         import json
+        headers = {'User-Agent': 'PwaniNet-App/1.0', 'Accept': 'application/vnd.github.v3+json'}
+        gh_token = os.environ.get('GITHUB_TOKEN')
+        if gh_token:
+            headers['Authorization'] = f'Bearer {gh_token}'
+
         req = urllib.request.Request(
             f'https://api.github.com/repos/{repo}/releases/latest',
-            headers={'User-Agent': 'PwaniNet-App/1.0', 'Accept': 'application/vnd.github.v3+json'}
+            headers=headers
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             if resp.status == 200:
@@ -85,7 +129,7 @@ def fetch_github_latest_release(repo="2006-zayne/pwaninet", timeout=3):
                 if tag:
                     if cache:
                         try:
-                            cache.set(f'github_latest_release:{repo}', tag, timeout=600)
+                            cache.set(f'github_latest_release:{repo}', tag, timeout=60)
                         except Exception:
                             pass
                     return tag
@@ -105,7 +149,7 @@ def resolve_latest_version(use_cache=True):
     """
     import time
     now = time.time()
-    if use_cache and _latest_version_cache["version"] and (now - _latest_version_cache["timestamp"] < 300):
+    if use_cache and _latest_version_cache["version"] and (now - _latest_version_cache["timestamp"] < 60):
         return _latest_version_cache["version"]
 
     env_latest = os.environ.get('LATEST_APP_VERSION')
@@ -128,11 +172,23 @@ def resolve_latest_version(use_cache=True):
         for tag in git_tags.splitlines():
             clean_tag = tag.strip().lstrip('v').strip()
             if clean_tag:
+                try:
+                    from releases.utils import parse_version
+                    if parse_version(clean_tag) < parse_version(DEFAULT_VERSION):
+                        clean_tag = DEFAULT_VERSION
+                except Exception:
+                    pass
                 _latest_version_cache["version"] = clean_tag
                 _latest_version_cache["timestamp"] = now
                 return clean_tag
 
     fallback = resolve_version()
+    try:
+        from releases.utils import parse_version
+        if parse_version(fallback) < parse_version(DEFAULT_VERSION):
+            fallback = DEFAULT_VERSION
+    except Exception:
+        pass
     _latest_version_cache["version"] = fallback
     _latest_version_cache["timestamp"] = now
     return fallback
@@ -143,7 +199,7 @@ NATIVE_PATHS = ['android/', 'package.json', 'package-lock.json', 'capacitor.conf
 _latest_apk_version_cache = {"version": None, "timestamp": 0}
 
 
-def fetch_github_latest_apk_release(repo="2006-zayne/pwaninet", timeout=3):
+def fetch_github_latest_apk_release(repo="2006-zayne/pwaninet", timeout=5):
     """
     Fetch the latest release tag from GitHub Releases API that has an .apk asset attached.
     Cached for 10 minutes.
@@ -159,8 +215,32 @@ def fetch_github_latest_apk_release(repo="2006-zayne/pwaninet", timeout=3):
     try:
         import urllib.request
         import json
+
+        # 1. Fast path: check releases/latest
+        try:
+            req_latest = urllib.request.Request(
+                f'https://api.github.com/repos/{repo}/releases/latest',
+                headers={'User-Agent': 'PwaniNet-App/1.0', 'Accept': 'application/vnd.github.v3+json'}
+            )
+            with urllib.request.urlopen(req_latest, timeout=timeout) as resp:
+                if resp.status == 200:
+                    r = json.loads(resp.read().decode('utf-8'))
+                    assets = r.get('assets', [])
+                    if any(a.get('name', '').endswith('.apk') for a in assets):
+                        tag = r.get('tag_name', '').lstrip('v').strip()
+                        if tag:
+                            if cache:
+                                try:
+                                    cache.set(f'github_latest_apk_release:{repo}', tag, timeout=60)
+                                except Exception:
+                                    pass
+                            return tag
+        except Exception:
+            pass
+
+        # 2. General path: query recent releases
         req = urllib.request.Request(
-            f'https://api.github.com/repos/{repo}/releases',
+            f'https://api.github.com/repos/{repo}/releases?per_page=10',
             headers={'User-Agent': 'PwaniNet-App/1.0', 'Accept': 'application/vnd.github.v3+json'}
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -173,7 +253,7 @@ def fetch_github_latest_apk_release(repo="2006-zayne/pwaninet", timeout=3):
                         if tag:
                             if cache:
                                 try:
-                                    cache.set(f'github_latest_apk_release:{repo}', tag, timeout=600)
+                                    cache.set(f'github_latest_apk_release:{repo}', tag, timeout=60)
                                 except Exception:
                                     pass
                             return tag
@@ -187,13 +267,13 @@ def resolve_latest_apk_version(use_cache=True):
     Resolve the latest version that introduced Capacitor / native Android changes and has an APK.
     Priority:
     1. Environment variable LATEST_APK_VERSION
-    2. Git tag of the most recent commit modifying native files (android/, package.json, capacitor config)
-    3. GitHub Releases API (latest release with an .apk asset)
+    2. GitHub Releases API (latest published release with an .apk asset)
+    3. Git tag of the most recent commit modifying native files (android/, package.json, capacitor config)
     4. Fallback to resolve_latest_version()
     """
     import time
     now = time.time()
-    if use_cache and _latest_apk_version_cache["version"] and (now - _latest_apk_version_cache["timestamp"] < 300):
+    if use_cache and _latest_apk_version_cache["version"] and (now - _latest_apk_version_cache["timestamp"] < 60):
         return _latest_apk_version_cache["version"]
 
     env_apk = os.environ.get('LATEST_APK_VERSION')
@@ -203,24 +283,36 @@ def resolve_latest_apk_version(use_cache=True):
         _latest_apk_version_cache["timestamp"] = now
         return ver
 
-    # Check Git commit history for the latest tag that modified native files
-    last_native_commit = _run_git_command(["log", "-n", "1", "--format=%H", "--"] + NATIVE_PATHS)
-    if last_native_commit:
-        native_tag = _run_git_command(["describe", "--tags", "--abbrev=0", last_native_commit])
-        if native_tag:
-            ver = native_tag.lstrip('v').strip()
-            _latest_apk_version_cache["version"] = ver
-            _latest_apk_version_cache["timestamp"] = now
-            return ver
-
-    # Check GitHub Releases API for releases with an APK asset
+    # Check GitHub Releases API for releases with an APK asset (source of truth for published APKs)
     gh_apk_tag = fetch_github_latest_apk_release()
     if gh_apk_tag:
         _latest_apk_version_cache["version"] = gh_apk_tag
         _latest_apk_version_cache["timestamp"] = now
         return gh_apk_tag
 
+    # Fallback: Check Git commit history for the latest tag that modified native files
+    last_native_commit = _run_git_command(["log", "-n", "1", "--format=%H", "--"] + NATIVE_PATHS)
+    if last_native_commit:
+        native_tag = _run_git_command(["describe", "--tags", "--abbrev=0", last_native_commit])
+        if native_tag:
+            ver = native_tag.lstrip('v').strip()
+            try:
+                from releases.utils import parse_version
+                if parse_version(ver) < parse_version(DEFAULT_VERSION):
+                    ver = DEFAULT_VERSION
+            except Exception:
+                pass
+            _latest_apk_version_cache["version"] = ver
+            _latest_apk_version_cache["timestamp"] = now
+            return ver
+
     fallback = resolve_latest_version(use_cache=use_cache)
+    try:
+        from releases.utils import parse_version
+        if parse_version(fallback) < parse_version(DEFAULT_VERSION):
+            fallback = DEFAULT_VERSION
+    except Exception:
+        pass
     _latest_apk_version_cache["version"] = fallback
     _latest_apk_version_cache["timestamp"] = now
     return fallback

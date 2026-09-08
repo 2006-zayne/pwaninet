@@ -189,6 +189,19 @@
     await checkForUpdates();
   });
 
+  function semverCmp(v1, v2) {
+    if (typeof window.semverCompare === 'function') return window.semverCompare(v1, v2);
+    if (!v1 || !v2) return 0;
+    var p1 = v1.replace(/^v/, '').split('.').map(Number);
+    var p2 = v2.replace(/^v/, '').split('.').map(Number);
+    for (var i = 0; i < Math.max(p1.length, p2.length); i++) {
+      var n1 = p1[i] || 0, n2 = p2[i] || 0;
+      if (n1 > n2) return 1;
+      if (n1 < n2) return -1;
+    }
+    return 0;
+  }
+
   async function checkForUpdates() {
     const btn = document.getElementById('check-updates-btn');
     btn.disabled = true;
@@ -196,46 +209,52 @@
 
     try {
       let query = '';
-      if (typeof window.getInstalledAppVersion === 'function') {
+      const isNative = typeof window.isRunningInNativeApp === 'function' ? window.isRunningInNativeApp() : false;
+      if (isNative && typeof window.getInstalledAppVersion === 'function') {
         const inst = await window.getInstalledAppVersion();
         if (inst && inst.version) {
           query = '?installed_version=' + encodeURIComponent(inst.version) + '&installed_build=' + encodeURIComponent(inst.build);
-        }
-      } else {
-        const cachedVer = localStorage.getItem('pwaninet_installed_apk_version');
-        const cachedBuild = localStorage.getItem('pwaninet_installed_apk_build');
-        if (cachedVer) {
-          query = '?installed_version=' + encodeURIComponent(cachedVer) + '&installed_build=' + encodeURIComponent(cachedBuild || 1);
         }
       }
 
       const response = await fetch('/api/releases/version_check/' + query);
       const data = await response.json();
 
-      // Update current and latest version displays
       const curVerEl = document.getElementById('current-version');
-      if (curVerEl && data.running_version) {
-        curVerEl.textContent = data.running_version;
-      }
       const latestVerEl = document.getElementById('latest-version');
-      if (latestVerEl && data.latest_version) {
-        latestVerEl.textContent = data.latest_version;
+
+      const targetVer = data.latest_apk_version || data.latest_version;
+      let effectiveRunning = data.running_version || (curVerEl ? curVerEl.textContent.trim() : targetVer);
+
+      // Never allow latest display to be lower than running version
+      let displayLatest = targetVer;
+      if (effectiveRunning && displayLatest && semverCmp(effectiveRunning, displayLatest) > 0) {
+        displayLatest = effectiveRunning;
+      }
+
+      if (curVerEl && effectiveRunning) {
+        curVerEl.textContent = effectiveRunning;
+      }
+      if (latestVerEl && displayLatest) {
+        latestVerEl.textContent = displayLatest;
       }
 
       // Update status
       const statusDot = document.getElementById('update-status-dot');
       const statusText = document.getElementById('update-status-text');
 
-      if (data.update_available) {
+      const isActuallyNewer = Boolean(isNative && targetVer && effectiveRunning && semverCmp(targetVer, effectiveRunning) > 0);
+
+      if (data.update_available && isActuallyNewer) {
         statusDot.style.background = '#f59e0b';
-        statusText.textContent = 'Update available (v' + (data.latest_apk_version || data.latest_version) + ')';
+        statusText.textContent = 'Update available (v' + targetVer + ')';
         statusText.style.color = '#f59e0b';
 
         // Show update notification
         if (data.mandatory_update) {
-          alert(`MANDATORY UPDATE: Version ${data.latest_version} is available. You must update to continue using the app.`);
+          alert(`MANDATORY UPDATE: Version ${targetVer} is available. You must update to continue using the app.`);
           window.location.href = data.apk_url || '/download/app/latest/';
-        } else if (confirm(`New version ${data.latest_version} is available. Would you like to download the update?`)) {
+        } else if (confirm(`New native version ${targetVer} is available. Would you like to download the update?`)) {
           if (typeof window.triggerNativeApkDownload === 'function') {
             window.triggerNativeApkDownload(data.apk_url || '/download/app/latest/');
           } else {

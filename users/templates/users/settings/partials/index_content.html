@@ -247,6 +247,9 @@
                 if (nativeMeta) {
                   nativeMeta.innerHTML = '<i class="bi bi-cloud-arrow-down text-primary me-1"></i>{% trans "Latest" %} v' + tag;
                 }
+                if (typeof window.checkNativeAppUpdates === 'function' && typeof window.isRunningInNativeApp === 'function' && window.isRunningInNativeApp()) {
+                  window.checkNativeAppUpdates(false);
+                }
               }
             } catch (e) {
               console.warn('[PwaniNet] GitHub release sync error:', e);

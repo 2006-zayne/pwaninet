@@ -1171,11 +1171,10 @@ def batch_follow_view(request):
 
     new_follows = []
     for uid in user_ids:
-        if not Follow.objects.filter(follower=request.user, followed_id=uid).exists():
-            new_follows.append(Follow(follower=request.user, followed_id=uid))
-
-    if new_follows:
-        Follow.objects.bulk_create(new_follows, ignore_conflicts=True)
+        follow, created = Follow.objects.get_or_create(follower=request.user, followed_id=uid)
+        if created:
+            new_follows.append(follow)
+            invalidate_unread_count_cache(uid)
 
     UnifiedRecommendationEngine.invalidate_all_user_caches(request.user.id)
 

@@ -236,6 +236,15 @@ class OnboardingFlowIntegrationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(Follow.objects.filter(follower=self.user, followed=self.peer).exists())
 
+        # Verify that follow event was published for notifications
+        from notifications.models import PlatformEvent
+        self.assertTrue(
+            PlatformEvent.objects.filter(
+                actor=self.user,
+                target_id=str(self.peer.id)
+            ).exists()
+        )
+
         # 2. Complete onboarding
         response = self.client.get(reverse('users:onboarding_complete'))
         self.assertEqual(response.status_code, 302)

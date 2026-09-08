@@ -564,13 +564,14 @@ function injectNativeUpdateStyles() {
 }
 
 async function getInstalledAppVersion() {
+    // 1. Try AndroidBridge / PwaninetBridge getAppVersionInfo
     var bridge = window.AndroidBridge || window.PwaninetBridge;
     if (bridge && typeof bridge.getAppVersionInfo === 'function') {
         try {
             var info = JSON.parse(bridge.getAppVersionInfo());
             if (info && (info.versionName || info.versionCode)) {
                 return {
-                    version: info.versionName || '1.0.0',
+                    version: String(info.versionName || '1.0.0').replace(/^v/, '').trim(),
                     build: parseInt(info.versionCode || '1', 10)
                 };
             }
@@ -579,23 +580,48 @@ async function getInstalledAppVersion() {
         }
     }
 
-    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+    // 2. Try Capacitor App plugin via registerPlugin, Plugins.App, or nativePromise
+    if (window.Capacitor) {
         try {
-            var appInfo = await window.Capacitor.Plugins.App.getInfo();
-            if (appInfo) {
-                return {
-                    version: appInfo.version || '1.0.0',
-                    build: parseInt(appInfo.build || '1', 10)
-                };
+            var App = (window.Capacitor.Plugins && window.Capacitor.Plugins.App) ||
+                      (typeof window.Capacitor.registerPlugin === 'function' && window.Capacitor.registerPlugin('App'));
+            if (App && typeof App.getInfo === 'function') {
+                var appInfo = await App.getInfo();
+                if (appInfo && (appInfo.version || appInfo.build)) {
+                    return {
+                        version: String(appInfo.version || '1.0.0').replace(/^v/, '').trim(),
+                        build: parseInt(appInfo.build || '1', 10)
+                    };
+                }
+            } else if (typeof window.Capacitor.nativePromise === 'function') {
+                var rawInfo = await window.Capacitor.nativePromise('App', 'getInfo');
+                if (rawInfo && (rawInfo.version || rawInfo.build)) {
+                    return {
+                        version: String(rawInfo.version || '1.0.0').replace(/^v/, '').trim(),
+                        build: parseInt(rawInfo.build || '1', 10)
+                    };
+                }
             }
         } catch (e) {
             console.warn('[NativeApp] Capacitor App.getInfo error:', e);
         }
     }
 
+    // 3. Try User-Agent parsing
+    if (typeof navigator !== 'undefined' && navigator.userAgent) {
+        var uaMatch = navigator.userAgent.match(/PwaniNetApp\/Android\/([0-9\.]+)/);
+        if (uaMatch && uaMatch[1]) {
+            var uaBuildMatch = navigator.userAgent.match(/Build\/([0-9]+)/);
+            return {
+                version: uaMatch[1].trim(),
+                build: uaBuildMatch ? parseInt(uaBuildMatch[1], 10) : 1
+            };
+        }
+    }
+
     var cachedVer = localStorage.getItem('pwaninet_installed_apk_version') || '1.0.0';
     var cachedBuild = parseInt(localStorage.getItem('pwaninet_installed_apk_build') || '1', 10);
-    return { version: cachedVer, build: cachedBuild };
+    return { version: cachedVer.replace(/^v/, '').trim(), build: cachedBuild };
 }
 
 function triggerNativeApkDownload(apkUrl) {
@@ -623,9 +649,27 @@ function semverCompare(v1, v2) {
     }
     return 0;
 }
+window.semverCompare = semverCompare;
+
+function isRunningInNativeApp() {
+    return Boolean(
+        (window.AndroidBridge && typeof window.AndroidBridge.getAppVersionInfo === 'function') ||
+        (window.PwaninetBridge && typeof window.PwaninetBridge.getAppVersionInfo === 'function') ||
+        (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) ||
+        (typeof navigator !== 'undefined' && /PwaniNetApp\/Android/i.test(navigator.userAgent))
+    );
+}
+window.isRunningInNativeApp = isRunningInNativeApp;
 
 async function checkNativeAppUpdates(manual) {
     try {
+        // Strict separation: Only run native update checks when inside the native app
+        if (!isRunningInNativeApp()) {
+            // Clean up legacy cookie on web/PWA so it never pollutes server context
+            document.cookie = 'pwaninet_native_version=; path=/; max-age=0; SameSite=Lax';
+            return;
+        }
+
         var installed = await getInstalledAppVersion();
         if (installed && installed.version) {
             localStorage.setItem('pwaninet_installed_apk_version', installed.version);
@@ -651,17 +695,14 @@ async function checkNativeAppUpdates(manual) {
                     return (a.name || '').endsWith('.apk');
                 });
 
-                if (ghTag && (!data.latest_version || semverCompare(ghTag, data.latest_version) > 0)) {
-                    data.latest_version = ghTag;
+                if (ghTag) {
+                    if (!data.latest_version || semverCompare(ghTag, data.latest_version) > 0) {
+                        data.latest_version = ghTag;
+                    }
                     if (hasApk) {
-                        data.latest_apk_version = ghTag;
-                        if (semverCompare(ghTag, installed.version) > 0) {
-                            data.update_available = true;
-                            data.running_version = installed.version; // STICKS!
+                        if (!data.latest_apk_version || semverCompare(ghTag, data.latest_apk_version) > 0) {
+                            data.latest_apk_version = ghTag;
                         }
-                    } else if (!data.update_available) {
-                        // Web-only release
-                        data.running_version = ghTag; // UPDATES!
                     }
                 }
             }
@@ -669,21 +710,32 @@ async function checkNativeAppUpdates(manual) {
             // Ignore offline or rate limits
         }
 
-        // Strict semver safety check: if installed native version >= latest_apk_version, no APK update is needed
+        // Ensure latest numbers are never lower than what client actually has installed
+        if (semverCompare(installed.version, data.latest_apk_version) > 0) {
+            data.latest_apk_version = installed.version;
+        }
+        if (semverCompare(installed.version, data.latest_version) > 0) {
+            data.latest_version = installed.version;
+        }
+
         var targetApkVer = data.latest_apk_version || data.latest_version;
-        if (installed && installed.version && targetApkVer) {
-            if (semverCompare(installed.version, targetApkVer) >= 0) {
-                data.update_available = false;
-                data.running_version = data.latest_version; // Web OTA update active
-                var existingBanner = document.getElementById('pwaninet-native-update-banner');
-                if (existingBanner) existingBanner.remove();
-                var existingModal = document.getElementById('pwaninet-mandatory-modal-backdrop');
-                if (existingModal) existingModal.remove();
-            }
+
+        // Strict invariant: update is ONLY available if targetApkVer is strictly higher than installed.version
+        if (semverCompare(targetApkVer, installed.version) > 0) {
+            data.update_available = true;
+            data.running_version = installed.version; // STICKS!
+        } else {
+            data.update_available = false;
+            // Running version is the installed version or latest web version if higher
+            data.running_version = semverCompare(installed.version, data.latest_version) >= 0 ? installed.version : data.latest_version;
+            var existingBanner = document.getElementById('pwaninet-native-update-banner');
+            if (existingBanner) existingBanner.remove();
+            var existingModal = document.getElementById('pwaninet-mandatory-modal-backdrop');
+            if (existingModal) existingModal.remove();
         }
 
         // Hydrate running version in DOM (footer, about page, updates page)
-        var effectiveVer = data.running_version || (data.update_available ? installed.version : data.latest_version);
+        var effectiveVer = data.running_version || installed.version;
         var curVerElements = document.querySelectorAll('.app-current-version, #current-version');
         curVerElements.forEach(function(el) {
             if (el.id === 'footer-app-version') {
@@ -700,7 +752,7 @@ async function checkNativeAppUpdates(manual) {
             if (installedVerSpan) installedVerSpan.textContent = 'v' + installed.version;
 
             var latestVerSpan = document.getElementById('native-latest-version-meta');
-            if (latestVerSpan) latestVerSpan.textContent = 'Latest v' + (data.latest_apk_version || data.latest_version);
+            if (latestVerSpan) latestVerSpan.textContent = 'Latest v' + targetApkVer;
 
             var badge = document.getElementById('native-app-status-badge');
             var desc = document.getElementById('native-app-update-desc');
@@ -714,7 +766,7 @@ async function checkNativeAppUpdates(manual) {
                     badge.style.color = '#d97706';
                 }
                 if (desc) {
-                    desc.textContent = 'Version ' + (data.latest_apk_version || data.latest_version) + ' is available with native enhancements. Please install the new APK build.';
+                    desc.textContent = 'Version ' + targetApkVer + ' is available with native enhancements. Please install the new APK build.';
                 }
                 if (updateBtn) {
                     updateBtn.classList.remove('d-none');
@@ -731,7 +783,7 @@ async function checkNativeAppUpdates(manual) {
                     badge.style.color = '#15803d';
                 }
                 if (desc) {
-                    desc.textContent = 'You have the latest version of the native Android app installed (v' + effectiveVer + ').';
+                    desc.textContent = 'You have the latest version of the native Android app installed (v' + installed.version + ').';
                 }
                 if (updateBtn) {
                     updateBtn.classList.add('d-none');
@@ -749,7 +801,15 @@ async function checkNativeAppUpdates(manual) {
             return;
         }
 
-        if (data.update_available) {
+        if (data.update_available && semverCompare(targetApkVer, installed.version) > 0) {
+            if (manual) {
+                showNativeUpdateBanner(data);
+                if (confirm('A new native version (v' + targetApkVer + ') is available! Would you like to download the APK update now?')) {
+                    triggerNativeApkDownload(data.apk_url || '/download/app/latest/');
+                }
+                return;
+            }
+
             // Check for mandatory update
             if (data.mandatory_update) {
                 showMandatoryUpdateModal(data);
@@ -776,6 +836,7 @@ function showNativeUpdateBanner(data) {
     if (document.getElementById('pwaninet-native-update-banner')) return;
     injectNativeUpdateStyles();
 
+    var targetVer = data.latest_apk_version || data.latest_version;
     var banner = document.createElement('div');
     banner.id = 'pwaninet-native-update-banner';
     banner.innerHTML = `
@@ -786,7 +847,7 @@ function showNativeUpdateBanner(data) {
             <div class="pwaninet-native-update-content">
                 <div class="pwaninet-native-update-title">
                     <span>PwaniNet Update</span>
-                    <span class="pwaninet-native-update-badge">v${data.latest_version}</span>
+                    <span class="pwaninet-native-update-badge">v${targetVer}</span>
                 </div>
                 <div class="pwaninet-native-update-sub">
                     ${data.release_title || 'New update available with performance enhancements.'}
@@ -826,6 +887,7 @@ function showMandatoryUpdateModal(data) {
     if (document.getElementById('pwaninet-mandatory-modal-backdrop')) return;
     injectNativeUpdateStyles();
 
+    var targetVer = data.latest_apk_version || data.latest_version;
     var backdrop = document.createElement('div');
     backdrop.id = 'pwaninet-mandatory-modal-backdrop';
     backdrop.innerHTML = `
@@ -833,7 +895,7 @@ function showMandatoryUpdateModal(data) {
             <img src="/static/images/pwaninet-app-icon.png" alt="PwaniNet" width="56" height="56" style="border-radius:14px; margin-bottom: 16px;"/>
             <h4 style="font-weight: 700; margin-bottom: 8px;">Update Required</h4>
             <p style="font-size: 14px; color: var(--text-secondary, #64748b); margin-bottom: 20px;">
-                A critical update (v${data.latest_version}) is required to continue using PwaniNet. Please download and install the latest APK.
+                A critical update (v${targetVer}) is required to continue using PwaniNet. Please download and install the latest APK.
             </p>
             <button type="button" class="btn btn-primary w-100 py-2" id="pwaninet-mandatory-download-btn" style="font-weight: 600;">
                 <i class="bi bi-download me-2"></i>Download & Install Update

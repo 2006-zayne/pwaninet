@@ -44,8 +44,10 @@ def release_metadata(request):
     latest_apk_version = getattr(version, 'resolve_latest_apk_version', version.resolve_latest_version)()
 
     # Check if request comes from the Capacitor native Android app
+    # Strict separation: ONLY true Android native app traffic is marked as native.
+    # Web and PWA traffic is NEVER treated as a native app and proceeds independently.
     user_agent = request.META.get('HTTP_USER_AGENT', '') if request else ''
-    is_native_app = 'PwaniNetApp/Android' in user_agent or (request and request.COOKIES.get('pwaninet_native_version'))
+    is_native_app = bool('PwaniNetApp/Android' in user_agent or (request and request.headers.get('X-Capacitor-Platform') == 'android'))
 
     client_installed_version = None
     if is_native_app:
@@ -57,15 +59,24 @@ def release_metadata(request):
             client_installed_version = request.COOKIES.get('pwaninet_native_version')
 
     # Effective version determination:
-    # If client is native and latest_apk_version > client_installed_version:
-    # version STICKS to client_installed_version until APK is installed!
-    # Otherwise, it updates to latest_app_version (OTA web updates).
-    effective_app_version = current_release.version if current_release else latest_app_version
-    is_native_update_available = False
+    # 1. Web and PWA (not native): ALWAYS runs the latest web release independently!
+    # 2. Native App: If latest_apk_version > client_installed_version, STICKS to client_installed_version.
+    #    Otherwise, updates to latest_app_version (or client_installed_version if client is newer).
+    from releases.utils import parse_version
 
+    # Ensure latest_apk_version and latest_app_version are not lower than client_installed_version
     if client_installed_version:
         try:
-            from releases.utils import parse_version
+            if parse_version(client_installed_version) > parse_version(latest_apk_version):
+                latest_apk_version = client_installed_version
+            if parse_version(client_installed_version) > parse_version(latest_app_version):
+                latest_app_version = client_installed_version
+        except Exception:
+            pass
+
+    is_native_update_available = False
+    if is_native_app and client_installed_version:
+        try:
             if parse_version(client_installed_version) < parse_version(latest_apk_version):
                 effective_app_version = client_installed_version
                 is_native_update_available = True
@@ -74,6 +85,10 @@ def release_metadata(request):
                 is_native_update_available = False
         except Exception:
             effective_app_version = latest_app_version
+    else:
+        # Web and PWA always run the latest release independently
+        effective_app_version = current_release.version if (current_release and parse_version(current_release.version) >= parse_version(latest_app_version)) else latest_app_version
+        is_native_update_available = False
 
     base_context = {
         'app_version': effective_app_version,

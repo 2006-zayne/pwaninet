@@ -157,14 +157,23 @@ class ReleaseViewSet(viewsets.ReadOnlyModelViewSet):
         # If client provides installed version string:
         # 1. An APK update is ONLY needed if latest_apk_version is strictly higher than client_installed_version.
         # 2. If an APK update is needed (native changes exist), running_version STICKS to client_installed_version.
-        # 3. If no APK update is needed (Django-only changes), running_version UPDATES to latest_version (instant OTA).
+        # 3. If no APK update is needed (Django-only changes or already on latest APK), running_version UPDATES to latest_version (instant OTA).
+        # 4. If client is on a version higher than what server knows, update latest values to prevent misleading UI.
         has_native_changes = False
+        from releases.utils import parse_version
+
         if client_installed_version:
             try:
-                from releases.utils import parse_version
                 client_v = parse_version(client_installed_version)
                 latest_apk_v = parse_version(latest_apk_version)
                 latest_v = parse_version(latest_version)
+
+                if client_v > latest_apk_v:
+                    latest_apk_version = client_installed_version
+                    latest_apk_v = client_v
+                if client_v > latest_v:
+                    latest_version = client_installed_version
+                    latest_v = client_v
 
                 update_available = client_v < latest_apk_v
                 has_native_changes = getattr(app_version_module, 'has_native_changes', lambda f, t: False)(client_installed_version, latest_version)
@@ -180,11 +189,12 @@ class ReleaseViewSet(viewsets.ReadOnlyModelViewSet):
             try:
                 check_build = int(client_installed_build)
                 update_available = latest_build_number > check_build
-                running_version = current_version
+                running_version = latest_version
             except (ValueError, TypeError):
                 update_available = False
-                running_version = current_version
+                running_version = latest_version
         else:
+            # Web and PWA callers: always up to date with the server
             update_available = False
             running_version = latest_version
         
