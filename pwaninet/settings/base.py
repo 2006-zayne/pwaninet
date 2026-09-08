@@ -352,9 +352,10 @@ CSRF_TRUSTED_ORIGINS = list(set([
 ]))
 
 # VAPID keys for Web Push notifications
-VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
-VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
-VAPID_SUBJECT = os.environ.get('VAPID_SUBJECT', 'mailto:admin@pwaninet.app')
+VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY', '')
+VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY', '')
+VAPID_SUBJECT = os.getenv('VAPID_SUBJECT', 'mailto:admin@pwaninet.app')
+FIREBASE_CREDENTIALS_PATH = os.getenv('FIREBASE_CREDENTIALS_PATH', os.path.join(BASE_DIR, 'firebase-adminsdk.json'))
 
 # Email configuration
 EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')

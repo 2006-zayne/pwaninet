@@ -16,52 +16,56 @@ class SubscriptionService:
     @transaction.atomic
     def subscribe(user, validated_data):
         """
-        Create or update a push subscription for a user.
-
-        This method implements deduplication logic:
-        - If a subscription with the same endpoint exists for the user, update it
-        - Otherwise, create a new subscription
-
-        Args:
-            user: The user instance subscribing
-            validated_data: Dictionary containing validated subscription data with keys:
-                - endpoint: str (required)
-                - p256dh: str (required)
-                - auth: str (required)
-                - user_agent: str (optional)
-
-        Returns:
-            PushSubscription: The created or updated subscription instance
+        Create or update a push subscription for a user (VAPID or FCM).
         """
-        endpoint = validated_data['endpoint']
-        p256dh = validated_data['p256dh']
-        auth = validated_data['auth']
+        token_type = validated_data.get('token_type', PushSubscription.TokenType.VAPID)
+        platform = validated_data.get('platform', PushSubscription.Platform.WEB)
+        device_id = validated_data.get('device_id')
         user_agent = validated_data.get('user_agent', '')
 
-        # Try to find existing subscription by endpoint for this user
-        try:
-            subscription = PushSubscription.objects.get(
-                user=user,
-                endpoint=endpoint
-            )
-            # Update existing subscription
-            subscription.p256dh = p256dh
-            subscription.auth = auth
-            subscription.user_agent = user_agent
-            subscription.is_active = True
-            subscription.save()
-            return subscription
-        except PushSubscription.DoesNotExist:
-            # Create new subscription
-            subscription = PushSubscription.objects.create(
+        if token_type == PushSubscription.TokenType.VAPID:
+            endpoint = validated_data.get('endpoint')
+            keys = validated_data.get('keys', {})
+            p256dh = keys.get('p256dh') or validated_data.get('p256dh')
+            auth = keys.get('auth') or validated_data.get('auth')
+
+            if not endpoint or not p256dh or not auth:
+                raise ValueError("Missing required WebPush keys (endpoint, p256dh, auth)")
+
+            subscription, _ = PushSubscription.objects.update_or_create(
                 user=user,
                 endpoint=endpoint,
-                p256dh=p256dh,
-                auth=auth,
-                user_agent=user_agent,
-                is_active=True
+                defaults={
+                    'platform': platform,
+                    'token_type': PushSubscription.TokenType.VAPID,
+                    'p256dh': p256dh,
+                    'auth': auth,
+                    'user_agent': user_agent,
+                    'device_id': device_id,
+                    'is_active': True,
+                }
             )
             return subscription
+
+        elif token_type == PushSubscription.TokenType.FCM:
+            fcm_token = validated_data.get('fcm_token')
+            if not fcm_token:
+                raise ValueError("Missing required fcm_token")
+
+            subscription, _ = PushSubscription.objects.update_or_create(
+                user=user,
+                fcm_token=fcm_token,
+                defaults={
+                    'platform': platform or PushSubscription.Platform.ANDROID_NATIVE,
+                    'token_type': PushSubscription.TokenType.FCM,
+                    'device_id': device_id,
+                    'user_agent': user_agent,
+                    'is_active': True,
+                }
+            )
+            return subscription
+        else:
+            raise ValueError(f"Unsupported token_type: {token_type}")
 
     @staticmethod
     @transaction.atomic

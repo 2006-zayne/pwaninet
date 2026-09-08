@@ -74,6 +74,9 @@ self.addEventListener('push', (event) => {
                 body: data.body || pushData.body,
                 icon: data.icon || pushData.icon,
                 badge: data.badge || pushData.badge,
+                image: data.image || undefined,
+                tag: data.tag || undefined,
+                renotify: data.renotify !== undefined ? data.renotify : undefined,
                 vibrate: data.vibrate || pushData.vibrate,
                 requireInteraction: data.requireInteraction || pushData.requireInteraction,
                 actions: data.actions || pushData.actions,
@@ -81,7 +84,8 @@ self.addEventListener('push', (event) => {
                     notification_id: data.data?.notification_id,
                     url: data.data?.url || pushData.data.url,
                     notification_type: data.data?.notification_type,
-                    category: data.data?.category
+                    category: data.data?.category,
+                    tag: data.data?.tag || data.tag
                 }
             };
         } catch (e) {

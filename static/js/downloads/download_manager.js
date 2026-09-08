@@ -158,6 +158,16 @@ class DownloadManager {
                 console.warn('[DownloadManager] Could not stat file:', statErr);
             }
 
+            // Cache thumbnail as Base64 Data URL so it is fully offline-accessible
+            let cachedNativeThumbnail = item.thumbnail || '';
+            if (cachedNativeThumbnail && !cachedNativeThumbnail.startsWith('data:') && !cachedNativeThumbnail.startsWith('blob:')) {
+                try {
+                    cachedNativeThumbnail = await this._resolveThumbnailDataUrl(cachedNativeThumbnail);
+                } catch (thumbErr) {
+                    console.warn('[DownloadManager] Native thumbnail caching failed:', thumbErr);
+                }
+            }
+
             const metadata = {
                 id: item.id,
                 url: item.url,
@@ -168,7 +178,7 @@ class DownloadManager {
                 downloadedAt: Date.now(),
                 postId: item.postId,
                 mediaId: item.mediaId,
-                thumbnail: item.thumbnail,
+                thumbnail: cachedNativeThumbnail,
                 isNative: true,
                 nativePath: relativePath,
                 nativeUri: uriResult.uri
@@ -237,6 +247,16 @@ class DownloadManager {
             // Save binary blob to IndexedDB
             await this.storage.saveBlob(item.id, blob);
 
+            // Cache thumbnail as Base64 Data URL so it is fully offline-accessible
+            let cachedWebThumbnail = item.thumbnail || '';
+            if (cachedWebThumbnail && !cachedWebThumbnail.startsWith('data:') && !cachedWebThumbnail.startsWith('blob:')) {
+                try {
+                    cachedWebThumbnail = await this._resolveThumbnailDataUrl(cachedWebThumbnail);
+                } catch (thumbErr) {
+                    console.warn('[DownloadManager] Web thumbnail caching failed:', thumbErr);
+                }
+            }
+
             const metadata = {
                 id: item.id,
                 url: item.url,
@@ -247,7 +267,7 @@ class DownloadManager {
                 downloadedAt: Date.now(),
                 postId: item.postId,
                 mediaId: item.mediaId,
-                thumbnail: item.thumbnail,
+                thumbnail: cachedWebThumbnail,
                 isNative: false,
                 nativePath: null,
                 nativeUri: null
@@ -484,6 +504,30 @@ class DownloadManager {
             window.dispatchEvent(new CustomEvent('pwaninet:show-toast', {
                 detail: { message: 'Link copied to clipboard!' }
             }));
+        }
+    }
+
+    /**
+     * Resolves a thumbnail URL to a Base64 Data URL so it is fully accessible offline
+     * @param {string} thumbUrl
+     * @returns {Promise<string>}
+     */
+    async _resolveThumbnailDataUrl(thumbUrl) {
+        if (!thumbUrl || typeof thumbUrl !== 'string') return '';
+        if (thumbUrl.startsWith('data:') || thumbUrl.startsWith('blob:')) return thumbUrl;
+        try {
+            const resp = await fetch(thumbUrl);
+            if (!resp.ok) return thumbUrl;
+            const blob = await resp.blob();
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result || thumbUrl);
+                reader.onerror = () => resolve(thumbUrl);
+                reader.readAsDataURL(blob);
+            });
+        } catch (e) {
+            console.warn('[DownloadManager] Could not convert thumbnail to data URL:', e);
+            return thumbUrl;
         }
     }
 }

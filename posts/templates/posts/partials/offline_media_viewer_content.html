@@ -410,6 +410,21 @@
     cursor: pointer;
 }
 
+.offline-reel-poster-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+    z-index: 2;
+    pointer-events: none;
+    transition: opacity 0.25s ease-out;
+}
+.offline-reel-poster-overlay.hidden {
+    opacity: 0;
+}
+
 /* Suppress all native browser video controls */
 .offline-reel-video::-webkit-media-controls {
     display: none !important;
@@ -663,6 +678,28 @@ body.in-reels-mode nav {
             allItems = await downloadManager.getAllDownloads();
             renderStats();
             renderItems();
+
+            // Self-heal: Cache any existing remote thumbnail URLs into Base64 Data URLs if online
+            if (navigator.onLine && Array.isArray(allItems)) {
+                allItems.forEach(async (it) => {
+                    if (it.thumbnail && typeof it.thumbnail === 'string' && !it.thumbnail.startsWith('data:')) {
+                        try {
+                            const resp = await fetch(it.thumbnail);
+                            if (resp.ok) {
+                                const blob = await resp.blob();
+                                const reader = new FileReader();
+                                reader.onloadend = async () => {
+                                    if (reader.result) {
+                                        it.thumbnail = reader.result;
+                                        await downloadStorage.saveMetadata(it);
+                                    }
+                                };
+                                reader.readAsDataURL(blob);
+                            }
+                        } catch (err) { /* silent */ }
+                    }
+                });
+            }
         } catch (e) {
             console.error('[OfflineMedia] Error loading items:', e);
         }
@@ -943,8 +980,9 @@ body.in-reels-mode nav {
 
             if (item.thumbnail) {
                 thumbMarkup = `
-                    <img src="${item.thumbnail}" class="offline-thumb-img" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                    <div class="w-100 h-100 d-flex flex-column align-items-center justify-content-center text-center p-2" style="background: ${docBg}; display: none;">
+                    <img src="${item.thumbnail}" class="offline-thumb-img" style="object-position: top;" alt="" onerror="this.style.display='none'; if (this.nextElementSibling) this.nextElementSibling.style.display='none'; this.parentElement.querySelector('.doc-fallback-cover').style.display='flex';">
+                    <span class="badge position-absolute top-0 end-0 m-2 bg-dark bg-opacity-75 text-white" style="font-size: 10px; font-weight: 600; z-index: 2;">${ext.toUpperCase()}</span>
+                    <div class="doc-fallback-cover w-100 h-100 d-flex flex-column align-items-center justify-content-center text-center p-2" style="background: ${docBg}; display: none;">
                         <i class="bi ${docIcon} fs-1" style="color: ${docColor};"></i>
                         <span class="badge text-white mt-1" style="background: ${docColor}; font-size: 10px;">${ext.toUpperCase()}</span>
                     </div>
@@ -1180,7 +1218,8 @@ body.in-reels-mode nav {
         slide.dataset.index = index;
 
         slide.innerHTML = `
-            <video class="offline-reel-video" src="${src}" loop playsinline webkit-playsinline disablePictureInPicture controlsList="nodownload nofullscreen noremoteplayback" preload="auto"></video>
+            ${item.thumbnail ? `<img class="offline-reel-poster-overlay" src="${item.thumbnail}" alt="" />` : ''}
+            <video class="offline-reel-video" src="${src}" poster="${item.thumbnail || ''}" loop playsinline webkit-playsinline disablePictureInPicture controlsList="nodownload nofullscreen noremoteplayback" preload="auto"></video>
             
             <div class="offline-reel-tap-indicator">
                 <i class="bi bi-play-fill"></i>
@@ -1226,9 +1265,21 @@ body.in-reels-mode nav {
         `;
 
         const video = slide.querySelector('.offline-reel-video');
+        const posterOverlay = slide.querySelector('.offline-reel-poster-overlay');
         const tapIndicator = slide.querySelector('.offline-reel-tap-indicator');
         const progressFill = slide.querySelector('.reels-progress-bar-fill');
         const progressContainer = slide.querySelector('.reels-progress-bar-container');
+
+        // Hide poster overlay once playback starts
+        const hidePoster = () => {
+            if (posterOverlay) {
+                posterOverlay.classList.add('hidden');
+            }
+        };
+        video.addEventListener('playing', hidePoster);
+        video.addEventListener('timeupdate', () => {
+            if (video.currentTime > 0) hidePoster();
+        });
 
         // Tap to play/pause
         video.onclick = () => {
@@ -1372,6 +1423,10 @@ body.in-reels-mode nav {
                 } else {
                     video.pause();
                     video.currentTime = 0;
+                    const posterOverlay = entry.target.querySelector('.offline-reel-poster-overlay');
+                    if (posterOverlay) {
+                        posterOverlay.classList.remove('hidden');
+                    }
                 }
             });
         }, {

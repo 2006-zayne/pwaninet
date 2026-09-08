@@ -11,6 +11,7 @@ class DocumentViewer {
         this.fileName = fileName;
         this.documentId = documentId;
         this.fileId = fileId;
+        this.thumbnail = (container && container.dataset && container.dataset.thumbnail) || '';
         this.currentPage = 1;
         this.totalPages = null;
         this.viewer = null;
@@ -563,7 +564,8 @@ class DocumentViewer {
                 postId: this.documentId,
                 mediaType: 'document',
                 category: 'document',
-                filename: this.fileName || `document_${Date.now()}`
+                filename: this.fileName || `document_${Date.now()}`,
+                thumbnail: this.thumbnail
             }).catch(err => {
                 console.warn('[Viewer Download] downloadManager failed, falling back:', err);
                 window.open(this.fileUrl, '_blank');

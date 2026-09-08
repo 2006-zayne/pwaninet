@@ -57,8 +57,9 @@
                          data-file-url="{{ first_file.file.url }}"
                          data-file-type="{{ first_file.extension }}"
                          data-file-name="{{ document.title }}.{{ first_file.extension }}"
-                         data-document.share_id="{{ document.share_id }}"
+                         data-document-id="{{ document.share_id }}"
                          data-file-id="{{ first_file.id }}"
+                         data-thumbnail="{% if first_file.preview_url %}{{ first_file.preview_url }}{% elif first_file.preview_path %}/media/{{ first_file.preview_path }}{% elif first_file.thumbnail_path %}/media/{{ first_file.thumbnail_path }}{% endif %}"
                          style="min-height: 70vh; height: 70vh;"></div>
                 {% else %}
                     <div class="doc-preview-placeholder" 

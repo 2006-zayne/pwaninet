@@ -198,6 +198,9 @@ function initNativeAppEnhancements() {
     // Initialize native-like pull to refresh
     initPullToRefresh();
 
+    // Initialize native push notifications (Capacitor FCM / APNS)
+    initNativePush();
+
     window._pwaninet_native_initialized = true;
 
     const endTime = performance.now();
@@ -1132,6 +1135,259 @@ function initNativeAppUpdates() {
         }
     });
 }
+
+function getNativeCsrfToken() {
+    const metaTag = document.querySelector('meta[name="csrf-token"]');
+    if (metaTag && metaTag.getAttribute('content')) {
+        return metaTag.getAttribute('content');
+    }
+    const inputTag = document.querySelector('[name="csrfmiddlewaretoken"]');
+    if (inputTag && inputTag.value) {
+        return inputTag.value;
+    }
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.startsWith('csrftoken=')) {
+            return decodeURIComponent(cookie.substring('csrftoken='.length));
+        }
+    }
+    return '';
+}
+
+/**
+ * Initialize native push notifications (Capacitor FCM / APNS)
+ */
+async function initNativePush() {
+    if (!window.Capacitor || (typeof window.Capacitor.isNativePlatform === 'function' && !window.Capacitor.isNativePlatform())) {
+        return;
+    }
+
+    const PushNotifications = window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications;
+    if (!PushNotifications) {
+        console.warn('[PWANINET-NATIVE] PushNotifications plugin not available on window.Capacitor.Plugins');
+        return;
+    }
+
+    try {
+        let permStatus = await PushNotifications.checkPermissions();
+        console.log('[PWANINET-NATIVE] Push permission status:', permStatus);
+
+        if (permStatus.receive === 'prompt') {
+            permStatus = await PushNotifications.requestPermissions();
+        }
+
+        if (permStatus.receive !== 'granted') {
+            console.warn('[PWANINET-NATIVE] Push notification permission not granted:', permStatus.receive);
+            return;
+        }
+
+        // Register Android Notification Channels (Android 8.0+)
+        if (typeof PushNotifications.createChannel === 'function') {
+            try {
+                await PushNotifications.createChannel({
+                    id: 'pwaninet_social',
+                    name: 'Social Alerts',
+                    description: 'Notifications for likes, pinches, follows, and mentions',
+                    importance: 5,
+                    visibility: 1,
+                    vibration: true,
+                    lights: true,
+                    lightColor: '#2563eb',
+                    sound: 'default'
+                });
+
+                await PushNotifications.createChannel({
+                    id: 'pwaninet_messages',
+                    name: 'Direct & Group Messages',
+                    description: 'Notifications for new messages and chat mentions',
+                    importance: 5,
+                    visibility: 1,
+                    vibration: true,
+                    lights: true,
+                    lightColor: '#2563eb',
+                    sound: 'default'
+                });
+                console.log('[PWANINET-NATIVE] Push notification channels created successfully');
+            } catch (chanErr) {
+                console.warn('[PWANINET-NATIVE] Failed to create notification channels:', chanErr);
+            }
+        }
+
+        // Register with native push service (APNS / FCM)
+        await PushNotifications.register();
+
+        // Listen for successful registration
+        PushNotifications.addListener('registration', async function(token) {
+            console.log('[PWANINET-NATIVE] Push registration success, token:', token.value);
+            try {
+                let deviceId = null;
+                if (window.Capacitor.Plugins && window.Capacitor.Plugins.Device && typeof window.Capacitor.Plugins.Device.getId === 'function') {
+                    try {
+                        const info = await window.Capacitor.Plugins.Device.getId();
+                        deviceId = info && info.identifier ? info.identifier : null;
+                    } catch (e) {}
+                }
+
+                const platform = (window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios') ? 'IOS_NATIVE' : 'ANDROID_NATIVE';
+                const tokenType = (platform === 'IOS_NATIVE') ? 'APNS' : 'FCM';
+                const csrfToken = getNativeCsrfToken();
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+                if (csrfToken) {
+                    headers['X-CSRFToken'] = csrfToken;
+                }
+
+                const payload = {
+                    token_type: tokenType,
+                    platform: platform,
+                    fcm_token: token.value,
+                    device_id: deviceId || undefined
+                };
+
+                const response = await fetch('/api/push/subscribe/', {
+                    method: 'POST',
+                    headers: headers,
+                    credentials: 'same-origin',
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    console.log('[PWANINET-NATIVE] Successfully registered native push token with backend');
+                } else {
+                    console.error('[PWANINET-NATIVE] Failed to register native push token with backend:', response.status);
+                }
+            } catch (err) {
+                console.error('[PWANINET-NATIVE] Error registering native push token:', err);
+            }
+        });
+
+        // Listen for registration errors
+        PushNotifications.addListener('registrationError', function(error) {
+            console.error('[PWANINET-NATIVE] Push registration error:', error);
+        });
+
+        // Listen for foreground push notifications
+        PushNotifications.addListener('pushNotificationReceived', function(notification) {
+            console.log('[PWANINET-NATIVE] Foreground push received:', notification);
+            showNativePushBanner(notification);
+        });
+
+        // Listen for user interaction on notification
+        PushNotifications.addListener('pushNotificationActionPerformed', function(notification) {
+            console.log('[PWANINET-NATIVE] Push action performed:', notification);
+            const data = notification.notification && notification.notification.data;
+            const targetUrl = data && (data.url || data.link || data.click_action);
+            if (targetUrl) {
+                window.location.href = targetUrl;
+            }
+        });
+
+    } catch (e) {
+        console.error('[PWANINET-NATIVE] Failed to initialize native push notifications:', e);
+    }
+}
+
+/**
+ * Display an in-app foreground notification banner matching PwaniNet notification card design.
+ */
+function showNativePushBanner(notification) {
+    if (!notification) return;
+
+    // Trigger subtle haptic
+    if (window.Haptics && typeof window.Haptics.impactLight === 'function') {
+        window.Haptics.impactLight();
+    }
+
+    const title = notification.title || 'PwaniNet';
+    const body = notification.body || '';
+    const data = notification.data || {};
+    const icon = data.icon || '/static/images/web-app-manifest-192x192-rounded.png';
+    const targetUrl = data.url || data.link || '/notifications';
+
+    // Remove existing banner if any
+    const existing = document.getElementById('pwaninet-foreground-push-banner');
+    if (existing) {
+        existing.remove();
+    }
+
+    const banner = document.createElement('div');
+    banner.id = 'pwaninet-foreground-push-banner';
+    banner.style.cssText = [
+        'position: fixed',
+        'top: calc(var(--pwaninet-safe-area-top, 0px) + 12px)',
+        'left: 12px',
+        'right: 12px',
+        'max-width: 480px',
+        'margin: 0 auto',
+        'background: var(--bg-card, #ffffff)',
+        'color: var(--text-primary, #1e293b)',
+        'border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1))',
+        'border-radius: 14px',
+        'box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+        'padding: 12px 14px',
+        'display: flex',
+        'align-items: center',
+        'gap: 12px',
+        'z-index: 100000',
+        'cursor: pointer',
+        'transform: translateY(-120%)',
+        'opacity: 0',
+        'transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease',
+        'user-select: none',
+        '-webkit-user-select: none'
+    ].join('; ');
+
+    banner.innerHTML = `
+        <img src="${icon}" alt="Avatar" style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.08);">
+        <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-primary, #2563eb); margin-bottom: 2px;">${title}</div>
+            <div style="font-size: 0.88rem; font-weight: 500; color: var(--text-primary, #0f172a); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${body}</div>
+        </div>
+        <button type="button" aria-label="Dismiss" style="background: none; border: none; padding: 6px; cursor: pointer; color: var(--text-secondary, #64748b); font-size: 1.25rem; line-height: 1; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            &times;
+        </button>
+    `;
+
+    // Click handler to open target
+    banner.addEventListener('click', function(e) {
+        if (e.target.closest('button')) {
+            dismissBanner();
+            return;
+        }
+        dismissBanner();
+        if (targetUrl) {
+            window.location.href = targetUrl;
+        }
+    });
+
+    document.body.appendChild(banner);
+
+    // Animate in
+    requestAnimationFrame(() => {
+        banner.style.transform = 'translateY(0)';
+        banner.style.opacity = '1';
+    });
+
+    let dismissTimer = setTimeout(dismissBanner, 5000);
+
+    function dismissBanner() {
+        clearTimeout(dismissTimer);
+        banner.style.transform = 'translateY(-120%)';
+        banner.style.opacity = '0';
+        setTimeout(() => {
+            if (banner.parentNode) {
+                banner.parentNode.removeChild(banner);
+            }
+        }, 350);
+    }
+}
+
+// Expose globally
+window.initNativePush = initNativePush;
+window.showNativePushBanner = showNativePushBanner;
+
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {

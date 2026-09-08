@@ -6,7 +6,18 @@ import uuid
 
 
 class PushSubscription(models.Model):
-    """Model for storing web push notification subscriptions."""
+    """Model for storing web push notification subscriptions and native push tokens."""
+
+    class Platform(models.TextChoices):
+        WEB = 'WEB', 'Web Browser'
+        PWA = 'PWA', 'Standalone PWA'
+        ANDROID_NATIVE = 'ANDROID_NATIVE', 'Android Native'
+        IOS_NATIVE = 'IOS_NATIVE', 'iOS Native'
+
+    class TokenType(models.TextChoices):
+        VAPID = 'VAPID', 'VAPID Web Push'
+        FCM = 'FCM', 'Firebase Cloud Messaging'
+        APNS = 'APNS', 'Direct APNs'
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -14,22 +25,54 @@ class PushSubscription(models.Model):
         related_name='push_subscriptions',
         db_index=True
     )
-    endpoint = models.TextField(unique=True)
-    p256dh = models.TextField()
-    auth = models.TextField()
+    platform = models.CharField(
+        max_length=20,
+        choices=Platform.choices,
+        default=Platform.WEB,
+        db_index=True
+    )
+    token_type = models.CharField(
+        max_length=10,
+        choices=TokenType.choices,
+        default=TokenType.VAPID
+    )
+
+    # W3C Web Push Fields (nullable for native FCM)
+    endpoint = models.TextField(null=True, blank=True)
+    p256dh = models.TextField(null=True, blank=True)
+    auth = models.TextField(null=True, blank=True)
     user_agent = models.TextField(blank=True)
+
+    # Native Token (nullable for Web Push)
+    fcm_token = models.TextField(null=True, blank=True, db_index=True)
+
+    device_id = models.CharField(max_length=255, null=True, blank=True, db_index=True)
     is_active = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'endpoint'],
+                condition=models.Q(endpoint__isnull=False),
+                name='unique_user_web_endpoint'
+            ),
+            models.UniqueConstraint(
+                fields=['user', 'fcm_token'],
+                condition=models.Q(fcm_token__isnull=False),
+                name='unique_user_fcm_token'
+            ),
+        ]
         indexes = [
             models.Index(fields=['user']),
             models.Index(fields=['is_active']),
+            models.Index(fields=['platform']),
+            models.Index(fields=['device_id']),
         ]
 
     def __str__(self):
-        return f"PushSubscription for {self.user.username} (active={self.is_active})"
+        return f"{self.user} - {self.platform} ({self.token_type}) [{self.id}]"
 
 
 # ============================================================================

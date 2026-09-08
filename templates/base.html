@@ -2115,6 +2115,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
     });
     </script>
     {% endverbatim %}
+    <!-- Push Notification Soft-Prompt Bottom Sheet (Web & PWA) -->
+    {% include 'partials/push_notification_bottom_sheet.html' %}
+    <script src="{% static 'js/notifications/push-subscription.js' %}"></script>
+    <script src="{% static 'js/notifications/push-sheet.js' %}"></script>
     {% endif %}
 
 

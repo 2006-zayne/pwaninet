@@ -167,33 +167,44 @@ class EmailAdapter(DeliveryAdapter):
         return True
 
 
+# Firebase Admin Initialization Guard
+_firebase_app = None
+
+
+def get_firebase_app():
+    global _firebase_app
+    if _firebase_app is None:
+        try:
+            import os
+            import firebase_admin
+            from firebase_admin import credentials
+            if not firebase_admin._apps:
+                cred_path = getattr(settings, 'FIREBASE_CREDENTIALS_PATH', None)
+                if cred_path and os.path.exists(cred_path):
+                    cred = credentials.Certificate(cred_path)
+                    _firebase_app = firebase_admin.initialize_app(cred)
+                    logger.info("Firebase Admin SDK initialized successfully with credentials at: %s", cred_path)
+                else:
+                    logger.warning("FIREBASE_CREDENTIALS_PATH not found or invalid (%s). Native push notifications disabled.", cred_path)
+            else:
+                _firebase_app = firebase_admin.get_app()
+        except Exception as err:
+            logger.error("Failed to initialize Firebase Admin SDK: %s", err)
+    return _firebase_app
+
+
 class PushAdapter(DeliveryAdapter):
     """
     Push notification adapter.
     
-    Delivers notifications via web push using VAPID authentication.
+    Delivers notifications via Web Push (VAPID via pywebpush) and Native Push (FCM via Firebase Admin SDK).
     """
 
-    def deliver(self, notification: NotificationObject, attempt: DeliveryAttempt) -> bool:
+    def deliver(self, notification: NotificationObject, attempt: Any = None) -> bool:
         """
-        Deliver notification via web push.
-
-        Uses pywebpush library to send notifications to subscribed users.
+        Deliver notification via Web Push or Native FCM push.
         """
         try:
-            from django.conf import settings
-            from pywebpush import webpush
-            import json
-
-            # Check VAPID configuration
-            vapid_private_key = getattr(settings, 'VAPID_PRIVATE_KEY', '')
-            vapid_subject = getattr(settings, 'VAPID_SUBJECT', 'mailto:admin@pwaninet.app')
-
-            if not vapid_private_key:
-                logger.warning(f"VAPID private key not configured, skipping push delivery for notification {notification.notification_id}")
-                return False
-
-            # Get active push subscriptions for recipient
             subscriptions = PushSubscription.objects.filter(
                 user=notification.recipient,
                 is_active=True
@@ -203,106 +214,261 @@ class PushAdapter(DeliveryAdapter):
                 logger.info(f"No active push subscriptions for user {notification.recipient.id}, skipping push delivery")
                 return True  # Not an error, just no subscriptions
 
-            # Prepare push notification payload
-            # Try to get actor avatar from metadata
-            actor_avatar = notification.metadata.get('actor_avatar') if notification.metadata else None
-            if not actor_avatar:
-                # Fallback to default app icon (rounded version)
-                actor_avatar = '/static/images/web-app-manifest-192x192-rounded.png'
+            delivered_count = 0
+            for sub in subscriptions:
+                if sub.token_type == PushSubscription.TokenType.VAPID:
+                    if self._deliver_webpush(sub, notification):
+                        delivered_count += 1
+                elif sub.token_type == PushSubscription.TokenType.FCM:
+                    if self._deliver_fcm(sub, notification):
+                        delivered_count += 1
 
-            push_data = {
-                'title': notification.title,
-                'body': notification.summary,
-                'icon': actor_avatar,
-                'badge': '/static/images/favicon-96x96.png',
-                'vibrate': [200, 100, 200],
-                'requireInteraction': False,
-                'actions': [
-                    {
-                        'action': 'view',
-                        'title': 'View',
-                        'icon': '/static/images/favicon-96x96.png'
-                    },
-                    {
-                        'action': 'dismiss',
-                        'title': 'Dismiss',
-                        'icon': '/static/images/favicon-96x96.png'
-                    }
-                ],
-                'data': {
-                    'notification_id': str(notification.notification_id),
-                    'url': f'/notifications/{notification.notification_id}',
-                    'notification_type': notification.notification_type,
-                    'category': notification.category
-                },
-                'timestamp': notification.created_at.isoformat()
-            }
-
-            logger.info(f"PushAdapter: Sending push data for notification {notification.notification_id}: {json.dumps(push_data, indent=2)}")
-
-            # Send to each subscription
-            success_count = 0
-            for subscription in subscriptions:
-                try:
-                    subscription_info = {
-                        'endpoint': subscription.endpoint,
-                        'keys': {
-                            'p256dh': subscription.p256dh,
-                            'auth': subscription.auth
-                        }
-                    }
-
-                    webpush(
-                        subscription_info=subscription_info,
-                        data=json.dumps(push_data),
-                        vapid_private_key=vapid_private_key,
-                        vapid_claims={'sub': vapid_subject},
-                        timeout=10
-                    )
-                    success_count += 1
-                    logger.info(f"Push sent successfully to subscription {subscription.id} for notification {notification.notification_id}")
-
-                except Exception as e:
-                    logger.error(f"Failed to send push to subscription {subscription.id}: {e}")
-                    # Deactivate failed subscription
-                    subscription.is_active = False
-                    subscription.save(update_fields=['is_active'])
-
-            # Mark delivery as successful if at least one push was sent
-            if success_count > 0:
-                logger.info(f"Push delivery successful for notification {notification.notification_id} (sent to {success_count}/{subscriptions.count()} subscriptions)")
+            if delivered_count > 0:
+                logger.info(f"Push delivery successful for notification {notification.notification_id} (delivered to {delivered_count}/{subscriptions.count()} subscriptions)")
+                if attempt:
+                    attempt.status = 'DELIVERED'
+                    attempt.delivered_at = timezone.now()
+                    attempt.save(update_fields=['status', 'delivered_at'])
                 return True
             else:
-                logger.warning(f"Push delivery failed for notification {notification.notification_id} (no successful sends)")
+                logger.warning(f"Push delivery failed for notification {notification.notification_id} across all active subscriptions")
+                if attempt:
+                    attempt.status = 'FAILED'
+                    attempt.error_message = 'Failed to deliver push across all active subscriptions.'
+                    attempt.save(update_fields=['status', 'error_message'])
                 return False
 
         except Exception as e:
-            logger.error(f"Push delivery failed for notification {notification.notification_id}: {e}")
-            attempt.status = 'FAILED'
-            attempt.error_message = str(e)
-            attempt.save(update_fields=['status', 'error_message'])
+            logger.error(f"Push delivery failed for notification {notification.notification_id}: {e}", exc_info=True)
+            if attempt:
+                attempt.status = 'FAILED'
+                attempt.error_message = str(e)
+                attempt.save(update_fields=['status', 'error_message'])
+            return False
+
+    def _resolve_push_content(self, notification: NotificationObject) -> dict:
+        """
+        Resolve rich push notification content matching in-app notification cards.
+        Uses NotificationMessageEngine to construct human-friendly message text
+        (e.g., 'Grace Student pinched you.' or 'Zayne Dev liked your post.').
+        Also computes smart aggregation / collapse tags and Android channels.
+        """
+        # 1. Resolve human-friendly conversational message body
+        rich_body = None
+        try:
+            from notifications.rendering.adapters import get_payload_adapter
+            from notifications.rendering.message_engine import message_engine
+
+            adapter = get_payload_adapter(notification)
+            payload = adapter.to_standard_payload(notification)
+            rich_body = message_engine.generate_message(payload)
+        except Exception as e:
+            logger.debug(f"Failed to generate rich message for notification {notification.notification_id}: {e}")
+
+        if not rich_body:
+            rich_body = notification.summary or notification.title or "You have a new notification"
+
+        # 2. Resolve Title
+        title = "PwaniNet"
+
+        # 3. Resolve Actor Avatar / Icon
+        actor_avatar = None
+        if notification.metadata and isinstance(notification.metadata, dict):
+            actor_avatar = notification.metadata.get('actor_avatar')
+        if not actor_avatar:
+            actor_avatar = '/static/images/web-app-manifest-192x192-rounded.png'
+
+        # 4. Resolve Target URL
+        target_url = getattr(notification, 'target_url', None)
+        if not target_url and notification.metadata and isinstance(notification.metadata, dict):
+            target_url = notification.metadata.get('url')
+        if not target_url:
+            target_url = f'/notifications/{notification.notification_id}'
+
+        # 5. Smart Tagging & Grouping
+        # Collapse related notifications together to avoid notification flooding
+        if notification.aggregation_key:
+            tag = f"pwaninet-{notification.aggregation_key}"
+        elif notification.context_type and notification.context_id:
+            tag = f"pwaninet-{str(notification.context_type).lower()}-{notification.context_id}"
+        else:
+            cat_str = str(notification.category).lower() if notification.category else "general"
+            type_str = str(notification.notification_type).lower() if notification.notification_type else "alert"
+            tag = f"pwaninet-{cat_str}-{type_str}"
+
+        # 6. Android Notification Channel
+        category = str(notification.category or '').upper()
+        ntype = str(notification.notification_type or '').upper()
+        if category == 'MESSAGING' or 'MESSAGE' in ntype:
+            channel_id = 'pwaninet_messages'
+        else:
+            channel_id = 'pwaninet_social'
+
+        return {
+            'title': title,
+            'body': rich_body,
+            'icon': actor_avatar,
+            'tag': tag,
+            'channel_id': channel_id,
+            'target_url': target_url,
+        }
+
+    def _deliver_webpush(self, sub: PushSubscription, notification: NotificationObject) -> bool:
+        """Deliver via W3C WebPush using pywebpush."""
+        from pywebpush import webpush, WebPushException
+
+        vapid_private_key = getattr(settings, 'VAPID_PRIVATE_KEY', '')
+        vapid_subject = getattr(settings, 'VAPID_SUBJECT', 'mailto:admin@pwaninet.app')
+
+        if not vapid_private_key:
+            logger.warning(f"VAPID private key not configured, skipping web push for subscription {sub.id}")
+            return False
+
+        if not sub.endpoint or not sub.p256dh or not sub.auth:
+            logger.warning(f"Subscription {sub.id} missing endpoint/keys, deactivating")
+            sub.is_active = False
+            sub.save(update_fields=['is_active'])
+            return False
+
+        content = self._resolve_push_content(notification)
+
+        push_data = {
+            'title': content['title'],
+            'body': content['body'],
+            'icon': content['icon'],
+            'badge': '/static/images/favicon-96x96.png',
+            'vibrate': [200, 100, 200],
+            'requireInteraction': False,
+            'tag': content['tag'],
+            'renotify': True,
+            'actions': [
+                {'action': 'view', 'title': 'View', 'icon': '/static/images/favicon-96x96.png'},
+                {'action': 'dismiss', 'title': 'Dismiss', 'icon': '/static/images/favicon-96x96.png'}
+            ],
+            'data': {
+                'notification_id': str(notification.notification_id),
+                'url': content['target_url'],
+                'notification_type': notification.notification_type,
+                'category': notification.category,
+                'tag': content['tag'],
+            },
+            'timestamp': notification.created_at.isoformat() if notification.created_at else timezone.now().isoformat()
+        }
+
+        try:
+            subscription_info = {
+                'endpoint': sub.endpoint,
+                'keys': {
+                    'p256dh': sub.p256dh,
+                    'auth': sub.auth
+                }
+            }
+
+            webpush(
+                subscription_info=subscription_info,
+                data=json.dumps(push_data),
+                vapid_private_key=vapid_private_key,
+                vapid_claims={'sub': vapid_subject},
+                timeout=10
+            )
+            logger.info(f"WebPush sent successfully to subscription {sub.id} for notification {notification.notification_id}")
+            return True
+
+        except WebPushException as ex:
+            logger.warning(f"WebPush failed for subscription {sub.id}: {ex}")
+            # Invalidate expired / unsubscribed endpoints
+            if ex.response and getattr(ex.response, 'status_code', None) in [404, 410]:
+                sub.is_active = False
+                sub.save(update_fields=['is_active'])
+                logger.info(f"Deactivated expired web push subscription {sub.id}")
+            return False
+        except Exception as ex:
+            logger.error(f"Unexpected WebPush error for subscription {sub.id}: {ex}")
+            return False
+
+    def _deliver_fcm(self, sub: PushSubscription, notification: NotificationObject) -> bool:
+        """Deliver via Firebase Cloud Messaging for native devices."""
+        app = get_firebase_app()
+        if not app:
+            logger.warning("Firebase app unavailable; skipping FCM delivery.")
+            return False
+
+        if not sub.fcm_token:
+            logger.warning(f"Subscription {sub.id} missing fcm_token, deactivating")
+            sub.is_active = False
+            sub.save(update_fields=['is_active'])
+            return False
+
+        content = self._resolve_push_content(notification)
+
+        try:
+            from firebase_admin import messaging
+            message = messaging.Message(
+                notification=messaging.Notification(
+                    title=content['title'],
+                    body=content['body'],
+                ),
+                android=messaging.AndroidConfig(
+                    priority='high',
+                    collapse_key=content['tag'],
+                    notification=messaging.AndroidNotification(
+                        channel_id=content['channel_id'],
+                        tag=content['tag'],
+                        color='#2563eb',
+                        sound='default',
+                        click_action='OPEN_NOTIFICATION',
+                    ),
+                    data={
+                        "url": content['target_url'] or '/',
+                        "notification_id": str(notification.notification_id),
+                        "notification_type": str(notification.notification_type),
+                        "category": str(notification.category),
+                        "icon": content['icon'],
+                        "tag": content['tag'],
+                    }
+                ),
+                data={
+                    "url": content['target_url'] or '/',
+                    "notification_id": str(notification.notification_id),
+                    "notification_type": str(notification.notification_type),
+                    "category": str(notification.category),
+                    "tag": content['tag'],
+                },
+                token=sub.fcm_token,
+            )
+            messaging.send(message, app=app)
+            logger.info(f"FCM sent successfully to subscription {sub.id} for notification {notification.notification_id}")
+            return True
+        except Exception as ex:
+            err_msg = str(ex)
+            ex_name = type(ex).__name__
+            logger.warning(f"FCM delivery failed for user {sub.user_id} (sub {sub.id}): [{ex_name}] {err_msg}")
+            if (
+                "Unregistered" in ex_name
+                or "NotFound" in ex_name
+                or "InvalidArgument" in ex_name
+                or "Unregistered" in err_msg
+                or "InvalidArgument" in err_msg
+                or "not a valid FCM registration token" in err_msg
+            ):
+                sub.is_active = False
+                sub.save(update_fields=['is_active'])
+                logger.info(f"Deactivated invalid FCM subscription {sub.id}")
             return False
 
     def validate(self, notification: NotificationObject) -> bool:
         """
         Validate that notification can be delivered via push.
-
-        Recipient must have an active push subscription.
+        Recipient must have an active push subscription (VAPID or FCM).
         """
-        # Check for active push subscription
         subscriptions = PushSubscription.objects.filter(
-            user=notification.recipient
+            user=notification.recipient,
+            is_active=True
         )
-        logger.info(f"Push validation for notification {notification.notification_id}: user {notification.recipient.id} has {subscriptions.count()} total subscriptions")
-        
-        active_subscriptions = subscriptions.filter(is_active=True)
-        logger.info(f"Push validation for notification {notification.notification_id}: user {notification.recipient.id} has {active_subscriptions.count()} active subscriptions")
-
-        if not active_subscriptions.exists():
+        if not subscriptions.exists():
             logger.info(f"Cannot deliver notification {notification.notification_id} via push: no active subscription for user {notification.recipient.id}")
             return False
 
-        logger.info(f"Push validation passed for notification {notification.notification_id}: user {notification.recipient.id} has active subscription")
         return True
 
 

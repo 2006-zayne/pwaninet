@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.core.paginator import Paginator
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -656,73 +656,212 @@ class VapidPublicKeyView(APIView):
                 {'error': 'VAPID public key not configured'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        return Response({'public_key': public_key})
+        return Response({
+            'public_key': public_key,
+            'publicKey': public_key,
+            'configured': bool(public_key)
+        })
 
 
 class SubscribeView(APIView):
     """
     Endpoint for users to subscribe to push notifications.
-    Requires authentication. Handles deduplication by endpoint.
+    Supports both W3C WebPush (VAPID) subscriptions and Native FCM tokens.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         """Create or update a push subscription for the authenticated user."""
-        serializer = SubscriptionSerializer(data=request.data)
-        if serializer.is_valid():
-            try:
-                subscription = SubscriptionService.subscribe(
-                    user=request.user,
-                    validated_data=serializer.validated_data
-                )
+        try:
+            payload = request.data if isinstance(request.data, dict) and request.data else {}
+            if not payload and request.body:
+                import json
+                payload = json.loads(request.body)
+        except Exception:
+            return Response({'error': 'Invalid JSON body'}, status=status.HTTP_400_BAD_REQUEST)
+
+        token_type = payload.get('token_type', PushSubscription.TokenType.VAPID)
+        platform = payload.get('platform', PushSubscription.Platform.WEB)
+        device_id = payload.get('device_id')
+        user_agent = payload.get('user_agent', request.META.get('HTTP_USER_AGENT', ''))
+
+        if token_type == PushSubscription.TokenType.VAPID:
+            endpoint = payload.get('endpoint')
+            keys = payload.get('keys', {})
+            p256dh = keys.get('p256dh') or payload.get('p256dh')
+            auth = keys.get('auth') or payload.get('auth')
+
+            if not endpoint or not p256dh or not auth:
                 return Response(
-                    {
-                        'status': 'subscribed',
-                        'subscription_id': subscription.id,
-                        'is_active': subscription.is_active
-                    },
-                    status=status.HTTP_200_OK
+                    {'error': 'Missing required WebPush keys (endpoint, p256dh, auth)'},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
-            except Exception as e:
+
+            sub, _ = PushSubscription.objects.update_or_create(
+                user=request.user,
+                endpoint=endpoint,
+                defaults={
+                    'platform': platform,
+                    'token_type': PushSubscription.TokenType.VAPID,
+                    'p256dh': p256dh,
+                    'auth': auth,
+                    'device_id': device_id,
+                    'user_agent': user_agent,
+                    'is_active': True,
+                }
+            )
+            return Response(
+                {
+                    'status': 'success',
+                    'message': 'Push device registered successfully.',
+                    'subscription_id': sub.id,
+                    'is_active': sub.is_active
+                },
+                status=status.HTTP_200_OK
+            )
+
+        elif token_type == PushSubscription.TokenType.FCM:
+            fcm_token = payload.get('fcm_token')
+            if not fcm_token:
                 return Response(
-                    {'error': str(e)},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    {'error': 'Missing required fcm_token'},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            sub, _ = PushSubscription.objects.update_or_create(
+                user=request.user,
+                fcm_token=fcm_token,
+                defaults={
+                    'platform': platform or PushSubscription.Platform.ANDROID_NATIVE,
+                    'token_type': PushSubscription.TokenType.FCM,
+                    'device_id': device_id,
+                    'user_agent': user_agent,
+                    'is_active': True,
+                }
+            )
+            return Response(
+                {
+                    'status': 'success',
+                    'message': 'Push device registered successfully.',
+                    'subscription_id': sub.id,
+                    'is_active': sub.is_active
+                },
+                status=status.HTTP_200_OK
+            )
+        else:
+            return Response(
+                {'error': f'Unsupported token_type: {token_type}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+@login_required
+@require_POST
+def subscribe_push(request):
+    """
+    Function view alternative for push subscription.
+    """
+    import json
+    from django.http import HttpResponseBadRequest, JsonResponse
+
+    try:
+        payload = json.loads(request.body)
+    except (ValueError, json.JSONDecodeError):
+        return HttpResponseBadRequest("Invalid JSON body")
+
+    token_type = payload.get('token_type', PushSubscription.TokenType.VAPID)
+    platform = payload.get('platform', PushSubscription.Platform.WEB)
+    device_id = payload.get('device_id')
+    user_agent = payload.get('user_agent', request.META.get('HTTP_USER_AGENT', ''))
+
+    if token_type == PushSubscription.TokenType.VAPID:
+        endpoint = payload.get('endpoint')
+        keys = payload.get('keys', {})
+        p256dh = keys.get('p256dh') or payload.get('p256dh')
+        auth = keys.get('auth') or payload.get('auth')
+
+        if not endpoint or not p256dh or not auth:
+            return HttpResponseBadRequest("Missing required WebPush keys (endpoint, p256dh, auth)")
+
+        sub, _ = PushSubscription.objects.update_or_create(
+            user=request.user,
+            endpoint=endpoint,
+            defaults={
+                'platform': platform,
+                'token_type': PushSubscription.TokenType.VAPID,
+                'p256dh': p256dh,
+                'auth': auth,
+                'device_id': device_id,
+                'user_agent': user_agent,
+                'is_active': True,
+            }
+        )
+    elif token_type == PushSubscription.TokenType.FCM:
+        fcm_token = payload.get('fcm_token')
+        if not fcm_token:
+            return HttpResponseBadRequest("Missing required fcm_token")
+
+        sub, _ = PushSubscription.objects.update_or_create(
+            user=request.user,
+            fcm_token=fcm_token,
+            defaults={
+                'platform': platform or PushSubscription.Platform.ANDROID_NATIVE,
+                'token_type': PushSubscription.TokenType.FCM,
+                'device_id': device_id,
+                'user_agent': user_agent,
+                'is_active': True,
+            }
+        )
+    else:
+        return HttpResponseBadRequest(f"Unsupported token_type: {token_type}")
+
+    return JsonResponse({'status': 'success', 'message': 'Push device registered successfully.', 'subscription_id': sub.id})
 
 
 class UnsubscribeView(APIView):
     """
     Endpoint for users to unsubscribe from push notifications.
     Requires authentication. Performs soft delete by setting is_active=False.
+    Supports unsubscribing by endpoint (WebPush) or fcm_token (Native).
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         """Deactivate a push subscription for the authenticated user."""
-        serializer = UnsubscribeSerializer(data=request.data)
-        if serializer.is_valid():
+        payload = request.data if isinstance(request.data, dict) and request.data else {}
+        if not payload and request.body:
+            import json
             try:
-                subscription = SubscriptionService.unsubscribe(
-                    user=request.user,
-                    endpoint=serializer.validated_data['endpoint']
-                )
-                return Response(
-                    {
-                        'status': 'unsubscribed',
-                        'subscription_id': subscription.id,
-                        'is_active': subscription.is_active
-                    },
-                    status=status.HTTP_200_OK
-                )
-            except PushSubscription.DoesNotExist:
-                return Response(
-                    {'error': 'Subscription not found'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            except Exception as e:
-                return Response(
-                    {'error': str(e)},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                payload = json.loads(request.body)
+            except Exception:
+                pass
+
+        endpoint = payload.get('endpoint')
+        fcm_token = payload.get('fcm_token')
+
+        if not endpoint and not fcm_token:
+            return Response(
+                {'error': 'Must provide either endpoint or fcm_token'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        updated = 0
+        if endpoint:
+            updated += PushSubscription.objects.filter(
+                user=request.user,
+                endpoint=endpoint
+            ).update(is_active=False)
+        if fcm_token:
+            updated += PushSubscription.objects.filter(
+                user=request.user,
+                fcm_token=fcm_token
+            ).update(is_active=False)
+
+        return Response(
+            {
+                'status': 'unsubscribed',
+                'is_active': False,
+                'updated_count': updated
+            },
+            status=status.HTTP_200_OK
+        )

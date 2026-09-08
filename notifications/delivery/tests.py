@@ -7,9 +7,11 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import timedelta
-from notifications.models import NotificationObject, DeliveryAttempt
+from notifications.models import NotificationObject, DeliveryAttempt, PushSubscription
 from notifications.delivery.engine import DeliveryEngine, deliver_notification
 from notifications.delivery.adapters import InAppAdapter, EmailAdapter, PushAdapter, SMSAdapter, get_adapter
+from unittest.mock import patch, MagicMock
+import json
 
 User = get_user_model()
 
@@ -70,12 +72,23 @@ class DeliveryAdapterTests(TestCase):
         
         self.assertFalse(valid)
     
-    def test_push_adapter_validate(self):
-        """Test Push adapter validation (placeholder)."""
+    def test_push_adapter_validate_without_subscription(self):
+        """Test Push adapter validation without active subscription."""
         adapter = PushAdapter()
         valid = adapter.validate(self.notification)
-        
-        # Placeholder returns True
+        self.assertFalse(valid)
+
+    def test_push_adapter_validate_with_subscription(self):
+        """Test Push adapter validation with active subscription."""
+        PushSubscription.objects.create(
+            user=self.user,
+            endpoint='https://fcm.googleapis.com/fcm/send/test',
+            p256dh='test_p256dh',
+            auth='test_auth',
+            is_active=True
+        )
+        adapter = PushAdapter()
+        valid = adapter.validate(self.notification)
         self.assertTrue(valid)
     
     def test_sms_adapter_validate(self):
@@ -356,3 +369,220 @@ class DeliveryEngineTests(TestCase):
         self.assertIsNotNone(attempt.queued_at)
         self.assertIsNotNone(attempt.sent_at)
         self.assertIsNotNone(attempt.delivered_at)
+
+
+class PushAdapterDeliveryTests(TestCase):
+    """Test the PushAdapter delivery implementation for WebPush and FCM."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='pushtestuser',
+            email='pushuser@example.com',
+            password='testpass123'
+        )
+        self.notification = NotificationObject.objects.create(
+            recipient=self.user,
+            notification_type='LIKE',
+            category='SOCIAL',
+            priority='NORMAL',
+            title='Push Notification Title',
+            summary='Push summary body'
+        )
+        self.attempt = DeliveryAttempt.objects.create(
+            notification=self.notification,
+            channel='PUSH',
+            status='PENDING'
+        )
+        self.adapter = PushAdapter()
+
+    def test_push_adapter_no_subscriptions(self):
+        """Test delivery returns True as graceful no-op when user has no subscriptions."""
+        success = self.adapter.deliver(self.notification, self.attempt)
+        self.assertTrue(success)
+
+    @patch('pywebpush.webpush')
+    def test_push_adapter_webpush_success(self, mock_webpush):
+        """Test successful WebPush delivery via pywebpush."""
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_webpush.return_value = mock_response
+
+        sub = PushSubscription.objects.create(
+            user=self.user,
+            endpoint='https://updates.push.services.mozilla.com/wpush/v2/test',
+            p256dh='test_p256dh_key',
+            auth='test_auth_key',
+            token_type='VAPID',
+            platform='WEB',
+            is_active=True
+        )
+
+        with patch('django.conf.settings.VAPID_PRIVATE_KEY', 'dummy_private_key'):
+            success = self.adapter.deliver(self.notification, self.attempt)
+
+        self.assertTrue(success)
+        self.attempt.refresh_from_db()
+        self.assertEqual(self.attempt.status, 'DELIVERED')
+        sub.refresh_from_db()
+        self.assertIsNotNone(sub.updated_at)
+        mock_webpush.assert_called_once()
+
+    @patch('pywebpush.webpush')
+    def test_push_adapter_webpush_unregistered_deactivates(self, mock_webpush):
+        """Test that 410 Gone from WebPush deactivates the subscription."""
+        from pywebpush import WebPushException
+        mock_response = MagicMock()
+        mock_response.status_code = 410
+        mock_webpush.side_effect = WebPushException('Subscription expired', response=mock_response)
+
+        sub = PushSubscription.objects.create(
+            user=self.user,
+            endpoint='https://fcm.googleapis.com/fcm/send/expired',
+            p256dh='test_p256dh',
+            auth='test_auth',
+            token_type='VAPID',
+            platform='PWA',
+            is_active=True
+        )
+
+        with patch('django.conf.settings.VAPID_PRIVATE_KEY', 'dummy_private_key'):
+            success = self.adapter.deliver(self.notification, self.attempt)
+
+        self.assertFalse(success)
+        sub.refresh_from_db()
+        self.assertFalse(sub.is_active)
+
+    @patch('notifications.delivery.adapters.get_firebase_app')
+    @patch('firebase_admin.messaging.send')
+    def test_push_adapter_fcm_success(self, mock_send, mock_get_app):
+        """Test successful FCM native delivery."""
+        mock_get_app.return_value = MagicMock()
+        mock_send.return_value = 'projects/test/messages/msg_123'
+
+        sub = PushSubscription.objects.create(
+            user=self.user,
+            fcm_token='test_fcm_token_device_abc',
+            token_type='FCM',
+            platform='ANDROID_NATIVE',
+            is_active=True
+        )
+
+        success = self.adapter.deliver(self.notification, self.attempt)
+        self.assertTrue(success)
+        self.attempt.refresh_from_db()
+        self.assertEqual(self.attempt.status, 'DELIVERED')
+        sub.refresh_from_db()
+        self.assertIsNotNone(sub.updated_at)
+        mock_send.assert_called_once()
+
+    @patch('notifications.delivery.adapters.get_firebase_app')
+    @patch('firebase_admin.messaging.send')
+    def test_push_adapter_fcm_unregistered_deactivates(self, mock_send, mock_get_app):
+        """Test that UnregisteredError from FCM deactivates the subscription."""
+        from firebase_admin import messaging
+        mock_get_app.return_value = MagicMock()
+        mock_send.side_effect = messaging.UnregisteredError('Device uninstalled app')
+
+        sub = PushSubscription.objects.create(
+            user=self.user,
+            fcm_token='test_stale_token',
+            token_type='FCM',
+            platform='ANDROID_NATIVE',
+            is_active=True
+        )
+
+        success = self.adapter.deliver(self.notification, self.attempt)
+        self.assertFalse(success)
+        sub.refresh_from_db()
+        self.assertFalse(sub.is_active)
+
+
+class PushAPITests(TestCase):
+    """Test push notification HTTP APIs (VAPID key, subscribe, unsubscribe)."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='apiuser',
+            email='apiuser@example.com',
+            password='testpass123'
+        )
+        self.client.force_login(self.user)
+
+    def test_vapid_public_key_endpoint(self):
+        """Test GET /api/push/vapid-public-key/."""
+        response = self.client.get('/api/push/vapid-public-key/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('publicKey', data)
+        self.assertIn('configured', data)
+
+    def test_subscribe_webpush_w3c_payload(self):
+        """Test POST /api/push/subscribe/ with W3C WebPush payload."""
+        payload = {
+            'endpoint': 'https://fcm.googleapis.com/fcm/send/w3c_device_1',
+            'keys': {
+                'p256dh': 'p256dh_test_key_sample',
+                'auth': 'auth_test_secret_sample'
+            },
+            'platform': 'PWA',
+            'token_type': 'VAPID'
+        }
+        response = self.client.post(
+            '/api/push/subscribe/',
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data.get('status'), 'success')
+
+        sub = PushSubscription.objects.get(endpoint=payload['endpoint'])
+        self.assertEqual(sub.user, self.user)
+        self.assertEqual(sub.platform, 'PWA')
+        self.assertEqual(sub.token_type, 'VAPID')
+        self.assertEqual(sub.p256dh, 'p256dh_test_key_sample')
+        self.assertTrue(sub.is_active)
+
+    def test_subscribe_fcm_native_payload(self):
+        """Test POST /api/push/subscribe/ with Capacitor FCM payload."""
+        payload = {
+            'token_type': 'FCM',
+            'platform': 'ANDROID_NATIVE',
+            'fcm_token': 'fcm_native_token_12345',
+            'device_id': 'android_device_unique_id_999'
+        }
+        response = self.client.post(
+            '/api/push/subscribe/',
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data.get('status'), 'success')
+
+        sub = PushSubscription.objects.get(fcm_token='fcm_native_token_12345')
+        self.assertEqual(sub.user, self.user)
+        self.assertEqual(sub.platform, 'ANDROID_NATIVE')
+        self.assertEqual(sub.token_type, 'FCM')
+        self.assertEqual(sub.device_id, 'android_device_unique_id_999')
+        self.assertTrue(sub.is_active)
+
+    def test_unsubscribe_endpoint(self):
+        """Test POST /api/push/unsubscribe/."""
+        sub = PushSubscription.objects.create(
+            user=self.user,
+            endpoint='https://fcm.googleapis.com/fcm/send/unsub_target',
+            p256dh='p256dh',
+            auth='auth',
+            is_active=True
+        )
+        payload = {'endpoint': 'https://fcm.googleapis.com/fcm/send/unsub_target'}
+        response = self.client.post(
+            '/api/push/unsubscribe/',
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        sub.refresh_from_db()
+        self.assertFalse(sub.is_active)
+

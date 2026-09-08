@@ -56,12 +56,19 @@ class PushSubscriptionManager {
             throw new Error('Notification permission was previously denied. Please enable it in browser settings.');
         }
 
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-            throw new Error('Notification permission denied');
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                return false;
+            }
+            return true;
+        } catch (err) {
+            if (err.name === 'NotAllowedError') {
+                console.warn('Push notification permission dismissed or not allowed:', err);
+                return false;
+            }
+            throw err;
         }
-
-        return true;
     }
 
     /**
@@ -110,12 +117,15 @@ class PushSubscriptionManager {
      * Get service worker registration
      */
     async getServiceWorkerRegistration() {
-        const registration = await navigator.serviceWorker.getRegistration();
+        if (!('serviceWorker' in navigator)) {
+            throw new Error('Service workers not supported in this browser.');
+        }
+        const registration = await navigator.serviceWorker.ready;
         if (!registration) {
-            console.error('Service worker not registered');
+            console.error('Service worker not ready');
             throw new Error('Service worker not registered. Please refresh the page.');
         }
-        console.log('Service worker registration found:', registration);
+        console.log('Service worker ready registration found:', registration);
         return registration;
     }
 
@@ -133,7 +143,11 @@ class PushSubscriptionManager {
 
         if (!this.hasPermission()) {
             console.log('Requesting permission...');
-            await this.requestPermission();
+            const granted = await this.requestPermission();
+            if (!granted) {
+                console.warn('Push notification permission was not granted.');
+                return null;
+            }
         }
 
         try {
@@ -176,6 +190,7 @@ class PushSubscriptionManager {
     async sendSubscriptionToServer(subscription) {
         const subscriptionJson = subscription.toJSON();
         const csrfToken = this.getCsrfToken();
+        const isStandalone = typeof window.isStandalonePWA === 'function' ? window.isStandalonePWA() : false;
 
         console.log('Sending subscription to server:', {
             endpoint: subscriptionJson.endpoint,
@@ -191,7 +206,13 @@ class PushSubscriptionManager {
                     'X-CSRFToken': csrfToken
                 },
                 body: JSON.stringify({
+                    token_type: 'VAPID',
+                    platform: isStandalone ? 'PWA' : 'WEB',
                     endpoint: subscriptionJson.endpoint,
+                    keys: {
+                        p256dh: subscriptionJson.keys.p256dh,
+                        auth: subscriptionJson.keys.auth
+                    },
                     p256dh: subscriptionJson.keys.p256dh,
                     auth: subscriptionJson.keys.auth,
                     user_agent: navigator.userAgent
