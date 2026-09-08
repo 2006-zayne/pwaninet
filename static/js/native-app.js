@@ -1228,14 +1228,6 @@ async function initNativePush() {
             }
         }
 
-        // Register with native push service (APNS on iOS / FCM on Android)
-        try {
-            await PushNotifications.register();
-        } catch (regErr) {
-            console.warn('[PWANINET-NATIVE] Push registration call failed gracefully:', regErr);
-            return;
-        }
-
         // Listen for successful registration
         PushNotifications.addListener('registration', async function(token) {
             console.log('[PWANINET-NATIVE] Push registration success, token:', token.value);
@@ -1302,6 +1294,14 @@ async function initNativePush() {
                 window.location.href = targetUrl;
             }
         });
+
+        // Register with native push service (APNS on iOS / FCM on Android)
+        try {
+            await PushNotifications.register();
+        } catch (regErr) {
+            console.warn('[PWANINET-NATIVE] Push registration call failed gracefully:', regErr);
+            return;
+        }
 
     } catch (e) {
         console.error('[PWANINET-NATIVE] Failed to initialize native push notifications:', e);

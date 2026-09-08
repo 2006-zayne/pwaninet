@@ -405,8 +405,11 @@ public class MainActivity extends BridgeActivity {
                         boolean wasOffline = !isNetworkAvailable;
                         isNetworkAvailable = true;
                         runOnUiThread(() -> {
-                            // Only reload or navigate if we were previously offline or currently showing the offline page
-                            if ((wasOffline || isOfflinePageShowing) && getBridge() != null && getBridge().getWebView() != null) {
+                            // Only reload if showing the offline fallback error page and not actively viewing offline media
+                            String currentUrl = (getBridge() != null && getBridge().getWebView() != null) ? getBridge().getWebView().getUrl() : null;
+                            boolean isViewingOfflineMedia = currentUrl != null && currentUrl.contains("/offline-media");
+
+                            if (isOfflinePageShowing && !isViewingOfflineMedia && getBridge() != null && getBridge().getWebView() != null) {
                                 isOfflinePageShowing = false;
                                 getBridge().getWebView().loadUrl("https://pwaninet.app");
                             }

@@ -53,6 +53,10 @@ celerybeat.pid
 *-key.pem
 *.key
 *.crt
+*firebase*.json
+*adminsdk*.json
+**/google-services.json
+firebase-adminsdk.json
 
 # =========================
 # IDE / OS FILES
