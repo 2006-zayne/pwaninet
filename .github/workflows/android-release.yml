@@ -122,6 +122,19 @@ jobs:
             echo "Warning: ANDROID_KEYSTORE_BASE64 not set, Gradle will build unsigned APK."
           fi
 
+      - name: Decode Google Services JSON
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "${GOOGLE_SERVICES_JSON}" ]; then
+            echo "${GOOGLE_SERVICES_JSON}" > android/app/google-services.json
+            echo "google-services.json restored from secrets."
+          elif [ -f android/app/google-services.json ]; then
+            echo "google-services.json already present."
+          else
+            echo "Notice: GOOGLE_SERVICES_JSON not provided, building without FCM config."
+          fi
+
       - name: Build Android Release APK
         working-directory: android
         env:
@@ -156,3 +169,20 @@ jobs:
         with:
           tag_name: ${{ env.TAG_NAME }}
           files: output/pwaninet.apk
+
+      - name: Notify Web / PWA Server of New Release
+        run: |
+          echo "Notifying web server of release ${{ env.TAG_NAME }}..."
+          curl -s -X POST https://pwaninet.app/api/releases/webhook/github/ \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: release" \
+            -d "{
+              \"action\": \"published\",
+              \"release\": {
+                \"tag_name\": \"${{ env.TAG_NAME }}\",
+                \"name\": \"Release ${{ env.VERSION_NAME }}\",
+                \"body\": \"Automated release via GitHub Actions build ${{ env.VERSION_CODE }}\",
+                \"prerelease\": false
+              }
+            }" || true
+

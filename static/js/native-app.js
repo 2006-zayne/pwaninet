@@ -1182,25 +1182,20 @@ async function initNativePush() {
             return;
         }
 
-        // Register Android Notification Channels (Android 8.0+)
+        // Register Android Notification Channel (Android 8.0+)
+        // Consolidate into ONE single unified notification channel matching in-app card system
         if (typeof PushNotifications.createChannel === 'function') {
             try {
-                await PushNotifications.createChannel({
-                    id: 'pwaninet_social',
-                    name: 'Social Alerts',
-                    description: 'Notifications for likes, pinches, follows, and mentions',
-                    importance: 5,
-                    visibility: 1,
-                    vibration: true,
-                    lights: true,
-                    lightColor: '#2563eb',
-                    sound: 'default'
-                });
+                // Delete legacy multi-channel configurations if they exist
+                if (typeof PushNotifications.deleteChannel === 'function') {
+                    await PushNotifications.deleteChannel({ id: 'pwaninet_social' }).catch(() => {});
+                    await PushNotifications.deleteChannel({ id: 'pwaninet_messages' }).catch(() => {});
+                }
 
                 await PushNotifications.createChannel({
-                    id: 'pwaninet_messages',
-                    name: 'Direct & Group Messages',
-                    description: 'Notifications for new messages and chat mentions',
+                    id: 'pwaninet_notifications',
+                    name: 'PwaniNet Notifications',
+                    description: 'All social updates, mentions, posts, documents, and messages',
                     importance: 5,
                     visibility: 1,
                     vibration: true,
@@ -1208,9 +1203,9 @@ async function initNativePush() {
                     lightColor: '#2563eb',
                     sound: 'default'
                 });
-                console.log('[PWANINET-NATIVE] Push notification channels created successfully');
+                console.log('[PWANINET-NATIVE] Push notification channel created successfully');
             } catch (chanErr) {
-                console.warn('[PWANINET-NATIVE] Failed to create notification channels:', chanErr);
+                console.warn('[PWANINET-NATIVE] Failed to configure notification channels:', chanErr);
             }
         }
 
@@ -1231,41 +1226,27 @@ async function initNativePush() {
         // Listen for successful registration
         PushNotifications.addListener('registration', async function(token) {
             console.log('[PWANINET-NATIVE] Push registration success, token:', token.value);
+            if (!token || !token.value) return;
+
+            // Submit token to backend Django endpoint
             try {
-                let deviceId = null;
-                if (window.Capacitor.Plugins && window.Capacitor.Plugins.Device && typeof window.Capacitor.Plugins.Device.getId === 'function') {
-                    try {
-                        const info = await window.Capacitor.Plugins.Device.getId();
-                        deviceId = info && info.identifier ? info.identifier : null;
-                    } catch (e) {}
-                }
-
-                const platform = (window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios') ? 'IOS_NATIVE' : 'ANDROID_NATIVE';
-                const tokenType = (platform === 'IOS_NATIVE') ? 'APNS' : 'FCM';
-                const csrfToken = getNativeCsrfToken();
-                const headers = {
-                    'Content-Type': 'application/json',
-                };
-                if (csrfToken) {
-                    headers['X-CSRFToken'] = csrfToken;
-                }
-
-                const payload = {
-                    token_type: tokenType,
-                    platform: platform,
-                    fcm_token: token.value,
-                    device_id: deviceId || undefined
-                };
-
                 const response = await fetch('/api/push/subscribe/', {
                     method: 'POST',
-                    headers: headers,
-                    credentials: 'same-origin',
-                    body: JSON.stringify(payload)
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getNativeCsrfToken()
+                    },
+                    body: JSON.stringify({
+                        token_type: 'FCM',
+                        platform: isAndroid ? 'ANDROID_NATIVE' : 'IOS_NATIVE',
+                        fcm_token: token.value,
+                        user_agent: navigator.userAgent
+                    })
                 });
 
                 if (response.ok) {
                     console.log('[PWANINET-NATIVE] Successfully registered native push token with backend');
+                    localStorage.setItem('pwaninet_push_subscribed', 'true');
                 } else {
                     console.error('[PWANINET-NATIVE] Failed to register native push token with backend:', response.status);
                 }
@@ -1289,7 +1270,7 @@ async function initNativePush() {
         PushNotifications.addListener('pushNotificationActionPerformed', function(notification) {
             console.log('[PWANINET-NATIVE] Push action performed:', notification);
             const data = notification.notification && notification.notification.data;
-            const targetUrl = data && (data.url || data.link || data.click_action);
+            const targetUrl = data && (data.url || data.link || data.destination_url || data.click_action);
             if (targetUrl) {
                 window.location.href = targetUrl;
             }
@@ -1309,21 +1290,29 @@ async function initNativePush() {
 }
 
 /**
- * Display an in-app foreground notification banner matching PwaniNet notification card design.
+ * Display an in-app foreground notification banner matching the PwaniNet in-app notification card design.
+ * Renders actor avatar, title, body, and post/document thumbnail previews.
  */
 function showNativePushBanner(notification) {
     if (!notification) return;
 
-    // Trigger subtle haptic
-    if (window.Haptics && typeof window.Haptics.impactLight === 'function') {
-        window.Haptics.impactLight();
-    }
+    // Trigger native haptic feedback
+    try {
+        if (window.AndroidBridge && typeof window.AndroidBridge.hapticNotification === 'function') {
+            window.AndroidBridge.hapticNotification('SUCCESS');
+        } else if (window.Haptics && typeof window.Haptics.impactLight === 'function') {
+            window.Haptics.impactLight();
+        }
+    } catch (_) {}
 
     const title = notification.title || 'PwaniNet';
     const body = notification.body || '';
     const data = notification.data || {};
-    const icon = data.icon || '/static/images/web-app-manifest-192x192-rounded.png';
-    const targetUrl = data.url || data.link || '/notifications';
+    const icon = data.icon || notification.icon || '/static/images/web-app-manifest-192x192-rounded.png';
+    const previewImage = data.image || notification.image || data.thumbnail_url || null;
+    const resourceType = (data.resource_type || '').toUpperCase();
+    const resourceTitle = data.resource_title || '';
+    const targetUrl = data.url || data.link || data.destination_url || '/notifications/';
 
     // Remove existing banner if any
     const existing = document.getElementById('pwaninet-foreground-push-banner');
@@ -1333,38 +1322,69 @@ function showNativePushBanner(notification) {
 
     const banner = document.createElement('div');
     banner.id = 'pwaninet-foreground-push-banner';
+    banner.className = 'notif-item pwaninet-native-card-banner';
     banner.style.cssText = [
         'position: fixed',
-        'top: calc(var(--pwaninet-safe-area-top, 0px) + 12px)',
+        'top: calc(var(--pwaninet-safe-area-top, 0px) + 10px)',
         'left: 12px',
         'right: 12px',
-        'max-width: 480px',
+        'max-width: 500px',
         'margin: 0 auto',
         'background: var(--bg-card, #ffffff)',
         'color: var(--text-primary, #1e293b)',
-        'border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1))',
-        'border-radius: 14px',
-        'box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+        'border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12))',
+        'border-radius: 16px',
+        'box-shadow: 0 12px 30px -6px rgba(0, 0, 0, 0.2), 0 6px 12px -4px rgba(0, 0, 0, 0.1)',
         'padding: 12px 14px',
         'display: flex',
         'align-items: center',
         'gap: 12px',
         'z-index: 100000',
         'cursor: pointer',
-        'transform: translateY(-120%)',
+        'transform: translateY(-130%)',
         'opacity: 0',
-        'transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease',
+        'transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease',
         'user-select: none',
         '-webkit-user-select: none'
     ].join('; ');
 
+    // Build right-side preview column matching in-app notification card
+    let previewHtml = '';
+    if (previewImage) {
+        previewHtml = `
+            <div class="notif-preview-col flex-shrink-0" style="width: 48px; height: 48px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border, rgba(0,0,0,0.1)); background-color: var(--bg-secondary, #f8fafc); display: flex; align-items: center; justify-content: center;">
+                <img src="${previewImage}" alt="Preview" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.parentElement.style.display='none';">
+            </div>
+        `;
+    } else if (resourceType === 'DOCUMENT' || (data.notification_type && data.notification_type.includes('DOC'))) {
+        previewHtml = `
+            <div class="notif-preview-col flex-shrink-0" style="width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background-color: var(--bg-secondary, #f1f5f9); border: 1px solid var(--border, rgba(0,0,0,0.1));">
+                <i class="bi bi-file-earmark-text" style="font-size: 1.35rem; color: var(--text-secondary, #64748b);"></i>
+            </div>
+        `;
+    } else if (resourceType === 'POST' || (data.notification_type && (data.notification_type.includes('POST') || data.notification_type === 'LIKE' || data.notification_type === 'COMMENT'))) {
+        previewHtml = `
+            <div class="notif-preview-col flex-shrink-0" style="width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background-color: var(--bg-secondary, #f1f5f9); border: 1px solid var(--border, rgba(0,0,0,0.1));">
+                <i class="bi bi-chat-text" style="font-size: 1.35rem; color: var(--text-secondary, #64748b);"></i>
+            </div>
+        `;
+    }
+
     banner.innerHTML = `
-        <img src="${icon}" alt="Avatar" style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.08);">
-        <div style="flex: 1; min-width: 0;">
-            <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-primary, #2563eb); margin-bottom: 2px;">${title}</div>
-            <div style="font-size: 0.88rem; font-weight: 500; color: var(--text-primary, #0f172a); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${body}</div>
+        <div class="notif-avatar-col flex-shrink-0" style="position: relative;">
+            <img src="${icon}" alt="Avatar" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--border, rgba(0,0,0,0.1)); background-color: var(--bg-secondary, #f1f5f9);" onerror="this.src='/static/images/web-app-manifest-192x192-rounded.png';">
         </div>
-        <button type="button" aria-label="Dismiss" style="background: none; border: none; padding: 6px; cursor: pointer; color: var(--text-secondary, #64748b); font-size: 1.25rem; line-height: 1; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <div class="notif-body flex-grow-1" style="min-width: 0;">
+            <div class="notif-title" style="font-size: 0.88rem; font-weight: 700; color: var(--text-primary, #0f172a); line-height: 1.25; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${title}
+            </div>
+            <div class="notif-message" style="font-size: 0.82rem; color: var(--text-secondary, #475569); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                ${body}
+            </div>
+            ${resourceTitle && resourceTitle !== body ? `<div style="font-size: 0.75rem; color: var(--text-muted, #94a3b8); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">“${resourceTitle}”</div>` : ''}
+        </div>
+        ${previewHtml}
+        <button type="button" aria-label="Dismiss" style="background: none; border: none; padding: 4px 6px; cursor: pointer; color: var(--text-secondary, #94a3b8); font-size: 1.35rem; line-height: 1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: 2px;">
             &times;
         </button>
     `;
@@ -1389,17 +1409,17 @@ function showNativePushBanner(notification) {
         banner.style.opacity = '1';
     });
 
-    let dismissTimer = setTimeout(dismissBanner, 5000);
+    let dismissTimer = setTimeout(dismissBanner, 6000);
 
     function dismissBanner() {
         clearTimeout(dismissTimer);
-        banner.style.transform = 'translateY(-120%)';
+        banner.style.transform = 'translateY(-130%)';
         banner.style.opacity = '0';
         setTimeout(() => {
             if (banner.parentNode) {
                 banner.parentNode.removeChild(banner);
             }
-        }, 350);
+        }, 380);
     }
 }
 

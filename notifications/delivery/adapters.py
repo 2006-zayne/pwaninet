@@ -7,7 +7,7 @@ Following Chapter 9 of the specification.
 import logging
 import json
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from django.utils import timezone
 from django.conf import settings
 from notifications.models import NotificationObject, DeliveryAttempt, PushSubscription
@@ -246,15 +246,31 @@ class PushAdapter(DeliveryAdapter):
                 attempt.save(update_fields=['status', 'error_message'])
             return False
 
+    @staticmethod
+    def _make_absolute_url(url: Optional[str]) -> Optional[str]:
+        """Convert relative paths or CDN links into fully qualified HTTPS URLs."""
+        if not url:
+            return None
+        url = str(url).strip()
+        if not url:
+            return None
+        if url.startswith('http://') or url.startswith('https://'):
+            return url
+        base_url = getattr(settings, 'SITE_URL', '') or getattr(settings, 'BASE_URL', '') or 'https://pwaninet.app'
+        base_url = base_url.rstrip('/')
+        if not url.startswith('/'):
+            url = '/' + url
+        return f"{base_url}{url}"
+
     def _resolve_push_content(self, notification: NotificationObject) -> dict:
         """
         Resolve rich push notification content matching in-app notification cards.
-        Uses NotificationMessageEngine to construct human-friendly message text
-        (e.g., 'Grace Student pinched you.' or 'Zayne Dev liked your post.').
-        Also computes smart aggregation / collapse tags and Android channels.
+        Uses NotificationMessageEngine to construct human-friendly message text.
+        Extracts resource previews (images, thumbnails, titles) for posts and docs.
+        Consolidates to a single unified notification channel for mobile clients.
         """
-        # 1. Resolve human-friendly conversational message body
         rich_body = None
+        payload = None
         try:
             from notifications.rendering.adapters import get_payload_adapter
             from notifications.rendering.message_engine import message_engine
@@ -268,22 +284,51 @@ class PushAdapter(DeliveryAdapter):
         if not rich_body:
             rich_body = notification.summary or notification.title or "You have a new notification"
 
-        # 2. Resolve Title
         title = "PwaniNet"
 
-        # 3. Resolve Actor Avatar / Icon
+        # 2. Resolve Actor Avatar / Icon
         actor_avatar = None
-        if notification.metadata and isinstance(notification.metadata, dict):
+        if payload and payload.actors and payload.actors[0].avatar:
+            actor_avatar = payload.actors[0].avatar
+        if not actor_avatar and notification.metadata and isinstance(notification.metadata, dict):
             actor_avatar = notification.metadata.get('actor_avatar')
         if not actor_avatar:
             actor_avatar = '/static/images/web-app-manifest-192x192-rounded.png'
 
+        actor_avatar = self._make_absolute_url(actor_avatar)
+
+        # 3. Resolve Resource Preview (Post / Document updates)
+        preview_image = None
+        resource_type = None
+        resource_title = None
+        resource_url = None
+
+        if payload and payload.resource:
+            res = payload.resource
+            resource_type = res.type.value if hasattr(res.type, 'value') else str(res.type or '')
+            resource_title = res.title
+            resource_url = res.url
+            if res.image_url:
+                preview_image = self._make_absolute_url(res.image_url)
+
+        # Fallback: check metadata directly if payload.resource image was missing
+        if not preview_image and notification.metadata and isinstance(notification.metadata, dict):
+            raw_thumb = notification.metadata.get('thumbnail_url') or notification.metadata.get('image_url')
+            if raw_thumb:
+                preview_image = self._make_absolute_url(raw_thumb)
+
         # 4. Resolve Target URL
+        try:
+            from notifications.services.notification_service import resolve_notification_target_url
+            destination_url = resolve_notification_target_url(notification)
+        except Exception:
+            destination_url = resource_url or '/notifications/'
+
         target_url = getattr(notification, 'target_url', None)
         if not target_url and notification.metadata and isinstance(notification.metadata, dict):
             target_url = notification.metadata.get('url')
         if not target_url:
-            target_url = f'/notifications/{notification.notification_id}'
+            target_url = f'/notifications/{notification.notification_id}/'
 
         # 5. Smart Tagging & Grouping
         # Collapse related notifications together to avoid notification flooding
@@ -308,9 +353,13 @@ class PushAdapter(DeliveryAdapter):
             'title': title,
             'body': rich_body,
             'icon': actor_avatar,
+            'image': preview_image,
+            'resource_type': resource_type,
+            'resource_title': resource_title,
             'tag': tag,
             'channel_id': channel_id,
             'target_url': target_url,
+            'destination_url': destination_url,
         }
 
     def _deliver_webpush(self, sub: PushSubscription, notification: NotificationObject) -> bool:
@@ -336,6 +385,7 @@ class PushAdapter(DeliveryAdapter):
             'title': content['title'],
             'body': content['body'],
             'icon': content['icon'],
+            'image': content.get('image'),
             'badge': '/static/images/favicon-96x96.png',
             'vibrate': [200, 100, 200],
             'requireInteraction': False,
@@ -348,8 +398,12 @@ class PushAdapter(DeliveryAdapter):
             'data': {
                 'notification_id': str(notification.notification_id),
                 'url': content['target_url'],
+                'destination_url': content.get('destination_url') or content['target_url'],
                 'notification_type': notification.notification_type,
                 'category': notification.category,
+                'image': content.get('image'),
+                'resource_type': content.get('resource_type'),
+                'resource_title': content.get('resource_title'),
                 'tag': content['tag'],
             },
             'timestamp': notification.created_at.isoformat() if notification.created_at else timezone.now().isoformat()
@@ -403,37 +457,46 @@ class PushAdapter(DeliveryAdapter):
 
         try:
             from firebase_admin import messaging
+
+            notification_kwargs = {
+                'title': content['title'],
+                'body': content['body'],
+            }
+            if content.get('image'):
+                notification_kwargs['image'] = content['image']
+
+            android_notif_kwargs = {
+                'channel_id': content['channel_id'],
+                'tag': content['tag'],
+                'color': '#2563eb',
+                'sound': 'default',
+                'click_action': 'OPEN_NOTIFICATION',
+            }
+            if content.get('image'):
+                android_notif_kwargs['image'] = content['image']
+
+            fcm_data = {
+                "url": content['target_url'] or '/',
+                "destination_url": content.get('destination_url') or content['target_url'] or '/',
+                "notification_id": str(notification.notification_id),
+                "notification_type": str(notification.notification_type),
+                "category": str(notification.category or ''),
+                "icon": content['icon'] or '',
+                "image": content.get('image') or '',
+                "resource_type": content.get('resource_type') or '',
+                "resource_title": content.get('resource_title') or '',
+                "tag": content['tag'],
+            }
+
             message = messaging.Message(
-                notification=messaging.Notification(
-                    title=content['title'],
-                    body=content['body'],
-                ),
+                notification=messaging.Notification(**notification_kwargs),
                 android=messaging.AndroidConfig(
                     priority='high',
                     collapse_key=content['tag'],
-                    notification=messaging.AndroidNotification(
-                        channel_id=content['channel_id'],
-                        tag=content['tag'],
-                        color='#2563eb',
-                        sound='default',
-                        click_action='OPEN_NOTIFICATION',
-                    ),
-                    data={
-                        "url": content['target_url'] or '/',
-                        "notification_id": str(notification.notification_id),
-                        "notification_type": str(notification.notification_type),
-                        "category": str(notification.category),
-                        "icon": content['icon'],
-                        "tag": content['tag'],
-                    }
+                    notification=messaging.AndroidNotification(**android_notif_kwargs),
+                    data=fcm_data
                 ),
-                data={
-                    "url": content['target_url'] or '/',
-                    "notification_id": str(notification.notification_id),
-                    "notification_type": str(notification.notification_type),
-                    "category": str(notification.category),
-                    "tag": content['tag'],
-                },
+                data=fcm_data,
                 token=sub.fcm_token,
             )
             messaging.send(message, app=app)

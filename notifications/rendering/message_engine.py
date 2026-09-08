@@ -260,6 +260,14 @@ class NotificationMessageEngine:
                 "MANY": "{actors} uploaded documents to {repository}.",
                 "HISTORICAL": "{actors} uploaded documents to {repository}.",
             },
+            "DOCUMENT_UPDATED": {
+                "SINGLE": "{actor} updated document: {document_title}.",
+                "DUAL": "{actor1} and {actor2} updated {document_title}.",
+                "FEW": "{actors} updated documents.",
+                "MANY": "{actors} updated documents.",
+                "HISTORICAL": "{actors} updated documents.",
+                "SUMMARY": "Document updated",
+            },
             "DOCUMENT_APPROVED": {
                 "SINGLE": "Your document {document} was approved.",
             },
