@@ -98,6 +98,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'notifications.context_processors.notification_count',
                 'pwaninet.context_processors.release_metadata',
+                'groups.context_processors.groups_nav_context',
             ],
         },
     }

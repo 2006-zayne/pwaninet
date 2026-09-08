@@ -49,7 +49,11 @@ from groups.services.group_notification_service import (
     send_group_invite_notification
 )
 from notifications.services.notification_service import (
-    get_cached_unread_count, get_group_unread_counts, invalidate_unread_count_cache
+    get_cached_unread_count,
+    get_group_unread_counts,
+    get_group_activity_by_type,
+    mark_group_notifications_as_read_and_invalidate,
+    invalidate_unread_count_cache
 )
 from notifications.queries.notification_queries import get_unread_count_by_user_id
 from notifications.models import NotificationObject
@@ -965,9 +969,11 @@ def groups_dashboard(request):
     user_group_ids = set(user_groups.values_list('id', flat=True))
     pending_group_ids = set(pending_groups.values_list('id', flat=True))
 
-    # Get unread notification counts for display groups
+    # Get unread notification counts and activity breakdown for both user groups and display groups
     display_group_ids = [g.id for g in display_groups]
-    group_unread_counts = get_group_unread_counts(request.user, display_group_ids)
+    all_relevant_group_ids = list(set(list(user_group_ids) + display_group_ids))
+    group_unread_counts = get_group_unread_counts(request.user, all_relevant_group_ids)
+    group_activity = get_group_activity_by_type(request.user, all_relevant_group_ids)
 
     # Get recent searches from session
     recent_searches = request.session.get('recent_group_searches', [])
@@ -979,6 +985,7 @@ def groups_dashboard(request):
         'pending_group_ids': pending_group_ids,
         'unread_notifications_count': get_cached_unread_count(request.user),
         'group_unread_counts': group_unread_counts,
+        'group_activity': group_activity,
         'query': query,
         'recent_searches': recent_searches,
     }
@@ -993,6 +1000,7 @@ def groups_dashboard(request):
 @login_required
 def groups_detail_view(request, group_id):
     from groups.services.group_service import build_group_detail_context
+    mark_group_notifications_as_read_and_invalidate(request.user, group_id)
     group = get_object_or_404(Group.objects.annotate(member_count=Count('memberships', filter=Q(memberships__status=MembershipStatus.APPROVED))), id=group_id)
     query = request.GET.get('search_user', '')
     page = int(request.GET.get('page', 1))
@@ -1018,7 +1026,9 @@ def groups_detail_view(request, group_id):
                 'liked_post_ids': liked_post_ids,
                 'is_member': context.get('is_member'),
             })
-        return render(request, 'groups/partials/groups_detail_navigation_partial.html', context)
+        response = render(request, 'groups/partials/groups_detail_navigation_partial.html', context)
+        response['HX-Trigger'] = 'updateGroupActivity'
+        return response
 
     return render(request, 'groups/groups_detail.html', context)
 
@@ -1738,6 +1748,18 @@ def group_unread_counts_api(request):
 
 
 @login_required
+def group_activity_status_api(request):
+    """
+    API endpoint to check if user has any unread group activity for the navigation red dot.
+    """
+    from notifications.services.notification_service import check_any_unread_group_activity
+    return JsonResponse({
+        'has_unread': check_any_unread_group_activity(request.user)
+    })
+
+
+
+@login_required
 def search_users_view(request):
     """
     Search users by username or global role for role assignment.
@@ -1922,6 +1944,7 @@ def group_members_search(request, group_id):
 def group_announcements_view(request, group_id):
     """View group announcements page"""
     group = get_object_or_404(Group, id=group_id)
+    mark_group_notifications_as_read_and_invalidate(request.user, group_id)
 
     # Check if user is a member
     try:
@@ -1955,7 +1978,9 @@ def group_announcements_view(request, group_id):
     }
 
     if request.headers.get('HX-Request'):
-        return render(request, 'groups/partials/group_announcements_navigation_partial.html', context)
+        response = render(request, 'groups/partials/group_announcements_navigation_partial.html', context)
+        response['HX-Trigger'] = 'updateGroupActivity'
+        return response
 
     return render(request, 'groups/group_announcements.html', context)
 

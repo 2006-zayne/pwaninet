@@ -658,6 +658,32 @@
             pointer-events: none;
         }
 
+        /* Groups Nav Red Dot Indicator */
+        .nav-groups-dot {
+            position: absolute;
+            top: -1px;
+            right: -2px;
+            width: 8px;
+            height: 8px;
+            background-color: #dc2626;
+            border-radius: 50%;
+            border: 1.5px solid var(--nav-bg, #ffffff);
+            pointer-events: none;
+            z-index: 10;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+        }
+
+        .mobile-bottom-nav .nav-groups-dot {
+            top: -2px;
+            right: -3px;
+            border-color: var(--mobile-nav-bg, var(--nav-bg, #ffffff));
+        }
+
+        [data-theme="dark"] .nav-groups-dot {
+            background-color: #ef4444;
+            border-color: var(--card-bg, #242526);
+        }
+
         /* Modal Styles - Custom backdrop solution */
         .modal {
             z-index: 1050 !important;
@@ -1017,7 +1043,10 @@
                    hx-swap="innerHTML"
                    hx-push-url="true"
                    hx-history="true">
-                    <i class="bi bi-people-fill" style="font-size: 1.5rem;"></i>
+                    <span style="position: relative; display: inline-block;">
+                        <i class="bi bi-people-fill" style="font-size: 1.5rem;"></i>
+                        <span class="nav-groups-dot" title="New group activity" style="{% if not has_unread_group_activity %}display: none;{% endif %}"></span>
+                    </span>
                     <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Groups" %}</span>
                 </a>
                 {% if request.user.is_authenticated %}
@@ -1169,7 +1198,10 @@
                hx-push-url="true"
                hx-history="true"
                aria-label="{% trans 'Groups' %}">
-                <i class="bi bi-people-fill"></i>
+                <span style="position: relative; display: inline-block;">
+                    <i class="bi bi-people-fill"></i>
+                    <span class="nav-groups-dot" title="New group activity" style="{% if not has_unread_group_activity %}display: none;{% endif %}"></span>
+                </span>
                 <span>{% trans "Groups" %}</span>
             </a>
             {% if user.is_authenticated %}
@@ -1601,6 +1633,11 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         console.log('[GLOBAL] Handling notification type:', data.type);
                         showNotification(data.notification);
                         // Update unread count badge in realtime
+                        if (data.notification && data.notification.context_type === 'GROUP') {
+                            if (typeof updateGroupsNavDot === 'function') {
+                                updateGroupsNavDot(true);
+                            }
+                        }
                         if (typeof data.unread_count !== 'undefined') {
                             updateNotificationCount(data.unread_count);
                         } else if (data.notification && typeof data.notification.unread_count !== 'undefined') {
@@ -1617,6 +1654,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         // Handle unread notification count update
                         console.log('[GLOBAL] Handling unread_count update:', data.count);
                         updateNotificationCount(data.count);
+                        if (typeof refreshGroupNavDot === 'function') {
+                            refreshGroupNavDot();
+                        }
                     } else if (data.type === 'user_status') {
                         // Handle user online/offline status updates
                         if (typeof handleUserStatusUpdate === 'function') {
@@ -1699,8 +1739,34 @@ window.addEventListener('beforeinstallprompt', (e) => {
         }
     }
 
-    // Listen for HTMX updateUnreadCount event
+    function updateGroupsNavDot(hasUnread) {
+        const dots = document.querySelectorAll('.nav-groups-dot');
+        dots.forEach(dot => {
+            dot.style.display = hasUnread ? 'block' : 'none';
+        });
+    }
+
+    function refreshGroupNavDot() {
+        fetch('/groups/api/activity-status/', {
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(r => {
+                if (!r.ok || r.redirected || (r.url && (r.url.includes('/accounts/login') || r.url.includes('/users/login')))) {
+                    return null;
+                }
+                return r.json();
+            })
+            .then(data => {
+                if (data && typeof data.has_unread !== 'undefined') {
+                    updateGroupsNavDot(data.has_unread);
+                }
+            })
+            .catch(() => {});
+    }
+
+    // Listen for HTMX updateUnreadCount and updateGroupActivity events
     document.body.addEventListener('updateUnreadCount', function(e) {
+        refreshGroupNavDot();
         fetch('/notifications/unread-count/?format=json', {
             headers: { 'Accept': 'application/json' }
         })
@@ -1711,6 +1777,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 }
             })
             .catch(() => {});
+    });
+
+    document.body.addEventListener('updateGroupActivity', function(e) {
+        refreshGroupNavDot();
     });
 
     function pollNotificationCount() {
@@ -1732,6 +1802,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
             .catch(error => {
                 console.error('Error polling notification count:', error);
             });
+
+        // Also poll group activity indicator
+        refreshGroupNavDot();
     }
 
     function startNotificationCountPolling() {

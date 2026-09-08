@@ -25,6 +25,7 @@ urlpatterns = [
     path('<int:group_id>/approve/<int:user_id>/', views.approve_from_notification, name='approve_from_notification'),
     path('<int:group_id>/reject/<int:user_id>/', views.reject_from_notification, name='reject_from_notification'),
     path('api/unread-counts/', views.group_unread_counts_api, name='group_unread_counts_api'),
+    path('api/activity-status/', views.group_activity_status_api, name='group_activity_status_api'),
     path('search-users/', views.search_users_view, name='search_users'),
     path('clear-recent-searches/', views.clear_recent_group_searches, name='clear_recent_searches'),
     path('<int:group_id>/photo/<str:photo_type>/', views.view_group_photo_fullscreen, name='view_group_photo_fullscreen'),

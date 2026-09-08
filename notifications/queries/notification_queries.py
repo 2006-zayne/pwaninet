@@ -270,17 +270,122 @@ def get_unread_counts_for_groups(user, group_ids):
     if not group_ids:
         return {}
     
+    str_ids = list(set(str(gid) for gid in group_ids))
+    
     counts = NotificationObject.objects.filter(
         recipient=user,
         context_type='GROUP',
-        context_id__in=group_ids
+        context_id__in=str_ids
     ).exclude(
         status__in=[NotificationStatuses.READ.value, NotificationStatuses.ARCHIVED.value, NotificationStatuses.EXPIRED.value]
     ).values('context_id').annotate(
         count=Count('notification_id')
     )
     
-    return {item['context_id']: item['count'] for item in counts}
+    res = {}
+    for item in counts:
+        cid = item['context_id']
+        cnt = item['count']
+        res[cid] = cnt
+        if cid and str(cid).isdigit():
+            res[int(cid)] = cnt
+    return res
+
+
+def get_unread_group_activity_by_type(user, group_ids):
+    """
+    Get unread notification counts per group broken down by type:
+    announcement, post, and total.
+    Returns: {group_id: {'announcement': int, 'post': int, 'total': int}}
+    Keys are provided as both integer and string group IDs.
+    """
+    if not user or not user.is_authenticated or not group_ids:
+        return {}
+    
+    canonical_data = {}
+    for gid in group_ids:
+        canonical_data[str(gid)] = {'announcement': 0, 'post': 0, 'total': 0}
+        
+    str_ids = list(canonical_data.keys())
+    
+    counts = NotificationObject.objects.filter(
+        recipient=user,
+        context_type='GROUP',
+        context_id__in=str_ids,
+        notification_type__in=['GROUP_ANNOUNCEMENT', 'POST_CREATED', 'DOCUMENT_SHARED']
+    ).exclude(
+        status__in=[NotificationStatuses.READ.value, NotificationStatuses.ARCHIVED.value, NotificationStatuses.EXPIRED.value]
+    ).values('context_id', 'notification_type').annotate(
+        count=Count('target_id', distinct=True)
+    )
+    
+    for item in counts:
+        cid = str(item['context_id'])
+        ntype = item['notification_type']
+        cnt = item['count']
+        
+        if cid not in canonical_data:
+            canonical_data[cid] = {'announcement': 0, 'post': 0, 'total': 0}
+            
+        canonical_data[cid]['total'] += cnt
+        if ntype == 'GROUP_ANNOUNCEMENT':
+            canonical_data[cid]['announcement'] += cnt
+        elif ntype in ('POST_CREATED', 'DOCUMENT_SHARED') or 'POST' in ntype:
+            canonical_data[cid]['post'] += cnt
+            
+    result = {}
+    for cid, data in canonical_data.items():
+        result[cid] = dict(data)
+        if cid.isdigit():
+            result[int(cid)] = dict(data)
+            
+    return result
+
+
+def has_any_unread_group_activity(user):
+    """
+    Check if the user has any unread notifications for any of their approved groups.
+    Only returns True if there are unread group updates (announcements or posts)
+    for groups the user is currently an approved member of.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    from groups.models import Membership, MembershipStatus
+    user_group_ids = list(Membership.objects.filter(
+        user=user,
+        status=MembershipStatus.APPROVED
+    ).values_list('group_id', flat=True))
+    
+    if not user_group_ids:
+        return False
+        
+    str_group_ids = [str(gid) for gid in user_group_ids]
+    
+    return NotificationObject.objects.filter(
+        recipient=user,
+        context_type='GROUP',
+        context_id__in=str_group_ids,
+        notification_type__in=['GROUP_ANNOUNCEMENT', 'POST_CREATED', 'DOCUMENT_SHARED']
+    ).exclude(
+        status__in=[NotificationStatuses.READ.value, NotificationStatuses.ARCHIVED.value, NotificationStatuses.EXPIRED.value]
+    ).exists()
+
+
+def mark_group_notifications_as_read(user, group_id):
+    """
+    Mark all unread notifications for a specific group as READ for this user.
+    """
+    if not user or not user.is_authenticated or not group_id:
+        return 0
+    str_gid = str(group_id)
+    return NotificationObject.objects.filter(
+        recipient=user,
+        context_type='GROUP',
+        context_id__in=[group_id, str_gid]
+    ).exclude(
+        status__in=[NotificationStatuses.READ.value, NotificationStatuses.ARCHIVED.value, NotificationStatuses.EXPIRED.value]
+    ).update(status=NotificationStatuses.READ.value)
+
 
 
 def get_notifications_grouped_by_sender(user, notification_type=None, is_read=None, search_query=None):

@@ -11,7 +11,10 @@ from notifications.queries.notification_queries import (
     delete_all_notifications,
     delete_read_notifications,
     get_grouped_notifications,
-    get_unread_counts_for_groups
+    get_unread_counts_for_groups,
+    get_unread_group_activity_by_type,
+    has_any_unread_group_activity,
+    mark_group_notifications_as_read
 )
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -130,11 +133,21 @@ def _group_unread_cache_key(user_id):
     return f'notif:group_unread:user:{user_id}'
 
 
+def _group_activity_cache_key(user_id):
+    return f'notif:group_activity:user:{user_id}'
+
+
+def _group_any_unread_cache_key(user_id):
+    return f'notif:group_any_unread:user:{user_id}'
+
+
 def get_group_unread_counts(user, group_ids):
     """
     Get unread notification counts for multiple groups with caching.
     Returns a dictionary mapping group_id -> count.
     """
+    if not user or not user.is_authenticated or not group_ids:
+        return {}
     cache_key = _group_unread_cache_key(user.id)
     cached_value = cache.get(cache_key)
     
@@ -151,5 +164,56 @@ def get_group_unread_counts(user, group_ids):
     return counts
 
 
+def get_group_activity_by_type(user, group_ids):
+    """
+    Get unread notification counts per group broken down by type with caching.
+    Returns a dictionary mapping group_id -> {'announcement': int, 'post': int, 'total': int}.
+    """
+    if not user or not user.is_authenticated or not group_ids:
+        return {}
+    cache_key = _group_activity_cache_key(user.id)
+    cached_value = cache.get(cache_key)
+    
+    if cached_value is not None:
+        return {gid: cached_value.get(gid, {'announcement': 0, 'post': 0, 'total': 0}) for gid in group_ids}
+    
+    activity = get_unread_group_activity_by_type(user, group_ids)
+    cache.set(cache_key, activity, timeout=10)
+    return activity
+
+
+def check_any_unread_group_activity(user):
+    """
+    Check if the user has any unread notifications for any group.
+    Cached check used by context processors for navigation red dot.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    cache_key = _group_any_unread_cache_key(user.id)
+    cached_value = cache.get(cache_key)
+    if cached_value is not None:
+        return cached_value
+    
+    has_any = has_any_unread_group_activity(user)
+    cache.set(cache_key, has_any, timeout=15)
+    return has_any
+
+
+def mark_group_notifications_as_read_and_invalidate(user, group_id):
+    """
+    Mark all unread notifications for a group as read and clear caches.
+    """
+    if not user or not user.is_authenticated or not group_id:
+        return 0
+    updated = mark_group_notifications_as_read(user, group_id)
+    invalidate_unread_count_cache(user.id)
+    invalidate_group_unread_cache(user.id)
+    broadcast_unread_count(user.id)
+    return updated
+
+
 def invalidate_group_unread_cache(user_id):
     cache.delete(_group_unread_cache_key(user_id))
+    cache.delete(_group_activity_cache_key(user_id))
+    cache.delete(_group_any_unread_cache_key(user_id))
+
