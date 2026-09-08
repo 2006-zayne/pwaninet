@@ -883,16 +883,17 @@ def create_post_view(request):
     return render(request, template, {'form': form, 'user_groups': user_groups})
 
 
-@login_required
 def storage_manager_view(request):
-    """View for the storage manager page"""
-    return render(request, 'posts/storage/storage_manager.html')
+    """View for storage manager - redirects to unified offline media library"""
+    if request.headers.get('HX-Request'):
+        return render(request, 'posts/partials/offline_media_viewer_content.html')
+    return redirect('posts:offline_media_viewer')
 
 
-@login_required
 def offline_media_viewer_view(request):
-    """View for the offline media viewer page"""
-    return render(request, 'posts/offline_media_viewer.html')
+    """View for the offline media viewer page - accessible offline without requiring active session"""
+    template = 'posts/partials/offline_media_viewer_content.html' if request.headers.get('HX-Request') else 'posts/offline_media_viewer.html'
+    return render(request, template)
 
 
 @login_required

@@ -36,6 +36,11 @@ import com.getcapacitor.WebViewListener;
 
 import android.os.Handler;
 import android.os.Looper;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.os.VibratorManager;
+import android.view.HapticFeedbackConstants;
+import android.widget.Toast;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Locale;
@@ -78,6 +83,46 @@ public class MainActivity extends BridgeActivity {
             MainActivity activity = activityRef.get();
             if (activity != null) {
                 activity.openExternalUrl(url);
+            }
+        }
+
+        @JavascriptInterface
+        public void hapticImpact(String style) {
+            MainActivity activity = activityRef.get();
+            if (activity != null) {
+                activity.performNativeHapticImpact(style);
+            }
+        }
+
+        @JavascriptInterface
+        public void hapticSelection() {
+            MainActivity activity = activityRef.get();
+            if (activity != null) {
+                activity.performNativeHapticSelection();
+            }
+        }
+
+        @JavascriptInterface
+        public void hapticNotification(String type) {
+            MainActivity activity = activityRef.get();
+            if (activity != null) {
+                activity.performNativeHapticNotification(type);
+            }
+        }
+
+        @JavascriptInterface
+        public void vibrate(long durationMs) {
+            MainActivity activity = activityRef.get();
+            if (activity != null) {
+                activity.performNativeVibrate(durationMs);
+            }
+        }
+
+        @JavascriptInterface
+        public void showToast(String message) {
+            MainActivity activity = activityRef.get();
+            if (activity != null) {
+                activity.showToast(message);
             }
         }
 
@@ -209,6 +254,7 @@ public class MainActivity extends BridgeActivity {
         }, SPLASH_WATCHDOG_TIMEOUT_MS);
 
         registerPlugin(NavigationBarPlugin.class);
+        registerPlugin(HapticsPlugin.class);
 
         // Configure edge-to-edge once at Activity creation
         EdgeToEdge.enable(this,
@@ -654,5 +700,148 @@ public class MainActivity extends BridgeActivity {
                 "<button onclick='location.reload()'>Retry</button></div></body></html>";
             webView.loadData(fallbackHtml, "text/html", "UTF-8");
         }
+    }
+
+    private Vibrator getVibratorService() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                VibratorManager vibratorManager = (VibratorManager) getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
+                if (vibratorManager != null) {
+                    return vibratorManager.getDefaultVibrator();
+                }
+            }
+            return (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    public void performNativeHapticImpact(String style) {
+        runOnUiThread(() -> {
+            try {
+                String cleanStyle = style != null ? style.trim().toLowerCase(Locale.US) : "light";
+                Vibrator vibrator = getVibratorService();
+                if (vibrator != null && vibrator.hasVibrator()) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        int effectId = VibrationEffect.EFFECT_CLICK;
+                        if ("light".equals(cleanStyle)) {
+                            effectId = VibrationEffect.EFFECT_TICK;
+                        } else if ("heavy".equals(cleanStyle)) {
+                            effectId = VibrationEffect.EFFECT_HEAVY_CLICK;
+                        }
+                        try {
+                            vibrator.vibrate(VibrationEffect.createPredefined(effectId));
+                        } catch (Exception e) {
+                            int amp = "light".equals(cleanStyle) ? 120 : ("heavy".equals(cleanStyle) ? 255 : 180);
+                            int dur = "light".equals(cleanStyle) ? 18 : ("heavy".equals(cleanStyle) ? 45 : 28);
+                            vibrator.vibrate(VibrationEffect.createOneShot(dur, amp));
+                        }
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        int amplitude = "light".equals(cleanStyle) ? 120 : ("heavy".equals(cleanStyle) ? 255 : 180);
+                        int duration = "light".equals(cleanStyle) ? 18 : ("heavy".equals(cleanStyle) ? 45 : 28);
+                        vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude));
+                    }
+                }
+
+                View view = getBridge() != null && getBridge().getWebView() != null 
+                    ? getBridge().getWebView() 
+                    : getWindow().getDecorView();
+                if (view != null) {
+                    int feedbackConstant = HapticFeedbackConstants.VIRTUAL_KEY;
+                    if ("light".equals(cleanStyle)) {
+                        feedbackConstant = HapticFeedbackConstants.KEYBOARD_TAP;
+                    } else if ("heavy".equals(cleanStyle)) {
+                        feedbackConstant = HapticFeedbackConstants.LONG_PRESS;
+                    }
+                    view.performHapticFeedback(feedbackConstant, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+                }
+            } catch (Exception ignored) {}
+        });
+    }
+
+    public void performNativeHapticSelection() {
+        runOnUiThread(() -> {
+            try {
+                Vibrator vibrator = getVibratorService();
+                if (vibrator != null && vibrator.hasVibrator()) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK));
+                        return;
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        vibrator.vibrate(VibrationEffect.createOneShot(8, 50));
+                        return;
+                    }
+                }
+                View view = getBridge() != null && getBridge().getWebView() != null 
+                    ? getBridge().getWebView() 
+                    : getWindow().getDecorView();
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+            } catch (Exception ignored) {}
+        });
+    }
+
+    public void performNativeHapticNotification(String type) {
+        runOnUiThread(() -> {
+            try {
+                Vibrator vibrator = getVibratorService();
+                String cleanType = type != null ? type.trim().toLowerCase(Locale.US) : "success";
+                if (vibrator != null && vibrator.hasVibrator()) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        if ("success".equals(cleanType)) {
+                            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK));
+                            return;
+                        }
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        if ("error".equals(cleanType)) {
+                            long[] timings = {0, 40, 60, 40, 60, 60};
+                            int[] amplitudes = {0, 200, 0, 200, 0, 255};
+                            vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1));
+                            return;
+                        } else if ("warning".equals(cleanType)) {
+                            long[] timings = {0, 50, 80, 50};
+                            int[] amplitudes = {0, 180, 0, 180};
+                            vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1));
+                            return;
+                        } else { // success
+                            long[] timings = {0, 20, 60, 30};
+                            int[] amplitudes = {0, 120, 0, 180};
+                            vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1));
+                            return;
+                        }
+                    }
+                }
+                View view = getBridge() != null && getBridge().getWebView() != null 
+                    ? getBridge().getWebView() 
+                    : getWindow().getDecorView();
+                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+            } catch (Exception ignored) {}
+        });
+    }
+
+    public void performNativeVibrate(long durationMs) {
+        runOnUiThread(() -> {
+            try {
+                Vibrator vibrator = getVibratorService();
+                if (vibrator != null && vibrator.hasVibrator()) {
+                    long dur = Math.max(10, Math.min(durationMs, 2000));
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        vibrator.vibrate(VibrationEffect.createOneShot(dur, VibrationEffect.DEFAULT_AMPLITUDE));
+                    } else {
+                        vibrator.vibrate(dur);
+                    }
+                }
+            } catch (Exception ignored) {}
+        });
+    }
+
+    public void showToast(String message) {
+        runOnUiThread(() -> {
+            try {
+                if (message != null && !message.trim().isEmpty()) {
+                    Toast.makeText(this, message.trim(), Toast.LENGTH_SHORT).show();
+                }
+            } catch (Exception ignored) {}
+        });
     }
 }

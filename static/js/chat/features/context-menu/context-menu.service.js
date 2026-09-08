@@ -161,9 +161,11 @@ export class ContextMenuService {
       // Use touch position for menu
       this.showContextMenu(this.touchStartX, this.touchStartY);
       
-      // Provide haptic feedback if available
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
+      // Provide crisp tactile haptic feedback
+      if (window.Haptics && typeof window.Haptics.impactMedium === 'function') {
+        window.Haptics.impactMedium();
+      } else if (navigator.vibrate) {
+        navigator.vibrate(25);
       }
     }, this.longPressThreshold);
   }

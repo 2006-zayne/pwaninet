@@ -144,8 +144,8 @@
 </style>
 
 <script type="module">
-  import { downloadsManager } from '/static/js/upload/downloads_manager.js';
-  import { storageManager } from '/static/js/upload/storage_manager.js';
+  import { downloadManager as downloadsManager } from '/static/js/downloads/download_manager.js';
+  import { downloadStorage as storageManager } from '/static/js/downloads/download_storage.js';
 
   let allDownloads = [];
   let currentCategory = 'all';

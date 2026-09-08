@@ -7,7 +7,7 @@
            hx-swap="innerHTML"
            hx-push-url="true"
            hx-history="true">
-            <img src="{{ announcement.author.profile_pic.url|default:'' }}" 
+            <img src="{% if announcement.author.profile_pic %}{{ announcement.author.profile_pic.url }}{% endif %}" 
                  onerror="this.src='{% static 'images/default_user.jpg' %}'"
                  alt="{{ announcement.author.get_full_name|default:announcement.author.username }}" 
                  class="rounded-circle border shadow-sm"

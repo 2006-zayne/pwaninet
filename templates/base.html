@@ -296,10 +296,12 @@
         // Configure HTMX for proper history handling
         htmx.config.historyEnabled = true;
         htmx.config.historyCacheSize = 10;
-        htmx.config.refreshOnHistoryMiss = true; // Refresh content if cache miss occurs
-        console.log('[HTMX Config] History caching enabled with refresh on miss');
+        htmx.config.refreshOnHistoryMiss = false; // Restore content via AJAX request instead of full page reload
+        console.log('[HTMX Config] History caching enabled without full page reload on miss');
     </script>
     <script src="{% static 'js/device_manager.js' %}"></script>
+    <!-- Unified Haptics Engine (Ultra-responsive tactile feedback) -->
+    <script src="{% static 'js/services/haptics-service.js' %}"></script>
 
     <!-- Native App Enhancements (Capacitor-specific) -->
     <script src="{% static 'js/native-app.js' %}"></script>
@@ -346,9 +348,29 @@
     <script src="{% static 'js/comments/comment-renderer.js' %}"></script>
     <script src="{% static 'js/comments/comment-manager.js' %}"></script>
 
+    <script>
+        // Synchronously detect standalone PWA mode early to prevent safe area layout shifts
+        (function() {
+            var isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+                               window.navigator.standalone === true ||
+                               localStorage.getItem('pwaInstalled') === 'true';
+            if (isStandalone) {
+                document.documentElement.classList.add('is-standalone-pwa');
+                if (document.body) document.body.classList.add('is-standalone-pwa');
+                else document.addEventListener('DOMContentLoaded', function() {
+                    if (document.body) document.body.classList.add('is-standalone-pwa');
+                });
+            }
+        })();
+    </script>
+
     <style>
         :root {
             --navbar-height: 56px;
+            --pwaninet-safe-area-top: env(safe-area-inset-top, 0px);
+            --pwaninet-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+            --pwaninet-safe-area-left: env(safe-area-inset-left, 0px);
+            --pwaninet-safe-area-right: env(safe-area-inset-right, 0px);
         }
         @media (min-width: 768px) {
             :root {
@@ -412,24 +434,42 @@
             font-size: 1rem;
         }
 
-        /* Native App Spacing Overrides */
-        body.is-native-app {
+        /* Native App & Standalone PWA Spacing Overrides */
+        body.is-native-app,
+        body.is-standalone-pwa,
+        .is-standalone-pwa body {
             padding-top: calc(var(--navbar-height) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
             padding-bottom: calc(90px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
         }
 
-        body.is-native-app .navbar-top {
+        body.is-native-app .navbar-top,
+        body.is-standalone-pwa .navbar-top,
+        .is-standalone-pwa .navbar-top {
             padding-top: var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)) !important;
             padding-bottom: 0 !important;
             height: calc(var(--navbar-height) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
             box-sizing: border-box;
         }
 
+        @media (display-mode: standalone) {
+            body {
+                padding-top: calc(var(--navbar-height) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+                padding-bottom: calc(90px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+            }
+            .navbar-top {
+                padding-top: var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)) !important;
+                padding-bottom: 0 !important;
+                height: calc(var(--navbar-height) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+                box-sizing: border-box;
+            }
+        }
+
         @media (max-width: 767px) {
             body {
                 padding-bottom: calc(85px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
             }
-            .is-native-app body, body.is-native-app {
+            .is-native-app body, body.is-native-app,
+            .is-standalone-pwa body, body.is-standalone-pwa {
                 padding-bottom: calc(90px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
             }
         }
@@ -940,25 +980,35 @@
         @media (max-width: 767.98px) {
             .back-to-top-btn {
                 bottom: calc(84px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
-                right: 18px;
+                right: calc(18px + var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px)));
             }
-            /* When upload banner is visible above mobile bottom nav, push Back to Top above upload banner */
+            /* When upload or download banner is visible above mobile bottom nav, push Back to Top above it */
             body:has(#upload-banner.visible) .back-to-top-btn,
-            body.has-active-upload .back-to-top-btn {
+            body:has(#download-banner.visible) .back-to-top-btn,
+            body.has-active-upload .back-to-top-btn,
+            body.has-active-download .back-to-top-btn {
                 bottom: calc(164px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+            }
+            body:has(#upload-banner.visible):has(#download-banner.visible) .back-to-top-btn {
+                bottom: calc(244px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
             }
         }
 
         /* Desktop layout: floating in bottom-right corner */
         @media (min-width: 768px) {
             .back-to-top-btn {
-                bottom: 28px;
-                right: 28px;
+                bottom: calc(28px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                right: calc(28px + var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px)));
             }
-            /* When upload banner is visible in bottom-right dock on desktop, push Back to Top above it */
+            /* When upload or download banner is visible in bottom-right dock on desktop, push Back to Top above it */
             body:has(#upload-banner.visible) .back-to-top-btn,
-            body.has-active-upload .back-to-top-btn {
-                bottom: 112px;
+            body:has(#download-banner.visible) .back-to-top-btn,
+            body.has-active-upload .back-to-top-btn,
+            body.has-active-download .back-to-top-btn {
+                bottom: calc(112px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+            }
+            body:has(#upload-banner.visible):has(#download-banner.visible) .back-to-top-btn {
+                bottom: calc(196px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
             }
         }
 
@@ -1093,9 +1143,33 @@
                     </span>
                     <span style="font-size: 0.65rem; font-weight: 600; white-space: nowrap;">{% trans "Notifications" %}</span>
                 </a>
+                <a href="{% url 'posts:offline_media_viewer' %}"
+                   class="nav-chip {% if request.resolver_match.url_name == 'offline_media_viewer' %}active{% endif %}"
+                   style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 60px;"
+                   hx-get="{% url 'posts:offline_media_viewer' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
+                   title="{% trans 'Downloaded Media' %}">
+                    <i class="bi bi-cloud-arrow-down-fill" style="font-size: 1.5rem;"></i>
+                    <span style="font-size: 0.65rem; font-weight: 600; white-space: nowrap;">{% trans "Downloads" %}</span>
+                </a>
             </div>
 
             <div class="d-flex align-items-center gap-3">
+                <!-- Quick Access Downloaded Media (Mobile & Desktop) -->
+                <a href="{% url 'posts:offline_media_viewer' %}"
+                   hx-get="{% url 'posts:offline_media_viewer' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
+                   class="btn btn-link p-0 text-decoration-none {% if request.resolver_match.url_name == 'offline_media_viewer' %}text-primary{% else %}text-secondary{% endif %}"
+                   style="color: var(--text-dark);"
+                   title="{% trans 'Downloaded Media' %}">
+                    <i class="bi bi-cloud-arrow-down" style="font-size: 1.35rem;"></i>
+                </a>
                 <!-- Theme Toggle -->
                 <div class="dropdown">
                     <button class="btn btn-link p-0" data-bs-toggle="dropdown" style="color: var(--text-dark);">
@@ -1181,6 +1255,7 @@
         <div class="mobile-bottom-nav d-md-none" role="navigation" aria-label="Mobile navigation">
             <a href="{% url 'posts:home' %}"
                class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
+               data-haptic="light"
                hx-get="{% url 'posts:home' %}"
                hx-target="#page-content-target"
                hx-swap="innerHTML"
@@ -1192,6 +1267,7 @@
             </a>
             <a href="{% url 'groups:groups_dashboard' %}"
                class="nav-chip {% if request.resolver_match.url_name == 'groups_dashboard' %}active{% endif %}"
+               data-haptic="light"
                hx-get="{% url 'groups:groups_dashboard' %}"
                hx-target="#page-content-target"
                hx-swap="innerHTML"
@@ -1207,6 +1283,7 @@
             {% if user.is_authenticated %}
                 <a href="{% url 'posts:create_post' %}"
                    class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}"
+                   data-haptic="light"
                    hx-get="{% url 'posts:create_post' %}"
                    hx-target="#page-content-target"
                    hx-swap="innerHTML"
@@ -1218,6 +1295,7 @@
                 </a>
                 <a href="{% url 'notifications:notifications' %}"
                    class="nav-chip {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
+                   data-haptic="light"
                    id="notification-badge-container"
                    hx-get="{% url 'notifications:notifications' %}"
                    hx-target="#page-content-target"
@@ -1243,6 +1321,7 @@
                 </a>
                 <a href="{% url 'users:profile' request.user.username %}"
                    class="nav-chip {% if request.resolver_match.url_name == 'profile' %}active{% endif %}"
+                   data-haptic="light"
                    hx-get="{% url 'users:profile' request.user.username %}"
                    hx-target="#page-content-target"
                    hx-swap="innerHTML"
@@ -1281,24 +1360,82 @@
         import { draftManager } from '{% static "js/upload/indexeddb_manager.js" %}';
         import { uploadEvents } from '{% static "js/upload/upload_events.js" %}';
 
+        import { downloadManager } from '{% static "js/downloads/download_manager.js" %}';
+        import { downloadUI } from '{% static "js/downloads/download_ui.js" %}';
+        import { downloadStorage } from '{% static "js/downloads/download_storage.js" %}';
+        import { downloadQueue } from '{% static "js/downloads/download_queue.js" %}';
+
         window.uploadManager = uploadManager;
         window.uploadUI = uploadUI;
         window.uploadEvents = uploadEvents;
         window.draftManager = draftManager;
 
-        const initializeUploadPlatform = () => {
+        window.downloadManager = downloadManager;
+        window.downloadsManager = downloadManager; // Alias for backward compatibility
+        window.downloadUI = downloadUI;
+        window.downloadStorage = downloadStorage;
+        window.downloadQueue = downloadQueue;
+
+        const initializePlatforms = () => {
             uploadManager.initialize();
             uploadUI.initialize();
             if (draftManager && typeof draftManager.initialize === 'function') {
                 draftManager.initialize();
             }
+
+            downloadManager.initialize();
+            downloadUI.initialize();
         };
 
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initializeUploadPlatform, { once: true });
+            document.addEventListener('DOMContentLoaded', initializePlatforms, { once: true });
         } else {
-            initializeUploadPlatform();
+            initializePlatforms();
         }
+
+        // Global download click delegation across all pages & HTMX content
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.media-download-btn, [data-action="download-media"]');
+            if (!btn) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const url = btn.dataset.url || btn.getAttribute('data-url') || btn.getAttribute('href');
+            if (!url) return;
+
+            const postId = btn.dataset.postId || btn.dataset['post.share_id'] || btn.getAttribute('data-post.share_id') || '';
+            const mediaType = btn.dataset.mediaType || btn.getAttribute('data-media-type') || 'document';
+            const filename = btn.dataset.filename || btn.getAttribute('data-filename') || url.split('/').pop()?.split('?')[0] || `download_${Date.now()}`;
+            const category = btn.dataset.category || btn.getAttribute('data-category') || mediaType;
+            const thumbnail = btn.dataset.thumbnail || btn.getAttribute('data-thumbnail') || '';
+
+            const origHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-arrow-repeat spin-icon"></i>';
+            btn.disabled = true;
+
+            downloadManager.download({
+                url,
+                postId,
+                mediaType,
+                category,
+                filename,
+                thumbnail
+            }).then(() => {
+                btn.innerHTML = '<i class="bi bi-check2 text-success"></i>';
+                setTimeout(() => {
+                    btn.innerHTML = origHtml;
+                    btn.disabled = false;
+                }, 2000);
+            }).catch((err) => {
+                console.error('[Download Click] Failed:', err);
+                btn.innerHTML = '<i class="bi bi-exclamation-triangle text-danger"></i>';
+                setTimeout(() => {
+                    btn.innerHTML = origHtml;
+                    btn.disabled = false;
+                }, 2000);
+            });
+        });
     </script>
     <script>
         // Offline/Online event listeners
@@ -2160,14 +2297,128 @@ window.addEventListener('beforeinstallprompt', (e) => {
                     return;
                 }
 
-                // If response is a full HTML document (e.g. redirected to /accounts/login/ or error page),
-                // do NOT swap full document into inner container; perform a clean top-level navigation instead.
+                // If response is a full HTML document (e.g. standard Django template or un-partialed view):
+                // Seamlessly extract #page-content-target to avoid any disruptive full page document reloads!
                 const responseText = evt.detail.xhr && evt.detail.xhr.responseText ? evt.detail.xhr.responseText.trim() : '';
                 if (responseText.startsWith('<!DOCTYPE') || responseText.startsWith('<html') || responseText.includes('<html lang=')) {
+                    // Check if response is redirected to authentication boundary
+                    if (responseUrl && (responseUrl.includes('/accounts/login') || responseUrl.includes('/users/login') || responseUrl.includes('/accounts/logout') || responseUrl.includes('/users/logout'))) {
+                        evt.detail.shouldSwap = false;
+                        window.location.href = responseUrl;
+                        return;
+                    }
+
+                    try {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(responseText, 'text/html');
+                        const incomingTarget = doc.getElementById('page-content-target');
+                        if (incomingTarget) {
+                            evt.detail.serverResponse = incomingTarget.innerHTML;
+                            evt.detail.shouldSwap = true;
+
+                            if (doc.title) {
+                                document.title = doc.title;
+                            }
+
+                            // Sync out-of-band floating actions if present
+                            const incomingFloating = doc.getElementById('profile-floating-actions');
+                            const currentFloating = document.getElementById('profile-floating-actions');
+                            if (currentFloating) {
+                                currentFloating.innerHTML = incomingFloating ? incomingFloating.innerHTML : '';
+                            }
+
+                            const targetPath = responseUrl || (evt.detail.requestConfig && evt.detail.requestConfig.path) || window.location.pathname;
+                            if (typeof updateActiveState === 'function') {
+                                updateActiveState(targetPath);
+                            }
+
+                            console.log('[HTMX Seamless] Extracted #page-content-target from full HTML response without page reload:', targetPath);
+                            return;
+                        }
+                    } catch (err) {
+                        console.warn('[HTMX Seamless] Error parsing full document response:', err);
+                    }
+
+                    // Fallback only if #page-content-target was completely absent from document
                     evt.detail.shouldSwap = false;
-                    const destination = responseUrl || window.location.href;
-                    window.location.href = destination;
+                    const requestUrl = (evt.detail.requestConfig && evt.detail.requestConfig.path) ||
+                                       (evt.detail.elt && (evt.detail.elt.getAttribute('hx-get') || evt.detail.elt.getAttribute('href'))) ||
+                                       '';
+                    const destination = responseUrl || requestUrl;
+                    if (destination && destination !== window.location.href && destination !== window.location.pathname) {
+                        window.location.href = destination;
+                    }
                 }
+            }
+        });
+
+        // Progressive Enhancement: Route in-app internal links via HTMX
+        // to prevent full-page browser document reloads unless typing directly in the URL search bar.
+        document.addEventListener('click', function(evt) {
+            if (evt.defaultPrevented || evt.button !== 0 || evt.ctrlKey || evt.metaKey || evt.shiftKey || evt.altKey) {
+                return;
+            }
+
+            const link = evt.target.closest('a');
+            if (!link) return;
+
+            // Skip links already explicitly handled by HTMX
+            if (link.hasAttribute('hx-get') || link.hasAttribute('hx-post') || link.hasAttribute('hx-put') ||
+                link.hasAttribute('hx-delete') || link.hasAttribute('hx-patch') ||
+                link.getAttribute('hx-boost') === 'false' || link.getAttribute('data-bypass-htmx') === 'true') {
+                return;
+            }
+
+            // Skip Bootstrap components, modals, downloads, target _blank
+            if (link.hasAttribute('data-bs-toggle') || link.hasAttribute('data-bs-target') ||
+                link.getAttribute('target') === '_blank' || link.hasAttribute('download') ||
+                link.getAttribute('data-apk-download') === 'true' || link.classList.contains('dropdown-toggle')) {
+                return;
+            }
+
+            const rawHref = link.getAttribute('href');
+            if (!rawHref || rawHref.startsWith('#') || rawHref.startsWith('javascript:') ||
+                rawHref.startsWith('mailto:') || rawHref.startsWith('tel:')) {
+                return;
+            }
+
+            // Check same origin
+            let targetUrl;
+            try {
+                targetUrl = new URL(link.href, window.location.origin);
+            } catch (err) {
+                return;
+            }
+
+            if (targetUrl.origin !== window.location.origin) return;
+
+            const pathname = targetUrl.pathname;
+            // Exclude static assets, media files, admin portal, downloads, and auth session boundary URLs
+            if (pathname.startsWith('/admin/') || pathname.startsWith('/static/') ||
+                pathname.startsWith('/media/') || pathname.startsWith('/download/') ||
+                pathname.startsWith('/accounts/login') || pathname.startsWith('/users/login') ||
+                pathname.startsWith('/accounts/logout') || pathname.startsWith('/users/logout') ||
+                pathname.startsWith('/api/')) {
+                return;
+            }
+
+            // Intercept and route smoothly through HTMX
+            evt.preventDefault();
+            console.log('[HTMX Seamless Navigation] Intercepted link click:', targetUrl.pathname + targetUrl.search);
+
+            if (window.Haptics && typeof window.Haptics.impactLight === 'function') {
+                window.Haptics.impactLight();
+            }
+
+            if (window.htmx) {
+                window.htmx.ajax('GET', targetUrl.pathname + targetUrl.search, {
+                    target: '#page-content-target',
+                    swap: 'innerHTML',
+                    pushUrl: true,
+                    headers: { 'HX-Request': 'true' }
+                });
+            } else {
+                window.location.href = link.href;
             }
         });
 

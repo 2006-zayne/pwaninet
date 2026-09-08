@@ -170,6 +170,11 @@ class ReactionSoundManager {
             return;
         }
 
+        // Trigger subtle tactile haptic feedback
+        if (window.Haptics && typeof window.Haptics.impactLight === 'function') {
+            window.Haptics.impactLight();
+        }
+
         try {
             // Force context resume before playback (mobile browsers suspend frequently)
             console.log('[REACTION_SOUND] Audio state before resume:', this.audioContext.state);

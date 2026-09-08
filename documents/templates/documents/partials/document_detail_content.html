@@ -240,6 +240,12 @@
                     {% with first_file=document.latest_version.files.first %}
                         <a href="{% url 'documents:serve_download' document.share_id %}?t={{ download_token }}" 
                            download="{{ document.title }}.{{ first_file.extension }}"
+                           data-action="download-media"
+                           data-post-id="{{ document.share_id }}"
+                           data-media-type="document"
+                           data-url="{% url 'documents:serve_download' document.share_id %}?t={{ download_token }}"
+                           data-filename="{{ document.title }}.{{ first_file.extension }}"
+                           data-thumbnail="{% if first_file.preview_url %}{{ first_file.preview_url }}{% elif first_file.preview_path %}/media/{{ first_file.preview_path }}{% elif first_file.thumbnail_path %}/media/{{ first_file.thumbnail_path }}{% endif %}"
                            onclick="trackAndDownload(event, '{{ document.share_id }}', {{ first_file.id }})"
                            class="btn btn-primary" 
                            style="padding: 14px 24px; border-radius: 12px; font-weight: 600; font-size: 1rem; text-decoration: none; display: inline-block; text-align: center;">
@@ -418,7 +424,15 @@
                                     {% if vfile and vfile.file %}
                                         <div style="margin-top: 6px; display: flex; justify-content: space-between; align-items: center;">
                                             <span style="color: var(--text-secondary); font-size: 0.75rem;">{{ vfile.size_mb }} MB &bull; {{ vfile.extension|upper }}</span>
-                                            <a href="{% url 'documents:serve_download' document.share_id %}?t={{ download_token }}&file_id={{ vfile.id }}" download="{{ document.title }}_v{{ ver.version_number }}.{{ vfile.extension }}" class="text-primary text-decoration-none" style="font-size: 0.75rem; font-weight: 500;">
+                                            <a href="{% url 'documents:serve_download' document.share_id %}?t={{ download_token }}&file_id={{ vfile.id }}" 
+                                                download="{{ document.title }}_v{{ ver.version_number }}.{{ vfile.extension }}" 
+                                                data-action="download-media"
+                                                data-post-id="{{ document.share_id }}"
+                                                data-media-type="document"
+                                                data-url="{% url 'documents:serve_download' document.share_id %}?t={{ download_token }}&file_id={{ vfile.id }}"
+                                                data-filename="{{ document.title }}_v{{ ver.version_number }}.{{ vfile.extension }}"
+                                                data-thumbnail="{% if vfile.preview_url %}{{ vfile.preview_url }}{% elif vfile.preview_path %}/media/{{ vfile.preview_path }}{% elif vfile.thumbnail_path %}/media/{{ vfile.thumbnail_path }}{% endif %}"
+                                                class="text-primary text-decoration-none" style="font-size: 0.75rem; font-weight: 500;">
                                                 <i class="bi bi-download me-1"></i>Download
                                             </a>
                                         </div>

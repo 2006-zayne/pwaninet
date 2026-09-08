@@ -9,7 +9,7 @@
 </div>
 
 <div class="settings-list-container">
-  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_profile' icon_class='bi-person' title='Profile' subtitle='Manage your profile, username, bio...' is_htmx=True %}
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_profile' icon_class='bi-person' title='Profile Settings' subtitle='Manage your profile, username, bio...' is_htmx=True %}
 
   {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_appearance' icon_class='bi-palette' title='Appearance' subtitle='Theme, dark mode, language...' is_htmx=True %}
 
@@ -17,7 +17,7 @@
 
   {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_privacy' icon_class='bi-shield-lock' title='Privacy & Security' subtitle='Password, sessions, blocked users...' is_htmx=True %}
 
-  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_storage' icon_class='bi-database' title='Storage' subtitle='Cache, downloads, storage...' is_htmx=True %}
+  {% include 'users/settings/components/settings_category_item.html' with url_name='posts:offline_media_viewer' icon_class='bi-cloud-arrow-down' title='Downloaded Media & Storage' subtitle='Offline videos, music, photos, documents, and storage...' is_htmx=True %}
 
   {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_about' icon_class='bi-info-circle' title='About PwaniNet' subtitle='Version, support, licenses...' is_htmx=True %}
 </div>

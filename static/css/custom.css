@@ -353,25 +353,93 @@ body.is-native-app .mobile-bottom-nav {
     z-index: 10000;
 }
 
-/* Instant button touch states for native app */
+/* =======================================================
+   NATIVE ANDROID EXPERIENCE & WEBVIEW SHELL ELIMINATION
+======================================================= */
+
+/* Suppress ugly browser tap highlight flash */
+body.is-native-app,
+body.is-native-app * {
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Prevent unwanted browser rubber-banding and pull glow */
+body.is-native-app {
+    overscroll-behavior-y: contain;
+}
+
+/* Disable browser text selection on UI chrome, headers, bars, and buttons */
+body.is-native-app,
+body.is-native-app header,
+body.is-native-app nav,
+body.is-native-app footer,
+body.is-native-app .navbar-top,
+body.is-native-app .mobile-bottom-nav,
+body.is-native-app .btn,
+body.is-native-app .btn-native,
+body.is-native-app button,
+body.is-native-app .nav-chip,
+body.is-native-app .card-header,
+body.is-native-app .action-icon,
+body.is-native-app .dropdown-item,
+body.is-native-app .badge {
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+}
+
+/* Allow text selection only on readable user content */
+body.is-native-app .post-content,
+body.is-native-app .post-content *,
+body.is-native-app .message-bubble,
+body.is-native-app .message-text,
+body.is-native-app input,
+body.is-native-app textarea,
+body.is-native-app .selectable-text {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+}
+
+/* Instant Spring Active States (Scale & Opacity) for all clickable UI elements */
 body.is-native-app .btn.activated,
 body.is-native-app .btn-native.activated,
-body.is-native-app button.activated {
-    opacity: 0.7;
-    transform: scale(0.98);
+body.is-native-app button.activated,
+body.is-native-app .action-icon.activated,
+body.is-native-app .nav-chip.activated,
+body.is-native-app .reaction-chip.activated {
+    transform: scale(0.95) !important;
+    opacity: 0.85 !important;
+    transition: transform 0.1s cubic-bezier(0, 0, 0.2, 1), opacity 0.1s ease !important;
 }
 
-/* Theme-specific activated states */
-body.is-native-app[data-theme="light"] .btn.activated,
-body.is-native-app[data-theme="light"] .btn-native.activated,
-body.is-native-app[data-theme="light"] button.activated {
-    background-color: var(--primary-hover) !important;
+body.is-native-app .card-clickable.activated {
+    transform: scale(0.98) !important;
+    opacity: 0.92 !important;
+    transition: transform 0.1s cubic-bezier(0, 0, 0.2, 1) !important;
 }
 
-body.is-native-app[data-theme="dark"] .btn.activated,
-body.is-native-app[data-theme="dark"] .btn-native.activated,
-body.is-native-app[data-theme="dark"] button.activated {
-    background-color: var(--primary-hover) !important;
+/* Virtual Keyboard (IME) Active State - Smoothly tuck bottom nav offscreen */
+body.keyboard-open .mobile-bottom-nav {
+    transform: translate(-50%, 160%) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease !important;
+}
+
+/* Hide scrollbars on horizontal tab bars, categories, and reels */
+.no-scrollbar,
+.category-pills,
+.nav-tabs-scrollable,
+.stories-reel {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+    -webkit-overflow-scrolling: touch;
+}
+.no-scrollbar::-webkit-scrollbar,
+.category-pills::-webkit-scrollbar,
+.nav-tabs-scrollable::-webkit-scrollbar,
+.stories-reel::-webkit-scrollbar {
+    display: none !important;
 }
 
 /* ================================

@@ -555,8 +555,23 @@ class DocumentViewer {
                 console.error('Error tracking download:', error);
             });
         }
-        // Open file in new tab
-        window.open(this.fileUrl, '_blank');
+
+        // Use unified downloadManager if available
+        if (window.downloadManager) {
+            window.downloadManager.download({
+                url: this.fileUrl,
+                postId: this.documentId,
+                mediaType: 'document',
+                category: 'document',
+                filename: this.fileName || `document_${Date.now()}`
+            }).catch(err => {
+                console.warn('[Viewer Download] downloadManager failed, falling back:', err);
+                window.open(this.fileUrl, '_blank');
+            });
+        } else {
+            // Fallback: Open file in new tab
+            window.open(this.fileUrl, '_blank');
+        }
     }
 
     getCookie(name) {

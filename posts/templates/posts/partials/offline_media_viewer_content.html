@@ -1,0 +1,1462 @@
+{% load i18n static %}
+
+<div class="offline-media-container py-3 px-2 px-md-4">
+    <!-- Header -->
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="d-flex align-items-center gap-3">
+            <a href="/" class="btn btn-outline-secondary btn-sm rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;" title="Back">
+                <i class="bi bi-arrow-left fs-5"></i>
+            </a>
+            <div>
+                <h1 class="h4 mb-0 fw-bold">{% trans "Offline Media Library" %}</h1>
+                <small class="text-muted">{% trans "Stream videos, view photos, play audio, and read documents offline" %}</small>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button id="btn-watch-reels-header" class="btn btn-sm btn-primary rounded-pill px-3 py-1 d-none align-items-center gap-1 shadow-sm">
+                <i class="bi bi-play-circle-fill"></i>
+                <span>{% trans "Watch Reels" %}</span>
+            </button>
+            <button id="btn-clear-all-downloads" class="btn btn-sm btn-outline-danger d-none">
+                <i class="bi bi-trash me-1"></i>{% trans "Clear All" %}
+            </button>
+        </div>
+    </div>
+
+    <!-- Storage Summary Bar -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4 bg-body-tertiary">
+        <div class="card-body p-3">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="small fw-semibold text-muted text-uppercase tracking-wider">{% trans "Storage Usage" %}</span>
+                <span class="small fw-bold" id="stat-total-storage-text">0 B</span>
+            </div>
+            <div class="progress mb-3" style="height: 6px; border-radius: 4px;">
+                <div class="progress-bar bg-primary" id="bar-videos" role="progressbar" style="width: 0%"></div>
+                <div class="progress-bar bg-info" id="bar-photos" role="progressbar" style="width: 0%"></div>
+                <div class="progress-bar bg-warning" id="bar-audios" role="progressbar" style="width: 0%"></div>
+                <div class="progress-bar bg-secondary" id="bar-documents" role="progressbar" style="width: 0%"></div>
+            </div>
+            <div class="row g-2 text-center">
+                <div class="col-3">
+                    <div class="p-2 rounded-3 bg-body">
+                        <div class="fw-bold text-primary" id="stat-count-video">0</div>
+                        <div class="text-muted" style="font-size: 11px;">{% trans "Videos" %}</div>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="p-2 rounded-3 bg-body">
+                        <div class="fw-bold text-info" id="stat-count-image">0</div>
+                        <div class="text-muted" style="font-size: 11px;">{% trans "Photos" %}</div>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="p-2 rounded-3 bg-body">
+                        <div class="fw-bold text-warning" id="stat-count-audio">0</div>
+                        <div class="text-muted" style="font-size: 11px;">{% trans "Audios" %}</div>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="p-2 rounded-3 bg-body">
+                        <div class="fw-bold text-secondary" id="stat-count-document">0</div>
+                        <div class="text-muted" style="font-size: 11px;">{% trans "Docs" %}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Tabs & Controls -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <ul class="nav nav-pills gap-1" id="offlineCategoryTabs">
+            <li class="nav-item">
+                <button class="nav-link active rounded-pill px-3 py-1 btn-sm" data-category="all">
+                    <i class="bi bi-grid-fill me-1"></i>{% trans "All" %}
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link rounded-pill px-3 py-1 btn-sm" data-category="video">
+                    <i class="bi bi-camera-video me-1"></i>{% trans "Videos" %}
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link rounded-pill px-3 py-1 btn-sm" data-category="image">
+                    <i class="bi bi-image me-1"></i>{% trans "Photos" %}
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link rounded-pill px-3 py-1 btn-sm" data-category="audio">
+                    <i class="bi bi-music-note-beamed me-1"></i>{% trans "Audio" %}
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link rounded-pill px-3 py-1 btn-sm" data-category="document">
+                    <i class="bi bi-file-earmark-text me-1"></i>{% trans "Docs" %}
+                </button>
+            </li>
+        </ul>
+
+        <div class="d-flex gap-2 flex-grow-1 flex-md-grow-0">
+            <div class="input-group input-group-sm flex-grow-1" style="min-width: 160px;">
+                <span class="input-group-text bg-body border-end-0"><i class="bi bi-search"></i></span>
+                <input type="text" id="offline-search-input" class="form-control border-start-0" placeholder="{% trans 'Search downloads…' %}">
+            </div>
+            <select id="offline-sort-select" class="form-select form-select-sm" style="width: auto;">
+                <option value="newest">{% trans "Newest" %}</option>
+                <option value="oldest">{% trans "Oldest" %}</option>
+                <option value="largest">{% trans "Largest" %}</option>
+                <option value="smallest">{% trans "Smallest" %}</option>
+                <option value="az">{% trans "A-Z" %}</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Media Grid -->
+    <div id="offline-media-grid" class="row g-3">
+        <!-- Injected via JavaScript -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="offline-empty-state" class="text-center py-5 d-none">
+        <div class="mb-3 text-muted" style="font-size: 54px; opacity: 0.5;">
+            <i class="bi bi-cloud-arrow-down" id="empty-icon"></i>
+        </div>
+        <h5 class="fw-bold" id="empty-title">{% trans "No downloaded media yet" %}</h5>
+        <p class="text-muted small mx-auto" style="max-width: 320px;" id="empty-desc">
+            {% trans "Files you download while browsing PwaniNet will automatically be saved here for full offline streaming and viewing." %}
+        </p>
+        <a href="/" class="btn btn-primary btn-sm rounded-pill px-4 mt-2">
+            <i class="bi bi-house me-1"></i>{% trans "Browse Feed" %}
+        </a>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- Offline Reels Player (TikTok / Instagram / Facebook Style) -->
+<!-- ========================================================================= -->
+<div id="offlineReelsContainer" class="offline-reels-container" style="display: none;">
+    <!-- Top Floating Header -->
+    <div class="offline-reels-top-bar d-flex align-items-center justify-content-between px-3">
+        <div class="d-flex align-items-center">
+            <button id="btn-close-reels" class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center reels-icon-btn" title="Exit Reels">
+                <i class="bi bi-x-lg fs-5"></i>
+            </button>
+        </div>
+        <!-- Centered Counter -->
+        <div class="reels-top-center-counter">
+            <span id="reels-counter" class="reels-top-counter-badge">1 / 1</span>
+        </div>
+        <div style="width: 38px;"><!-- Spacer to balance close button --></div>
+    </div>
+
+    <!-- Snap Scroll Slider -->
+    <div id="offlineReelsSlider" class="offline-reels-slider">
+        <!-- Reel slides injected via JavaScript -->
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- Document Viewer Modal (In-App Offline Reading + Save to Phone) -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="offlineDocModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-fullscreen-lg-down">
+        <div class="modal-content bg-body border-0 rounded-4 shadow overflow-hidden" style="height: 88vh;">
+            <div class="modal-header py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2 overflow-hidden me-2">
+                    <i class="bi bi-file-earmark-pdf text-danger fs-5 flex-shrink-0"></i>
+                    <h6 class="modal-title text-truncate fw-semibold mb-0" id="offlineDocTitle">Document</h6>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                    <button id="offlineDocExportBtn" class="btn btn-sm btn-primary rounded-pill px-3 d-flex align-items-center gap-1">
+                        <i class="bi bi-phone-arrow-down"></i> <span>{% trans "Save to Phone" %}</span>
+                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="modal-body p-0 bg-dark position-relative d-flex justify-content-center align-items-center">
+                <iframe id="offlineDocFrame" src="" class="w-100 h-100 border-0" style="background: #fff;"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- Video Player Modal (Fallback) -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="offlineVideoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-black border-0 rounded-4 overflow-hidden">
+            <div class="modal-header border-0 pb-0 text-white">
+                <h6 class="modal-title text-truncate fw-semibold" id="offlineVideoTitle">Video</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0 d-flex justify-content-center align-items-center bg-black position-relative" style="min-height: 320px;">
+                <video id="offlinePlayerVideo" class="w-100 h-100" controls playsinline preload="auto" style="max-height: 75vh; object-fit: contain;">
+                </video>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- Image Lightbox Modal -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="offlineImageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-black border-0 rounded-4 overflow-hidden">
+            <div class="modal-header border-0 pb-0 text-white">
+                <h6 class="modal-title text-truncate fw-semibold" id="offlineImageTitle">Image</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-2 d-flex justify-content-center align-items-center bg-black" style="min-height: 300px;">
+                <img id="offlinePlayerImage" src="" alt="" class="img-fluid rounded-3" style="max-height: 75vh; object-fit: contain;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- Audio Player Modal -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="offlineAudioModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-body-tertiary border-0 rounded-4 shadow">
+            <div class="modal-header border-0">
+                <h6 class="modal-title text-truncate fw-semibold" id="offlineAudioTitle">Audio</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-3 text-warning fs-1">
+                    <i class="bi bi-music-note-beamed"></i>
+                </div>
+                <audio id="offlinePlayerAudio" class="w-100" controls preload="auto"></audio>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.btn-gradient-reels {
+    background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+    color: #ffffff !important;
+    border: none;
+    font-weight: 600;
+}
+.btn-gradient-reels:hover {
+    filter: brightness(1.1);
+    transform: scale(1.02);
+}
+
+.offline-media-card {
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    border-radius: 16px;
+    overflow: hidden;
+}
+.offline-media-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+.offline-thumb-container {
+    height: 150px;
+    background: var(--border, #2a2b2e);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+.offline-thumb-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.offline-play-overlay {
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(4px);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+.offline-media-card:hover .offline-play-overlay {
+    transform: scale(1.1);
+    background: var(--primary, #2563eb);
+}
+.badge-category {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    backdrop-filter: blur(4px);
+    z-index: 2;
+}
+
+/* ========================================================================= */
+/* Fullscreen Reels Layout (TikTok / Instagram Snap Experience) */
+/* ========================================================================= */
+.offline-reels-container {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    background: #000;
+    z-index: 99999;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.offline-reels-top-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 35;
+    padding-top: calc(14px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)));
+    padding-left: calc(14px + var(--pwaninet-safe-area-left, env(safe-area-inset-left, 0px)));
+    padding-right: calc(14px + var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px)));
+    padding-bottom: 12px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0) 100%);
+    pointer-events: auto;
+}
+
+.reels-top-center-counter {
+    position: absolute;
+    left: 50%;
+    top: calc(14px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)) + 19px);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 40;
+}
+
+.reels-top-counter-badge {
+    background: rgba(0, 0, 0, 0.18) !important;
+    border: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    color: rgba(255, 255, 255, 0.85) !important;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    display: inline-block;
+}
+
+.reels-icon-btn {
+    width: 38px;
+    height: 38px;
+    background: rgba(0, 0, 0, 0.18) !important;
+    border: none !important;
+    color: rgba(255, 255, 255, 0.85) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    cursor: pointer;
+    transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.reels-icon-btn:hover {
+    background: rgba(0, 0, 0, 0.28) !important;
+    color: #ffffff !important;
+    transform: scale(1.08);
+}
+
+.offline-reels-slider {
+    width: 100%;
+    height: 100%;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.offline-reels-slider::-webkit-scrollbar {
+    display: none;
+}
+
+.offline-reel-slide {
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    max-height: 100%;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    overflow: hidden;
+}
+
+.offline-reel-video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+    cursor: pointer;
+}
+
+/* Suppress all native browser video controls */
+.offline-reel-video::-webkit-media-controls {
+    display: none !important;
+}
+.offline-reel-video::-webkit-media-controls-start-playback-button {
+    display: none !important;
+}
+.offline-reel-video::-webkit-media-controls-enclosure {
+    display: none !important;
+}
+
+.offline-reel-tap-indicator {
+    position: absolute;
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 36px;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 15;
+}
+.offline-reel-tap-indicator.active {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Semi-transparent full-height action rail with pinned icon positioning */
+.offline-reels-right-rail {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 64px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 18px;
+    padding-bottom: calc(75px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+    padding-right: var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px));
+    background: rgba(0, 0, 0, 0.18) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    pointer-events: none;
+    z-index: 25;
+}
+
+.reels-rail-btn {
+    width: 100%;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 6px 0;
+    pointer-events: auto;
+    opacity: 0.82;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.reels-rail-btn i {
+    font-size: 26px;
+    color: #ffffff;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    width: auto;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.reels-rail-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.reels-rail-btn:hover i {
+    color: #ffffff;
+}
+
+.reels-rail-btn:active {
+    transform: scale(0.94);
+}
+
+.reels-rail-btn .rail-label {
+    font-size: 10px;
+    margin-top: 3px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #ffffff;
+    text-shadow: none !important;
+}
+
+.reels-rail-btn:hover .rail-label {
+    color: #ffffff;
+}
+
+/* Subtle delete button */
+.reels-rail-btn.reel-delete-btn {
+    opacity: 0.78;
+}
+.reels-rail-btn.reel-delete-btn:hover {
+    opacity: 1;
+}
+.reels-rail-btn.reel-delete-btn:hover i,
+.reels-rail-btn.reel-delete-btn:hover .rail-label {
+    color: #fca5a5;
+}
+
+.offline-reels-bottom-info {
+    position: absolute;
+    left: calc(16px + var(--pwaninet-safe-area-left, env(safe-area-inset-left, 0px)));
+    bottom: calc(16px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+    right: calc(75px + var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px)));
+    z-index: 25;
+    pointer-events: auto;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.85);
+}
+
+.reels-progress-bar-container {
+    width: 100%;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    margin-top: 4px;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.reels-progress-bar-track {
+    width: 100%;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 2px;
+    position: relative;
+    transition: height 0.15s ease;
+}
+.reels-progress-bar-container:hover .reels-progress-bar-track,
+.reels-progress-bar-container.is-scrubbing .reels-progress-bar-track {
+    height: 6px;
+}
+.reels-progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--primary, #2563eb) !important;
+    box-shadow: 0 0 10px rgba(37, 99, 235, 0.8);
+    position: relative;
+    border-radius: 2px;
+}
+.reels-progress-bar-fill::after {
+    content: '';
+    position: absolute;
+    right: -5px;
+    top: 50%;
+    transform: translateY(-50%) scale(0);
+    width: 12px;
+    height: 12px;
+    background: #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.7);
+    transition: transform 0.15s ease;
+}
+.reels-progress-bar-container:hover .reels-progress-bar-fill::after,
+.reels-progress-bar-container.is-scrubbing .reels-progress-bar-fill::after {
+    transform: translateY(-50%) scale(1);
+}
+
+/* Hide web navigation bars while in immersive reels mode */
+body.in-reels-mode .mobile-bottom-nav,
+body.in-reels-mode .header,
+body.in-reels-mode #topNavbar,
+body.in-reels-mode .top-nav,
+body.in-reels-mode #mobile-bottom-nav,
+body.in-reels-mode nav {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* Safe area padding for offline media hub */
+.offline-media-container {
+    padding-left: calc(0.5rem + var(--pwaninet-safe-area-left, env(safe-area-inset-left, 0px)));
+    padding-right: calc(0.5rem + var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px)));
+    padding-bottom: calc(90px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+}
+@media (min-width: 768px) {
+    .offline-media-container {
+        padding-left: calc(1.5rem + var(--pwaninet-safe-area-left, env(safe-area-inset-left, 0px)));
+        padding-right: calc(1.5rem + var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px)));
+    }
+}
+
+/* Modal safe area handling for native app & PWA */
+@media (max-width: 991.98px) {
+    #offlineDocModal .modal-content,
+    #offlineVideoModal .modal-content,
+    #offlineImageModal .modal-content,
+    #offlineAudioModal .modal-content {
+        padding-top: var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px));
+        padding-bottom: var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px));
+        padding-left: var(--pwaninet-safe-area-left, env(safe-area-inset-left, 0px));
+        padding-right: var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px));
+    }
+}
+</style>
+
+<script type="module">
+    import { downloadManager } from '{% static "js/downloads/download_manager.js" %}';
+    import { downloadStorage } from '{% static "js/downloads/download_storage.js" %}';
+
+    let allItems = [];
+    let currentCategory = 'all';
+    let searchQuery = '';
+    let currentSort = 'newest';
+
+    // Reels state
+    let reelsObserver = null;
+    let isReelsMuted = false;
+    let activeReelVideo = null;
+    let reelSources = new Map(); // id -> blob url
+
+    async function initOfflineMediaHub() {
+        await downloadManager.initialize();
+        await loadItems();
+        setupEvents();
+    }
+
+    async function loadItems() {
+        try {
+            allItems = await downloadManager.getAllDownloads();
+            renderStats();
+            renderItems();
+        } catch (e) {
+            console.error('[OfflineMedia] Error loading items:', e);
+        }
+    }
+
+    function setupEvents() {
+        // Tab buttons
+        document.querySelectorAll('#offlineCategoryTabs button').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('#offlineCategoryTabs button').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentCategory = btn.dataset.category;
+                renderItems();
+            };
+        });
+
+        // Search
+        const searchInput = document.getElementById('offline-search-input');
+        if (searchInput) {
+            searchInput.oninput = (e) => {
+                searchQuery = e.target.value;
+                renderItems();
+            };
+        }
+
+        // Sort
+        const sortSelect = document.getElementById('offline-sort-select');
+        if (sortSelect) {
+            sortSelect.onchange = (e) => {
+                currentSort = e.target.value;
+                renderItems();
+            };
+        }
+
+        // Clear All
+        const clearBtn = document.getElementById('btn-clear-all-downloads');
+        if (clearBtn) {
+            clearBtn.onclick = async () => {
+                if (confirm('Delete all downloaded offline media? This cannot be undone.')) {
+                    for (const item of allItems) {
+                        await downloadManager.delete(item.id);
+                    }
+                    await loadItems();
+                }
+            };
+        }
+
+        // Header Watch Reels button
+        const watchReelsHeader = document.getElementById('btn-watch-reels-header');
+        if (watchReelsHeader) {
+            watchReelsHeader.onclick = () => openReelsPlayer(0);
+        }
+
+        // Close Reels button
+        const closeReelsBtn = document.getElementById('btn-close-reels');
+        if (closeReelsBtn) {
+            closeReelsBtn.onclick = closeReelsPlayer;
+        }
+
+        // Keyboard navigation for Reels
+        window.addEventListener('keydown', (e) => {
+            const reelsContainer = document.getElementById('offlineReelsContainer');
+            if (!reelsContainer || reelsContainer.style.display === 'none') return;
+
+            const slider = document.getElementById('offlineReelsSlider');
+            const slides = document.querySelectorAll('.offline-reel-slide');
+
+            if (e.key === 'Escape') {
+                closeReelsPlayer();
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                slider.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                slider.scrollBy({ top: -window.innerHeight, behavior: 'smooth' });
+            } else if (e.key === ' ' || e.code === 'Space') {
+                e.preventDefault();
+                if (activeReelVideo) {
+                    if (activeReelVideo.paused) activeReelVideo.play();
+                    else activeReelVideo.pause();
+                }
+            } else if (e.key === 'm' || e.key === 'M') {
+                toggleReelsMute();
+            }
+        });
+
+        // Reactive updates
+        window.addEventListener('pwaninet:download-completed', () => loadItems());
+        window.addEventListener('pwaninet:download-deleted', () => loadItems());
+
+        // Stop fallback video playback on modal close
+        const videoModal = document.getElementById('offlineVideoModal');
+        if (videoModal) {
+            videoModal.addEventListener('hidden.bs.modal', () => {
+                const video = document.getElementById('offlinePlayerVideo');
+                if (video) {
+                    video.pause();
+                    video.src = '';
+                }
+            });
+        }
+
+        // Stop audio playback on modal close
+        const audioModal = document.getElementById('offlineAudioModal');
+        if (audioModal) {
+            audioModal.addEventListener('hidden.bs.modal', () => {
+                const audio = document.getElementById('offlinePlayerAudio');
+                if (audio) {
+                    audio.pause();
+                    audio.src = '';
+                }
+            });
+        }
+
+        // Clean document modal on close
+        const docModal = document.getElementById('offlineDocModal');
+        if (docModal) {
+            docModal.addEventListener('hidden.bs.modal', () => {
+                const frame = document.getElementById('offlineDocFrame');
+                if (frame) frame.src = '';
+            });
+        }
+    }
+
+    async function renderStats() {
+        const stats = await downloadStorage.getStorageStats();
+        const format = downloadStorage.formatBytes;
+
+        const totalText = document.getElementById('stat-total-storage-text');
+        if (totalText) totalText.textContent = format(stats.totalBytes);
+
+        const countVideo = document.getElementById('stat-count-video');
+        const countImage = document.getElementById('stat-count-image');
+        const countAudio = document.getElementById('stat-count-audio');
+        const countDoc = document.getElementById('stat-count-document');
+
+        if (countVideo) countVideo.textContent = stats.counts.video;
+        if (countImage) countImage.textContent = stats.counts.image;
+        if (countAudio) countAudio.textContent = stats.counts.audio;
+        if (countDoc) countDoc.textContent = stats.counts.document;
+
+        const clearBtn = document.getElementById('btn-clear-all-downloads');
+        if (clearBtn) {
+            clearBtn.classList.toggle('d-none', allItems.length === 0);
+        }
+
+        // Show Watch Reels button if videos exist
+        const watchReelsHeader = document.getElementById('btn-watch-reels-header');
+        if (watchReelsHeader) {
+            watchReelsHeader.classList.toggle('d-none', stats.counts.video === 0);
+            watchReelsHeader.classList.toggle('d-flex', stats.counts.video > 0);
+        }
+
+        // Progress bar segments
+        if (stats.totalBytes > 0) {
+            document.getElementById('bar-videos').style.width = `${(stats.bytes.video / stats.totalBytes) * 100}%`;
+            document.getElementById('bar-photos').style.width = `${(stats.bytes.image / stats.totalBytes) * 100}%`;
+            document.getElementById('bar-audios').style.width = `${(stats.bytes.audio / stats.totalBytes) * 100}%`;
+            document.getElementById('bar-documents').style.width = `${(stats.bytes.document / stats.totalBytes) * 100}%`;
+        } else {
+            document.getElementById('bar-videos').style.width = '0%';
+            document.getElementById('bar-photos').style.width = '0%';
+            document.getElementById('bar-audios').style.width = '0%';
+            document.getElementById('bar-documents').style.width = '0%';
+        }
+    }
+
+    function renderItems() {
+        let filtered = [...allItems];
+
+        if (currentCategory !== 'all') {
+            filtered = filtered.filter(item => item.category === currentCategory);
+        }
+
+        if (searchQuery) {
+            filtered = downloadManager.searchDownloads(filtered, searchQuery);
+        }
+
+        filtered = downloadManager.sortDownloads(filtered, currentSort);
+
+        const grid = document.getElementById('offline-media-grid');
+        const empty = document.getElementById('offline-empty-state');
+
+        if (!grid || !empty) return;
+
+        if (filtered.length === 0) {
+            grid.innerHTML = '';
+            empty.classList.remove('d-none');
+            updateEmptyState();
+            return;
+        }
+
+        empty.classList.add('d-none');
+        grid.innerHTML = filtered.map(item => renderMediaCard(item)).join('');
+        attachCardActions();
+        resolveCardThumbnails();
+    }
+
+    async function resolveCardThumbnails() {
+        const lazyThumbs = document.querySelectorAll('[data-thumb-lazy]');
+        for (const el of lazyThumbs) {
+            const id = el.dataset.thumbLazy;
+            const item = allItems.find(it => it.id === id);
+            if (!item) continue;
+
+            try {
+                const src = await downloadManager.getMediaSrc(item);
+                if (src && el.tagName === 'IMG' && !el.src) {
+                    el.src = src;
+                }
+            } catch (err) {
+                console.warn('[Thumbnail] Failed to resolve:', id, err);
+            }
+        }
+    }
+
+    function renderMediaCard(item) {
+        const format = downloadStorage.formatBytes;
+        const dateStr = item.downloadedAt ? new Date(item.downloadedAt).toLocaleDateString() : '';
+        const sizeStr = format(item.size || 0);
+
+        let thumbMarkup = '';
+        let playButton = '';
+
+        if (item.category === 'video') {
+            if (item.thumbnail) {
+                thumbMarkup = `
+                    <img src="${item.thumbnail}" class="offline-thumb-img" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="offline-video-fallback d-none flex-column align-items-center justify-content-center w-100 h-100 text-primary" style="background: radial-gradient(circle, rgba(37,99,235,0.2) 0%, rgba(0,0,0,0.8) 100%);">
+                        <i class="bi bi-camera-video fs-1"></i>
+                    </div>
+                `;
+            } else {
+                thumbMarkup = `
+                    <div class="offline-video-fallback d-flex flex-column align-items-center justify-content-center w-100 h-100 text-primary" style="background: radial-gradient(circle, rgba(37,99,235,0.2) 0%, rgba(0,0,0,0.8) 100%);">
+                        <i class="bi bi-camera-video fs-1"></i>
+                    </div>
+                `;
+            }
+            playButton = `<div class="offline-play-overlay"><i class="bi bi-play-fill"></i></div>`;
+        } else if (item.category === 'image') {
+            thumbMarkup = `
+                <img data-thumb-lazy="${item.id}" src="${item.thumbnail || ''}" class="offline-thumb-img" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="d-none w-100 h-100 align-items-center justify-content-center text-info fs-1 bg-dark">
+                    <i class="bi bi-image"></i>
+                </div>
+            `;
+        } else if (item.category === 'audio') {
+            thumbMarkup = `
+                <div class="w-100 h-100 d-flex flex-column align-items-center justify-content-center text-center p-2" style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #4338ca 100%);">
+                    <div class="rounded-circle bg-warning bg-opacity-25 p-3 mb-1">
+                        <i class="bi bi-music-note-beamed fs-2 text-warning"></i>
+                    </div>
+                    <span class="text-white-50 fw-semibold text-uppercase tracking-wider" style="font-size: 10px;">Offline Audio</span>
+                </div>
+            `;
+            playButton = `<div class="offline-play-overlay bg-warning"><i class="bi bi-play-fill"></i></div>`;
+        } else {
+            // Document - customized badge and cover
+            const ext = (item.filename?.split('.').pop() || 'doc').toLowerCase();
+            let docColor = '#dc2626';
+            let docBg = 'linear-gradient(135deg, #450a0a 0%, #7f1d1d 60%, #991b1b 100%)';
+            let docIcon = 'bi-file-earmark-pdf-fill';
+
+            if (ext === 'doc' || ext === 'docx') {
+                docColor = '#2563eb';
+                docBg = 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #1d4ed8 100%)';
+                docIcon = 'bi-file-earmark-word-fill';
+            } else if (ext === 'xls' || ext === 'xlsx' || ext === 'csv') {
+                docColor = '#16a34a';
+                docBg = 'linear-gradient(135deg, #022c22 0%, #064e3b 60%, #047857 100%)';
+                docIcon = 'bi-file-earmark-excel-fill';
+            } else if (ext === 'ppt' || ext === 'pptx') {
+                docColor = '#ea580c';
+                docBg = 'linear-gradient(135deg, #431407 0%, #7c2d12 60%, #c2410c 100%)';
+                docIcon = 'bi-file-earmark-ppt-fill';
+            }
+
+            if (item.thumbnail) {
+                thumbMarkup = `
+                    <img src="${item.thumbnail}" class="offline-thumb-img" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="w-100 h-100 d-flex flex-column align-items-center justify-content-center text-center p-2" style="background: ${docBg}; display: none;">
+                        <i class="bi ${docIcon} fs-1" style="color: ${docColor};"></i>
+                        <span class="badge text-white mt-1" style="background: ${docColor}; font-size: 10px;">${ext.toUpperCase()}</span>
+                    </div>
+                `;
+            } else {
+                thumbMarkup = `
+                    <div class="w-100 h-100 d-flex flex-column align-items-center justify-content-center text-center p-2" style="background: ${docBg};">
+                        <i class="bi ${docIcon} fs-1" style="color: ${docColor};"></i>
+                        <span class="badge text-white mt-1" style="background: ${docColor}; font-size: 10px;">${ext.toUpperCase()}</span>
+                    </div>
+                `;
+            }
+        }
+
+        return `
+            <div class="col-6 col-md-4 col-lg-3" id="card-${item.id}">
+                <div class="card h-100 border-0 shadow-sm offline-media-card bg-body-tertiary">
+                    <div class="offline-thumb-container cursor-pointer" data-action="open-media" data-id="${item.id}">
+                        <span class="badge badge-category">${item.category}</span>
+                        ${thumbMarkup}
+                        ${playButton}
+                    </div>
+                    <div class="card-body p-2 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="fw-semibold small text-truncate mb-1" title="${item.filename}">
+                                ${item.filename}
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center text-muted" style="font-size: 11px;">
+                                <span>${sizeStr}</span>
+                                <span>${dateStr}</span>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-2 pt-1 border-top border-secondary-subtle">
+                            ${item.category === 'document' ? `
+                                <button class="btn btn-xs btn-outline-primary py-0 px-2 rounded-pill d-flex align-items-center gap-1" data-action="export-doc" data-id="${item.id}" title="Save to Phone">
+                                    <i class="bi bi-phone-arrow-down" style="font-size: 11px;"></i>
+                                    <span style="font-size: 11px;">Phone</span>
+                                </button>
+                            ` : `<span></span>`}
+                            <div class="d-flex gap-1">
+                                <button class="btn btn-sm btn-ghost p-1 text-muted" data-action="share-media" data-id="${item.id}" title="Share">
+                                    <i class="bi bi-share"></i>
+                                </button>
+                                <button class="btn btn-sm btn-ghost p-1 text-danger" data-action="delete-media" data-id="${item.id}" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function attachCardActions() {
+        // Open/Play Media
+        document.querySelectorAll('[data-action="open-media"]').forEach(el => {
+            el.onclick = () => handleOpenMedia(el.dataset.id);
+        });
+
+        // Save Document to Phone (Capacitor/Browser download)
+        document.querySelectorAll('[data-action="export-doc"]').forEach(btn => {
+            btn.onclick = async (e) => {
+                e.stopPropagation();
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="bi bi-arrow-repeat spin-icon"></i>';
+                try {
+                    await downloadManager.exportToDevice(btn.dataset.id);
+                    btn.innerHTML = '<i class="bi bi-check2 text-success"></i> Saved';
+                    setTimeout(() => { btn.innerHTML = orig; }, 2000);
+                } catch (err) {
+                    console.error('[Export Doc] Failed:', err);
+                    btn.innerHTML = orig;
+                    alert('Could not export to phone: ' + (err.message || err));
+                }
+            };
+        });
+
+        // Share Media
+        document.querySelectorAll('[data-action="share-media"]').forEach(el => {
+            el.onclick = (e) => {
+                e.stopPropagation();
+                downloadManager.share(el.dataset.id);
+            };
+        });
+
+        // Delete Media
+        document.querySelectorAll('[data-action="delete-media"]').forEach(el => {
+            el.onclick = async (e) => {
+                e.stopPropagation();
+                if (confirm('Delete this download from your device?')) {
+                    await downloadManager.delete(el.dataset.id);
+                    await loadItems();
+                }
+            };
+        });
+    }
+
+    async function handleOpenMedia(id) {
+        const item = allItems.find(it => it.id === id);
+        if (!item) return;
+
+        // For Videos -> Open Fullscreen TikTok/Reels Player
+        if (item.category === 'video') {
+            const videoItems = allItems.filter(it => it.category === 'video');
+            const index = videoItems.findIndex(it => it.id === id);
+            await openReelsPlayer(index >= 0 ? index : 0);
+            return;
+        }
+
+        const src = await downloadManager.getMediaSrc(item);
+        if (!src) {
+            alert('Media file could not be loaded offline.');
+            return;
+        }
+
+        if (item.category === 'image') {
+            const img = document.getElementById('offlinePlayerImage');
+            const title = document.getElementById('offlineImageTitle');
+            if (img && title) {
+                title.textContent = item.filename;
+                img.src = src;
+                const modal = new bootstrap.Modal(document.getElementById('offlineImageModal'));
+                modal.show();
+            }
+        } else if (item.category === 'audio') {
+            const audio = document.getElementById('offlinePlayerAudio');
+            const title = document.getElementById('offlineAudioTitle');
+            if (audio && title) {
+                title.textContent = item.filename;
+                audio.src = src;
+                const modal = new bootstrap.Modal(document.getElementById('offlineAudioModal'));
+                modal.show();
+                audio.play().catch(() => {});
+            }
+        } else {
+            // Document Viewer Modal with Save to Phone action
+            const docFrame = document.getElementById('offlineDocFrame');
+            const docTitle = document.getElementById('offlineDocTitle');
+            const exportBtn = document.getElementById('offlineDocExportBtn');
+
+            if (docFrame && docTitle) {
+                docTitle.textContent = item.filename;
+                docFrame.src = src;
+
+                if (exportBtn) {
+                    exportBtn.onclick = async () => {
+                        const orig = exportBtn.innerHTML;
+                        exportBtn.innerHTML = '<i class="bi bi-arrow-repeat spin-icon"></i> Saving…';
+                        try {
+                            await downloadManager.exportToDevice(item.id);
+                            exportBtn.innerHTML = '<i class="bi bi-check2"></i> Saved to Phone!';
+                            setTimeout(() => { exportBtn.innerHTML = orig; }, 2000);
+                        } catch (err) {
+                            console.error('Export failed:', err);
+                            exportBtn.innerHTML = orig;
+                            alert('Failed to save to phone: ' + (err.message || err));
+                        }
+                    };
+                }
+
+                const modal = new bootstrap.Modal(document.getElementById('offlineDocModal'));
+                modal.show();
+            }
+        }
+    }
+
+    /* ========================================================================= */
+    /* Offline Reels Player Engine (TikTok / Instagram / Facebook style) */
+    /* ========================================================================= */
+    async function openReelsPlayer(startIndex = 0) {
+        const videoItems = allItems.filter(item => item.category === 'video');
+        if (videoItems.length === 0) {
+            alert('No downloaded videos found.');
+            return;
+        }
+
+        const container = document.getElementById('offlineReelsContainer');
+        const slider = document.getElementById('offlineReelsSlider');
+        const counter = document.getElementById('reels-counter');
+
+        if (!container || !slider) return;
+
+        slider.innerHTML = '';
+        container.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        document.body.classList.add('in-reels-mode');
+
+        // Hide native system navigation / status bars if on Capacitor/Android
+        if (window.Capacitor && window.Capacitor.Plugins) {
+            if (window.Capacitor.Plugins.StatusBar && typeof window.Capacitor.Plugins.StatusBar.hide === 'function') {
+                window.Capacitor.Plugins.StatusBar.hide().catch(() => {});
+            }
+            if (window.Capacitor.Plugins.NavigationBar && typeof window.Capacitor.Plugins.NavigationBar.hide === 'function') {
+                window.Capacitor.Plugins.NavigationBar.hide().catch(() => {});
+            }
+        }
+        if (window.AndroidBridge && typeof window.AndroidBridge.setImmersiveMode === 'function') {
+            try { window.AndroidBridge.setImmersiveMode(true); } catch (_) {}
+        }
+
+        // Preload sources and render slides
+        for (let i = 0; i < videoItems.length; i++) {
+            const item = videoItems[i];
+            let src = reelSources.get(item.id);
+            if (!src) {
+                src = await downloadManager.getMediaSrc(item);
+                reelSources.set(item.id, src);
+            }
+
+            const slide = createReelSlide(item, src, i, videoItems.length);
+            slider.appendChild(slide);
+        }
+
+        // Setup scroll observer
+        setupReelsObserver(videoItems);
+
+        // Scroll to startIndex
+        const targetSlide = slider.children[startIndex];
+        if (targetSlide) {
+            targetSlide.scrollIntoView({ behavior: 'auto' });
+        }
+    }
+
+    function createReelSlide(item, src, index, total) {
+        const format = downloadStorage.formatBytes;
+        const sizeStr = format(item.size || 0);
+        const dateStr = item.downloadedAt ? new Date(item.downloadedAt).toLocaleDateString() : '';
+
+        const slide = document.createElement('div');
+        slide.className = 'offline-reel-slide';
+        slide.dataset.id = item.id;
+        slide.dataset.index = index;
+
+        slide.innerHTML = `
+            <video class="offline-reel-video" src="${src}" loop playsinline webkit-playsinline disablePictureInPicture controlsList="nodownload nofullscreen noremoteplayback" preload="auto"></video>
+            
+            <div class="offline-reel-tap-indicator">
+                <i class="bi bi-play-fill"></i>
+            </div>
+
+            <!-- Continuous borderless action panel -->
+            <div class="offline-reels-right-rail">
+                <button class="reels-rail-btn reel-sound-btn" title="Toggle Sound">
+                    <i class="bi ${isReelsMuted ? 'bi-volume-mute-fill' : 'bi-volume-up-fill'}"></i>
+                    <span class="rail-label">${isReelsMuted ? 'Muted' : 'Sound'}</span>
+                </button>
+
+                <button class="reels-rail-btn reel-export-btn" title="Save to Phone">
+                    <i class="bi bi-phone-arrow-down"></i>
+                    <span class="rail-label">Save</span>
+                </button>
+
+                <button class="reels-rail-btn reel-share-btn" title="Share">
+                    <i class="bi bi-share-fill"></i>
+                    <span class="rail-label">Share</span>
+                </button>
+
+                <button class="reels-rail-btn reel-delete-btn" title="Delete">
+                    <i class="bi bi-trash3"></i>
+                    <span class="rail-label">Delete</span>
+                </button>
+            </div>
+
+            <!-- Bottom Caption & Progress -->
+            <div class="offline-reels-bottom-info">
+                <div class="fw-bold text-white text-truncate mb-1" style="font-size: 15px;">${item.filename}</div>
+                <div class="text-white-50 small d-flex align-items-center gap-2">
+                    <span><i class="bi bi-hdd me-1"></i>${sizeStr}</span>
+                    <span>•</span>
+                    <span><i class="bi bi-calendar-check me-1"></i>${dateStr}</span>
+                </div>
+                <div class="reels-progress-bar-container">
+                    <div class="reels-progress-bar-track">
+                        <div class="reels-progress-bar-fill"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const video = slide.querySelector('.offline-reel-video');
+        const tapIndicator = slide.querySelector('.offline-reel-tap-indicator');
+        const progressFill = slide.querySelector('.reels-progress-bar-fill');
+        const progressContainer = slide.querySelector('.reels-progress-bar-container');
+
+        // Tap to play/pause
+        video.onclick = () => {
+            if (video.paused) {
+                video.play();
+                tapIndicator.querySelector('i').className = 'bi bi-play-fill';
+            } else {
+                video.pause();
+                tapIndicator.querySelector('i').className = 'bi bi-pause-fill';
+            }
+            tapIndicator.classList.add('active');
+            setTimeout(() => tapIndicator.classList.remove('active'), 400);
+        };
+
+        // Progress bar updates
+        let isScrubbing = false;
+        let wasPausedBeforeScrub = false;
+
+        video.ontimeupdate = () => {
+            if (video.duration && !isScrubbing) {
+                const pct = (video.currentTime / video.duration) * 100;
+                progressFill.style.width = `${pct}%`;
+            }
+        };
+
+        // Interactive scrubbing & dragging support
+        const updateScrubPosition = (clientX) => {
+            const rect = progressContainer.getBoundingClientRect();
+            if (rect.width <= 0) return;
+            let pos = (clientX - rect.left) / rect.width;
+            pos = Math.max(0, Math.min(1, pos));
+            progressFill.style.width = `${pos * 100}%`;
+            if (video.duration) {
+                video.currentTime = pos * video.duration;
+            }
+        };
+
+        progressContainer.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            isScrubbing = true;
+            wasPausedBeforeScrub = video.paused;
+            video.pause();
+            progressContainer.classList.add('is-scrubbing');
+            try {
+                progressContainer.setPointerCapture(e.pointerId);
+            } catch (_) {}
+            updateScrubPosition(e.clientX);
+        });
+
+        progressContainer.addEventListener('pointermove', (e) => {
+            if (!isScrubbing) return;
+            e.stopPropagation();
+            e.preventDefault();
+            updateScrubPosition(e.clientX);
+        });
+
+        const stopScrubbing = (e) => {
+            if (!isScrubbing) return;
+            e.stopPropagation();
+            isScrubbing = false;
+            progressContainer.classList.remove('is-scrubbing');
+            try {
+                progressContainer.releasePointerCapture(e.pointerId);
+            } catch (_) {}
+            if (!wasPausedBeforeScrub) {
+                video.play().catch(() => {});
+            }
+        };
+
+        progressContainer.addEventListener('pointerup', stopScrubbing);
+        progressContainer.addEventListener('pointercancel', stopScrubbing);
+
+        // Right Rail Actions
+        const soundBtn = slide.querySelector('.reel-sound-btn');
+        soundBtn.onclick = (e) => {
+            e.stopPropagation();
+            toggleReelsMute();
+        };
+
+        const exportBtn = slide.querySelector('.reel-export-btn');
+        exportBtn.onclick = async (e) => {
+            e.stopPropagation();
+            const orig = exportBtn.innerHTML;
+            exportBtn.innerHTML = '<i class="bi bi-arrow-repeat spin-icon"></i>';
+            try {
+                await downloadManager.exportToDevice(item.id);
+                exportBtn.innerHTML = '<i class="bi bi-check2 text-success"></i><span class="rail-label">Saved</span>';
+                setTimeout(() => { exportBtn.innerHTML = orig; }, 2000);
+            } catch (err) {
+                console.error('[Reel Export] Failed:', err);
+                exportBtn.innerHTML = orig;
+                alert('Could not save to phone: ' + (err.message || err));
+            }
+        };
+
+        const shareBtn = slide.querySelector('.reel-share-btn');
+        shareBtn.onclick = (e) => {
+            e.stopPropagation();
+            downloadManager.share(item.id);
+        };
+
+        const deleteBtn = slide.querySelector('.reel-delete-btn');
+        deleteBtn.onclick = async (e) => {
+            e.stopPropagation();
+            if (confirm(`Delete "${item.filename}"?`)) {
+                await downloadManager.delete(item.id);
+                slide.remove();
+                await loadItems();
+                const remaining = document.querySelectorAll('.offline-reel-slide');
+                if (remaining.length === 0) {
+                    closeReelsPlayer();
+                } else {
+                    document.getElementById('reels-counter').textContent = `1 / ${remaining.length}`;
+                }
+            }
+        };
+
+        return slide;
+    }
+
+    function setupReelsObserver(videoItems) {
+        if (reelsObserver) reelsObserver.disconnect();
+
+        const slider = document.getElementById('offlineReelsSlider');
+        const counter = document.getElementById('reels-counter');
+
+        reelsObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const video = entry.target.querySelector('video');
+                const index = parseInt(entry.target.dataset.index, 10);
+                if (!video) return;
+
+                if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+                    activeReelVideo = video;
+                    video.muted = isReelsMuted;
+                    video.play().catch(() => {});
+                    if (counter) {
+                        counter.textContent = `${index + 1} / ${videoItems.length}`;
+                    }
+                } else {
+                    video.pause();
+                    video.currentTime = 0;
+                }
+            });
+        }, {
+            root: slider,
+            threshold: 0.6
+        });
+
+        document.querySelectorAll('.offline-reel-slide').forEach(slide => {
+            reelsObserver.observe(slide);
+        });
+    }
+
+    function toggleReelsMute() {
+        isReelsMuted = !isReelsMuted;
+        document.querySelectorAll('.offline-reel-video').forEach(vid => {
+            vid.muted = isReelsMuted;
+        });
+        document.querySelectorAll('.reel-sound-btn').forEach(btn => {
+            btn.querySelector('i').className = `bi ${isReelsMuted ? 'bi-volume-mute-fill' : 'bi-volume-up-fill'}`;
+            btn.querySelector('.rail-label').textContent = isReelsMuted ? 'Muted' : 'Sound';
+        });
+    }
+
+    function closeReelsPlayer() {
+        const container = document.getElementById('offlineReelsContainer');
+        if (container) container.style.display = 'none';
+        document.body.style.overflow = '';
+        document.body.classList.remove('in-reels-mode');
+
+        // Restore native system navigation / status bars
+        if (window.Capacitor && window.Capacitor.Plugins) {
+            if (window.Capacitor.Plugins.StatusBar && typeof window.Capacitor.Plugins.StatusBar.show === 'function') {
+                window.Capacitor.Plugins.StatusBar.show().catch(() => {});
+            }
+            if (window.Capacitor.Plugins.NavigationBar && typeof window.Capacitor.Plugins.NavigationBar.show === 'function') {
+                window.Capacitor.Plugins.NavigationBar.show().catch(() => {});
+            }
+        }
+        if (window.AndroidBridge && typeof window.AndroidBridge.setImmersiveMode === 'function') {
+            try { window.AndroidBridge.setImmersiveMode(false); } catch (_) {}
+        }
+
+        if (reelsObserver) {
+            reelsObserver.disconnect();
+            reelsObserver = null;
+        }
+
+        document.querySelectorAll('.offline-reel-video').forEach(video => {
+            video.pause();
+            video.src = '';
+        });
+
+        activeReelVideo = null;
+    }
+
+    function updateEmptyState() {
+        const title = document.getElementById('empty-title');
+        const desc = document.getElementById('empty-desc');
+        const icon = document.getElementById('empty-icon');
+        if (currentCategory === 'video') {
+            icon.className = 'bi bi-camera-video';
+            title.textContent = 'No downloaded videos';
+            desc.textContent = 'Videos you download from posts and reels will appear here for offline streaming.';
+        } else if (currentCategory === 'image') {
+            icon.className = 'bi bi-image';
+            title.textContent = 'No downloaded photos';
+            desc.textContent = 'Images you save will be available here without an internet connection.';
+        } else if (currentCategory === 'audio') {
+            icon.className = 'bi bi-music-note-beamed';
+            title.textContent = 'No downloaded audio';
+            desc.textContent = 'Voice messages, songs, and audio tracks will be ready here offline.';
+        } else if (currentCategory === 'document') {
+            icon.className = 'bi bi-file-earmark-text';
+            title.textContent = 'No downloaded documents';
+            desc.textContent = 'PDFs, docs, and notes you download can be read offline anytime.';
+        } else {
+            icon.className = 'bi bi-cloud-arrow-down';
+            title.textContent = 'No downloaded media yet';
+            desc.textContent = 'Files you download while browsing PwaniNet will automatically be saved here for full offline streaming and viewing.';
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initOfflineMediaHub, { once: true });
+    } else {
+        initOfflineMediaHub();
+    }
+</script>

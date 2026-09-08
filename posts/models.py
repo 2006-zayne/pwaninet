@@ -124,20 +124,38 @@ class Post(models.Model):
         return None
     
     @property
+    def thumbnail_url(self):
+        """Safely retrieve thumbnail URL without raising ValueError if file is missing."""
+        if self.thumbnail:
+            try:
+                return self.thumbnail.url
+            except ValueError:
+                return None
+        return None
+
+    @property
     def get_video_for_feed(self):
         """Get video preview for feed, fallback to original"""
         if self.video_preview:
             return self.video_preview
-        return self.video
+        if self.video:
+            return self.video
+        return None
     
     @property
     def get_video_poster(self):
         """Get video poster image"""
         if self.video_poster:
-            return self.video_poster.url
+            try:
+                return self.video_poster.url
+            except ValueError:
+                pass
         # Generate poster from first frame if video exists
         if self.video:
-            return self.video.url + '#poster'
+            try:
+                return self.video.url + '#poster'
+            except ValueError:
+                pass
         return None
 
     @property

@@ -192,6 +192,12 @@ function initNativeAppEnhancements() {
     // Initialize native app update checks
     initNativeAppUpdates();
 
+    // Initialize virtual keyboard (IME) viewport management
+    initKeyboardManager();
+
+    // Initialize native-like pull to refresh
+    initPullToRefresh();
+
     window._pwaninet_native_initialized = true;
 
     const endTime = performance.now();
@@ -200,14 +206,31 @@ function initNativeAppEnhancements() {
 }
 
 /**
- * Instant button touch states - eliminates 300ms gesture delay
+ * Instant button touch states - eliminates 300ms gesture delay and provides tactile feedback
  */
 function initInstantTouchStates() {
-    const clickableSelectors = ['.btn', '.btn-native', 'button'];
+    const clickableSelectors = [
+        '.btn',
+        '.btn-native',
+        'button',
+        '.nav-chip',
+        '.action-icon',
+        '.card-clickable',
+        '.dropdown-item',
+        '.reaction-chip',
+        '.cursor-pointer',
+        '[data-clickable="true"]'
+    ];
     
     document.addEventListener('touchstart', function(e) {
         const target = e.target.closest(clickableSelectors.join(','));
-        if (target) target.classList.add('activated');
+        if (target) {
+            target.classList.add('activated');
+            // Trigger instant light haptic if element doesn't have an explicit haptic attribute
+            if (!target.hasAttribute('data-haptic') && window.Haptics && typeof window.Haptics.impactLight === 'function') {
+                window.Haptics.impactLight();
+            }
+        }
     }, { passive: true });
 
     document.addEventListener('touchend', function(e) {
@@ -368,24 +391,48 @@ function initNativeMedia() {
 }
 
 /**
- * Android Back Button Handling
+ * Android Back Button Handling with Double-Tap to Exit
  */
+let _lastBackPressTime = 0;
+
 async function initBackNavigation() {
     try {
         if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
         const { App } = window.Capacitor.Plugins;
 
         App.addListener('backButton', async () => {
+            // 1. Dismiss active overlays/drawers first
             const dismissed = dismissActiveOverlays();
-            if (dismissed) return;
+            if (dismissed) {
+                if (window.Haptics) window.Haptics.impactLight();
+                return;
+            }
 
             const currentPath = window.location.pathname;
-            const isRoot = currentPath === '/' || currentPath === '/home/';
+            const isRoot = currentPath === '/' || currentPath === '/home/' || currentPath === '';
 
+            // 2. Non-root: pop browser history
             if (!isRoot && window.history.length > 1) {
+                if (window.Haptics) window.Haptics.selection();
                 window.history.back();
-            } else {
+                return;
+            }
+
+            // 3. Root: double-tap to exit
+            const now = Date.now();
+            if (now - _lastBackPressTime < 2000) {
+                if (window.Haptics) window.Haptics.impactMedium();
                 await App.exitApp();
+            } else {
+                _lastBackPressTime = now;
+                if (window.Haptics) window.Haptics.impactLight();
+
+                var bridge = window.AndroidBridge || window.PwaninetBridge;
+                if (bridge && typeof bridge.showToast === 'function') {
+                    bridge.showToast('Press back again to exit');
+                } else {
+                    showInAppBackToast('Press back again to exit');
+                }
             }
         });
     } catch (error) {
@@ -393,11 +440,44 @@ async function initBackNavigation() {
     }
 }
 
+function showInAppBackToast(message) {
+    let toast = document.getElementById('pwaninet-back-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'pwaninet-back-toast';
+        toast.style.cssText = 'position:fixed;bottom:calc(85px + var(--pwaninet-safe-area-bottom, 0px));left:50%;transform:translateX(-50%);background:rgba(15,23,42,0.92);color:#fff;font-size:13px;font-weight:600;padding:8px 18px;border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,0.3);z-index:100000;pointer-events:none;transition:opacity 0.25s ease;backdrop-filter:blur(8px);';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.opacity = '1';
+    clearTimeout(toast._fadeTimeout);
+    toast._fadeTimeout = setTimeout(() => {
+        toast.style.opacity = '0';
+    }, 1800);
+}
+
 /**
  * Dismisses any active UI overlays
  */
 function dismissActiveOverlays() {
     let dismissed = false;
+
+    // Bootstrap Offcanvas (sidebars / navigation drawers)
+    const activeOffcanvas = document.querySelectorAll('.offcanvas.show');
+    activeOffcanvas.forEach(el => {
+        if (window.bootstrap && window.bootstrap.Offcanvas) {
+            const instance = window.bootstrap.Offcanvas.getInstance(el);
+            if (instance) {
+                instance.hide();
+                dismissed = true;
+            }
+        }
+        if (!dismissed) {
+            el.classList.remove('show');
+            dismissed = true;
+        }
+    });
+    if (dismissed) return true;
 
     // Modals
     const activeModals = document.querySelectorAll('.modal.show, #pwaninetStatusModal.show');
@@ -420,15 +500,128 @@ function dismissActiveOverlays() {
     });
     if (dismissed) return true;
 
-    // Custom Overlays
-    const customOverlays = document.querySelectorAll('.overlay.show, .emoji-picker-modal.show, .attachment-modal.show, .voice-recording-preview.show, .context-menu.show, #themeModal.show, #voiceModal.show, #attachmentModal.show');
+    // Custom Overlays & Menus
+    const customOverlays = document.querySelectorAll('.overlay.show, .emoji-picker-modal.show, .attachment-modal.show, .voice-recording-preview.show, .context-menu.show, #themeModal.show, #voiceModal.show, #attachmentModal.show, .dropdown-menu.show');
     customOverlays.forEach(overlay => {
         overlay.classList.remove('show');
-        if (overlay.classList.contains('context-menu')) overlay.style.display = 'none';
+        if (overlay.classList.contains('context-menu') || overlay.classList.contains('dropdown-menu')) {
+            overlay.style.display = 'none';
+        }
         dismissed = true;
     });
 
     return dismissed;
+}
+
+/**
+ * Virtual Keyboard (IME) Viewport Management
+ * Hides floating bottom navigation when typing to prevent viewport overlap
+ */
+function initKeyboardManager() {
+    if (!window.visualViewport) return;
+
+    function handleViewportChange() {
+        const currentHeight = window.visualViewport.height;
+        const isKeyboardVisible = (window.innerHeight - currentHeight) > 150;
+        if (isKeyboardVisible) {
+            document.body.classList.add('keyboard-open');
+        } else {
+            document.body.classList.remove('keyboard-open');
+        }
+    }
+
+    window.visualViewport.addEventListener('resize', handleViewportChange);
+    window.visualViewport.addEventListener('scroll', handleViewportChange);
+
+    document.addEventListener('focusin', function(e) {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) {
+            setTimeout(() => {
+                document.body.classList.add('keyboard-open');
+            }, 60);
+        }
+    });
+
+    document.addEventListener('focusout', function(e) {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) {
+            setTimeout(() => {
+                if (window.visualViewport && (window.innerHeight - window.visualViewport.height) <= 150) {
+                    document.body.classList.remove('keyboard-open');
+                }
+            }, 100);
+        }
+    });
+}
+
+/**
+ * Native-style Pull-to-Refresh with tactile haptic feedback
+ */
+function initPullToRefresh() {
+    let startY = 0;
+    let currentY = 0;
+    let isPulling = false;
+    let hapticTriggered = false;
+    const threshold = 65;
+
+    let ptrIndicator = document.getElementById('pwaninet-ptr-indicator');
+    if (!ptrIndicator) {
+        ptrIndicator = document.createElement('div');
+        ptrIndicator.id = 'pwaninet-ptr-indicator';
+        ptrIndicator.style.cssText = 'position:fixed;top:calc(var(--navbar-height, 56px) + var(--pwaninet-safe-area-top, 0px) + 8px);left:50%;transform:translate(-50%, -150%);width:36px;height:36px;border-radius:50%;background:var(--card-bg, #ffffff);box-shadow:0 3px 12px rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;z-index:9998;pointer-events:none;transition:transform 0.15s cubic-bezier(0.2,0,0.2,1), opacity 0.2s ease;opacity:0;';
+        ptrIndicator.innerHTML = '<i class="bi bi-arrow-clockwise" style="font-size:18px;color:var(--primary, #2563eb);display:inline-block;transition:transform 0.2s;"></i>';
+        document.body.appendChild(ptrIndicator);
+    }
+
+    const icon = ptrIndicator.querySelector('i');
+
+    document.addEventListener('touchstart', function(e) {
+        if (window.scrollY <= 2 && e.touches.length === 1) {
+            startY = e.touches[0].clientY;
+            isPulling = true;
+            hapticTriggered = false;
+        } else {
+            isPulling = false;
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function(e) {
+        if (!isPulling || window.scrollY > 2) return;
+        currentY = e.touches[0].clientY;
+        const diff = currentY - startY;
+
+        if (diff > 10) {
+            const pullDistance = Math.min(diff * 0.45, threshold + 25);
+            ptrIndicator.style.opacity = String(Math.min(pullDistance / threshold, 1));
+            ptrIndicator.style.transform = 'translate(-50%, ' + pullDistance + 'px)';
+            if (icon) icon.style.transform = 'rotate(' + (pullDistance * 3) + 'deg)';
+
+            if (pullDistance >= threshold && !hapticTriggered) {
+                hapticTriggered = true;
+                if (window.Haptics) window.Haptics.impactLight();
+            } else if (pullDistance < threshold) {
+                hapticTriggered = false;
+            }
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchend', function() {
+        if (!isPulling) return;
+        const diff = currentY - startY;
+        isPulling = false;
+
+        if (diff * 0.45 >= threshold) {
+            if (window.Haptics) window.Haptics.selection();
+            ptrIndicator.style.transform = 'translate(-50%, ' + threshold + 'px)';
+            if (icon) {
+                icon.style.animation = 'spin 0.8s linear infinite';
+            }
+            setTimeout(() => {
+                window.location.reload();
+            }, 300);
+        } else {
+            ptrIndicator.style.opacity = '0';
+            ptrIndicator.style.transform = 'translate(-50%, -150%)';
+        }
+    }, { passive: true });
 }
 
 /**

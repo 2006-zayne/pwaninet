@@ -5,7 +5,7 @@
  */
 
 'use strict';
-let CACHE_VERSION = '1.2.0';
+let CACHE_VERSION = '1.3.0';
 let CACHE_BUILD = '1';
 let CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}`;
 let OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}`;
@@ -39,6 +39,7 @@ self.addEventListener('message', (event) => {
 const CORE_ASSETS = [
     '/',
     '/offline.html',
+    '/offline-media/',
     '/static/css/bootstrap.min.css',
     '/static/css/bootstrap-icons.css',
     '/static/css/custom.css',
@@ -61,12 +62,17 @@ const CORE_ASSETS = [
     '/static/js/messaging/sync-manager.js',
     '/static/js/messaging/offline-ui.js',
     '/static/js/messaging/offline-integration.js',
-    '/static/js/native-pwa-install.js'
+    '/static/js/native-pwa-install.js',
+    '/static/js/downloads/download_storage.js',
+    '/static/js/downloads/download_queue.js',
+    '/static/js/downloads/download_manager.js',
+    '/static/js/downloads/download_ui.js'
 ];
 
 // Page shells to cache for offline access
 const PAGE_SHELLS = [
     '/',
+    '/offline-media/',
     '/messaging/',
     '/posts/',
     '/users/profile/'
@@ -240,6 +246,11 @@ async function handleRequest(request) {
     const url = new URL(request.url);
     
     try {
+        // Handle virtual offline media stream with range support (HTTP 206)
+        if (url.pathname.startsWith('/offline-media-stream/')) {
+            return await handleOfflineMediaStreamRequest(request);
+        }
+
         // Try network first for navigation requests
         if (isNavigationRequest(request)) {
             return await handleNavigationRequest(request);
@@ -372,6 +383,69 @@ async function handleStaticAssetRequest(request) {
         // Return offline asset if available
         return await getOfflineAsset(request);
     }
+}
+
+async function handleOfflineMediaStreamRequest(request) {
+    const url = new URL(request.url);
+    const id = url.pathname.replace('/offline-media-stream/', '').split('?')[0];
+    
+    return new Promise((resolve) => {
+        const req = indexedDB.open('pwaninet_downloads_v1', 1);
+        req.onerror = () => resolve(new Response('Database error', { status: 500 }));
+        req.onsuccess = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains('blobs')) {
+                resolve(new Response('Store not found', { status: 404 }));
+                return;
+            }
+            const tx = db.transaction(['blobs'], 'readonly');
+            const store = tx.objectStore('blobs');
+            const getReq = store.get(id);
+
+            getReq.onerror = () => resolve(new Response('File read error', { status: 500 }));
+            getReq.onsuccess = () => {
+                const record = getReq.result;
+                if (!record || !record.blob) {
+                    resolve(new Response('Media not found offline', { status: 404 }));
+                    return;
+                }
+
+                const blob = record.blob;
+                const rangeHeader = request.headers.get('Range');
+                const contentType = blob.type || 'video/mp4';
+
+                if (rangeHeader) {
+                    const match = rangeHeader.match(/bytes=(\d+)-(\d+)?/);
+                    if (match) {
+                        const start = parseInt(match[1], 10);
+                        const end = match[2] ? parseInt(match[2], 10) : blob.size - 1;
+                        const chunk = blob.slice(start, end + 1);
+
+                        resolve(new Response(chunk, {
+                            status: 206,
+                            statusText: 'Partial Content',
+                            headers: {
+                                'Content-Range': `bytes ${start}-${end}/${blob.size}`,
+                                'Accept-Ranges': 'bytes',
+                                'Content-Length': String(chunk.size),
+                                'Content-Type': contentType
+                            }
+                        }));
+                        return;
+                    }
+                }
+
+                resolve(new Response(blob, {
+                    status: 200,
+                    headers: {
+                        'Accept-Ranges': 'bytes',
+                        'Content-Length': String(blob.size),
+                        'Content-Type': contentType
+                    }
+                }));
+            };
+        };
+    });
 }
 
 async function handleApiRequest(request) {

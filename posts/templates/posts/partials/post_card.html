@@ -480,13 +480,17 @@
                     </button>
                 </li>
                 {% with post_obj=post.repost_of|default:post %}
-                    {% if post_obj.images.exists or post_obj.video or post_obj.docs or post_obj.audio or post_obj.get_intel_file %}
+                    {% if post_obj.images.exists or post_obj.video or post_obj.docs or post_obj.audio or post_obj.get_intel_file or post_obj.shared_document %}
                 <li><hr class="dropdown-divider"></li>
                 <li>
-                    <button class="dropdown-item d-flex align-items-center gap-2 download-media-btn"
-                            data-post.share_id="{{ post.share_id }}"
-                            data-post-type="{% if post_obj.images.exists %}image{% elif post_obj.video %}video{% elif post_obj.docs %}document{% elif post_obj.audio %}audio{% elif post_obj.get_intel_file %}file{% endif %}">
-                        <i class="bi bi-download"></i> Download
+                    <button class="dropdown-item d-flex align-items-center gap-2"
+                            data-action="download-media"
+                            data-post-id="{{ post_obj.share_id }}"
+                            data-media-type="{% if post_obj.video %}video{% elif post_obj.images.exists %}image{% elif post_obj.audio %}audio{% elif post_obj.docs or post_obj.shared_document %}document{% elif post_obj.get_intel_file %}{% with f_url=post_obj.get_intel_file.url|lower %}{% if '.mp4' in f_url or '.mov' in f_url or '.webm' in f_url %}video{% elif '.mp3' in f_url or '.wav' in f_url or '.ogg' in f_url or '.m4a' in f_url %}audio{% elif '.pdf' in f_url or '.doc' in f_url or '.ppt' in f_url or '.xls' in f_url %}document{% else %}image{% endif %}{% endwith %}{% endif %}"
+                            data-url="{% if post_obj.video %}{{ post_obj.get_video_for_feed.url }}{% elif post_obj.images.exists %}{{ post_obj.images.first.image.url }}{% elif post_obj.audio %}{{ post_obj.audio.url }}{% elif post_obj.docs %}{{ post_obj.docs.url }}{% elif post_obj.shared_document %}{{ post_obj.shared_document.file.url }}{% elif post_obj.get_intel_file %}{{ post_obj.get_intel_file.url }}{% endif %}"
+                            data-filename="{% if post_obj.video %}video_{{ post_obj.share_id }}.mp4{% elif post_obj.images.exists %}image_{{ post_obj.share_id }}.jpg{% elif post_obj.audio %}audio_{{ post_obj.share_id }}.mp3{% elif post_obj.docs %}{{ post_obj.docs.name|default:'document' }}{% elif post_obj.shared_document %}{{ post_obj.shared_document.title|default:'document' }}{% elif post_obj.get_intel_file %}{{ post_obj.get_intel_file.name|default:'media_file' }}{% endif %}"
+                            data-thumbnail="{% if post_obj.video %}{% if post_obj.get_video_poster %}{{ post_obj.get_video_poster }}{% elif post_obj.thumbnail %}{{ post_obj.thumbnail.url }}{% endif %}{% elif post_obj.images.exists %}{% if post_obj.images.first.get_thumbnail_url %}{{ post_obj.images.first.get_thumbnail_url }}{% elif post_obj.images.first.image %}{{ post_obj.images.first.image.url }}{% endif %}{% elif post_obj.thumbnail %}{{ post_obj.thumbnail.url }}{% elif post_obj.shared_document %}{% with doc_file=post_obj.shared_document.latest_version.files.first %}{% if doc_file.preview_url %}{{ doc_file.preview_url }}{% elif doc_file.thumbnail_path %}/media/{{ doc_file.thumbnail_path }}{% endif %}{% endwith %}{% endif %}">
+                        <i class="bi bi-download"></i> {% trans "Download Media" %}
                     </button>
                 </li>
                     {% endif %}
@@ -536,7 +540,7 @@
 
     {% if post.audio %}
     <div class="post-media border-top border-bottom bg-light position-relative" data-media-type="audio" data-post.share_id="{{ post.share_id }}">
-        <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="audio" data-url="{{ post.audio.url }}" title="Download">
+        <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="audio" data-url="{{ post.audio.url }}" data-thumbnail="{% if post.thumbnail %}{{ post.thumbnail.url }}{% endif %}" title="Download">
             <i class="bi bi-download"></i>
         </button>
         <div class="p-3 d-flex align-items-center gap-3">
@@ -563,7 +567,7 @@
        hx-push-url="true"
        hx-history="true">
         <div class="post-media border-top border-bottom bg-light" data-post.share_id="{{ post.share_id }}" data-media-type="image">
-            <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="image" data-url="{{ post.images.first.image.url }}" title="Download">
+            <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="image" data-url="{{ post.images.first.image.url }}" data-thumbnail="{% if post.images.first.get_thumbnail_url %}{{ post.images.first.get_thumbnail_url }}{% elif post.images.first.image %}{{ post.images.first.image.url }}{% endif %}" title="Download">
                 <i class="bi bi-download"></i>
             </button>
             <div class="image-grid-{{ post.share_id }}" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px; max-height: 400px;">
@@ -590,12 +594,12 @@
         <div class="post-media border-top border-bottom bg-light">
             {% with f_url=post.get_intel_file.url|lower %}
                 {% if ".jpg" in f_url or ".png" in f_url or ".jpeg" in f_url or ".webp" in f_url %}
-                    <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="image" data-url="{{ post.get_intel_file.url }}" title="Download">
+                    <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="image" data-url="{{ post.get_intel_file.url }}" data-thumbnail="{{ post.get_intel_file.url }}" title="Download">
                         <i class="bi bi-download"></i>
                     </button>
                     <img src="{{ post.get_intel_file.url }}" loading="lazy" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;" alt="Post image">
                 {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
-                    <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="video" data-url="{{ post.get_video_for_feed.url }}" title="Download">
+                    <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="video" data-url="{{ post.get_video_for_feed.url }}" data-thumbnail="{% if post.get_video_poster %}{{ post.get_video_poster }}{% elif post.thumbnail %}{{ post.thumbnail.url }}{% endif %}" title="Download">
                         <i class="bi bi-download"></i>
                     </button>
                     <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post.share_id="{{ post.share_id }}">
@@ -635,7 +639,7 @@
                     </div>
 
                 {% elif ".mp3" in f_url or ".wav" in f_url or ".ogg" in f_url or ".m4a" in f_url %}
-                    <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="audio" data-url="{{ post.get_intel_file.url }}" title="Download">
+                    <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="audio" data-url="{{ post.get_intel_file.url }}" data-thumbnail="{% if post.thumbnail %}{{ post.thumbnail.url }}{% endif %}" title="Download">
                         <i class="bi bi-download"></i>
                     </button>
                     <div class="p-3 d-flex align-items-center justify-content-between" style="background: transparent;" data-media-type="audio" data-post.share_id="{{ post.share_id }}">
@@ -656,7 +660,7 @@
                 {% elif ".pdf" in f_url %}
                     <a href="{{ post.get_intel_file.url }}" target="_blank" class="text-decoration-none">
                         <div class="p-4 d-flex align-items-center justify-content-between bg-white position-relative">
-                            <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="document" data-url="{{ post.get_intel_file.url }}" title="Download">
+                            <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="document" data-url="{{ post.get_intel_file.url }}" data-thumbnail="{% if post.thumbnail %}{{ post.thumbnail.url }}{% endif %}" title="Download">
                                 <i class="bi bi-download"></i>
                             </button>
                             <div class="d-flex align-items-center">
@@ -1038,56 +1042,6 @@
 {% endwith %}
 </script>
 
-<script type="module">
-  import { downloadsManager } from '{% static "js/upload/downloads_manager.js" %}';
-  
-  // Expose downloadsManager to global scope for download buttons
-  window.downloadsManager = downloadsManager;
-  downloadsManager.initialize();
-  
-  // Handle download button clicks
-  document.addEventListener('click', async function(e) {
-    const downloadBtn = e.target.closest('.media-download-btn');
-    if (!downloadBtn) return;
-    
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const postId = downloadBtn.dataset.postId;
-    const mediaType = downloadBtn.dataset.mediaType;
-    const url = downloadBtn.dataset.url;
-    
-    try {
-      // Show loading state
-      downloadBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i>';
-      downloadBtn.disabled = true;
-      
-      // Download the file
-      await downloadsManager.download(url, {
-        postId: postId,
-        mediaType: mediaType,
-        filename: url.split('/').pop() || `post_${postId}_${mediaType}`,
-        category: mediaType === 'document' ? 'document' : mediaType
-      });
-      
-      // Show success feedback
-      downloadBtn.innerHTML = '<i class="bi bi-check"></i>';
-      setTimeout(() => {
-        downloadBtn.innerHTML = '<i class="bi bi-download"></i>';
-        downloadBtn.disabled = false;
-      }, 2000);
-      
-    } catch (error) {
-      console.error('Download failed:', error);
-      // Show error feedback
-      downloadBtn.innerHTML = '<i class="bi bi-x"></i>';
-      setTimeout(() => {
-        downloadBtn.innerHTML = '<i class="bi bi-download"></i>';
-        downloadBtn.disabled = false;
-      }, 2000);
-    }
-  });
-</script>
 
 <script>
 (function() {

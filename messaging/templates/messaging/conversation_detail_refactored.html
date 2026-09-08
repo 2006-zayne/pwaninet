@@ -894,7 +894,7 @@
 {% for member in conversation.members.all %}
 {% if member.user != request.user %}
 <script>
-  document.body.dataset.receiverAvatar = '{{ member.user.profile_pic.url|default:"/static/images/default_pic1.jpg"|escapejs }}';
+  document.body.dataset.receiverAvatar = '{% if member.user.profile_pic %}{{ member.user.profile_pic.url|escapejs }}{% else %}/static/images/default_pic1.jpg{% endif %}';
   document.body.dataset.receiverName = '{{ member.user.get_full_name|default:member.user.username|escapejs }}';
   document.body.dataset.receiverUsername = '{{ member.user.username|escapejs }}';
   document.body.dataset.receiverProfileUrl = '/users/user/{{ member.user.username|escapejs }}/';

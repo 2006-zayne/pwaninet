@@ -18,7 +18,7 @@
                        hx-history="true"
                        data-bs-dismiss="modal"
                        class="text-decoration-none flex-shrink-0">
-                        <img src="{{ membership.user.profile_pic.url|default:'/static/images/default_user.jpg' }}" 
+                        <img src="{% if membership.user.profile_pic %}{{ membership.user.profile_pic.url }}{% else %}/static/images/default_user.jpg{% endif %}" 
                              alt="{{ membership.user.username }}" 
                              class="people-user-avatar rounded-circle border border-2 border-light shadow-sm"
                              style="width: 48px; height: 48px; object-fit: cover;">
@@ -105,7 +105,7 @@
                        hx-history="true"
                        data-bs-dismiss="modal"
                        class="text-decoration-none flex-shrink-0">
-                        <img src="{{ membership.user.profile_pic.url|default:'/static/images/default_user.jpg' }}" 
+                        <img src="{% if membership.user.profile_pic %}{{ membership.user.profile_pic.url }}{% else %}/static/images/default_user.jpg{% endif %}" 
                              alt="{{ membership.user.username }}" 
                              class="people-user-avatar rounded-circle border border-2 border-light shadow-sm"
                              style="width: 48px; height: 48px; object-fit: cover;">

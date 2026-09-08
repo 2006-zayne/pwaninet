@@ -549,24 +549,18 @@ def settings_privacy_view(request):
     return render(request, 'users/settings/privacy.html')
 
 
-@login_required
 def settings_storage_view(request):
-    """Storage settings page"""
+    """Storage settings page - seamlessly renders unified downloaded media page"""
     if request.headers.get('HX-Request'):
-        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
-            'settings_content_partial': 'users/settings/partials/storage_content.html'
-        })
-    return render(request, 'users/settings/storage.html')
+        return render(request, 'posts/partials/offline_media_viewer_content.html')
+    return redirect('posts:offline_media_viewer')
 
 
-@login_required
 def settings_downloads_view(request):
-    """Downloads manager page"""
+    """Downloads manager page - seamlessly renders unified downloaded media page"""
     if request.headers.get('HX-Request'):
-        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
-            'settings_content_partial': 'users/settings/partials/downloads_content.html'
-        })
-    return render(request, 'users/settings/downloads.html')
+        return render(request, 'posts/partials/offline_media_viewer_content.html')
+    return redirect('posts:offline_media_viewer')
 
 
 @login_required
