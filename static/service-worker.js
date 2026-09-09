@@ -5,8 +5,8 @@
  */
 
 'use strict';
-let CACHE_VERSION = '1.3.0';
-let CACHE_BUILD = '1';
+let CACHE_VERSION = '1.3.1';
+let CACHE_BUILD = '2';
 let CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}`;
 let OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}`;
 
@@ -48,6 +48,7 @@ const CORE_ASSETS = [
     '/static/css/comments.css',
     '/static/css/people-modal.css',
     '/static/notifications/css/notifications.css',
+    '/static/css/downloads/offline_media_viewer.css',
     '/static/js/bootstrap.bundle.min.js',
     '/static/images/favicon.ico',
     '/static/images/favicon-96x96.png',
@@ -66,7 +67,8 @@ const CORE_ASSETS = [
     '/static/js/downloads/download_storage.js',
     '/static/js/downloads/download_queue.js',
     '/static/js/downloads/download_manager.js',
-    '/static/js/downloads/download_ui.js'
+    '/static/js/downloads/download_ui.js',
+    '/static/js/downloads/offline_media_viewer.js'
 ];
 
 // Page shells to cache for offline access
@@ -157,7 +159,7 @@ self.addEventListener('push', (event) => {
             }
         ],
         data: {
-            url: '/notifications'
+            url: '/notifications/'
         }
     };
 
@@ -179,6 +181,7 @@ self.addEventListener('push', (event) => {
                 data: {
                     notification_id: data.data?.notification_id,
                     url: data.data?.url || pushData.data.url,
+                    destination_url: data.data?.destination_url,
                     notification_type: data.data?.notification_type,
                     category: data.data?.category,
                     tag: data.data?.tag || data.tag
@@ -210,7 +213,7 @@ self.addEventListener('notificationclick', (event) => {
     }
 
     // Handle view action or default click
-    const urlToOpen = event.notification.data?.url || '/notifications';
+    const urlToOpen = event.notification.data?.url || event.notification.data?.destination_url || '/notifications/';
     const notificationId = event.notification.data?.notification_id;
 
     event.waitUntil(
@@ -218,10 +221,21 @@ self.addEventListener('notificationclick', (event) => {
             type: 'window',
             includeUncontrolled: true
         }).then((clientList) => {
-            // Check if there's already a window open
+            // Check if there's already a window open with this exact url
             for (const client of clientList) {
                 if (client.url === new URL(urlToOpen, self.location.origin).href && 'focus' in client) {
                     return client.focus();
+                }
+            }
+
+            // If an app window is already open, focus it and navigate to the target
+            for (const client of clientList) {
+                if ('focus' in client) {
+                    client.focus();
+                    if ('navigate' in client) {
+                        return client.navigate(urlToOpen);
+                    }
+                    return;
                 }
             }
 
@@ -255,6 +269,11 @@ async function handleRequest(request) {
             return await handleOfflineMediaStreamRequest(request);
         }
 
+        // Dedicated handler for Offline Media Hub (/offline-media/) - supports HTMX partials & full page offline
+        if (url.pathname === '/offline-media/') {
+            return await handleOfflineMediaRequest(request);
+        }
+
         // Try network first for navigation requests
         if (isNavigationRequest(request)) {
             return await handleNavigationRequest(request);
@@ -279,7 +298,54 @@ async function handleRequest(request) {
     }
 }
 
+async function handleOfflineMediaRequest(request) {
+    try {
+        const networkResponse = await fetch(request);
+        if (networkResponse && networkResponse.ok) {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(request, networkResponse.clone());
+        }
+        return networkResponse;
+    } catch (error) {
+        console.log('Service Worker: Network failed for /offline-media/, serving offline cache:', error);
+        
+        // 1. Try matching the exact request (cached partial if HTMX, or cached full document)
+        const cachedResponse = await caches.match(request);
+        if (cachedResponse) {
+            return cachedResponse;
+        }
+
+        // 2. Try matching the pre-cached page shell '/offline-media/'
+        const cachedShell = await caches.match('/offline-media/');
+        if (cachedShell) {
+            return cachedShell;
+        }
+
+        return await getOfflinePage();
+    }
+}
+
 async function handleNavigationRequest(request) {
+    const url = new URL(request.url);
+
+    // Explicit request to view cached pages (from offline screen action button)
+    const isExplicitCacheView = url.searchParams.has('view_cache') || url.searchParams.has('cached');
+    if (isExplicitCacheView) {
+        const cleanUrl = new URL(request.url);
+        cleanUrl.searchParams.delete('view_cache');
+        cleanUrl.searchParams.delete('cached');
+        const cleanReq = new Request(cleanUrl.toString(), {
+            headers: request.headers,
+            mode: request.mode,
+            credentials: request.credentials
+        });
+
+        const cached = (await caches.match(cleanReq)) || (await caches.match(request)) || (await caches.match('/'));
+        if (cached) {
+            return cached;
+        }
+    }
+
     try {
         // Try network first directly
         const networkResponse = await fetch(request);
@@ -294,15 +360,17 @@ async function handleNavigationRequest(request) {
         return networkResponse;
         
     } catch (error) {
-        console.log('Service Worker: Network failed, trying cache for navigation:', error);
+        console.log('Service Worker: Network failed for navigation request:', error);
         
-        // Try cache
-        const cachedResponse = await caches.match(request);
-        if (cachedResponse) {
-            return cachedResponse;
+        // When navigating to /offline-media/, always serve the offline media viewer shell if cached
+        if (url.pathname === '/offline-media/' || url.pathname.startsWith('/offline-media/')) {
+            const cachedMedia = (await caches.match('/offline-media/')) || (await caches.match(request));
+            if (cachedMedia) {
+                return cachedMedia;
+            }
         }
         
-        // Return offline page only when genuinely unreachable
+        // When offline, present the offline screen with options to view cached pages or downloaded media
         return await getOfflinePage();
     }
 }
@@ -508,6 +576,12 @@ async function networkFirst(request) {
 
 async function getOfflineResponse(request) {
     const url = new URL(request.url);
+
+    // Return cached offline media viewer response
+    if (url.pathname === '/offline-media/') {
+        const cached = (await caches.match(request)) || (await caches.match('/offline-media/'));
+        if (cached) return cached;
+    }
     
     // Return offline page for navigation requests
     if (isNavigationRequest(request)) {

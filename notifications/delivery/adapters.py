@@ -341,13 +341,8 @@ class PushAdapter(DeliveryAdapter):
             type_str = str(notification.notification_type).lower() if notification.notification_type else "alert"
             tag = f"pwaninet-{cat_str}-{type_str}"
 
-        # 6. Android Notification Channel
-        category = str(notification.category or '').upper()
-        ntype = str(notification.notification_type or '').upper()
-        if category == 'MESSAGING' or 'MESSAGE' in ntype:
-            channel_id = 'pwaninet_messages'
-        else:
-            channel_id = 'pwaninet_social'
+        # 6. Android Notification Channel (unified channel matching native-app.js)
+        channel_id = 'pwaninet_notifications'
 
         return {
             'title': title,
@@ -386,7 +381,7 @@ class PushAdapter(DeliveryAdapter):
             'body': content['body'],
             'icon': content['icon'],
             'image': content.get('image'),
-            'badge': '/static/images/favicon-96x96.png',
+            'badge': self._make_absolute_url('/static/images/favicon-96x96.png'),
             'vibrate': [200, 100, 200],
             'requireInteraction': False,
             'tag': content['tag'],

@@ -169,18 +169,18 @@ class ReleaseService:
         return release
     
     @staticmethod
-    def ensure_git_release_in_db() -> Optional[Release]:
+    def ensure_git_release_in_db(target_version: Optional[str] = None, target_build: Optional[int] = None, title: Optional[str] = None, summary: Optional[str] = None) -> Optional[Release]:
         """
-        Synchronize the Git release version to the database Release model.
+        Synchronize the Git/GitHub release version to the database Release model.
         Acts as the bridge between Git/mobile releases and the Django database.
 
-        If a Release record for the current Git version does not exist,
+        If a Release record for the target/latest version does not exist,
         it automatically creates one, marks it PUBLISHED, and sets is_current_release=True.
-        Caches the lookup in Django's cache for 5 minutes so it does not query DB on every request.
         """
         from pwaninet import version as app_version
-        git_ver = app_version.resolve_version()
-        git_build = app_version.resolve_build_number()
+        git_ver = target_version or getattr(app_version, 'resolve_latest_version', app_version.resolve_version)()
+        git_ver = git_ver.lstrip('v').strip()
+        git_build = target_build or app_version.resolve_build_number()
 
         cache_key = f'release:current_git_release:{git_ver}'
         try:
@@ -192,26 +192,43 @@ class ReleaseService:
 
         try:
             with transaction.atomic():
+                from releases.utils import parse_version
+                active_current = Release.objects.filter(is_current_release=True).first()
+                should_be_current = True
+                if active_current:
+                    try:
+                        if parse_version(active_current.version) > parse_version(git_ver):
+                            should_be_current = False
+                    except Exception:
+                        pass
+
                 release = Release.objects.filter(version=git_ver).first()
                 if not release:
+                    # Prevent duplicate build_number unique constraint errors
+                    if Release.objects.filter(build_number=git_build).exists():
+                        highest_rel = Release.objects.order_by('-build_number').first()
+                        git_build = (highest_rel.build_number + 1) if highest_rel else (git_build + 1)
+
                     # Auto-create release record for this git tag
                     release = Release.objects.create(
                         version=git_ver,
                         build_number=git_build,
-                        release_title=f"Release {git_ver}",
-                        release_summary=f"PwaniNet Release {git_ver}",
+                        release_title=title or f"Release {git_ver}",
+                        release_summary=summary or f"PwaniNet Release {git_ver}",
                         release_type='PATCH' if git_ver.count('.') == 2 and git_ver.split('.')[-1] != '0' else 'MINOR',
                         status='PUBLISHED',
                         published=True,
                         release_channel='STABLE',
-                        is_current_release=True,
+                        is_current_release=should_be_current,
                     )
-                    # Unset any other active releases
-                    Release.objects.filter(is_current_release=True).exclude(id=release.id).update(is_current_release=False)
-                elif not release.is_current_release:
+                    if should_be_current:
+                        Release.objects.filter(is_current_release=True).exclude(id=release.id).update(is_current_release=False)
+                elif should_be_current and not release.is_current_release:
                     Release.objects.filter(is_current_release=True).exclude(id=release.id).update(is_current_release=False)
                     release.is_current_release = True
-                    release.save(update_fields=['is_current_release'])
+                    Release.objects.filter(id=release.id).update(is_current_release=True)
+
+                ReleaseService.invalidate_all_version_caches()
 
                 try:
                     cache.set(cache_key, release, timeout=300)
@@ -222,6 +239,23 @@ class ReleaseService:
         except Exception:
             # If DB is not ready or connection fails, return None gracefully
             return None
+
+    @staticmethod
+    def invalidate_all_version_caches():
+        """
+        Invalidate all application, service worker, and release caches.
+        """
+        from pwaninet import version as app_version
+        if hasattr(app_version, 'clear_version_cache'):
+            try:
+                app_version.clear_version_cache()
+            except Exception:
+                pass
+        
+        try:
+            ReleaseService._invalidate_release_caches()
+        except Exception:
+            pass
 
     @staticmethod
     def get_current_release() -> Optional[Release]:
@@ -243,18 +277,40 @@ class ReleaseService:
         """
         Get the latest published release.
         Looks up published releases ordered by build_number desc.
+        If Git / GitHub has a higher release version than the DB,
+        automatically synchronizes and returns the newer release.
         Falls back to current release if no published release is found.
         """
+        from pwaninet import version as app_version
+        from releases.utils import parse_version
+
+        latest_external_ver = getattr(app_version, 'resolve_latest_version', app_version.resolve_version)()
+        if latest_external_ver:
+            latest_external_ver = latest_external_ver.lstrip('v').strip()
+
         try:
             latest = Release.objects.filter(
                 status='PUBLISHED',
                 published=True
             ).order_by('-build_number').first()
-            if latest:
-                return latest
+
+            if latest and latest_external_ver:
+                if parse_version(latest.version) >= parse_version(latest_external_ver):
+                    return latest
+        except Exception:
+            pass
+
+        # If DB is behind or missing, sync and ensure latest external release
+        synced = ReleaseService.ensure_git_release_in_db(target_version=latest_external_ver)
+        if synced:
+            return synced
+
+        try:
+            return Release.objects.filter(status='PUBLISHED', published=True).order_by('-build_number').first()
         except Exception:
             pass
         return ReleaseService.get_current_release()
+
 
     @staticmethod
     def get_latest_stable() -> Optional[Release]:

@@ -56,6 +56,7 @@ public class MainActivity extends BridgeActivity {
     private int lastSafeBottom = 0;
     private int lastSafeLeft = 0;
     private int lastSafeRight = 0;
+    private String pendingDeepLinkPath = null;
 
     public static class WebAppInterface {
         private final java.lang.ref.WeakReference<MainActivity> activityRef;
@@ -352,6 +353,70 @@ public class MainActivity extends BridgeActivity {
         if (savedInstanceState != null) {
             restoreWebViewState(savedInstanceState);
         }
+
+        // Check if app was launched via deep link Intent
+        if (getIntent() != null) {
+            handleDeepLinkIntent(getIntent());
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleDeepLinkIntent(intent);
+    }
+
+    private void handleDeepLinkIntent(Intent intent) {
+        if (intent == null) return;
+        Uri data = intent.getData();
+        if (data == null) return;
+
+        String path = null;
+        String scheme = data.getScheme();
+        if ("pwaninet".equalsIgnoreCase(scheme)) {
+            String host = data.getHost();
+            String dataPath = data.getPath();
+            if (host != null && !host.isEmpty() && !host.contains(".")) {
+                path = "/" + host + (dataPath != null ? dataPath : "");
+            } else if (dataPath != null && !dataPath.isEmpty()) {
+                path = dataPath;
+            } else {
+                path = "/";
+            }
+        } else if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+            String dataPath = data.getPath();
+            String dataQuery = data.getQuery();
+            path = (dataPath != null ? dataPath : "/") + (dataQuery != null ? "?" + dataQuery : "");
+        }
+
+        if (path != null && !path.isEmpty()) {
+            final String targetPath = path;
+            if (!isPageReady) {
+                pendingDeepLinkPath = targetPath;
+            } else {
+                executeDeepLinkNavigation(targetPath);
+            }
+        }
+    }
+
+    private void executeDeepLinkNavigation(String targetPath) {
+        if (targetPath == null || targetPath.isEmpty()) return;
+        runOnUiThread(() -> {
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                WebView webView = getBridge().getWebView();
+                String js = "(function() {" +
+                            "  var target = '" + targetPath.replace("'", "\\'") + "';" +
+                            "  if (window.htmx && document.getElementById('page-content-target')) {" +
+                            "    window.htmx.ajax('GET', target, { target: '#page-content-target', swap: 'innerHTML' });" +
+                            "    window.history.pushState({}, '', target);" +
+                            "  } else {" +
+                            "    window.location.href = target;" +
+                            "  }" +
+                            "})();";
+                webView.evaluateJavascript(js, null);
+            }
+        });
     }
 
     @Override
@@ -566,6 +631,14 @@ public class MainActivity extends BridgeActivity {
                     injectSafeAreaInsets();
                     syncSystemBarThemeFromDom();
                     injectThemeObserver();
+
+                    if (pendingDeepLinkPath != null) {
+                        String path = pendingDeepLinkPath;
+                        pendingDeepLinkPath = null;
+                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                            executeDeepLinkNavigation(path);
+                        }, 300);
+                    }
                 }
 
                 @Override

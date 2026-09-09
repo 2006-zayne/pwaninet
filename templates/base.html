@@ -5,6 +5,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <meta name="user-authenticated" content="{% if request.user.is_authenticated %}true{% else %}false{% endif %}">
     <title>PwaniNet</title>
 
     <!-- PWA Manifest -->
@@ -291,6 +293,7 @@
     <link rel="stylesheet" href="{% static 'css/comments.css' %}">
     <link rel="stylesheet" href="{% static 'css/profile.css' %}">
     <link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}">
+    <link rel="stylesheet" href="{% static 'css/downloads/offline_media_viewer.css' %}">
     <script src="{% static 'js/htmx.min.js' %}"></script>
     <script>
         // Configure HTMX for proper history handling
@@ -323,6 +326,9 @@
 
     <!-- Native PWA Install Manager -->
     <script src="{% static 'js/native-pwa-install.js' %}"></script>
+
+    <!-- Smart Outside-Link Chooser (Native App, PWA, Chrome) -->
+    <script src="{% static 'js/link-chooser.js' %}"></script>
 
     <!-- Update Manager -->
     <script src="{% static 'js/update-manager.js' %}"></script>
@@ -1143,33 +1149,9 @@
                     </span>
                     <span style="font-size: 0.65rem; font-weight: 600; white-space: nowrap;">{% trans "Notifications" %}</span>
                 </a>
-                <a href="{% url 'posts:offline_media_viewer' %}"
-                   class="nav-chip {% if request.resolver_match.url_name == 'offline_media_viewer' %}active{% endif %}"
-                   style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 60px;"
-                   hx-get="{% url 'posts:offline_media_viewer' %}"
-                   hx-target="#page-content-target"
-                   hx-swap="innerHTML"
-                   hx-push-url="true"
-                   hx-history="true"
-                   title="{% trans 'Downloaded Media' %}">
-                    <i class="bi bi-cloud-arrow-down-fill" style="font-size: 1.5rem;"></i>
-                    <span style="font-size: 0.65rem; font-weight: 600; white-space: nowrap;">{% trans "Downloads" %}</span>
-                </a>
             </div>
 
             <div class="d-flex align-items-center gap-3">
-                <!-- Quick Access Downloaded Media (Mobile & Desktop) -->
-                <a href="{% url 'posts:offline_media_viewer' %}"
-                   hx-get="{% url 'posts:offline_media_viewer' %}"
-                   hx-target="#page-content-target"
-                   hx-swap="innerHTML"
-                   hx-push-url="true"
-                   hx-history="true"
-                   class="btn btn-link p-0 text-decoration-none {% if request.resolver_match.url_name == 'offline_media_viewer' %}text-primary{% else %}text-secondary{% endif %}"
-                   style="color: var(--text-dark);"
-                   title="{% trans 'Downloaded Media' %}">
-                    <i class="bi bi-cloud-arrow-down" style="font-size: 1.35rem;"></i>
-                </a>
                 <!-- Theme Toggle -->
                 <div class="dropdown">
                     <button class="btn btn-link p-0" data-bs-toggle="dropdown" style="color: var(--text-dark);">
@@ -1350,6 +1332,8 @@
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.18/dist/hls.min.js" defer></script>
     <!-- hls_player.js initialises hls.js on feed video elements -->
     <script src="{% static 'js/hls_player.js' %}" defer></script>
+    <!-- offline_media_viewer.js handles offline library and fullscreen reels playback -->
+    <script src="{% static 'js/downloads/offline_media_viewer.js' %}" defer></script>
 
     {% block page_scripts %}{% endblock %}
 
@@ -2285,11 +2269,14 @@ window.addEventListener('beforeinstallprompt', (e) => {
             }
         });
 
-        // Clean up modal backdrops when swapping page-content-target
+        // Clean up modal backdrops, reels mode, and media when swapping page-content-target
         document.body.addEventListener('htmx:beforeSwap', function(evt) {
             if (evt.detail.target && evt.detail.target.id === 'page-content-target') {
+                if (typeof window.cleanupOfflineMediaHub === 'function') {
+                    try { window.cleanupOfflineMediaHub(); } catch (_) {}
+                }
                 document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
-                document.body.classList.remove('modal-open');
+                document.body.classList.remove('modal-open', 'in-reels-mode');
                 document.body.style.removeProperty('overflow');
                 document.body.style.removeProperty('padding-right');
 
@@ -2436,27 +2423,33 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
         // 2. After HTMX swap for page navigation
         document.body.addEventListener('htmx:afterSwap', function(evt) {
-            if (evt.detail.target && evt.detail.target.id === 'page-content-target' && evt.detail.xhr && evt.detail.xhr.status === 200) {
-                const targetUrl = evt.detail.xhr.responseURL || window.location.pathname;
-                const goingToHome = isHomeRoute(targetUrl);
+            if (evt.detail.target && evt.detail.target.id === 'page-content-target') {
+                if (document.querySelector('.offline-media-container') && typeof window.initOfflineMediaHub === 'function') {
+                    window.initOfflineMediaHub();
+                }
 
-                if (!goingToHome) {
-                    // Non-Home pages: ALWAYS reset scroll to (0, 0)
-                    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-                    if (backToTopBtn) backToTopBtn.classList.remove('visible');
-                } else {
-                    // Returning to Home: restore saved feed position
-                    const savedY = sessionStorage.getItem(HOME_SCROLL_KEY);
-                    const targetY = savedY ? parseInt(savedY, 10) : 0;
-                    if (targetY > 0) {
-                        window.scrollTo({ top: targetY, left: 0, behavior: 'instant' });
-                        requestAnimationFrame(function() {
-                            window.scrollTo({ top: targetY, left: 0, behavior: 'instant' });
-                            updateBackToTopVisibility();
-                        });
-                    } else {
+                if (evt.detail.xhr && evt.detail.xhr.status === 200) {
+                    const targetUrl = evt.detail.xhr.responseURL || window.location.pathname;
+                    const goingToHome = isHomeRoute(targetUrl);
+
+                    if (!goingToHome) {
+                        // Non-Home pages: ALWAYS reset scroll to (0, 0)
                         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-                        updateBackToTopVisibility();
+                        if (backToTopBtn) backToTopBtn.classList.remove('visible');
+                    } else {
+                        // Returning to Home: restore saved feed position
+                        const savedY = sessionStorage.getItem(HOME_SCROLL_KEY);
+                        const targetY = savedY ? parseInt(savedY, 10) : 0;
+                        if (targetY > 0) {
+                            window.scrollTo({ top: targetY, left: 0, behavior: 'instant' });
+                            requestAnimationFrame(function() {
+                                window.scrollTo({ top: targetY, left: 0, behavior: 'instant' });
+                                updateBackToTopVisibility();
+                            });
+                        } else {
+                            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+                            updateBackToTopVisibility();
+                        }
                     }
                 }
             }
@@ -2465,6 +2458,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
         // 3. Browser Back/Forward history restore
         document.body.addEventListener('htmx:historyRestore', function() {
             setTimeout(updateBackToTopVisibility, 60);
+            if (document.querySelector('.offline-media-container') && typeof window.initOfflineMediaHub === 'function') {
+                window.initOfflineMediaHub();
+            }
         });
 
         // 4. Awareness for upload banner: keep body.has-active-upload synced

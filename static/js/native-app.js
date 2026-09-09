@@ -183,6 +183,9 @@ function initNativeAppEnhancements() {
     // Initialize back button handling
     initBackNavigation();
 
+    // Initialize deep link URL handling
+    initDeepLinkNavigation();
+
     // Initialize native media handling
     initNativeMedia();
 
@@ -440,6 +443,42 @@ async function initBackNavigation() {
         });
     } catch (error) {
         console.error('[NativeApp] Failed to initialize back navigation:', error);
+    }
+}
+
+async function initDeepLinkNavigation() {
+    try {
+        if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
+        const { App } = window.Capacitor.Plugins;
+
+        App.addListener('appUrlOpen', (data) => {
+            console.log('[NativeApp] Received appUrlOpen event:', data.url);
+            if (!data || !data.url) return;
+            try {
+                let targetPath = null;
+                if (data.url.startsWith('pwaninet://')) {
+                    const withoutScheme = data.url.replace('pwaninet://', '');
+                    const slashIndex = withoutScheme.indexOf('/');
+                    targetPath = slashIndex !== -1 ? withoutScheme.substring(slashIndex) : '/' + withoutScheme;
+                } else if (data.url.startsWith('http://') || data.url.startsWith('https://')) {
+                    const parsed = new URL(data.url);
+                    targetPath = parsed.pathname + parsed.search;
+                }
+
+                if (targetPath && targetPath !== (window.location.pathname + window.location.search)) {
+                    if (window.htmx && document.getElementById('page-content-target')) {
+                        window.htmx.ajax('GET', targetPath, { target: '#page-content-target', swap: 'innerHTML' });
+                        window.history.pushState({}, '', targetPath);
+                    } else {
+                        window.location.href = targetPath;
+                    }
+                }
+            } catch (err) {
+                console.error('[NativeApp] Error handling deep link URL:', err);
+            }
+        });
+    } catch (error) {
+        console.error('[NativeApp] Failed to initialize deep link navigation:', error);
     }
 }
 
@@ -1141,6 +1180,13 @@ function getNativeCsrfToken() {
     if (metaTag && metaTag.getAttribute('content')) {
         return metaTag.getAttribute('content');
     }
+    const hxHeaders = document.body && document.body.getAttribute('hx-headers');
+    if (hxHeaders) {
+        try {
+            const parsed = JSON.parse(hxHeaders);
+            if (parsed['X-CSRFToken']) return parsed['X-CSRFToken'];
+        } catch (_) {}
+    }
     const inputTag = document.querySelector('[name="csrfmiddlewaretoken"]');
     if (inputTag && inputTag.value) {
         return inputTag.value;
@@ -1173,7 +1219,7 @@ async function initNativePush() {
         let permStatus = await PushNotifications.checkPermissions();
         console.log('[PWANINET-NATIVE] Push permission status:', permStatus);
 
-        if (permStatus.receive === 'prompt') {
+        if (permStatus.receive === 'prompt' || permStatus.receive === 'prompt-with-rationale') {
             permStatus = await PushNotifications.requestPermissions();
         }
 
@@ -1182,16 +1228,10 @@ async function initNativePush() {
             return;
         }
 
-        // Register Android Notification Channel (Android 8.0+)
-        // Consolidate into ONE single unified notification channel matching in-app card system
+        // Register Android Notification Channels (Android 8.0+)
+        // Unified channel 'pwaninet_notifications' + fallback channels
         if (typeof PushNotifications.createChannel === 'function') {
             try {
-                // Delete legacy multi-channel configurations if they exist
-                if (typeof PushNotifications.deleteChannel === 'function') {
-                    await PushNotifications.deleteChannel({ id: 'pwaninet_social' }).catch(() => {});
-                    await PushNotifications.deleteChannel({ id: 'pwaninet_messages' }).catch(() => {});
-                }
-
                 await PushNotifications.createChannel({
                     id: 'pwaninet_notifications',
                     name: 'PwaniNet Notifications',
@@ -1203,7 +1243,28 @@ async function initNativePush() {
                     lightColor: '#2563eb',
                     sound: 'default'
                 });
-                console.log('[PWANINET-NATIVE] Push notification channel created successfully');
+
+                await PushNotifications.createChannel({
+                    id: 'pwaninet_social',
+                    name: 'Social Updates',
+                    description: 'Likes, comments, shares, follows, and mentions',
+                    importance: 5,
+                    visibility: 1,
+                    vibration: true,
+                    sound: 'default'
+                }).catch(() => {});
+
+                await PushNotifications.createChannel({
+                    id: 'pwaninet_messages',
+                    name: 'Direct & Group Messages',
+                    description: 'Chat messages and conversation updates',
+                    importance: 5,
+                    visibility: 1,
+                    vibration: true,
+                    sound: 'default'
+                }).catch(() => {});
+
+                console.log('[PWANINET-NATIVE] Push notification channels configured successfully');
             } catch (chanErr) {
                 console.warn('[PWANINET-NATIVE] Failed to configure notification channels:', chanErr);
             }
@@ -1223,12 +1284,9 @@ async function initNativePush() {
             }
         }
 
-        // Listen for successful registration
-        PushNotifications.addListener('registration', async function(token) {
-            console.log('[PWANINET-NATIVE] Push registration success, token:', token.value);
-            if (!token || !token.value) return;
-
-            // Submit token to backend Django endpoint
+        // Helper to submit FCM token to backend
+        async function submitFCMToken(tokenValue) {
+            if (!tokenValue) return false;
             try {
                 const response = await fetch('/api/push/subscribe/', {
                     method: 'POST',
@@ -1239,7 +1297,7 @@ async function initNativePush() {
                     body: JSON.stringify({
                         token_type: 'FCM',
                         platform: isAndroid ? 'ANDROID_NATIVE' : 'IOS_NATIVE',
-                        fcm_token: token.value,
+                        fcm_token: tokenValue,
                         user_agent: navigator.userAgent
                     })
                 });
@@ -1247,12 +1305,31 @@ async function initNativePush() {
                 if (response.ok) {
                     console.log('[PWANINET-NATIVE] Successfully registered native push token with backend');
                     localStorage.setItem('pwaninet_push_subscribed', 'true');
+                    localStorage.removeItem('pwaninet_pending_fcm_token');
+                    return true;
                 } else {
-                    console.error('[PWANINET-NATIVE] Failed to register native push token with backend:', response.status);
+                    console.warn('[PWANINET-NATIVE] Failed to register native push token with backend:', response.status);
+                    localStorage.setItem('pwaninet_pending_fcm_token', tokenValue);
+                    return false;
                 }
             } catch (err) {
                 console.error('[PWANINET-NATIVE] Error registering native push token:', err);
+                localStorage.setItem('pwaninet_pending_fcm_token', tokenValue);
+                return false;
             }
+        }
+
+        // Check if there is a pending token from a previous run before login
+        const pendingToken = localStorage.getItem('pwaninet_pending_fcm_token');
+        if (pendingToken) {
+            submitFCMToken(pendingToken);
+        }
+
+        // Listen for successful registration
+        PushNotifications.addListener('registration', async function(token) {
+            console.log('[PWANINET-NATIVE] Push registration success, token:', token.value);
+            if (!token || !token.value) return;
+            await submitFCMToken(token.value);
         });
 
         // Listen for registration errors
@@ -1291,7 +1368,7 @@ async function initNativePush() {
 
 /**
  * Display an in-app foreground notification banner matching the PwaniNet in-app notification card design.
- * Renders actor avatar, title, body, and post/document thumbnail previews.
+ * Renders actor avatar, title, body, and post/document thumbnail previews. Also broadcasts on-screen toast.
  */
 function showNativePushBanner(notification) {
     if (!notification) return;
@@ -1307,6 +1384,16 @@ function showNativePushBanner(notification) {
 
     const title = notification.title || 'PwaniNet';
     const body = notification.body || '';
+
+    // Broadcast native on-screen toast via AndroidBridge
+    try {
+        const toastMessage = title ? `${title}: ${body}` : body;
+        if (window.AndroidBridge && typeof window.AndroidBridge.showToast === 'function') {
+            window.AndroidBridge.showToast(toastMessage);
+        } else if (window.PwaninetBridge && typeof window.PwaninetBridge.showToast === 'function') {
+            window.PwaninetBridge.showToast(toastMessage);
+        }
+    } catch (_) {}
     const data = notification.data || {};
     const icon = data.icon || notification.icon || '/static/images/web-app-manifest-192x192-rounded.png';
     const previewImage = data.image || notification.image || data.thumbnail_url || null;

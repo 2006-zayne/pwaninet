@@ -34,6 +34,8 @@ urlpatterns = [
     path('expand/<uuid:notif_id>/', views.expand_notification, name='expand_notification'),
     path('follow-back/<uuid:notif_id>/', views.follow_back_from_notification, name='follow_back'),
     path('pinch/<uuid:notif_id>/', views.pinch_from_notification, name='pinch'),
+    path('<uuid:notif_id>/', views.open_notification, name='open_notification'),
+    path('<uuid:notif_id>', views.open_notification),
     
     # Notification preference routes
     path('set-dnd/', views.set_do_not_disturb, name='set_do_not_disturb'),

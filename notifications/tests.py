@@ -137,3 +137,124 @@ class NotificationModelTest(TestCase):
         )
         self.assertEqual(notification.event_count, 5)
         self.assertEqual(notification.aggregation_key, 'post-123')
+
+
+class NotificationTargetUrlTests(TestCase):
+    """Test resolve_notification_target_url service function."""
+
+    def setUp(self):
+        self.user1 = User.objects.create_user(username='author', email='a@example.com', password='pw')
+        self.user2 = User.objects.create_user(username='reader', email='r@example.com', password='pw')
+        self.post = Post.objects.create(author=self.user1, content='Hello world')
+        self.group = Group.objects.create(name='Engineers', created_by=self.user1)
+
+    def test_resolve_post_url(self):
+        from notifications.services.notification_service import resolve_notification_target_url
+        notification = NotificationObject.objects.create(
+            recipient=self.user1,
+            notification_type='LIKE',
+            category='SOCIAL',
+            context_type='POST',
+            context_id=str(self.post.id),
+            metadata={'actor_username': self.user2.username}
+        )
+        url = resolve_notification_target_url(notification)
+        self.assertEqual(url, f'/post/{self.post.share_id}/')
+
+    def test_resolve_comment_url(self):
+        from notifications.services.notification_service import resolve_notification_target_url
+        notification = NotificationObject.objects.create(
+            recipient=self.user1,
+            notification_type='COMMENT',
+            category='SOCIAL',
+            context_type='POST',
+            context_id=str(self.post.id),
+            metadata={'actor_username': self.user2.username, 'target_id': 99}
+        )
+        url = resolve_notification_target_url(notification)
+        self.assertEqual(url, f'/post/{self.post.share_id}/#comment-99')
+
+    def test_resolve_group_url(self):
+        from notifications.services.notification_service import resolve_notification_target_url
+        notification = NotificationObject.objects.create(
+            recipient=self.user2,
+            notification_type='INVITE',
+            category='GROUP',
+            context_type='GROUP',
+            context_id=str(self.group.id),
+        )
+        url = resolve_notification_target_url(notification)
+        self.assertEqual(url, f'/groups/{self.group.id}/')
+
+    def test_resolve_profile_url(self):
+        from notifications.services.notification_service import resolve_notification_target_url
+        notification = NotificationObject.objects.create(
+            recipient=self.user1,
+            notification_type='FOLLOW',
+            category='SOCIAL',
+            metadata={'actor_username': 'grace'}
+        )
+        url = resolve_notification_target_url(notification)
+        self.assertEqual(url, '/users/user/grace/')
+
+    def test_resolve_custom_url_in_metadata(self):
+        from notifications.services.notification_service import resolve_notification_target_url
+        notification = NotificationObject.objects.create(
+            recipient=self.user1,
+            notification_type='CUSTOM',
+            category='SYSTEM',
+            metadata={'url': '/custom-landing-page/'}
+        )
+        url = resolve_notification_target_url(notification)
+        self.assertEqual(url, '/custom-landing-page/')
+
+    def test_resolve_fallback_url(self):
+        from notifications.services.notification_service import resolve_notification_target_url
+        notification = NotificationObject.objects.create(
+            recipient=self.user1,
+            notification_type='UNKNOWN',
+            category='SYSTEM',
+        )
+        url = resolve_notification_target_url(notification)
+        self.assertEqual(url, '/notifications/')
+
+
+class NotificationOpenViewTests(TestCase):
+    """Test GET /notifications/<uuid>/ and /notifications/<uuid> click-through view."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='tester', email='t@example.com', password='pw')
+        self.post = Post.objects.create(author=self.user, content='Sample Post')
+        self.notification = NotificationObject.objects.create(
+            recipient=self.user,
+            notification_type='LIKE',
+            category='SOCIAL',
+            status='CREATED',
+            context_type='POST',
+            context_id=str(self.post.id),
+        )
+
+    def test_open_notification_with_trailing_slash(self):
+        self.client.force_login(self.user)
+        response = self.client.get(f'/notifications/{self.notification.notification_id}/')
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f'/post/{self.post.share_id}/')
+
+        self.notification.refresh_from_db()
+        self.assertEqual(self.notification.status, 'READ')
+
+    def test_open_notification_without_trailing_slash(self):
+        self.client.force_login(self.user)
+        response = self.client.get(f'/notifications/{self.notification.notification_id}')
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f'/post/{self.post.share_id}/')
+
+        self.notification.refresh_from_db()
+        self.assertEqual(self.notification.status, 'READ')
+
+    def test_open_nonexistent_notification_redirects_safely(self):
+        import uuid
+        random_id = uuid.uuid4()
+        response = self.client.get(f'/notifications/{random_id}/')
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, '/notifications/')

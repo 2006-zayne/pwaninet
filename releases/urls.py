@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import ReleaseViewSet, UserReleaseViewViewSet, VersionAPIView, CreateReleaseView
+from .webhook import github_release_webhook
 from .web_views import (
     release_list,
     dashboard,
@@ -23,6 +24,8 @@ urlpatterns = [
     path('api/', include(router.urls)),
     path('api/version/', VersionAPIView.as_view(), name='version'),
     path('api/releases/create/', CreateReleaseView.as_view(), name='create_release'),
+    path('api/releases/webhook/github/', github_release_webhook, name='github_release_webhook'),
+
     
     # Release Center UI routes (/system/releases/)
     path('system/releases/', dashboard, name='release_dashboard'),

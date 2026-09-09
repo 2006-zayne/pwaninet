@@ -39,16 +39,41 @@ def serve_manifest(request):
     except FileNotFoundError:
         return HttpResponse('Manifest not found', status=404)
 
-# Service Worker - served as static file to bypass auth middleware
+# Service Worker - served dynamically with active version to bust cache on release
 @require_http_methods(["GET", "HEAD"])
 @csrf_exempt
 def serve_service_worker(request):
     import os
+    import re
+    from releases.services import ReleaseService
+    from pwaninet import version as app_version_module
+
     sw_path = os.path.join(settings.BASE_DIR, 'static', 'service-worker.js')
     try:
         with open(sw_path, 'r') as f:
             content = f.read()
-        return HttpResponse(content, content_type='application/javascript')
+
+        # Resolve active version & build number dynamically
+        try:
+            rel = ReleaseService.get_latest_release()
+            current_ver = rel.version if rel else getattr(app_version_module, 'resolve_latest_version', app_version_module.resolve_version)()
+            current_build = rel.build_number if rel else app_version_module.resolve_build_number()
+        except Exception:
+            current_ver = app_version_module.resolve_version()
+            current_build = app_version_module.resolve_build_number()
+
+        current_ver = str(current_ver).lstrip('v').strip()
+        current_build = str(current_build).strip()
+
+        # Dynamically inject the active version and build number into service worker
+        content = re.sub(r"let CACHE_VERSION\s*=\s*['\"][^'\"]*['\"];", f"let CACHE_VERSION = '{current_ver}';", content)
+        content = re.sub(r"let CACHE_BUILD\s*=\s*['\"][^'\"]*['\"];", f"let CACHE_BUILD = '{current_build}';", content)
+
+        response = HttpResponse(content, content_type='application/javascript; charset=utf-8')
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        return response
     except FileNotFoundError:
         return HttpResponse('Service worker not found', status=404)
 

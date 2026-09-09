@@ -62,7 +62,7 @@ self.addEventListener('push', (event) => {
             }
         ],
         data: {
-            url: '/notifications'
+            url: '/notifications/'
         }
     };
 
@@ -83,6 +83,7 @@ self.addEventListener('push', (event) => {
                 data: {
                     notification_id: data.data?.notification_id,
                     url: data.data?.url || pushData.data.url,
+                    destination_url: data.data?.destination_url,
                     notification_type: data.data?.notification_type,
                     category: data.data?.category,
                     tag: data.data?.tag || data.tag
@@ -111,17 +112,28 @@ self.addEventListener('notificationclick', (event) => {
     }
 
     // Handle view action or default click
-    const urlToOpen = event.notification.data?.url || '/notifications';
+    const urlToOpen = event.notification.data?.url || event.notification.data?.destination_url || '/notifications/';
 
     event.waitUntil(
         clients.matchAll({
             type: 'window',
             includeUncontrolled: true
         }).then((clientList) => {
-            // Check if there's already a window open
+            // Check if there's already a window open with this exact url
             for (const client of clientList) {
                 if (client.url === new URL(urlToOpen, self.location.origin).href && 'focus' in client) {
                     return client.focus();
+                }
+            }
+
+            // If an app window is already open, focus it and navigate to the target
+            for (const client of clientList) {
+                if ('focus' in client) {
+                    client.focus();
+                    if ('navigate' in client) {
+                        return client.navigate(urlToOpen);
+                    }
+                    return;
                 }
             }
 

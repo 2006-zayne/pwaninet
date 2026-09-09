@@ -16,12 +16,49 @@ User = get_user_model()
 def create_release_published_event(release):
     """
     Create a PlatformEvent when a release is published.
-    This event will be consumed by the notification engine to deliver notifications.
+    Strictly enforced: ONLY sends ONCE per version across the application lifetime.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    if not release or not release.published:
+        return
+
     try:
-        from notifications.models import PlatformEvent
+        from notifications.models import PlatformEvent, NotificationObject
         from notifications.events.registry import EventTypes, EventSources, EventActions
-        
+        from django.db.models import Q
+        from django.core.cache import cache
+
+        version_str = str(release.version).lstrip('v').strip()
+        cache_key = f"release_notification_dispatched:{version_str}"
+
+        # 1. Check fast cache lock (prevents concurrency bursts)
+        if cache.get(cache_key):
+            logger.info(f"[Release Notification] Notification for version {version_str} recently dispatched (cache). Skipping duplicate.")
+            return
+
+        # 2. Check PlatformEvent table (ensure no duplicate platform event for this release or version)
+        if PlatformEvent.objects.filter(event_type=EventTypes.RELEASES_RELEASE_PUBLISHED.value).filter(
+            Q(target_id=str(release.id)) | Q(metadata__version=version_str) | Q(metadata__version=f"v{version_str}")
+        ).exists():
+            logger.info(f"[Release Notification] PlatformEvent for version {version_str} already exists. Skipping duplicate.")
+            cache.set(cache_key, True, timeout=86400 * 30)
+            return
+
+        # 3. Check NotificationObject table (ensure notifications have not already been created for users)
+        if NotificationObject.objects.filter(
+            notification_type='RELEASE'
+        ).filter(
+            Q(metadata__version=version_str) | Q(title__icontains=version_str) | Q(summary__icontains=version_str)
+        ).exists():
+            logger.info(f"[Release Notification] NotificationObject for version {version_str} already exists. Skipping duplicate.")
+            cache.set(cache_key, True, timeout=86400 * 30)
+            return
+
+        # Set cache key immediately to prevent duplicate race conditions
+        cache.set(cache_key, True, timeout=86400 * 30)
+
         # Create platform event for release publication
         PlatformEvent.objects.create(
             event_type=EventTypes.RELEASES_RELEASE_PUBLISHED.value,
@@ -33,7 +70,7 @@ def create_release_published_event(release):
             audience='EVERYONE',  # Release notifications go to all users
             metadata={
                 'target_id': str(release.id),
-                'version': release.version,
+                'version': version_str,
                 'build_number': release.build_number,
                 'release_title': release.release_title,
                 'release_summary': release.release_summary,
@@ -44,11 +81,10 @@ def create_release_published_event(release):
                 'release_url': f'/system/releases/{release.id}/',
             }
         )
+        logger.info(f"[Release Notification] Successfully created release published event for version {version_str}")
     except Exception as e:
-        # Log error but don't break the publishing process
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"Failed to create release published event: {e}")
+
 
 
 @receiver(pre_save, sender=Release)
@@ -124,7 +160,7 @@ def log_release_audit_trail(sender, instance, created, **kwargs):
                     change_message=f'Status changed from {instance._old_status} to {instance.status}'
                 )
         
-        # Log publishing
+        # Log publishing and dispatch notification event (strictly once per version)
         if hasattr(instance, '_old_published') and not instance._old_published and instance.published:
             user_id = get_valid_user_id(instance.published_by)
             if user_id:
@@ -136,12 +172,13 @@ def log_release_audit_trail(sender, instance, created, **kwargs):
                     action_flag=2,  # CHANGE
                     change_message=f'Published release {instance.version}'
                 )
+            create_release_published_event(instance)
         
-        # Log and create notification when release is set as current
+        # Log when release is set as current (audit only, NO notification)
         if hasattr(instance, '_old_is_current') and not instance._old_is_current and instance.is_current_release:
             import logging
             logger = logging.getLogger(__name__)
-            logger.info(f"Release {instance.version} set as current, creating notification event")
+            logger.info(f"Release {instance.version} set as current")
             
             user_id = get_valid_user_id(instance.published_by or instance.created_by)
             if user_id:
@@ -153,9 +190,6 @@ def log_release_audit_trail(sender, instance, created, **kwargs):
                     action_flag=2,  # CHANGE
                     change_message=f'Set release {instance.version} as current'
                 )
-            
-            # Create notification event when release is set as current
-            create_release_published_event(instance)
 
 
 @receiver(pre_delete, sender=Release)

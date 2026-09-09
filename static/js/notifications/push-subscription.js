@@ -318,9 +318,24 @@ class PushSubscriptionManager {
     }
 
     /**
-     * Get CSRF token from cookies
+     * Get CSRF token from meta tags, hx-headers, forms, or cookies
      */
     getCsrfToken() {
+        const metaTag = document.querySelector('meta[name="csrf-token"]');
+        if (metaTag && metaTag.getAttribute('content')) {
+            return metaTag.getAttribute('content');
+        }
+        const hxHeaders = document.body && document.body.getAttribute('hx-headers');
+        if (hxHeaders) {
+            try {
+                const parsed = JSON.parse(hxHeaders);
+                if (parsed['X-CSRFToken']) return parsed['X-CSRFToken'];
+            } catch (_) {}
+        }
+        const inputTag = document.querySelector('[name="csrfmiddlewaretoken"]');
+        if (inputTag && inputTag.value) {
+            return inputTag.value;
+        }
         const cookies = document.cookie.split(';');
         for (const cookie of cookies) {
             const [name, value] = cookie.trim().split('=');
@@ -330,7 +345,54 @@ class PushSubscriptionManager {
         }
         return '';
     }
+
+    /**
+     * Auto-sync existing PushManager subscription with the backend.
+     * Guarantees that whether running on Web or installed PWA, the server
+     * always has the current active subscription mapped to the logged-in user.
+     */
+    async syncActiveSubscription() {
+        if (!this.isSupported() || !this.hasPermission()) {
+            return null;
+        }
+
+        try {
+            const registration = await this.getServiceWorkerRegistration();
+            if (!registration || !registration.pushManager) return null;
+
+            const subscription = await registration.pushManager.getSubscription();
+            if (!subscription) return null;
+
+            this.subscription = subscription;
+            this.isSubscribed = true;
+            return await this.sendSubscriptionToServer(subscription);
+        } catch (err) {
+            console.warn('[PUSH-SUBSCRIPTION] Auto-sync subscription skipped:', err);
+            return null;
+        }
+    }
 }
 
 // Export for use in other modules
 window.PushSubscriptionManager = PushSubscriptionManager;
+
+// Automatically sync subscription on boot if permission is already granted
+(function() {
+    function autoSync() {
+        // Skip in native capacitor app (native push handled by native-app.js)
+        if (typeof isNativeAppContainer === 'function' && isNativeAppContainer()) return;
+        if (typeof window.Capacitor !== 'undefined' && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) return;
+
+        if ('Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+            const manager = new PushSubscriptionManager();
+            manager.syncActiveSubscription().catch(() => {});
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', autoSync);
+    } else {
+        autoSync();
+    }
+})();
+

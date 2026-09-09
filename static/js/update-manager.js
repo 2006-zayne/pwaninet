@@ -32,6 +32,19 @@
             latestVersion = latestData.latest_version;
             latestBuild = latestData.latest_build_number;
 
+            // Hydrate current and footer version in DOM
+            const activeVer = latestData.running_version || currentVersion || latestVersion;
+            if (activeVer) {
+                const curVerElements = document.querySelectorAll('.app-current-version, #footer-app-version, #current-version');
+                curVerElements.forEach(function(el) {
+                    if (el.id === 'footer-app-version') {
+                        el.textContent = 'Version ' + activeVer;
+                    } else {
+                        el.textContent = activeVer;
+                    }
+                });
+            }
+
             // Compare versions
             if (latestData.update_available) {
                 console.log('[UpdateManager] New version available:', latestVersion, 'build', latestBuild);

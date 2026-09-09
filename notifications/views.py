@@ -1,4 +1,5 @@
-from django.shortcuts import render
+import logging
+from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.core.paginator import Paginator
@@ -20,8 +21,10 @@ from notifications.services.notification_service import (
     delete_single_notification,
     delete_all_user_notifications,
     delete_user_read_notifications,
-    broadcast_unread_count
+    broadcast_unread_count,
+    resolve_notification_target_url
 )
+logger = logging.getLogger(__name__)
 from notifications.services.preference_service import NotificationPreferenceService
 from .serializers import (
     NotificationSerializer,
@@ -267,6 +270,37 @@ def mark_notification_as_read(request, notif_id):
     response = render(request, 'notifications/partials/notification_list_items.html', context)
     response['HX-Trigger'] = 'updateUnreadCount'
     return response
+
+
+def open_notification(request, notif_id):
+    """
+    Handle clicking on a notification popup or link (/notifications/<notif_id>/).
+    Marks the notification as read and redirects the user to the destination page.
+    """
+    notification = None
+    try:
+        if request.user.is_authenticated:
+            notification = mark_single_notification_as_read(request.user, notif_id)
+            if not notification:
+                # In case notification belongs to user but under different query or edge case
+                notification = NotificationObject.objects.filter(notification_id=notif_id).first()
+                if notification and notification.recipient_id == request.user.id:
+                    notification.status = 'READ'
+                    notification.save(update_fields=['status'])
+                    invalidate_unread_count_cache(request.user.id)
+                    broadcast_unread_count(request.user.id)
+        else:
+            notification = NotificationObject.objects.filter(notification_id=notif_id).first()
+            if notification and notification.status != 'READ':
+                notification.status = 'READ'
+                notification.save(update_fields=['status'])
+                invalidate_unread_count_cache(notification.recipient_id)
+                broadcast_unread_count(notification.recipient_id)
+    except Exception as e:
+        logger.warning(f"Error opening notification {notif_id}: {e}")
+
+    destination = resolve_notification_target_url(notification)
+    return redirect(destination)
 
 
 @login_required

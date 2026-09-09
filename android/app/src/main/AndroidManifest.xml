@@ -28,6 +28,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Deep linking for https://pwaninet.app and http://pwaninet.app -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="pwaninet.app" />
+                <data android:scheme="http" android:host="pwaninet.app" />
+            </intent-filter>
+
+            <!-- Custom URL scheme for explicit native app launches -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="pwaninet" />
+            </intent-filter>
         </activity>
 
         <provider

@@ -233,3 +233,98 @@ def invalidate_group_unread_cache(user_id):
     cache.delete(_group_activity_cache_key(user_id))
     cache.delete(_group_any_unread_cache_key(user_id))
 
+
+def resolve_notification_target_url(notification):
+    """
+    Resolve the intended destination URL for a notification.
+    Ensures safe, valid redirects to posts, comments, groups, documents,
+    profiles, or releases. Falls back to /notifications/.
+    """
+    if not notification:
+        return '/notifications/'
+
+    # 1. Explicit target_url attribute or metadata['url']
+    target_url = getattr(notification, 'target_url', None)
+    if not target_url and notification.metadata and isinstance(notification.metadata, dict):
+        target_url = notification.metadata.get('url')
+    
+    # Avoid self-referencing loop if target_url points to /notifications/<id>
+    notif_id_str = str(getattr(notification, 'notification_id', getattr(notification, 'id', '')))
+    if target_url:
+        target_url_str = str(target_url).strip()
+        if notif_id_str and not target_url_str.startswith(f'/notifications/{notif_id_str}'):
+            return target_url_str
+
+    # 2. Try Standard Payload Adapter (extracts resource URL or navigation URL)
+    try:
+        from notifications.rendering.adapters import get_payload_adapter
+        adapter = get_payload_adapter(notification)
+        payload = adapter.to_standard_payload(notification)
+
+        # Primary navigation URL
+        if payload.navigation and payload.navigation.primary and payload.navigation.primary.url:
+            nav_url = str(payload.navigation.primary.url).strip()
+            if nav_url and nav_url != '#' and not (notif_id_str and nav_url.startswith(f'/notifications/{notif_id_str}')):
+                return nav_url
+
+        # Resource URL (Post, Document, etc.)
+        if payload.resource and payload.resource.url:
+            res_url = str(payload.resource.url).strip()
+            if res_url and res_url != '#' and not (notif_id_str and res_url.startswith(f'/notifications/{notif_id_str}')):
+                return res_url
+    except Exception:
+        payload = None
+
+    # 3. Context-based destination resolution
+    meta = notification.metadata if isinstance(notification.metadata, dict) else {}
+    ctx_type = str(notification.context_type or '').upper()
+    ctx_id = notification.context_id
+    ntype = str(notification.notification_type or '').upper()
+
+    # Posts
+    if ctx_type in ('POST', 'POSTS') and ctx_id:
+        try:
+            from notifications.rendering.adapters import _post_share_id
+            sid = _post_share_id(ctx_id) or ctx_id
+        except Exception:
+            sid = ctx_id
+        cid = meta.get('target_id') or meta.get('comment_id') or meta.get('parent_comment_id')
+        if cid:
+            return f'/post/{sid}/#comment-{cid}'
+        return f'/post/{sid}/'
+
+    # Documents
+    if ctx_type == 'DOCUMENT' and ctx_id:
+        doc_share_id = meta.get('doc_share_id') or meta.get('share_id')
+        if doc_share_id:
+            return f'/documents/document/{doc_share_id}/'
+        return f'/documents/{ctx_id}/'
+
+    # Groups
+    if ctx_type in ('GROUP', 'GROUPS') and ctx_id:
+        if 'ANNOUNCEMENT' in ntype:
+            return f'/groups/{ctx_id}/#announcements'
+        return f'/groups/{ctx_id}/'
+
+    # Profiles (Follow, Pinch, etc.)
+    actor_username = meta.get('actor_username')
+    if actor_username:
+        return f'/users/user/{actor_username}/'
+
+    # Releases / What's new
+    if 'RELEASE' in ntype:
+        rel_id = meta.get('target_id') or meta.get('release_id')
+        if rel_id:
+            return f'/system/releases/{rel_id}/'
+        return '/'
+
+    # 4. Action URLs (only GET navigation actions like VIEW_*, SEE_*)
+    if payload and payload.actions:
+        for action in payload.actions:
+            if getattr(action, 'method', 'GET') == 'GET':
+                act_url = str(action.url).strip() if action.url else None
+                if act_url and act_url != '#' and not act_url.startswith('/notifications/'):
+                    return act_url
+
+    return '/notifications/'
+

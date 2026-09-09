@@ -896,7 +896,51 @@ def offline_media_viewer_view(request):
     return render(request, template)
 
 
-@login_required
+from urllib.parse import urlparse
+
+def _is_safe_previous_page(url_str, request_host, share_id):
+    """Validate that previous_page is an internal HTML page and not a script/worker/API."""
+    if not url_str or not isinstance(url_str, str):
+        return False
+    url_str = url_str.strip()
+    if not url_str:
+        return False
+
+    # Block foreign schemes
+    if url_str.startswith(('javascript:', 'data:', 'android-app:', 'mailto:', 'tel:')):
+        return False
+
+    try:
+        parsed = urlparse(url_str)
+    except Exception:
+        return False
+
+    # If host is specified, ensure it matches current host
+    if parsed.netloc and parsed.netloc.lower() != request_host.lower():
+        return False
+
+    path = parsed.path.lower()
+
+    # Block non-HTML resources, service workers, manifests, APIs
+    blocked_keywords = [
+        'service-worker', 'manifest', 'offline', '/api/', '/static/', '/media/',
+        '/ws/', 'clear-cache', 'download/app', '/apk'
+    ]
+    if any(k in path for k in blocked_keywords):
+        return False
+
+    # Block static file extensions
+    blocked_extensions = ('.js', '.css', '.json', '.xml', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.map', '.apk')
+    if path.endswith(blocked_extensions):
+        return False
+
+    # Do not loop back to the current post detail page
+    if str(share_id) in path:
+        return False
+
+    return True
+
+
 def post_detail_view(request, share_id):
     post = get_object_or_404(Post, share_id=share_id)
     show_all = request.GET.get('show_all') == '1'
@@ -908,15 +952,26 @@ def post_detail_view(request, share_id):
     is_new_post = request.session.pop('is_new_post', False)
     new_share_id = request.session.pop('new_share_id', None)
 
-    # If not a new post, save the referring URL for back button
+    request_host = request.get_host()
+    default_home = reverse('posts:home')
+
+    # If not a new post, save the referring URL for back button IF safe
     if not is_new_post and request.META.get('HTTP_REFERER'):
-        # Only save if it's not already the post detail page
         referer = request.META.get('HTTP_REFERER')
-        if str(share_id) not in referer:
+        if _is_safe_previous_page(referer, request_host, share_id):
             request.session['previous_page'] = referer
+        else:
+            request.session['previous_page'] = default_home
 
     context['is_new_post'] = is_new_post
-    context['previous_page'] = request.session.get('previous_page', reverse('posts:home'))
+
+    # Ensure previous_page is safe (clears any legacy corrupted session values)
+    candidate_prev = request.session.get('previous_page', default_home)
+    if not _is_safe_previous_page(candidate_prev, request_host, share_id):
+        candidate_prev = default_home
+        request.session['previous_page'] = default_home
+
+    context['previous_page'] = candidate_prev
 
     # For HTMX requests to show all comments, return only the comments section
     if request.headers.get('HX-Request') and show_all:

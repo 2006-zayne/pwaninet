@@ -391,3 +391,25 @@ def get_version_info():
         'git_commit': resolve_git_commit(),
         'git_branch': resolve_git_branch(),
     }
+
+
+def clear_version_cache():
+    """
+    Clear all in-memory LRU and API release caches.
+    Ensures newly pulled commits, tags, or GitHub releases are immediately recognized.
+    """
+    resolve_version.cache_clear()
+    resolve_build_number.cache_clear()
+    resolve_git_commit.cache_clear()
+    resolve_git_branch.cache_clear()
+    _latest_version_cache["version"] = None
+    _latest_version_cache["timestamp"] = 0
+    _latest_apk_version_cache["version"] = None
+    _latest_apk_version_cache["timestamp"] = 0
+    try:
+        from django.core.cache import cache
+        cache.delete('github_latest_release:2006-zayne/pwaninet')
+        cache.delete('github_latest_apk_release:2006-zayne/pwaninet')
+    except Exception:
+        pass
+
