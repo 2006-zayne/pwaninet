@@ -1204,7 +1204,7 @@ function getNativeCsrfToken() {
 /**
  * Initialize native push notifications (Capacitor FCM / APNS)
  */
-async function initNativePush() {
+async function initNativePush(requestIfPrompt = false) {
     if (!window.Capacitor || (typeof window.Capacitor.isNativePlatform === 'function' && !window.Capacitor.isNativePlatform())) {
         return;
     }
@@ -1220,7 +1220,12 @@ async function initNativePush() {
         console.log('[PWANINET-NATIVE] Push permission status:', permStatus);
 
         if (permStatus.receive === 'prompt' || permStatus.receive === 'prompt-with-rationale') {
-            permStatus = await PushNotifications.requestPermissions();
+            if (requestIfPrompt) {
+                permStatus = await PushNotifications.requestPermissions();
+            } else {
+                console.log('[PWANINET-NATIVE] Push permission is prompt state; deferring OS dialog to soft prompt');
+                return;
+            }
         }
 
         if (permStatus.receive !== 'granted') {
@@ -1305,6 +1310,7 @@ async function initNativePush() {
                 if (response.ok) {
                     console.log('[PWANINET-NATIVE] Successfully registered native push token with backend');
                     localStorage.setItem('pwaninet_push_subscribed', 'true');
+                    localStorage.setItem('pwaninet_fcm_token', tokenValue);
                     localStorage.removeItem('pwaninet_pending_fcm_token');
                     return true;
                 } else {

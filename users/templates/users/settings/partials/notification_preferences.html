@@ -729,6 +729,17 @@ function getCsrfToken() {
     function updateStatusUI(status) {
       hideAllStatus();
 
+      const notSupportedSpan = notSupportedEl.querySelector('span');
+      const deniedSpan = deniedEl.querySelector('span');
+
+      if (status.isNative) {
+        if (notSupportedSpan) notSupportedSpan.textContent = 'Push notifications are not supported on this device.';
+        if (deniedSpan) deniedSpan.textContent = 'Notification permission denied. Please enable it in device settings.';
+      } else {
+        if (notSupportedSpan) notSupportedSpan.textContent = 'Push notifications are not supported in your browser.';
+        if (deniedSpan) deniedSpan.textContent = 'Notification permission denied. Please enable it in browser settings.';
+      }
+
       if (!status.supported) {
         notSupportedEl.style.display = 'flex';
         return;
@@ -825,6 +836,12 @@ function getCsrfToken() {
   } else {
     initPushSubscription();
   }
+
+  document.addEventListener('htmx:afterSwap', function(e) {
+    if (e.target && e.target.querySelector && e.target.querySelector('.push-subscription-status')) {
+      initPushSubscription();
+    }
+  });
 })();
 </script>
 

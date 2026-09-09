@@ -11,9 +11,52 @@ class PushSubscriptionManager {
     }
 
     /**
+     * Check if running in a native application container (Capacitor / Android wrapper)
+     */
+    isNative() {
+        return (
+            (typeof window.Capacitor !== 'undefined' &&
+             typeof window.Capacitor.isNativePlatform === 'function' &&
+             window.Capacitor.isNativePlatform()) ||
+            document.documentElement.classList.contains('is-capacitor') ||
+            document.documentElement.classList.contains('is-native-app') ||
+            typeof window.AndroidBridge !== 'undefined' ||
+            typeof window.PwaninetBridge !== 'undefined' ||
+            (typeof window.isNativeAppContainer === 'function' && window.isNativeAppContainer())
+        );
+    }
+
+    /**
+     * Wait briefly for native bridge injection if running inside native app container
+     */
+    async waitForNativeBridge() {
+        if (!this.isNative()) return;
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications) {
+            return;
+        }
+        for (let i = 0; i < 20; i++) {
+            await new Promise(r => setTimeout(r, 25));
+            if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications) {
+                break;
+            }
+        }
+    }
+
+    /**
      * Check if push notifications are supported
      */
     isSupported() {
+        if (this.isNative()) {
+            const hasCapacitorPush = typeof window.Capacitor !== 'undefined' &&
+                window.Capacitor.Plugins &&
+                !!window.Capacitor.Plugins.PushNotifications;
+            const bridge = window.AndroidBridge || window.PwaninetBridge;
+            const isPushReady = bridge && typeof bridge.isPushNotificationsAvailable === 'function'
+                ? bridge.isPushNotificationsAvailable()
+                : true;
+            return hasCapacitorPush || isPushReady;
+        }
+
         const hasServiceWorker = 'serviceWorker' in navigator;
         const hasPushManager = 'PushManager' in window;
         const hasNotification = 'Notification' in window;
@@ -120,13 +163,16 @@ class PushSubscriptionManager {
         if (!('serviceWorker' in navigator)) {
             throw new Error('Service workers not supported in this browser.');
         }
-        const registration = await navigator.serviceWorker.ready;
+        let registration = await navigator.serviceWorker.getRegistration();
         if (!registration) {
-            console.error('Service worker not ready');
-            throw new Error('Service worker not registered. Please refresh the page.');
+            try {
+                registration = await navigator.serviceWorker.register('/service-worker.js');
+            } catch (e) {
+                console.warn('Auto service worker register attempt failed:', e);
+            }
         }
-        console.log('Service worker ready registration found:', registration);
-        return registration;
+        const readyReg = await navigator.serviceWorker.ready;
+        return readyReg || registration;
     }
 
     /**
@@ -134,6 +180,36 @@ class PushSubscriptionManager {
      */
     async subscribe() {
         console.log('Starting push subscription process...');
+
+        if (this.isNative()) {
+            await this.waitForNativeBridge();
+            if (!this.isSupported()) {
+                throw new Error('Push notifications are not supported on this device');
+            }
+
+            const PushNotifications = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications;
+            if (!PushNotifications) {
+                throw new Error('Push notification plugin not available on this device');
+            }
+
+            let permStatus = await PushNotifications.checkPermissions();
+            if (permStatus.receive === 'prompt' || permStatus.receive === 'prompt-with-rationale') {
+                permStatus = await PushNotifications.requestPermissions();
+            }
+
+            if (permStatus.receive !== 'granted') {
+                console.warn('Native push notification permission was not granted.');
+                return null;
+            }
+
+            if (typeof window.initNativePush === 'function') {
+                await window.initNativePush(true);
+            }
+
+            localStorage.setItem('pwaninet_push_subscribed', 'true');
+            this.isSubscribed = true;
+            return true;
+        }
 
         if (!this.isSupported()) {
             throw new Error('Push notifications are not supported in this browser');
@@ -176,6 +252,7 @@ class PushSubscriptionManager {
             console.log('Sending subscription to server...');
             await this.sendSubscriptionToServer(subscription);
 
+            localStorage.setItem('pwaninet_push_subscribed', 'true');
             console.log('Push subscription successful');
             return subscription;
         } catch (error) {
@@ -240,8 +317,44 @@ class PushSubscriptionManager {
      * Unsubscribe from push notifications
      */
     async unsubscribe() {
+        if (this.isNative()) {
+            const fcmToken = localStorage.getItem('pwaninet_fcm_token') || localStorage.getItem('pwaninet_pending_fcm_token');
+            const csrfToken = this.getCsrfToken();
+            try {
+                if (fcmToken) {
+                    await fetch('/api/push/unsubscribe/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
+                        },
+                        body: JSON.stringify({ fcm_token: fcmToken })
+                    });
+                }
+            } catch (err) {
+                console.warn('Failed to unsubscribe FCM token on server:', err);
+            }
+            localStorage.removeItem('pwaninet_push_subscribed');
+            this.isSubscribed = false;
+            console.log('Native push unsubscription successful');
+            return true;
+        }
+
         if (!this.isSubscribed || !this.subscription) {
+            try {
+                const registration = await this.getServiceWorkerRegistration();
+                const sub = await registration.pushManager.getSubscription();
+                if (sub) {
+                    this.subscription = sub;
+                    this.isSubscribed = true;
+                }
+            } catch (_) {}
+        }
+
+        if (!this.subscription) {
             console.log('No active subscription to unsubscribe');
+            localStorage.removeItem('pwaninet_push_subscribed');
+            this.isSubscribed = false;
             return true;
         }
 
@@ -254,6 +367,7 @@ class PushSubscriptionManager {
 
             this.subscription = null;
             this.isSubscribed = false;
+            localStorage.removeItem('pwaninet_push_subscribed');
 
             console.log('Push unsubscription successful');
             return true;
@@ -295,8 +409,49 @@ class PushSubscriptionManager {
      * Get current subscription status
      */
     async getSubscriptionStatus() {
+        if (this.isNative()) {
+            await this.waitForNativeBridge();
+            if (!this.isSupported()) {
+                return { supported: false, subscribed: false, isNative: true };
+            }
+
+            const PushNotifications = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications;
+            if (!PushNotifications) {
+                const isSubscribed = localStorage.getItem('pwaninet_push_subscribed') === 'true';
+                return {
+                    supported: true,
+                    subscribed: isSubscribed,
+                    permission: isSubscribed ? 'granted' : 'default',
+                    isNative: true
+                };
+            }
+
+            try {
+                const permStatus = await PushNotifications.checkPermissions();
+                const isGranted = permStatus.receive === 'granted';
+                const isDenied = permStatus.receive === 'denied';
+                const isSubscribed = isGranted && localStorage.getItem('pwaninet_push_subscribed') === 'true';
+
+                return {
+                    supported: true,
+                    subscribed: isSubscribed,
+                    permission: isGranted ? 'granted' : (isDenied ? 'denied' : 'default'),
+                    isNative: true
+                };
+            } catch (err) {
+                console.warn('[PUSH-SUBSCRIPTION] Error checking native permissions:', err);
+                const isSubscribed = localStorage.getItem('pwaninet_push_subscribed') === 'true';
+                return {
+                    supported: true,
+                    subscribed: isSubscribed,
+                    permission: isSubscribed ? 'granted' : 'default',
+                    isNative: true
+                };
+            }
+        }
+
         if (!this.isSupported()) {
-            return { supported: false, subscribed: false };
+            return { supported: false, subscribed: false, isNative: false };
         }
 
         try {
@@ -309,11 +464,12 @@ class PushSubscriptionManager {
             return {
                 supported: true,
                 subscribed: this.isSubscribed,
-                permission: Notification.permission
+                permission: Notification.permission,
+                isNative: false
             };
         } catch (error) {
             console.error('Error getting subscription status:', error);
-            return { supported: true, subscribed: false, error: error.message };
+            return { supported: true, subscribed: false, error: error.message, isNative: false };
         }
     }
 

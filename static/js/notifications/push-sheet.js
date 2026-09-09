@@ -25,17 +25,35 @@
              typeof window.Capacitor.isNativePlatform === 'function' &&
              window.Capacitor.isNativePlatform()) ||
             document.documentElement.classList.contains('is-capacitor') ||
-            document.documentElement.classList.contains('is-native-app')
+            document.documentElement.classList.contains('is-native-app') ||
+            typeof window.AndroidBridge !== 'undefined' ||
+            typeof window.PwaninetBridge !== 'undefined'
         );
+    }
+
+    async function waitForBridge() {
+        if (!isNativeApp()) return;
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications) {
+            return;
+        }
+        for (let i = 0; i < 20; i++) {
+            await new Promise(r => setTimeout(r, 25));
+            if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications) {
+                break;
+            }
+        }
     }
 
     function isSupported() {
         if (isNativeApp()) {
-            return (
-                typeof window.Capacitor !== 'undefined' &&
+            const hasPlugin = typeof window.Capacitor !== 'undefined' &&
                 window.Capacitor.Plugins &&
-                !!window.Capacitor.Plugins.PushNotifications
-            );
+                !!window.Capacitor.Plugins.PushNotifications;
+            const bridge = window.AndroidBridge || window.PwaninetBridge;
+            const isPushReady = bridge && typeof bridge.isPushNotificationsAvailable === 'function'
+                ? bridge.isPushNotificationsAvailable()
+                : true;
+            return hasPlugin && isPushReady;
         }
         return (
             'Notification' in window &&
@@ -45,6 +63,10 @@
     }
 
     async function isEligible() {
+        if (isNativeApp()) {
+            await waitForBridge();
+        }
+
         // 1. Feature support check
         if (!isSupported()) {
             return false;
@@ -67,11 +89,22 @@
         // 4. Permission check
         if (isNativeApp()) {
             try {
-                const PushNotifications = window.Capacitor.Plugins.PushNotifications;
+                const PushNotifications = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications;
+                if (!PushNotifications) return false;
                 const status = await PushNotifications.checkPermissions();
                 if (status.receive === 'denied') {
                     return false;
                 }
+                if (status.receive === 'granted') {
+                    // Already granted at OS level (e.g. Android <= 12 or previously allowed)
+                    // Auto-sync FCM registration in background without showing prompt sheet
+                    if (typeof window.initNativePush === 'function') {
+                        window.initNativePush(false);
+                    }
+                    localStorage.setItem(STORAGE_KEY_SUBSCRIBED, 'true');
+                    return false;
+                }
+                // Status is 'prompt' or 'prompt-with-rationale' -> Eligible for soft prompt!
                 return true;
             } catch (e) {
                 return false;
@@ -146,7 +179,7 @@
 
                 if (permStatus.receive === 'granted') {
                     if (typeof window.initNativePush === 'function') {
-                        await window.initNativePush();
+                        await window.initNativePush(true);
                     }
                     localStorage.setItem(STORAGE_KEY_SUBSCRIBED, 'true');
                     console.log('[PUSH-SHEET] Native push permission granted and subscribed');
@@ -251,8 +284,11 @@
     }
 
     // Expose programmatic trigger on window
-    window.showPushPromptSheet = function() {
+    window.showPushPromptSheet = async function() {
         if (!sheetRoot) initPushSheet();
+        if (isNativeApp()) {
+            await waitForBridge();
+        }
         showSheet();
     };
 
