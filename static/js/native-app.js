@@ -1281,7 +1281,15 @@ async function initNativePush(requestIfPrompt = false) {
         const isAndroid = platformName === 'android' || navigator.userAgent.includes('Android');
 
         if (isAndroid) {
-            const bridge = window.AndroidBridge || window.PwaninetBridge;
+            let bridge = window.AndroidBridge || window.PwaninetBridge;
+            if (!bridge || typeof bridge.isPushNotificationsAvailable !== 'function') {
+                // Wait up to 1000ms for WebView bridge injection
+                for (let i = 0; i < 20; i++) {
+                    await new Promise(r => setTimeout(r, 50));
+                    bridge = window.AndroidBridge || window.PwaninetBridge;
+                    if (bridge && typeof bridge.isPushNotificationsAvailable === 'function') break;
+                }
+            }
             const isPushReady = bridge && typeof bridge.isPushNotificationsAvailable === 'function' && bridge.isPushNotificationsAvailable();
             if (!isPushReady) {
                 console.warn('[PWANINET-NATIVE] Native push / Firebase is not initialized on this Android build (google-services.json missing). Push registration skipped to protect app stability.');
@@ -1388,8 +1396,9 @@ function showNativePushBanner(notification) {
         }
     } catch (_) {}
 
-    const title = notification.title || 'PwaniNet';
-    const body = notification.body || '';
+    const data = notification.data || {};
+    const title = notification.title || data.title || 'PwaniNet';
+    const body = notification.body || data.body || '';
 
     // Broadcast native on-screen toast via AndroidBridge
     try {
@@ -1400,7 +1409,6 @@ function showNativePushBanner(notification) {
             window.PwaninetBridge.showToast(toastMessage);
         }
     } catch (_) {}
-    const data = notification.data || {};
     const icon = data.icon || notification.icon || '/static/images/web-app-manifest-192x192-rounded.png';
     const previewImage = data.image || notification.image || data.thumbnail_url || null;
     const resourceType = (data.resource_type || '').toUpperCase();

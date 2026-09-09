@@ -74,7 +74,7 @@
                         <h4 class="fw-bold mb-0">{{ profile_user.get_full_name }}</h4>
                         <p class="text-muted small">@{{ profile_user.username }}</p>
 
-                        <div class="bg-light rounded-3 p-2 mb-3">
+                        <div class="bg-light rounded-3 p-2 mb-3 profile-bio-box">
                             <p class="small mb-0 text-secondary italic">
                                 <i class="bi bi-shield-lock me-1"></i>
                                 "{{ profile_user.bio|default:_('Pwani University Student.') }}"
@@ -115,7 +115,7 @@
                         {% endif %}
                     </div>
 
-                    <div class="row g-0 border-top text-center py-3">
+                    <div class="row g-0 border-top text-center py-3 profile-stats-row">
                         <div class="col-4 border-end">
                             <button type="button" class="profile-stat-btn js-people-trigger"
                                     data-bs-toggle="modal"
@@ -124,8 +124,8 @@
                                     data-connection-title="{% trans 'Followers' %}"
                                     data-profile-username="{{ profile_user.username }}"
                                     aria-label="View followers">
-                                <h6 id="follower-count" class="fw-bold mb-0">{{ followers_count }}</h6>
-                                <small class="text-muted text-uppercase" style="font-size: 0.65rem;">{% trans "Followers" %}</small>
+                                <h6 id="follower-count" class="fw-bold mb-0 count-number">{{ followers_count }}</h6>
+                                <small class="text-muted text-uppercase count-label" style="font-size: 0.65rem;">{% trans "Followers" %}</small>
                             </button>
                         </div>
                         <div class="col-4 border-end">
@@ -136,17 +136,19 @@
                                     data-connection-title="{% trans 'Following' %}"
                                     data-profile-username="{{ profile_user.username }}"
                                     aria-label="View following">
-                                <h6 id="following-count" class="fw-bold mb-0">{{ following_count }}</h6>
-                                <small class="text-muted text-uppercase" style="font-size: 0.65rem;">{% trans "Following" %}</small>
+                                <h6 id="following-count" class="fw-bold mb-0 count-number">{{ following_count }}</h6>
+                                <small class="text-muted text-uppercase count-label" style="font-size: 0.65rem;">{% trans "Following" %}</small>
                             </button>
                         </div>
-                        <div class="col-4">
-                            <h6 id="total-likes-count" class="fw-bold mb-0 text-primary">{{ total_likes|default:"0" }}</h6>
-                            <small class="text-muted text-uppercase" style="font-size: 0.65rem;">{% trans "Likes" %}</small>
+                        <div class="col-4 d-flex align-items-center justify-content-center">
+                            <div class="py-1">
+                                <h6 id="total-likes-count" class="fw-bold mb-0 count-number count-likes text-primary">{{ total_likes|default:"0" }}</h6>
+                                <small class="text-muted text-uppercase count-label" style="font-size: 0.65rem;">{% trans "Likes" %}</small>
+                            </div>
                         </div>
                     </div>
                     {% if is_own_profile %}
-                    <div class="row g-0 border-top text-center py-3">
+                    <div class="row g-0 border-top text-center py-3 profile-stats-row">
                         <div class="col-6 border-end">
                             <button type="button" class="profile-stat-btn js-people-trigger"
                                     data-bs-toggle="modal"
@@ -155,8 +157,8 @@
                                     data-connection-title="{% trans 'Pinches Sent' %}"
                                     data-profile-username="{{ profile_user.username }}"
                                     aria-label="View pinches sent">
-                                <h6 id="pinches-sent-count" class="fw-bold mb-0">{{ pinches_sent_count|default:"0" }}</h6>
-                                <small class="text-muted text-uppercase" style="font-size: 0.65rem;">{% trans "Pinches Sent" %}</small>
+                                <h6 id="pinches-sent-count" class="fw-bold mb-0 count-number">{{ pinches_sent_count|default:"0" }}</h6>
+                                <small class="text-muted text-uppercase count-label" style="font-size: 0.65rem;">{% trans "Pinches Sent" %}</small>
                             </button>
                         </div>
                         <div class="col-6">
@@ -167,8 +169,8 @@
                                     data-connection-title="{% trans 'Pinches Received' %}"
                                     data-profile-username="{{ profile_user.username }}"
                                     aria-label="View pinches received">
-                                <h6 id="pinches-received-count" class="fw-bold mb-0">{{ pinches_received_count|default:"0" }}</h6>
-                                <small class="text-muted text-uppercase" style="font-size: 0.65rem;">{% trans "Pinches Received" %}</small>
+                                <h6 id="pinches-received-count" class="fw-bold mb-0 count-number">{{ pinches_received_count|default:"0" }}</h6>
+                                <small class="text-muted text-uppercase count-label" style="font-size: 0.65rem;">{% trans "Pinches Received" %}</small>
                             </button>
                         </div>
                     </div>
@@ -251,7 +253,7 @@
                         <span class="fw-bold small text-primary">{{ profile_completion }}%</span>
                     </div>
                     {% if profile_completion < 50 %}
-                    <div class="mt-2 p-2 bg-light rounded">
+                    <div class="mt-2 p-2 bg-light rounded profile-suggestions-box">
                         <small class="text-muted mb-1 d-block">{% trans "Suggestions to improve your profile:" %}</small>
                         {% if not profile_user.headline %}
                         <small class="text-secondary d-block"><i class="bi bi-plus-circle me-1"></i>{% trans "Add a headline to introduce yourself better" %}</small>
@@ -294,7 +296,7 @@
                     {% endif %}
 
                     <div class="collapse mt-3" id="profileMoreInfo">
-                        <div class="card card-body bg-light border-0">
+                        <div class="card card-body bg-light border-0 profile-more-card">
                             {% if profile_user.interests %}
                             <div class="mb-3">
                                 <small class="text-muted text-uppercase fw-bold mb-1 d-block">{% trans "Interests" %}</small>

@@ -1,5 +1,7 @@
 package com.pwaninet.app;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
@@ -196,6 +198,46 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    private void setupNotificationChannels() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                NotificationManager notificationManager = getSystemService(NotificationManager.class);
+                if (notificationManager != null) {
+                    NotificationChannel defaultChannel = new NotificationChannel(
+                        "pwaninet_notifications",
+                        "PwaniNet Notifications",
+                        NotificationManager.IMPORTANCE_HIGH
+                    );
+                    defaultChannel.setDescription("All social updates, mentions, posts, documents, and messages");
+                    defaultChannel.enableVibration(true);
+                    defaultChannel.enableLights(true);
+                    defaultChannel.setLightColor(Color.parseColor("#2563eb"));
+                    notificationManager.createNotificationChannel(defaultChannel);
+
+                    NotificationChannel socialChannel = new NotificationChannel(
+                        "pwaninet_social",
+                        "Social Updates",
+                        NotificationManager.IMPORTANCE_HIGH
+                    );
+                    socialChannel.setDescription("Likes, comments, shares, follows, and mentions");
+                    socialChannel.enableVibration(true);
+                    notificationManager.createNotificationChannel(socialChannel);
+
+                    NotificationChannel messagesChannel = new NotificationChannel(
+                        "pwaninet_messages",
+                        "Direct & Group Messages",
+                        NotificationManager.IMPORTANCE_HIGH
+                    );
+                    messagesChannel.setDescription("Chat messages and conversation updates");
+                    messagesChannel.enableVibration(true);
+                    notificationManager.createNotificationChannel(messagesChannel);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     public void injectThemeObserver() {
         runOnUiThread(() -> {
             if (getBridge() != null && getBridge().getWebView() != null) {
@@ -324,6 +366,7 @@ public class MainActivity extends BridgeActivity {
         applySystemBarTheme(!isSystemNight);
 
         setupAndroidBridge();
+        setupNotificationChannels();
         setupSafeAreaInsets();
         setupNetworkMonitoring();
         setupCustomWebViewClient();

@@ -151,7 +151,7 @@
         }
 
         [data-theme="dark"] body {
-            background-color: #0f172a;
+            background-color: #18191f;
         }
 
         /* Critical gradient classes to prevent FOUC */
@@ -1434,7 +1434,7 @@
         });
 
         // Theme Management
-        function setTheme(theme) {
+        function setTheme(theme, saveToServer = true) {
             const html = document.documentElement;
             const userPreference = '{{ request.user.theme_preference|default:"system" }}';
             let resolvedTheme = 'light';
@@ -1464,8 +1464,8 @@
                 }
             }
 
-            // Save to server if user is authenticated
-            if ('{{ request.user.is_authenticated }}' === 'True') {
+            // Save to server only if requested, authenticated, and preference actually changed
+            if (saveToServer && '{{ request.user.is_authenticated }}' === 'True' && theme !== userPreference) {
                 fetch('/users/api/users/update_theme/', {
                     method: 'PATCH',
                     headers: {
@@ -1483,18 +1483,18 @@
             const userPreference = '{{ request.user.theme_preference|default:"system" }}';
 
             if (userPreference !== 'system') {
-                setTheme(userPreference);
+                setTheme(userPreference, false);
             } else if (savedTheme && savedTheme !== 'system') {
-                setTheme(savedTheme);
+                setTheme(savedTheme, true);
             } else {
-                setTheme('system');
+                setTheme('system', false);
             }
 
             // Listen for system theme changes
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
                 const currentTheme = localStorage.getItem('theme');
                 if (currentTheme === 'system' || !currentTheme) {
-                    setTheme('system');
+                    setTheme('system', false);
                 }
             });
         });

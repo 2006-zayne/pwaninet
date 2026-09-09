@@ -1,5 +1,36 @@
 {% load static %}
 
+<style>
+  .classmate-card {
+    background-color: var(--card-bg, #ffffff) !important;
+    border-color: var(--border, #e2e8f0) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+  }
+  .classmate-card .classmate-name {
+    color: var(--text-dark, #0f172a);
+    transition: color 0.2s ease;
+  }
+  .classmate-card .avatar-placeholder {
+    background-color: #f1f5f9 !important;
+    color: var(--primary, #2563eb) !important;
+  }
+  [data-theme="dark"] .classmate-card {
+    background-color: var(--card-bg, #242526) !important;
+    border-color: var(--border, #3a3b3c) !important;
+  }
+  [data-theme="dark"] .classmate-card .classmate-name {
+    color: #ffffff !important;
+  }
+  [data-theme="dark"] .classmate-card .avatar-placeholder {
+    background-color: rgba(99, 102, 241, 0.15) !important;
+    color: #818cf8 !important;
+  }
+  [data-theme="dark"] .classmate-card .academic-badge {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: #cbd5e1 !important;
+  }
+</style>
+
 <div class="step-content animate-fade-in" id="step-classmates-container">
   <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
     <div>
@@ -42,7 +73,7 @@
                          class="rounded-circle object-fit-cover shadow-xs"
                          style="width: 52px; height: 52px;">
                   {% else %}
-                    <div class="rounded-circle bg-light text-primary d-flex align-items-center justify-content-center fw-bold shadow-xs"
+                    <div class="rounded-circle avatar-placeholder bg-light text-primary d-flex align-items-center justify-content-center fw-bold shadow-xs"
                          style="width: 52px; height: 52px; font-size: 1.15rem;">
                       {{ classmate.first_name|first|default:classmate.username|first|upper }}
                     </div>
@@ -53,7 +84,7 @@
               <div class="flex-grow-1 min-w-0">
                 <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
                   <div class="min-w-0 flex-grow-1 pe-1">
-                    <a href="{% url 'users:profile' classmate.username %}" target="_blank" class="text-decoration-none text-dark fw-bold text-truncate d-block" style="font-size: 0.95rem;">
+                    <a href="{% url 'users:profile' classmate.username %}" target="_blank" class="text-decoration-none classmate-name fw-bold text-truncate d-block" style="font-size: 0.95rem;">
                       {{ classmate.get_full_name|default:classmate.username }}
                     </a>
                     <span class="text-muted small d-block text-truncate" style="font-size: 0.78rem;">@{{ classmate.username }}</span>
@@ -84,7 +115,7 @@
                     <i class="bi bi-mortarboard-fill me-1"></i>{{ classmate.recommendation_reason }}
                   </span>
                   {% if classmate.academic_level %}
-                    <span class="badge bg-light text-secondary rounded-pill px-2 py-1" style="font-size: 0.72rem;">
+                    <span class="badge bg-light text-secondary academic-badge rounded-pill px-2 py-1" style="font-size: 0.72rem;">
                       {{ classmate.academic_level.name }}
                     </span>
                   {% endif %}
@@ -106,7 +137,7 @@
       {% endfor %}
     </div>
   {% else %}
-    <div class="text-center py-5 border rounded-4 bg-light p-4">
+    <div class="text-center py-5 border rounded-4 p-4 classmate-card">
       <i class="bi bi-mortarboard text-muted display-5"></i>
       <h5 class="fw-bold mt-3 mb-1">No classmates found yet</h5>
       <p class="text-muted small mb-3">You're one of the first students from your course to join! You can explore groups in the next step.</p>

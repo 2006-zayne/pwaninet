@@ -4,7 +4,7 @@
       hx-swap="innerHTML">
     {% csrf_token %}
     <button type="submit"
-            class="btn {% if is_following %}btn-outline-dark{% else %}btn-primary{% endif %} w-100 rounded-pill fw-bold mb-2">
+            class="btn {% if is_following %}btn-outline-secondary{% else %}btn-primary{% endif %} w-100 rounded-pill fw-bold mb-2">
         {% if is_following %}Unfollow{% else %}Follow{% endif %}
     </button>
 </form>
@@ -13,4 +13,4 @@
 {# Messaging button - FROZEN FOR MVP #}
 {% endif %}
 
-<h6 id="follower-count" class="fw-bold mb-0" hx-swap-oob="true">{{ follower_count }}</h6>
+<h6 id="follower-count" class="fw-bold mb-0 count-number" hx-swap-oob="true">{{ follower_count }}</h6>

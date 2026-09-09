@@ -461,33 +461,34 @@ class PushAdapter(DeliveryAdapter):
                 notification_kwargs['image'] = content['image']
 
             android_notif_kwargs = {
-                'channel_id': content['channel_id'],
-                'tag': content['tag'],
+                'channel_id': content.get('channel_id') or 'pwaninet_notifications',
+                'tag': content.get('tag') or f"pwaninet-{notification.notification_id}",
                 'color': '#2563eb',
-                'sound': 'default',
-                'click_action': 'OPEN_NOTIFICATION',
+                'default_sound': True,
+                'default_vibrate_timings': True,
+                'priority': 'high',
+                'visibility': 'public',
             }
             if content.get('image'):
                 android_notif_kwargs['image'] = content['image']
 
             fcm_data = {
-                "url": content['target_url'] or '/',
-                "destination_url": content.get('destination_url') or content['target_url'] or '/',
+                "url": str(content.get('target_url') or '/'),
+                "destination_url": str(content.get('destination_url') or content.get('target_url') or '/'),
                 "notification_id": str(notification.notification_id),
                 "notification_type": str(notification.notification_type),
                 "category": str(notification.category or ''),
-                "icon": content['icon'] or '',
-                "image": content.get('image') or '',
-                "resource_type": content.get('resource_type') or '',
-                "resource_title": content.get('resource_title') or '',
-                "tag": content['tag'],
+                "icon": str(content.get('icon') or ''),
+                "image": str(content.get('image') or ''),
+                "resource_type": str(content.get('resource_type') or ''),
+                "resource_title": str(content.get('resource_title') or ''),
+                "tag": str(content.get('tag') or f"pwaninet-{notification.notification_id}"),
             }
 
             message = messaging.Message(
                 notification=messaging.Notification(**notification_kwargs),
                 android=messaging.AndroidConfig(
                     priority='high',
-                    collapse_key=content['tag'],
                     notification=messaging.AndroidNotification(**android_notif_kwargs),
                     data=fcm_data
                 ),
@@ -504,9 +505,8 @@ class PushAdapter(DeliveryAdapter):
             if (
                 "Unregistered" in ex_name
                 or "NotFound" in ex_name
-                or "InvalidArgument" in ex_name
                 or "Unregistered" in err_msg
-                or "InvalidArgument" in err_msg
+                or "registration-token-not-registered" in err_msg
                 or "not a valid FCM registration token" in err_msg
             ):
                 sub.is_active = False

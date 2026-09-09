@@ -7,9 +7,9 @@
 
     const STORAGE_KEY_DISMISSED = 'pwaninet_push_sheet_dismissed_at';
     const STORAGE_KEY_SUBSCRIBED = 'pwaninet_push_subscribed';
-    const COOLDOWN_DAYS = 7;
+    const COOLDOWN_DAYS = 3;
     const COOLDOWN_MS = COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
-    const SHOW_DELAY_MS = 3500;
+    const SHOW_DELAY_MS = 1000;
 
     let sheetRoot = null;
     let sheetBackdrop = null;
@@ -17,7 +17,8 @@
     let enableBtn = null;
     let dismissBtn = null;
     let closeBtn = null;
-    let isInitialized = false;
+    let isScheduled = false;
+    let isVisible = false;
 
     function isNativeApp() {
         return (
@@ -62,7 +63,7 @@
         );
     }
 
-    async function isEligible() {
+    async function isEligible(bypassCooldown = false) {
         if (isNativeApp()) {
             await waitForBridge();
         }
@@ -72,22 +73,35 @@
             return false;
         }
 
-        // 2. Check if already marked subscribed
-        if (localStorage.getItem(STORAGE_KEY_SUBSCRIBED) === 'true') {
-            return false;
-        }
+        // Check for debug/test query parameter to bypass cooldown
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('push_prompt') || urlParams.has('test_push')) {
+                bypassCooldown = true;
+            }
+        } catch (_) {}
 
-        // 3. Check cooldown from previous dismissal
-        const dismissedAt = localStorage.getItem(STORAGE_KEY_DISMISSED);
-        if (dismissedAt) {
-            const timeSinceDismiss = Date.now() - parseInt(dismissedAt, 10);
-            if (timeSinceDismiss < COOLDOWN_MS) {
-                return false;
+        // 2. Cooldown check from previous dismissal
+        if (!bypassCooldown) {
+            const dismissedAt = localStorage.getItem(STORAGE_KEY_DISMISSED);
+            if (dismissedAt) {
+                const timeSinceDismiss = Date.now() - parseInt(dismissedAt, 10);
+                if (timeSinceDismiss < COOLDOWN_MS) {
+                    return false;
+                }
             }
         }
 
-        // 4. Permission check
+        // 3. Platform-specific subscription & permission checks
         if (isNativeApp()) {
+            const hasToken = !!localStorage.getItem('pwaninet_fcm_token');
+            const isSubscribed = localStorage.getItem(STORAGE_KEY_SUBSCRIBED) === 'true';
+
+            // Already fully registered and subscribed on native
+            if (hasToken && isSubscribed) {
+                return false;
+            }
+
             try {
                 const PushNotifications = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications;
                 if (!PushNotifications) return false;
@@ -95,32 +109,33 @@
                 if (status.receive === 'denied') {
                     return false;
                 }
-                if (status.receive === 'granted') {
-                    // Already granted at OS level (e.g. Android <= 12 or previously allowed)
-                    // Auto-sync FCM registration in background without showing prompt sheet
-                    if (typeof window.initNativePush === 'function') {
-                        window.initNativePush(false);
-                    }
-                    localStorage.setItem(STORAGE_KEY_SUBSCRIBED, 'true');
-                    return false;
-                }
-                // Status is 'prompt' or 'prompt-with-rationale' -> Eligible for soft prompt!
+                // Eligible: prompt, prompt-with-rationale, or granted without completed subscription
                 return true;
             } catch (e) {
                 return false;
             }
         } else {
-            // Only show if permission is 'default' (not granted, not denied)
-            if (Notification.permission !== 'default') {
+            // Web / PWA browser environment
+            if (!('Notification' in window)) {
                 return false;
             }
-        }
+            if (Notification.permission === 'denied') {
+                return false;
+            }
+            if (Notification.permission === 'granted') {
+                localStorage.setItem(STORAGE_KEY_SUBSCRIBED, 'true');
+                return false;
+            }
 
-        return true;
+            // Notification.permission === 'default'
+            // Permission has never been granted/denied in this browser session
+            localStorage.removeItem(STORAGE_KEY_SUBSCRIBED);
+            return true;
+        }
     }
 
     function showSheet() {
-        if (!sheetRoot || !sheetContainer) return;
+        if (!sheetRoot || !sheetContainer || isVisible) return;
 
         sheetRoot.style.display = 'block';
         // Force reflow for animation
@@ -130,6 +145,7 @@
         if (sheetBackdrop) {
             sheetBackdrop.classList.add('visible');
         }
+        isVisible = true;
 
         console.log('[PUSH-SHEET] Push prompt bottom sheet presented');
     }
@@ -142,12 +158,13 @@
         if (sheetBackdrop) {
             sheetBackdrop.classList.remove('visible');
         }
+        isVisible = false;
 
         setTimeout(function() {
-            if (sheetRoot) {
+            if (sheetRoot && !isVisible) {
                 sheetRoot.style.display = 'none';
             }
-        }, 400);
+        }, 380);
 
         if (rememberDismissal) {
             localStorage.setItem(STORAGE_KEY_DISMISSED, Date.now().toString());
@@ -245,9 +262,7 @@
         }, 3000);
     }
 
-    function initPushSheet() {
-        if (isInitialized) return;
-
+    function initPushSheet(force = false) {
         sheetRoot = document.getElementById('push-notification-sheet-root');
         if (!sheetRoot) return;
 
@@ -257,45 +272,56 @@
         dismissBtn = document.getElementById('btn-push-sheet-dismiss');
         closeBtn = document.getElementById('push-sheet-close-btn');
 
-        if (enableBtn) {
-            enableBtn.addEventListener('click', handleEnablePush);
+        if (!sheetRoot._pushEventsBound) {
+            if (enableBtn) {
+                enableBtn.addEventListener('click', handleEnablePush);
+            }
+            if (dismissBtn) {
+                dismissBtn.addEventListener('click', function() { hideSheet(true); });
+            }
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function() { hideSheet(true); });
+            }
+            if (sheetBackdrop) {
+                sheetBackdrop.addEventListener('click', function() { hideSheet(true); });
+            }
+            sheetRoot._pushEventsBound = true;
         }
 
-        if (dismissBtn) {
-            dismissBtn.addEventListener('click', function() { hideSheet(true); });
-        }
-
-        if (closeBtn) {
-            closeBtn.addEventListener('click', function() { hideSheet(true); });
-        }
-
-        if (sheetBackdrop) {
-            sheetBackdrop.addEventListener('click', function() { hideSheet(true); });
-        }
-
-        isInitialized = true;
+        if (isVisible || isScheduled) return;
 
         // Check eligibility and schedule presentation
-        Promise.resolve(isEligible()).then(function(eligible) {
-            if (eligible) {
-                setTimeout(showSheet, SHOW_DELAY_MS);
+        Promise.resolve(isEligible(force)).then(function(eligible) {
+            if (eligible && !isVisible && !isScheduled) {
+                isScheduled = true;
+                setTimeout(function() {
+                    isScheduled = false;
+                    showSheet();
+                }, SHOW_DELAY_MS);
             }
         });
     }
 
-    // Expose programmatic trigger on window
-    window.showPushPromptSheet = async function() {
-        if (!sheetRoot) initPushSheet();
+    // Expose programmatic trigger on window for testing or manual prompt
+    window.showPushPromptSheet = async function(force = true) {
         if (isNativeApp()) {
             await waitForBridge();
         }
-        showSheet();
+        initPushSheet(force);
     };
 
     // Initialize on DOM ready
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initPushSheet);
+        document.addEventListener('DOMContentLoaded', function() { initPushSheet(false); });
     } else {
-        initPushSheet();
+        initPushSheet(false);
     }
+
+    // Re-check after HTMX navigation / page settling
+    document.addEventListener('htmx:afterSettle', function() {
+        initPushSheet(false);
+    });
+    document.addEventListener('htmx:historyRestore', function() {
+        initPushSheet(false);
+    });
 })();

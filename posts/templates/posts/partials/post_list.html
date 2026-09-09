@@ -3,7 +3,7 @@
 
 {% empty %}
     {% if not cursor %}
-        <div class="card border-0 shadow-sm rounded-4 p-4 my-3 text-center bg-white">
+        <div class="card border-0 shadow-sm rounded-4 p-4 my-3 text-center feed-empty-card">
             <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3 mx-auto" style="width: 56px; height: 56px;">
                 <i class="bi bi-people-fill fs-3"></i>
             </div>
@@ -20,18 +20,18 @@
                     </div>
                     <div class="d-flex gap-2 overflow-auto pb-2" style="scrollbar-width: thin;">
                         {% for sug_user in suggested_users %}
-                            <div class="card border rounded-4 p-3 shadow-xs flex-shrink-0" style="width: 170px;">
+                            <div class="card border rounded-4 p-3 shadow-xs flex-shrink-0 feed-empty-user-card" style="width: 170px;">
                                 <div class="text-center">
                                     <div class="position-relative d-inline-block mb-2">
                                         {% if sug_user.profile_pic and sug_user.profile_pic.url %}
                                             <img src="{{ sug_user.profile_pic.url }}" alt="{{ sug_user.username }}" class="rounded-circle object-fit-cover" style="width: 48px; height: 48px;">
                                         {% else %}
-                                            <div class="rounded-circle bg-light text-primary d-flex align-items-center justify-content-center fw-bold mx-auto" style="width: 48px; height: 48px;">
+                                            <div class="rounded-circle avatar-placeholder bg-light text-primary d-flex align-items-center justify-content-center fw-bold mx-auto" style="width: 48px; height: 48px;">
                                                 {{ sug_user.first_name|first|default:sug_user.username|first|upper }}
                                             </div>
                                         {% endif %}
                                     </div>
-                                    <h6 class="fw-bold small text-truncate mb-0 text-dark">{{ sug_user.get_full_name|default:sug_user.username }}</h6>
+                                    <h6 class="fw-bold small text-truncate mb-0 user-card-name">{{ sug_user.get_full_name|default:sug_user.username }}</h6>
                                     <span class="text-muted d-block text-truncate mb-2" style="font-size: 0.72rem;">{{ sug_user.recommendation_reason|default:sug_user.username }}</span>
                                     <button class="btn btn-sm btn-primary rounded-pill w-100 py-1 fw-bold onboarding-follow-btn"
                                             id="onboarding-follow-btn-{{ sug_user.id }}"

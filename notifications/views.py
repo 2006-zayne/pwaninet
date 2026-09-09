@@ -744,16 +744,6 @@ class SubscribeView(APIView):
                     'is_active': True,
                 }
             )
-            return Response(
-                {
-                    'status': 'success',
-                    'message': 'Push device registered successfully.',
-                    'subscription_id': sub.id,
-                    'is_active': sub.is_active
-                },
-                status=status.HTTP_200_OK
-            )
-
         elif token_type == PushSubscription.TokenType.FCM:
             fcm_token = payload.get('fcm_token')
             if not fcm_token:
@@ -773,20 +763,28 @@ class SubscribeView(APIView):
                     'is_active': True,
                 }
             )
-            return Response(
-                {
-                    'status': 'success',
-                    'message': 'Push device registered successfully.',
-                    'subscription_id': sub.id,
-                    'is_active': sub.is_active
-                },
-                status=status.HTTP_200_OK
-            )
         else:
             return Response(
                 {'error': f'Unsupported token_type: {token_type}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        # Ensure user's push_enabled preference is True
+        try:
+            from notifications.models import NotificationPreference
+            NotificationPreference.objects.filter(user=request.user).update(push_enabled=True)
+        except Exception:
+            pass
+
+        return Response(
+            {
+                'status': 'success',
+                'message': 'Push device registered successfully.',
+                'subscription_id': sub.id,
+                'is_active': sub.is_active
+            },
+            status=status.HTTP_200_OK
+        )
 
 
 @login_required
@@ -848,6 +846,13 @@ def subscribe_push(request):
         )
     else:
         return HttpResponseBadRequest(f"Unsupported token_type: {token_type}")
+
+    # Ensure user's push_enabled preference is True
+    try:
+        from notifications.models import NotificationPreference
+        NotificationPreference.objects.filter(user=request.user).update(push_enabled=True)
+    except Exception:
+        pass
 
     return JsonResponse({'status': 'success', 'message': 'Push device registered successfully.', 'subscription_id': sub.id})
 

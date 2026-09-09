@@ -1,14 +1,31 @@
 {% if request.session.just_onboarded %}
-<div class="welcome-tour-banner alert alert-light border shadow-sm rounded-4 p-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3 animate-fade-in"
-     id="welcomeTourBanner"
-     style="background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%); border-color: #bfdbfe !important;">
+<style>
+  .welcome-tour-banner {
+    background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+    border-color: #bfdbfe !important;
+    color: var(--text-dark, #0f172a);
+  }
+  .welcome-tour-banner .banner-title {
+    color: var(--text-dark, #0f172a);
+  }
+  [data-theme="dark"] .welcome-tour-banner {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, var(--card-bg, #242526) 100%) !important;
+    border-color: rgba(99, 102, 241, 0.35) !important;
+    color: var(--text-dark, #e4e6eb) !important;
+  }
+  [data-theme="dark"] .welcome-tour-banner .banner-title {
+    color: #ffffff !important;
+  }
+</style>
+<div class="welcome-tour-banner alert border shadow-sm rounded-4 p-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3 animate-fade-in"
+     id="welcomeTourBanner">
   <div class="d-flex align-items-center gap-3 min-w-0">
     <div class="rounded-circle bg-primary bg-opacity-10 text-primary p-2 d-flex align-items-center justify-content-center flex-shrink-0"
          style="width: 44px; height: 44px;">
       <i class="bi bi-stars fs-4"></i>
     </div>
     <div>
-      <h6 class="mb-1 fw-bold text-dark">You're all set, {{ request.user.first_name|default:request.user.username }}! 🎉</h6>
+      <h6 class="mb-1 fw-bold banner-title">You're all set, {{ request.user.first_name|default:request.user.username }}! 🎉</h6>
       <p class="text-muted small mb-0">Your feed is populated with classmates and groups. Want a quick 30-second tour of PwaniNet features?</p>
     </div>
   </div>

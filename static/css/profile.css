@@ -100,6 +100,24 @@
 
 [data-theme="dark"] .avatar {
     background-color: #334155;
+    border-color: var(--card-bg, #242526);
+}
+
+.profile-card,
+.post-card {
+    background-color: var(--card-bg, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    color: var(--text-dark, #0f172a);
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+[data-theme="dark"] .profile-card,
+[data-theme="dark"] .post-card,
+[data-theme="dark"] #profile-completion-card {
+    background-color: var(--card-bg, #242526) !important;
+    border-color: var(--border, #3a3b3c) !important;
+    color: var(--text-dark, #e4e6eb) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
 }
 
 [data-theme="dark"] .bg-white {
@@ -112,7 +130,7 @@
     color: #ffffff !important;
 }
 [data-theme="dark"] .text-muted {
-    color: #d1d5db !important;
+    color: #94a3b8 !important;
 }
 [data-theme="dark"] .card {
     background-color: var(--card-bg) !important;
@@ -124,6 +142,19 @@
 
 .profile-card {
     position: relative;
+}
+
+/* Bio box in profile card */
+.profile-card .bg-light {
+    background-color: #f1f5f9 !important;
+    border: 1px solid #e2e8f0;
+}
+[data-theme="dark"] .profile-card .bg-light {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid var(--border, #3a3b3c) !important;
+}
+[data-theme="dark"] .profile-card .bg-light p {
+    color: #cbd5e1 !important;
 }
 
 .photo-edit-icon {
@@ -185,20 +216,155 @@
 .profile-stat-btn {
     border: none;
     background: transparent;
-    padding: 0;
+    padding: 6px 4px;
     width: 100%;
     cursor: pointer;
-    transition: background 0.2s ease;
-    border-radius: 8px;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+    border-radius: 10px;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
 .profile-stat-btn:hover {
     background: rgba(37, 99, 235, 0.08);
 }
 
-.profile-stat-btn:focus {
+.profile-stat-btn:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+}
+
+[data-theme="dark"] .profile-stat-btn {
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .profile-stat-btn:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] .profile-stat-btn:focus-visible {
+    box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.4) !important;
+}
+
+/* Profile Counts & Stats Typography */
+.profile-card .profile-stat-btn h6,
+.profile-card h6#follower-count,
+.profile-card h6#following-count,
+.profile-card h6#pinches-sent-count,
+.profile-card h6#pinches-received-count,
+#follower-count,
+#following-count,
+#pinches-sent-count,
+#pinches-received-count {
+    font-weight: 700 !important;
+    color: var(--text-dark, #0f172a);
+    font-size: 1.15rem;
+    line-height: 1.25;
+    margin-bottom: 2px;
+    transition: color 0.2s ease;
+}
+
+.profile-card h6#total-likes-count,
+#total-likes-count {
+    font-weight: 700 !important;
+    color: var(--primary, #2563eb) !important;
+    font-size: 1.15rem;
+    line-height: 1.25;
+    margin-bottom: 2px;
+    transition: color 0.2s ease;
+}
+
+.profile-card .profile-stat-btn small,
+.profile-card .row.text-center small {
+    font-size: 0.68rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase;
+    color: #64748b;
+    transition: color 0.2s ease;
+}
+
+/* Dark theme counts & labels */
+[data-theme="dark"] .profile-card .profile-stat-btn h6,
+[data-theme="dark"] .profile-card h6#follower-count,
+[data-theme="dark"] .profile-card h6#following-count,
+[data-theme="dark"] .profile-card h6#pinches-sent-count,
+[data-theme="dark"] .profile-card h6#pinches-received-count,
+[data-theme="dark"] #follower-count,
+[data-theme="dark"] #following-count,
+[data-theme="dark"] #pinches-sent-count,
+[data-theme="dark"] #pinches-received-count {
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .profile-card h6#total-likes-count,
+[data-theme="dark"] #total-likes-count {
+    color: #818cf8 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .profile-card .profile-stat-btn small,
+[data-theme="dark"] .profile-card .row.text-center small {
+    color: #94a3b8 !important;
+}
+
+/* Profile card dividers */
+.profile-card .border-top,
+.profile-card .border-end,
+.profile-card .border-bottom,
+.profile-card .border-start {
+    border-color: var(--border, #e2e8f0) !important;
+    transition: border-color 0.2s ease;
+}
+
+[data-theme="dark"] .profile-card .border-top,
+[data-theme="dark"] .profile-card .border-end,
+[data-theme="dark"] .profile-card .border-bottom,
+[data-theme="dark"] .profile-card .border-start {
+    border-color: var(--border, #3a3b3c) !important;
+}
+
+/* Profile Completion Card (especially for new users) */
+#profile-completion-card .progress {
+    background-color: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+}
+[data-theme="dark"] #profile-completion-card .progress {
+    background-color: rgba(255, 255, 255, 0.12) !important;
+}
+[data-theme="dark"] #profile-completion-card .bg-light {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid var(--border, #3a3b3c) !important;
+}
+[data-theme="dark"] #profile-completion-card .text-secondary {
+    color: #cbd5e1 !important;
+}
+
+/* Academic details & About card text visibility */
+[data-theme="dark"] .profile-content .post-card h6,
+[data-theme="dark"] .profile-content .post-card h4 {
+    color: #f8fafc !important;
+}
+[data-theme="dark"] .profile-content .post-card span.fw-bold {
+    color: #f1f5f9 !important;
+}
+[data-theme="dark"] .profile-content .post-card small.text-muted {
+    color: #94a3b8 !important;
+}
+[data-theme="dark"] #profileMoreInfo .card-body.bg-light {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid var(--border, #3a3b3c) !important;
+    color: #e4e6eb !important;
+}
+[data-theme="dark"] #profileMoreInfo .badge.bg-light {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: #e4e6eb !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
 /* Connections bottom sheet (mobile) / centered modal (desktop) */
