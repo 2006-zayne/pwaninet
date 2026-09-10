@@ -30,19 +30,37 @@ def _url_to_local_path(url_or_path: str) -> str | None:
     parsed = urlparse(url_or_path)
     path = parsed.path if parsed.path else url_or_path
 
-    # Handle /media/ URLs
-    media_url = settings.MEDIA_URL
-    if path.startswith(media_url):
-        rel_path = path[len(media_url):]
+    # Handle /media/ URLs (including CDN or absolute URLs)
+    media_url = getattr(settings, 'MEDIA_URL', '/media/')
+    media_path = urlparse(media_url).path if media_url.startswith(('http://', 'https://')) else media_url
+    if media_path and path.startswith(media_path):
+        rel_path = path[len(media_path):]
+        local_file = os.path.join(settings.MEDIA_ROOT, rel_path)
+        if os.path.exists(local_file):
+            return local_file
+    elif path.startswith('/media/'):
+        rel_path = path[7:]
         local_file = os.path.join(settings.MEDIA_ROOT, rel_path)
         if os.path.exists(local_file):
             return local_file
 
     # Handle /static/ URLs
-    static_url = settings.STATIC_URL
-    if path.startswith(static_url):
-        rel_path = path[len(static_url):]
+    static_url = getattr(settings, 'STATIC_URL', '/static/')
+    static_path = urlparse(static_url).path if static_url.startswith(('http://', 'https://')) else static_url
+    if static_path and path.startswith(static_path):
+        rel_path = path[len(static_path):]
         # Check staticfiles directories
+        if hasattr(settings, 'STATICFILES_DIRS') and settings.STATICFILES_DIRS:
+            for sdir in settings.STATICFILES_DIRS:
+                cand = os.path.join(sdir, rel_path)
+                if os.path.exists(cand):
+                    return cand
+        if hasattr(settings, 'STATIC_ROOT') and settings.STATIC_ROOT:
+            cand = os.path.join(settings.STATIC_ROOT, rel_path)
+            if os.path.exists(cand):
+                return cand
+    elif path.startswith('/static/'):
+        rel_path = path[8:]
         if hasattr(settings, 'STATICFILES_DIRS') and settings.STATICFILES_DIRS:
             for sdir in settings.STATICFILES_DIRS:
                 cand = os.path.join(sdir, rel_path)

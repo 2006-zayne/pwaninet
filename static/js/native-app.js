@@ -1409,7 +1409,17 @@ function showNativePushBanner(notification) {
             window.PwaninetBridge.showToast(toastMessage);
         }
     } catch (_) {}
-    const icon = data.icon || notification.icon || '/static/images/web-app-manifest-192x192-rounded.png';
+
+    let icon = data.avatar_url;
+    if (!icon && data.icon && (data.icon.startsWith('http://') || data.icon.startsWith('https://') || data.icon.startsWith('/'))) {
+        icon = data.icon;
+    }
+    if (!icon && notification.icon && (notification.icon.startsWith('http://') || notification.icon.startsWith('https://') || notification.icon.startsWith('/'))) {
+        icon = notification.icon;
+    }
+    if (!icon) {
+        icon = '/static/images/web-app-manifest-192x192-rounded.png';
+    }
     const previewImage = data.image || notification.image || data.thumbnail_url || null;
     const resourceType = (data.resource_type || '').toUpperCase();
     const resourceTitle = data.resource_title || '';

@@ -103,6 +103,19 @@ class InAppAdapter(DeliveryAdapter):
                 if notification.metadata and isinstance(notification.metadata, dict):
                     thumb_img = notification.metadata.get('thumbnail_url') or notification.metadata.get('image_url')
 
+                try:
+                    from notifications.delivery.image_utils import get_rounded_avatar_url, get_rounded_thumbnail_url
+                    if actor_avatar:
+                        rounded_av = get_rounded_avatar_url(actor_avatar)
+                        if rounded_av:
+                            actor_avatar = rounded_av
+                    if thumb_img:
+                        rounded_th = get_rounded_thumbnail_url(thumb_img)
+                        if rounded_th:
+                            thumb_img = rounded_th
+                except Exception:
+                    pass
+
                 # Serialize notification data
                 notification_data = {
                     'notification_id': str(notification.notification_id),
@@ -526,52 +539,72 @@ class PushAdapter(DeliveryAdapter):
         try:
             from firebase_admin import messaging
 
-            notification_kwargs = {
-                'title': content['title'],
-                'body': content['body'],
-            }
-
-            android_notif_kwargs = {
-                'icon': 'ic_stat_pwaninet',
-                'channel_id': content.get('channel_id') or 'pwaninet_notifications',
-                'tag': content.get('tag') or f"pwaninet-{notification.notification_id}",
-                'color': '#2563eb',
-                'default_sound': True,
-                'default_vibrate_timings': True,
-                'priority': 'high',
-                'visibility': 'public',
-            }
-
-            # Display image: Post thumbnail preview, or actor avatar as primary image
-            display_image = content.get('image') or content.get('icon')
-            if display_image:
-                notification_kwargs['image'] = display_image
-                android_notif_kwargs['image'] = display_image
-
             fcm_data = {
+                "title": str(content.get('title') or 'PwaniNet'),
+                "body": str(content.get('body') or ''),
                 "url": str(content.get('target_url') or '/'),
                 "destination_url": str(content.get('destination_url') or content.get('target_url') or '/'),
                 "notification_id": str(notification.notification_id),
                 "notification_type": str(notification.notification_type),
                 "category": str(notification.category or ''),
-                "icon": str(content.get('icon') or ''),
+                "icon": "ic_stat_pwaninet",
                 "avatar_url": str(content.get('icon') or ''),
                 "image": str(content.get('image') or ''),
                 "resource_type": str(content.get('resource_type') or ''),
                 "resource_title": str(content.get('resource_title') or ''),
+                "channel_id": str(content.get('channel_id') or 'pwaninet_notifications'),
                 "tag": str(content.get('tag') or f"pwaninet-{notification.notification_id}"),
+                "color": "#2563eb",
             }
 
-            message = messaging.Message(
-                notification=messaging.Notification(**notification_kwargs),
-                android=messaging.AndroidConfig(
-                    priority='high',
-                    notification=messaging.AndroidNotification(**android_notif_kwargs),
-                    data=fcm_data
-                ),
-                data=fcm_data,
-                token=sub.fcm_token,
-            )
+            is_android = str(getattr(sub, 'platform', '')).upper() in ('ANDROID_NATIVE', 'ANDROID')
+
+            if is_android:
+                # For Android Native, dispatch high-priority data message.
+                # This guarantees PwaninetFirebaseMessagingService runs across all lifecycle states
+                # (Foreground, Background, and Terminated), downloading the actor avatar as largeIcon (circular)
+                # and media thumbnail as BigPictureStyle, while preventing Google Play Services from double-posting.
+                message = messaging.Message(
+                    android=messaging.AndroidConfig(
+                        priority='high',
+                        data=fcm_data
+                    ),
+                    data=fcm_data,
+                    token=sub.fcm_token,
+                )
+            else:
+                notification_kwargs = {
+                    'title': content['title'],
+                    'body': content['body'],
+                }
+
+                android_notif_kwargs = {
+                    'icon': 'ic_stat_pwaninet',
+                    'channel_id': content.get('channel_id') or 'pwaninet_notifications',
+                    'tag': content.get('tag') or f"pwaninet-{notification.notification_id}",
+                    'color': '#2563eb',
+                    'default_sound': True,
+                    'default_vibrate_timings': True,
+                    'priority': 'high',
+                    'visibility': 'public',
+                }
+
+                # Display image: Post thumbnail preview, or actor avatar as primary image
+                display_image = content.get('image') or content.get('icon')
+                if display_image:
+                    notification_kwargs['image'] = display_image
+                    android_notif_kwargs['image'] = display_image
+
+                message = messaging.Message(
+                    notification=messaging.Notification(**notification_kwargs),
+                    android=messaging.AndroidConfig(
+                        priority='high',
+                        notification=messaging.AndroidNotification(**android_notif_kwargs),
+                        data=fcm_data
+                    ),
+                    data=fcm_data,
+                    token=sub.fcm_token,
+                )
             messaging.send(message, app=app)
             logger.info(f"FCM sent successfully to subscription {sub.id} for notification {notification.notification_id}")
             return True
