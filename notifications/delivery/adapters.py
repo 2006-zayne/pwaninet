@@ -86,6 +86,23 @@ class InAppAdapter(DeliveryAdapter):
                 from notifications.queries.notification_queries import get_unread_count
                 unread_count = get_unread_count(notification.recipient)
 
+                # Resolve actor avatar and thumbnail for rich in-app toast
+                actor_avatar = None
+                if notification.metadata and isinstance(notification.metadata, dict):
+                    actor_avatar = notification.metadata.get('actor_avatar')
+                if not actor_avatar and hasattr(notification, 'actor') and notification.actor:
+                    if hasattr(notification.actor, 'profile_pic') and notification.actor.profile_pic:
+                        try:
+                            actor_avatar = notification.actor.profile_pic.url
+                        except Exception:
+                            pass
+                if not actor_avatar:
+                    actor_avatar = '/static/images/web-app-manifest-192x192-rounded.png'
+
+                thumb_img = None
+                if notification.metadata and isinstance(notification.metadata, dict):
+                    thumb_img = notification.metadata.get('thumbnail_url') or notification.metadata.get('image_url')
+
                 # Serialize notification data
                 notification_data = {
                     'notification_id': str(notification.notification_id),
@@ -94,6 +111,8 @@ class InAppAdapter(DeliveryAdapter):
                     'priority': notification.priority,
                     'title': notification.title,
                     'summary': notification.summary,
+                    'actor_avatar': actor_avatar,
+                    'thumbnail_url': thumb_img,
                     'context_type': notification.context_type,
                     'context_id': notification.context_id,
                     'created_at': notification.created_at.isoformat(),
@@ -292,10 +311,23 @@ class PushAdapter(DeliveryAdapter):
             actor_avatar = payload.actors[0].avatar
         if not actor_avatar and notification.metadata and isinstance(notification.metadata, dict):
             actor_avatar = notification.metadata.get('actor_avatar')
+        if not actor_avatar and hasattr(notification, 'actor') and notification.actor:
+            try:
+                if hasattr(notification.actor, 'profile_pic') and notification.actor.profile_pic:
+                    actor_avatar = notification.actor.profile_pic.url
+            except Exception:
+                pass
         if not actor_avatar:
             actor_avatar = '/static/images/web-app-manifest-192x192-rounded.png'
 
         actor_avatar = self._make_absolute_url(actor_avatar)
+        try:
+            from notifications.delivery.image_utils import get_rounded_avatar_url, get_rounded_thumbnail_url
+            rounded_avatar = get_rounded_avatar_url(actor_avatar)
+            if rounded_avatar:
+                actor_avatar = self._make_absolute_url(rounded_avatar)
+        except Exception as e:
+            logger.debug(f"Could not generate rounded avatar: {e}")
 
         # 3. Resolve Resource Preview (Post / Document updates)
         preview_image = None
@@ -311,11 +343,52 @@ class PushAdapter(DeliveryAdapter):
             if res.image_url:
                 preview_image = self._make_absolute_url(res.image_url)
 
-        # Fallback: check metadata directly if payload.resource image was missing
+        # Fallback 1: check metadata directly if payload.resource image was missing
         if not preview_image and notification.metadata and isinstance(notification.metadata, dict):
             raw_thumb = notification.metadata.get('thumbnail_url') or notification.metadata.get('image_url')
             if raw_thumb:
                 preview_image = self._make_absolute_url(raw_thumb)
+
+        # Fallback 2: If still no preview_image and notification relates to a post, lookup post directly
+        if not preview_image:
+            post_id = None
+            if str(notification.target_type).upper() in ['POST', 'POSTS'] and notification.target_id:
+                post_id = notification.target_id
+            elif str(notification.context_type).upper() in ['POST', 'POSTS'] and notification.context_id:
+                post_id = notification.context_id
+            elif notification.metadata and isinstance(notification.metadata, dict):
+                post_id = notification.metadata.get('post_id') or notification.metadata.get('target_id')
+
+            if post_id:
+                try:
+                    from posts.models import Post
+                    post_obj = Post.objects.filter(id=int(post_id)).first() if str(post_id).isdigit() else Post.objects.filter(share_id=str(post_id)).first()
+                    if post_obj:
+                        if post_obj.images.exists():
+                            first_img = post_obj.images.first()
+                            thumb = getattr(first_img, 'get_thumbnail_url', lambda s: None)('400') or (first_img.image.url if getattr(first_img, 'image', None) else None)
+                            if thumb:
+                                preview_image = self._make_absolute_url(thumb)
+                        if not preview_image and post_obj.video_poster:
+                            preview_image = self._make_absolute_url(post_obj.video_poster.url)
+                        if not preview_image and post_obj.shared_document:
+                            doc = post_obj.shared_document
+                            if hasattr(doc, 'latest_version') and doc.latest_version:
+                                f_file = doc.latest_version.files.first()
+                                if f_file and (f_file.thumbnail_path or f_file.preview_path):
+                                    preview_image = self._make_absolute_url(f"/media/{f_file.thumbnail_path or f_file.preview_path}")
+                        if not preview_image and post_obj.thumbnail:
+                            preview_image = self._make_absolute_url(post_obj.thumbnail.url)
+                except Exception as e:
+                    logger.debug(f"Failed direct post thumbnail lookup for notification {notification.notification_id}: {e}")
+
+        if preview_image:
+            try:
+                rounded_thumb = get_rounded_thumbnail_url(preview_image)
+                if rounded_thumb:
+                    preview_image = self._make_absolute_url(rounded_thumb)
+            except Exception as e:
+                logger.debug(f"Could not generate rounded thumbnail: {e}")
 
         # 4. Resolve Target URL
         try:
@@ -381,7 +454,7 @@ class PushAdapter(DeliveryAdapter):
             'body': content['body'],
             'icon': content['icon'],
             'image': content.get('image'),
-            'badge': self._make_absolute_url('/static/images/favicon-96x96.png'),
+            'badge': self._make_absolute_url('/static/images/pwaninetmonochrome.png'),
             'vibrate': [200, 100, 200],
             'requireInteraction': False,
             'tag': content['tag'],
@@ -457,10 +530,9 @@ class PushAdapter(DeliveryAdapter):
                 'title': content['title'],
                 'body': content['body'],
             }
-            if content.get('image'):
-                notification_kwargs['image'] = content['image']
 
             android_notif_kwargs = {
+                'icon': 'ic_stat_pwaninet',
                 'channel_id': content.get('channel_id') or 'pwaninet_notifications',
                 'tag': content.get('tag') or f"pwaninet-{notification.notification_id}",
                 'color': '#2563eb',
@@ -469,8 +541,12 @@ class PushAdapter(DeliveryAdapter):
                 'priority': 'high',
                 'visibility': 'public',
             }
-            if content.get('image'):
-                android_notif_kwargs['image'] = content['image']
+
+            # Display image: Post thumbnail preview, or actor avatar as primary image
+            display_image = content.get('image') or content.get('icon')
+            if display_image:
+                notification_kwargs['image'] = display_image
+                android_notif_kwargs['image'] = display_image
 
             fcm_data = {
                 "url": str(content.get('target_url') or '/'),
@@ -479,6 +555,7 @@ class PushAdapter(DeliveryAdapter):
                 "notification_type": str(notification.notification_type),
                 "category": str(notification.category or ''),
                 "icon": str(content.get('icon') or ''),
+                "avatar_url": str(content.get('icon') or ''),
                 "image": str(content.get('image') or ''),
                 "resource_type": str(content.get('resource_type') or ''),
                 "resource_title": str(content.get('resource_title') or ''),

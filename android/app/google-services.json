@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "904740616294",
+    "project_id": "pwaninet-da105",
+    "storage_bucket": "pwaninet-da105.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:904740616294:android:3db2c7dc6f55afd5a5d5a7",
+        "android_client_info": {
+          "package_name": "com.pwaninet.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAA-jTnxpXhgS3q6KTbfFBT-nk3ClsU_hw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

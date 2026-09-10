@@ -122,7 +122,14 @@ jobs:
             echo "Warning: ANDROID_KEYSTORE_BASE64 not set, Gradle will build unsigned APK."
           fi
 
-      - name: Decode Google Services JSON
+      - name: Print Release Certificate Fingerprints
+        run: |
+          if [ -f android/release.jks ]; then
+            echo "=== Release Keystore SHA Fingerprints ==="
+            keytool -list -v -keystore android/release.jks -alias "${{ secrets.ANDROID_KEY_ALIAS }}" -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" | grep -E "SHA1:|SHA256:|Owner:" || true
+          fi
+
+      - name: Verify Google Services JSON
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
@@ -130,9 +137,10 @@ jobs:
             echo "${GOOGLE_SERVICES_JSON}" > android/app/google-services.json
             echo "google-services.json restored from secrets."
           elif [ -f android/app/google-services.json ]; then
-            echo "google-services.json already present."
+            echo "google-services.json already present from repository."
           else
-            echo "Notice: GOOGLE_SERVICES_JSON not provided, building without FCM config."
+            echo "::error::google-services.json is missing! Push notifications cannot work in release builds."
+            exit 1
           fi
 
       - name: Build Android Release APK

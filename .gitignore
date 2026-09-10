@@ -55,8 +55,9 @@ celerybeat.pid
 *.crt
 *firebase*.json
 *adminsdk*.json
-**/google-services.json
 firebase-adminsdk.json
+# Allow Android client google-services.json for CI/CD builds
+!android/app/google-services.json
 
 # =========================
 # IDE / OS FILES
