@@ -13,6 +13,7 @@ import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
+import android.net.http.HttpResponseCache;
 import android.net.Uri;
 import android.os.Build;
 import android.util.Log;
@@ -26,10 +27,15 @@ import com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
+import java.io.File;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Custom Firebase Messaging Service for PwaniNet.
@@ -46,6 +52,25 @@ public class PwaninetFirebaseMessagingService extends FirebaseMessagingService {
     private static final String TAG = "PwaninetPushService";
     private static final String DEFAULT_CHANNEL_ID = "pwaninet_notifications";
     private static final int IMAGE_TIMEOUT_MS = 2500;
+    private static final ExecutorService DOWNLOAD_EXECUTOR = Executors.newFixedThreadPool(2);
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        initHttpCache();
+    }
+
+    private void initHttpCache() {
+        try {
+            if (HttpResponseCache.getInstalled() == null) {
+                File cacheDir = new File(getCacheDir(), "notif_http_cache");
+                long cacheSize = 10 * 1024 * 1024; // 10 MiB disk cache
+                HttpResponseCache.install(cacheDir, cacheSize);
+            }
+        } catch (Exception e) {
+            Log.d(TAG, "HTTP response cache could not be installed: " + e.getMessage());
+        }
+    }
 
     @Override
     public void onNewToken(@NonNull String token) {
@@ -167,29 +192,50 @@ public class PwaninetFirebaseMessagingService extends FirebaseMessagingService {
             );
             builder.setContentIntent(pendingIntent);
 
-            // 1. Actor Avatar Processing: Download and apply circular masking
+            // Concurrent Image Processing: Fetch avatar and media images in parallel
+            Future<Bitmap> avatarFuture = null;
             if (avatarUrl != null && !avatarUrl.trim().isEmpty()) {
-                Bitmap avatarBitmap = downloadBitmapWithTimeout(avatarUrl);
-                if (avatarBitmap != null) {
-                    Bitmap circularAvatar = createCircularBitmap(avatarBitmap);
-                    if (circularAvatar != null) {
-                        builder.setLargeIcon(circularAvatar);
+                final String aUrl = avatarUrl;
+                avatarFuture = DOWNLOAD_EXECUTOR.submit(() -> downloadBitmapWithTimeout(aUrl));
+            }
+
+            Future<Bitmap> mediaFuture = null;
+            if (imageUrl != null && !imageUrl.trim().isEmpty()) {
+                final String mUrl = imageUrl;
+                mediaFuture = DOWNLOAD_EXECUTOR.submit(() -> downloadBitmapWithTimeout(mUrl));
+            }
+
+            // 1. Actor Avatar Processing: Apply circular masking
+            if (avatarFuture != null) {
+                try {
+                    Bitmap avatarBitmap = avatarFuture.get(IMAGE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                    if (avatarBitmap != null) {
+                        Bitmap circularAvatar = createCircularBitmap(avatarBitmap);
+                        if (circularAvatar != null) {
+                            builder.setLargeIcon(circularAvatar);
+                        }
                     }
+                } catch (Exception e) {
+                    Log.d(TAG, "Avatar image retrieval skipped/timed out: " + e.getMessage());
                 }
             }
 
-            // 2. Media Processing: Download and apply BigPictureStyle
-            if (imageUrl != null && !imageUrl.trim().isEmpty()) {
-                Bitmap mediaBitmap = downloadBitmapWithTimeout(imageUrl);
-                if (mediaBitmap != null) {
-                    NotificationCompat.BigPictureStyle bigPicStyle = new NotificationCompat.BigPictureStyle()
-                            .bigPicture(mediaBitmap)
-                            .bigLargeIcon((Bitmap) null) // Cleanly removes largeIcon when expanded so media has full visual focus
-                            .setSummaryText(body);
-                    builder.setStyle(bigPicStyle);
-                } else {
-                    builder.setStyle(new NotificationCompat.BigTextStyle().bigText(body));
+            // 2. Media Processing: Apply BigPictureStyle
+            Bitmap mediaBitmap = null;
+            if (mediaFuture != null) {
+                try {
+                    mediaBitmap = mediaFuture.get(IMAGE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                } catch (Exception e) {
+                    Log.d(TAG, "Media image retrieval skipped/timed out: " + e.getMessage());
                 }
+            }
+
+            if (mediaBitmap != null) {
+                NotificationCompat.BigPictureStyle bigPicStyle = new NotificationCompat.BigPictureStyle()
+                        .bigPicture(mediaBitmap)
+                        .bigLargeIcon((Bitmap) null) // Cleanly removes largeIcon when expanded so media has full visual focus
+                        .setSummaryText(body);
+                builder.setStyle(bigPicStyle);
             } else {
                 builder.setStyle(new NotificationCompat.BigTextStyle().bigText(body));
             }
