@@ -698,6 +698,7 @@ class PushContentCustomizationTests(TestCase):
         self.assertIn('Grace Student pinched you', sent_data['body'])
         self.assertTrue(sent_data['renotify'])
         self.assertEqual(sent_data['tag'], 'pwaninet-social-pinch')
+        self.assertIn('pwaninetmonochrome.png', sent_data['badge'])
 
     @patch('notifications.delivery.adapters.get_firebase_app')
     @patch('firebase_admin.messaging.send')
@@ -732,6 +733,7 @@ class PushContentCustomizationTests(TestCase):
         self.assertIsNotNone(sent_message.android)
         self.assertEqual(sent_message.android.notification.channel_id, 'pwaninet_social')
         self.assertEqual(sent_message.android.notification.color, '#2563eb')
+        self.assertEqual(sent_message.android.notification.icon, 'ic_stat_pwaninet')
         self.assertEqual(sent_message.android.collapse_key, 'pwaninet-social-pinch')
 
 

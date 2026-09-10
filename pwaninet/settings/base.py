@@ -70,6 +70,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'pwaninet.middleware.auth_logging_middleware.AuthLoggingMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -175,6 +176,7 @@ AUTH_USER_MODEL = 'users.User'
 
 AUTHENTICATION_BACKENDS = [
     'axes.backends.AxesStandaloneBackend',
+    'users.backends.CaseInsensitiveAuthBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
@@ -339,14 +341,28 @@ _env_cors = [c.strip() for c in os.environ.get('CORS_ALLOWED_ORIGINS', '').split
 CORS_ALLOWED_ORIGINS = list(set(_default_cors + _env_cors))
 CORS_ALLOW_CREDENTIALS = True
 
+# Proxy SSL header for reverse proxies and tunnels (Cloudflare Tunnel, Nginx)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+
 # CSRF settings (supports both http:// and https:// for web and Capacitor)
 _csrf_hosts = [h.split(':')[0].strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,pwaninet.app').split(',') if h.strip()]
 CSRF_TRUSTED_ORIGINS = list(set([
     'https://pwaninet.app',
+    'https://*.pwaninet.app',
+    'http://pwaninet.app',
+    'https://*.trycloudflare.com',
     'https://cdn.pwaninet.app',
     'capacitor://localhost',
     'http://localhost',
+    'http://localhost:8000',
     'https://localhost',
+    'https://localhost:8000',
+    'http://127.0.0.1',
+    'http://127.0.0.1:8000',
+    'https://127.0.0.1',
+    'https://127.0.0.1:8000',
     *[f"http://{h}" for h in _csrf_hosts],
     *[f"https://{h}" for h in _csrf_hosts],
 ]))
@@ -475,4 +491,35 @@ if USE_S3:
     MEDIA_URL  = f'https://{CDN_DOMAIN}/media/'
     if USE_S3_STATIC:
         STATIC_URL = f'https://{CDN_DOMAIN}/static/'
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'users.auth': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'users': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
+
 

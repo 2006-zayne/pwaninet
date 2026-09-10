@@ -707,3 +707,52 @@ body.keyboard-open .mobile-bottom-nav {
     color: #94a3b8 !important;
     border: 1px solid #334155;
 }
+
+/* ===================================================
+   UNIVERSAL NOTIFICATION AVATARS & THUMBNAILS (ROUNDED)
+   =================================================== */
+.notif-item .notif-avatar-col img,
+.notif-item .actor-stack img,
+.notif-item .sender-avatar,
+.notif-item .notif-avatar,
+.notif-item .avatar-stack-item,
+.notif-item .expanded-actors img,
+.notif-toast .toast-avatar img,
+.notif-avatar-col img {
+    border-radius: 50% !important;
+    object-fit: cover !important;
+}
+
+.notif-item .resource-preview,
+.notif-item .resource-preview img,
+.notif-item .notif-preview-col img,
+.notif-item .notif-thumbnail,
+.notif-item .notif-thumbnail img,
+.notif-toast .toast-preview img,
+.resource-preview,
+.resource-preview img {
+    border-radius: 10px !important;
+    object-fit: cover !important;
+    overflow: hidden !important;
+}
+
+@keyframes slideInNotifToast {
+    from {
+        opacity: 0;
+        transform: translateY(-16px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.notif-toast:hover {
+    box-shadow: var(--shadow-hover, 0 14px 28px rgba(0, 0, 0, 0.25)) !important;
+}
+
+[data-theme="dark"] .notif-toast {
+    background: #1e222a !important;
+    border-color: #2e3542 !important;
+    color: #f1f5f9 !important;
+}

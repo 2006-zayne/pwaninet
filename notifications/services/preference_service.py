@@ -73,7 +73,8 @@ class NotificationPreferenceService:
     
     @staticmethod
     def update_global_preferences(user, email_enabled=None, push_enabled=None, 
-                                  in_app_enabled=None, email_digest=None, push_sound=None):
+                                  in_app_enabled=None, email_digest=None, push_sound=None,
+                                  in_app_toast_enabled=None):
         """
         Update global notification preferences for a user.
         
@@ -84,6 +85,7 @@ class NotificationPreferenceService:
             in_app_enabled: Enable in-app notifications
             email_digest: Send daily digest
             push_sound: Play sound for push notifications
+            in_app_toast_enabled: Enable in-app notification toasts/banners
             
         Returns:
             Updated NotificationPreference instance
@@ -100,6 +102,8 @@ class NotificationPreferenceService:
             preferences.email_digest = email_digest
         if push_sound is not None:
             preferences.push_sound = push_sound
+        if in_app_toast_enabled is not None:
+            preferences.in_app_toast_enabled = in_app_toast_enabled
         
         preferences.save()
         return preferences

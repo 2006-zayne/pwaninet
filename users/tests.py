@@ -185,18 +185,17 @@ class UserSerializerTest(TestCase):
 
 
 class RegistrationTest(TestCase):
-    """Test cases for registration with email field"""
-    
+    """Test cases for registration without email field and case-insensitive auth"""
+
     def setUp(self):
         """Set up test data"""
         self.course = Course.objects.create(name='Computer Science')
         self.year = Year.objects.create(course=self.course, level=1)
-    
-    def test_valid_registration_with_email(self):
-        """Test that registration works with email field"""
+
+    def test_valid_registration_without_email(self):
+        """Test that registration succeeds without an email field"""
         form_data = {
             'username': 'newuser',
-            'email': 'newuser@example.com',
             'password1': 'SecurePass123!',
             'password2': 'SecurePass123!',
             'first_name': 'New',
@@ -205,23 +204,20 @@ class RegistrationTest(TestCase):
             'year': self.year.id,
         }
         form = PwaniSignupForm(data=form_data)
-        self.assertTrue(form.is_valid())
-    
-    def test_duplicate_email_rejected(self):
-        """Test that duplicate email addresses are rejected"""
-        # Create first user
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+        self.assertEqual(user.username, 'newuser')
+
+    def test_duplicate_username_case_insensitive_rejected(self):
+        """Test that duplicate username with different casing is rejected"""
         User.objects.create_user(
-            username='user1',
-            email='test@example.com',
+            username='OriginalUser',
             course=self.course,
             year=self.year,
             password='testpass123'
         )
-        
-        # Try to create second user with same email
         form_data = {
-            'username': 'user2',
-            'email': 'test@example.com',
+            'username': 'originaluser',
             'password1': 'SecurePass123!',
             'password2': 'SecurePass123!',
             'first_name': 'Second',
@@ -231,40 +227,31 @@ class RegistrationTest(TestCase):
         }
         form = PwaniSignupForm(data=form_data)
         self.assertFalse(form.is_valid())
-        self.assertIn('email', form.errors)
-    
-    def test_email_normalization(self):
-        """Test that email is normalized to lowercase"""
-        form_data = {
-            'username': 'newuser',
-            'email': 'TestUser@Example.COM',
-            'password1': 'SecurePass123!',
-            'password2': 'SecurePass123!',
-            'first_name': 'New',
-            'last_name': 'User',
-            'course': self.course.id,
-            'year': self.year.id,
-        }
-        form = PwaniSignupForm(data=form_data)
-        if form.is_valid():
-            user = form.save()
-            self.assertEqual(user.email, 'testuser@example.com')
-    
-    def test_email_required(self):
-        """Test that email field is required"""
-        form_data = {
-            'username': 'newuser',
-            'email': '',
-            'password1': 'SecurePass123!',
-            'password2': 'SecurePass123!',
-            'first_name': 'New',
-            'last_name': 'User',
-            'course': self.course.id,
-            'year': self.year.id,
-        }
-        form = PwaniSignupForm(data=form_data)
-        self.assertFalse(form.is_valid())
-        self.assertIn('email', form.errors)
+        self.assertIn('username', form.errors)
+
+    def test_case_insensitive_auth_backend(self):
+        """Test CaseInsensitiveAuthBackend allows login regardless of username casing or whitespace"""
+        from django.contrib.auth import authenticate
+        from django.test import RequestFactory
+        factory = RequestFactory()
+        request = factory.post('/accounts/login/')
+        user = User.objects.create_user(
+            username='JohnDoe',
+            course=self.course,
+            year=self.year,
+            password='SecretPassword123!'
+        )
+        # Test exact match
+        self.assertEqual(authenticate(request, username='JohnDoe', password='SecretPassword123!'), user)
+
+        # Test lowercase match
+        self.assertEqual(authenticate(request, username='johndoe', password='SecretPassword123!'), user)
+
+        # Test uppercase match
+        self.assertEqual(authenticate(request, username='JOHNDOE', password='SecretPassword123!'), user)
+
+        # Test leading/trailing spaces match
+        self.assertEqual(authenticate(request, username='  JohnDoe  ', password='SecretPassword123!'), user)
 
 
 class EmailVerificationTest(TestCase):

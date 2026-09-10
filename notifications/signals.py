@@ -62,6 +62,26 @@ def create_comment_like_notification(sender, instance, created, **kwargs):
         comment_author = comment.author
         
         if liker != comment_author:
+            post = comment.post
+            thumbnail_url = None
+            if post:
+                if post.thumbnail:
+                    thumbnail_url = post.thumbnail.url
+                elif post.images.exists():
+                    first_img = post.images.first()
+                    thumbnail_url = getattr(first_img, 'get_thumbnail_url', lambda s: None)('400') or (first_img.image.url if getattr(first_img, 'image', None) else None)
+                elif post.video_poster:
+                    thumbnail_url = post.video_poster.url
+                elif post.shared_document:
+                    try:
+                        from documents.models import DocumentFile
+                        if post.shared_document.latest_version:
+                            first_file = post.shared_document.latest_version.files.first()
+                            if first_file and first_file.preview_path:
+                                thumbnail_url = f"/media/{first_file.preview_path}"
+                    except Exception:
+                        pass
+
             # Emit event for new notification engine
             publish_event(
                 event_type=EventTypes.POSTS_COMMENT_LIKED.value,
@@ -71,10 +91,12 @@ def create_comment_like_notification(sender, instance, created, **kwargs):
                 target_type='Comment',
                 target_id=str(comment.id),
                 context_type='POST',
-                context_id=str(comment.post.id),
+                context_id=str(comment.post.id) if comment.post else None,
                 metadata={
                     'comment_content': (comment.content[:50] + '...') if comment.content and len(comment.content) > 50 else (comment.content or ''),
-                    'liker_username': liker.username
+                    'liker_username': liker.username,
+                    'thumbnail_url': thumbnail_url,
+                    'resource_type': 'POST',
                 }
             )
 

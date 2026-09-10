@@ -27,23 +27,130 @@ from .serializers import (
     UserSerializer, UserPublicSerializer, FollowSerializer, PinchSerializer,
     DeviceAccountSerializer, UserUpdateSerializer, NotificationPreferencesSerializer
 )
+import logging
+from django.contrib.auth.views import LoginView
 from .filters import UserFilter, FollowFilter
+
+logger = logging.getLogger('users.auth')
+
+
+def get_client_ip(request):
+    """Safely extract the client IP address from the request."""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        return x_forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR', 'unknown')
 
 
 def register_view(request):
+    """
+    Handle user registration with robust validation, detailed logging,
+    and clear user-facing error feedback.
+    """
     if request.user.is_authenticated:
         return redirect('posts:home')
+
     if request.method == 'POST':
+        ip = get_client_ip(request)
+        submitted_username = request.POST.get('username', '').strip()
+        msg_attempt = f"[AUTH-REGISTER] Registration attempt received from IP={ip} for username='{submitted_username}'"
+        print(msg_attempt, flush=True)
+        logger.info(msg_attempt)
+
         form = PwaniSignupForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            # Send verification email (non-blocking)
-            send_verification_email(user)
-            messages.success(request, 'Account created successfully. Please check your email for account verification instructions.')
-            return redirect('login')
+        try:
+            if form.is_valid():
+                user = form.save()
+                msg_success = f"[AUTH-REGISTER] SUCCESS: User created. id={user.id}, username='{user.username}', IP={ip}"
+                print(msg_success, flush=True)
+                logger.info(msg_success)
+                request.session['registered_username'] = user.username
+                messages.success(request, f"Welcome @{user.username}! Your account has been created successfully. Please log in.")
+                return redirect('login')
+            else:
+                msg_warn = f"[AUTH-REGISTER] Validation failed for username='{submitted_username}', IP={ip}. Errors: {form.errors.as_json()}"
+                print(msg_warn, flush=True)
+                logger.warning(msg_warn)
+                messages.error(request, "Please correct the errors highlighted below.")
+        except Exception as e:
+            msg_err = f"[AUTH-REGISTER] Unexpected exception for username='{submitted_username}': {e}"
+            print(msg_err, flush=True)
+            logger.error(msg_err, exc_info=True)
+            messages.error(request, "An unexpected server error occurred during account creation. Please try again.")
     else:
         form = PwaniSignupForm()
+
     return render(request, 'users/register.html', {'form': form})
+
+
+class PwaniLoginView(LoginView):
+    """
+    Custom LoginView providing:
+    1. Structured logging of authentication attempts and failures.
+    2. Intelligent diagnostic error messages to help users (e.g. distinguishing
+       non-existent accounts from wrong passwords).
+    3. Seamless redirection and session cleanup for newly registered users.
+    """
+    template_name = 'registration/login.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return redirect('posts:home')
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        user = form.get_user()
+        ip = get_client_ip(self.request)
+        msg = f"[AUTH-LOGIN] SUCCESS: User '{user.username}' (id={user.id}) authenticated from IP={ip}"
+        print(msg, flush=True)
+        logger.info(msg)
+        # Clean up transient registered_username session key
+        self.request.session.pop('registered_username', None)
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        username = self.request.POST.get('username', '').strip()
+        ip = get_client_ip(self.request)
+        msg_fail = f"[AUTH-LOGIN] FAILED: Login failed for username='{username}' from IP={ip}"
+        print(msg_fail, flush=True)
+        logger.warning(msg_fail)
+
+        context_extra = {
+            'attempted_username': username,
+        }
+
+        # Check DB to distinguish whether user exists or not
+        user_match = User.objects.filter(username__iexact=username).first()
+        if not user_match and '@' in username:
+            user_match = User.objects.filter(email__iexact=username).first()
+
+        if user_match is None:
+            msg_diag = f"[AUTH-LOGIN] Diagnostic: No account found for username='{username}' in DB."
+            print(msg_diag, flush=True)
+            logger.warning(msg_diag)
+            context_extra['login_error_type'] = 'account_not_found'
+            context_extra['login_error_message'] = (
+                f"No account exists with the username '{username}'. "
+                "If you haven't created an account yet, please sign up."
+            )
+        elif not user_match.is_active:
+            msg_diag = f"[AUTH-LOGIN] Diagnostic: User '{user_match.username}' is inactive."
+            print(msg_diag, flush=True)
+            logger.warning(msg_diag)
+            context_extra['login_error_type'] = 'account_inactive'
+            context_extra['login_error_message'] = (
+                f"The account '{user_match.username}' has been deactivated. Please contact support."
+            )
+        else:
+            msg_diag = f"[AUTH-LOGIN] Diagnostic: Incorrect password for existing user '{user_match.username}'."
+            print(msg_diag, flush=True)
+            logger.warning(msg_diag)
+            context_extra['login_error_type'] = 'wrong_password'
+            context_extra['login_error_message'] = (
+                f"Incorrect password for '{user_match.username}'. Please check your password or reset it below."
+            )
+
+        return self.render_to_response(self.get_context_data(form=form, **context_extra))
 
 
 def load_academic_levels(request):
@@ -878,85 +985,9 @@ def settings_notifications_view(request):
     """Notification preferences settings page"""
     from notifications.services.preference_service import NotificationPreferenceService
     from notifications.events import EventTypes
+    from datetime import time
+    from django.contrib import messages
 
-    # Handle form submission
-    if request.method == 'POST':
-        # Update global preferences
-        email_enabled = request.POST.get('email_enabled') == 'on'
-        email_digest = request.POST.get('email_digest') == 'on'
-        push_enabled = request.POST.get('push_enabled') == 'on'
-        push_sound = request.POST.get('push_sound') == 'on'
-        in_app_enabled = request.POST.get('in_app_enabled') == 'on'
-
-        NotificationPreferenceService.update_global_preferences(
-            request.user,
-            email_enabled=email_enabled,
-            email_digest=email_digest,
-            push_enabled=push_enabled,
-            push_sound=push_sound,
-            in_app_enabled=in_app_enabled
-        )
-
-        # Update quiet hours
-        quiet_hours_enabled = request.POST.get('quiet_hours_enabled') == 'on'
-        quiet_hours_start = request.POST.get('quiet_hours_start')
-        quiet_hours_end = request.POST.get('quiet_hours_end')
-
-        from datetime import time
-        NotificationPreferenceService.update_quiet_hours(
-            request.user,
-            enabled=quiet_hours_enabled,
-            start=time.fromisoformat(quiet_hours_start) if quiet_hours_start else None,
-            end=time.fromisoformat(quiet_hours_end) if quiet_hours_end else None
-        )
-
-        # Update type preferences
-        type_preferences = {}
-        event_type_mapping = {
-            'POSTS_POST_LIKED': EventTypes.POSTS_POST_LIKED.value,
-            'POSTS_COMMENT_CREATED': EventTypes.POSTS_COMMENT_CREATED.value,
-            'POSTS_COMMENT_REPLY_CREATED': EventTypes.POSTS_COMMENT_REPLY_CREATED.value,
-            'POSTS_COMMENT_REPLIED': EventTypes.POSTS_COMMENT_REPLIED.value,
-            'POSTS_POST_SHARED': EventTypes.POSTS_POST_SHARED.value,
-            'POSTS_POST_REPOSTED': EventTypes.POSTS_POST_REPOSTED.value,
-            'POSTS_POST_SHARED_TO_GROUP': EventTypes.POSTS_POST_SHARED_TO_GROUP.value,
-            'USERS_USER_FOLLOWED': EventTypes.USERS_USER_FOLLOWED.value,
-            'USERS_USER_PINCHED': EventTypes.USERS_USER_PINCHED.value,
-            'GROUPS_MEMBER_INVITED': EventTypes.GROUPS_MEMBER_INVITED.value,
-            'GROUPS_MEMBER_REQUESTED': EventTypes.GROUPS_MEMBER_REQUESTED.value,
-            'GROUPS_MEMBER_APPROVED': EventTypes.GROUPS_MEMBER_APPROVED.value,
-            'GROUPS_MEMBER_REJECTED': EventTypes.GROUPS_MEMBER_REJECTED.value,
-            'DOCUMENTS_DOCUMENT_UPLOADED': EventTypes.DOCUMENTS_DOCUMENT_UPLOADED.value,
-            'DOCUMENTS_DOCUMENT_DOWNLOADED': EventTypes.DOCUMENTS_DOCUMENT_DOWNLOADED.value,
-            'DOCUMENTS_DOCUMENT_BOOKMARKED': EventTypes.DOCUMENTS_DOCUMENT_BOOKMARKED.value,
-            'DOCUMENTS_DOCUMENT_RATED': EventTypes.DOCUMENTS_DOCUMENT_RATED.value,
-            'MESSAGING_MESSAGE_SENT': EventTypes.MESSAGING_MESSAGE_SENT.value,
-            'MESSAGING_CONVERSATION_CREATED': EventTypes.MESSAGING_CONVERSATION_CREATED.value,
-            'MESSAGING_CONVERSATION_MEMBER_ADDED': EventTypes.MESSAGING_CONVERSATION_MEMBER_ADDED.value,
-            'COURSES_ASSIGNMENT_PUBLISHED': EventTypes.COURSES_ASSIGNMENT_PUBLISHED.value,
-        }
-
-        for field_name, event_type in event_type_mapping.items():
-            type_preferences[event_type] = {
-                'email': request.POST.get(f'type_{field_name}_email') == 'on',
-                'push': request.POST.get(f'type_{field_name}_push') == 'on',
-                'in_app': request.POST.get(f'type_{field_name}_in_app') == 'on',
-            }
-
-        NotificationPreferenceService.update_type_preferences(request.user, type_preferences)
-
-        if not request.headers.get('HX-Request'):
-            return redirect('users:settings_notifications')
-
-    # Get or create user preferences for GET request or HTMX POST response
-    preferences = NotificationPreferenceService.get_or_create_preferences(request.user)
-
-    # Initialize type preferences if empty only - don't merge with defaults
-    if not preferences.type_preferences:
-        preferences.type_preferences = NotificationPreferenceService.get_default_type_preferences()
-        preferences.save()
-
-    # Create a mapping for template access (dot keys -> underscore keys)
     event_type_mapping = {
         'POSTS_POST_LIKED': EventTypes.POSTS_POST_LIKED.value,
         'POSTS_COMMENT_CREATED': EventTypes.POSTS_COMMENT_CREATED.value,
@@ -981,12 +1012,89 @@ def settings_notifications_view(request):
         'COURSES_ASSIGNMENT_PUBLISHED': EventTypes.COURSES_ASSIGNMENT_PUBLISHED.value,
     }
 
-    # Create a copy of preferences with underscore keys for template
+    preferences = NotificationPreferenceService.get_or_create_preferences(request.user)
+
+    # Handle form submission
+    if request.method == 'POST':
+        # Update global preferences
+        preferences.email_enabled = request.POST.get('email_enabled') in ('on', 'true', '1')
+        preferences.email_digest = request.POST.get('email_digest') in ('on', 'true', '1')
+        preferences.push_enabled = request.POST.get('push_enabled') in ('on', 'true', '1')
+        preferences.push_sound = request.POST.get('push_sound') in ('on', 'true', '1')
+        preferences.in_app_enabled = request.POST.get('in_app_enabled') in ('on', 'true', '1')
+        preferences.in_app_toast_enabled = request.POST.get('in_app_toast_enabled') in ('on', 'true', '1')
+
+        # Update quiet hours
+        preferences.quiet_hours_enabled = request.POST.get('quiet_hours_enabled') in ('on', 'true', '1')
+        quiet_hours_start = request.POST.get('quiet_hours_start')
+        quiet_hours_end = request.POST.get('quiet_hours_end')
+
+        if quiet_hours_start:
+            try:
+                preferences.quiet_hours_start = time.fromisoformat(quiet_hours_start)
+            except (ValueError, TypeError):
+                preferences.quiet_hours_start = None
+        else:
+            preferences.quiet_hours_start = None
+
+        if quiet_hours_end:
+            try:
+                preferences.quiet_hours_end = time.fromisoformat(quiet_hours_end)
+            except (ValueError, TypeError):
+                preferences.quiet_hours_end = None
+        else:
+            preferences.quiet_hours_end = None
+
+        # Update type preferences
+        if not isinstance(preferences.type_preferences, dict):
+            preferences.type_preferences = {}
+
+        for field_name, event_type in event_type_mapping.items():
+            email_val = request.POST.get(f'type_{field_name}_email') in ('on', 'true', '1')
+            push_val = request.POST.get(f'type_{field_name}_push') in ('on', 'true', '1')
+            in_app_val = request.POST.get(f'type_{field_name}_in_app') in ('on', 'true', '1')
+            preferences.type_preferences[event_type] = {
+                'email': email_val,
+                'push': push_val,
+                'in_app': in_app_val,
+            }
+
+        preferences.save()
+
+        # Update cache on user instance if present
+        if hasattr(request.user, '_state') and hasattr(request.user._state, 'fields_cache'):
+            request.user._state.fields_cache['notification_preferences'] = preferences
+
+        messages.success(request, 'Notification preferences updated successfully.')
+
+        if not request.headers.get('HX-Request'):
+            return redirect('users:settings_notifications')
+
+    # Ensure type_preferences is a dictionary
+    if not isinstance(preferences.type_preferences, dict):
+        preferences.type_preferences = {}
+
+    # Check if event types are populated; if not, merge default type preferences
+    has_event_types = any(k in preferences.type_preferences for k in event_type_mapping.values())
+    if not has_event_types:
+        defaults = NotificationPreferenceService.get_default_type_preferences()
+        for k, v in defaults.items():
+            if k not in preferences.type_preferences:
+                preferences.type_preferences[k] = v
+        preferences.save()
+
+    # Create a mapping for template access (dot keys -> underscore keys)
     template_preferences = preferences
     template_preferences.type_preferences_template = {}
     for underscore_key, dot_key in event_type_mapping.items():
-        if dot_key in preferences.type_preferences:
+        if dot_key in preferences.type_preferences and isinstance(preferences.type_preferences[dot_key], dict):
             template_preferences.type_preferences_template[underscore_key] = preferences.type_preferences[dot_key]
+        else:
+            template_preferences.type_preferences_template[underscore_key] = {
+                'email': preferences.email_enabled,
+                'push': preferences.push_enabled,
+                'in_app': preferences.in_app_enabled,
+            }
 
     if request.headers.get('HX-Request'):
         return render(request, 'users/settings/partials/settings_navigation_partial.html', {

@@ -72,6 +72,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/static/images/pwaninetmonochrome.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "monochrome"
     }
   ],
   "screenshots": [

@@ -57,6 +57,7 @@ const CORE_ASSETS = [
     '/static/images/web-app-manifest-192x192.png',
     '/static/images/web-app-manifest-192x192-rounded.png',
     '/static/images/web-app-manifest-512x512.png',
+    '/static/images/pwaninetmonochrome.png',
     '/static/images/browserconfig.xml',
     '/static/js/messaging/offline-cache.js',
     '/static/js/messaging/network-status.js',
@@ -143,7 +144,7 @@ self.addEventListener('push', (event) => {
         title: 'PwaniNet Notification',
         body: 'You have a new notification',
         icon: '/static/images/web-app-manifest-192x192-rounded.png',
-        badge: '/static/images/favicon-96x96.png',
+        badge: '/static/images/pwaninetmonochrome.png',
         vibrate: [200, 100, 200],
         requireInteraction: false,
         actions: [

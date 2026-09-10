@@ -71,7 +71,7 @@
                    style="width: 56px; height: 56px; background-color: var(--bg-secondary); border-radius: 12px; overflow: hidden; text-decoration: none;"
                    onclick="event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this)">
                   {% if payload.context.avatar_url %}
-                    <img src="{{ payload.context.avatar_url }}" alt="{{ payload.context.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+                    <img src="{{ payload.context.avatar_url }}" alt="{{ payload.context.name }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;">
                   {% else %}
                     <i class="bi bi-people" style="font-size: 1.75rem; color: var(--text-secondary);"></i>
                   {% endif %}
@@ -230,7 +230,7 @@
                 <div class="rounded-circle d-flex align-items-center justify-content-center"
                      style="width: 32px; height: 32px; background-color: var(--bg-tertiary); overflow: hidden;">
                   {% if actor.avatar %}
-                    <img src="{{ actor.avatar }}" alt="{{ actor.name }}" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
+                    <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" loading="lazy">
                   {% else %}
                     <i class="bi bi-person" style="font-size: 1rem; color: var(--text-secondary);"></i>
                   {% endif %}
@@ -334,7 +334,7 @@
           {% endif %}
             {% if payload.resource.image_url %}
               <img src="{{ payload.resource.image_url }}" 
-                   style="width: 100%; height: 100%; object-fit: cover;" 
+                   style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" 
                    alt="Preview"
                    loading="lazy"
                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">

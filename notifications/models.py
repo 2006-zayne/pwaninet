@@ -319,6 +319,22 @@ class NotificationPreference(models.Model):
     def __str__(self):
         return f"Preferences for {self.user.username}"
     
+    @property
+    def in_app_toast_enabled(self):
+        """
+        Whether in-app popup toasts are enabled for the user.
+        Defaults to True.
+        """
+        if not isinstance(self.type_preferences, dict):
+            return True
+        return self.type_preferences.get('in_app_toast_enabled', True)
+
+    @in_app_toast_enabled.setter
+    def in_app_toast_enabled(self, value):
+        if not isinstance(self.type_preferences, dict):
+            self.type_preferences = {}
+        self.type_preferences['in_app_toast_enabled'] = bool(value)
+    
     def get_type_preference(self, notification_type, channel):
         """
         Get preference for a specific notification type and channel.

@@ -76,17 +76,63 @@
                             <p class="text-muted">{% trans "Identify yourself to access the PwaniNet feed." %}</p>
                         </div>
 
-                        <form method="POST" id="loginForm" novalidate>
+                        <!-- Alerts & Messages -->
+                        {% if messages %}
+                            <div class="mb-3">
+                                {% for message in messages %}
+                                    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show d-flex align-items-center" role="alert">
+                                        {% if message.tags == 'error' %}
+                                            <i class="bi bi-exclamation-triangle-fill me-2 fs-5 flex-shrink-0 text-danger"></i>
+                                        {% elif message.tags == 'success' %}
+                                            <i class="bi bi-check-circle-fill me-2 fs-5 flex-shrink-0 text-success"></i>
+                                        {% else %}
+                                            <i class="bi bi-info-circle-fill me-2 fs-5 flex-shrink-0 text-primary"></i>
+                                        {% endif %}
+                                        <div class="small">{{ message }}</div>
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        {% if login_error_type == 'account_not_found' %}
+                            <div class="alert alert-warning border-0 shadow-sm mb-3" role="alert">
+                                <div class="d-flex align-items-center mb-1">
+                                    <i class="bi bi-person-x-fill text-warning me-2 fs-5"></i>
+                                    <strong class="text-dark">Account Not Found</strong>
+                                </div>
+                                <div class="small mb-2 text-dark">{{ login_error_message }}</div>
+                                <a href="{% url 'users:register' %}" data-bypass-htmx="true" class="btn btn-sm btn-primary">
+                                    <i class="bi bi-person-plus-fill me-1"></i>Create New Account
+                                </a>
+                            </div>
+                        {% elif login_error_type == 'wrong_password' %}
+                            <div class="alert alert-danger border-0 shadow-sm mb-3" role="alert">
+                                <div class="d-flex align-items-center mb-1">
+                                    <i class="bi bi-shield-lock-fill text-danger me-2 fs-5"></i>
+                                    <strong>Incorrect Password</strong>
+                                </div>
+                                <div class="small">{{ login_error_message }}</div>
+                            </div>
+                        {% elif login_error_type == 'account_inactive' %}
+                            <div class="alert alert-danger border-0 shadow-sm mb-3" role="alert">
+                                <div class="d-flex align-items-center mb-1">
+                                    <i class="bi bi-slash-circle-fill text-danger me-2 fs-5"></i>
+                                    <strong>Account Deactivated</strong>
+                                </div>
+                                <div class="small">{{ login_error_message }}</div>
+                            </div>
+                        {% elif form.non_field_errors %}
+                            <div class="alert alert-danger mb-3" role="alert">
+                                {% for error in form.non_field_errors %}
+                                    <div class="small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        <form method="POST" action="{% url 'login' %}" id="loginForm" novalidate>
                             {% csrf_token %}
                             <input type="hidden" name="device_id" id="device_id_field">
-                            
-                            {% if form.non_field_errors %}
-                                <div class="alert alert-danger">
-                                    {% for error in form.non_field_errors %}
-                                        {{ error }}
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
 
                             {% for field in form %}
                                 <div class="mb-2">
@@ -124,7 +170,7 @@
 
                         <div class="text-center">
                             <p class="mb-0 text-muted">{% trans "New to the squad?" %}</p>
-                            <a href="{% url 'users:register' %}" class="fw-bold text-primary text-decoration-none">{% trans "Create a New Account" %}</a>
+                            <a href="{% url 'users:register' %}" data-bypass-htmx="true" class="fw-bold text-primary text-decoration-none">{% trans "Create a New Account" %}</a>
                         </div>
                     </div>
                 </div>
@@ -158,8 +204,18 @@
             input.classList.add('tactical-form-input');
             
             // Add placeholders based on field name if not already present
-            if (input.id === 'id_username' && !input.getAttribute('placeholder')) {
-                input.setAttribute('placeholder', 'Enter your username');
+            if (input.id === 'id_username') {
+                if (!input.getAttribute('placeholder')) {
+                    input.setAttribute('placeholder', 'Enter your username');
+                }
+                input.setAttribute('autocapitalize', 'none');
+                input.setAttribute('autocorrect', 'off');
+                input.setAttribute('spellcheck', 'false');
+                {% if request.session.registered_username %}
+                if (!input.value) {
+                    input.value = "{{ request.session.registered_username|escapejs }}";
+                }
+                {% endif %}
             } else if (input.id === 'id_password' && !input.getAttribute('placeholder')) {
                 input.setAttribute('placeholder', 'Enter your password');
             }
@@ -246,6 +302,13 @@
 
         if (!isUsernameValid || !isPasswordValid) {
             e.preventDefault();
+            if (!isUsernameValid && usernameField) {
+                usernameField.focus();
+            } else if (!isPasswordValid && passwordFieldForValidation) {
+                passwordFieldForValidation.focus();
+            }
+            loginSubmitBtn.disabled = false;
+            loginSubmitBtn.innerHTML = '{% trans "Authenticate & Enter" %}';
             return;
         }
 

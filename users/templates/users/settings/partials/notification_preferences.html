@@ -6,7 +6,7 @@
 
   <div class="form-check">
     <div>
-      <input type="checkbox" class="form-check-input" id="email_enabled" name="email_enabled" {% if preferences.email_enabled %}checked{% endif %}>
+      <input type="checkbox" class="form-check-input" id="email_enabled" name="email_enabled" value="on" {% if preferences.email_enabled %}checked{% endif %}>
       <label class="form-check-label" for="email_enabled">
         Email notifications
         <span class="form-check-description">Receive notifications via email</span>
@@ -16,7 +16,7 @@
 
   <div class="form-check">
     <div>
-      <input type="checkbox" class="form-check-input" id="email_digest" name="email_digest" {% if preferences.email_digest %}checked{% endif %}>
+      <input type="checkbox" class="form-check-input" id="email_digest" name="email_digest" value="on" {% if preferences.email_digest %}checked{% endif %}>
       <label class="form-check-label" for="email_digest">
         Daily digest
         <span class="form-check-description">Send daily digest instead of immediate emails</span>
@@ -26,7 +26,7 @@
 
   <div class="form-check">
     <div>
-      <input type="checkbox" class="form-check-input" id="push_enabled" name="push_enabled" {% if preferences.push_enabled %}checked{% endif %}>
+      <input type="checkbox" class="form-check-input" id="push_enabled" name="push_enabled" value="on" {% if preferences.push_enabled %}checked{% endif %}>
       <label class="form-check-label" for="push_enabled">
         Push notifications
         <span class="form-check-description">Receive push notifications in browser</span>
@@ -66,7 +66,7 @@
 
   <div class="form-check">
     <div>
-      <input type="checkbox" class="form-check-input" id="push_sound" name="push_sound" {% if preferences.push_sound %}checked{% endif %}>
+      <input type="checkbox" class="form-check-input" id="push_sound" name="push_sound" value="on" {% if preferences.push_sound %}checked{% endif %}>
       <label class="form-check-label" for="push_sound">
         Push notification sounds
         <span class="form-check-description">Play sound for push notifications</span>
@@ -76,10 +76,20 @@
 
   <div class="form-check">
     <div>
-      <input type="checkbox" class="form-check-input" id="in_app_enabled" name="in_app_enabled" {% if preferences.in_app_enabled %}checked{% endif %}>
+      <input type="checkbox" class="form-check-input" id="in_app_enabled" name="in_app_enabled" value="on" {% if preferences.in_app_enabled %}checked{% endif %}>
       <label class="form-check-label" for="in_app_enabled">
         In-app notifications
         <span class="form-check-description">Show notifications in the app</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="form-check">
+    <div>
+      <input type="checkbox" class="form-check-input" id="in_app_toast_enabled" name="in_app_toast_enabled" value="on" {% if preferences.in_app_toast_enabled %}checked{% endif %} onchange="localStorage.setItem('pwaninet_in_app_toasts', this.checked ? 'true' : 'false')">
+      <label class="form-check-label" for="in_app_toast_enabled">
+        In-app notification popups (toasts)
+        <span class="form-check-description">Display floating banner alerts on screen when new notifications arrive</span>
       </label>
     </div>
   </div>
@@ -382,7 +392,7 @@
 
   <div class="form-check">
     <div>
-      <input type="checkbox" class="form-check-input" id="quiet_hours_enabled" name="quiet_hours_enabled" {% if preferences.quiet_hours_enabled %}checked{% endif %}>
+      <input type="checkbox" class="form-check-input" id="quiet_hours_enabled" name="quiet_hours_enabled" value="on" {% if preferences.quiet_hours_enabled %}checked{% endif %}>
       <label class="form-check-label" for="quiet_hours_enabled">
         Enable quiet hours
         <span class="form-check-description">Pause push and in-app notifications during quiet hours</span>
@@ -831,16 +841,28 @@ function getCsrfToken() {
     checkStatus();
   }
 
+  function syncToastPref() {
+    const toastCheck = document.getElementById('in_app_toast_enabled');
+    if (toastCheck) {
+      localStorage.setItem('pwaninet_in_app_toasts', toastCheck.checked ? 'true' : 'false');
+    }
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initPushSubscription, { once: true });
+    document.addEventListener('DOMContentLoaded', function() {
+      initPushSubscription();
+      syncToastPref();
+    }, { once: true });
   } else {
     initPushSubscription();
+    syncToastPref();
   }
 
   document.addEventListener('htmx:afterSwap', function(e) {
     if (e.target && e.target.querySelector && e.target.querySelector('.push-subscription-status')) {
       initPushSubscription();
     }
+    syncToastPref();
   });
 })();
 </script>

@@ -9,7 +9,7 @@ class PwaniSignupForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
         model = User
         fields = UserCreationForm.Meta.fields + \
-            ('email', 'first_name', 'second_name', 'last_name', 
+            ('first_name', 'second_name', 'last_name', 
              'programme', 'academic_level', 'academic_year', 'semester')
 
         # We use HTMX for dynamic dropdowns
@@ -39,75 +39,58 @@ class PwaniSignupForm(UserCreationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Make email required
-        self.fields['email'].required = True
-
         # Add placeholders to form fields
         self.fields['username'].widget.attrs['placeholder'] = 'Choose a username'
-        self.fields['email'].widget.attrs['placeholder'] = 'Enter your email address'
-        self.fields['first_name'].widget.attrs['placeholder'] = 'Enter your first name'
+        self.fields['first_name'].widget.attrs['placeholder'] = 'Enter your first name (optional)'
         self.fields['second_name'].widget.attrs['placeholder'] = 'Enter your middle name (optional)'
-        self.fields['last_name'].widget.attrs['placeholder'] = 'Enter your last name'
+        self.fields['last_name'].widget.attrs['placeholder'] = 'Enter your last name (optional)'
         self.fields['password1'].widget.attrs['placeholder'] = 'Create a password'
         self.fields['password2'].widget.attrs['placeholder'] = 'Confirm your password'
 
-        # Start with empty querysets for cascading dropdowns
-        self.fields['academic_level'].queryset = AcademicLevel.objects.none()
-        self.fields['academic_year'].queryset = AcademicYear.objects.none()
-        self.fields['semester'].queryset = Semester.objects.none()
+        # Optional fields: never block registration if student hasn't selected them yet
+        self.fields['first_name'].required = False
+        self.fields['second_name'].required = False
+        self.fields['last_name'].required = False
+        self.fields['programme'].required = False
+        self.fields['academic_level'].required = False
+        self.fields['academic_year'].required = False
+        self.fields['semester'].required = False
 
-        # Update querysets if data is present (for validation and HTMX)
-        if 'programme' in self.data:
-            try:
-                programme_id = int(self.data.get('programme'))
-                # For now, show all academic levels (could be filtered by programme duration)
-                self.fields['academic_level'].queryset = AcademicLevel.objects.filter(
-                    is_active=True).order_by('level')
-            except (ValueError, TypeError):
-                pass
-
-        if 'academic_level' in self.data:
-            try:
-                level_id = int(self.data.get('academic_level'))
-                # Show all academic years
-                self.fields['academic_year'].queryset = AcademicYear.objects.all().order_by('-code')
-            except (ValueError, TypeError):
-                pass
-
-        if 'academic_year' in self.data:
-            try:
-                year_id = int(self.data.get('academic_year'))
-                self.fields['semester'].queryset = Semester.objects.filter(
-                    academic_year_id=year_id).order_by('number')
-            except (ValueError, TypeError):
-                pass
-
-        # For existing users, load their current academic context
+        # When validating bound POST data, ensure active querysets exist so valid selections are accepted
+        if self.is_bound:
+            self.fields['academic_level'].queryset = AcademicLevel.objects.filter(is_active=True).order_by('level')
+            self.fields['academic_year'].queryset = AcademicYear.objects.all().order_by('-code')
+            if 'academic_year' in self.data and self.data.get('academic_year'):
+                try:
+                    year_id = int(self.data.get('academic_year'))
+                    self.fields['semester'].queryset = Semester.objects.filter(academic_year_id=year_id).order_by('number')
+                except (ValueError, TypeError):
+                    self.fields['semester'].queryset = Semester.objects.all().order_by('academic_year', 'number')
+            else:
+                self.fields['semester'].queryset = Semester.objects.all().order_by('academic_year', 'number')
         elif self.instance.pk:
             if self.instance.programme:
-                self.fields['academic_level'].queryset = AcademicLevel.objects.filter(
-                    is_active=True).order_by('level')
+                self.fields['academic_level'].queryset = AcademicLevel.objects.filter(is_active=True).order_by('level')
             if self.instance.academic_year:
                 self.fields['semester'].queryset = Semester.objects.filter(
                     academic_year=self.instance.academic_year).order_by('number')
+        else:
+            # Start with empty querysets for fresh cascading dropdowns on initial GET
+            self.fields['academic_level'].queryset = AcademicLevel.objects.none()
+            self.fields['academic_year'].queryset = AcademicYear.objects.none()
+            self.fields['semester'].queryset = Semester.objects.none()
 
-    def clean_email(self):
-        """Validate that email is unique across all users."""
-        email = self.cleaned_data.get('email')
-        if not email:
-            return email
-
-        # Normalize email to lowercase for consistency
-        email = email.lower()
-
-        # Check if email already exists
-        if User.objects.filter(email=email).exists():
-            raise forms.ValidationError(
-                "A user with this email address already exists. "
-                "Please use a different email address or log in to your existing account."
-            )
-
-        return email
+    def clean_username(self):
+        """Clean username by stripping whitespace and checking uniqueness case-insensitively."""
+        username = self.cleaned_data.get('username')
+        if username:
+            username = username.strip()
+            qs = User.objects.filter(username__iexact=username)
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError("A user with this username already exists.")
+        return username
 
 
 class ProfileUpdateForm(forms.ModelForm):

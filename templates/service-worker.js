@@ -46,7 +46,7 @@ self.addEventListener('push', (event) => {
         title: 'PwaniNet Notification',
         body: 'You have a new notification',
         icon: '/static/images/web-app-manifest-192x192.png',
-        badge: '/static/images/favicon-96x96.png',
+        badge: '/static/images/pwaninetmonochrome.png',
         vibrate: [200, 100, 200],
         requireInteraction: false,
         actions: [

@@ -40,8 +40,17 @@ SECURE_CONTENT_TYPE_NOSNIFF = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 
+# Proxy SSL header for reverse proxies and tunnels (Cloudflare Tunnel, Nginx)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+
 # Allow all origins for CSRF in local development (both HTTP and HTTPS)
 CSRF_TRUSTED_ORIGINS = [
+    'https://pwaninet.app',
+    'http://pwaninet.app',
+    'https://*.pwaninet.app',
+    'https://*.trycloudflare.com',
     'http://localhost',
     'http://localhost:8000',
     'https://localhost',

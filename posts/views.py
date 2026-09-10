@@ -720,6 +720,17 @@ class ReportViewSet(viewsets.ModelViewSet):
                 status=MembershipStatus.APPROVED
             ).exclude(user=report.reporter)
 
+            # Get thumbnail URL for notification preview
+            thumbnail_url = None
+            if report.post:
+                if report.post.thumbnail:
+                    thumbnail_url = report.post.thumbnail.url
+                elif report.post.images.exists():
+                    first_img = report.post.images.first()
+                    thumbnail_url = getattr(first_img, 'get_thumbnail_url', lambda s: None)('400') or (first_img.image.url if getattr(first_img, 'image', None) else None)
+                elif report.post.video_poster:
+                    thumbnail_url = report.post.video_poster.url
+
             # Emit event for each official - the rules engine will create notifications
             for membership in officials:
                 publish_event(
@@ -736,6 +747,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                         'report_reason': report.reason,
                         'reporter_username': report.reporter.username,
                         'post_content': report.post.content[:100] if report.post.content else '',
+                        'thumbnail_url': thumbnail_url,
                         'resource_type': 'POST',
                     }
                 )

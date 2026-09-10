@@ -178,12 +178,52 @@
                             <p class="text-muted">Create your account to access the PwaniNet feed.</p>
                         </div>
 
-                        <form method="POST" id="registerForm" novalidate>
+                        <!-- Alerts & Messages -->
+                        {% if messages %}
+                            <div class="mb-3">
+                                {% for message in messages %}
+                                    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show d-flex align-items-center" role="alert">
+                                        {% if message.tags == 'error' %}
+                                            <i class="bi bi-exclamation-triangle-fill me-2 fs-5 flex-shrink-0 text-danger"></i>
+                                        {% elif message.tags == 'success' %}
+                                            <i class="bi bi-check-circle-fill me-2 fs-5 flex-shrink-0 text-success"></i>
+                                        {% else %}
+                                            <i class="bi bi-info-circle-fill me-2 fs-5 flex-shrink-0 text-primary"></i>
+                                        {% endif %}
+                                        <div class="small">{{ message }}</div>
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger d-flex align-items-start mb-3" role="alert">
+                                <i class="bi bi-exclamation-octagon-fill me-2 fs-5 flex-shrink-0 text-danger mt-1"></i>
+                                <div class="small">
+                                    {% for error in form.non_field_errors %}
+                                        <div>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% elif form.errors %}
+                            <div class="alert alert-danger d-flex align-items-center mb-3" role="alert">
+                                <i class="bi bi-exclamation-circle-fill me-2 fs-5 flex-shrink-0 text-danger"></i>
+                                <div class="small">Please fix the errors below to create your account.</div>
+                            </div>
+                        {% endif %}
+
+                        <form method="POST" action="{% url 'users:register' %}" id="registerForm" novalidate>
                             {% csrf_token %}
 
                             {% for field in form %}
                                 <div class="mb-2">
-                                    <label class="form-label fw-semibold small" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    <label class="form-label fw-semibold small" for="{{ field.id_for_label }}">
+                                        {{ field.label }}
+                                        {% if field.name == 'username' or field.name == 'password1' or field.name == 'password2' %}
+                                            <span class="text-danger">*</span>
+                                        {% endif %}
+                                    </label>
                                     {% if field.name == 'programme' %}
                                         <div class="course-search-wrapper">
                                             <input type="text" class="course-search-input" placeholder="Search programmes..." id="programme-search">
@@ -200,9 +240,11 @@
                                         {{ field }}
                                     {% endif %}
                                     {% if field.errors %}
-                                        {% for error in field.errors %}
-                                            <div class="text-danger x-small">{{ error }}</div>
-                                        {% endfor %}
+                                        <div class="text-danger x-small mt-1 fw-semibold">
+                                            {% for error in field.errors %}
+                                                <div><i class="bi bi-x-circle me-1"></i>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
                                     {% endif %}
                                     {% if field.help_text %}
                                         <div class="form-text text-muted small">{{ field.help_text }}</div>
@@ -235,7 +277,7 @@
 
                         <div class="text-center">
                             <p class="mb-0 text-muted">Already in the squad?</p>
-                            <a href="{% url 'login' %}" class="fw-bold text-primary text-decoration-none">Login to Your Account</a>
+                            <a href="{% url 'login' %}" data-bypass-htmx="true" class="fw-bold text-primary text-decoration-none">Login to Your Account</a>
                         </div>
                     </div>
                 </div>
@@ -257,6 +299,13 @@
             input.classList.add('tactical-form-input');
         }
     });
+
+    const usernameInput = document.getElementById('id_username');
+    if (usernameInput) {
+        usernameInput.setAttribute('autocapitalize', 'none');
+        usernameInput.setAttribute('autocorrect', 'off');
+        usernameInput.setAttribute('spellcheck', 'false');
+    }
 
     // Password visibility toggles
     const passwordToggleBtns = document.querySelectorAll('.password-toggle-btn');
@@ -286,7 +335,8 @@
 
     // Form validation
     const registerForm = document.getElementById('registerForm');
-    const requiredFields = ['username', 'email', 'password1', 'password2', 'first_name', 'last_name', 'programme', 'academic_level', 'academic_year', 'semester'];
+    // Only core credentials are strictly required for initial signup
+    const requiredFields = ['username', 'password1', 'password2'];
     
     function validateField(field, errorElement) {
         if (!field) return false;
@@ -294,6 +344,7 @@
         if (errorElement) {
             errorElement.classList.toggle('visible', isEmpty);
         }
+        field.classList.toggle('is-invalid', isEmpty);
         return !isEmpty;
     }
 
@@ -307,7 +358,7 @@
                 validateField(field, errorElement);
             });
             field.addEventListener('input', function() {
-                if (errorElement.classList.contains('visible')) {
+                if (errorElement.classList.contains('visible') || field.classList.contains('is-invalid')) {
                     validateField(field, errorElement);
                 }
             });
@@ -359,13 +410,23 @@
 
     const registerSubmitBtn = document.getElementById('registerSubmitBtn');
 
+    function resetSubmitButton() {
+        registerSubmitBtn.disabled = false;
+        registerSubmitBtn.innerHTML = '<span id="registerBtnText">Create Account</span><span id="registerSpinner" class="spinner-border spinner-border-sm ms-2" style="display: none;"></span>';
+    }
+
     registerForm.addEventListener('submit', function(e) {
         let isValid = true;
+        let firstInvalidField = null;
+
         requiredFields.forEach(function(fieldName) {
             const field = document.getElementById('id_' + fieldName);
             const errorElement = document.getElementById(fieldName + '-error');
             if (!validateField(field, errorElement)) {
                 isValid = false;
+                if (!firstInvalidField) {
+                    firstInvalidField = field;
+                }
             }
         });
 
@@ -374,6 +435,9 @@
             passwordMatchFeedback.classList.add('visible');
             passwordMatchFeedback.textContent = '✗ Passwords do not match';
             passwordMatchFeedback.classList.add('password-match-error');
+            if (!firstInvalidField) firstInvalidField = password2Field;
+            firstInvalidField.focus();
+            resetSubmitButton();
             return;
         }
 
@@ -384,15 +448,21 @@
                 strengthHint.textContent = 'Password is too weak. Reach at least Fair strength to continue.';
                 strengthHint.style.color = '#dc2626';
             }
+            if (!firstInvalidField) firstInvalidField = password1Field;
+            firstInvalidField.focus();
+            resetSubmitButton();
             return;
         }
 
         if (!isValid) {
             e.preventDefault();
+            if (firstInvalidField) {
+                firstInvalidField.focus();
+                firstInvalidField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            resetSubmitButton();
             return;
         }
-
-        sessionStorage.setItem('showRegistrationSuccess', 'true');
 
         registerSubmitBtn.disabled = true;
         registerSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating your account…';

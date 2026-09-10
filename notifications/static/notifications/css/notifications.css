@@ -1262,3 +1262,29 @@ body { background: var(--page-bg); color: var(--text-primary); }
   white-space: nowrap;
   border: 0;
 }
+
+/* ── Universal Rounded Borders for Notifications (Avatars & Thumbnails) ── */
+.notif-avatar-col img,
+.actor-stack img,
+.sender-avatar,
+.sender-avatar img,
+.notif-avatar,
+.notif-avatar img,
+.avatar-stack-item,
+.notif-item .rounded-circle,
+.expanded-actors img {
+  border-radius: 50% !important;
+  object-fit: cover !important;
+}
+
+.resource-preview,
+.resource-preview img,
+.notif-preview-col,
+.notif-preview-col img,
+.notif-thumbnail,
+.notif-thumbnail img {
+  border-radius: 10px !important;
+  object-fit: cover !important;
+  overflow: hidden !important;
+}
+
