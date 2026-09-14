@@ -2,7 +2,12 @@ import os
 from celery import Celery
 
 # Set the default Django settings module for the 'celery' program.
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pwaninet.settings.local')
+# Defaults safely to production if DJANGO_ENV is production; otherwise local for dev ergonomics.
+if not os.environ.get('DJANGO_SETTINGS_MODULE'):
+    if os.environ.get('DJANGO_ENV', '').strip().lower() == 'production':
+        os.environ['DJANGO_SETTINGS_MODULE'] = 'pwaninet.settings.production'
+    else:
+        os.environ['DJANGO_SETTINGS_MODULE'] = 'pwaninet.settings.local'
 
 app = Celery('pwaninet')
 

@@ -37,6 +37,6 @@ urlpatterns = [
     path('api/reports/<int:pk>/', views.ReportViewSet.as_view({'get': 'retrieve', 'delete': 'destroy'}), name='report_detail'),
     path('api/author-preferences/', views.AuthorPreferenceViewSet.as_view({'get': 'list', 'post': 'create'}), name='author_preference_list'),
     path('api/author-preferences/<int:pk>/', views.AuthorPreferenceViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='author_preference_detail'),
-    path('api/shared-posts/', views.SharedPostViewSet.as_view({'get': 'list', 'post': 'create'}), name='shared_post_list'),
-    path('api/shared-posts/<int:pk>/', views.SharedPostViewSet.as_view({'get': 'retrieve', 'delete': 'destroy'}), name='shared_post_detail'),
+    path('api/shared-posts/', views.SharedPostViewSet.as_view({'get': 'list'}), name='shared_post_list'),
+    path('api/shared-posts/<int:pk>/', views.SharedPostViewSet.as_view({'get': 'retrieve'}), name='shared_post_detail'),
 ]

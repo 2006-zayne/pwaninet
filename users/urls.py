@@ -30,24 +30,10 @@ urlpatterns = [
     # Email verification
     path('verify-email/<uidb64>/<token>/', views.verify_email_view, name='verify_email'),
     
-    # Password reset
-    path('password_reset/', auth_views.PasswordResetView.as_view(
-        template_name='registration/password_reset_form.html',
-        email_template_name='registration/password_reset_email.html',
-        subject_template_name='registration/password_reset_subject.txt',
-        success_url='/users/password_reset/done/',
-        html_email_template_name='registration/password_reset_email.html',
-    ), name='password_reset'),
-    path('password_reset/done/', auth_views.PasswordResetDoneView.as_view(
-        template_name='registration/password_reset_done.html',
-    ), name='password_reset_done'),
-    path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(
-        template_name='registration/password_reset_confirm.html',
-        success_url='/users/reset/done/',
-    ), name='password_reset_confirm'),
-    path('reset/done/', auth_views.PasswordResetCompleteView.as_view(
-        template_name='registration/password_reset_complete.html',
-    ), name='password_reset_complete'),
+    # Phase 4: 2FA & Single-Use Recovery Code Account Recovery / Password Reset
+    path('password_reset/', views.password_recovery_identify_view, name='password_reset'),
+    path('password_reset/verify/', views.password_recovery_verify_view, name='password_recovery_verify'),
+    path('password_reset/set-password/', views.password_recovery_set_new_view, name='password_recovery_set_new'),
     
     # Logout view
     path('logout/', auth_views.LogoutView.as_view(template_name='logout.html', next_page='login'), name='logout'),
@@ -68,6 +54,12 @@ urlpatterns = [
     path('settings/appearance/', views.settings_appearance_view, name='settings_appearance'),
     path('settings/notifications/', views.settings_notifications_view, name='settings_notifications'),
     path('settings/privacy/', views.settings_privacy_view, name='settings_privacy'),
+    path('settings/privacy/two-factor/', views.settings_two_factor_view, name='settings_two_factor'),
+    path('settings/privacy/two-factor/setup/', views.settings_two_factor_setup_view, name='settings_two_factor_setup'),
+    path('settings/privacy/two-factor/verify/', views.settings_two_factor_verify_view, name='settings_two_factor_verify'),
+    path('settings/privacy/two-factor/disable/', views.settings_two_factor_disable_view, name='settings_two_factor_disable'),
+    path('settings/privacy/two-factor/recovery-codes/regenerate/', views.settings_two_factor_regenerate_codes_view, name='settings_two_factor_regenerate_codes'),
+    path('settings/privacy/two-factor/recovery-codes/download/', views.settings_two_factor_download_codes_view, name='settings_two_factor_download_codes'),
     path('settings/privacy/password/', views.settings_password_manager_view, name='settings_password_manager'),
     path('settings/privacy/devices/', views.settings_active_devices_view, name='settings_active_devices'),
     path('settings/privacy/blocked/', views.settings_blocked_users_view, name='settings_blocked_users'),

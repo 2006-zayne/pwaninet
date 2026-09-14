@@ -95,30 +95,11 @@
                             </div>
                         {% endif %}
 
-                        {% if login_error_type == 'account_not_found' %}
-                            <div class="alert alert-warning border-0 shadow-sm mb-3" role="alert">
-                                <div class="d-flex align-items-center mb-1">
-                                    <i class="bi bi-person-x-fill text-warning me-2 fs-5"></i>
-                                    <strong class="text-dark">Account Not Found</strong>
-                                </div>
-                                <div class="small mb-2 text-dark">{{ login_error_message }}</div>
-                                <a href="{% url 'users:register' %}" data-bypass-htmx="true" class="btn btn-sm btn-primary">
-                                    <i class="bi bi-person-plus-fill me-1"></i>Create New Account
-                                </a>
-                            </div>
-                        {% elif login_error_type == 'wrong_password' %}
+                        {% if login_error_message %}
                             <div class="alert alert-danger border-0 shadow-sm mb-3" role="alert">
                                 <div class="d-flex align-items-center mb-1">
                                     <i class="bi bi-shield-lock-fill text-danger me-2 fs-5"></i>
-                                    <strong>Incorrect Password</strong>
-                                </div>
-                                <div class="small">{{ login_error_message }}</div>
-                            </div>
-                        {% elif login_error_type == 'account_inactive' %}
-                            <div class="alert alert-danger border-0 shadow-sm mb-3" role="alert">
-                                <div class="d-flex align-items-center mb-1">
-                                    <i class="bi bi-slash-circle-fill text-danger me-2 fs-5"></i>
-                                    <strong>Account Deactivated</strong>
+                                    <strong>{% trans "Authentication Failed" %}</strong>
                                 </div>
                                 <div class="small">{{ login_error_message }}</div>
                             </div>
@@ -185,6 +166,11 @@
 
 <script>
 (function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('fresh') === '1') {
+        sessionStorage.removeItem('pwaninet_pending_2fa');
+    }
+
     const DEVICE_ID_KEY = 'pwaninet_device_id';
     let deviceId = localStorage.getItem(DEVICE_ID_KEY);
     

@@ -102,8 +102,9 @@ class AcademicUnitViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AcademicUnit.objects.all()
     serializer_class = AcademicUnitSerializer
     permission_classes = [AllowAny]
-    filterset_fields = ['programme']
+    filterset_fields = ['is_active']
     search_fields = ['code', 'name']
+
 
 
 # Document Domain ViewSets

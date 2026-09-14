@@ -1,9 +1,34 @@
 #!/bin/bash
 # Terminal 3: Secure Global Uplink
-cd projects 
-source venv/bin/activate
-cd pwaninet
-cloudflared tunnel run --token eyJhIjoiZmY3ZDU4NmNmYjhkNzc1MDgwMjIxYjk0OWRhMzkxMTQiLCJzIjoiTjRlcmFGRlI2R3E4bnFoMTU3cWk1cDNlR2hYVzljZGRUczViSFZZT0xuTT0iLCJ0IjoiOWI1ODdhYmMtM2QyMy00OGY0LTllNjQtOTMyNDEyZTFhNDk1In0=
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Load virtual environment if present
+if [ -f ../venv/bin/activate ]; then
+  source ../venv/bin/activate
+elif [ -f venv/bin/activate ]; then
+  source venv/bin/activate
+fi
+# Load environment variables if .env exists
+if [ -f .env ]; then
+  set -a
+  source .env
+  set +a
+elif [ -f ../.env ]; then
+  set -a
+  source ../.env
+  set +a
+fi
+
+if [ -z "$CLOUDFLARE_TUNNEL_TOKEN" ]; then
+  echo "[ERROR] CLOUDFLARE_TUNNEL_TOKEN is not set. Please define it in your .env file or environment."
+  exit 1
+fi
+
+# Run cloudflared with token, forwarding any optional arguments
+cloudflared tunnel run --token "$CLOUDFLARE_TUNNEL_TOKEN" "$@"
+
 
 
 

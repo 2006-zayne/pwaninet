@@ -346,6 +346,14 @@ class User(AbstractUser):
         
         return score
 
+    @property
+    def is_two_factor_enabled(self) -> bool:
+        """Return True if the user has an active, confirmed 2FA configuration."""
+        try:
+            return bool(self.two_factor and self.two_factor.is_enabled)
+        except Exception:
+            return False
+
 
 class Follow(models.Model):
     follower = models.ForeignKey(User, on_delete=models.CASCADE, related_name='following_relationships', db_index=True)
@@ -503,3 +511,60 @@ class HiddenAuthor(models.Model):
 
     def __str__(self):
         return f"{self.hider.username} hid {self.hidden_author.username}"
+
+
+class UserTwoFactor(models.Model):
+    """
+    Two-factor authentication (TOTP) configuration for a user.
+    Secret is stored encrypted at rest via authenticated encryption.
+    """
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='two_factor',
+        db_index=True
+    )
+    is_enabled = models.BooleanField(default=False, db_index=True)
+    encrypted_secret = models.TextField(help_text="Authenticated encrypted TOTP secret")
+    enrolled_at = models.DateTimeField(null=True, blank=True)
+    last_used_timestep = models.BigIntegerField(null=True, blank=True, help_text="Last successfully consumed TOTP timestep for replay protection")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "User Two-Factor Configuration"
+        verbose_name_plural = "User Two-Factor Configurations"
+
+    def __str__(self):
+        status = "enabled" if self.is_enabled else "pending"
+        return f"UserTwoFactor({self.user.username}, status={status})"
+
+
+class RecoveryCode(models.Model):
+    """
+    Single-use recovery code for account recovery / 2FA backup.
+    Plaintext code is never stored; only cryptographic password hash is retained.
+    """
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='recovery_codes',
+        db_index=True
+    )
+    code_hash = models.CharField(max_length=255, help_text="Cryptographic hash of the recovery code")
+    is_consumed = models.BooleanField(default=False, db_index=True)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Recovery Code"
+        verbose_name_plural = "Recovery Codes"
+        indexes = [
+            models.Index(fields=['user', 'is_consumed']),
+        ]
+        ordering = ['created_at']
+
+    def __str__(self):
+        status = "consumed" if self.is_consumed else "active"
+        return f"RecoveryCode(user={self.user.username}, id={self.id}, status={status})"
+

@@ -145,6 +145,10 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection."""
+        user = getattr(self, 'user', None)
+        if not user or not getattr(user, 'is_authenticated', False):
+            return
+
         print(f"[BACKEND] Group chat WebSocket disconnect for user {self.user_id} from group {self.group_id}")
 
         # Remove from channel group

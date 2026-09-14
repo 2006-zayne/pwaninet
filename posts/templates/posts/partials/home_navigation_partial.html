@@ -154,31 +154,6 @@
   .search-clear:hover { background: var(--text-main); }
   .search-input:not(:placeholder-shown) ~ .search-clear { display: flex; }
 
-  /* ── Live Search Dropdown ── */
-  #search-dropdown-results {
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 0;
-    right: 0;
-    background: var(--card-bg, #ffffff);
-    border: 1px solid var(--border-soft, #e2e8f0);
-    border-radius: 16px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-    z-index: 1050;
-    max-height: 480px;
-    overflow-y: auto;
-  }
-  #search-dropdown-results:empty {
-    display: none !important;
-  }
-  #search-dropdown-results:not(:empty) {
-    display: block !important;
-  }
-  [data-theme="dark"] #search-dropdown-results {
-    background: var(--card-bg, #242526);
-    border-color: var(--border-soft, #3a3b3c);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-  }
 
   /* ── Loading Indicator ── */
   #search-indicator {
@@ -336,7 +311,7 @@
       </a>
 
       <!-- Search Form -->
-      <form method="GET"
+      <form id="global-search-form"
             action="{% url 'search:unified_search' %}"
             hx-get="{% url 'search:unified_search' %}"
             hx-target="#page-content-target"
@@ -344,7 +319,8 @@
             hx-push-url="true"
             hx-history="true"
             class="search-form"
-            autocomplete="off">
+            autocomplete="off"
+            onsubmit="const dd = document.getElementById('search-dropdown-results'); if(dd) { dd.innerHTML=''; dd.style.removeProperty('display'); }">
         <i class="bi bi-search search-icon"></i>
         <input type="text"
                name="q"
@@ -354,12 +330,13 @@
                hx-get="{% url 'search:search_suggest' %}"
                hx-target="#search-dropdown-results"
                hx-swap="innerHTML"
-               hx-trigger="keyup changed delay:300ms, search"
+               hx-trigger="input changed delay:200ms"
+               hx-sync="this:replace"
                hx-indicator="#search-indicator"
                aria-label="{% trans 'Search PwaniNet' %}">
         <button type="button"
                 class="search-clear"
-                onclick="this.previousElementSibling.value=''; const dd = document.getElementById('search-dropdown-results'); if(dd) { dd.innerHTML=''; dd.style.display='none'; } this.previousElementSibling.dispatchEvent(new Event('search'));"
+                onclick="this.previousElementSibling.value=''; const dd = document.getElementById('search-dropdown-results'); if(dd) { dd.innerHTML=''; dd.style.removeProperty('display'); } this.previousElementSibling.dispatchEvent(new Event('input'));"
                 aria-label="Clear search">
           <i class="bi bi-x"></i>
         </button>
@@ -431,16 +408,6 @@ document.addEventListener('DOMContentLoaded', function() {
       localStorage.setItem('profileNudgeDismissed', 'true');
     });
   }
-
-  // Click outside search form closes dropdown
-  document.addEventListener('click', function(e) {
-    const searchForm = document.querySelector('.search-form');
-    const dropdown = document.getElementById('search-dropdown-results');
-    if (dropdown && searchForm && !searchForm.contains(e.target)) {
-      dropdown.innerHTML = '';
-      dropdown.style.display = 'none';
-    }
-  });
 });
 </script>
 

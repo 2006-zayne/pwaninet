@@ -214,17 +214,13 @@
 (function() {
   'use strict';
 
-  const PROFILE_URL = "{% url 'users:profile' request.user.username %}";
-  const HOME_URL = "{% url 'posts:home' %}";
-
   const TOUR_STEPS = [
     {
       title: "Campus Feed & Search",
       icon: "bi-search",
       body: "Your home feed displays real-time posts, questions, and course updates from your classmates and academic groups. Use the search bar anytime to find friends, notes, or groups.",
       tip: "Search for unit codes like CSC101 or classmate names to find discussions instantly.",
-      targets: ['.search-header', '.search-inner', '#main-content-area'],
-      isProfileTarget: false
+      targets: ['.search-header', '.search-inner', '#main-content-area']
     },
     {
       title: "Academic Groups & Cohorts",
@@ -237,16 +233,19 @@
         '.navbar-top a[href*="groups_dashboard"]',
         '.navbar-top a[href*="groups"]',
         '.groups-explore-section'
-      ],
-      isProfileTarget: false
+      ]
     },
     {
-      title: "Document Repository Shortcut",
-      icon: "bi-folder-fill",
-      body: "We've navigated to your profile! Tap this floating Documents button anytime to access lecture notes, summaries, and past papers tailored to your semester curriculum.",
-      tip: "Notes matching your active units have a 'Matches Unit' badge and can be saved for offline study.",
-      targets: ['#documents-btn', '.floating-btn[href*="documents"]', '#profile-floating-actions'],
-      isProfileTarget: true
+      title: "Profile & Document Repository",
+      icon: "bi-person-circle",
+      body: "Tap your profile avatar anytime to view your degree details, edit your bio, and access the Document Repository for lecture notes, past papers, and study materials.",
+      tip: "Your profile is also where you can customize notification preferences, switch themes, and manage your account.",
+      targets: [
+        '.search-header .avatar-link',
+        '.navbar-top a[href*="profile"]',
+        '.avatar-link',
+        'a[href*="/profile/"]'
+      ]
     },
     {
       title: "Ask & Share (Create Post)",
@@ -258,8 +257,7 @@
         '.mobile-bottom-nav a[href*="create_post"]',
         '.navbar-top a[href*="create_post"]',
         'a[href*="create_post"]'
-      ],
-      isProfileTarget: false
+      ]
     },
     {
       title: "Notifications & Alerts",
@@ -271,8 +269,7 @@
         '.mobile-bottom-nav a[aria-label="Notifications"]',
         '#notification-badge-container-desktop',
         '.navbar-top a[href*="notifications"]'
-      ],
-      isProfileTarget: false
+      ]
     }
   ];
 
@@ -314,68 +311,11 @@
     if (!step) return;
 
     currentStepIndex = index;
-
-    // Handle profile page navigation for Document Repository step
-    if (step.isProfileTarget) {
-      const existingBtn = document.getElementById('documents-btn');
-      if (!existingBtn || existingBtn.offsetParent === null) {
-        // Navigate to profile using HTMX or window.location
-        if (window.htmx) {
-          htmx.ajax('GET', PROFILE_URL, { target: '#page-content-target', swap: 'innerHTML' });
-        } else {
-          const profileChip = document.querySelector('a.nav-chip[aria-label="Profile"]') || document.querySelector('a[href*="/profile/"]');
-          if (profileChip) profileChip.click();
-        }
-
-        // Wait for profile content and documents button to mount
-        let attempts = 0;
-        const checkInterval = setInterval(() => {
-          attempts++;
-          const btn = document.getElementById('documents-btn');
-          if (btn && btn.offsetParent !== null) {
-            clearInterval(checkInterval);
-            proceedWithTarget(step, index, btn);
-          } else if (attempts > 30) {
-            clearInterval(checkInterval);
-            proceedWithTarget(step, index, resolveTarget(step));
-          }
-        }, 80);
-        return;
-      } else {
-        proceedWithTarget(step, index, existingBtn);
-        return;
-      }
-    } else if (index === 0) {
-      // If moving back to Step 1 and we're still on profile, navigate back to feed
-      const searchHeader = document.querySelector('.search-header');
-      if (!searchHeader && window.htmx) {
-        htmx.ajax('GET', HOME_URL, { target: '#page-content-target', swap: 'innerHTML' });
-        setTimeout(() => {
-          proceedWithTarget(step, index, resolveTarget(step));
-        }, 150);
-        return;
-      }
-    }
-
     proceedWithTarget(step, index, resolveTarget(step));
   }
 
   function proceedWithTarget(step, index, target) {
-    // Reset previous target styling
-    if (activeTargetElement) {
-      if (activeTargetElement.id === 'documents-btn') {
-        activeTargetElement.classList.remove('expanded');
-        activeTargetElement.style.removeProperty('z-index');
-      }
-    }
-
     activeTargetElement = target;
-
-    // Handle Documents floating button expansion
-    if (target && target.id === 'documents-btn') {
-      target.classList.add('expanded');
-      target.style.zIndex = '10053';
-    }
 
     // Handle Mobile Bottom Nav elevation when targeting nav chips
     const mobileNav = document.querySelector('.mobile-bottom-nav');
@@ -454,12 +394,17 @@
     spotlight.style.width = `${width}px`;
     spotlight.style.height = `${height}px`;
 
+    // Dynamic border-radius: circular for profile avatar, rounded rectangle for other elements
+    if (activeTargetElement.matches('.avatar-link, .avatar-link *, a[href*="profile"], a[href*="profile"] *, .avatar-img')) {
+      spotlight.style.borderRadius = '50%';
+    } else {
+      spotlight.style.borderRadius = '16px';
+    }
+
     // Position Card
     if (isMobile) {
-      // On mobile: if target is near bottom (e.g. floating documents button at bottom 110px),
-      // place dialogue at top to avoid covering it!
-      const isNearBottomAction = activeTargetElement.id === 'documents-btn' ||
-                                (rect.top > window.innerHeight * 0.48 && rect.bottom < window.innerHeight - 80);
+      // On mobile: if target is in bottom half, place dialogue near top; otherwise place above bottom nav
+      const isNearBottomAction = (rect.top > window.innerHeight * 0.48 && rect.bottom < window.innerHeight - 80);
 
       if (isNearBottomAction) {
         card.style.top = 'calc(24px + var(--pwaninet-safe-area-top, 0px))';
@@ -567,12 +512,7 @@
     const overlay = document.getElementById('pwaninet-tour-overlay');
     const card = document.getElementById('pwaninet-tour-card');
     const mobileNav = document.querySelector('.mobile-bottom-nav');
-    const docsBtn = document.getElementById('documents-btn');
 
-    if (docsBtn) {
-      docsBtn.classList.remove('expanded');
-      docsBtn.style.removeProperty('z-index');
-    }
     if (mobileNav) {
       mobileNav.style.removeProperty('z-index');
     }

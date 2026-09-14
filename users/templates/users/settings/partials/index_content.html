@@ -86,195 +86,51 @@
   </div>
 </div>
 
-<!-- Hidden download target iframe to prevent top-level page reloads on 302 downloads -->
-<iframe name="pwaninet-download-target" id="pwaninet-download-target" style="display:none; width:0; height:0; border:0;" aria-hidden="true"></iframe>
+<script>
+  (function() {
+    async function syncLatestReleaseFromGitHub() {
+      try {
+        const cached = sessionStorage.getItem('pwaninet_gh_latest');
+        const cachedTime = parseInt(sessionStorage.getItem('pwaninet_gh_latest_time') || '0', 10);
+        let tag = (cached && Date.now() - cachedTime < 300000) ? cached : null;
 
-<!-- Desktop QR Install Modal -->
-<div class="modal fade" id="qrInstallModal" tabindex="-1" aria-labelledby="qrInstallModalTitle" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
-      <div class="modal-header border-0 pb-0 pt-4 px-4 align-items-center">
-        <h5 class="modal-title fw-bold" id="qrInstallModalTitle">
-          <i class="bi bi-phone text-primary me-2"></i>{% trans "Install PwaniNet on Android" %}
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
-      </div>
-      <div class="modal-body px-4 py-3 text-center">
-        <!-- QR Code — pure white card so dark-mode never inverts the modules -->
-        <div class="d-inline-flex flex-column align-items-center justify-content-center p-3 my-2 rounded-3 shadow-sm"
-             style="background: #ffffff !important; border: 1px solid #e2e8f0; width: 200px; height: 200px; margin: 0 auto;">
-          <img src="{% url 'qr_code_svg' %}"
-               alt="{% trans 'PwaniNet APK QR Code' %}"
-               width="176"
-               height="176"
-               style="display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #ffffff;"
-               loading="lazy">
-        </div>
-        <p class="text-muted small mt-2 mb-3">
-          {% trans "Point your phone's camera or QR scanner at the code above." %}
-        </p>
-
-        <!-- 3-Step Sideloading Instructions -->
-        <div class="qr-steps text-start p-3 rounded-3 mb-3" style="background: var(--bg-tertiary, #f8fafc); border: 1px solid var(--border, #e2e8f0);">
-          <div class="d-flex align-items-start mb-2">
-            <span class="badge rounded-circle bg-primary text-white me-2" style="width: 22px; height: 22px; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">1</span>
-            <span class="small text-secondary">{% trans "Scan the QR code and tap Download APK." %}</span>
-          </div>
-          <div class="d-flex align-items-start mb-2">
-            <span class="badge rounded-circle bg-primary text-white me-2" style="width: 22px; height: 22px; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">2</span>
-            <span class="small text-secondary">{% trans "If prompted by Chrome, select Download anyway." %}</span>
-          </div>
-          <div class="d-flex align-items-start">
-            <span class="badge rounded-circle bg-primary text-white me-2" style="width: 22px; height: 22px; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">3</span>
-            <span class="small text-secondary">{% trans "Open the downloaded file and tap Install." %}</span>
-          </div>
-        </div>
-
-        <!-- Copyable Link Input -->
-        <div class="input-group mb-2">
-          <span class="input-group-text bg-transparent border-end-0 text-muted">
-            <i class="bi bi-link-45deg"></i>
-          </span>
-          <input type="text" id="qr-modal-link-input" class="form-control border-start-0 border-end-0 small" value="https://pwaninet.app/apk/" readonly style="font-size: 0.85rem; background: transparent;">
-          <button class="btn btn-outline-primary btn-sm px-3" type="button" id="qr-modal-copy-btn" onclick="if (typeof copyApkLink === 'function') copyApkLink(this);">
-            <i class="bi bi-clipboard me-1"></i>{% trans "Copy" %}
-          </button>
-        </div>
-      </div>
-      <script>
-        function copyApkLink(btn) {
-          const button = btn || document.getElementById('qr-modal-copy-btn');
-          if (!button) return;
-          if (button.dataset.copying === 'true') return;
-          button.dataset.copying = 'true';
-
-          const input = document.getElementById('qr-modal-link-input');
-          const textToCopy = (input && input.value) ? input.value : 'https://pwaninet.app/apk/';
-
-          const originalHtml = button.getAttribute('data-original-html') || button.innerHTML;
-          if (!button.getAttribute('data-original-html')) {
-            button.setAttribute('data-original-html', originalHtml);
-          }
-
-          function showSuccess() {
-            button.innerHTML = '<i class="bi bi-check2 me-1"></i>{% trans "Copied!" %}';
-            button.classList.remove('btn-outline-primary');
-            button.classList.add('btn-success');
-            setTimeout(() => {
-              button.innerHTML = originalHtml;
-              button.classList.remove('btn-success');
-              button.classList.add('btn-outline-primary');
-              delete button.dataset.copying;
-            }, 2000);
-          }
-
-          function fallbackCopy() {
-            let copied = false;
-            try {
-              const temp = document.createElement('textarea');
-              temp.value = textToCopy;
-              temp.style.position = 'fixed';
-              temp.style.top = '0';
-              temp.style.left = '0';
-              temp.style.width = '2em';
-              temp.style.height = '2em';
-              temp.style.padding = '0';
-              temp.style.border = 'none';
-              temp.style.outline = 'none';
-              temp.style.boxShadow = 'none';
-              temp.style.background = 'transparent';
-              temp.setAttribute('readonly', '');
-              document.body.appendChild(temp);
-              temp.focus();
-              temp.select();
-              temp.setSelectionRange(0, textToCopy.length);
-              copied = document.execCommand('copy');
-              document.body.removeChild(temp);
-            } catch (err) {
-              console.warn('[Clipboard] fallback textarea error:', err);
+        if (!tag) {
+          const res = await fetch('https://api.github.com/repos/2006-zayne/pwaninet/releases/latest');
+          if (res.ok) {
+            const data = await res.json();
+            tag = (data.tag_name || '').replace(/^v/, '').trim();
+            if (tag) {
+              sessionStorage.setItem('pwaninet_gh_latest', tag);
+              sessionStorage.setItem('pwaninet_gh_latest_time', String(Date.now()));
             }
-
-            if (!copied && input) {
-              try {
-                input.focus();
-                input.select();
-                input.setSelectionRange(0, 99999);
-                copied = document.execCommand('copy');
-              } catch (e) {
-                console.warn('[Clipboard] fallback input error:', e);
-              }
-            }
-
-            showSuccess();
-          }
-
-          if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(textToCopy)
-              .then(() => showSuccess())
-              .catch(() => fallbackCopy());
-          } else {
-            fallbackCopy();
           }
         }
-        window.copyApkLink = copyApkLink;
-      </script>
-      <script>
-        (function() {
-          async function syncLatestReleaseFromGitHub() {
-            try {
-              const cached = sessionStorage.getItem('pwaninet_gh_latest');
-              const cachedTime = parseInt(sessionStorage.getItem('pwaninet_gh_latest_time') || '0', 10);
-              let tag = (cached && Date.now() - cachedTime < 300000) ? cached : null;
 
-              if (!tag) {
-                const res = await fetch('https://api.github.com/repos/2006-zayne/pwaninet/releases/latest');
-                if (res.ok) {
-                  const data = await res.json();
-                  tag = (data.tag_name || '').replace(/^v/, '').trim();
-                  if (tag) {
-                    sessionStorage.setItem('pwaninet_gh_latest', tag);
-                    sessionStorage.setItem('pwaninet_gh_latest_time', String(Date.now()));
-                  }
-                }
-              }
-
-              if (tag) {
-                const apkLabel = document.getElementById('settings-apk-version-label');
-                if (apkLabel) {
-                  apkLabel.innerHTML = '<i class="bi bi-check2-circle text-primary me-1"></i>{% trans "Latest Version" %} ' + tag;
-                }
-                const nativeMeta = document.getElementById('native-latest-version-meta');
-                if (nativeMeta) {
-                  nativeMeta.innerHTML = '<i class="bi bi-cloud-arrow-down text-primary me-1"></i>{% trans "Latest" %} v' + tag;
-                }
-                if (typeof window.checkNativeAppUpdates === 'function' && typeof window.isRunningInNativeApp === 'function' && window.isRunningInNativeApp()) {
-                  window.checkNativeAppUpdates(false);
-                }
-              }
-            } catch (e) {
-              console.warn('[PwaniNet] GitHub release sync error:', e);
-            }
+        if (tag) {
+          const apkLabel = document.getElementById('settings-apk-version-label');
+          if (apkLabel) {
+            apkLabel.innerHTML = '<i class="bi bi-check2-circle text-primary me-1"></i>{% trans "Latest Version" %} ' + tag;
           }
-
-          if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', syncLatestReleaseFromGitHub);
-          } else {
-            syncLatestReleaseFromGitHub();
+          const nativeMeta = document.getElementById('native-latest-version-meta');
+          if (nativeMeta) {
+            nativeMeta.innerHTML = '<i class="bi bi-cloud-arrow-down text-primary me-1"></i>{% trans "Latest" %} v' + tag;
           }
-          document.addEventListener('htmx:afterSwap', syncLatestReleaseFromGitHub);
-        })();
-      </script>
-      <div class="modal-footer border-0 pt-0 pb-4 px-4 justify-content-center">
-        <span class="text-muted small">
-          {% trans "Downloading on this device?" %} 
-          <a href="{% url 'download_android_apk' %}" target="pwaninet-download-target" data-apk-download="true" class="text-primary text-decoration-none fw-semibold" hx-boost="false">
-            {% trans "Download directly on your computer" %}
-          </a>
-        </span>
-      </div>
-    </div>
-  </div>
-</div>
+          if (typeof window.checkNativeAppUpdates === 'function' && typeof window.isRunningInNativeApp === 'function' && window.isRunningInNativeApp()) {
+            window.checkNativeAppUpdates(false);
+          }
+        }
+      } catch (e) {
+        console.warn('[PwaniNet] GitHub release sync error:', e);
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', syncLatestReleaseFromGitHub, { once: true });
+    } else {
+      syncLatestReleaseFromGitHub();
+    }
+  })();
+</script>
 
 
 <style>
@@ -283,6 +139,106 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     overflow: hidden;
+  }
+
+  .settings-category-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border);
+    text-decoration: none;
+    transition: background 0.2s ease;
+    cursor: pointer;
+  }
+
+  .settings-category-item:first-child {
+    border-top: none;
+    border-top-left-radius: var(--radius-md);
+    border-top-right-radius: var(--radius-md);
+  }
+
+  .settings-category-item:last-child {
+    border-bottom: none;
+    border-bottom-left-radius: var(--radius-md);
+    border-bottom-right-radius: var(--radius-md);
+  }
+
+  .settings-category-item:hover {
+    background: var(--brand-light);
+  }
+
+  .settings-category-item:focus {
+    outline: 2px solid var(--brand);
+    outline-offset: -2px;
+  }
+
+  .settings-category-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand-light);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .settings-category-icon i {
+    font-size: 1.25rem;
+    color: var(--brand);
+  }
+
+  .settings-category-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .settings-category-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .settings-category-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+  }
+
+  .settings-category-chevron {
+    flex-shrink: 0;
+    color: var(--text-secondary);
+  }
+
+  .settings-category-chevron i {
+    font-size: 1.1rem;
+  }
+
+  @media (max-width: 768px) {
+    .settings-category-item {
+      padding: 0.875rem 1rem;
+      gap: 0.875rem;
+    }
+
+    .settings-category-icon {
+      width: 36px;
+      height: 36px;
+    }
+
+    .settings-category-icon i {
+      font-size: 1.1rem;
+    }
+
+    .settings-category-title {
+      font-size: 0.95rem;
+    }
+
+    .settings-category-subtitle {
+      font-size: 0.8rem;
+    }
   }
 
   .settings-app-download-card {

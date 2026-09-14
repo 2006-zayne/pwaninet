@@ -143,7 +143,7 @@ class Semester(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.get_number_display()} - {self.academic_year}"
+        return f"{self.get_number_display()} {self.academic_year.code}"
     
     def save(self, *args, **kwargs):
         # Ensure only one current semester

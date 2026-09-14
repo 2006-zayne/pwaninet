@@ -1,5 +1,5 @@
 #!/bin/bash
-# Terminal 1: Production Application Server
+# Terminal 4: Production Celery Beat Scheduler Daemon
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -26,8 +26,5 @@ fi
 export DJANGO_ENV=production
 export DJANGO_SETTINGS_MODULE=pwaninet.settings.production
 
-# Start backing services (PostgreSQL & Redis)
-docker compose up -d db redis
-
-# Start production ASGI server without development autoreload
-exec uvicorn pwaninet.asgi:application --host 0.0.0.0 --port 8000
+# Start Celery beat scheduler
+exec /home/zayne/projects/venv/bin/python -m celery -A pwaninet beat -l info

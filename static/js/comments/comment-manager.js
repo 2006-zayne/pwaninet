@@ -509,7 +509,21 @@ const CommentManager = {
     
     const menuHtml = CommentRenderer.renderMenu(commentId, isOwner, isModerator);
     const contentDiv = commentEl.querySelector('.comment-content');
+    if (commentEl) {
+      commentEl.classList.add('menu-open');
+    }
     contentDiv.insertAdjacentHTML('beforeend', menuHtml);
+    
+    // Smart dropup detection: if menu extends near or below bottom composer, open upward
+    const menuEl = document.getElementById(`menu-${commentId}`);
+    if (menuEl) {
+      const rect = menuEl.getBoundingClientRect();
+      const composer = document.querySelector('.post-detail-container .fixed-bottom') || document.querySelector('.fixed-bottom');
+      const bottomLimit = composer ? composer.getBoundingClientRect().top : (window.innerHeight - 70);
+      if (rect.bottom > bottomLimit) {
+        menuEl.classList.add('menu-dropup');
+      }
+    }
     
     button.setAttribute('aria-expanded', 'true');
   },
@@ -520,6 +534,9 @@ const CommentManager = {
   closeAllMenus() {
     document.querySelectorAll('.comment-menu-dropdown').forEach(menu => {
       menu.remove();
+    });
+    document.querySelectorAll('.comment-item.menu-open').forEach(el => {
+      el.classList.remove('menu-open');
     });
     document.querySelectorAll('[data-action="menu"]').forEach(btn => {
       btn.setAttribute('aria-expanded', 'false');

@@ -105,23 +105,17 @@
 
         // Animate to completion
         progressContainer.classList.add('completing');
-        currentProgress = 85;
-        progressBar.style.width = '85%';
+        currentProgress = 100;
+        progressBar.style.width = '100%';
 
-        // Quick transition to 100%
-        setTimeout(() => {
-            currentProgress = 100;
-            progressBar.style.width = '100%';
-        }, 100);
-
-        // Fade out and hide
+        // Fade out and hide quickly
         setTimeout(() => {
             progressBar.style.opacity = '0';
             setTimeout(() => {
                 progressBar.style.width = '0%';
                 progressContainer.classList.remove('active', 'completing');
-            }, 300);
-        }, 200);
+            }, 150);
+        }, 80);
 
         console.log('[NavigationProgress] Completed');
     }
@@ -236,6 +230,16 @@
 
         document.addEventListener('htmx:sendError', function() {
             console.warn('[NavigationProgress] HTMX send error, cancelling progress');
+            cancelNavigationProgress();
+        });
+
+        document.addEventListener('htmx:sendAbort', function() {
+            console.log('[NavigationProgress] HTMX send aborted, cancelling progress');
+            cancelNavigationProgress();
+        });
+
+        document.addEventListener('htmx:abort', function() {
+            console.log('[NavigationProgress] HTMX abort event, cancelling progress');
             cancelNavigationProgress();
         });
 

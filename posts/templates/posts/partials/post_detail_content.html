@@ -157,6 +157,36 @@
       padding-bottom: 0 !important;
     }
   }
+
+  /* Three-dots menu, dropdowns, and modals above sticky composer in Post Detail */
+  .post-detail-container .dropdown-menu {
+    z-index: 10010 !important;
+  }
+  .post-detail-container .post-card:has(.dropdown-menu.show) {
+    overflow: visible !important;
+    z-index: 10010 !important;
+  }
+  .post-detail-container .comment-item:has(.comment-menu-dropdown),
+  .post-detail-container .comment-item.menu-open {
+    z-index: 10010 !important;
+    position: relative;
+  }
+  .post-detail-container .comment-menu-dropdown {
+    z-index: 10010 !important;
+  }
+  .post-detail-container .modal {
+    z-index: 10500 !important;
+  }
+  .post-detail-container .modal-backdrop {
+    z-index: 10400 !important;
+  }
+  /* Hide sticky composer when any modal is open so it cannot overlap */
+  body.modal-open .fixed-bottom,
+  body.modal-open .post-detail-composer-bar,
+  body.modal-open .main-composer {
+    display: none !important;
+    pointer-events: none !important;
+  }
 </style>
 
 <div class="post-detail-container" data-post.share_id="{{ post.share_id }}">
@@ -450,7 +480,7 @@
   </div>
 
   <!-- Sticky Comment Input at Bottom -->
-  <div class="fixed-bottom" style="z-index: 1000; background-color: transparent; border-top: none;">
+  <div class="fixed-bottom post-detail-composer-bar" style="z-index: 1000; background-color: transparent; border-top: none;">
     <div class="container py-3" style="background-color: transparent;">
         <div class="row justify-content-center">
             <div class="col-12 col-lg-8">

@@ -704,14 +704,27 @@
   position: absolute;
   right: 0;
   top: 100%;
-  z-index: 100;
+  z-index: 10010 !important;
   min-width: 180px;
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
   padding: 4px 0;
   animation: fadeIn 0.15s ease;
+}
+
+.comment-menu-dropdown.menu-dropup {
+  top: auto !important;
+  bottom: 100% !important;
+  margin-bottom: 6px;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.18);
+}
+
+.comment-item:has(.comment-menu-dropdown),
+.comment-item.menu-open {
+  z-index: 10010 !important;
+  position: relative;
 }
 
 .comment-menu-item {

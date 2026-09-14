@@ -191,6 +191,14 @@ SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
 CSRF_COOKIE_HTTPONLY = True
 
+# Two-Factor Authentication (2FA / TOTP) and Recovery Codes
+MFA_ENCRYPTION_KEY = os.environ.get('MFA_ENCRYPTION_KEY', None)
+TOTP_DIGITS = int(os.environ.get('TOTP_DIGITS', 6))
+TOTP_INTERVAL = int(os.environ.get('TOTP_INTERVAL', 30))
+TOTP_ALLOWED_DRIFT = int(os.environ.get('TOTP_ALLOWED_DRIFT', 1))
+TOTP_ISSUER = os.environ.get('TOTP_ISSUER', 'PwaniNet')
+RECOVERY_CODE_COUNT = int(os.environ.get('RECOVERY_CODE_COUNT', 8))
+
 # Caching configuration
 CACHES = {
     'default': {

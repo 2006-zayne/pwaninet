@@ -68,6 +68,9 @@ class DownloadManager {
         const existing = await this.storage.getMetadataByUrl(options.url);
         if (existing) {
             window.dispatchEvent(new CustomEvent('pwaninet:download-already-downloaded', { detail: existing }));
+            if (!this.isNativeEnvironment()) {
+                await this.exportToDevice(existing.id);
+            }
             return existing;
         }
 
@@ -276,6 +279,26 @@ class DownloadManager {
             // Save metadata
             await this.storage.saveMetadata(metadata);
             this.queue.markCompleted(item.id, metadata);
+
+            // Trigger native browser download to user's device Downloads
+            try {
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = blobUrl;
+                a.download = item.filename || 'download';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    if (a.parentNode) {
+                        a.parentNode.removeChild(a);
+                    }
+                    URL.revokeObjectURL(blobUrl);
+                }, 5000);
+            } catch (downloadErr) {
+                console.warn('[DownloadManager] Native browser file download trigger failed:', downloadErr);
+            }
+
             return metadata;
 
         } catch (err) {

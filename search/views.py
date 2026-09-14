@@ -6,6 +6,7 @@ Handles live typing suggestions dropdown and multi-tab dedicated search page.
 import logging
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
+from django.core.cache import cache
 from .services.unified_search_service import UnifiedSearchService
 
 logger = logging.getLogger(__name__)
@@ -18,43 +19,53 @@ def search_suggest_view(request):
     """
     query = request.GET.get('q', '').strip()
     if not query or len(query) < 2:
-        return HttpResponse("")
+        return HttpResponse("", content_type="text/html")
 
-    user = request.user if hasattr(request, 'user') and request.user.is_authenticated else None
-    service = UnifiedSearchService()
-    data = service.search(
-        query=query,
-        active_tab='all',
-        user=user,
-        page=1,
-        page_size=3
-    )
+    try:
+        user = request.user if hasattr(request, 'user') and request.user.is_authenticated else None
+        cache_key = f"search_suggest:{query.lower()}:{user.id if user else 'anon'}"
+        cached_html = cache.get(cache_key)
+        if cached_html is not None:
+            return HttpResponse(cached_html, content_type="text/html")
+        service = UnifiedSearchService()
+        data = service.search(
+            query=query,
+            active_tab='all',
+            user=user,
+            page=1,
+            page_size=3
+        )
 
-    following_ids = set()
-    liked_post_ids = set()
-    if user:
-        from users.models import Follow
-        from posts.models import Like
-        following_ids = set(Follow.objects.filter(follower=user).values_list('followed_id', flat=True))
-        post_ids = [
-            item['obj'].id if isinstance(item, dict) and 'obj' in item and item['obj'] else item.get('id')
-            for item in data['results']['posts']
-        ]
-        post_ids = [pid for pid in post_ids if pid]
-        if post_ids:
-            for pid, sid in Like.objects.filter(user=request.user, post_id__in=post_ids).values_list('post_id', 'post__share_id'):
-                liked_post_ids.add(pid)
-                liked_post_ids.add(sid)
-                liked_post_ids.add(str(sid))
+        following_ids = set()
+        liked_post_ids = set()
+        if user:
+            from users.models import Follow
+            from posts.models import Like
+            following_ids = set(Follow.objects.filter(follower=user).values_list('followed_id', flat=True))
+            post_ids = [
+                item['obj'].id if isinstance(item, dict) and 'obj' in item and item['obj'] else item.get('id')
+                for item in data['results']['posts']
+            ]
+            post_ids = [pid for pid in post_ids if pid]
+            if post_ids:
+                for pid, sid in Like.objects.filter(user=request.user, post_id__in=post_ids).values_list('post_id', 'post__share_id'):
+                    liked_post_ids.add(pid)
+                    liked_post_ids.add(sid)
+                    liked_post_ids.add(str(sid))
 
-    context = {
-        'query': query,
-        'results': data['results'],
-        'counts': data['counts'],
-        'following_ids': following_ids,
-        'liked_post_ids': liked_post_ids,
-    }
-    return render(request, 'search/partials/search_dropdown_results.html', context)
+        context = {
+            'query': query,
+            'results': data['results'],
+            'counts': data['counts'],
+            'following_ids': following_ids,
+            'liked_post_ids': liked_post_ids,
+        }
+        response = render(request, 'search/partials/search_dropdown_results.html', context)
+        cache.set(cache_key, response.content, 60)
+        return response
+    except Exception as e:
+        logger.error("Error generating search suggestions for query '%s': %s", query, e, exc_info=True)
+        return HttpResponse("", content_type="text/html")
 
 
 def unified_search_view(request):
@@ -62,6 +73,10 @@ def unified_search_view(request):
     Handle dedicated multi-tab search results page and tab switching.
     Supports HTMX partial swaps (page navigation vs tab content) and full page loads.
     """
+    # Guard against accidental targeting of search dropdown
+    if request.headers.get('HX-Target') == 'search-dropdown-results':
+        return search_suggest_view(request)
+
     query = request.GET.get('q', '').strip()
     tab = request.GET.get('tab', 'all').strip().lower()
     if tab not in ('all', 'people', 'documents', 'posts', 'groups'):
@@ -111,14 +126,14 @@ def unified_search_view(request):
             pass
 
     # Save search to session if query exists
-    if query:
+    if query and hasattr(request, 'session'):
         recent = request.session.get('global_recent_searches', [])
         if query in recent:
             recent.remove(query)
         recent.insert(0, query)
         request.session['global_recent_searches'] = recent[:8]
 
-    recent_searches = request.session.get('global_recent_searches', [])
+    recent_searches = request.session.get('global_recent_searches', []) if hasattr(request, 'session') else []
 
     # Did you mean is scoped strictly to the documents tab
     did_you_mean = service.get_document_did_you_mean(query) if (query and tab == 'documents') else None

@@ -9,40 +9,32 @@ from notifications.events import publish_event, EventTypes, EventSources, EventA
 @receiver(user_logged_in)
 def track_device_on_login(sender, request, user, **kwargs):
     """
-    Automatically create or update DeviceAccount when a user logs in.
-    This tracks which accounts have been used on which devices.
+    Automatically create or update UserSession and DeviceAccount when a user logs in.
+    Guarantees active session tracking across all authentication entry points.
     """
     if not request or not user:
         return
 
-    device_id = get_or_create_device_id(request)
-    if device_id:
-        hashed_device_id = hash_device_id(device_id)
-        session_key = getattr(request.session, 'session_key', None) if hasattr(request, 'session') else None
-
-        DeviceAccount.objects.update_or_create(
-            user=user,
-            device_id=hashed_device_id,
-            defaults={
-                'session_key': session_key
-            }
-        )
-
+    from .services.session_service import create_or_update_session
+    create_or_update_session(user, request)
 
 
 @receiver(user_logged_out)
 def clear_session_on_logout(sender, request, user, **kwargs):
     """
-    Clear the session key from DeviceAccount when user logs out.
+    Revoke UserSession and clear the session key from DeviceAccount when user logs out.
     """
-    device_id = get_or_create_device_id(request)
-    
-    if device_id and user:
-        hashed_device_id = hash_device_id(device_id)
-        DeviceAccount.objects.filter(
-            user=user,
-            device_id=hashed_device_id
-        ).update(session_key=None)
+    if request and hasattr(request, 'session') and request.session.session_key:
+        from .services.session_service import revoke_session
+        revoke_session(request.session.session_key, user=user)
+    elif user and request:
+        device_id = get_or_create_device_id(request)
+        if device_id:
+            hashed_device_id = hash_device_id(device_id)
+            DeviceAccount.objects.filter(
+                user=user,
+                device_id=hashed_device_id
+            ).update(session_key=None)
 
 
 @receiver(post_save, sender=User)

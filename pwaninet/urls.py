@@ -24,7 +24,7 @@ from django.http import HttpResponse, HttpResponseRedirect, FileResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from notifications import views as notification_views
-from users.views import toggle_profile_photo_like, PwaniLoginView
+from users.views import toggle_profile_photo_like, PwaniLoginView, login_2fa_challenge_view
 
 # PWA Manifest - served as static file to bypass auth middleware
 @require_http_methods(["GET", "HEAD"])
@@ -185,6 +185,8 @@ urlpatterns = [
     # Custom login with diagnostics and structured logging
     path('accounts/login/', PwaniLoginView.as_view(), name='login'),
     path('login/', PwaniLoginView.as_view(), name='login_direct'),
+    # Phase 3: 2FA challenge (shown after valid password, before full login)
+    path('login/2fa/', login_2fa_challenge_view, name='login_2fa_challenge'),
     # This maps 'accounts/logout/' and remaining auth views automatically
     path('accounts/', include('django.contrib.auth.urls')),
     # PWA Offline Page (handles both /offline/ and /offline.html)

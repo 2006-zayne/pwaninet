@@ -9,6 +9,8 @@
 </div>
 
 <div class="settings-list-container">
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_two_factor' icon_class='bi-shield-check' title='Two-Factor Authentication' subtitle='Protect your account with an authenticator app' is_htmx=True %}
+
   {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_password_manager' icon_class='bi-shield-lock' title='Password Manager' subtitle='Change your password' is_htmx=True %}
 
   {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_active_devices' icon_class='bi-laptop' title='Active Devices' subtitle='Manage devices and sessions' is_htmx=True %}

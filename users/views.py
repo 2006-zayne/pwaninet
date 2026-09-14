@@ -1,3 +1,4 @@
+import datetime
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, logout
@@ -17,6 +18,7 @@ from users.models import User, Follow, DeviceAccount, Pinch, UserSession, Block,
 from posts.models import Post, Like
 from users.forms import PwaniSignupForm, ProfileUpdateForm
 from django.contrib import messages
+from django.utils.translation import gettext_lazy as _
 from django.db import transaction
 from notifications.models import NotificationObject
 from notifications.services.notification_service import invalidate_unread_count_cache
@@ -28,7 +30,8 @@ from .serializers import (
     DeviceAccountSerializer, UserUpdateSerializer, NotificationPreferencesSerializer
 )
 import logging
-from django.contrib.auth.views import LoginView
+from django.contrib.auth.views import LoginView, PasswordResetView, PasswordResetConfirmView
+from django.core.cache import cache
 from .filters import UserFilter, FollowFilter
 
 logger = logging.getLogger('users.auth')
@@ -90,67 +93,437 @@ class PwaniLoginView(LoginView):
     2. Intelligent diagnostic error messages to help users (e.g. distinguishing
        non-existent accounts from wrong passwords).
     3. Seamless redirection and session cleanup for newly registered users.
+    4. Phase 3: 2FA challenge interception for enrolled users.
     """
     template_name = 'registration/login.html'
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
             return redirect('posts:home')
+        # If user has an active, unexpired 2FA challenge and didn't explicitly request a fresh login, auto-resume
+        if request.method == 'GET' and request.GET.get('fresh') != '1' and request.session.get('_2fa_pending_user_id'):
+            import time as _time
+            pending_ts = request.session.get('_2fa_pending_ts', 0)
+            if int(_time.time()) - pending_ts <= _2FA_CHALLENGE_TIMEOUT:
+                return redirect('login_2fa_challenge')
+        elif request.method == 'GET' and request.GET.get('fresh') == '1':
+            _clear_2fa_pending(request)
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
+        from users.services import two_factor_service
+        import time as _time
         user = form.get_user()
         ip = get_client_ip(self.request)
-        msg = f"[AUTH-LOGIN] SUCCESS: User '{user.username}' (id={user.id}) authenticated from IP={ip}"
+        msg = f"[AUTH-LOGIN] SUCCESS: User '{user.username}' (id={user.id}) credentials verified from IP={ip}"
         print(msg, flush=True)
         logger.info(msg)
-        # Clean up transient registered_username session key
+
+        # Phase 3: if user has 2FA enabled, do NOT log them in yet.
+        # Stash their pk in the session and redirect to the 2FA challenge page.
+        if two_factor_service.is_two_factor_enabled(user):
+            self.request.session['_2fa_pending_user_id'] = user.pk
+            self.request.session['_2fa_pending_ts'] = int(_time.time())
+            self.request.session['_2fa_backend'] = getattr(user, 'backend', 'users.backends.CaseInsensitiveAuthBackend')
+            next_url = self.request.POST.get('next', '') or self.request.GET.get('next', '') or self.get_success_url()
+            self.request.session['_2fa_next'] = next_url
+            device_id = self.request.POST.get('device_id')
+            if device_id:
+                self.request.session['_2fa_device_id'] = device_id
+            logger.info(
+                f"[SECURITY-2FA] CHALLENGE: Redirecting user '{user.username}' to 2FA challenge (IP={ip})"
+            )
+            return redirect('login_2fa_challenge')
+
+        # No 2FA enrolled — log in immediately.
         self.request.session.pop('registered_username', None)
+        # Signal the base template to show a one-time 2FA enrollment nudge.
+        self.request.session['_show_2fa_nudge'] = True
         return super().form_valid(form)
 
     def form_invalid(self, form):
         username = self.request.POST.get('username', '').strip()
         ip = get_client_ip(self.request)
-        msg_fail = f"[AUTH-LOGIN] FAILED: Login failed for username='{username}' from IP={ip}"
+        msg_fail = f"[AUTH-LOGIN] FAILED: Login failed for identifier='{username}' from IP={ip}"
         print(msg_fail, flush=True)
         logger.warning(msg_fail)
 
         context_extra = {
             'attempted_username': username,
+            'login_error_message': 'Invalid username or password. Please check your credentials and try again.',
         }
 
-        # Check DB to distinguish whether user exists or not
-        user_match = User.objects.filter(username__iexact=username).first()
-        if not user_match and '@' in username:
-            user_match = User.objects.filter(email__iexact=username).first()
+        return self.render_to_response(self.get_context_data(form=form, **context_extra))
 
-        if user_match is None:
-            msg_diag = f"[AUTH-LOGIN] Diagnostic: No account found for username='{username}' in DB."
-            print(msg_diag, flush=True)
-            logger.warning(msg_diag)
-            context_extra['login_error_type'] = 'account_not_found'
-            context_extra['login_error_message'] = (
-                f"No account exists with the username '{username}'. "
-                "If you haven't created an account yet, please sign up."
-            )
-        elif not user_match.is_active:
-            msg_diag = f"[AUTH-LOGIN] Diagnostic: User '{user_match.username}' is inactive."
-            print(msg_diag, flush=True)
-            logger.warning(msg_diag)
-            context_extra['login_error_type'] = 'account_inactive'
-            context_extra['login_error_message'] = (
-                f"The account '{user_match.username}' has been deactivated. Please contact support."
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 3: 2FA login challenge
+# ──────────────────────────────────────────────────────────────────────────────
+
+_2FA_CHALLENGE_TIMEOUT = 900      # seconds before pending session expires (15 min for seamless app switching)
+_2FA_MAX_ATTEMPTS = 5             # wrong codes before the challenge is revoked
+
+
+def login_2fa_challenge_view(request):
+    """
+    Second-factor challenge shown after credentials are verified for a 2FA-enrolled user.
+
+    Session keys managed:
+      _2fa_pending_user_id  – pk of the verified-but-not-yet-logged-in user
+      _2fa_pending_ts       – unix timestamp when the pending session was created
+      _2fa_next             – URL to redirect to after successful 2FA
+      _2fa_attempts         – running count of failed attempts in this challenge
+
+    GET  → render the TOTP / recovery-code input form.
+    POST → validate code, complete login on success, or re-render with error on failure.
+    """
+    import time as _time
+
+    # ── Guard: must have a pending 2FA session ────────────────────────────────
+    pending_user_id = request.session.get('_2fa_pending_user_id')
+    pending_ts = request.session.get('_2fa_pending_ts', 0)
+
+    if not pending_user_id:
+        messages.error(request, 'Your session has expired. Please log in again.')
+        return redirect('login')
+
+    if int(_time.time()) - pending_ts > _2FA_CHALLENGE_TIMEOUT:
+        _clear_2fa_pending(request)
+        messages.error(request, 'Your authentication session expired. Please log in again.')
+        return redirect('login')
+
+    try:
+        pending_user = User.objects.get(pk=pending_user_id)
+    except User.DoesNotExist:
+        _clear_2fa_pending(request)
+        return redirect('login')
+
+    ip = get_client_ip(request)
+
+    if request.method == 'GET':
+        return render(request, 'registration/login_2fa.html', {
+            'username': pending_user.username,
+        })
+
+    # ── POST: validate the submitted code ─────────────────────────────────────
+    from users.services import two_factor_service, recovery_code_service
+
+    code = request.POST.get('code', '').strip()
+    attempts = request.session.get('_2fa_attempts', 0)
+
+    # Rate-limit
+    if attempts >= _2FA_MAX_ATTEMPTS:
+        _clear_2fa_pending(request)
+        msg = (
+            f"[SECURITY-2FA] LOCKOUT: 2FA challenge exceeded {_2FA_MAX_ATTEMPTS} attempts "
+            f"for user '{pending_user.username}' from IP={ip}"
+        )
+        logger.warning(msg)
+        messages.error(request, 'Too many incorrect attempts. Please log in again.')
+        return redirect('login')
+
+    # Try TOTP first, then recovery code
+    used_recovery_code = False
+    if two_factor_service.verify_totp(pending_user, code):
+        verified = True
+    elif recovery_code_service.consume_recovery_code(pending_user, code):
+        verified = True
+        used_recovery_code = True
+    else:
+        verified = False
+
+    if not verified:
+        attempts += 1
+        request.session['_2fa_attempts'] = attempts
+        remaining = _2FA_MAX_ATTEMPTS - attempts
+        logger.warning(
+            f"[SECURITY-2FA] FAILED: Invalid 2FA code for user '{pending_user.username}' "
+            f"from IP={ip} (attempt {attempts}/{_2FA_MAX_ATTEMPTS})"
+        )
+        return render(request, 'registration/login_2fa.html', {
+            'username': pending_user.username,
+            'error': 'Invalid code. Please try again.',
+            'remaining_attempts': remaining,
+        })
+
+    # ── Success: complete the login ───────────────────────────────────────────
+    next_url = request.session.get('_2fa_next', '/')
+    device_id = request.POST.get('device_id') or request.session.get('_2fa_device_id')
+    backend = request.session.get('_2fa_backend', 'users.backends.CaseInsensitiveAuthBackend')
+    if device_id:
+        request.device_id = device_id
+
+    _clear_2fa_pending(request)
+
+    from django.contrib.auth import login as auth_login
+    auth_login(request, pending_user, backend=backend)
+
+    logger.info(
+        f"[AUTH-LOGIN] SUCCESS: User '{pending_user.username}' (id={pending_user.pk}) "
+        f"completed 2FA and is now logged in from IP={ip}"
+        + (" [RECOVERY CODE]" if used_recovery_code else "")
+    )
+
+    if used_recovery_code:
+        remaining_codes = recovery_code_service.get_remaining_recovery_codes_count(pending_user)
+        if remaining_codes == 0:
+            messages.warning(
+                request,
+                'You used your last recovery code. Please generate new recovery codes immediately to avoid being locked out.'
             )
         else:
-            msg_diag = f"[AUTH-LOGIN] Diagnostic: Incorrect password for existing user '{user_match.username}'."
-            print(msg_diag, flush=True)
-            logger.warning(msg_diag)
-            context_extra['login_error_type'] = 'wrong_password'
-            context_extra['login_error_message'] = (
-                f"Incorrect password for '{user_match.username}'. Please check your password or reset it below."
+            messages.warning(
+                request,
+                f'You signed in with a recovery code ({remaining_codes} remaining). '
+                'Generate new codes now if you have lost access to your authenticator app.'
             )
 
-        return self.render_to_response(self.get_context_data(form=form, **context_extra))
+    return redirect(next_url or 'posts:home')
+
+
+def _clear_2fa_pending(request):
+    """Remove all pending 2FA challenge keys from the session."""
+    for key in ('_2fa_pending_user_id', '_2fa_pending_ts', '_2fa_next', '_2fa_attempts', '_2fa_device_id', '_2fa_backend'):
+        request.session.pop(key, None)
+
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 4: 2FA & Single-Use Recovery Code Account Recovery / Password Reset
+# ──────────────────────────────────────────────────────────────────────────────
+
+_PW_RECOVERY_TIMEOUT = 900       # 15 minutes for 2FA step (allows seamless app switching)
+_PW_RESET_GRANT_TIMEOUT = 900    # 15 minutes for setting new password
+_PW_RECOVERY_MAX_ATTEMPTS = 5    # Max incorrect 2FA codes
+
+
+def password_recovery_identify_view(request):
+    """
+    Step 1 of Account Recovery: Look up user by username and check for active 2FA.
+    Does NOT require or use email. Auto-resumes in-progress recovery if app reloaded.
+    """
+    if request.user.is_authenticated:
+        return redirect('posts:home')
+
+    if request.method == 'GET':
+        if request.GET.get('fresh') == '1':
+            _clear_pw_recovery_pending(request)
+            _clear_pw_reset_grant(request)
+        else:
+            import time as _time
+            grant_user_id = request.session.get('_pw_reset_grant_user_id')
+            grant_ts = request.session.get('_pw_reset_grant_ts', 0)
+            if grant_user_id and (int(_time.time()) - grant_ts <= _PW_RESET_GRANT_TIMEOUT):
+                return redirect('users:password_recovery_set_new')
+
+            pending_user_id = request.session.get('_pw_recovery_user_id')
+            pending_ts = request.session.get('_pw_recovery_ts', 0)
+            if pending_user_id and (int(_time.time()) - pending_ts <= _PW_RECOVERY_TIMEOUT):
+                return redirect('users:password_recovery_verify')
+
+        return render(request, 'registration/password_recovery_identify.html')
+
+    ip = get_client_ip(request)
+    cache_key = f"pwaninet:ratelimit:pwidentify:{ip}"
+    attempts = cache.get(cache_key, 0)
+    if attempts >= 10:
+        logger.warning(f"[SECURITY-RATELIMIT] BLOCKED: Password recovery lookup rate limit exceeded for IP={ip}")
+        return render(request, 'registration/password_recovery_identify.html', {
+            'error': _('Too many recovery attempts. Please wait 5 minutes before trying again.'),
+        }, status=429)
+
+    cache.set(cache_key, attempts + 1, timeout=300)
+
+    username = request.POST.get('username', '').strip()
+    if not username:
+        return render(request, 'registration/password_recovery_identify.html', {
+            'error': _('Please enter your username.'),
+        })
+
+    from users.services import two_factor_service
+
+    target_user = User.objects.filter(username__iexact=username).first()
+    if not target_user:
+        logger.warning(f"[SECURITY-RECOVERY] FAILED: Recovery requested for non-existent username='{username}' from IP={ip}")
+        return render(request, 'registration/password_recovery_identify.html', {
+            'attempted_username': username,
+            'error': _('No account found with that username. Please verify and try again.'),
+        })
+
+    if not two_factor_service.is_two_factor_enabled(target_user):
+        logger.warning(f"[SECURITY-RECOVERY] BLOCKED: Recovery requested for unenrolled user '{target_user.username}' from IP={ip}")
+        return render(request, 'registration/password_recovery_identify.html', {
+            'attempted_username': username,
+            'error': _('Two-Factor Authentication is not enabled for this account. Self-service recovery requires 2FA or a recovery code. Please contact support.'),
+        })
+
+    # Stash pending recovery in session
+    import time as _time
+    _clear_pw_recovery_pending(request)
+    _clear_pw_reset_grant(request)
+
+    request.session['_pw_recovery_user_id'] = target_user.pk
+    request.session['_pw_recovery_ts'] = int(_time.time())
+    request.session['_pw_recovery_attempts'] = 0
+
+    logger.info(f"[SECURITY-RECOVERY] INITIATED: 2FA password recovery initiated for user '{target_user.username}' from IP={ip}")
+    return redirect('users:password_recovery_verify')
+
+
+def password_recovery_verify_view(request):
+    """
+    Step 2 of Account Recovery: Verify identity via 6-digit TOTP code or single-use recovery code.
+    """
+    if request.user.is_authenticated:
+        return redirect('posts:home')
+
+    import time as _time
+
+    if request.method == 'GET' and request.GET.get('fresh') != '1':
+        grant_user_id = request.session.get('_pw_reset_grant_user_id')
+        grant_ts = request.session.get('_pw_reset_grant_ts', 0)
+        if grant_user_id and (int(_time.time()) - grant_ts <= _PW_RESET_GRANT_TIMEOUT):
+            return redirect('users:password_recovery_set_new')
+
+    pending_user_id = request.session.get('_pw_recovery_user_id')
+    pending_ts = request.session.get('_pw_recovery_ts', 0)
+
+    if not pending_user_id or (int(_time.time()) - pending_ts > _PW_RECOVERY_TIMEOUT):
+        _clear_pw_recovery_pending(request)
+        messages.error(request, _('Your recovery session expired. Please start over.'))
+        return redirect('users:password_reset')
+
+    try:
+        pending_user = User.objects.get(pk=pending_user_id)
+    except User.DoesNotExist:
+        _clear_pw_recovery_pending(request)
+        return redirect('users:password_reset')
+
+    if request.method == 'GET':
+        return render(request, 'registration/password_recovery_verify.html', {
+            'username': pending_user.username,
+        })
+
+    ip = get_client_ip(request)
+    attempts = request.session.get('_pw_recovery_attempts', 0)
+    if attempts >= _PW_RECOVERY_MAX_ATTEMPTS:
+        _clear_pw_recovery_pending(request)
+        logger.warning(f"[SECURITY-RECOVERY] LOCKOUT: Recovery challenge exceeded {_PW_RECOVERY_MAX_ATTEMPTS} attempts for user '{pending_user.username}' from IP={ip}")
+        messages.error(request, _('Too many incorrect verification attempts. Please start over.'))
+        return redirect('users:password_reset')
+
+    code = request.POST.get('code', '').strip()
+    from users.services import two_factor_service, recovery_code_service
+
+    used_recovery_code = False
+    if two_factor_service.verify_totp(pending_user, code):
+        verified = True
+    elif recovery_code_service.consume_recovery_code(pending_user, code):
+        verified = True
+        used_recovery_code = True
+    else:
+        verified = False
+
+    if not verified:
+        attempts += 1
+        request.session['_pw_recovery_attempts'] = attempts
+        remaining = _PW_RECOVERY_MAX_ATTEMPTS - attempts
+        logger.warning(f"[SECURITY-RECOVERY] FAILED: Invalid 2FA/recovery code for user '{pending_user.username}' from IP={ip} (attempt {attempts}/{_PW_RECOVERY_MAX_ATTEMPTS})")
+        return render(request, 'registration/password_recovery_verify.html', {
+            'username': pending_user.username,
+            'error': _('Invalid verification code. Please check and try again.'),
+            'remaining_attempts': remaining,
+        })
+
+    # Identity Verified! Issue single-use reset grant
+    import secrets
+    _clear_pw_recovery_pending(request)
+    grant_token = secrets.token_urlsafe(32)
+
+    request.session['_pw_reset_grant_user_id'] = pending_user.pk
+    request.session['_pw_reset_grant_ts'] = int(_time.time())
+    request.session['_pw_reset_grant_token'] = grant_token
+
+    logger.info(
+        f"[SECURITY-RECOVERY] VERIFIED: User '{pending_user.username}' verified identity via "
+        f"{'Recovery Code' if used_recovery_code else 'TOTP'} from IP={ip}. Reset grant issued."
+    )
+    return redirect('users:password_recovery_set_new')
+
+
+def password_recovery_set_new_view(request):
+    """
+    Step 3 of Account Recovery: Set new password after verified 2FA / Recovery Code challenge.
+    """
+    if request.user.is_authenticated:
+        return redirect('posts:home')
+
+    import time as _time
+
+    grant_user_id = request.session.get('_pw_reset_grant_user_id')
+    grant_ts = request.session.get('_pw_reset_grant_ts', 0)
+    grant_token = request.session.get('_pw_reset_grant_token')
+
+    if not grant_user_id or not grant_token or (int(_time.time()) - grant_ts > _PW_RESET_GRANT_TIMEOUT):
+        _clear_pw_reset_grant(request)
+        messages.error(request, _('Your password reset authorization has expired. Please start over.'))
+        return redirect('users:password_reset')
+
+    try:
+        user = User.objects.get(pk=grant_user_id)
+    except User.DoesNotExist:
+        _clear_pw_reset_grant(request)
+        return redirect('users:password_reset')
+
+    if request.method == 'GET':
+        return render(request, 'registration/password_recovery_set_new.html', {
+            'username': user.username,
+        })
+
+    new_password = request.POST.get('new_password', '')
+    confirm_password = request.POST.get('confirm_password', '')
+
+    errors = []
+    if not new_password:
+        errors.append(_('Please enter a new password.'))
+    elif new_password != confirm_password:
+        errors.append(_('The two password fields did not match.'))
+    else:
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError
+        try:
+            validate_password(new_password, user=user)
+        except ValidationError as e:
+            errors.extend(e.messages)
+
+    if errors:
+        return render(request, 'registration/password_recovery_set_new.html', {
+            'username': user.username,
+            'errors': errors,
+        })
+
+    # Update password
+    user.set_password(new_password)
+    user.save(update_fields=['password'])
+
+    _clear_pw_reset_grant(request)
+    ip = get_client_ip(request)
+    logger.info(f"[SECURITY-RECOVERY] SUCCESS: Password successfully reset for user '{user.username}' from IP={ip}")
+
+    messages.success(request, _('Your password has been reset successfully. Please log in with your new password.'))
+    return redirect('login')
+
+
+def _clear_pw_recovery_pending(request):
+    for key in ('_pw_recovery_user_id', '_pw_recovery_ts', '_pw_recovery_attempts'):
+        request.session.pop(key, None)
+
+
+def _clear_pw_reset_grant(request):
+    for key in ('_pw_reset_grant_user_id', '_pw_reset_grant_ts', '_pw_reset_grant_token'):
+        request.session.pop(key, None)
+
+
 
 
 def load_academic_levels(request):
@@ -719,6 +1092,16 @@ def settings_password_manager_view(request):
         from django.contrib.auth import update_session_auth_hash
         update_session_auth_hash(request, request.user)
 
+        # Invalidate all other active sessions across devices
+        from users.services.session_service import revoke_other_user_sessions
+        revoked_count = revoke_other_user_sessions(request.user, request.session.session_key)
+
+        ip = get_client_ip(request)
+        logger.info(
+            f"[SECURITY-PASSWORD] CHANGED: Password updated for user '{request.user.username}' (id={request.user.id}) "
+            f"from IP={ip}; revoked {revoked_count} other sessions"
+        )
+
         messages.success(request, 'Password changed successfully.')
         if request.headers.get('HX-Request'):
             return render(request, 'users/settings/partials/settings_navigation_partial.html', {
@@ -731,6 +1114,236 @@ def settings_password_manager_view(request):
             'settings_content_partial': 'users/settings/partials/password_content.html'
         })
     return render(request, 'users/settings/password_manager.html')
+
+
+def _render_two_factor_view(request, context):
+    """Helper to render 2FA settings either as HTMX partial or full page."""
+    if request.headers.get('HX-Request'):
+        context['settings_content_partial'] = 'users/settings/partials/two_factor_content.html'
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', context)
+    return render(request, 'users/settings/two_factor.html', context)
+
+
+@login_required
+def settings_two_factor_view(request):
+    """
+    Two-factor authentication management dashboard.
+    Renders active protection status if enrolled, or onboarding banner if unenrolled.
+    """
+    from users.services.two_factor_service import (
+        is_two_factor_enabled, get_two_factor
+    )
+    from users.services.recovery_code_service import get_remaining_recovery_codes_count
+
+    enabled = is_two_factor_enabled(request.user)
+    two_factor = get_two_factor(request.user) if enabled else None
+    active_codes_count = get_remaining_recovery_codes_count(request.user) if enabled else 0
+
+    context = {
+        'is_enabled': enabled,
+        'two_factor': two_factor,
+        'active_codes_count': active_codes_count,
+    }
+    return _render_two_factor_view(request, context)
+
+
+@login_required
+def settings_two_factor_setup_view(request):
+    """
+    Starts or resumes 2FA enrollment.
+    Generates QR code SVG and manual setup key for authenticator app.
+    """
+    from users.services.two_factor_service import (
+        is_two_factor_enabled, get_two_factor, initialize_two_factor,
+        get_provisioning_uri, generate_qr_svg, decrypt_secret
+    )
+
+    if is_two_factor_enabled(request.user):
+        messages.info(request, _("Two-factor authentication is already enabled."))
+        return redirect('users:settings_two_factor')
+
+    # If pending setup exists and user didn't ask to reset, reuse the pending secret
+    pending_tf = get_two_factor(request.user)
+    if pending_tf and not pending_tf.is_enabled and request.GET.get('reset') != '1':
+        try:
+            secret = decrypt_secret(pending_tf.encrypted_secret)
+        except Exception:
+            pending_tf, secret = initialize_two_factor(request.user)
+    else:
+        pending_tf, secret = initialize_two_factor(request.user)
+
+    formatted_secret = ' '.join(secret[i:i+4] for i in range(0, len(secret), 4))
+    provisioning_uri = get_provisioning_uri(request.user)
+    qr_svg = generate_qr_svg(provisioning_uri)
+
+    context = {
+        'state': 'setup',
+        'qr_svg': qr_svg,
+        'manual_secret': secret,
+        'formatted_secret': formatted_secret,
+    }
+    return _render_two_factor_view(request, context)
+
+
+@login_required
+def settings_two_factor_verify_view(request):
+    """
+    Verifies 6-digit confirmation code and activates 2FA.
+    Generates and returns recovery codes exactly once upon success.
+    """
+    if request.method != 'POST':
+        return redirect('users:settings_two_factor_setup')
+
+    from users.services.two_factor_service import (
+        is_two_factor_enabled, confirm_and_enable_two_factor,
+        get_two_factor, decrypt_secret, get_provisioning_uri, generate_qr_svg
+    )
+    from users.services.recovery_code_service import generate_recovery_codes
+
+    if is_two_factor_enabled(request.user):
+        messages.info(request, _("Two-factor authentication is already enabled."))
+        return redirect('users:settings_two_factor')
+
+    code = request.POST.get('code', '').strip()
+    success = confirm_and_enable_two_factor(request.user, code)
+
+    if success:
+        # Generate recovery codes for immediate one-time display
+        recovery_codes = generate_recovery_codes(request.user)
+        context = {
+            'state': 'recovery_codes_display',
+            'recovery_codes': recovery_codes,
+            'is_new_enrollment': True,
+        }
+        return _render_two_factor_view(request, context)
+
+    # Verification failed: re-render setup with error message
+    two_factor = get_two_factor(request.user)
+    if two_factor:
+        secret = decrypt_secret(two_factor.encrypted_secret)
+        formatted_secret = ' '.join(secret[i:i+4] for i in range(0, len(secret), 4))
+        provisioning_uri = get_provisioning_uri(request.user)
+        qr_svg = generate_qr_svg(provisioning_uri)
+    else:
+        return redirect('users:settings_two_factor_setup')
+
+    context = {
+        'state': 'setup',
+        'qr_svg': qr_svg,
+        'manual_secret': secret,
+        'formatted_secret': formatted_secret,
+        'error_message': _("Invalid verification code. Please check the time on your device and authenticator app and try again."),
+    }
+    return _render_two_factor_view(request, context)
+
+
+@login_required
+def settings_two_factor_disable_view(request):
+    """
+    Disables 2FA after verifying current 6-digit TOTP code.
+    Requires POST and valid TOTP code.
+    """
+    if request.method != 'POST':
+        messages.error(request, _("Invalid request method."))
+        return redirect('users:settings_two_factor')
+
+    from users.services.two_factor_service import (
+        is_two_factor_enabled, verify_totp, disable_two_factor
+    )
+
+    if not is_two_factor_enabled(request.user):
+        messages.info(request, _("Two-factor authentication is not enabled."))
+        return redirect('users:settings_two_factor')
+
+    code = request.POST.get('code', '').strip()
+    if not code:
+        messages.error(request, _("Please provide your 6-digit authenticator code to disable 2FA."))
+        return redirect('users:settings_two_factor')
+
+    if verify_totp(request.user, code):
+        disable_two_factor(request.user)
+        messages.success(request, _("Two-factor authentication has been successfully disabled."))
+        return redirect('users:settings_two_factor')
+    else:
+        messages.error(request, _("Invalid authentication code. Could not disable two-factor authentication."))
+        return redirect('users:settings_two_factor')
+
+
+@login_required
+def settings_two_factor_regenerate_codes_view(request):
+    """
+    Regenerates single-use recovery codes after verifying current 6-digit TOTP code.
+    Displays the new recovery codes exactly once.
+    """
+    if request.method != 'POST':
+        messages.error(request, _("Invalid request method."))
+        return redirect('users:settings_two_factor')
+
+    from users.services.two_factor_service import (
+        is_two_factor_enabled, verify_totp
+    )
+    from users.services.recovery_code_service import regenerate_recovery_codes
+
+    if not is_two_factor_enabled(request.user):
+        messages.info(request, _("Two-factor authentication is not enabled."))
+        return redirect('users:settings_two_factor')
+
+    code = request.POST.get('code', '').strip()
+    if not code:
+        messages.error(request, _("Please provide your 6-digit authenticator code to regenerate recovery codes."))
+        return redirect('users:settings_two_factor')
+
+    if verify_totp(request.user, code):
+        new_codes = regenerate_recovery_codes(request.user)
+        context = {
+            'state': 'recovery_codes_display',
+            'recovery_codes': new_codes,
+            'is_regenerated': True,
+        }
+        return _render_two_factor_view(request, context)
+    else:
+        messages.error(request, _("Invalid authentication code. Could not regenerate recovery codes."))
+        return redirect('users:settings_two_factor')
+
+
+@login_required
+@require_http_methods(["POST"])
+def settings_two_factor_download_codes_view(request):
+    """
+    Directly streams recovery codes as a downloadable .txt file attachment.
+    Does not read from or persist to DB; streams codes submitted from the active one-time display.
+    """
+    raw_codes = request.POST.getlist('codes')
+    if not raw_codes:
+        single = request.POST.get('codes', '')
+        raw_codes = [c.strip() for c in single.split('\n') if c.strip()]
+
+    lines = [
+        "==================================================",
+        "  PwaniNet Two-Factor Authentication Recovery Codes",
+        f"  Account: {request.user.username}",
+        f"  Generated: {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        "==================================================",
+        "",
+        "Save these codes in a safe, offline place.",
+        "Each recovery code can be used ONLY ONCE.",
+        "",
+        "--------------------------------------------------",
+    ]
+    for i, c in enumerate(raw_codes, start=1):
+        lines.append(f"  {i}. {c.strip()}")
+    lines.extend([
+        "--------------------------------------------------",
+        "",
+        "If you lose your authenticator app, use one of",
+        "these codes to recover access to your account.",
+        "==================================================",
+    ])
+    content = "\r\n".join(lines)
+    filename = f"pwaninet-recovery-codes-{request.user.username}.txt"
+    response = HttpResponse(content, content_type='text/plain; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 @login_required
@@ -819,31 +1432,15 @@ def settings_active_devices_view(request):
     current_session = None
 
     # Try to get or create UserSession for current session
-    try:
-        current_session = UserSession.objects.get(
-            user=request.user,
-            session_key=current_session_key
-        )
+    from users.services.session_service import create_or_update_session
+    current_session = UserSession.objects.filter(
+        user=request.user,
+        session_key=current_session_key
+    ).first()
+    if not current_session:
+        current_session = create_or_update_session(request.user, request)
+    else:
         current_session.is_current = True
-        current_session.last_activity = current_session.last_activity
-    except UserSession.DoesNotExist:
-        # Create session record
-        user_agent_string = request.META.get('HTTP_USER_AGENT', '')
-        device_info = parse_device_info(user_agent_string)
-
-        ip_address = request.META.get('REMOTE_ADDR')
-
-        current_session = UserSession.objects.create(
-            user=request.user,
-            session_key=current_session_key,
-            ip_address=ip_address,
-            user_agent=user_agent_string,
-            device_name=device_info['device_model'],
-            browser=device_info['browser'],
-            operating_system=device_info['os'],
-            device_type=device_info['device_type'],
-            is_current=True
-        )
 
     # Get other sessions
     other_sessions = UserSession.objects.filter(
@@ -1111,6 +1708,7 @@ def settings_notifications_view(request):
 @require_http_methods(["POST"])
 def api_sign_out_session(request, session_id):
     """Sign out a specific session (API endpoint for HTMX)"""
+    from users.services.session_service import revoke_session
     try:
         session = UserSession.objects.get(id=session_id, user=request.user)
 
@@ -1118,17 +1716,7 @@ def api_sign_out_session(request, session_id):
         if session.session_key == request.session.session_key:
             return JsonResponse({'error': 'Cannot sign out current session'}, status=400)
 
-        # Delete the Django session
-        from django.contrib.sessions.models import Session
-        try:
-            django_session = Session.objects.get(session_key=session.session_key)
-            django_session.delete()
-        except Session.DoesNotExist:
-            pass
-
-        # Delete our UserSession record
-        session.delete()
-
+        revoke_session(session.id, user=request.user)
         return HttpResponse('')  # HTMX will remove the element
     except UserSession.DoesNotExist:
         return JsonResponse({'error': 'Session not found'}, status=404)
@@ -1138,23 +1726,10 @@ def api_sign_out_session(request, session_id):
 @require_http_methods(["POST"])
 def api_sign_out_all_sessions(request):
     """Sign out all other sessions (API endpoint for HTMX)"""
+    from users.services.session_service import revoke_other_user_sessions
     current_session_key = request.session.session_key
 
-    # Delete all other sessions
-    other_sessions = UserSession.objects.filter(
-        user=request.user
-    ).exclude(
-        session_key=current_session_key
-    )
-
-    from django.contrib.sessions.models import Session
-    for session in other_sessions:
-        try:
-            django_session = Session.objects.get(session_key=session.session_key)
-            django_session.delete()
-        except Session.DoesNotExist:
-            pass
-        session.delete()
+    revoke_other_user_sessions(request.user, current_session_key)
 
     messages.success(request, 'All other devices have been signed out.')
     if request.headers.get('HX-Request'):

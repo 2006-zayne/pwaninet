@@ -140,6 +140,34 @@
             const style = fontStyleMap[userFontStylePreference] || savedFontStyle || 'normal';
             document.documentElement.style.setProperty('--font-style', style);
         })();
+
+        // Set mobile navigation position immediately to prevent layout flash
+        (function() {
+            try {
+                var savedPos = localStorage.getItem('mobileNavPosition') || 'bottom';
+                document.documentElement.setAttribute('data-mobile-nav-position', savedPos);
+            } catch (e) {
+                document.documentElement.setAttribute('data-mobile-nav-position', 'bottom');
+            }
+        })();
+
+        // Reactive setter for mobile navigation position
+        window.setMobileNavPosition = function(position) {
+            var pos = (position === 'top') ? 'top' : 'bottom';
+            try {
+                localStorage.setItem('mobileNavPosition', pos);
+            } catch (e) {}
+            document.documentElement.setAttribute('data-mobile-nav-position', pos);
+            window.dispatchEvent(new CustomEvent('mobileNavPositionChanged', { detail: { position: pos } }));
+        };
+
+        window.getMobileNavPosition = function() {
+            try {
+                return localStorage.getItem('mobileNavPosition') || 'bottom';
+            } catch (e) {
+                return 'bottom';
+            }
+        };
     </script>
 
     <!-- Set initial body background to prevent flash (will be overridden by theme CSS) -->
@@ -302,36 +330,36 @@
         htmx.config.refreshOnHistoryMiss = false; // Restore content via AJAX request instead of full page reload
         console.log('[HTMX Config] History caching enabled without full page reload on miss');
     </script>
-    <script src="{% static 'js/device_manager.js' %}"></script>
+    <script defer src="{% static 'js/device_manager.js' %}"></script>
     <!-- Unified Haptics Engine (Ultra-responsive tactile feedback) -->
-    <script src="{% static 'js/services/haptics-service.js' %}"></script>
+    <script defer src="{% static 'js/services/haptics-service.js' %}"></script>
 
     <!-- Native App Enhancements (Capacitor-specific) -->
-    <script src="{% static 'js/native-app.js' %}"></script>
+    <script defer src="{% static 'js/native-app.js' %}"></script>
 
     <!-- Share Manager — unified share logic for Capacitor, Web Share API, and platform links -->
-    <script src="{% static 'js/share-manager.js' %}"></script>
+    <script defer src="{% static 'js/share-manager.js' %}"></script>
 
     <!-- Lazy Image Loader for performance -->
-    <script src="{% static 'js/lazy-load-images.js' %}"></script>
+    <script defer src="{% static 'js/lazy-load-images.js' %}"></script>
 
     <!-- Video Manager - replaces auto_video_play.js -->
-    <script src="{% static 'js/video-manager.js' %}"></script>
+    <script defer src="{% static 'js/video-manager.js' %}"></script>
 
     <!-- Global Audio Manager -->
     <script defer src="{% static 'js/global-audio-manager.js' %}"></script>
 
     <!-- QR Code Generator -->
-    <script src="{% static 'js/qrcode.min.js' %}"></script>
+    <script defer src="{% static 'js/qrcode.min.js' %}"></script>
 
     <!-- Native PWA Install Manager -->
-    <script src="{% static 'js/native-pwa-install.js' %}"></script>
+    <script defer src="{% static 'js/native-pwa-install.js' %}"></script>
 
     <!-- Smart Outside-Link Chooser (Native App, PWA, Chrome) -->
-    <script src="{% static 'js/link-chooser.js' %}"></script>
+    <script defer src="{% static 'js/link-chooser.js' %}"></script>
 
     <!-- Update Manager -->
-    <script src="{% static 'js/update-manager.js' %}"></script>
+    <script defer src="{% static 'js/update-manager.js' %}"></script>
 
     <!-- What's New Modal -->
     <script>
@@ -347,12 +375,12 @@
         window.PwaniNetUserAudioPreference = null;
         {% endif %}
     </script>
-    <script src="{% static 'js/whats-new-modal.js' %}"></script>
+    <script defer src="{% static 'js/whats-new-modal.js' %}"></script>
 
     <!-- Comment System - Phase 2 Threaded Comments -->
-    <script src="{% static 'js/comments/comment-api.js' %}"></script>
-    <script src="{% static 'js/comments/comment-renderer.js' %}"></script>
-    <script src="{% static 'js/comments/comment-manager.js' %}"></script>
+    <script defer src="{% static 'js/comments/comment-api.js' %}"></script>
+    <script defer src="{% static 'js/comments/comment-renderer.js' %}"></script>
+    <script defer src="{% static 'js/comments/comment-manager.js' %}"></script>
 
     <script>
         // Synchronously detect standalone PWA mode early to prevent safe area layout shifts
@@ -419,6 +447,9 @@
             --search-bg-focus: #4e4f50;
         }
 
+        [data-theme="dark"] .text-dark {
+            color: var(--text-dark, #e4e6eb) !important;
+        }
         [data-theme="dark"] .text-muted {
             color: #e4e6eb !important;
         }
@@ -558,6 +589,12 @@
             height: var(--navbar-height);
             padding-top: 0 !important;
             padding-bottom: 0 !important;
+            z-index: 10002 !important;
+        }
+
+        .navbar-top .dropdown,
+        .navbar-top .dropdown-menu {
+            z-index: 10005 !important;
         }
 
         .navbar-top > .container {
@@ -730,16 +767,121 @@
             border-color: var(--card-bg, #242526);
         }
 
-        /* Modal Styles - Custom backdrop solution */
-        .modal {
-            z-index: 1050 !important;
+        /* ==========================================================================
+           CONFIGURABLE TOP MOBILE NAVIGATION (Mobile-only, Desktop strictly isolated)
+           ========================================================================== */
+        @media (max-width: 767.98px) {
+            /* Seamless unified header: remove border between navbar-top and top mobile nav */
+            [data-mobile-nav-position="top"] .navbar-top {
+                z-index: 10002 !important;
+                border-bottom: none !important;
+                box-shadow: none !important;
+            }
+
+            /* Ensure theme toggle and other dropdown menus in navbar-top sit on top of the navigation bar */
+            [data-mobile-nav-position="top"] .navbar-top .dropdown,
+            [data-mobile-nav-position="top"] .navbar-top .dropdown-menu {
+                z-index: 10005 !important;
+            }
+
+            /* Full-width top mobile navigation bar seamlessly integrated with navbar-top */
+            [data-mobile-nav-position="top"] .mobile-bottom-nav {
+                z-index: 9999 !important;
+                top: calc(var(--navbar-height, 56px) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+                bottom: auto !important;
+                left: 0 !important;
+                right: 0 !important;
+                transform: none !important;
+                width: 100% !important;
+                width: 100vw !important;
+                max-width: 100% !important;
+                border-radius: 0 !important;
+                border-left: none !important;
+                border-right: none !important;
+                border-top: none !important;
+                border-bottom: 1px solid var(--border) !important;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06) !important;
+                padding-top: 0 !important;
+                padding-bottom: 2px !important;
+                padding-left: 8px !important;
+                padding-right: 8px !important;
+                height: 48px !important;
+                margin: 0 !important;
+                box-sizing: border-box !important;
+                background: var(--nav-bg) !important;
+                backdrop-filter: blur(12px) !important;
+                -webkit-backdrop-filter: blur(12px) !important;
+            }
+
+            [data-theme="dark"][data-mobile-nav-position="top"] .mobile-bottom-nav {
+                box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28) !important;
+            }
+
+            /* Dynamic page padding:
+               - Top clearance for combined unified header (.navbar-top 56px + nav tier 48px + safe-area-top)
+               - Clear bottom nav offset (retaining only safe-area-inset-bottom) */
+            [data-mobile-nav-position="top"] body {
+                padding-top: calc(var(--navbar-height, 56px) + 48px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+                padding-bottom: calc(var(--pwaninet-safe-area-bottom, 0px) + env(safe-area-inset-bottom, 0px)) !important;
+            }
+
+            [data-mobile-nav-position="top"] body.is-native-app,
+            [data-mobile-nav-position="top"] body.is-standalone-pwa,
+            [data-mobile-nav-position="top"].is-standalone-pwa body {
+                padding-top: calc(var(--navbar-height, 56px) + 48px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+                padding-bottom: calc(var(--pwaninet-safe-area-bottom, 0px) + env(safe-area-inset-bottom, 0px)) !important;
+            }
+
+            /* Small screens (<= 360px) */
+            @media (max-width: 360px) {
+                [data-mobile-nav-position="top"] .mobile-bottom-nav {
+                    height: 44px !important;
+                    padding-left: 4px !important;
+                    padding-right: 4px !important;
+                }
+                [data-mobile-nav-position="top"] body {
+                    padding-top: calc(var(--navbar-height, 56px) + 44px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+                }
+                [data-mobile-nav-position="top"] #navigation-progress,
+                [data-mobile-nav-position="top"] .search-header {
+                    top: calc(var(--navbar-height, 56px) + 44px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+                }
+            }
+
+            /* Back-to-top button clearance when mobile nav is at the top */
+            [data-mobile-nav-position="top"] .back-to-top-btn {
+                bottom: calc(18px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+            }
+
+            /* Navigation progress bar positioned under combined unified header */
+            [data-mobile-nav-position="top"] #navigation-progress {
+                top: calc(var(--navbar-height, 56px) + 48px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+            }
+
+            /* Sticky search header on feed sits cleanly below combined unified header */
+            [data-mobile-nav-position="top"] .search-header {
+                top: calc(var(--navbar-height, 56px) + 48px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+            }
+
+            /* Keyboard open state: keep top mobile nav stable at top */
+            [data-mobile-nav-position="top"] body.keyboard-open .mobile-bottom-nav,
+            [data-mobile-nav-position="top"].keyboard-open .mobile-bottom-nav {
+                transform: none !important;
+                opacity: 1 !important;
+                pointer-events: auto !important;
+            }
         }
+
+        /* Modal Styles - Elevated above all navigation bars and sticky bars */
         .modal-backdrop {
-            z-index: 1040 !important;
+            z-index: 10400 !important;
             pointer-events: none !important; /* Let clicks pass through */
         }
+        .modal {
+            z-index: 10500 !important;
+        }
         .modal-dialog {
-            z-index: 1051 !important;
+            z-index: 10501 !important;
         }
         /* Create custom backdrop that doesn't block clicks */
         .modal-backdrop::before {
@@ -762,12 +904,33 @@
             /* Remove any transforms that could break fixed positioning */
             transform: none !important;
         }
-        /* Mobile: Ensure bottom nav stays below modals but above other content */
-        @media (max-width: 768px) {
-            body.modal-open .mobile-bottom-nav {
-                z-index: 2039 !important; /* Just below modal backdrop */
-                display: none !important; /* Hide entirely when modal is open */
-            }
+        /* When modal is open: hide bottom nav and bottom composer, keep header below modal */
+        body.modal-open .navbar-top,
+        [data-mobile-nav-position="top"] body.modal-open .navbar-top {
+            z-index: 1030 !important;
+        }
+        body.modal-open .mobile-bottom-nav {
+            z-index: 1020 !important;
+            display: none !important; /* Hide entirely when modal is open */
+        }
+        body.modal-open .fixed-bottom,
+        body.modal-open .post-detail-container .fixed-bottom,
+        body.modal-open .main-composer {
+            display: none !important; /* Hide composer while modal is open */
+            pointer-events: none !important;
+        }
+
+        /* Post card dropdown menus (three-dots context menus) elevated above bottom composer & mobile bottom nav */
+        .post-card .dropdown-menu,
+        .post-detail-container .dropdown-menu,
+        .dropdown-menu.dropdown-menu-end {
+            z-index: 10010 !important;
+        }
+        .post-card:has(.dropdown-menu.show),
+        .post-card.dropdown-open {
+            overflow: visible !important;
+            z-index: 10010 !important;
+            position: relative;
         }
         .modal-content {
             background-color: var(--card-bg);
@@ -893,6 +1056,77 @@
             background-color: var(--card-bg);
             border: 1px solid var(--border);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        /* 2FA Nudge Banner */
+        .twofactor-nudge-banner,
+        #twoFactorNudgeBanner {
+            background-color: #eff6ff;
+            border: 1px solid #bfdbfe !important;
+            color: #1e293b;
+        }
+        .twofactor-nudge-title,
+        #twoFactorNudgeBanner strong,
+        #twoFactorNudgeBanner .twofactor-nudge-title {
+            color: #0f172a;
+        }
+        .twofactor-nudge-desc,
+        #twoFactorNudgeBanner .twofactor-nudge-desc {
+            color: #475569;
+        }
+        .twofactor-nudge-dismiss,
+        #twoFactorNudgeBanner .twofactor-nudge-dismiss {
+            color: #64748b !important;
+            text-decoration: none;
+            transition: color 0.15s ease, opacity 0.15s ease;
+        }
+        .twofactor-nudge-dismiss:hover,
+        #twoFactorNudgeBanner .twofactor-nudge-dismiss:hover {
+            color: #0f172a !important;
+        }
+        [data-theme="dark"] .twofactor-nudge-banner,
+        [data-theme="dark"] #twoFactorNudgeBanner {
+            background-color: rgba(99, 102, 241, 0.14) !important;
+            border: 1px solid rgba(99, 102, 241, 0.3) !important;
+            color: #e4e6eb !important;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+        }
+        [data-theme="dark"] #twoFactorNudgeBanner .twofactor-nudge-icon {
+            background-color: rgba(99, 102, 241, 0.22) !important;
+            color: #a5b4fc !important;
+        }
+        [data-theme="dark"] .twofactor-nudge-title,
+        [data-theme="dark"] #twoFactorNudgeBanner .twofactor-nudge-title,
+        [data-theme="dark"] #twoFactorNudgeBanner strong,
+        [data-theme="dark"] #twoFactorNudgeBanner .text-dark {
+            color: #f8fafc !important;
+        }
+        [data-theme="dark"] .twofactor-nudge-desc,
+        [data-theme="dark"] #twoFactorNudgeBanner .twofactor-nudge-desc,
+        [data-theme="dark"] #twoFactorNudgeBanner .text-muted {
+            color: #cbd5e1 !important;
+        }
+        [data-theme="dark"] .twofactor-nudge-dismiss,
+        [data-theme="dark"] #twoFactorNudgeBanner .twofactor-nudge-dismiss {
+            color: #94a3b8 !important;
+        }
+        [data-theme="dark"] .twofactor-nudge-dismiss:hover,
+        [data-theme="dark"] #twoFactorNudgeBanner .twofactor-nudge-dismiss:hover,
+        [data-theme="dark"] .twofactor-nudge-dismiss:focus,
+        [data-theme="dark"] #twoFactorNudgeBanner .twofactor-nudge-dismiss:focus {
+            color: #ffffff !important;
+        }
+        [data-theme="dark"] #twoFactorNudgeBanner .btn-primary {
+            background-color: #6366f1 !important;
+            border-color: #6366f1 !important;
+            color: #ffffff !important;
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+        }
+        [data-theme="dark"] #twoFactorNudgeBanner .btn-primary:hover,
+        [data-theme="dark"] #twoFactorNudgeBanner .btn-primary:focus {
+            background-color: #818cf8 !important;
+            border-color: #818cf8 !important;
+            color: #ffffff !important;
         }
 
         @media (min-width: 768px) { .mobile-bottom-nav { display: none; } }
@@ -1181,7 +1415,8 @@
                        hx-target="#page-content-target"
                        hx-swap="innerHTML"
                        hx-push-url="true"
-                       hx-history="true">
+                       hx-history="true"
+                       class="avatar-link">
                         <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 35px; height: 35px; object-fit: cover; margin-right:8px;">
                     </a>
                 {% else %}
@@ -1198,7 +1433,51 @@
 
     <main class="container">
         <div class="row justify-content-center">
-            <div class="col-12 col-lg-8" id="page-content-target" hx-history-elt>
+            <div class="col-12 col-lg-8" id="page-content-target" hx-history-elt hx-sync="this:replace">
+                {% if request.user.is_authenticated and not request.user.is_two_factor_enabled %}
+                <div id="twoFactorNudgeBanner" class="alert alert-primary border-0 shadow-sm rounded-3 d-flex align-items-center justify-content-between p-3 mb-3 twofactor-nudge-banner" style="display: none !important;" role="alert">
+                    <div class="d-flex align-items-center me-2">
+                        <div class="twofactor-nudge-icon me-3 p-2 bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; flex-shrink: 0;">
+                            <i class="bi bi-shield-lock-fill fs-5"></i>
+                        </div>
+                        <div>
+                            <strong class="twofactor-nudge-title d-block fw-bold mb-0">{% trans "Protect Your Account with 2FA" %}</strong>
+                            <span class="twofactor-nudge-desc small">{% trans "Add an extra layer of security to your student account." %}</span>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                        <a href="{% url 'users:settings_two_factor' %}" class="btn btn-primary btn-sm rounded-pill px-3 fw-semibold text-nowrap">
+                            {% trans "Enable" %}
+                        </a>
+                        <button type="button" class="btn btn-sm btn-link p-1 twofactor-nudge-dismiss" onclick="dismiss2faNudge()" aria-label="Dismiss">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                </div>
+                <script>
+                (function() {
+                    try {
+                        var dismissedAt = localStorage.getItem('pwaninet_2fa_nudge_dismissed');
+                        var now = Date.now();
+                        if (!dismissedAt || (now - parseInt(dismissedAt, 10)) > 7 * 24 * 60 * 60 * 1000) {
+                            var banner = document.getElementById('twoFactorNudgeBanner');
+                            if (banner) {
+                                banner.style.setProperty('display', 'flex', 'important');
+                            }
+                        }
+                    } catch(e) {}
+                })();
+                function dismiss2faNudge() {
+                    try {
+                        localStorage.setItem('pwaninet_2fa_nudge_dismissed', Date.now().toString());
+                    } catch(e) {}
+                    var banner = document.getElementById('twoFactorNudgeBanner');
+                    if (banner) {
+                        banner.remove();
+                    }
+                }
+                </script>
+                {% endif %}
                 {% block content %}{% endblock %}
             </div>
         </div>
@@ -1231,7 +1510,152 @@
         {% if request.user.is_authenticated %}
             {% include 'users/partials/account_switcher_modal.html' %}
         {% endif %}
+
+        <!-- Hidden download target iframe to prevent top-level page reloads on 302 downloads -->
+        <iframe name="pwaninet-download-target" id="pwaninet-download-target" style="display:none; width:0; height:0; border:0;" aria-hidden="true"></iframe>
+
+        <!-- Desktop QR Install Modal (Persistent in Base Shell) -->
+        <div class="modal fade" id="qrInstallModal" tabindex="-1" aria-labelledby="qrInstallModalTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+              <div class="modal-header border-0 pb-0 pt-4 px-4 align-items-center">
+                <h5 class="modal-title fw-bold" id="qrInstallModalTitle">
+                  <i class="bi bi-phone text-primary me-2"></i>{% trans "Install PwaniNet on Android" %}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+              </div>
+              <div class="modal-body px-4 py-3 text-center">
+                <!-- QR Code — pure white card so dark-mode never inverts the modules -->
+                <div class="d-inline-flex flex-column align-items-center justify-content-center p-3 my-2 rounded-3 shadow-sm"
+                     style="background: #ffffff !important; border: 1px solid #e2e8f0; width: 200px; height: 200px; margin: 0 auto;">
+                  <img src="{% url 'qr_code_svg' %}"
+                       alt="{% trans 'PwaniNet APK QR Code' %}"
+                       width="176"
+                       height="176"
+                       style="display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #ffffff;"
+                       loading="lazy">
+                </div>
+                <p class="text-muted small mt-2 mb-3">
+                  {% trans "Point your phone's camera or QR scanner at the code above." %}
+                </p>
+
+                <!-- 3-Step Sideloading Instructions -->
+                <div class="qr-steps text-start p-3 rounded-3 mb-3" style="background: var(--bg-tertiary, #f8fafc); border: 1px solid var(--border, #e2e8f0);">
+                  <div class="d-flex align-items-start mb-2">
+                    <span class="badge rounded-circle bg-primary text-white me-2" style="width: 22px; height: 22px; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">1</span>
+                    <span class="small text-secondary">{% trans "Scan the QR code and tap Download APK." %}</span>
+                  </div>
+                  <div class="d-flex align-items-start mb-2">
+                    <span class="badge rounded-circle bg-primary text-white me-2" style="width: 22px; height: 22px; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">2</span>
+                    <span class="small text-secondary">{% trans "If prompted by Chrome, select Download anyway." %}</span>
+                  </div>
+                  <div class="d-flex align-items-start">
+                    <span class="badge rounded-circle bg-primary text-white me-2" style="width: 22px; height: 22px; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">3</span>
+                    <span class="small text-secondary">{% trans "Open the downloaded file and tap Install." %}</span>
+                  </div>
+                </div>
+
+                <!-- Copyable Link Input -->
+                <div class="input-group mb-2">
+                  <span class="input-group-text bg-transparent border-end-0 text-muted">
+                    <i class="bi bi-link-45deg"></i>
+                  </span>
+                  <input type="text" id="qr-modal-link-input" class="form-control border-start-0 border-end-0 small" value="https://pwaninet.app/apk/" readonly style="font-size: 0.85rem; background: transparent;">
+                  <button class="btn btn-outline-primary btn-sm px-3" type="button" id="qr-modal-copy-btn" onclick="if (typeof copyApkLink === 'function') copyApkLink(this);">
+                    <i class="bi bi-clipboard me-1"></i>{% trans "Copy" %}
+                  </button>
+                </div>
+              </div>
+              <script>
+                function copyApkLink(btn) {
+                  const button = btn || document.getElementById('qr-modal-copy-btn');
+                  if (!button) return;
+                  if (button.dataset.copying === 'true') return;
+                  button.dataset.copying = 'true';
+
+                  const input = document.getElementById('qr-modal-link-input');
+                  const textToCopy = (input && input.value) ? input.value : 'https://pwaninet.app/apk/';
+
+                  const originalHtml = button.getAttribute('data-original-html') || button.innerHTML;
+                  if (!button.getAttribute('data-original-html')) {
+                    button.setAttribute('data-original-html', originalHtml);
+                  }
+
+                  function showSuccess() {
+                    button.innerHTML = '<i class="bi bi-check2 me-1"></i>{% trans "Copied!" %}';
+                    button.classList.remove('btn-outline-primary');
+                    button.classList.add('btn-success');
+                    setTimeout(() => {
+                      button.innerHTML = originalHtml;
+                      button.classList.remove('btn-success');
+                      button.classList.add('btn-outline-primary');
+                      delete button.dataset.copying;
+                    }, 2000);
+                  }
+
+                  function fallbackCopy() {
+                    let copied = false;
+                    try {
+                      const temp = document.createElement('textarea');
+                      temp.value = textToCopy;
+                      temp.style.position = 'fixed';
+                      temp.style.top = '0';
+                      temp.style.left = '0';
+                      temp.style.width = '2em';
+                      temp.style.height = '2em';
+                      temp.style.padding = '0';
+                      temp.style.border = 'none';
+                      temp.style.outline = 'none';
+                      temp.style.boxShadow = 'none';
+                      temp.style.background = 'transparent';
+                      temp.setAttribute('readonly', '');
+                      document.body.appendChild(temp);
+                      temp.focus();
+                      temp.select();
+                      temp.setSelectionRange(0, textToCopy.length);
+                      copied = document.execCommand('copy');
+                      document.body.removeChild(temp);
+                    } catch (err) {
+                      console.warn('[Clipboard] fallback textarea error:', err);
+                    }
+
+                    if (!copied && input) {
+                      try {
+                        input.focus();
+                        input.select();
+                        input.setSelectionRange(0, 99999);
+                        copied = document.execCommand('copy');
+                      } catch (e) {
+                        console.warn('[Clipboard] fallback input error:', e);
+                      }
+                    }
+
+                    showSuccess();
+                  }
+
+                  if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(textToCopy)
+                      .then(() => showSuccess())
+                      .catch(() => fallbackCopy());
+                  } else {
+                    fallbackCopy();
+                  }
+                }
+                window.copyApkLink = copyApkLink;
+              </script>
+              <div class="modal-footer border-0 pt-0 pb-4 px-4 justify-content-center">
+                <span class="text-muted small">
+                  {% trans "Downloading on this device?" %} 
+                  <a href="{% url 'download_android_apk' %}" target="pwaninet-download-target" data-apk-download="true" class="text-primary text-decoration-none fw-semibold" hx-boost="false">
+                    {% trans "Download directly on your computer" %}
+                  </a>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
     {% endblock %}
+
 
     {% block mobile_bottom_nav %}
         <div class="mobile-bottom-nav d-md-none" role="navigation" aria-label="Mobile navigation">
@@ -1398,27 +1822,49 @@
             btn.innerHTML = '<i class="bi bi-arrow-repeat spin-icon"></i>';
             btn.disabled = true;
 
-            downloadManager.download({
-                url,
-                postId,
-                mediaType,
-                category,
-                filename,
-                thumbnail
-            }).then(() => {
+            const triggerDirectBrowserDownload = () => {
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    if (a.parentNode) a.parentNode.removeChild(a);
+                }, 2000);
+            };
+
+            if (window.downloadManager && typeof window.downloadManager.download === 'function') {
+                window.downloadManager.download({
+                    url,
+                    postId,
+                    mediaType,
+                    category,
+                    filename,
+                    thumbnail
+                }).then(() => {
+                    btn.innerHTML = '<i class="bi bi-check2 text-success"></i>';
+                    setTimeout(() => {
+                        btn.innerHTML = origHtml;
+                        btn.disabled = false;
+                    }, 2000);
+                }).catch((err) => {
+                    console.error('[Download Click] downloadManager error, falling back to direct browser download:', err);
+                    triggerDirectBrowserDownload();
+                    btn.innerHTML = '<i class="bi bi-check2 text-success"></i>';
+                    setTimeout(() => {
+                        btn.innerHTML = origHtml;
+                        btn.disabled = false;
+                    }, 2000);
+                });
+            } else {
+                triggerDirectBrowserDownload();
                 btn.innerHTML = '<i class="bi bi-check2 text-success"></i>';
                 setTimeout(() => {
                     btn.innerHTML = origHtml;
                     btn.disabled = false;
                 }, 2000);
-            }).catch((err) => {
-                console.error('[Download Click] Failed:', err);
-                btn.innerHTML = '<i class="bi bi-exclamation-triangle text-danger"></i>';
-                setTimeout(() => {
-                    btn.innerHTML = origHtml;
-                    btn.disabled = false;
-                }, 2000);
-            });
+            }
         });
     </script>
     <script>
@@ -2396,9 +2842,11 @@ window.addEventListener('beforeinstallprompt', (e) => {
                                        (evt.detail.elt && (evt.detail.elt.getAttribute('hx-get') || evt.detail.elt.getAttribute('href'))) ||
                                        '';
                     const destination = responseUrl || requestUrl;
-                    if (destination && destination !== window.location.href && destination !== window.location.pathname) {
-                        window.location.href = destination;
+                    if (destination) {
+                        console.log('[HTMX Seamless] #page-content-target not in response, loading natively:', destination);
+                        window.location.assign(destination);
                     }
+                    return;
                 }
             }
         });
@@ -2450,29 +2898,76 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 pathname.startsWith('/accounts/') || pathname.startsWith('/users/login') ||
                 pathname.startsWith('/users/logout') || pathname.startsWith('/users/register') ||
                 pathname.startsWith('/register') || pathname.startsWith('/login') ||
-                pathname.startsWith('/users/password') ||
+                pathname.startsWith('/users/password') || pathname.startsWith('/users/reset') ||
+                pathname.startsWith('/users/verify-email') || pathname.startsWith('/auth/') ||
                 pathname.startsWith('/api/')) {
+                return;
+            }
+
+            const targetPath = targetUrl.pathname + targetUrl.search;
+            // If the link points to the current URL, don't intercept unless intended
+            if (targetPath === window.location.pathname + window.location.search && !targetUrl.hash) {
                 return;
             }
 
             // Intercept and route smoothly through HTMX
             evt.preventDefault();
-            console.log('[HTMX Seamless Navigation] Intercepted link click:', targetUrl.pathname + targetUrl.search);
+            console.log('[HTMX Seamless Navigation] Intercepted link click:', targetPath);
 
             if (window.Haptics && typeof window.Haptics.impactLight === 'function') {
                 window.Haptics.impactLight();
             }
 
             if (window.htmx) {
-                window.htmx.ajax('GET', targetUrl.pathname + targetUrl.search, {
+                // Instantly abort any active page navigation request to avoid stale overwrites
+                window.htmx.trigger('#page-content-target', 'htmx:abort');
+
+                window.htmx.ajax('GET', targetPath, {
+                    source: link,
                     target: '#page-content-target',
                     swap: 'innerHTML',
-                    pushUrl: true,
-                    headers: { 'HX-Request': 'true' }
+                    headers: {
+                        'HX-Request': 'true',
+                        'HX-Target': 'page-content-target'
+                    }
                 });
             } else {
                 window.location.href = link.href;
             }
+        });
+
+        // Search dropdown hygiene across SPA navigation and browser history
+        function closeSearchDropdown() {
+            const dropdown = document.getElementById('search-dropdown-results');
+            if (dropdown) {
+                dropdown.innerHTML = '';
+                dropdown.style.display = 'none';
+            }
+        }
+
+        // Dismiss search dropdown on click outside
+        document.addEventListener('click', function(e) {
+            const searchForm = e.target.closest('.search-form');
+            if (!searchForm) {
+                closeSearchDropdown();
+            }
+        });
+
+        // Dismiss search dropdown on form submission
+        document.addEventListener('submit', function(e) {
+            if (e.target && e.target.matches('.search-form')) {
+                closeSearchDropdown();
+            }
+        });
+
+        // Clear search dropdown before HTMX snapshots page for browser history
+        document.body.addEventListener('htmx:beforeHistorySave', function() {
+            closeSearchDropdown();
+        });
+
+        // Ensure search dropdown is cleared upon history restore
+        document.body.addEventListener('htmx:historyRestore', function() {
+            closeSearchDropdown();
         });
 
         // Redirect to login if an unauthorized response occurs during HTMX requests
@@ -2480,6 +2975,25 @@ window.addEventListener('beforeinstallprompt', (e) => {
             const status = evt.detail.xhr ? evt.detail.xhr.status : 0;
             if (status === 401 || status === 403) {
                 window.location.href = '/accounts/login/';
+                return;
+            }
+            if (evt.detail.target && evt.detail.target.id === 'page-content-target') {
+                const path = (evt.detail.requestConfig && evt.detail.requestConfig.path) || (evt.detail.xhr && evt.detail.xhr.responseURL);
+                if (path) {
+                    console.warn('[HTMX Seamless Navigation] Response error ' + status + ', falling back to native navigation:', path);
+                    window.location.assign(path);
+                }
+            }
+        });
+
+        // Fallback on network send error during page navigation
+        document.body.addEventListener('htmx:sendError', function(evt) {
+            if (evt.detail.target && evt.detail.target.id === 'page-content-target') {
+                const path = evt.detail.requestConfig && evt.detail.requestConfig.path;
+                if (path) {
+                    console.warn('[HTMX Seamless Navigation] Network send error, falling back to full navigation:', path);
+                    window.location.assign(path);
+                }
             }
         });
 
@@ -2491,8 +3005,23 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 }
 
                 if (evt.detail.xhr && evt.detail.xhr.status === 200) {
-                    const targetUrl = evt.detail.xhr.responseURL || window.location.pathname;
-                    const goingToHome = isHomeRoute(targetUrl);
+                    const rawTargetUrl = evt.detail.xhr.responseURL;
+                    let targetPath = window.location.pathname;
+                    try {
+                        targetPath = rawTargetUrl ? (new URL(rawTargetUrl, window.location.origin).pathname + new URL(rawTargetUrl, window.location.origin).search) : ((evt.detail.requestConfig && evt.detail.requestConfig.path) || window.location.pathname);
+                    } catch (e) {}
+
+                    // Maintain browser history and address bar in sync
+                    if (targetPath && window.history && window.history.pushState) {
+                        if ((window.location.pathname + window.location.search) !== targetPath) {
+                            window.history.pushState({ htmx: true }, '', targetPath);
+                        }
+                        if (typeof updateActiveState === 'function') {
+                            updateActiveState(targetPath);
+                        }
+                    }
+
+                    const goingToHome = isHomeRoute(targetPath);
 
                     if (!goingToHome) {
                         // Non-Home pages: ALWAYS reset scroll to (0, 0)

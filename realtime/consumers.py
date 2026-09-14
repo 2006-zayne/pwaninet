@@ -98,7 +98,9 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         # connection_count = WebSocketConnectionTracker.get_connection_count(self.user.id)
         # is_online = PresenceService.is_user_online(self.user.id)
 
-        print(f'[NOTIFICATIONS] User {self.user.id} disconnect')
+        user = getattr(self, 'user', None)
+        if user and hasattr(user, 'id'):
+            print(f'[NOTIFICATIONS] User {user.id} disconnect')
 
         # If user is truly offline (no heartbeat, no connections), persist to DB - FROZEN FOR MVP
         # if not is_online and connection_count == 0:
@@ -208,16 +210,18 @@ class FeedConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection."""
         # Leave user's feed group
-        await self.channel_layer.group_discard(
-            self.user_group_name,
-            self.channel_name
-        )
+        if hasattr(self, 'user_group_name'):
+            await self.channel_layer.group_discard(
+                self.user_group_name,
+                self.channel_name
+            )
         
         # Leave global feed updates group
-        await self.channel_layer.group_discard(
-            "feed_updates",
-            self.channel_name
-        )
+        if hasattr(self, 'user'):
+            await self.channel_layer.group_discard(
+                "feed_updates",
+                self.channel_name
+            )
 
     async def receive(self, text_data):
         """Handle incoming WebSocket messages."""
@@ -331,11 +335,15 @@ class CommentConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection."""
         # Leave post's comment group
-        await self.channel_layer.group_discard(
-            self.post_group_name,
-            self.channel_name
-        )
-        print(f'[COMMENTS] User {self.user.id} disconnected from post {self.post_id}')
+        if hasattr(self, 'post_group_name'):
+            await self.channel_layer.group_discard(
+                self.post_group_name,
+                self.channel_name
+            )
+        user = getattr(self, 'user', None)
+        post_id = getattr(self, 'post_id', None)
+        if user and hasattr(user, 'id') and post_id:
+            print(f'[COMMENTS] User {user.id} disconnected from post {post_id}')
 
     async def receive(self, text_data):
         """Handle incoming WebSocket messages."""
@@ -400,6 +408,10 @@ class OnlineStatusConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection."""
+        user = getattr(self, 'user', None)
+        if not user or getattr(user, 'is_anonymous', True):
+            return
+
         # Update user's offline status
         await self.update_online_status(False)
 

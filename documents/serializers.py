@@ -35,9 +35,12 @@ class AcademicYearSerializer(serializers.ModelSerializer):
 
 
 class SemesterSerializer(serializers.ModelSerializer):
+    semester_name = serializers.CharField(source='get_number_display', read_only=True)
+
     class Meta:
         model = Semester
-        fields = ['id', 'code', 'name', 'academic_year', 'order']
+        fields = ['id', 'number', 'semester_name', 'academic_year', 'start_date', 'end_date', 'is_current']
+
 
 
 class FacultySerializer(serializers.ModelSerializer):
@@ -71,11 +74,10 @@ class ProgrammeSerializer(serializers.ModelSerializer):
 
 
 class AcademicUnitSerializer(serializers.ModelSerializer):
-    programme_name = serializers.CharField(source='programme.name', read_only=True)
-    
     class Meta:
         model = AcademicUnit
-        fields = ['id', 'code', 'name', 'programme', 'programme_name', 'credits', 'description']
+        fields = ['id', 'code', 'name', 'slug', 'credit_hours', 'description', 'is_active']
+
 
 
 # Document Domain Serializers
@@ -97,7 +99,8 @@ class DocumentAuthorSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = DocumentAuthor
-        fields = ['id', 'user', 'name', 'author_type', 'contribution_notes']
+        fields = ['id', 'user', 'name', 'author_name', 'author_type', 'contribution_notes']
+
     
     def get_author_name(self, obj):
         if obj.user:

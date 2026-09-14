@@ -351,6 +351,68 @@
         </form>
       </div>
     </div>
+
+    <!-- Mobile Navigation Position (Strictly visible only on mobile viewports) -->
+    <div class="settings-list-item expandable mobile-nav-setting-item d-md-none" data-target="mobile-nav-position">
+      <div class="settings-list-icon">
+        <i class="bi bi-phone"></i>
+      </div>
+      <div class="settings-list-content">
+        <div class="settings-list-title">{% trans "Mobile Navigation Position" %}</div>
+        <div class="settings-list-subtitle">{% trans "Bottom dock or full-width top bar" %}</div>
+      </div>
+      <div class="settings-list-chevron">
+        <i class="bi bi-chevron-right"></i>
+      </div>
+    </div>
+
+    <div class="settings-expandable-content mobile-nav-setting-content d-md-none" id="mobile-nav-position">
+      <div class="settings-expandable-body">
+        <form id="mobile-nav-position-form" class="preference-form">
+          <div class="radio-group">
+            <div class="radio-option">
+              <input type="radio" id="nav-pos-bottom" name="mobile_nav_position" value="bottom">
+              <label for="nav-pos-bottom" class="position-option-label">
+                <div class="radio-text-content">
+                  <span class="radio-label">{% trans "Bottom (Default)" %}</span>
+                  <span class="radio-description">{% trans "Floating navigation bar docked near the bottom of your screen." %}</span>
+                </div>
+                <div class="nav-position-preview bottom-preview" aria-hidden="true" title="{% trans 'Bottom navigation preview' %}">
+                  <div class="preview-screen">
+                    <div class="preview-notch"></div>
+                    <div class="preview-lines">
+                      <div class="preview-line"></div>
+                      <div class="preview-line short"></div>
+                    </div>
+                    <div class="preview-bar bottom-bar"></div>
+                  </div>
+                </div>
+              </label>
+            </div>
+            <div class="radio-option">
+              <input type="radio" id="nav-pos-top" name="mobile_nav_position" value="top">
+              <label for="nav-pos-top" class="position-option-label">
+                <div class="radio-text-content">
+                  <span class="radio-label">{% trans "Top (Full Width)" %}</span>
+                  <span class="radio-description">{% trans "Full-width navigation bar docked beneath the header with brand and profile maintained." %}</span>
+                </div>
+                <div class="nav-position-preview top-preview" aria-hidden="true" title="{% trans 'Top navigation preview' %}">
+                  <div class="preview-screen">
+                    <div class="preview-header-bar"></div>
+                    <div class="preview-bar top-bar"></div>
+                    <div class="preview-lines">
+                      <div class="preview-line"></div>
+                      <div class="preview-line short"></div>
+                    </div>
+                    <div class="preview-home-indicator"></div>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -542,6 +604,125 @@
       font-size: 0.8rem;
     }
   }
+
+  /* Desktop Isolation: Never display mobile navigation position selector on desktop */
+  @media (min-width: 768px) {
+    .mobile-nav-setting-item,
+    .mobile-nav-setting-content {
+      display: none !important;
+    }
+  }
+
+  /* Mobile Navigation Position Option & Visual Preview */
+  .position-option-label {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 1rem !important;
+  }
+
+  .radio-text-content {
+    flex: 1;
+    min-width: 0;
+    padding-right: 0.75rem;
+  }
+
+  .nav-position-preview {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .preview-screen {
+    width: 42px;
+    height: 64px;
+    border: 2px solid var(--border);
+    border-radius: 9px;
+    background: var(--page-bg);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 3px;
+    box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.04);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .radio-option input[type="radio"]:checked + label .preview-screen {
+    border-color: var(--brand, #2563eb);
+    box-shadow: 0 0 0 1px var(--brand, #2563eb);
+  }
+
+  .preview-notch {
+    width: 14px;
+    height: 2px;
+    background: var(--text-secondary);
+    opacity: 0.45;
+    border-radius: 1px;
+    align-self: center;
+    margin-top: 1px;
+  }
+
+  .preview-home-indicator {
+    width: 16px;
+    height: 2px;
+    background: var(--text-secondary);
+    opacity: 0.45;
+    border-radius: 1px;
+    align-self: center;
+    margin-bottom: 1px;
+  }
+
+  .preview-lines {
+    padding: 3px 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: 100%;
+  }
+
+  .preview-line {
+    height: 3px;
+    background: var(--border);
+    border-radius: 1.5px;
+    width: 100%;
+    opacity: 0.8;
+  }
+
+  .preview-line.short {
+    width: 55%;
+  }
+
+  .preview-bar {
+    background: var(--brand, #2563eb);
+    transition: all 0.2s ease;
+  }
+
+  .preview-bar.bottom-bar {
+    width: 28px;
+    height: 6px;
+    align-self: center;
+    border-radius: 4px;
+    margin-bottom: 2px;
+  }
+
+  .preview-header-bar {
+    width: 100%;
+    height: 5px;
+    background: var(--text-secondary);
+    opacity: 0.35;
+    border-radius: 2px 2px 0 0;
+    margin-bottom: 0;
+  }
+
+  .preview-bar.top-bar {
+    width: 100%;
+    height: 7px;
+    border-radius: 0;
+    margin: 0;
+  }
 </style>
 
 <script>
@@ -640,6 +821,32 @@
             const fontStyle = e.target.value;
             setFontStyle(fontStyle);
             savePreference('font_style_preference', fontStyle);
+          }
+        });
+      }
+
+      // Mobile Navigation Position handling (Local persistence & reactive layout update)
+      const navPosForm = document.getElementById('mobile-nav-position-form');
+      if (navPosForm) {
+        const currentNavPos = (typeof window.getMobileNavPosition === 'function')
+          ? window.getMobileNavPosition()
+          : (localStorage.getItem('mobileNavPosition') || 'bottom');
+        const activeRadio = navPosForm.querySelector(`input[name="mobile_nav_position"][value="${currentNavPos}"]`);
+        if (activeRadio) {
+          activeRadio.checked = true;
+        }
+
+        navPosForm.addEventListener('change', function(e) {
+          if (e.target.name === 'mobile_nav_position') {
+            const position = e.target.value;
+            if (typeof window.setMobileNavPosition === 'function') {
+              window.setMobileNavPosition(position);
+            } else {
+              try {
+                localStorage.setItem('mobileNavPosition', position);
+              } catch (err) {}
+              document.documentElement.setAttribute('data-mobile-nav-position', position);
+            }
           }
         });
       }
@@ -745,5 +952,13 @@
     } else {
       initAppearanceSettings();
     }
+
+    // Re-initialize when loaded or navigated via HTMX
+    document.addEventListener('htmx:afterSwap', function(e) {
+      const container = document.getElementById('appearance-settings-container');
+      if (container && container.dataset.initialized !== 'true') {
+        initAppearanceSettings();
+      }
+    });
   })();
 </script>

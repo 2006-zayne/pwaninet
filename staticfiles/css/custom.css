@@ -512,6 +512,104 @@ body.keyboard-open .mobile-bottom-nav {
     transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease !important;
 }
 
+/* Configurable top mobile navigation overrides */
+@media (max-width: 767.98px) {
+    /* Seamless unified header: remove border between navbar-top and top mobile nav */
+    [data-mobile-nav-position="top"] .navbar-top {
+        z-index: 10002 !important;
+        border-bottom: none !important;
+        box-shadow: none !important;
+    }
+
+    /* Ensure theme toggle and other dropdown menus in navbar-top sit on top of the navigation bar */
+    [data-mobile-nav-position="top"] .navbar-top .dropdown,
+    [data-mobile-nav-position="top"] .navbar-top .dropdown-menu {
+        z-index: 10005 !important;
+    }
+
+    [data-mobile-nav-position="top"] .mobile-bottom-nav {
+        z-index: 9999 !important;
+        top: calc(var(--navbar-height, 56px) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+        bottom: auto !important;
+        left: 0 !important;
+        right: 0 !important;
+        transform: none !important;
+        width: 100% !important;
+        width: 100vw !important;
+        max-width: 100% !important;
+        border-radius: 0 !important;
+        border-left: none !important;
+        border-right: none !important;
+        border-top: none !important;
+        border-bottom: 1px solid var(--border) !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06) !important;
+        padding-top: 0 !important;
+        padding-bottom: 2px !important;
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+        height: 48px !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        background: var(--nav-bg) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+    }
+
+    [data-theme="dark"][data-mobile-nav-position="top"] .mobile-bottom-nav {
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28) !important;
+    }
+
+    [data-mobile-nav-position="top"] body {
+        padding-top: calc(var(--navbar-height, 56px) + 48px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+        padding-bottom: calc(var(--pwaninet-safe-area-bottom, 0px) + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    [data-mobile-nav-position="top"] body.is-native-app,
+    [data-mobile-nav-position="top"] body.is-standalone-pwa,
+    [data-mobile-nav-position="top"].is-standalone-pwa body {
+        padding-top: calc(var(--navbar-height, 56px) + 48px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+        padding-bottom: calc(var(--pwaninet-safe-area-bottom, 0px) + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    [data-mobile-nav-position="top"] body.keyboard-open .mobile-bottom-nav,
+    [data-mobile-nav-position="top"].keyboard-open .mobile-bottom-nav {
+        transform: none !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+}
+
+/* Modal & Dropdown Layering - Above navigation bars and sticky bottom composer */
+.modal-backdrop {
+    z-index: 10400 !important;
+}
+.modal {
+    z-index: 10500 !important;
+}
+.modal-dialog {
+    z-index: 10501 !important;
+}
+
+body.modal-open .fixed-bottom,
+body.modal-open .post-detail-composer-bar,
+body.modal-open .main-composer {
+    display: none !important;
+    pointer-events: none !important;
+}
+
+.post-card .dropdown-menu,
+.post-detail-container .dropdown-menu,
+.dropdown-menu.dropdown-menu-end {
+    z-index: 10010 !important;
+}
+
+.post-card:has(.dropdown-menu.show),
+.post-card.dropdown-open {
+    overflow: visible !important;
+    z-index: 10010 !important;
+    position: relative;
+}
+
 /* Hide scrollbars on horizontal tab bars, categories, and reels */
 .no-scrollbar,
 .category-pills,
@@ -706,4 +804,201 @@ body.keyboard-open .mobile-bottom-nav {
     background-color: #1e293b !important;
     color: #94a3b8 !important;
     border: 1px solid #334155;
+}
+
+/* ===================================================
+   UNIVERSAL NOTIFICATION AVATARS & THUMBNAILS (ROUNDED)
+   =================================================== */
+.notif-item .notif-avatar-col img,
+.notif-item .actor-stack img,
+.notif-item .sender-avatar,
+.notif-item .notif-avatar,
+.notif-item .avatar-stack-item,
+.notif-item .expanded-actors img,
+.notif-toast .toast-avatar img,
+.notif-avatar-col img {
+    border-radius: 50% !important;
+    object-fit: cover !important;
+}
+
+.notif-item .resource-preview,
+.notif-item .resource-preview img,
+.notif-item .notif-preview-col img,
+.notif-item .notif-thumbnail,
+.notif-item .notif-thumbnail img,
+.notif-toast .toast-preview img,
+.resource-preview,
+.resource-preview img {
+    border-radius: 10px !important;
+    object-fit: cover !important;
+    overflow: hidden !important;
+}
+
+@keyframes slideInNotifToast {
+    from {
+        opacity: 0;
+        transform: translateY(-16px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.notif-toast:hover {
+    box-shadow: var(--shadow-hover, 0 14px 28px rgba(0, 0, 0, 0.25)) !important;
+}
+
+[data-theme="dark"] .notif-toast {
+    background: #1e222a !important;
+    border-color: #2e3542 !important;
+    color: #f1f5f9 !important;
+}
+
+/* ===================================================
+   UNIFIED LIVE SEARCH DROPDOWN & MOBILE MODAL
+   =================================================== */
+#search-dropdown-results {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: var(--card-bg, #ffffff);
+    border: 1px solid var(--border-soft, #e2e8f0);
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+    z-index: 1050;
+    max-height: 480px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+#search-dropdown-results:empty {
+    display: none !important;
+}
+
+#search-dropdown-results:not(:empty) {
+    display: block !important;
+}
+
+[data-theme="dark"] #search-dropdown-results {
+    background: var(--card-bg, #242526);
+    border-color: var(--border-soft, #3a3b3c);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Full mobile width suggestion modal */
+@media (max-width: 767.98px) {
+    #search-dropdown-results {
+        position: absolute !important;
+        top: calc(100% + 8px) !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-height: calc(85vh - 70px) !important;
+        border-radius: 16px !important;
+        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.25) !important;
+        z-index: 1060 !important;
+    }
+
+    body.is-native-app #search-dropdown-results {
+        top: calc(100% + 8px) !important;
+    }
+}
+
+.hover-bg {
+    transition: background-color 0.15s ease;
+}
+
+.hover-bg:hover {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="dark"] .hover-bg:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ===================================================
+   2FA ENROLLMENT NUDGE BANNER
+   =================================================== */
+.twofactor-nudge-banner,
+#twoFactorNudgeBanner {
+    background-color: #eff6ff;
+    border: 1px solid #bfdbfe !important;
+    color: #1e293b;
+}
+
+.twofactor-nudge-title,
+#twoFactorNudgeBanner strong,
+#twoFactorNudgeBanner .twofactor-nudge-title {
+    color: #0f172a;
+}
+
+.twofactor-nudge-desc,
+#twoFactorNudgeBanner .twofactor-nudge-desc {
+    color: #475569;
+}
+
+.twofactor-nudge-dismiss,
+#twoFactorNudgeBanner .twofactor-nudge-dismiss {
+    color: #64748b !important;
+    text-decoration: none;
+    transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.twofactor-nudge-dismiss:hover,
+#twoFactorNudgeBanner .twofactor-nudge-dismiss:hover {
+    color: #0f172a !important;
+}
+
+[data-theme="dark"] .twofactor-nudge-banner,
+[data-theme="dark"] #twoFactorNudgeBanner {
+    background-color: rgba(99, 102, 241, 0.14) !important;
+    border: 1px solid rgba(99, 102, 241, 0.3) !important;
+    color: #e4e6eb !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] #twoFactorNudgeBanner .twofactor-nudge-icon {
+    background-color: rgba(99, 102, 241, 0.22) !important;
+    color: #a5b4fc !important;
+}
+
+[data-theme="dark"] .twofactor-nudge-title,
+[data-theme="dark"] #twoFactorNudgeBanner .twofactor-nudge-title,
+[data-theme="dark"] #twoFactorNudgeBanner strong,
+[data-theme="dark"] #twoFactorNudgeBanner .text-dark {
+    color: #f8fafc !important;
+}
+
+[data-theme="dark"] .twofactor-nudge-desc,
+[data-theme="dark"] #twoFactorNudgeBanner .twofactor-nudge-desc,
+[data-theme="dark"] #twoFactorNudgeBanner .text-muted {
+    color: #cbd5e1 !important;
+}
+
+[data-theme="dark"] .twofactor-nudge-dismiss,
+[data-theme="dark"] #twoFactorNudgeBanner .twofactor-nudge-dismiss {
+    color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .twofactor-nudge-dismiss:hover,
+[data-theme="dark"] #twoFactorNudgeBanner .twofactor-nudge-dismiss:hover,
+[data-theme="dark"] .twofactor-nudge-dismiss:focus,
+[data-theme="dark"] #twoFactorNudgeBanner .twofactor-nudge-dismiss:focus {
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] #twoFactorNudgeBanner .btn-primary {
+    background-color: #6366f1 !important;
+    border-color: #6366f1 !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+
+[data-theme="dark"] #twoFactorNudgeBanner .btn-primary:hover,
+[data-theme="dark"] #twoFactorNudgeBanner .btn-primary:focus {
+    background-color: #818cf8 !important;
+    border-color: #818cf8 !important;
+    color: #ffffff !important;
 }

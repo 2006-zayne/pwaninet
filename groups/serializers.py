@@ -24,7 +24,8 @@ class CourseSerializer(serializers.ModelSerializer):
 class YearSerializer(serializers.ModelSerializer):
     class Meta:
         model = Year
-        fields = ['id', 'year']
+        fields = ['id', 'level']
+
 
 
 class GroupSerializer(serializers.ModelSerializer):

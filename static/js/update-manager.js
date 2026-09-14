@@ -343,6 +343,33 @@
         }
     }
 
+    function canSafelyReload() {
+        const pathname = window.location.pathname;
+        const authPaths = [
+            '/login', '/accounts/login', '/users/login',
+            '/register', '/accounts/register', '/users/register',
+            '/users/password', '/users/reset', '/users/verify',
+            '/auth/'
+        ];
+        if (authPaths.some(p => pathname.startsWith(p))) {
+            return false;
+        }
+
+        const active = document.activeElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
+            return false;
+        }
+
+        const inputs = document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]), textarea');
+        for (const input of inputs) {
+            if (input.value && input.value.trim().length > 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     // Initialize service worker registration
     async function initServiceWorker() {
         if (!('serviceWorker' in navigator)) {
@@ -351,6 +378,8 @@
         }
 
         try {
+            const hadController = Boolean(navigator.serviceWorker.controller);
+
             // Fetch current version info first
             const versionResponse = await fetch('/api/version/');
             const versionData = await versionResponse.json();
@@ -376,6 +405,10 @@
                     try {
                         localStorage.removeItem('htmx-history-cache');
                     } catch (e) {}
+                    if (!canSafelyReload()) {
+                        console.log('[UpdateManager] Deferring reload on NEW_VERSION_ACTIVATED: user on auth page or actively typing');
+                        return;
+                    }
                     window.location.reload();
                 }
             });
@@ -383,7 +416,15 @@
             // Reload when new service worker takes control so fresh HTML is served
             let isRefreshing = false;
             navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!hadController) {
+                    console.log('[UpdateManager] Initial controller active - skipping reload as fresh HTML is already loaded');
+                    return;
+                }
                 if (!isRefreshing) {
+                    if (!canSafelyReload()) {
+                        console.log('[UpdateManager] Deferring reload on controllerchange: user on auth page or actively typing');
+                        return;
+                    }
                     isRefreshing = true;
                     console.log('[UpdateManager] New controller active - refreshing for fresh HTML');
                     try {

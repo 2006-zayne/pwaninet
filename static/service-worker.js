@@ -92,12 +92,16 @@ self.addEventListener('install', (event) => {
                 return cache.addAll(CORE_ASSETS);
             })
             .then(() => {
-                console.log('Service Worker: Core assets cached, activating immediately');
-                return self.skipWaiting();
+                console.log('Service Worker: Core assets cached');
+                // Only skip waiting on first install when there is no active controller yet
+                if (!self.registration.active) {
+                    console.log('Service Worker: First install, activating immediately');
+                    return self.skipWaiting();
+                }
+                console.log('Service Worker: New version installed, waiting for user activation');
             })
             .catch((error) => {
                 console.error('Service Worker: Failed to cache core assets:', error);
-                return self.skipWaiting();
             })
     );
 });

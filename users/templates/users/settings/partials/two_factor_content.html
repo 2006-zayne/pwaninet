@@ -1,0 +1,474 @@
+{% load i18n static %}
+
+<div class="page-header">
+  <a href="{% url 'users:settings_privacy' %}" class="back-link" hx-get="{% url 'users:settings_privacy' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true">
+    <i class="bi bi-arrow-left"></i> {% trans "Back to Privacy & Security" %}
+  </a>
+  <h1 class="page-title">{% trans "Two-Factor Authentication" %}</h1>
+  <p class="page-subtitle">{% trans "Add an authenticator app for an additional layer of account protection." %}</p>
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show mb-4 border-0 shadow-sm" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+{% if error_message %}
+  <div class="alert alert-danger alert-dismissible fade show mb-4 border-0 shadow-sm" role="alert">
+    <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ error_message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+{% endif %}
+
+{# -------------------------------------------------------------------------- #}
+{# STATE 1: ONE-TIME RECOVERY CODES DISPLAY                                    #}
+{# -------------------------------------------------------------------------- #}
+{% if state == 'recovery_codes_display' %}
+  <div class="settings-section border-0 shadow-sm mb-4" style="border-radius: var(--radius-md); background: var(--card-bg);">
+    <div class="settings-section-body p-4">
+      <div class="text-center mb-4">
+        <div class="d-inline-flex align-items-center justify-content-center bg-success bg-opacity-10 text-success rounded-circle mb-3" style="width: 64px; height: 64px;">
+          <i class="bi bi-shield-check fs-1"></i>
+        </div>
+        {% if is_regenerated %}
+          <h3 class="fw-bold mb-1 text-dark" data-theme-text>{% trans "New Recovery Codes Generated" %}</h3>
+          <p class="text-secondary small mb-0">{% trans "Your previous recovery codes have been permanently invalidated." %}</p>
+        {% else %}
+          <h3 class="fw-bold mb-1 text-dark" data-theme-text>{% trans "Two-Factor Authentication Enabled!" %}</h3>
+          <p class="text-secondary small mb-0">{% trans "Your account is now protected with an authenticator app." %}</p>
+        {% endif %}
+      </div>
+
+      <div class="alert alert-warning border-0 d-flex align-items-start gap-3 p-3 mb-4 rounded-3">
+        <i class="bi bi-exclamation-octagon-fill text-warning fs-4 flex-shrink-0 mt-1"></i>
+        <div class="small">
+          <strong>{% trans "Save these recovery codes immediately." %}</strong><br>
+          {% trans "These codes are displayed ONLY ONCE and cannot be recovered later. Each single-use code can recover your account if you lose access to your authenticator app." %}
+        </div>
+      </div>
+
+      <!-- Recovery Codes Grid -->
+      <div class="recovery-codes-grid mb-4" id="recovery-codes-container">
+        {% for code in recovery_codes %}
+          <div class="recovery-code-pill font-monospace fw-bold text-center py-2 px-3">
+            {{ code }}
+          </div>
+        {% endfor %}
+      </div>
+
+      <!-- Hidden text and form for copying / downloading -->
+      <textarea id="raw-recovery-codes" class="d-none" readonly>{% for code in recovery_codes %}{{ code }}{% if not forloop.last %}&#10;{% endif %}{% endfor %}</textarea>
+
+      <form id="download-codes-form" method="POST" action="{% url 'users:settings_two_factor_download_codes' %}" class="d-none">
+        {% csrf_token %}
+        {% for code in recovery_codes %}
+          <input type="hidden" name="codes" value="{{ code }}">
+        {% endfor %}
+      </form>
+
+      <!-- Action Buttons -->
+      <div class="d-flex flex-wrap gap-2 mb-4 justify-content-center">
+        <button type="button" class="btn btn-outline-primary d-inline-flex align-items-center gap-2" id="copy-all-codes-btn" onclick="copyAllRecoveryCodes()">
+          <i class="bi bi-clipboard"></i> {% trans "Copy All Codes" %}
+        </button>
+        <button type="button" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2" id="download-codes-btn" onclick="downloadRecoveryCodesFile('{{ request.user.username }}')">
+          <i class="bi bi-download"></i> {% trans "Download (.txt)" %}
+        </button>
+      </div>
+
+      <hr class="my-4 border-secondary opacity-25">
+
+      <div class="text-center">
+        <a href="{% url 'users:settings_two_factor' %}" class="btn btn-primary px-4 py-2 fw-semibold" hx-get="{% url 'users:settings_two_factor' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">
+          <i class="bi bi-check2-circle me-1"></i> {% trans "I Have Saved My Recovery Codes" %}
+        </a>
+      </div>
+    </div>
+  </div>
+
+{# -------------------------------------------------------------------------- #}
+{# STATE 2: ENROLLMENT SETUP (QR + MANUAL KEY + 6-DIGIT VERIFY)               #}
+{# -------------------------------------------------------------------------- #}
+{% elif state == 'setup' %}
+  <div class="settings-section border-0 shadow-sm mb-4" style="border-radius: var(--radius-md); background: var(--card-bg);">
+    <div class="settings-section-header p-3 px-4 border-bottom">
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-primary rounded-pill">{% trans "Step 1 of 2" %}</span>
+        <h5 class="settings-section-title mb-0">{% trans "Scan Authenticator QR Code" %}</h5>
+      </div>
+      <p class="text-secondary small mb-0 mt-1">{% trans "Use Google Authenticator, Microsoft Authenticator, or any compatible TOTP app." %}</p>
+    </div>
+
+    <div class="settings-section-body p-4">
+      <!-- QR Code Container (Always crisp white background for reliable camera scanning) -->
+      <div class="text-center mb-4">
+        <div class="qr-code-wrapper p-3 d-inline-block rounded-3 shadow-sm" style="background: #ffffff; border: 1px solid var(--border);">
+          <div class="qr-svg-render">
+            {{ qr_svg|safe }}
+          </div>
+        </div>
+        <div class="text-muted small mt-2">
+          <i class="bi bi-camera me-1"></i>{% trans "Point your phone camera or authenticator app at this code" %}
+        </div>
+      </div>
+
+      <!-- Manual Setup Key Accordion/Collapse -->
+      <div class="card border-0 mb-4 rounded-3" style="background: var(--page-bg); border: 1px solid var(--border) !important;">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+            <span class="fw-semibold small text-primary d-flex align-items-center gap-1">
+              <i class="bi bi-key-fill"></i> {% trans "Can't scan? Use manual setup key:" %}
+            </span>
+            <button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1" id="copy-secret-btn" onclick="copySecretKey('{{ manual_secret }}')">
+              <i class="bi bi-clipboard"></i> {% trans "Copy Key" %}
+            </button>
+          </div>
+          <div class="p-2 px-3 rounded font-monospace text-center fw-bold letter-spacing-1 manual-key-box" style="background: var(--card-bg); border: 1px dashed var(--border); font-size: 1.05rem; letter-spacing: 2px;">
+            {{ formatted_secret }}
+          </div>
+          <p class="text-muted small mb-0 mt-2">
+            <i class="bi bi-info-circle me-1"></i>{% trans "Enter this key manually into your app (Time-based / 30 seconds)." %}
+          </p>
+        </div>
+      </div>
+
+      <hr class="my-4 border-secondary opacity-25">
+
+      <!-- Step 2: Verification Form -->
+      <div class="mb-2">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="badge bg-primary rounded-pill">{% trans "Step 2 of 2" %}</span>
+          <h5 class="fw-bold mb-0">{% trans "Enter the 6-Digit Code" %}</h5>
+        </div>
+        <p class="text-secondary small mb-3">
+          {% trans "Enter the 6-digit code shown in your authenticator app to activate protection." %}
+        </p>
+
+        <form method="POST" action="{% url 'users:settings_two_factor_verify' %}" hx-post="{% url 'users:settings_two_factor_verify' %}" hx-target="#page-content-target" hx-swap="innerHTML" class="needs-validation">
+          {% csrf_token %}
+          <div class="mb-3 max-w-sm mx-auto" style="max-width: 320px;">
+            <label for="totp-code-input" class="form-label visually-hidden">{% trans "6-digit code" %}</label>
+            <input type="text"
+                   id="totp-code-input"
+                   name="code"
+                   class="form-control form-control-lg text-center font-monospace fw-bold"
+                   placeholder="000000"
+                   pattern="\d{6}"
+                   maxlength="6"
+                   inputmode="numeric"
+                   autocomplete="one-time-code"
+                   style="font-size: 1.8rem; letter-spacing: 6px;"
+                   required
+                   autofocus>
+          </div>
+
+          <div class="d-grid gap-2 max-w-sm mx-auto" style="max-width: 320px;">
+            <button type="submit" class="btn btn-primary py-2 fw-semibold">
+              <i class="bi bi-shield-check me-1"></i> {% trans "Verify and Activate" %}
+            </button>
+            <a href="{% url 'users:settings_two_factor' %}" class="btn btn-link text-secondary text-decoration-none small" hx-get="{% url 'users:settings_two_factor' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">
+              {% trans "Cancel" %}
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+{# -------------------------------------------------------------------------- #}
+{# STATE 3: ALREADY ENROLLED & ACTIVE                                         #}
+{# -------------------------------------------------------------------------- #}
+{% elif is_enabled %}
+  <div class="settings-section border-0 shadow-sm mb-4" style="border-radius: var(--radius-md); background: var(--card-bg);">
+    <div class="settings-section-body p-4">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+        <div class="d-flex align-items-center gap-3">
+          <div class="d-inline-flex align-items-center justify-content-center bg-success bg-opacity-10 text-success rounded-circle" style="width: 52px; height: 52px;">
+            <i class="bi bi-shield-lock-fill fs-3"></i>
+          </div>
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <h5 class="fw-bold mb-0 text-dark" data-theme-text>{% trans "Two-Factor Authentication is Active" %}</h5>
+              <span class="badge bg-success bg-opacity-10 text-success fw-bold px-2 py-1">{% trans "Enabled" %}</span>
+            </div>
+            <p class="text-secondary small mb-0 mt-1">
+              {% trans "Your authenticator app is actively protecting this account." %}
+              {% if two_factor.enrolled_at %}
+                • {% trans "Enrolled on" %} {{ two_factor.enrolled_at|date:"M j, Y" }}
+              {% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-3 rounded-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2" style="background: var(--page-bg); border: 1px solid var(--border);">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-key text-primary fs-5"></i>
+          <div>
+            <div class="fw-semibold small">{% trans "Recovery Codes" %}</div>
+            <div class="text-secondary small">{{ active_codes_count }} {% trans "active recovery code(s) remaining" %}</div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#regenerateCollapse" aria-expanded="false" aria-controls="regenerateCollapse">
+          <i class="bi bi-arrow-repeat me-1"></i> {% trans "Regenerate Codes" %}
+        </button>
+      </div>
+
+      <!-- Regenerate Codes Collapsible Verification -->
+      <div class="collapse mb-4" id="regenerateCollapse">
+        <div class="card card-body border-0 shadow-sm p-4 rounded-3" style="background: var(--page-bg); border: 1px solid var(--border) !important;">
+          <h6 class="fw-bold text-dark mb-1" data-theme-text>{% trans "Regenerate Recovery Codes" %}</h6>
+          <p class="text-secondary small mb-3">
+            {% trans "Regenerating will permanently invalidate all existing recovery codes. Enter your current 6-digit authenticator code to confirm." %}
+          </p>
+          <form method="POST" action="{% url 'users:settings_two_factor_regenerate_codes' %}" hx-post="{% url 'users:settings_two_factor_regenerate_codes' %}" hx-target="#page-content-target" hx-swap="innerHTML">
+            {% csrf_token %}
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <input type="text"
+                     name="code"
+                     class="form-control font-monospace text-center fw-bold"
+                     style="max-width: 180px; letter-spacing: 4px;"
+                     placeholder="000000"
+                     pattern="\d{6}"
+                     maxlength="6"
+                     inputmode="numeric"
+                     autocomplete="one-time-code"
+                     required>
+              <button type="submit" class="btn btn-warning fw-semibold">
+                <i class="bi bi-arrow-clockwise me-1"></i> {% trans "Confirm & Generate New Codes" %}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <hr class="my-4 border-secondary opacity-25">
+
+      <!-- Danger Zone: Disable 2FA -->
+      <div>
+        <h6 class="fw-bold text-danger mb-1">{% trans "Disable Two-Factor Authentication" %}</h6>
+        <p class="text-secondary small mb-3">
+          {% trans "Disabling 2FA removes the extra security layer. You will only need your password to log in." %}
+        </p>
+
+        <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="collapse" data-bs-target="#disableCollapse" aria-expanded="false" aria-controls="disableCollapse">
+          <i class="bi bi-slash-circle me-1"></i> {% trans "Disable 2FA..." %}
+        </button>
+
+        <div class="collapse mt-3" id="disableCollapse">
+          <div class="card card-body border-0 shadow-sm p-3 rounded-3" style="background: var(--page-bg); border: 1px solid rgba(220, 53, 69, 0.3) !important;">
+            <p class="small text-danger fw-semibold mb-2">
+              <i class="bi bi-shield-exclamation me-1"></i>{% trans "Enter your 6-digit authenticator code to confirm disabling 2FA:" %}
+            </p>
+            <form method="POST" action="{% url 'users:settings_two_factor_disable' %}" hx-post="{% url 'users:settings_two_factor_disable' %}" hx-target="#page-content-target" hx-swap="innerHTML">
+              {% csrf_token %}
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+                <input type="text"
+                       name="code"
+                       class="form-control font-monospace text-center fw-bold"
+                       style="max-width: 180px; letter-spacing: 4px;"
+                       placeholder="000000"
+                       pattern="\d{6}"
+                       maxlength="6"
+                       inputmode="numeric"
+                       autocomplete="one-time-code"
+                       required>
+                <button type="submit" class="btn btn-danger fw-semibold">
+                  {% trans "Confirm & Disable 2FA" %}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+{# -------------------------------------------------------------------------- #}
+{# STATE 4: NOT ENROLLED (LANDING PROMPT)                                     #}
+{# -------------------------------------------------------------------------- #}
+{% else %}
+  <div class="settings-section border-0 shadow-sm mb-4" style="border-radius: var(--radius-md); background: var(--card-bg);">
+    <div class="settings-section-body p-4 text-center">
+      <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3" style="width: 64px; height: 64px;">
+        <i class="bi bi-shield-lock fs-1"></i>
+      </div>
+      <h3 class="fw-bold mb-2 text-dark" data-theme-text>{% trans "Protect Your Account with 2FA" %}</h3>
+      <p class="text-secondary mb-4 mx-auto" style="max-width: 520px;">
+        {% trans "Two-factor authentication adds an extra layer of security to your PwaniNet account. Once enabled, you'll enter a 6-digit verification code from your authenticator app whenever you perform sensitive security actions." %}
+      </p>
+
+      <div class="row g-3 text-start mx-auto mb-4" style="max-width: 640px;">
+        <div class="col-md-4">
+          <div class="p-3 rounded-3 h-100" style="background: var(--page-bg); border: 1px solid var(--border);">
+            <i class="bi bi-phone text-primary fs-4 mb-2 d-block"></i>
+            <div class="fw-semibold small mb-1">{% trans "1. Get an App" %}</div>
+            <div class="text-muted small">{% trans "Google Authenticator, Microsoft Authenticator, or Authy." %}</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="p-3 rounded-3 h-100" style="background: var(--page-bg); border: 1px solid var(--border);">
+            <i class="bi bi-qr-code text-primary fs-4 mb-2 d-block"></i>
+            <div class="fw-semibold small mb-1">{% trans "2. Scan QR Code" %}</div>
+            <div class="text-muted small">{% trans "Scan the setup code or enter the key manually." %}</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="p-3 rounded-3 h-100" style="background: var(--page-bg); border: 1px solid var(--border);">
+            <i class="bi bi-key text-primary fs-4 mb-2 d-block"></i>
+            <div class="fw-semibold small mb-1">{% trans "3. Save Codes" %}</div>
+            <div class="text-muted small">{% trans "Keep single-use recovery codes in case you lose your phone." %}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-center">
+        <a href="{% url 'users:settings_two_factor_setup' %}" class="btn btn-primary px-4 py-2 fw-semibold d-inline-flex align-items-center gap-2" hx-get="{% url 'users:settings_two_factor_setup' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">
+          <i class="bi bi-shield-plus"></i> {% trans "Set Up Authenticator" %}
+        </a>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+<style>
+  .recovery-codes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+  }
+  .recovery-code-pill {
+    background: var(--page-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 1.05rem;
+    color: var(--text-primary);
+    letter-spacing: 1px;
+    user-select: all;
+  }
+  .qr-code-wrapper svg {
+    display: block;
+    width: 200px;
+    height: 200px;
+    margin: 0 auto;
+  }
+  [data-theme="dark"] [data-theme-text] {
+    color: #f1f5f9 !important;
+  }
+  [data-theme="dark"] .manual-key-box {
+    color: #f1f5f9;
+  }
+</style>
+
+<script>
+function copySecretKey(secret) {
+  var btn = document.getElementById('copy-secret-btn');
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(secret).then(function() {
+      showCopiedFeedback(btn, "{% trans 'Key Copied!' %}");
+    });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = secret;
+    ta.style.position = 'fixed';
+    ta.style.left = '-999999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      showCopiedFeedback(btn, "{% trans 'Key Copied!' %}");
+    } catch (e) {
+      console.error(e);
+    }
+    document.body.removeChild(ta);
+  }
+}
+
+function copyAllRecoveryCodes() {
+  var btn = document.getElementById('copy-all-codes-btn');
+  var ta = document.getElementById('raw-recovery-codes');
+  if (!ta) return;
+  var text = ta.value;
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(function() {
+      showCopiedFeedback(btn, "{% trans 'All Codes Copied!' %}");
+    });
+  } else {
+    ta.classList.remove('d-none');
+    ta.select();
+    try {
+      document.execCommand('copy');
+      showCopiedFeedback(btn, "{% trans 'All Codes Copied!' %}");
+    } catch (e) {
+      console.error(e);
+    }
+    ta.classList.add('d-none');
+  }
+}
+
+function showCopiedFeedback(btn, msg) {
+  if (!btn) return;
+  var origHtml = btn.innerHTML;
+  btn.innerHTML = '<i class="bi bi-check2 me-1"></i> ' + msg;
+  btn.classList.add('btn-success');
+  btn.classList.remove('btn-outline-primary', 'btn-outline-secondary');
+  setTimeout(function() {
+    btn.innerHTML = origHtml;
+    btn.classList.remove('btn-success');
+    btn.classList.add('btn-outline-primary');
+  }, 2000);
+}
+
+function downloadRecoveryCodesFile(username) {
+  var btn = document.getElementById('download-codes-btn');
+  if (btn) {
+    showCopiedFeedback(btn, "{% trans 'Downloading\u2026' %}");
+  }
+
+  var ta = document.getElementById('raw-recovery-codes');
+  if (!ta) return;
+  var rawCodes = ta.value.split('\n');
+
+  var lines = [
+    "==================================================",
+    "  PwaniNet Two-Factor Authentication Recovery Codes",
+    "  Account: " + username,
+    "  Generated: " + new Date().toISOString().split('T')[0],
+    "==================================================",
+    "",
+    "Save these codes in a safe, offline place.",
+    "Each recovery code can be used ONLY ONCE.",
+    "",
+    "--------------------------------------------------"
+  ];
+  for (var i = 0; i < rawCodes.length; i++) {
+    var c = rawCodes[i].trim();
+    if (c) {
+      lines.push("  " + (i + 1) + ". " + c);
+    }
+  }
+  lines.push("--------------------------------------------------");
+  lines.push("");
+  lines.push("If you lose your authenticator app, use one of");
+  lines.push("these codes to recover access to your account.");
+  lines.push("==================================================");
+
+  var blob = new Blob([lines.join("\r\n")], { type: "text/plain;charset=utf-8" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.style.display = "none";
+  a.href = url;
+  a.download = "pwaninet-recovery-codes-" + username + ".txt";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function() {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 10000);
+}
+</script>
