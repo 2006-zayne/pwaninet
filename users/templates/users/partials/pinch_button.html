@@ -6,7 +6,7 @@
     {% if profile_user|can_pinch:request.user %}
         <form class="m-0"
               hx-post="{% url 'users:toggle_pinch' profile_user.username %}"
-              hx-target="#pinch-btn-container"
+              hx-target="closest .pinch-btn-container"
               hx-swap="innerHTML">
             {% csrf_token %}
             <button type="submit"

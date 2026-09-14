@@ -749,6 +749,22 @@ document.addEventListener('click', function(event) {
     grid-area: related;
 }
 
+/* Desktop three-panel shell: sidebar moved to right rail */
+@media (min-width: 1200px) {
+    .doc-detail-container {
+        grid-template-columns: 1fr !important;
+        grid-template-areas:
+            "preview"
+            "description"
+            "related" !important;
+        gap: 24px;
+    }
+
+    .doc-detail-sidebar {
+        display: none !important;
+    }
+}
+
 /* Tablets and smaller desktops */
 @media (max-width: 1024px) {
     .doc-detail-container {

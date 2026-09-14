@@ -139,6 +139,10 @@
     .groups-layout { grid-template-columns: 1fr; }
     .sidebar-sticky { position: static !important; }
   }
+  @media (min-width: 1200px) {
+    .groups-layout { grid-template-columns: 1fr; }
+    .page-wrap { max-width: 100%; padding: 0.5rem 0 3rem; }
+  }
   .sidebar-sticky { position: sticky; top: 88px; }
 
   /* ── Card base ── */
@@ -597,7 +601,7 @@
   <div class="groups-layout">
 
     <!-- ══ SIDEBAR ══ -->
-    <aside class="sidebar-sticky">
+    <aside class="sidebar-sticky d-xl-none">
 
       <!-- Your Groups -->
       <div class="card my-groups-card">

@@ -87,3 +87,15 @@ def get_dict_value(dictionary, key):
     if not dictionary:
         return None
     return dictionary.get(key)
+
+
+@register.filter
+def get_total_likes(user):
+    """Get total likes received on user's posts"""
+    if not user or not getattr(user, 'is_authenticated', False):
+        return 0
+    try:
+        from posts.models import Like
+        return Like.objects.filter(post__author=user).count()
+    except Exception:
+        return 0

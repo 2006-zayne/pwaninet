@@ -1,6 +1,6 @@
 <form class="m-0"
       hx-post="{% url 'users:toggle_follow' profile_user.username %}"
-      hx-target="#follow-btn-container"
+      hx-target="closest .follow-btn-container"
       hx-swap="innerHTML">
     {% csrf_token %}
     <button type="submit"

@@ -1,0 +1,51 @@
+{% load i18n %}
+{% load static %}
+
+<div class="context-rail-default d-flex flex-column gap-3">
+    <!-- PwaniNet Student Hub Card -->
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-body p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-stars text-primary fs-5"></i>
+                <h6 class="fw-bold mb-0 text-dark">{% trans "Campus Hub" %}</h6>
+            </div>
+            <p class="small text-secondary mb-3">
+                {% trans "Stay connected with class groups, course revisions, shared notes, and peer updates." %}
+            </p>
+            <div class="d-flex flex-column gap-2">
+                <a href="{% url 'documents:home' %}"
+                   class="btn btn-outline-primary btn-sm rounded-pill d-flex align-items-center justify-content-between px-3"
+                   hx-get="{% url 'documents:home' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
+                    <span><i class="bi bi-file-earmark-text me-2"></i>{% trans "Course Materials" %}</span>
+                    <i class="bi bi-chevron-right small"></i>
+                </a>
+                <a href="{% url 'groups:groups_dashboard' %}"
+                   class="btn btn-outline-primary btn-sm rounded-pill d-flex align-items-center justify-content-between px-3"
+                   hx-get="{% url 'groups:groups_dashboard' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
+                    <span><i class="bi bi-people me-2"></i>{% trans "Study Groups" %}</span>
+                    <i class="bi bi-chevron-right small"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Footer Card -->
+    <div class="px-2 text-muted small" style="font-size: 0.75rem;">
+        <div class="d-flex flex-wrap gap-2 mb-1">
+            <a href="{% url 'users:settings' %}" class="text-muted text-decoration-none" hx-get="{% url 'users:settings' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">{% trans "Settings" %}</a>
+            <span>&middot;</span>
+            <a href="{% url 'users:settings_privacy' %}" class="text-muted text-decoration-none" hx-get="{% url 'users:settings_privacy' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">{% trans "Privacy" %}</a>
+            <span>&middot;</span>
+            <a href="{% url 'users:settings_about' %}" class="text-muted text-decoration-none" hx-get="{% url 'users:settings_about' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">{% trans "About" %}</a>
+        </div>
+        <div>PwaniNet &copy; 2026 Pwani University</div>
+    </div>
+</div>

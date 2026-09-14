@@ -6,3 +6,11 @@
 
 <!-- Clear profile floating actions when navigating to Groups Dashboard -->
 <div id="profile-floating-actions" hx-swap-oob="true"></div>
+
+<!-- Context Rail Out-Of-Band update for Groups Dashboard -->
+<aside id="context-rail-target" class="desktop-context-rail d-none d-xl-block" aria-label="{% trans 'Contextual Information' %}" hx-swap-oob="true">
+    <div class="context-rail-inner" id="context-rail-inner">
+        {% include 'groups/partials/groups_dashboard_context_rail.html' %}
+    </div>
+</aside>
+

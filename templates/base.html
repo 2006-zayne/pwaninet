@@ -1313,7 +1313,7 @@
                 PWANI<span class="brand-net">NET</span>
             </a>
 
-            <div class="d-none d-md-flex gap-2">
+            <div class="d-none d-md-flex d-lg-none gap-2">
                 <a href="{% url 'posts:home' %}"
                    class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
                    style="display: flex; flex-direction: column; align-items: center; gap: 0px;"
@@ -1431,57 +1431,81 @@
         <div id="navigation-progress-bar"></div>
     </div>
 
-    <main class="container">
-        <div class="row justify-content-center">
-            <div class="col-12 col-lg-8" id="page-content-target" hx-history-elt hx-sync="this:replace">
-                {% if request.user.is_authenticated and not request.user.is_two_factor_enabled %}
-                <div id="twoFactorNudgeBanner" class="alert alert-primary border-0 shadow-sm rounded-3 d-flex align-items-center justify-content-between p-3 mb-3 twofactor-nudge-banner" style="display: none !important;" role="alert">
-                    <div class="d-flex align-items-center me-2">
-                        <div class="twofactor-nudge-icon me-3 p-2 bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; flex-shrink: 0;">
-                            <i class="bi bi-shield-lock-fill fs-5"></i>
-                        </div>
-                        <div>
-                            <strong class="twofactor-nudge-title d-block fw-bold mb-0">{% trans "Protect Your Account with 2FA" %}</strong>
-                            <span class="twofactor-nudge-desc small">{% trans "Add an extra layer of security to your student account." %}</span>
-                        </div>
+    <!-- Desktop Three-Surface Shell / Mobile Single-Surface Shell -->
+    <div class="app-shell-layout" id="app-shell-layout">
+
+        <!-- 1. LEFT RAIL: Persistent Global Navigation (Desktop only: >= 992px) -->
+        <aside id="left-nav-rail" class="desktop-left-rail d-none d-lg-block" aria-label="{% trans 'Global Navigation' %}">
+            <div class="left-rail-inner">
+                {% include 'partials/desktop_left_rail.html' %}
+            </div>
+        </aside>
+
+        <!-- 2. CENTER PANEL: Primary Page Surface (Desktop + Mobile) -->
+        <main id="page-content-target"
+              class="desktop-center-panel"
+              hx-history-elt
+              hx-sync="this:replace"
+              role="main">
+            {% if request.user.is_authenticated and not request.user.is_two_factor_enabled %}
+            <div id="twoFactorNudgeBanner" class="alert alert-primary border-0 shadow-sm rounded-3 d-flex align-items-center justify-content-between p-3 mb-3 twofactor-nudge-banner" style="display: none !important;" role="alert">
+                <div class="d-flex align-items-center me-2">
+                    <div class="twofactor-nudge-icon me-3 p-2 bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; flex-shrink: 0;">
+                        <i class="bi bi-shield-lock-fill fs-5"></i>
                     </div>
-                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                        <a href="{% url 'users:settings_two_factor' %}" class="btn btn-primary btn-sm rounded-pill px-3 fw-semibold text-nowrap">
-                            {% trans "Enable" %}
-                        </a>
-                        <button type="button" class="btn btn-sm btn-link p-1 twofactor-nudge-dismiss" onclick="dismiss2faNudge()" aria-label="Dismiss">
-                            <i class="bi bi-x-lg"></i>
-                        </button>
+                    <div>
+                        <strong class="twofactor-nudge-title d-block fw-bold mb-0">{% trans "Protect Your Account with 2FA" %}</strong>
+                        <span class="twofactor-nudge-desc small">{% trans "Add an extra layer of security to your student account." %}</span>
                     </div>
                 </div>
-                <script>
-                (function() {
-                    try {
-                        var dismissedAt = localStorage.getItem('pwaninet_2fa_nudge_dismissed');
-                        var now = Date.now();
-                        if (!dismissedAt || (now - parseInt(dismissedAt, 10)) > 7 * 24 * 60 * 60 * 1000) {
-                            var banner = document.getElementById('twoFactorNudgeBanner');
-                            if (banner) {
-                                banner.style.setProperty('display', 'flex', 'important');
-                            }
-                        }
-                    } catch(e) {}
-                })();
-                function dismiss2faNudge() {
-                    try {
-                        localStorage.setItem('pwaninet_2fa_nudge_dismissed', Date.now().toString());
-                    } catch(e) {}
-                    var banner = document.getElementById('twoFactorNudgeBanner');
-                    if (banner) {
-                        banner.remove();
-                    }
-                }
-                </script>
-                {% endif %}
-                {% block content %}{% endblock %}
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                    <a href="{% url 'users:settings_two_factor' %}" class="btn btn-primary btn-sm rounded-pill px-3 fw-semibold text-nowrap">
+                        {% trans "Enable" %}
+                    </a>
+                    <button type="button" class="btn btn-sm btn-link p-1 twofactor-nudge-dismiss" onclick="dismiss2faNudge()" aria-label="Dismiss">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
             </div>
-        </div>
-    </main>
+            <script>
+            (function() {
+                try {
+                    var dismissedAt = localStorage.getItem('pwaninet_2fa_nudge_dismissed');
+                    var now = Date.now();
+                    if (!dismissedAt || (now - parseInt(dismissedAt, 10)) > 7 * 24 * 60 * 60 * 1000) {
+                        var banner = document.getElementById('twoFactorNudgeBanner');
+                        if (banner) {
+                            banner.style.setProperty('display', 'flex', 'important');
+                        }
+                    }
+                } catch(e) {}
+            })();
+            function dismiss2faNudge() {
+                try {
+                    localStorage.setItem('pwaninet_2fa_nudge_dismissed', Date.now().toString());
+                } catch(e) {}
+                var banner = document.getElementById('twoFactorNudgeBanner');
+                if (banner) {
+                    banner.remove();
+                }
+            }
+            </script>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- 3. RIGHT RAIL: Contextual Surface (Desktop only: >= 1200px) -->
+        <aside id="context-rail-target"
+               class="desktop-context-rail d-none d-xl-block"
+               aria-label="{% trans 'Contextual Information' %}">
+            <div class="context-rail-inner" id="context-rail-inner">
+                {% block context_rail %}
+                    {% include 'partials/default_context_rail.html' %}
+                {% endblock %}
+            </div>
+        </aside>
+
+    </div>
 
     <!-- Floating Actions Container - swapped via HTMX out-of-band -->
     {% block floating_actions %}
@@ -2643,6 +2667,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
             const groupsNavChips = document.querySelectorAll('.nav-chip[href*="/groups"]');
             groupsNavChips.forEach(chip => chip.classList.add('active'));
             console.log('[HTMX History] Set Groups nav chips as active');
+        } else if (pathname.startsWith('/documents')) {
+            const docsNavChips = document.querySelectorAll('.nav-chip[href*="/documents"]');
+            docsNavChips.forEach(chip => chip.classList.add('active'));
+            console.log('[HTMX History] Set Documents nav chips as active');
         } else if (pathname.startsWith('/notifications')) {
             const notifNavChips = document.querySelectorAll('.nav-chip[href*="/notifications"]');
             notifNavChips.forEach(chip => chip.classList.add('active'));
@@ -2656,7 +2684,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
             createNavChips.forEach(chip => chip.classList.add('active'));
             console.log('[HTMX History] Set Create Post nav chips as active');
         } else if (pathname.startsWith('/users/settings')) {
-            console.log('[HTMX History] Settings route active - no top-level chip activated');
+            const settingsNavChips = document.querySelectorAll('.nav-chip[href*="/users/settings"], .nav-chip[href*="/settings"]');
+            settingsNavChips.forEach(chip => chip.classList.add('active'));
+            console.log('[HTMX History] Set Settings nav chips as active');
         }
     }
 

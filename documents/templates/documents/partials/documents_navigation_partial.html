@@ -1,6 +1,19 @@
+{% load i18n %}
 {% include document_content_partial %}
 
 {% include 'documents/partials/document_floating_actions.html' with oob=True %}
 
 <div id="document-modal-container"></div>
+
+<!-- Context Rail Out-Of-Band update -->
+<aside id="context-rail-target" class="desktop-context-rail d-none d-xl-block" aria-label="{% trans 'Contextual Information' %}" hx-swap-oob="true">
+    <div class="context-rail-inner" id="context-rail-inner">
+        {% if document_content_partial == 'documents/partials/document_detail_content.html' %}
+            {% include 'documents/partials/document_detail_context_rail.html' %}
+        {% else %}
+            {% include 'partials/default_context_rail.html' %}
+        {% endif %}
+    </div>
+</aside>
+
 

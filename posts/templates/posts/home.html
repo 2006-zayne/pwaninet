@@ -191,6 +191,16 @@
     padding: 20px 16px 80px;
   }
 
+  @media (min-width: 992px) {
+    .content-wrapper {
+      max-width: 100% !important;
+      padding: 16px 0 80px 0 !important;
+    }
+    .search-inner {
+      max-width: 100% !important;
+    }
+  }
+
   @media (max-width: 767px) {
     .content-wrapper {
       max-width: 100% !important;
@@ -607,4 +617,8 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 })();
 </script>
+{% endblock %}
+
+{% block context_rail %}
+  {% include 'posts/partials/home_context_rail.html' %}
 {% endblock %}

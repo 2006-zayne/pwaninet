@@ -8,3 +8,11 @@
 
 <!-- OOB Cleanup for Profile Floating Action Buttons -->
 <div id="profile-floating-actions" hx-swap-oob="true"></div>
+
+<!-- Context Rail Out-Of-Band update for Settings -->
+<aside id="context-rail-target" class="desktop-context-rail d-none d-xl-block" aria-label="Contextual Information" hx-swap-oob="true">
+    <div class="context-rail-inner" id="context-rail-inner">
+        {% include 'users/partials/profile_context_rail.html' %}
+    </div>
+</aside>
+

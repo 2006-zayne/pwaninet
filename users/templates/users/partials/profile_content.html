@@ -5,8 +5,9 @@
 <div class="container-fluid p-0 profile-mobile-fullscreen profile-content">
     <div class="row g-3 g-md-4 justify-content-center">
 
-        <div class="col-12 col-md-6 col-lg-5 col-xl-4">
-            <div class="sticky-top" style="top: 85px; z-index: 10;">
+        <!-- Profile Hero & Info Column (Mobile / Tablet only: < 1200px) -->
+        <div class="col-12 d-xl-none">
+            <div>
 
                 <div class="post-card shadow-sm mb-4 border-0 rounded-3 overflow-visible profile-card">
                     <div class="cover-container {% if request.user == profile_user or is_following %}clickable-cover{% endif %}"
@@ -82,10 +83,10 @@
                         </div>
 
                         {% if request.user != profile_user %}
-                            <div id="follow-btn-container">
+                            <div id="follow-btn-container" class="follow-btn-container">
                                 {% include 'users/partials/follow_button_profile.html' %}
                             </div>
-                            <div id="pinch-btn-container">
+                            <div id="pinch-btn-container" class="pinch-btn-container">
                                 {% include 'users/partials/pinch_button.html' %}
                             </div>
                         {% else %}
@@ -177,7 +178,7 @@
                     {% endif %}
                 </div>
 
-                <div class="post-card p-3 shadow-sm border-0 mb-3">
+                <div class="post-card p-3 shadow-sm border-0 mb-3 d-xl-none">
                     <h6 class="small fw-bold text-uppercase text-muted mb-3"><i class="bi bi-info-circle me-1"></i>{% trans "Academic Details" %}</h6>
                     {% if profile_user.programme %}
                         <div class="mb-2 d-flex justify-content-between">
@@ -372,7 +373,7 @@
             </div>
         </div>
 
-        <div class="col-12 col-md-6 col-lg-7 col-xl-6">
+        <div class="col-12">
             <style>
               /* Polished Classic Profile Nav Tabs */
               #profileTabs.nav-tabs {

@@ -1,0 +1,194 @@
+{% load i18n %}
+{% load static %}
+{% load humanize %}
+
+<div class="document-detail-context-rail d-flex flex-column gap-3">
+    <!-- Document Info & Action Card -->
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-body p-3">
+            <!-- Title & Unit -->
+            <h5 class="fw-bold mb-2 text-dark" style="line-height: 1.35; word-wrap: break-word;">
+                {{ document.title }}
+            </h5>
+
+            {% if primary_unit %}
+                <div class="mb-3">
+                    <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-1 fw-semibold small">
+                        {{ primary_unit.academic_unit.code }}
+                    </span>
+                </div>
+            {% endif %}
+
+            <!-- Actions -->
+            <div class="d-flex flex-column gap-2 mb-3">
+                {% if document.latest_version %}
+                    {% with first_file=document.latest_version.files.first %}
+                        <a href="{% url 'documents:serve_download' document.share_id %}?t={{ download_token }}"
+                           download="{{ document.title }}.{{ first_file.extension }}"
+                           data-action="download-media"
+                           data-post-id="{{ document.share_id }}"
+                           data-media-type="document"
+                           data-url="{% url 'documents:serve_download' document.share_id %}?t={{ download_token }}"
+                           data-filename="{{ document.title }}.{{ first_file.extension }}"
+                           data-thumbnail="{% if first_file.preview_url %}{{ first_file.preview_url }}{% elif first_file.preview_path %}/media/{{ first_file.preview_path }}{% elif first_file.thumbnail_path %}/media/{{ first_file.thumbnail_path }}{% endif %}"
+                           onclick="trackAndDownload(event, '{{ document.share_id }}', {{ first_file.id }})"
+                           class="btn btn-primary btn-sm rounded-pill fw-semibold py-2 d-flex align-items-center justify-content-center gap-2">
+                            <i class="bi bi-download"></i>
+                            <span>{% trans "Download" %} ({{ first_file.size_mb|default:"N/A" }} MB)</span>
+                        </a>
+                    {% endwith %}
+                {% endif %}
+
+                {% if can_manage %}
+                <div class="dropdown">
+                    <button class="btn btn-outline-primary btn-sm rounded-pill w-100 d-flex align-items-center justify-content-between px-3 py-1"
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false">
+                        <span><i class="bi bi-gear-wide-connected me-1"></i>{% trans "Manage" %}</span>
+                        <i class="bi bi-chevron-down small"></i>
+                    </button>
+                    <ul class="dropdown-menu w-100 shadow border-0 rounded-3">
+                        <li>
+                            <button type="button" class="dropdown-item small"
+                                    hx-get="{% url 'documents:edit_document' document.share_id %}"
+                                    hx-target="#document-modal-container"
+                                    hx-swap="innerHTML">
+                                <i class="bi bi-pencil text-primary me-2"></i>{% trans "Edit Details" %}
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" class="dropdown-item small"
+                                    hx-get="{% url 'documents:new_version' document.share_id %}"
+                                    hx-target="#document-modal-container"
+                                    hx-swap="innerHTML">
+                                <i class="bi bi-cloud-arrow-up text-info me-2"></i>{% trans "Upload New Version" %}
+                            </button>
+                        </li>
+                        <li><hr class="dropdown-divider my-1"></li>
+                        <li>
+                            <button type="button" class="dropdown-item small text-danger"
+                                    hx-get="{% url 'documents:delete_document_modal' document.share_id %}"
+                                    hx-target="#document-modal-container"
+                                    hx-swap="innerHTML">
+                                <i class="bi bi-trash me-2"></i>{% trans "Delete Document" %}
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Stats -->
+            <div class="d-flex justify-content-around py-2 border-top border-bottom text-center mb-3">
+                <div>
+                    <div class="fw-bold text-dark fs-6">{% if analytics %}{{ analytics.download_count }}{% else %}{{ document.downloads.count }}{% endif %}</div>
+                    <div class="text-secondary x-small">{% trans "Downloads" %}</div>
+                </div>
+                <div class="border-end"></div>
+                <div>
+                    <div class="fw-bold text-dark fs-6">{% if analytics %}{{ analytics.view_count }}{% else %}{{ document.views.count }}{% endif %}</div>
+                    <div class="text-secondary x-small">{% trans "Views" %}</div>
+                </div>
+                <div class="border-end"></div>
+                <div>
+                    <div class="fw-bold text-dark fs-6">{% if analytics %}{{ analytics.bookmark_count }}{% else %}{{ document.bookmarks.count }}{% endif %}</div>
+                    <div class="text-secondary x-small">{% trans "Bookmarks" %}</div>
+                </div>
+            </div>
+
+            <!-- Metadata List -->
+            <div class="d-flex flex-column gap-1 small text-secondary" style="font-size: 0.82rem;">
+                <div class="d-flex justify-content-between py-1 border-bottom">
+                    <span>{% trans "Category" %}</span>
+                    <span class="text-dark fw-medium">{{ document.category.name }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-1 border-bottom">
+                    <span>{% trans "File Type" %}</span>
+                    {% if document.latest_version %}
+                        {% with first_file=document.latest_version.files.first %}
+                            <span class="text-dark fw-medium">{{ first_file.extension|upper|default:"N/A" }}</span>
+                        {% endwith %}
+                    {% else %}
+                        <span class="text-dark fw-medium">N/A</span>
+                    {% endif %}
+                </div>
+                <div class="d-flex justify-content-between py-1 border-bottom">
+                    <span>{% trans "Uploaded" %}</span>
+                    <span class="text-dark fw-medium">{{ document.created_at|timesince }} {% trans "ago" %}</span>
+                </div>
+                <div class="d-flex justify-content-between py-1 border-bottom">
+                    <span>{% trans "Size" %}</span>
+                    {% if document.latest_version %}
+                        {% with first_file=document.latest_version.files.first %}
+                            <span class="text-dark fw-medium">{{ first_file.size_mb|default:"N/A" }} MB</span>
+                        {% endwith %}
+                    {% else %}
+                        <span class="text-dark fw-medium">N/A</span>
+                    {% endif %}
+                </div>
+                <div class="d-flex justify-content-between py-1 border-bottom">
+                    <span>{% trans "Pages" %}</span>
+                    {% if document.latest_version %}
+                        {% with first_file=document.latest_version.files.first %}
+                            <span class="text-dark fw-medium">{{ first_file.page_count|default:"N/A" }}</span>
+                        {% endwith %}
+                    {% else %}
+                        <span class="text-dark fw-medium">N/A</span>
+                    {% endif %}
+                </div>
+                <div class="d-flex justify-content-between py-1">
+                    <span>{% trans "Language" %}</span>
+                    <span class="text-dark fw-medium">{{ document.get_language_display|default:"English" }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Uploader Card -->
+    {% if document.uploaded_by %}
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-body p-3">
+            <h6 class="fw-bold mb-2 text-dark" style="font-size: 0.85rem;">{% trans "Uploaded by" %}</h6>
+            <a href="{% url 'users:profile' document.uploaded_by.username %}"
+               class="d-flex align-items-center gap-2 text-decoration-none text-dark"
+               hx-get="{% url 'users:profile' document.uploaded_by.username %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true">
+                {% if document.uploaded_by.profile_pic and document.uploaded_by.profile_pic.name != 'profile_pic/default_pic1.jpg' %}
+                    <img src="{{ document.uploaded_by.profile_pic.url }}"
+                         alt="{{ document.uploaded_by.get_full_name|default:document.uploaded_by.username }}"
+                         class="rounded-circle flex-shrink-0"
+                         style="width: 38px; height: 38px; object-fit: cover; border: 1px solid var(--border);">
+                {% else %}
+                    <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary text-white fw-bold flex-shrink-0"
+                         style="width: 38px; height: 38px;">
+                        {{ document.uploaded_by.username|first|upper }}
+                    </div>
+                {% endif %}
+                <div class="overflow-hidden flex-grow-1" style="min-width: 0;">
+                    <div class="fw-semibold text-truncate small">{{ document.uploaded_by.get_full_name|default:document.uploaded_by.username }}</div>
+                    {% if document.uploaded_by.course %}
+                        <div class="text-secondary x-small text-truncate">{{ document.uploaded_by.course.name }}</div>
+                    {% endif %}
+                </div>
+                <i class="bi bi-chevron-right text-muted small flex-shrink-0"></i>
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Quick Footer Links -->
+    <div class="px-2 text-muted small" style="font-size: 0.75rem;">
+        <div class="d-flex flex-wrap gap-2 mb-1">
+            <a href="{% url 'documents:home' %}" class="text-muted text-decoration-none" hx-get="{% url 'documents:home' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">{% trans "Documents" %}</a>
+            <span>&middot;</span>
+            <a href="{% url 'users:settings' %}" class="text-muted text-decoration-none" hx-get="{% url 'users:settings' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">{% trans "Settings" %}</a>
+            <span>&middot;</span>
+            <a href="{% url 'users:settings_privacy' %}" class="text-muted text-decoration-none" hx-get="{% url 'users:settings_privacy' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">{% trans "Privacy" %}</a>
+        </div>
+        <div>PwaniNet &copy; 2026 Pwani University</div>
+    </div>
+</div>

@@ -1,0 +1,101 @@
+{% load i18n %}
+{% load static %}
+
+<div class="home-context-rail d-flex flex-column gap-3">
+    {% if explore_groups %}
+    <!-- Recommended Groups Card -->
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-header bg-transparent border-0 pt-3 px-3 pb-2 d-flex align-items-center justify-content-between">
+            <h6 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2" style="font-size: 0.95rem;">
+                <i class="bi bi-people-fill text-primary"></i>
+                {% trans "Groups to Explore" %}
+            </h6>
+            <a href="{% url 'groups:groups_dashboard' %}"
+               class="text-primary small text-decoration-none fw-semibold"
+               hx-get="{% url 'groups:groups_dashboard' %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true">
+                {% trans "See all" %}
+            </a>
+        </div>
+        <div class="card-body p-2 pt-0">
+            <div class="d-flex flex-column">
+                {% for group in explore_groups|slice:":5" %}
+                <a href="{% url 'groups:groups_detail' group.id %}"
+                   class="d-flex align-items-center gap-3 p-2 rounded-3 text-decoration-none context-rail-item-hover"
+                   hx-get="{% url 'groups:groups_detail' group.id %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
+                    <img src="{{ group.get_photo_url }}"
+                         alt="{{ group.name }}"
+                         class="rounded-circle flex-shrink-0"
+                         style="width: 38px; height: 38px; object-fit: cover; border: 1px solid var(--border);">
+                    <div class="overflow-hidden flex-grow-1">
+                        <div class="fw-semibold text-dark text-truncate small">{{ group.name }}</div>
+                        <div class="text-secondary x-small text-truncate">
+                            {% if group.members_count %}
+                                {{ group.members_count }} {% trans "members" %}
+                            {% else %}
+                                {% trans "Study Group" %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted small flex-shrink-0"></i>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Campus Hub Shortcuts -->
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-body p-3">
+            <h6 class="fw-bold mb-2 text-dark d-flex align-items-center gap-2" style="font-size: 0.95rem;">
+                <i class="bi bi-mortarboard-fill text-primary"></i>
+                {% trans "Campus Hub" %}
+            </h6>
+            <p class="small text-secondary mb-3" style="font-size: 0.82rem;">
+                {% trans "Quick access to course notes, revision papers, and student study circles." %}
+            </p>
+            <div class="d-flex flex-column gap-2">
+                <a href="{% url 'documents:home' %}"
+                   class="btn btn-outline-primary btn-sm rounded-pill d-flex align-items-center justify-content-between px-3 py-1"
+                   hx-get="{% url 'documents:home' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
+                    <span class="small"><i class="bi bi-folder2-open me-2"></i>{% trans "Documents & Past Papers" %}</span>
+                    <i class="bi bi-chevron-right small"></i>
+                </a>
+                <a href="{% url 'groups:groups_dashboard' %}"
+                   class="btn btn-outline-primary btn-sm rounded-pill d-flex align-items-center justify-content-between px-3 py-1"
+                   hx-get="{% url 'groups:groups_dashboard' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
+                    <span class="small"><i class="bi bi-people me-2"></i>{% trans "All Student Groups" %}</span>
+                    <i class="bi bi-chevron-right small"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Footer Links -->
+    <div class="px-2 text-muted small" style="font-size: 0.75rem;">
+        <div class="d-flex flex-wrap gap-2 mb-1">
+            <a href="{% url 'users:settings' %}" class="text-muted text-decoration-none" hx-get="{% url 'users:settings' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">{% trans "Settings" %}</a>
+            <span>&middot;</span>
+            <a href="{% url 'users:settings_privacy' %}" class="text-muted text-decoration-none" hx-get="{% url 'users:settings_privacy' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">{% trans "Privacy" %}</a>
+            <span>&middot;</span>
+            <a href="{% url 'users:settings_about' %}" class="text-muted text-decoration-none" hx-get="{% url 'users:settings_about' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">{% trans "About" %}</a>
+        </div>
+        <div>PwaniNet &copy; 2026 Pwani University</div>
+    </div>
+</div>
