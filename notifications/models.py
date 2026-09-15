@@ -678,6 +678,30 @@ class NotificationObject(models.Model):
     def is_delivered(self):
         """Check if notification has been delivered."""
         return self.status in ['DELIVERED', 'SEEN', 'READ', 'ARCHIVED']
+
+    @property
+    def target_type(self):
+        """Target type, retrieved from metadata or aggregation key if available."""
+        if self.metadata and isinstance(self.metadata, dict) and self.metadata.get('target_type'):
+            return self.metadata.get('target_type')
+        if self.aggregation_key:
+            parts = str(self.aggregation_key).split(':')
+            if len(parts) >= 3:
+                return parts[1]
+        return None
+
+    @property
+    def target_id(self):
+        """Target ID, retrieved from metadata or aggregation key if available."""
+        if self.metadata and isinstance(self.metadata, dict):
+            target_id = self.metadata.get('target_id') or self.metadata.get('post_id')
+            if target_id:
+                return str(target_id)
+        if self.aggregation_key:
+            parts = str(self.aggregation_key).split(':')
+            if len(parts) >= 3:
+                return parts[2]
+        return None
     
     def mark_as_read(self):
         """Mark notification as read."""

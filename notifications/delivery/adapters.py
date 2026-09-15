@@ -365,12 +365,35 @@ class PushAdapter(DeliveryAdapter):
         # Fallback 2: If still no preview_image and notification relates to a post, lookup post directly
         if not preview_image:
             post_id = None
-            if str(notification.target_type).upper() in ['POST', 'POSTS'] and notification.target_id:
-                post_id = notification.target_id
-            elif str(notification.context_type).upper() in ['POST', 'POSTS'] and notification.context_id:
-                post_id = notification.context_id
+            target_type = getattr(notification, 'target_type', None)
+            target_id = getattr(notification, 'target_id', None)
+            context_type = getattr(notification, 'context_type', None)
+            context_id = getattr(notification, 'context_id', None)
+
+            if not target_type and notification.metadata and isinstance(notification.metadata, dict):
+                target_type = notification.metadata.get('target_type')
+            if not target_id and notification.metadata and isinstance(notification.metadata, dict):
+                target_id = notification.metadata.get('target_id') or notification.metadata.get('post_id')
+
+            if target_type and str(target_type).upper() in ['POST', 'POSTS'] and target_id:
+                post_id = target_id
+            elif context_type and str(context_type).upper() in ['POST', 'POSTS'] and context_id:
+                post_id = context_id
             elif notification.metadata and isinstance(notification.metadata, dict):
-                post_id = notification.metadata.get('post_id') or notification.metadata.get('target_id')
+                post_id = notification.metadata.get('post_id')
+                if not post_id and (not target_type or str(target_type).upper() in ['POST', 'POSTS']):
+                    post_id = notification.metadata.get('target_id')
+
+            if not post_id and (str(target_type or '').upper() == 'COMMENT' or getattr(notification, 'notification_type', None) in ['COMMENT', 'COMMENT_REPLY', 'COMMENT_LIKE']):
+                comment_pk = target_id or (notification.metadata.get('comment_id') if notification.metadata and isinstance(notification.metadata, dict) else None)
+                if comment_pk:
+                    try:
+                        from posts.models import Comment
+                        c = Comment.objects.filter(id=int(comment_pk)).select_related('post').first()
+                        if c and c.post_id:
+                            post_id = c.post_id
+                    except Exception:
+                        pass
 
             if post_id:
                 try:

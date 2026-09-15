@@ -244,6 +244,43 @@ class NotificationObjectTests(TestCase):
         notification.save()
         
         self.assertTrue(notification.is_delivered)
+
+    def test_notification_target_properties(self):
+        """Test target_type and target_id properties from metadata and aggregation_key."""
+        # Without metadata or aggregation_key
+        notif_empty = NotificationObject.objects.create(
+            recipient=self.user,
+            notification_type='LIKE',
+            category='SOCIAL',
+            priority='NORMAL',
+            title='Empty targets'
+        )
+        self.assertIsNone(notif_empty.target_type)
+        self.assertIsNone(notif_empty.target_id)
+
+        # From metadata
+        notif_meta = NotificationObject.objects.create(
+            recipient=self.user,
+            notification_type='LIKE',
+            category='SOCIAL',
+            priority='NORMAL',
+            title='Meta targets',
+            metadata={'target_type': 'Post', 'target_id': '456'}
+        )
+        self.assertEqual(notif_meta.target_type, 'Post')
+        self.assertEqual(notif_meta.target_id, '456')
+
+        # From aggregation key fallback
+        notif_agg = NotificationObject.objects.create(
+            recipient=self.user,
+            notification_type='LIKE',
+            category='SOCIAL',
+            priority='NORMAL',
+            title='Agg targets',
+            aggregation_key='like:post:789'
+        )
+        self.assertEqual(notif_agg.target_type, 'post')
+        self.assertEqual(notif_agg.target_id, '789')
     
     def test_mark_as_read(self):
         """Test mark_as_read method."""
