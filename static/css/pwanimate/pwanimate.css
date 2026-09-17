@@ -1,0 +1,1395 @@
+/* ==========================================================================
+   Pwanimate AI Assistant Styling
+   Scoped, theme-aware, responsive styling for Web, PWA, and Capacitor
+   ========================================================================== */
+
+:root {
+    --pwanimate-bg: #f8fafc;
+    --pwanimate-sidebar-bg: #ffffff;
+    --pwanimate-border: #e2e8f0;
+    --pwanimate-user-bubble: #2563eb;
+    --pwanimate-user-text: #ffffff;
+    --pwanimate-asst-bubble: #ffffff;
+    --pwanimate-asst-text: #0f172a;
+    --pwanimate-card-bg: #ffffff;
+    --pwanimate-citation-bg: #f1f5f9;
+    --pwanimate-citation-border: #cbd5e1;
+    --pwanimate-citation-text: #1e293b;
+    --pwanimate-code-bg: #f1f5f9;
+    --pwanimate-code-text: #0f172a;
+    --pwanimate-composer-bg: #ffffff;
+    --pwanimate-hover-bg: #f1f5f9;
+    --pwanimate-muted: #64748b;
+}
+
+[data-theme="dark"] {
+    --pwanimate-bg: #18191f;
+    --pwanimate-sidebar-bg: #242526;
+    --pwanimate-border: #3a3b3c;
+    --pwanimate-user-bubble: var(--primary, #6366f1);
+    --pwanimate-user-text: #ffffff;
+    --pwanimate-asst-bubble: #242526;
+    --pwanimate-asst-text: #e4e6eb;
+    --pwanimate-card-bg: #242526;
+    --pwanimate-citation-bg: #3a3b3c;
+    --pwanimate-citation-border: #4e4f50;
+    --pwanimate-citation-text: #e4e6eb;
+    --pwanimate-code-bg: #1e1e24;
+    --pwanimate-code-text: #e2e8f0;
+    --pwanimate-composer-bg: #242526;
+    --pwanimate-hover-bg: #3a3b3c;
+    --pwanimate-muted: #94a3b8;
+    --pwanimate-close-filter: invert(1);
+}
+
+/* Base Workspace Layout */
+.pwanimate-workspace {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    background-color: var(--pwanimate-bg);
+    overflow: hidden;
+    position: relative;
+    border-radius: 0;
+    border: none;
+    margin-bottom: 0;
+}
+
+@media (max-width: 767.98px) {
+    .pwanimate-workspace {
+        height: 100%;
+        border: none;
+        border-radius: 0;
+        margin-bottom: 0;
+    }
+}
+
+/* Sidebar (Desktop) */
+.pwanimate-sidebar {
+    width: 290px;
+    min-width: 290px;
+    max-width: 290px;
+    background-color: var(--pwanimate-sidebar-bg);
+    border-right: 1px solid var(--pwanimate-border);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    z-index: 10;
+}
+
+.pwanimate-sidebar-header {
+    padding: 1rem;
+    border-bottom: 1px solid var(--pwanimate-border);
+}
+
+.pwanimate-sidebar-list {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 0.5rem;
+    scrollbar-width: thin;
+}
+
+/* Conversation Item */
+.pwanimate-conversation-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.65rem 0.85rem;
+    border-radius: 8px;
+    color: var(--pwanimate-asst-text);
+    text-decoration: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
+    margin-bottom: 4px;
+    border: 1px solid transparent;
+}
+
+.pwanimate-conversation-item:hover {
+    background-color: var(--pwanimate-hover-bg);
+    color: var(--pwanimate-asst-text);
+}
+
+.pwanimate-conversation-item.active {
+    background-color: var(--pwanimate-hover-bg);
+    border-color: var(--pwanimate-border);
+    font-weight: 600;
+}
+
+.pwanimate-conversation-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-right: 0.5rem;
+}
+
+.pwanimate-conversation-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.9rem;
+    line-height: 1.3;
+}
+
+.pwanimate-conversation-time {
+    font-size: 0.75rem;
+    color: var(--pwanimate-muted);
+}
+
+.pwanimate-conversation-delete {
+    opacity: 0;
+    transition: opacity 0.15s ease, color 0.15s ease;
+    color: var(--pwanimate-muted);
+    background: transparent;
+    border: none;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.pwanimate-conversation-item:hover .pwanimate-conversation-delete,
+.pwanimate-conversation-item:focus-within .pwanimate-conversation-delete {
+    opacity: 1;
+}
+
+.pwanimate-conversation-delete:hover {
+    color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* Main Chat Area */
+.pwanimate-chat-pane {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    background-color: var(--pwanimate-bg);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Chat Header */
+.pwanimate-chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.25rem;
+    background-color: var(--pwanimate-sidebar-bg);
+    border-bottom: 1px solid var(--pwanimate-border);
+    min-height: 56px;
+    flex-shrink: 0;
+}
+
+.pwanimate-header-title {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--pwanimate-asst-text);
+    margin: 0;
+}
+
+.pwanimate-header-avatar {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+}
+
+/* Transcript Scrollable Area */
+.pwanimate-transcript {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1.25rem 1.25rem 0.5rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.25) transparent;
+    border: none;
+}
+
+.pwanimate-transcript::-webkit-scrollbar {
+    width: 6px;
+}
+
+.pwanimate-transcript::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.pwanimate-transcript::-webkit-scrollbar-thumb {
+    background-color: rgba(100, 116, 139, 0.25);
+    border-radius: 10px;
+}
+
+.pwanimate-transcript::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(100, 116, 139, 0.45);
+}
+
+/* Empty State / Hero */
+.pwanimate-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    margin: auto;
+    padding: 2rem 1rem;
+    max-width: 580px;
+}
+
+.pwanimate-hero-icon {
+    width: 88px;
+    height: 88px;
+    margin-bottom: 1.25rem;
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.15);
+}
+
+.pwanimate-empty-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--pwanimate-asst-text);
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.5px;
+}
+
+.pwanimate-empty-tagline {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--primary, #2563eb);
+    margin-bottom: 0.75rem;
+}
+
+.pwanimate-empty-desc {
+    color: var(--pwanimate-muted);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 1.75rem;
+}
+
+.pwanimate-suggestion-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.pwanimate-suggestion-chip {
+    background-color: var(--pwanimate-card-bg);
+    border: 1px solid var(--pwanimate-border);
+    color: var(--pwanimate-asst-text);
+    padding: 0.5rem 0.9rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-decoration: none;
+    text-align: left;
+}
+
+.pwanimate-suggestion-chip:hover {
+    background-color: var(--pwanimate-hover-bg);
+    border-color: var(--primary);
+    transform: translateY(-1px);
+}
+
+/* Messages */
+.pwanimate-message-row {
+    display: flex;
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+
+.pwanimate-message-row.user {
+    justify-content: flex-end;
+}
+
+.pwanimate-message-row.assistant {
+    justify-content: flex-start;
+}
+
+.pwanimate-message-content {
+    max-width: 82%;
+}
+
+@media (max-width: 767.98px) {
+    .pwanimate-message-content {
+        max-width: 92%;
+    }
+}
+
+/* User Bubble */
+.pwanimate-user-bubble {
+    background-color: var(--pwanimate-hover-bg);
+    color: var(--pwanimate-asst-text);
+    padding: 0.85rem 1.15rem;
+    border-radius: 18px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-shadow: none;
+}
+
+/* Assistant Bubble */
+.pwanimate-assistant-bubble {
+    background-color: transparent;
+    color: var(--pwanimate-asst-text);
+    border: none;
+    padding: 0.5rem 0;
+    border-radius: 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    word-break: break-word;
+    box-shadow: none;
+}
+
+.pwanimate-assistant-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.pwanimate-assistant-avatar {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+}
+
+/* Markdown typography inside assistant messages */
+.pwanimate-markdown-body h1,
+.pwanimate-markdown-body h2,
+.pwanimate-markdown-body h3,
+.pwanimate-markdown-body h4 {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+    color: var(--pwanimate-asst-text);
+}
+
+.pwanimate-markdown-body h1 { font-size: 1.25rem; }
+.pwanimate-markdown-body h2 { font-size: 1.15rem; }
+.pwanimate-markdown-body h3 { font-size: 1.05rem; }
+.pwanimate-markdown-body h4 { font-size: 0.95rem; }
+
+.pwanimate-markdown-body p {
+    margin-bottom: 0.65rem;
+}
+
+.pwanimate-markdown-body p:last-child {
+    margin-bottom: 0;
+}
+
+.pwanimate-markdown-body ul,
+.pwanimate-markdown-body ol {
+    margin-bottom: 0.65rem;
+    padding-left: 1.4rem;
+}
+
+.pwanimate-markdown-body li {
+    margin-bottom: 0.25rem;
+}
+
+.pwanimate-markdown-body blockquote {
+    border-left: 3px solid var(--primary);
+    padding-left: 0.75rem;
+    margin: 0.65rem 0;
+    color: var(--pwanimate-muted);
+    font-style: italic;
+}
+
+.pwanimate-markdown-body pre {
+    background-color: var(--pwanimate-code-bg);
+    color: var(--pwanimate-code-text);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    border: 1px solid var(--pwanimate-border);
+    margin: 0.65rem 0;
+}
+
+.pwanimate-markdown-body code {
+    background-color: var(--pwanimate-code-bg);
+    color: var(--pwanimate-code-text);
+    padding: 0.15rem 0.35rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.pwanimate-markdown-body pre code {
+    padding: 0;
+    background: transparent;
+}
+
+.pwanimate-markdown-body table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.65rem 0;
+    font-size: 0.85rem;
+}
+
+.pwanimate-markdown-body th,
+.pwanimate-markdown-body td {
+    border: 1px solid var(--pwanimate-border);
+    padding: 0.4rem 0.65rem;
+    text-align: left;
+}
+
+.pwanimate-markdown-body th {
+    background-color: var(--pwanimate-hover-bg);
+    font-weight: 600;
+}
+
+/* Citations Container */
+.pwanimate-citations {
+    margin-top: 0.75rem;
+    padding-top: 0.65rem;
+    border-top: 1px dashed var(--pwanimate-border);
+}
+
+.pwanimate-citations-header {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--pwanimate-muted);
+    margin-bottom: 0.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.pwanimate-citation-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.pwanimate-citation-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background-color: var(--pwanimate-citation-bg);
+    border: 1px solid var(--pwanimate-citation-border);
+    color: var(--pwanimate-citation-text);
+    font-size: 0.8rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+a.pwanimate-citation-badge:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    text-decoration: none;
+}
+
+/* Typing / Loading Indicator */
+.pwanimate-typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0.5rem 0;
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    width: fit-content;
+}
+
+.pwanimate-typing-dot {
+    width: 8px;
+    height: 8px;
+    background-color: var(--primary);
+    border-radius: 50%;
+    animation: pwanimate-bounce 1.4s infinite ease-in-out both;
+}
+
+.pwanimate-typing-dot:nth-child(1) { animation-delay: -0.32s; }
+.pwanimate-typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes pwanimate-bounce {
+    0%, 80%, 100% {
+        transform: scale(0);
+        opacity: 0.4;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pwanimate-typing-dot {
+        animation: none;
+        opacity: 0.7;
+    }
+}
+
+/* Error Bubble */
+.pwanimate-error-bubble {
+    background-color: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: #ef4444;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+/* Composer Container (Docked Flex Island Architecture) */
+/* Composer Container (Docked Flex Island Architecture) */
+.pwanimate-composer-wrapper {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+    background-color: var(--pwanimate-bg);
+    border-top: none;
+    padding: 0.5rem 1rem 0.75rem 1rem;
+    width: 100%;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+}
+
+body.keyboard-open .pwanimate-composer-wrapper {
+    padding-bottom: 0.5rem !important;
+}
+
+.pwanimate-composer-box {
+    display: flex;
+    flex-direction: column;
+    background-color: var(--pwanimate-composer-bg);
+    border: 1px solid var(--pwanimate-border);
+    border-radius: 26px;
+    padding: 0.75rem 0.85rem 0.65rem 1.15rem;
+    box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.07), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    pointer-events: auto;
+}
+
+[data-theme="dark"] .pwanimate-composer-box {
+    box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.4), 0 2px 6px -1px rgba(0, 0, 0, 0.25);
+}
+
+.pwanimate-composer-box:focus-within {
+    border-color: var(--primary, #2563eb);
+    box-shadow: 0 4px 18px -2px rgba(37, 99, 235, 0.12), 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+[data-theme="dark"] .pwanimate-composer-box:focus-within {
+    border-color: var(--primary, #6366f1);
+    box-shadow: 0 4px 18px -2px rgba(99, 102, 241, 0.18), 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.pwanimate-composer-input-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.pwanimate-textarea {
+    flex: 1 1 auto;
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: var(--pwanimate-asst-text);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    max-height: 160px;
+    min-height: 24px;
+    resize: none;
+    outline: none;
+    padding: 2px 0 6px 0;
+    overflow-y: auto;
+    font-family: inherit;
+    box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.2) transparent;
+}
+
+.pwanimate-textarea::-webkit-scrollbar {
+    width: 4px;
+}
+
+.pwanimate-textarea::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.pwanimate-textarea::-webkit-scrollbar-thumb {
+    background-color: rgba(100, 116, 139, 0.2);
+    border-radius: 4px;
+}
+
+.pwanimate-textarea::placeholder {
+    color: var(--pwanimate-muted);
+    opacity: 0.85;
+}
+
+.pwanimate-composer-action-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.pwanimate-composer-actions-start {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 40px;
+}
+
+.pwanimate-composer-actions-end {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.pwanimate-send-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex-shrink: 0;
+    background-color: var(--primary);
+    border: none;
+    color: #ffffff;
+    cursor: pointer;
+    transition: transform 0.12s ease, background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.pwanimate-send-btn:hover:not(:disabled) {
+    background-color: var(--primary-hover);
+    color: #ffffff;
+}
+
+.pwanimate-send-btn:active:not(:disabled) {
+    transform: scale(0.92);
+}
+
+.pwanimate-send-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Visual hierarchy: send button is subtly subordinate when textarea is empty */
+.pwanimate-composer-box:has(.pwanimate-textarea:placeholder-shown) .pwanimate-send-btn {
+    opacity: 0.65;
+}
+
+.pwanimate-composer-box:has(.pwanimate-textarea:placeholder-shown) .pwanimate-send-btn:hover:not(:disabled) {
+    opacity: 0.9;
+}
+
+.pwanimate-composer-box:has(.pwanimate-textarea:not(:placeholder-shown)) .pwanimate-send-btn {
+    opacity: 1;
+}
+
+.pwanimate-composer-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.45rem;
+    padding: 0 0.5rem;
+    font-size: 0.72rem;
+    color: var(--pwanimate-muted);
+    pointer-events: auto;
+}
+
+@media (max-width: 767.98px) {
+    .pwanimate-composer-wrapper {
+        padding: 0.5rem 12px 0.75rem 12px;
+    }
+
+    body.keyboard-open .pwanimate-composer-wrapper {
+        padding-bottom: 6px !important;
+    }
+
+    .pwanimate-composer-box {
+        border-radius: 24px;
+        padding: 0.65rem 0.75rem 0.55rem 0.95rem;
+    }
+
+    .pwanimate-send-btn {
+        width: 42px;
+        height: 42px;
+    }
+}
+
+/* Offcanvas Drawer for Mobile */
+.pwanimate-offcanvas {
+    background-color: var(--pwanimate-sidebar-bg);
+    color: var(--pwanimate-asst-text);
+    max-width: 320px;
+    z-index: 10500 !important; /* Must be higher than navbar-top's 10002 on mobile */
+}
+
+.pwanimate-offcanvas .offcanvas-header {
+    border-bottom: 1px solid var(--pwanimate-border);
+}
+/* Resizable Right Rail */
+.pwanimate-right-rail {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    resize: horizontal;
+    direction: rtl; /* resize handle on left side */
+    min-width: 250px;
+    max-width: 600px;
+    width: 320px;
+    /* Custom scrollbar for right rail */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.25) transparent;
+}
+
+.pwanimate-right-rail > * {
+    direction: ltr; /* reset content direction */
+}
+
+.pwanimate-right-rail::-webkit-scrollbar {
+    width: 6px;
+}
+.pwanimate-right-rail::-webkit-scrollbar-track {
+    background: transparent;
+}
+.pwanimate-right-rail::-webkit-scrollbar-thumb {
+    background-color: rgba(100, 116, 139, 0.25);
+    border-radius: 10px;
+}
+.pwanimate-right-rail::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(100, 116, 139, 0.45);
+}
+
+/* Pwanimate Standalone App Layout Overrides */
+/* Scoped to body.pwanimate-active to prevent freezing scrolling across the rest of the site */
+html.pwanimate-active,
+html:has(body.pwanimate-active),
+html.is-capacitor:has(body.pwanimate-active),
+html.is-native-app:has(body.pwanimate-active),
+html.is-standalone-pwa:has(body.pwanimate-active) {
+    height: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+}
+
+body.pwanimate-active,
+body.pwanimate-active.is-native-app,
+body.pwanimate-active.is-standalone-pwa,
+body.is-native-app.pwanimate-active,
+body.is-standalone-pwa.pwanimate-active,
+.is-native-app body.pwanimate-active,
+.is-standalone-pwa body.pwanimate-active,
+.is-capacitor body.pwanimate-active {
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding-top: calc(var(--navbar-height, 56px) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+    padding-bottom: var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)) !important;
+    height: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+}
+
+body.keyboard-open.pwanimate-active,
+body.keyboard-open.is-native-app.pwanimate-active,
+body.keyboard-open.is-standalone-pwa.pwanimate-active,
+.is-native-app body.keyboard-open.pwanimate-active,
+.is-standalone-pwa body.keyboard-open.pwanimate-active,
+.is-capacitor body.keyboard-open.pwanimate-active {
+    padding-bottom: 0 !important;
+}
+
+body.pwanimate-active .mobile-bottom-nav {
+    display: none !important;
+}
+
+body.pwanimate-active #twoFactorNudgeBanner {
+    display: none !important;
+}
+
+/* ==========================================================================
+   Pwanimate shell geometry — desktop three-zone layout & clean responsive
+   ========================================================================== */
+
+/* Full-viewport shell base (<1200px and mobile) */
+body.pwanimate-active #app {
+    height: 100% !important;
+    max-height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+body.pwanimate-active .app-shell-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    align-items: stretch !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    gap: 0 !important;
+}
+
+/* Reduced desktop & tablet landscape (<1200px): Clean single-center + offcanvas menu */
+@media (max-width: 1199.98px) {
+    body.pwanimate-active .desktop-left-rail {
+        display: none !important;
+    }
+    body.pwanimate-active .navbar-top .d-lg-none {
+        display: flex !important;
+    }
+    body.pwanimate-active #pwanimateMobileMenu.d-lg-none {
+        display: block !important;
+    }
+    body.pwanimate-active .desktop-center-panel {
+        width: 100% !important;
+        max-width: 800px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+}
+
+/* Desktop navbar clearance (>=992px) */
+@media (min-width: 992px) {
+    body.pwanimate-active,
+    body.pwanimate-active.is-native-app,
+    body.pwanimate-active.is-standalone-pwa,
+    body.is-native-app.pwanimate-active,
+    body.is-standalone-pwa.pwanimate-active,
+    .is-native-app body.pwanimate-active,
+    .is-standalone-pwa body.pwanimate-active,
+    .is-capacitor body.pwanimate-active {
+        padding-top: var(--navbar-height, 60px) !important;
+        padding-bottom: 0 !important;
+    }
+}
+
+/* Large Desktop Three-Zone Shell (>=1200px) */
+@media (min-width: 1200px) {
+    body.pwanimate-active .app-shell-layout {
+        display: grid !important;
+        grid-template-columns: minmax(250px, 1fr) minmax(0, 800px) minmax(250px, 1fr) !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        align-items: stretch !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+        gap: 0 !important;
+    }
+
+    /* 1. Left Rail: anchored flush to left viewport wall */
+    body.pwanimate-active .desktop-left-rail {
+        display: block !important;
+        grid-column: 1 !important;
+        justify-self: start !important;
+        width: 240px !important;
+        max-width: 260px !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        position: static !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        border-right: 1px solid var(--pwanimate-border);
+        background-color: var(--pwanimate-sidebar-bg);
+        z-index: 10;
+    }
+
+    /* 2. Center Panel: locked to grid column 2, mathematically centered in viewport */
+    body.pwanimate-active .desktop-center-panel {
+        display: flex !important;
+        flex-direction: column !important;
+        grid-column: 2 !important;
+        width: 100% !important;
+        max-width: 800px !important;
+        justify-self: center !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        min-width: 0 !important;
+        border: none !important;
+        overflow: hidden !important;
+        flex: 1 1 auto !important;
+    }
+
+    /* 3. Right Rail: anchored flush to right viewport wall */
+    body.pwanimate-active .desktop-context-rail {
+        display: block !important;
+        grid-column: 3 !important;
+        justify-self: end !important;
+        width: auto !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        position: static !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        border-left: 1px solid var(--pwanimate-border);
+        background-color: var(--pwanimate-sidebar-bg);
+        z-index: 10;
+    }
+}
+
+/* Center Panel general surface */
+body.pwanimate-active .desktop-center-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: 100% !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    min-width: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+}
+
+/* Workspace fills the center panel */
+body.pwanimate-active .pwanimate-workspace {
+    display: flex !important;
+    flex-direction: column !important;
+    border-radius: 0 !important;
+    border: none !important;
+    margin: 0 !important;
+    height: 100% !important; /* fill the center panel */
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+body.pwanimate-active .pwanimate-chat-pane {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+body.pwanimate-active .pwanimate-transcript {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+
+body.pwanimate-active .pwanimate-composer-wrapper {
+    flex-shrink: 0 !important;
+    position: relative !important;
+    z-index: 10 !important;
+    width: 100% !important;
+    max-width: 800px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+/* Right Rail: isolation and sizing */
+body.pwanimate-active .desktop-context-rail {
+    flex: 0 0 auto !important;
+    width: auto !important;
+}
+
+body.pwanimate-active .pwanimate-right-rail {
+    height: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Scrollbar for left rail */
+.pwanimate-left-rail-list {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.25) transparent;
+}
+.pwanimate-left-rail-list::-webkit-scrollbar { width: 4px; }
+.pwanimate-left-rail-list::-webkit-scrollbar-track { background: transparent; }
+.pwanimate-left-rail-list::-webkit-scrollbar-thumb { background-color: rgba(100, 116, 139, 0.25); border-radius: 10px; }
+.pwanimate-left-rail-list::-webkit-scrollbar-thumb:hover { background-color: rgba(100, 116, 139, 0.45); }
+
+/* Force left rail to not scroll globally so inner chat list can scroll independently */
+body.pwanimate-active .desktop-left-rail {
+    overflow: hidden !important;
+}
+body.pwanimate-active .left-rail-inner {
+    height: 100% !important;
+}
+
+/* Ensure offcanvas backdrop overlays the navbar */
+.offcanvas-backdrop {
+    z-index: 10499 !important;
+}
+
+/* Force parents to not create stacking contexts so offcanvas can escape to root */
+.app-shell-layout,
+.desktop-center-panel,
+.pwanimate-workspace {
+    z-index: auto !important;
+    isolation: auto !important;
+    transform: none !important;
+    filter: none !important;
+}
+
+/* Force mobile navbar to standard Bootstrap z-index so offcanvas works normally */
+@media (max-width: 767.98px) {
+    body [data-mobile-nav-position="top"] .navbar-top,
+    body .navbar-top {
+        z-index: 1030 !important;
+    }
+}
+
+/* ==========================================================================
+   Quota Status Indicator & Fallback Notice
+   ========================================================================== */
+
+.pwanimate-quota-status {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+}
+
+.pwanimate-quota-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.68rem;
+    color: var(--pwanimate-muted);
+    cursor: default;
+    position: relative;
+}
+
+.pwanimate-quota-dot::before {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.pwanimate-quota-dot.healthy::before {
+    background-color: #22c55e;
+}
+
+.pwanimate-quota-dot.rate-limited::before {
+    background-color: #ef4444;
+    animation: pwanimate-pulse-dot 1.5s ease-in-out infinite;
+}
+
+.pwanimate-quota-dot.cooldown::before {
+    background-color: #f59e0b;
+}
+
+@keyframes pwanimate-pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.pwanimate-quota-dot .pwanimate-quota-tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--pwanimate-asst-text);
+    color: var(--pwanimate-bg);
+    font-size: 0.65rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 20;
+}
+
+.pwanimate-quota-dot:hover .pwanimate-quota-tooltip {
+    display: block;
+}
+
+.pwanimate-fallback-notice {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.7rem;
+    color: var(--pwanimate-muted);
+    padding: 0.25rem 0;
+    margin-top: 0.3rem;
+}
+
+.pwanimate-fallback-notice i {
+    color: #f59e0b;
+    font-size: 0.8rem;
+}
+
+.pwanimate-active-model-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    color: var(--pwanimate-muted);
+    padding: 0.2rem 0.55rem;
+    border-radius: 9999px;
+    background-color: var(--pwanimate-item-hover);
+    border: 1px solid var(--pwanimate-border);
+    transition: all 0.2s ease;
+    user-select: none;
+    line-height: 1.2;
+}
+
+.pwanimate-active-model-chip.switched {
+    color: #f59e0b;
+    border-color: rgba(245, 158, 11, 0.4);
+    background-color: rgba(245, 158, 11, 0.1);
+}
+
+.pwanimate-active-model-chip .model-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #22c55e;
+    flex-shrink: 0;
+}
+
+.pwanimate-active-model-chip.switched .model-dot {
+    background-color: #f59e0b;
+    animation: pwanimate-pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   Model Selection Dropdown & Quota Modal
+   ========================================================================== */
+
+.pwanimate-model-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.pwanimate-model-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.76rem;
+    font-weight: 500;
+    padding: 0.25rem 0.65rem;
+    border-radius: 20px;
+    background-color: var(--pwanimate-card-bg);
+    border: 1px solid var(--pwanimate-border);
+    color: var(--pwanimate-asst-text);
+    transition: all 0.15s ease;
+    cursor: pointer;
+    line-height: 1.3;
+}
+
+.pwanimate-model-btn:hover,
+.pwanimate-model-btn:focus,
+.pwanimate-model-btn.show {
+    background-color: var(--pwanimate-hover-bg);
+    border-color: var(--primary);
+    color: var(--pwanimate-asst-text);
+}
+
+.pwanimate-model-btn::after {
+    display: none; /* remove bootstrap default caret */
+}
+
+.pwanimate-model-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: inline-block;
+}
+
+.pwanimate-model-status-dot.healthy { background-color: #22c55e; }
+.pwanimate-model-status-dot.rate-limited { background-color: #ef4444; animation: pwanimate-pulse-dot 1.5s infinite; }
+.pwanimate-model-status-dot.cooldown { background-color: #f59e0b; }
+
+.pwanimate-model-menu {
+    min-width: 290px;
+    max-width: 360px;
+    background-color: var(--pwanimate-card-bg);
+    border: 1px solid var(--pwanimate-border);
+    border-radius: 12px;
+    padding: 0.5rem;
+    z-index: 1050;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+}
+
+[data-theme="dark"] .pwanimate-model-menu {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+}
+
+#pwanimate-dropdown-models-list {
+    max-height: 340px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+}
+
+.pwanimate-model-option {
+    border-radius: 8px;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.83rem;
+    color: var(--pwanimate-asst-text);
+    transition: background-color 0.15s ease;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+}
+
+.pwanimate-model-option:hover {
+    background-color: var(--pwanimate-hover-bg);
+    color: var(--pwanimate-asst-text);
+}
+
+.pwanimate-model-option.active {
+    background-color: var(--pwanimate-hover-bg);
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.pwanimate-model-option .pwanimate-check-icon {
+    display: none;
+    font-size: 1.1rem;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.pwanimate-model-option.active .pwanimate-check-icon {
+    display: inline-block;
+}
+
+.pwanimate-quota-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 0.82rem;
+    color: var(--pwanimate-muted);
+    border: 1px solid var(--pwanimate-border);
+    background: var(--pwanimate-card-bg);
+    transition: all 0.15s ease;
+    cursor: pointer;
+}
+
+.pwanimate-quota-btn:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+    background-color: var(--pwanimate-hover-bg);
+}
+
+/* Quota Modal Styling */
+#pwanimateQuotaModal {
+    z-index: 10600 !important;
+}
+
+#pwanimateQuotaModal .modal-content {
+    background-color: var(--pwanimate-card-bg);
+    color: var(--pwanimate-asst-text);
+    border: 1px solid var(--pwanimate-border);
+    border-radius: 16px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="dark"] #pwanimateQuotaModal .modal-content {
+    background-color: var(--pwanimate-sidebar-bg);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+#pwanimateQuotaModal .modal-header,
+#pwanimateQuotaModal .modal-footer {
+    border-color: var(--pwanimate-border);
+}
+
+.pwanimate-quota-card {
+    background-color: var(--pwanimate-bg);
+    border: 1px solid var(--pwanimate-border);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    transition: all 0.18s ease;
+}
+
+.pwanimate-quota-card:hover {
+    border-color: var(--primary);
+}
+
+.pwanimate-quota-card.selected {
+    border-color: var(--primary);
+    background-color: var(--pwanimate-hover-bg);
+    box-shadow: 0 0 0 1px var(--primary);
+}
+
+.pwanimate-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.pwanimate-status-badge.healthy {
+    background-color: rgba(34, 197, 94, 0.12);
+    color: #16a34a;
+}
+
+[data-theme="dark"] .pwanimate-status-badge.healthy {
+    background-color: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+}
+
+.pwanimate-status-badge.rate-limited {
+    background-color: rgba(239, 68, 68, 0.12);
+    color: #dc2626;
+}
+
+[data-theme="dark"] .pwanimate-status-badge.rate-limited {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+
+.pwanimate-status-badge.cooldown {
+    background-color: rgba(245, 158, 11, 0.12);
+    color: #d97706;
+}
+
+[data-theme="dark"] .pwanimate-status-badge.cooldown {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+}
+
+

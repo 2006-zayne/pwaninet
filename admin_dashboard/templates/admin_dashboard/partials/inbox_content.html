@@ -1,0 +1,49 @@
+<div class="page-header px-4 py-3 border-bottom d-flex justify-content-between align-items-center">
+  <div>
+    <a href="{% url 'admin_dashboard:dashboard_home' %}" hx-get="{% url 'admin_dashboard:dashboard_home' %}" hx-target="#page-content-target" hx-push-url="true" class="text-decoration-none small text-muted mb-2 d-inline-block"><i class="bi bi-arrow-left"></i> Back to Dashboard</a>
+    <h1 class="page-title fs-3 mb-0">Feedback Mailbox</h1>
+  </div>
+  <div class="dropdown">
+    <button class="btn btn-outline-secondary dropdown-toggle btn-sm" type="button" data-bs-toggle="dropdown">
+      Filter: {{ current_filter|default:"All" }}
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <li><a class="dropdown-item" href="{% url 'admin_dashboard:feedback_inbox' %}" hx-get="{% url 'admin_dashboard:feedback_inbox' %}" hx-target="#page-content-target" hx-push-url="true">All</a></li>
+      <li><a class="dropdown-item" href="{% url 'admin_dashboard:feedback_inbox' %}?status=UNREAD" hx-get="{% url 'admin_dashboard:feedback_inbox' %}?status=UNREAD" hx-target="#page-content-target" hx-push-url="true">Unread</a></li>
+      <li><a class="dropdown-item" href="{% url 'admin_dashboard:feedback_inbox' %}?status=OPEN" hx-get="{% url 'admin_dashboard:feedback_inbox' %}?status=OPEN" hx-target="#page-content-target" hx-push-url="true">Open</a></li>
+      <li><a class="dropdown-item" href="{% url 'admin_dashboard:feedback_inbox' %}?status=RESOLVED" hx-get="{% url 'admin_dashboard:feedback_inbox' %}?status=RESOLVED" hx-target="#page-content-target" hx-push-url="true">Resolved</a></li>
+    </ul>
+  </div>
+</div>
+
+<div class="p-0">
+  <div class="list-group list-group-flush">
+    {% for ticket in tickets %}
+    <a href="{% url 'admin_dashboard:feedback_detail' ticket.id %}" 
+       hx-get="{% url 'admin_dashboard:feedback_detail' ticket.id %}" 
+       hx-target="#page-content-target" 
+       hx-push-url="true" 
+       class="list-group-item text-dark list-group-item-action py-3 {% if ticket.status == 'UNREAD' %}fw-bold border-start border-4 border-primary{% endif %}">
+      <div class="d-flex w-100 justify-content-between">
+        <h6 class="mb-1 text-truncate" style="max-width: 70%;">
+          {% if ticket.status == 'UNREAD' %}<span class="text-primary me-1">●</span>{% endif %}
+          {{ ticket.subject }}
+        </h6>
+        <small class="text-muted">{{ ticket.created_at|date:"M d, Y" }}</small>
+      </div>
+      <div class="d-flex w-100 justify-content-between align-items-center mt-2">
+        <small class="text-muted">From: {{ ticket.sender.username }}</small>
+        <div>
+          <span class="badge bg-secondary rounded-pill fw-normal">{{ ticket.get_category_display }}</span>
+          <span class="badge {% if ticket.status == 'RESOLVED' %}bg-success{% elif ticket.status == 'OPEN' %}bg-primary{% else %}bg-warning{% endif %} rounded-pill fw-normal">{{ ticket.get_status_display }}</span>
+        </div>
+      </div>
+    </a>
+    {% empty %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+      <p>No feedback tickets found.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>

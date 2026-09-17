@@ -9,6 +9,10 @@
 </div>
 
 <div class="settings-list-container">
+  {% if request.user.is_staff %}
+  {% include 'users/settings/components/settings_category_item.html' with url_name='admin_dashboard:dashboard_home' icon_class='bi-shield-lock-fill text-primary' title='Admin Panel' subtitle='Manage platform & feedback' is_htmx=True %}
+  {% endif %}
+  
   {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_profile' icon_class='bi-person' title='Profile Settings' subtitle='Manage your profile, username, bio...' is_htmx=True %}
 
   {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_appearance' icon_class='bi-palette' title='Appearance' subtitle='Theme, dark mode, language...' is_htmx=True %}

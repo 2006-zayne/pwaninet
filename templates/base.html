@@ -1,7 +1,7 @@
 {% load static %}
 {% load i18n %}
 <!DOCTYPE html>
-<html lang="{% if LANGUAGE_CODE == 'sw' %}sw{% else %}en{% endif %}">
+<html lang="{% if LANGUAGE_CODE == 'sw' %}sw{% else %}en{% endif %}" class="{% block html_class %}{% endblock %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -123,8 +123,21 @@
                 'tangerine': "'Tangerine', cursive"
             };
 
-            const family = fontFamilyMap[userFontFamilyPreference] || savedFontFamily || '';
-            document.documentElement.style.setProperty('--font-family', family);
+            let resolvedPreference = 'default';
+            if (userFontFamilyPreference && userFontFamilyPreference !== 'default' && fontFamilyMap[userFontFamilyPreference] !== undefined) {
+                resolvedPreference = userFontFamilyPreference;
+            } else if (savedFontFamily && fontFamilyMap[savedFontFamily] !== undefined) {
+                resolvedPreference = savedFontFamily;
+            } else if (userFontFamilyPreference && fontFamilyMap[userFontFamilyPreference] !== undefined) {
+                resolvedPreference = userFontFamilyPreference;
+            }
+
+            const family = fontFamilyMap[resolvedPreference] || '';
+            if (family) {
+                document.documentElement.style.setProperty('--font-family', family);
+            } else {
+                document.documentElement.style.removeProperty('--font-family');
+            }
         })();
 
         // Set font style immediately to prevent flash
@@ -231,6 +244,65 @@
             justify-content: center;
             padding: 2.5rem;
         }
+
+        /* Critical App Shell Layout (zero layout shift / clean 3-zone desktop geometry) */
+        .app-shell-layout {
+            width: 100%;
+            box-sizing: border-box;
+            margin-left: 0;
+            margin-right: 0;
+        }
+        @media (min-width: 992px) {
+            .desktop-left-rail {
+                width: 240px;
+                flex: 0 0 240px;
+            }
+            .desktop-center-panel {
+                width: 100%;
+                max-width: 800px;
+                min-width: 0;
+            }
+        }
+        @media (min-width: 1200px) {
+            .app-shell-layout {
+                display: grid;
+                grid-template-columns: minmax(240px, 1fr) minmax(0, 800px) minmax(240px, 1fr);
+                align-items: start;
+                width: 100%;
+                max-width: 100%;
+                margin: 0;
+                padding: 20px 0 0 0;
+                gap: 0;
+            }
+            .desktop-left-rail {
+                grid-column: 1;
+                justify-self: start;
+                width: 240px;
+                position: sticky;
+                top: calc(var(--navbar-height, 60px) + 20px);
+                max-height: calc(100vh - var(--navbar-height, 60px) - 32px);
+                padding-left: 24px;
+                padding-right: 16px;
+                box-sizing: border-box;
+            }
+            .desktop-center-panel {
+                grid-column: 2;
+                width: 100%;
+                max-width: 800px;
+                justify-self: center;
+            }
+            .desktop-context-rail {
+                grid-column: 3;
+                justify-self: end;
+                width: 340px;
+                position: sticky;
+                top: calc(var(--navbar-height, 60px) + 20px);
+                max-height: calc(100vh - var(--navbar-height, 60px) - 32px);
+                padding-left: 16px;
+                padding-right: 24px;
+                box-sizing: border-box;
+            }
+        }
     </style>
 
     <script>
@@ -322,6 +394,7 @@
     <link rel="stylesheet" href="{% static 'css/profile.css' %}">
     <link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}">
     <link rel="stylesheet" href="{% static 'css/downloads/offline_media_viewer.css' %}">
+    {% block extra_css %}{% endblock %}
     <script src="{% static 'js/htmx.min.js' %}"></script>
     <script>
         // Configure HTMX for proper history handling
@@ -427,6 +500,8 @@
             --font-scale: 1.00;
             --search-bg: #e9ecef;
             --search-bg-focus: #fff;
+            --bs-body-font-family: var(--font-family, system-ui, -apple-system, 'Roboto', 'Inter', sans-serif);
+            --bs-font-sans-serif: var(--font-family, system-ui, -apple-system, 'Roboto', 'Inter', sans-serif);
         }
 
         /* Dark theme variables */
@@ -445,6 +520,8 @@
             --font-scale: 1.00;
             --search-bg: #3a3b3c;
             --search-bg-focus: #4e4f50;
+            --bs-body-font-family: var(--font-family, system-ui, -apple-system, 'Roboto', 'Inter', sans-serif);
+            --bs-font-sans-serif: var(--font-family, system-ui, -apple-system, 'Roboto', 'Inter', sans-serif);
         }
 
         [data-theme="dark"] .text-dark {
@@ -459,6 +536,16 @@
 
         html {
             font-size: calc(16px * var(--font-scale));
+        }
+
+        *, *::before, *::after {
+            font-family: var(--font-family, system-ui, -apple-system, 'Roboto', 'Inter', sans-serif);
+            font-style: var(--font-style, normal);
+        }
+
+        .bi, [class^="bi-"], [class*=" bi-"], i.bi {
+            font-family: "bootstrap-icons" !important;
+            font-style: normal !important;
         }
 
         body {
@@ -1271,7 +1358,8 @@
         }
     </style>
 </head>
-<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+<body class="{% block body_class %}{% endblock %}"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
       data-user-id="{{ request.user.id }}"
       data-app-version="{{ app_version }}"
       data-app-build="{{ app_build }}"
@@ -1301,7 +1389,9 @@
     <!-- Main App Container -->
     <div id="app">
 
-    <nav class="navbar navbar-top fixed-top">
+    <!-- Top Navigation Bar -->
+    {% block header %}
+    <nav class="navbar navbar-expand-lg navbar-light navbar-top fixed-top p-0" id="navbar-top">
         <div class="container d-flex justify-content-between align-items-center">
             <a class="nav-brand-tactical"
                href="{% url 'posts:home' %}"
@@ -1381,11 +1471,25 @@
                             </span>
                         {% endif %}
                     </span>
-                    <span style="font-size: 0.65rem; font-weight: 600; white-space: nowrap;">{% trans "Notifications" %}</span>
                 </a>
             </div>
 
             <div class="d-flex align-items-center gap-3">
+                {% if request.user.is_authenticated %}
+                <!-- Pwanimate Quick Entry (Mobile & Header) -->
+                <a href="{% url 'pwanimate:index' %}"
+                   class="btn btn-link p-0 text-decoration-none d-md-none"
+                   style="color: var(--primary, #2563eb);"
+                   hx-get="{% url 'pwanimate:index' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   title="Pwanimate AI Assistant"
+                   aria-label="Pwanimate AI Assistant">
+                    <img src="{% static 'images/pwanimate/pwanimate-transparent.png' %}" alt="Pwanimate" style="width: 24px; height: 24px; object-fit: contain;">
+                </a>
+                {% endif %}
+
                 <!-- Theme Toggle -->
                 <div class="dropdown">
                     <button class="btn btn-link p-0" data-bs-toggle="dropdown" style="color: var(--text-dark);">
@@ -1417,7 +1521,7 @@
                        hx-push-url="true"
                        hx-history="true"
                        class="avatar-link">
-                        <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 35px; height: 35px; object-fit: cover; margin-right:8px;">
+                        <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 35px; height: 35px; object-fit: cover; margin-right:8px;" alt="Profile">
                     </a>
                 {% else %}
                     <a href="{% url 'login' %}" class="btn btn-primary btn-sm rounded-pill px-3">{% trans "Login" %}</a>
@@ -1425,6 +1529,7 @@
             </div>
         </div>
     </nav>
+    {% endblock header %}
 
     <!-- Navigation Progress Bar -->
     <div id="navigation-progress" aria-hidden="true">
@@ -1437,7 +1542,9 @@
         <!-- 1. LEFT RAIL: Persistent Global Navigation (Desktop only: >= 992px) -->
         <aside id="left-nav-rail" class="desktop-left-rail d-none d-lg-block" aria-label="{% trans 'Global Navigation' %}">
             <div class="left-rail-inner">
+                {% block left_rail %}
                 {% include 'partials/desktop_left_rail.html' %}
+                {% endblock left_rail %}
             </div>
         </aside>
 
@@ -2812,7 +2919,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
                     try { window.cleanupOfflineMediaHub(); } catch (_) {}
                 }
                 document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
-                document.body.classList.remove('modal-open', 'in-reels-mode');
+                document.documentElement.classList.remove('pwanimate-active');
+                document.body.classList.remove('modal-open', 'in-reels-mode', 'pwanimate-active');
                 document.body.style.removeProperty('overflow');
                 document.body.style.removeProperty('padding-right');
 
@@ -2854,6 +2962,28 @@ window.addEventListener('beforeinstallprompt', (e) => {
                                 currentFloating.innerHTML = incomingFloating ? incomingFloating.innerHTML : '';
                             }
 
+                            // Sync left-nav-rail from the parsed full document
+                            // This ensures the correct rail (PwaniNet vs Pwanimate) is always shown
+                            const incomingLeftRail = doc.getElementById('left-nav-rail');
+                            const currentLeftRail = document.getElementById('left-nav-rail');
+                            if (incomingLeftRail && currentLeftRail) {
+                                currentLeftRail.innerHTML = incomingLeftRail.innerHTML;
+                            }
+
+                            // Sync context-rail-target from the parsed full document
+                            const incomingContextRail = doc.getElementById('context-rail-target');
+                            const currentContextRail = document.getElementById('context-rail-target');
+                            if (incomingContextRail && currentContextRail) {
+                                currentContextRail.innerHTML = incomingContextRail.innerHTML;
+                            }
+
+                            // Sync navbar from the parsed full document
+                            const incomingNavbar = doc.getElementById('navbar-top');
+                            const currentNavbar = document.getElementById('navbar-top');
+                            if (incomingNavbar && currentNavbar) {
+                                currentNavbar.innerHTML = incomingNavbar.innerHTML;
+                            }
+
                             const targetPath = responseUrl || (evt.detail.requestConfig && evt.detail.requestConfig.path) || window.location.pathname;
                             if (typeof updateActiveState === 'function') {
                                 updateActiveState(targetPath);
@@ -2880,6 +3010,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 }
             }
         });
+
 
         // Progressive Enhancement: Route in-app internal links via HTMX
         // to prevent full-page browser document reloads unless typing directly in the URL search bar.
@@ -3051,6 +3182,22 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         }
                     }
 
+                    // After any HTMX swap into #page-content-target, re-process
+                    // the newly swapped left-nav-rail and context-rail so HTMX binds
+                    // on any elements injected by OOB swaps are active.
+                    const leftRail = document.getElementById('left-nav-rail');
+                    if (leftRail && window.htmx) {
+                        window.htmx.process(leftRail);
+                    }
+                    const contextRail = document.getElementById('context-rail-target');
+                    if (contextRail && window.htmx) {
+                        window.htmx.process(contextRail);
+                    }
+                    const navbarTop = document.getElementById('navbar-top');
+                    if (navbarTop && window.htmx) {
+                        window.htmx.process(navbarTop);
+                    }
+
                     const goingToHome = isHomeRoute(targetPath);
 
                     if (!goingToHome) {
@@ -3075,6 +3222,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 }
             }
         });
+
 
         // 3. Browser Back/Forward history restore
         document.body.addEventListener('htmx:historyRestore', function() {

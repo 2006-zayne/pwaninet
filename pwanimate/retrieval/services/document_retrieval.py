@@ -1,0 +1,264 @@
+"""
+Document Semantic Retrieval Service for Pwanimate.
+
+Performs vector similarity search against DocumentChunk embeddings using pgvector,
+with strict pre-retrieval authorization candidate filtering, version integrity,
+and citation generation.
+"""
+
+import logging
+from typing import Any, List, Optional
+from django.db.models import Q
+from pgvector.django import CosineDistance
+
+from pwanimate.models import DocumentChunk
+from pwanimate.retrieval.types import RetrievalRequest, RetrievalResult, SourceType
+from pwanimate.ai.embeddings.base import BaseEmbeddingProvider, EmbeddingProviderError
+from pwanimate.ai.embeddings.factory import get_embedding_provider
+
+logger = logging.getLogger(__name__)
+
+
+class DocumentSemanticRetrievalService:
+    """Service handling semantic retrieval over authorized DocumentChunks."""
+
+    def __init__(self, embedding_provider: Optional[BaseEmbeddingProvider] = None):
+        self._provider = embedding_provider
+
+    @property
+    def provider(self) -> BaseEmbeddingProvider:
+        """Lazily resolve active embedding provider."""
+        if self._provider is None:
+            self._provider = get_embedding_provider()
+        return self._provider
+
+    def build_candidate_queryset(self, user: Optional[Any] = None, filters: Optional[dict] = None):
+        """
+        Build pre-retrieval candidate queryset enforcing strict authorization invariants.
+
+        Invariants:
+        1. DocumentChunk must be active (`is_active=True`).
+        2. Embedding status must be 'completed' with non-null embedding.
+        3. Embedding model must match current active provider model name.
+        4. Parent Document status must be 'ready'.
+        5. Parent Document must be available (`is_available=True`).
+        6. Visibility rules:
+           - Public: accessible to everyone.
+           - Private: accessible only to uploader, staff, superuser, or student leadership.
+           - Restricted: accessible to uploader, staff/superuser/leadership, or students
+             enrolled in matching academic programme / course units.
+        """
+        model_name = self.provider.get_model_name()
+
+        # Base candidate queryset
+        qs = DocumentChunk.objects.filter(
+            is_active=True,
+            embedding_status='completed',
+            embedding_model=model_name,
+            embedding__isnull=False,
+            document__status='ready',
+            document__is_available=True,
+        )
+
+        # Authorization filter
+        if user and getattr(user, 'is_authenticated', False):
+            # Staff, superuser, and executive student leaders have administrative read access
+            global_role = getattr(user, 'global_role', None)
+            is_admin_or_leader = (
+                user.is_staff or
+                user.is_superuser or
+                global_role in ['PRESIDENT', 'DELEGATE']
+            )
+
+            if not is_admin_or_leader:
+                # Build student visibility query
+                visibility_q = Q(document__visibility='public') | Q(document__uploaded_by=user)
+
+                # Restricted visibility check
+                restricted_q = Q(document__visibility='restricted')
+                has_restricted_match = False
+
+                # 1. Match student's enrolled programme units
+                programme = getattr(user, 'programme', None)
+                if programme:
+                    visibility_q |= (
+                        restricted_q &
+                        Q(document__academic_units__academic_unit__programme_units__programme=programme)
+                    )
+                    has_restricted_match = True
+
+                # 2. Legacy fallback to course
+                course = getattr(user, 'course', None)
+                if course and not has_restricted_match:
+                    visibility_q |= (
+                        restricted_q &
+                        Q(document__academic_units__academic_unit__code__icontains=course.name)
+                    )
+
+                qs = qs.filter(visibility_q).distinct()
+        else:
+            # Anonymous users can only view public documents
+            qs = qs.filter(document__visibility='public')
+
+        # Domain metadata filters
+        if filters:
+            if filters.get('category'):
+                cat = filters['category']
+                qs = qs.filter(
+                    Q(document__category__code=cat) |
+                    Q(document__category__id=cat)
+                )
+
+            if filters.get('academic_unit'):
+                unit = filters['academic_unit']
+                qs = qs.filter(
+                    Q(document__academic_units__academic_unit__code=unit) |
+                    Q(document__academic_units__academic_unit__id=unit)
+                )
+
+            if filters.get('academic_units'):
+                units = filters['academic_units']
+                qs = qs.filter(
+                    document__academic_units__academic_unit_id__in=units
+                )
+
+            if filters.get('document_id'):
+                qs = qs.filter(document_id=filters['document_id'])
+
+            if filters.get('file_type'):
+                ft = str(filters['file_type']).lower().strip()
+                qs = qs.filter(document__versions__files__extension=ft)
+
+        return qs
+
+    def retrieve(self, request: RetrievalRequest) -> List[RetrievalResult]:
+        """
+        Execute semantic retrieval for the given request.
+
+        Args:
+            request: RetrievalRequest containing query, user, limit, and filters.
+
+        Returns:
+            List of normalized RetrievalResult objects ranked by cosine similarity.
+        """
+        query = (request.query or "").strip()
+        if not query:
+            return []
+
+        # 1. Generate query embedding vector
+        try:
+            query_vector = self.provider.embed_query(query)
+        except EmbeddingProviderError as exc:
+            logger.error("Failed to generate query embedding: %s", exc)
+            raise
+
+        expected_dim = self.provider.get_dimensions()
+        if len(query_vector) != expected_dim:
+            logger.error(
+                "Query embedding dimension mismatch: got %d, expected %d",
+                len(query_vector), expected_dim
+            )
+            return []
+
+        # 2. Get authorized candidates
+        candidate_qs = self.build_candidate_queryset(
+            user=request.user,
+            filters=request.filters
+        )
+
+        # 3. Annotate pgvector cosine distance and order by similarity
+        ranked_qs = (
+            candidate_qs
+            .annotate(distance=CosineDistance('embedding', query_vector))
+            .filter(distance__isnull=False)
+            .select_related('document', 'document_version')
+            .order_by('distance')
+        )
+
+        limit = max(1, int(request.limit or 10))
+        chunks = list(ranked_qs[:limit])
+
+        results = []
+        for chunk in chunks:
+            # CosineDistance returns 1.0 - cosine_similarity.
+            # Similarity = 1.0 - distance, bounded to [0.0, 1.0]
+            dist = float(chunk.distance) if chunk.distance is not None else 1.0
+            similarity = max(0.0, min(1.0, 1.0 - dist))
+
+            if request.min_score > 0.0 and similarity < request.min_score:
+                continue
+
+            results.append(self._format_chunk_result(chunk, similarity))
+
+        return results
+
+    def _format_chunk_result(self, chunk: DocumentChunk, similarity: float) -> RetrievalResult:
+        """Format DocumentChunk into a normalized RetrievalResult."""
+        doc = chunk.document
+        version = chunk.document_version
+
+        # Generate deterministic citation string
+        citation = self.generate_citation(chunk)
+
+        # Canonical detail URL
+        detail_url = f"/documents/document/{doc.share_id}/"
+
+        metadata = {
+            "document_id": doc.id,
+            "document_share_id": str(doc.share_id),
+            "document_version_id": version.id,
+            "version_number": version.version_number,
+            "chunk_id": chunk.id,
+            "chunk_index": chunk.chunk_index,
+            "chunk_type": chunk.chunk_type,
+            "page_number": chunk.page_number,
+            "page_end": chunk.page_end,
+            "slide_number": chunk.slide_number,
+            "section_heading": chunk.section_heading,
+            "embedding_model": chunk.embedding_model,
+        }
+
+        return RetrievalResult(
+            source=SourceType.DOCUMENT,
+            object_id=chunk.id,
+            title=doc.title,
+            snippet=chunk.content,
+            score=round(similarity, 4),
+            url=detail_url,
+            citation=citation,
+            metadata=metadata,
+            raw_object=chunk,
+        )
+
+    @staticmethod
+    def generate_citation(chunk: DocumentChunk) -> str:
+        """
+        Generate academic citation label from chunk location provenance.
+
+        Format:
+        [<Title>, v<N>, p. <page> - <Heading>]
+        [<Title>, v<N>, Slide <slide>]
+        [<Title>, v<N>, chunk <idx>]
+        """
+        parts = [chunk.document.title]
+        version_str = f"v{chunk.document_version.version_number}"
+        parts.append(version_str)
+
+        loc_parts = []
+        if chunk.chunk_type == 'slide' or (chunk.slide_number and not chunk.page_number):
+            loc_parts.append(f"Slide {chunk.slide_number}")
+        elif chunk.page_number:
+            if chunk.page_end and chunk.page_end > chunk.page_number:
+                loc_parts.append(f"pp. {chunk.page_number}–{chunk.page_end}")
+            else:
+                loc_parts.append(f"p. {chunk.page_number}")
+        elif chunk.slide_number:
+            loc_parts.append(f"Slide {chunk.slide_number}")
+        else:
+            loc_parts.append(f"Chunk {chunk.chunk_index + 1}")
+
+        if chunk.section_heading:
+            loc_parts.append(f'"{chunk.section_heading}"')
+
+        citation_loc = ", ".join(loc_parts)
+        return f"[{', '.join(parts)}: {citation_loc}]"

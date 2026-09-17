@@ -103,6 +103,7 @@ class EventTypes(Enum):
     CORE_SEMESTER_CHANGED = "core.semester.changed"
     CORE_ACADEMIC_YEAR_CHANGED = "core.academic_year.changed"
     CORE_BACKUP_COMPLETED = "core.backup.completed"
+    ADMIN_FEEDBACK_REPLIED = "admin.feedback.replied"
     
     # Security Events
     SECURITY_LOGIN_DETECTED = "security.login.detected"

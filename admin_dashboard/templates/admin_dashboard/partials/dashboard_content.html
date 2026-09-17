@@ -1,0 +1,189 @@
+<div class="page-header px-4 py-3 border-bottom">
+  <h1 class="page-title fs-3 mb-1">Admin Dashboard</h1>
+  <p class="text-muted small mb-0">Platform telemetry and support mailbox</p>
+</div>
+
+<div class="p-4">
+  <div class="row g-4 mb-4">
+    <!-- Mailbox Card -->
+    <div class="col-md-6 col-lg-3">
+      <div class="card text-dark border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center mb-3">
+            <div class="flex-shrink-0 bg-primary bg-opacity-10 text-primary rounded p-3">
+              <i class="bi bi-inbox-fill fs-4"></i>
+            </div>
+            <div class="ms-3">
+              <h6 class="card-title mb-1">Feedback Mailbox</h6>
+              <a href="{% url 'admin_dashboard:feedback_inbox' %}" 
+                 hx-get="{% url 'admin_dashboard:feedback_inbox' %}" 
+                 hx-target="#page-content-target" 
+                 hx-push-url="true" 
+                 class="text-decoration-none small">View Inbox <i class="bi bi-arrow-right"></i></a>
+            </div>
+          </div>
+          <div class="row text-center">
+            <div class="col-6 border-end">
+              <h3 class="mb-0 fw-bold">{{ unread_feedback_count }}</h3>
+              <span class="text-muted small">Unread</span>
+            </div>
+            <div class="col-6">
+              <h3 class="mb-0 fw-bold">{{ open_tickets_count }}</h3>
+              <span class="text-muted small">Open</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Users Card -->
+    <div class="col-md-6 col-lg-3">
+      <div class="card text-dark border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center mb-3">
+            <div class="flex-shrink-0 bg-success bg-opacity-10 text-success rounded p-3">
+              <i class="bi bi-people-fill fs-4"></i>
+            </div>
+            <div class="ms-3">
+              <h6 class="card-title mb-1">Users</h6>
+              <span class="text-muted small">Platform growth</span>
+            </div>
+          </div>
+          <div class="row text-center">
+            <div class="col-6 border-end">
+              <h3 class="mb-0 fw-bold">{{ total_users }}</h3>
+              <span class="text-muted small">Total</span>
+            </div>
+            <div class="col-6">
+              <h3 class="mb-0 fw-bold text-success">{{ online_users }}</h3>
+              <span class="text-muted small">Online Now</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Moderation Card -->
+    <div class="col-md-6 col-lg-3">
+      <div class="card text-dark border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center mb-3">
+            <div class="flex-shrink-0 bg-warning bg-opacity-10 text-warning rounded p-3">
+              <i class="bi bi-shield-exclamation fs-4"></i>
+            </div>
+            <div class="ms-3">
+              <h6 class="card-title mb-1">Moderation</h6>
+              <span class="text-muted small">Content safety</span>
+            </div>
+          </div>
+          <div class="text-center mt-3">
+             <h3 class="mb-0 fw-bold">{{ pending_reports }}</h3>
+             <span class="text-muted small">Pending Reports</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  <div class="row g-4 mb-4">
+    <!-- Graphs -->
+    <div class="col-md-6">
+      <div class="card text-dark border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h6 class="card-title fw-bold mb-3">User Growth (Last 14 days)</h6>
+          <div style="position: relative; height: 250px; width: 100%;">
+            <canvas id="growthChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-6">
+      <div class="card text-dark border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h6 class="card-title fw-bold mb-3">Daily Active Users (Last 14 days)</h6>
+          <div style="position: relative; height: 250px; width: 100%;">
+            <canvas id="activeChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h4 class="fs-5 mb-3">Recent Unread Feedback</h4>
+  <div class="list-group shadow-sm">
+    {% for ticket in recent_feedback %}
+    <a href="{% url 'admin_dashboard:feedback_detail' ticket.id %}" 
+       hx-get="{% url 'admin_dashboard:feedback_detail' ticket.id %}" 
+       hx-target="#page-content-target" 
+       hx-push-url="true" 
+       class="list-group-item text-dark list-group-item-action d-flex justify-content-between align-items-center">
+      <div>
+        <h6 class="mb-1">{{ ticket.subject }}</h6>
+        <p class="mb-0 text-muted small">{{ ticket.sender.username }} • {{ ticket.created_at|timesince }} ago</p>
+      </div>
+      <span class="badge bg-primary rounded-pill">{{ ticket.get_category_display }}</span>
+    </a>
+    {% empty %}
+    <div class="list-group-item text-dark text-center text-muted py-4">
+      <i class="bi bi-check-circle fs-3 d-block mb-2 text-success"></i>
+      Inbox zero! No unread feedback.
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  (function() {
+    if (!document.getElementById('growthChart')) return;
+    
+    // Set chart default color based on current theme
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    Chart.defaults.color = isDark ? '#e4e6eb' : '#666';
+    Chart.defaults.scale.grid.color = isDark ? '#3a3b3c' : '#e5e5e5';
+    Chart.defaults.scale.grid.borderColor = isDark ? '#3a3b3c' : '#e5e5e5';
+
+    const labels = {{ chart_labels|safe }};
+    const growthData = {{ growth_data|safe }};
+    const activeData = {{ active_data|safe }};
+    
+    new Chart(document.getElementById('growthChart'), {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'New Registrations',
+          data: growthData,
+          borderColor: '#0d6efd',
+          backgroundColor: 'rgba(13, 110, 253, 0.1)',
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+      }
+    });
+
+    new Chart(document.getElementById('activeChart'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Active Users',
+          data: activeData,
+          backgroundColor: '#198754',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+      }
+    });
+  })();
+</script>

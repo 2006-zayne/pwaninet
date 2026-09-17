@@ -1,0 +1,34 @@
+{% load i18n %}
+{% if conversations %}
+    {% for conv in conversations %}
+        <div class="pwanimate-conversation-item {% if active_conversation and active_conversation.id == conv.id %}active{% endif %}"
+             data-id="{{ conv.id }}"
+             hx-get="{% url 'pwanimate:conversation_detail' conv.id %}"
+             hx-target="#page-content-target"
+             hx-swap="innerHTML"
+             hx-push-url="true"
+             role="button"
+             tabindex="0">
+            <div class="pwanimate-conversation-info">
+                <div class="pwanimate-conversation-title" title="{{ conv.title }}">
+                    {{ conv.title|default:_("New Conversation") }}
+                </div>
+                <div class="pwanimate-conversation-time">
+                    {{ conv.updated_at|timesince }} {% trans "ago" %}
+                </div>
+            </div>
+            <button type="button"
+                    class="pwanimate-conversation-delete"
+                    data-conversation-id="{{ conv.id }}"
+                    aria-label="{% trans 'Delete conversation' %}"
+                    title="{% trans 'Delete conversation' %}"
+                    onclick="event.stopPropagation();">
+                <i class="bi bi-trash3"></i>
+            </button>
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="text-center text-muted p-3 x-small">
+        {% trans "No conversations yet. Ask a question to start one!" %}
+    </div>
+{% endif %}

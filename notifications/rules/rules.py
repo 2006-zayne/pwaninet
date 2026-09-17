@@ -1003,6 +1003,27 @@ RELEASE_PUBLISHED_RULE = NotificationRule(
 )
 
 
+ADMIN_FEEDBACK_REPLY_RULE = NotificationRule(
+    name="Admin Feedback Reply",
+    trigger="admin.feedback.replied",
+    notification_type="ADMIN_FEEDBACK_REPLY",
+    category="SYSTEM",
+    priority="HIGH",
+    recipients=lambda data: [data.get('metadata', {}).get('user_id')] if data.get('metadata', {}).get('user_id') else [],
+    title_template="Admin replied to your feedback",
+    summary_template="An admin has responded to your feedback: '{{ context_name }}'",
+    delivery_policy="IMMEDIATE",
+    aggregation_policy="NEVER",
+    actions=lambda data: [
+        {
+            'action_type': 'LINK',
+            'label': 'View Reply',
+            'url': f"/dashboard/feedback/user/{data.get('metadata', {}).get('ticket_id', '')}/",
+            'style': 'primary'
+        }
+    ]
+)
+
 # All rules registry
 RULES_REGISTRY = [
     POST_LIKE_RULE,
@@ -1033,6 +1054,7 @@ RULES_REGISTRY = [
     CONVERSATION_MEMBER_ADDED_RULE,
     COURSE_ASSIGNMENT_PUBLISHED_RULE,
     RELEASE_PUBLISHED_RULE,
+    ADMIN_FEEDBACK_REPLY_RULE,
 ]
 
 

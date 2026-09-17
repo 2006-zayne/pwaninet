@@ -234,6 +234,11 @@ urlpatterns = [
     path('', include('releases.urls')),
     # Messaging - Unfrozen for group chat functionality
     path('messaging/', include(('messaging.urls', 'messaging'), namespace='messaging')),
+    # Admin Dashboard
+    path('dashboard/', include('admin_dashboard.urls')),
+    # Pwanimate AI Assistant UI & API
+    path('pwanimate/', include(('pwanimate.urls', 'pwanimate'), namespace='pwanimate')),
+    path('api/pwanimate/', include(('pwanimate.api.urls', 'pwanimate_api'), namespace='pwanimate_api')),
     # JWT Token endpoints (temporarily disabled due to pkg_resources issue)
     # path('api/token/', include('rest_framework_simplejwt.urls')),
 ]

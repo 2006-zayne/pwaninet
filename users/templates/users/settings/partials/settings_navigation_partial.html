@@ -1,10 +1,9 @@
 {% load static %}
+{% load i18n %}
 
 {% include 'users/settings/partials/base_settings_styles.html' %}
 
-<div class="page-wrap">
-  {% include settings_content_partial %}
-</div>
+{% include settings_content_partial %}
 
 <!-- OOB Cleanup for Profile Floating Action Buttons -->
 <div id="profile-floating-actions" hx-swap-oob="true"></div>
@@ -13,6 +12,13 @@
 <aside id="context-rail-target" class="desktop-context-rail d-none d-xl-block" aria-label="Contextual Information" hx-swap-oob="true">
     <div class="context-rail-inner" id="context-rail-inner">
         {% include 'users/partials/profile_context_rail.html' %}
+    </div>
+</aside>
+
+<!-- Left Rail Out-Of-Band: restore PwaniNet left rail -->
+<aside id="left-nav-rail" class="desktop-left-rail d-none d-lg-block" aria-label="{% trans 'Global Navigation' %}" hx-swap-oob="true">
+    <div class="left-rail-inner">
+        {% include 'partials/desktop_left_rail.html' %}
     </div>
 </aside>
 

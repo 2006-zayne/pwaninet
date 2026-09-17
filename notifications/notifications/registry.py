@@ -36,6 +36,7 @@ class NotificationTypes(Enum):
     INVITE = "INVITE"
     SHARE = "SHARE"
     POST_CREATED = "POST_CREATED"
+    ADMIN_FEEDBACK_REPLY = "ADMIN_FEEDBACK_REPLY"
     
     @classmethod
     def get_all_types(cls):

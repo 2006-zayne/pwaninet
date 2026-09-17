@@ -213,6 +213,16 @@ def process_document(self, document_id: int):
         
         logger.info(f"Completed processing for document {document_id}")
         
+        # Trigger Pwanimate structural ingestion asynchronously for the version
+        try:
+            from pwanimate.tasks.ingestion import ingest_document_version
+            ingest_document_version.delay(version.id)
+        except Exception as pwanimate_err:
+            logger.warning(
+                "Failed to dispatch Pwanimate ingestion for document %s (version %s): %s",
+                document_id, version.id, pwanimate_err
+            )
+        
     except Document.DoesNotExist:
         logger.error(f"Document {document_id} not found")
     except Exception as e:

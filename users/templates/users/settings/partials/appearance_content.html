@@ -736,18 +736,25 @@
       }
       container.dataset.initialized = 'true';
 
-      const expandableItems = container.querySelectorAll('.settings-list-item.expandable');
+      // Using event delegation so it works flawlessly with HTMX swaps
+      if (!window.__appearanceSettingsDelegated) {
+        document.body.addEventListener('click', function(e) {
+          const item = e.target.closest('.settings-list-item.expandable');
+          if (!item) return;
 
-      expandableItems.forEach(item => {
-        item.addEventListener('click', function() {
-          const targetId = this.getAttribute('data-target');
+          // Make sure the clicked item is inside appearance settings
+          const container = document.getElementById('appearance-settings-container');
+          if (!container || !container.contains(item)) return;
+
+          const targetId = item.getAttribute('data-target');
           const content = document.getElementById(targetId);
           if (!content) return;
 
-          const isExpanded = this.classList.contains('expanded');
-
+          const isExpanded = item.classList.contains('expanded');
+          
+          const expandableItems = container.querySelectorAll('.settings-list-item.expandable');
           expandableItems.forEach(otherItem => {
-            if (otherItem !== this) {
+            if (otherItem !== item) {
               const otherTargetId = otherItem.getAttribute('data-target');
               const otherContent = document.getElementById(otherTargetId);
               otherItem.classList.remove('expanded');
@@ -756,14 +763,15 @@
           });
 
           if (isExpanded) {
-            this.classList.remove('expanded');
+            item.classList.remove('expanded');
             content.classList.remove('expanded');
           } else {
-            this.classList.add('expanded');
+            item.classList.add('expanded');
             content.classList.add('expanded');
           }
         });
-      });
+        window.__appearanceSettingsDelegated = true;
+      }
 
       // Theme preference handling
       const themeForm = document.getElementById('theme-form');
@@ -926,8 +934,12 @@
         'italianno': "'Italianno', cursive",
         'tangerine': "'Tangerine', cursive"
       };
-      const family = fontFamilyMap[fontFamily] || '';
-      document.documentElement.style.setProperty('--font-family', family);
+      const family = fontFamilyMap[fontFamily];
+      if (family) {
+        document.documentElement.style.setProperty('--font-family', family);
+      } else {
+        document.documentElement.style.removeProperty('--font-family');
+      }
       localStorage.setItem('font_family', fontFamily);
     }
 
@@ -939,6 +951,15 @@
     }
 
     function getCSRFToken() {
+      // Priority 1: Hidden input field
+      const tokenFromInput = document.querySelector('[name="csrfmiddlewaretoken"]');
+      if (tokenFromInput && tokenFromInput.value) return tokenFromInput.value;
+
+      // Priority 2: Meta tag
+      const tokenFromMeta = document.querySelector('meta[name="csrf-token"]');
+      if (tokenFromMeta && tokenFromMeta.content) return tokenFromMeta.content;
+
+      // Priority 3: Cookie
       const cookies = document.cookie.split(';');
       for (let cookie of cookies) {
         const [name, value] = cookie.trim().split('=');

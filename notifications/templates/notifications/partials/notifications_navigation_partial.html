@@ -1,4 +1,5 @@
 {% load static %}
+{% load i18n %}
 <!-- Notifications HTMX Navigation Bridge -->
 {% include 'notifications/partials/notifications_content.html' %}
 
@@ -9,6 +10,13 @@
 <aside id="context-rail-target" class="desktop-context-rail d-none d-xl-block" aria-label="Contextual Information" hx-swap-oob="true">
     <div class="context-rail-inner" id="context-rail-inner">
         {% include 'partials/default_context_rail.html' %}
+    </div>
+</aside>
+
+<!-- Left Rail Out-Of-Band: restore PwaniNet left rail -->
+<aside id="left-nav-rail" class="desktop-left-rail d-none d-lg-block" aria-label="{% trans 'Global Navigation' %}" hx-swap-oob="true">
+    <div class="left-rail-inner">
+        {% include 'partials/desktop_left_rail.html' %}
     </div>
 </aside>
 

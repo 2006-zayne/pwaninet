@@ -95,11 +95,17 @@
   <div class="settings-expandable-content" id="support">
     <div class="settings-expandable-body">
       <div class="placeholder-section">
-        <i class="bi bi-question-circle"></i>
-        <p>Support resources coming soon...</p>
+        <i class="bi bi-headset mb-3 text-primary" style="font-size: 2rem;"></i>
+        <p>Need help or want to share feedback with the PwaniNet team?</p>
+        <button type="button" class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#feedbackModal">
+          <i class="bi bi-chat-text me-2"></i> Contact Support / Feedback
+        </button>
       </div>
     </div>
   </div>
+
+  <!-- Include Feedback Modal -->
+  {% include 'admin_dashboard/partials/submit_feedback_modal.html' %}
 
   <div class="settings-list-item expandable" data-target="licenses">
     <div class="settings-list-icon">

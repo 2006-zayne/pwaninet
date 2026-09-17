@@ -1,0 +1,218 @@
+"""
+Asynchronous Embedding Celery Tasks for Pwanimate (Phase 2F).
+
+Processes eligible DocumentChunks, generates vector embeddings via
+the configured EmbeddingProvider, and stores them in PostgreSQL/pgvector.
+"""
+
+import logging
+from typing import Dict, Any, Optional, List
+from celery import shared_task
+from django.conf import settings
+from django.db import transaction
+
+from documents.models import Document, DocumentVersion
+from ..models import DocumentChunk
+from ..ai.embeddings.factory import get_embedding_provider
+from ..ai.embeddings.base import (
+    BaseEmbeddingProvider,
+    EmbeddingProviderError,
+    EmbeddingConfigurationError,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def _chunk_batch_generator(items: List[Any], batch_size: int):
+    """Yield successive batches from items."""
+    for i in range(0, len(items), batch_size):
+        yield items[i:i + batch_size]
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='pwanimate.tasks.embeddings.embed_document_version'
+)
+def embed_document_version(
+    self,
+    version_id: int,
+    force: bool = False,
+    provider_name: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Generates and stores vector embeddings for all eligible chunks in a DocumentVersion.
+
+    Args:
+        version_id: Primary key of DocumentVersion to embed.
+        force: If True, forces re-embedding even if chunks are already completed.
+        provider_name: Optional override for provider type ('gemini' or 'mock').
+
+    Returns:
+        Summary dictionary with embedding metrics.
+    """
+    logger.info(f"[PWANIMATE-EMBEDDINGS] Starting embedding task for DocumentVersion {version_id} (force={force})")
+
+    try:
+        version = DocumentVersion.objects.select_related('document').get(id=version_id)
+    except DocumentVersion.DoesNotExist:
+        logger.error(f"[PWANIMATE-EMBEDDINGS] DocumentVersion {version_id} not found")
+        return {
+            'status': 'failed',
+            'reason': 'version_not_found',
+            'version_id': version_id,
+        }
+
+    # Resolve provider
+    try:
+        provider: BaseEmbeddingProvider = get_embedding_provider(provider_name=provider_name)
+    except Exception as e:
+        logger.error(f"[PWANIMATE-EMBEDDINGS] Could not initialize embedding provider: {e}", exc_info=True)
+        return {
+            'status': 'failed',
+            'reason': 'provider_initialization_error',
+            'error': str(e),
+        }
+
+    # Check configuration
+    if not provider.is_configured():
+        logger.warning(
+            f"[PWANIMATE-EMBEDDINGS] Provider '{provider.get_model_name()}' is not configured (missing credentials). "
+            f"Chunks for version {version_id} remain in pending status."
+        )
+        return {
+            'status': 'provider_unconfigured',
+            'version_id': version_id,
+            'model': provider.get_model_name(),
+        }
+
+    active_model = provider.get_model_name()
+    expected_dim = provider.get_dimensions()
+
+    # Query eligible chunks
+    # By default, process chunks that are 'pending' or 'failed', or whose model does not match active_model
+    chunk_qs = version.chunks.exclude(content='').order_by('chunk_index')
+    if not force:
+        chunk_qs = chunk_qs.filter(
+            models_to_embed := (
+                ~DocumentChunk.objects.filter(embedding_status='completed', embedding_model=active_model)
+                .values('id')
+            ).query
+        ) if False else chunk_qs.exclude(embedding_status='completed', embedding_model=active_model)
+
+    chunks_to_embed = list(chunk_qs)
+
+    if not chunks_to_embed:
+        logger.info(f"[PWANIMATE-EMBEDDINGS] Version {version_id} has 0 chunks requiring embedding. Everything up to date.")
+        return {
+            'status': 'up_to_date',
+            'version_id': version_id,
+            'embedded_count': 0,
+            'model': active_model,
+        }
+
+    batch_size = getattr(settings, 'PWANIMATE_EMBEDDING_BATCH_SIZE', 32)
+    logger.info(
+        f"[PWANIMATE-EMBEDDINGS] Embedding {len(chunks_to_embed)} chunks for version {version_id} "
+        f"using model '{active_model}' (batch size: {batch_size}, dim: {expected_dim})"
+    )
+
+    total_embedded = 0
+
+    for batch in _chunk_batch_generator(chunks_to_embed, batch_size):
+        texts = [c.content for c in batch]
+
+        try:
+            vectors = provider.embed_texts(texts, task_type="RETRIEVAL_DOCUMENT")
+        except EmbeddingConfigurationError as e:
+            logger.error(f"[PWANIMATE-EMBEDDINGS] Configuration error during embedding: {e}")
+            return {
+                'status': 'provider_unconfigured',
+                'version_id': version_id,
+                'error': str(e),
+            }
+        except Exception as e:
+            logger.error(
+                f"[PWANIMATE-EMBEDDINGS] Provider error generating embeddings for version {version_id}: {e}",
+                exc_info=True
+            )
+            # Mark this batch as failed
+            with transaction.atomic():
+                for c in batch:
+                    c.embedding_status = 'failed'
+                    c.is_active = False
+                DocumentChunk.objects.bulk_update(batch, fields=['embedding_status', 'is_active', 'updated_at'])
+            raise self.retry(exc=e)
+
+        if len(vectors) != len(batch):
+            err_msg = f"Provider returned {len(vectors)} vectors for {len(batch)} chunks"
+            logger.error(f"[PWANIMATE-EMBEDDINGS] {err_msg}")
+            with transaction.atomic():
+                for c in batch:
+                    c.embedding_status = 'failed'
+                    c.is_active = False
+                DocumentChunk.objects.bulk_update(batch, fields=['embedding_status', 'is_active', 'updated_at'])
+            return {'status': 'failed', 'reason': err_msg}
+
+        # Persist vectors and transition lifecycle to completed + active
+        with transaction.atomic():
+            for chunk, vec in zip(batch, vectors):
+                chunk.embedding = vec
+                chunk.embedding_status = 'completed'
+                chunk.embedding_model = active_model
+                chunk.is_active = True  # Now validated and retrieval-ready
+
+            DocumentChunk.objects.bulk_update(
+                batch,
+                fields=['embedding', 'embedding_status', 'embedding_model', 'is_active', 'updated_at']
+            )
+
+        total_embedded += len(batch)
+
+    logger.info(
+        f"[PWANIMATE-EMBEDDINGS] SUCCESS: Embedded and activated {total_embedded} chunks for "
+        f"version {version_id} with model '{active_model}'."
+    )
+
+    return {
+        'status': 'success',
+        'version_id': version_id,
+        'document_id': version.document_id,
+        'embedded_count': total_embedded,
+        'model': active_model,
+        'dimensions': expected_dim,
+    }
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='pwanimate.tasks.embeddings.embed_document'
+)
+def embed_document(
+    self,
+    document_id: int,
+    force: bool = False,
+    provider_name: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Convenience task to embed the latest version of a Document.
+    """
+    try:
+        doc = Document.objects.get(id=document_id)
+    except Document.DoesNotExist:
+        logger.error(f"[PWANIMATE-EMBEDDINGS] Document {document_id} not found")
+        return {'status': 'failed', 'reason': 'document_not_found', 'document_id': document_id}
+
+    latest_version = doc.latest_version
+    if not latest_version:
+        logger.warning(f"[PWANIMATE-EMBEDDINGS] Document {document_id} has no latest_version, skipping.")
+        return {'status': 'skipped', 'reason': 'no_latest_version', 'document_id': document_id}
+
+    return embed_document_version(
+        version_id=latest_version.id,
+        force=force,
+        provider_name=provider_name
+    )

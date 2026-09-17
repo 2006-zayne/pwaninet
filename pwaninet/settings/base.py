@@ -67,6 +67,8 @@ INSTALLED_APPS = [
     'messaging',
     'search',
     'recommendations',
+    'pwanimate',
+    'admin_dashboard',
 ]
 
 MIDDLEWARE = [
@@ -330,6 +332,9 @@ CELERY_TASK_ROUTES = {
     'search.tasks.*': {'queue': 'search_queue'},
     'documents.tasks.search_indexing.*': {'queue': 'search_queue'},
     
+    # Pwanimate ingestion & chunking tasks
+    'pwanimate.tasks.*': {'queue': 'docs_queue'},
+    
     # Fallback to default
     '*': {'queue': 'default'},
 }
@@ -529,5 +534,50 @@ LOGGING = {
         },
     },
 }
+
+# ---------------------------------------------------------------------------
+# Pwanimate Configuration
+# ---------------------------------------------------------------------------
+PWANIMATE_ENABLED = os.environ.get('PWANIMATE_ENABLED', 'True').lower() in ('true', '1', 'yes')
+PWANIMATE_GEMINI_API_KEY = os.environ.get('PWANIMATE_GEMINI_API_KEY', '')
+PWANIMATE_GROQ_API_KEY = os.environ.get('PWANIMATE_GROQ_API_KEY', '')
+PWANIMATE_OPENROUTER_API_KEY = os.environ.get('PWANIMATE_OPENROUTER_API_KEY', '')
+
+# Embedding Subsystem
+PWANIMATE_EMBEDDING_PROVIDER = os.environ.get('PWANIMATE_EMBEDDING_PROVIDER', 'gemini')
+PWANIMATE_EMBEDDING_MODEL = os.environ.get('PWANIMATE_EMBEDDING_MODEL', 'gemini-embedding-2')
+PWANIMATE_EMBEDDING_DIMENSIONS = int(os.environ.get('PWANIMATE_EMBEDDING_DIMENSIONS', '768'))
+PWANIMATE_EMBEDDING_BATCH_SIZE = int(os.environ.get('PWANIMATE_EMBEDDING_BATCH_SIZE', '32'))
+
+# AI Gateway (LLM Generation)
+PWANIMATE_DEFAULT_LLM_PROVIDER = os.environ.get('PWANIMATE_DEFAULT_LLM_PROVIDER', 'gemini')
+PWANIMATE_GEMINI_MODEL = os.environ.get('PWANIMATE_GEMINI_MODEL', 'gemini-3.6-flash')
+PWANIMATE_GROQ_MODEL = os.environ.get('PWANIMATE_GROQ_MODEL', 'openai/gpt-oss-120b')
+PWANIMATE_OPENROUTER_MODEL = os.environ.get('PWANIMATE_OPENROUTER_MODEL', 'google/gemini-2.5-flash')
+PWANIMATE_LLM_TIMEOUT = float(os.environ.get('PWANIMATE_LLM_TIMEOUT', '30.0'))
+PWANIMATE_LLM_CONNECT_TIMEOUT = float(os.environ.get('PWANIMATE_LLM_CONNECT_TIMEOUT', '5.0'))
+PWANIMATE_PROVIDER_FALLBACK_ORDER = os.environ.get(
+    'PWANIMATE_PROVIDER_FALLBACK_ORDER', 'gemini,groq,openrouter'
+).split(',')
+PWANIMATE_RATE_LIMIT_COOLDOWN = float(os.environ.get('PWANIMATE_RATE_LIMIT_COOLDOWN', '60'))
+
+# Model-level fallback chain: interleaved across providers so that when one provider
+# is throttled or quota-depleted, the gateway immediately fails over to an available provider.
+PWANIMATE_LLM_FALLBACK_CHAIN = [
+    {"provider": "gemini", "model": "gemini-3.6-flash"},
+    {"provider": "groq", "model": "openai/gpt-oss-120b"},
+    {"provider": "openrouter", "model": "google/gemini-2.5-flash"},
+    {"provider": "groq", "model": "openai/gpt-oss-20b"},
+    {"provider": "gemini", "model": "gemini-3.5-flash"},
+    {"provider": "openrouter", "model": "nvidia/nemotron-3.5-lightning:free"},
+    {"provider": "groq", "model": "qwen/qwen3.8-27b"},
+    {"provider": "gemini", "model": "gemini-3.5-flash-lite"},
+    {"provider": "openrouter", "model": "nex-agi/nex-n2.5-pro:free"},
+    {"provider": "groq", "model": "groq/compound-mini"},
+    {"provider": "gemini", "model": "gemini-flash-latest"},
+    {"provider": "openrouter", "model": "liquid/lfm-2.5-2.6b:free"},
+]
+
+
 
 

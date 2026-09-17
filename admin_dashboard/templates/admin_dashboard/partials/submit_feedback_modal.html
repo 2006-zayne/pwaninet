@@ -1,0 +1,43 @@
+<div class="modal fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold" id="feedbackModalLabel">Contact Support / Feedback</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="feedback-form-target">
+          <p class="text-muted small mb-3">Found a bug? Have a feature request? Let us know!</p>
+          <form hx-post="{% url 'admin_dashboard:submit_feedback' %}" hx-target="#feedback-form-target" hx-swap="innerHTML">
+            {% csrf_token %}
+            <input type="hidden" name="current_url" id="feedback_current_url" value="">
+            <script>document.getElementById('feedback_current_url').value = window.location.href;</script>
+            
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Category</label>
+              <select class="form-select" name="category" required>
+                <option value="BUG">Report a Bug</option>
+                <option value="FEATURE">Feature Request</option>
+                <option value="ACADEMIC">Academic Issue</option>
+                <option value="ACCOUNT">Account Help</option>
+                <option value="OTHER">Other Feedback</option>
+              </select>
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Subject</label>
+              <input type="text" class="form-control" name="subject" required placeholder="Brief summary of your feedback">
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Message</label>
+              <textarea class="form-control" name="message" rows="4" required placeholder="Please describe in detail..."></textarea>
+            </div>
+            
+            <button type="submit" class="btn btn-primary w-100 fw-bold">Submit to Admins</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
