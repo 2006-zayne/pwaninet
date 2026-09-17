@@ -174,9 +174,14 @@
     justify-content: space-between;
     padding: 0.75rem 1.25rem;
     background-color: var(--pwanimate-sidebar-bg);
+    /* Frosted-glass lock: visible on web, PWA, and Capacitor */
+    backdrop-filter: blur(12px) saturate(1.3);
+    -webkit-backdrop-filter: blur(12px) saturate(1.3);
     border-bottom: 1px solid var(--pwanimate-border);
     min-height: 56px;
+    /* flex-shrink:0 keeps this anchored — the 100%-height chain does the locking */
     flex-shrink: 0;
+    z-index: 20;
 }
 
 .pwanimate-header-title {
@@ -549,10 +554,15 @@ a.pwanimate-citation-badge:hover {
 /* Composer Container (Docked Flex Island Architecture) */
 .pwanimate-composer-wrapper {
     flex-shrink: 0;
+    /* relative positioning — the flex-shrink:0 + 100%-height chain locks this to the bottom */
     position: relative;
     z-index: 10;
+    /* Solid frosted-glass background: locked appearance on web, PWA, and Capacitor */
     background-color: var(--pwanimate-bg);
-    border-top: none;
+    background-color: color-mix(in srgb, var(--pwanimate-bg, #f8fafc) 90%, transparent);
+    backdrop-filter: blur(16px) saturate(1.3);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+    border-top: 1px solid var(--pwanimate-border);
     padding: 0.5rem 1rem 0.75rem 1rem;
     width: 100%;
     max-width: 800px;
@@ -777,11 +787,9 @@ body.keyboard-open .pwanimate-composer-wrapper {
 
 /* Pwanimate Standalone App Layout Overrides */
 /* Scoped to body.pwanimate-active to prevent freezing scrolling across the rest of the site */
+/* Applied to ALL environments: web browser tab, PWA, and Capacitor native */
 html.pwanimate-active,
-html:has(body.pwanimate-active),
-html.is-capacitor:has(body.pwanimate-active),
-html.is-native-app:has(body.pwanimate-active),
-html.is-standalone-pwa:has(body.pwanimate-active) {
+html:has(body.pwanimate-active) {
     height: 100% !important;
     height: 100dvh !important;
     max-height: 100dvh !important;

@@ -602,7 +602,10 @@ function initPullToRefresh() {
     let currentY = 0;
     let isPulling = false;
     let hapticTriggered = false;
-    const threshold = 65;
+    // Raised from 65 → 80px so a casual short swipe cannot accidentally fire a reload.
+    const threshold = 80;
+    // Minimum raw finger travel (px) before the indicator even starts appearing.
+    const MIN_SHOW_PX = 30;
 
     let ptrIndicator = document.getElementById('pwaninet-ptr-indicator');
     if (!ptrIndicator) {
@@ -615,9 +618,36 @@ function initPullToRefresh() {
 
     const icon = ptrIndicator.querySelector('i');
 
+    /**
+     * Returns true if the touch target is inside a child element that can itself
+     * scroll vertically (e.g. a chat message list, a modal body, a horizontal carousel).
+     * We must NOT activate PTR in those cases.
+     */
+    function touchStartsInScrollableChild(target) {
+        let el = target;
+        while (el && el !== document.body) {
+            const style = window.getComputedStyle(el);
+            const overflowY = style.overflowY;
+            const isScrollable = (overflowY === 'auto' || overflowY === 'scroll');
+            if (isScrollable && el.scrollHeight > el.clientHeight) return true;
+            el = el.parentElement;
+        }
+        return false;
+    }
+
     document.addEventListener('touchstart', function(e) {
+        // Always reset currentY to avoid stale diff from a previous drag.
+        currentY = 0;
+        startY = 0;
+
         if (window.scrollY <= 2 && e.touches.length === 1) {
+            // Don't activate PTR when the touch is inside a scrollable child container.
+            if (touchStartsInScrollableChild(e.target)) {
+                isPulling = false;
+                return;
+            }
             startY = e.touches[0].clientY;
+            currentY = startY; // initialise to same point — diff starts at 0
             isPulling = true;
             hapticTriggered = false;
         } else {
@@ -630,7 +660,8 @@ function initPullToRefresh() {
         currentY = e.touches[0].clientY;
         const diff = currentY - startY;
 
-        if (diff > 10) {
+        // Only start showing the indicator after MIN_SHOW_PX of deliberate downward drag.
+        if (diff > MIN_SHOW_PX) {
             const pullDistance = Math.min(diff * 0.45, threshold + 25);
             ptrIndicator.style.opacity = String(Math.min(pullDistance / threshold, 1));
             ptrIndicator.style.transform = 'translate(-50%, ' + pullDistance + 'px)';
