@@ -11,7 +11,17 @@ from typing import List
 
 class EmbeddingProviderError(Exception):
     """Base exception for all embedding generation errors."""
-    pass
+    def __init__(self, message: str, provider: str = "", status_code: int = None, details: dict = None):
+        super().__init__(message)
+        self.message = message
+        self.provider = provider
+        self.status_code = status_code
+        self.details = details or {}
+
+    def __str__(self):
+        prefix = f"[{self.provider}] " if self.provider else ""
+        code = f" (status {self.status_code})" if self.status_code else ""
+        return f"{prefix}{self.message}{code}"
 
 
 class EmbeddingConfigurationError(EmbeddingProviderError):
@@ -19,8 +29,43 @@ class EmbeddingConfigurationError(EmbeddingProviderError):
     pass
 
 
+class EmbeddingAuthenticationError(EmbeddingProviderError):
+    """Raised when external provider returns 401 or 403 authentication failure."""
+    pass
+
+
 class EmbeddingDimensionMismatchError(EmbeddingProviderError):
     """Raised when returned vectors do not match the expected dimensionality."""
+    pass
+
+
+class EmbeddingQuotaExhaustedError(EmbeddingProviderError):
+    """Raised when the API quota is exhausted (HTTP 429 / rate limit).
+
+    Unlike hard failures, quota errors are transient — the request should be
+    retried after a sufficient back-off window, and chunks must NOT be marked
+    'failed' while waiting for quota to reset.
+    """
+    pass
+
+
+class EmbeddingTimeoutError(EmbeddingProviderError):
+    """Raised when connection or read timeout occurs during provider call."""
+    pass
+
+
+class EmbeddingInvalidRequestError(EmbeddingProviderError):
+    """Raised when external provider returns 400 or 422 client payload error."""
+    pass
+
+
+class EmbeddingServerResponseError(EmbeddingProviderError):
+    """Raised when external provider returns 5xx server error or unhandled error status."""
+    pass
+
+
+class EmbeddingMalformedResponseError(EmbeddingProviderError):
+    """Raised when external provider returns unparseable or unexpected response payload."""
     pass
 
 

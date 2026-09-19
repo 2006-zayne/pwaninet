@@ -147,12 +147,30 @@ class OpenRouterLLMProvider(BaseLLMProvider):
         if not messages:
             messages.append({"role": "user", "content": "Hello"})
 
-        return {
+        model_lower = model.lower()
+        is_reasoning_model = any(
+            pattern in model_lower
+            for pattern in ("nex-", "r1", "reasoning", "thinking", "nemotron")
+        )
+
+        max_tokens = request.max_tokens or 1500
+        if is_reasoning_model and max_tokens <= 1024:
+            max_tokens = 2048
+
+        payload: Dict[str, Any] = {
             "model": model,
             "messages": messages,
             "temperature": request.temperature,
-            "max_tokens": request.max_tokens or 1500,
+            "max_tokens": max_tokens,
         }
+
+        # Configure reasoning effort if supported/requested
+        if request.metadata and "reasoning" in request.metadata:
+            payload["reasoning"] = request.metadata["reasoning"]
+        elif is_reasoning_model:
+            payload["reasoning"] = {"effort": "low"}
+
+        return payload
 
     def _parse_response(self, data: Dict[str, Any], request: LLMRequest, model: str) -> LLMResponse:
         """Extract content, finish reason, and usage from OpenRouter response."""
@@ -165,15 +183,62 @@ class OpenRouterLLMProvider(BaseLLMProvider):
             )
 
         choice = choices[0]
-        content = choice.get("message", {}).get("content") or ""
-        finish_reason = choice.get("finish_reason")
+        msg = choice.get("message", {})
+        content = (msg.get("content") or "").strip()
+        reasoning = (msg.get("reasoning") or msg.get("reasoning_content") or "").strip()
+
+        raw_finish = choice.get("finish_reason")
+        finish_reason = raw_finish
+        if raw_finish:
+            lower_finish = raw_finish.strip().lower()
+            if lower_finish in ("length", "max_tokens"):
+                finish_reason = "max_tokens"
+            elif lower_finish == "stop":
+                finish_reason = "stop"
+            else:
+                finish_reason = lower_finish
 
         usage = data.get("usage", {})
         prompt_tokens = usage.get("prompt_tokens")
         completion_tokens = usage.get("completion_tokens")
         total_tokens = usage.get("total_tokens")
 
+        # Extract reasoning/thinking tokens
+        details = usage.get("completion_tokens_details") or {}
+        thoughts_tokens = details.get("reasoning_tokens") or usage.get("reasoning_tokens")
+
+        # In OpenRouter/OpenAI standard, completion_tokens includes reasoning_tokens
+        total_output_tokens = completion_tokens
+        if total_output_tokens is None and (completion_tokens or thoughts_tokens):
+            total_output_tokens = (completion_tokens or 0) + (thoughts_tokens or 0)
+
+        # Empty content validation and recovery
+        if not content:
+            if finish_reason == "max_tokens":
+                raise AIProviderAPIError(
+                    f"OpenRouter model '{model}' reached maximum token limit ({request.max_tokens}) during reasoning without generating visible content.",
+                    provider=self.provider_name,
+                )
+            elif reasoning:
+                # Fall back to reasoning text if model only populated reasoning field on normal stop
+                content = reasoning
+            else:
+                raise AIProviderAPIError(
+                    f"OpenRouter model '{model}' generated empty content (finish_reason={raw_finish}).",
+                    provider=self.provider_name,
+                )
+
         citations = list(request.context.citations) if request.context else []
+
+        metadata: Dict[str, Any] = {
+            "openrouter_id": data.get("id"),
+            "provider_finish_reason": raw_finish,
+            "max_output_tokens": request.max_tokens,
+            "thoughts_tokens": thoughts_tokens,
+            "total_output_tokens": total_output_tokens,
+        }
+        if reasoning:
+            metadata["reasoning"] = reasoning
 
         return LLMResponse(
             content=content,
@@ -184,7 +249,7 @@ class OpenRouterLLMProvider(BaseLLMProvider):
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
             citations=citations,
-            metadata={"openrouter_id": data.get("id")},
+            metadata=metadata,
         )
 
     def _extract_error_message(self, resp: requests.Response) -> str:

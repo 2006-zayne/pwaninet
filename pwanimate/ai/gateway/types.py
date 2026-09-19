@@ -64,7 +64,9 @@ class LLMRequest:
     def __post_init__(self):
         if self.temperature < 0.0 or self.temperature > 2.0:
             raise ValueError(f"Temperature must be between 0.0 and 2.0, got {self.temperature}")
-        if self.max_tokens <= 0:
+        if self.max_tokens is None:
+            self.max_tokens = 1024
+        elif self.max_tokens <= 0:
             raise ValueError(f"max_tokens must be positive, got {self.max_tokens}")
         # Ensure messages is a list
         if not isinstance(self.messages, list):
@@ -110,3 +112,33 @@ class LLMResponse:
             "citations": list(self.citations),
             "metadata": dict(self.metadata),
         }
+
+
+@dataclass(frozen=True)
+class GenerationPolicy:
+    """
+    Task-aware generation policy specifying output token budget and sampling parameters.
+    """
+    max_output_tokens: int
+    temperature: float = 0.2
+
+
+# Initial task policies:
+# - conversational: greetings, short orientation (512 tokens)
+# - tool: presentation of deterministic domain tool records (1024 tokens)
+# - rag: academic tutoring, conceptual explanation, grounding citations (4096 tokens)
+DEFAULT_TASK_POLICIES: Dict[str, GenerationPolicy] = {
+    "conversational": GenerationPolicy(max_output_tokens=512, temperature=0.2),
+    "general": GenerationPolicy(max_output_tokens=512, temperature=0.2),
+    "tool": GenerationPolicy(max_output_tokens=1024, temperature=0.2),
+    "rag": GenerationPolicy(max_output_tokens=4096, temperature=0.2),
+}
+
+DEFAULT_GENERATION_POLICY = GenerationPolicy(max_output_tokens=1024, temperature=0.2)
+
+
+def get_task_policy(task: str) -> GenerationPolicy:
+    """Resolve generation policy for a given task, falling back to safe 1024 default."""
+    if not task:
+        return DEFAULT_GENERATION_POLICY
+    return DEFAULT_TASK_POLICIES.get(task.strip().lower(), DEFAULT_GENERATION_POLICY)

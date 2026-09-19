@@ -160,15 +160,59 @@ class GroqLLMProvider(BaseLLMProvider):
             )
 
         choice = choices[0]
-        content = choice.get("message", {}).get("content", "")
-        finish_reason = choice.get("finish_reason")
+        msg = choice.get("message", {})
+        content = (msg.get("content") or "").strip()
+        reasoning = (msg.get("reasoning") or msg.get("reasoning_content") or "").strip()
+        raw_finish = choice.get("finish_reason")
+        finish_reason = raw_finish
+        if raw_finish:
+            lower_finish = raw_finish.strip().lower()
+            if lower_finish in ("length", "max_tokens"):
+                finish_reason = "max_tokens"
+            elif lower_finish == "stop":
+                finish_reason = "stop"
+            else:
+                finish_reason = lower_finish
 
         usage = data.get("usage", {})
         prompt_tokens = usage.get("prompt_tokens")
         completion_tokens = usage.get("completion_tokens")
         total_tokens = usage.get("total_tokens")
 
+        # Extract reasoning/thinking tokens
+        details = usage.get("completion_tokens_details") or {}
+        thoughts_tokens = details.get("reasoning_tokens") or usage.get("reasoning_tokens")
+
+        total_output_tokens = completion_tokens
+        if total_output_tokens is None and (completion_tokens or thoughts_tokens):
+            total_output_tokens = (completion_tokens or 0) + (thoughts_tokens or 0)
+
+        # Empty content validation and recovery
+        if not content:
+            if finish_reason == "max_tokens":
+                raise AIProviderAPIError(
+                    f"Groq model '{model}' reached maximum token limit ({request.max_tokens}) during reasoning without generating visible content.",
+                    provider=self.provider_name,
+                )
+            elif reasoning:
+                content = reasoning
+            else:
+                raise AIProviderAPIError(
+                    f"Groq model '{model}' generated empty content (finish_reason={raw_finish}).",
+                    provider=self.provider_name,
+                )
+
         citations = list(request.context.citations) if request.context else []
+
+        metadata: Dict[str, Any] = {
+            "groq_id": data.get("id"),
+            "provider_finish_reason": raw_finish,
+            "max_output_tokens": request.max_tokens,
+            "thoughts_tokens": thoughts_tokens,
+            "total_output_tokens": total_output_tokens,
+        }
+        if reasoning:
+            metadata["reasoning"] = reasoning
 
         return LLMResponse(
             content=content,
@@ -179,7 +223,7 @@ class GroqLLMProvider(BaseLLMProvider):
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
             citations=citations,
-            metadata={"groq_id": data.get("id")},
+            metadata=metadata,
         )
 
     def _extract_error_message(self, resp: requests.Response) -> str:

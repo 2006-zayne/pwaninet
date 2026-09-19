@@ -1,0 +1,154 @@
+{% load i18n %}
+{% load static %}
+
+<div class="documents-context-rail d-flex flex-column gap-3">
+    <!-- Academic Repository Action Card -->
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-body p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-folder2-open text-primary fs-5"></i>
+                <h6 class="fw-bold mb-0 text-dark">{% trans "Academic Repository" %}</h6>
+            </div>
+            <p class="small text-secondary mb-3" style="font-size: 0.82rem;">
+                {% trans "Share course notes, past papers, and revision materials or access your personal workspace." %}
+            </p>
+            <div class="d-flex flex-column gap-2">
+                {% if request.user.is_authenticated %}
+                <a href="{% url 'documents:upload' %}"
+                   class="btn btn-primary w-100 rounded-pill fw-semibold py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm"
+                   hx-get="{% url 'documents:upload' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
+                    <i class="bi bi-cloud-arrow-up-fill"></i>
+                    <span>{% trans "Upload Document" %}</span>
+                </a>
+                <a href="{% url 'documents:my_library' %}"
+                   class="btn btn-outline-primary w-100 rounded-pill fw-semibold py-2 d-flex align-items-center justify-content-center gap-2"
+                   hx-get="{% url 'documents:my_library' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
+                    <i class="bi bi-journal-bookmark-fill"></i>
+                    <span>{% trans "My Library" %}</span>
+                </a>
+                {% else %}
+                <a href="{% url 'login' %}?next={% url 'documents:upload' %}"
+                   class="btn btn-primary w-100 rounded-pill fw-semibold py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm">
+                    <i class="bi bi-cloud-arrow-up-fill"></i>
+                    <span>{% trans "Upload Document" %}</span>
+                </a>
+                <a href="{% url 'login' %}?next={% url 'documents:my_library' %}"
+                   class="btn btn-outline-primary w-100 rounded-pill fw-semibold py-2 d-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-journal-bookmark-fill"></i>
+                    <span>{% trans "My Library" %}</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Library Shortcuts Card (Authenticated Users) -->
+    {% if request.user.is_authenticated %}
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-header bg-transparent border-0 pt-3 px-3 pb-1 d-flex align-items-center justify-content-between">
+            <h6 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2" style="font-size: 0.92rem;">
+                <i class="bi bi-collection-fill text-primary"></i>
+                {% trans "Library Shortcuts" %}
+            </h6>
+            <a href="{% url 'documents:my_library' %}"
+               class="text-primary small text-decoration-none fw-semibold"
+               hx-get="{% url 'documents:my_library' %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true">
+                {% trans "Overview" %}
+            </a>
+        </div>
+        <div class="card-body p-2 pt-0">
+            <div class="d-flex flex-column">
+                <a href="{% url 'documents:my_uploads' %}"
+                   class="d-flex align-items-center justify-content-between p-2 rounded-3 text-decoration-none context-rail-item-hover text-dark"
+                   hx-get="{% url 'documents:my_uploads' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
+                    <span class="small d-flex align-items-center gap-2">
+                        <i class="bi bi-upload text-primary"></i>
+                        <span>{% trans "My Uploads" %}</span>
+                    </span>
+                    <i class="bi bi-chevron-right text-muted small"></i>
+                </a>
+                <a href="{% url 'documents:my_bookmarks' %}"
+                   class="d-flex align-items-center justify-content-between p-2 rounded-3 text-decoration-none context-rail-item-hover text-dark"
+                   hx-get="{% url 'documents:my_bookmarks' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
+                    <span class="small d-flex align-items-center gap-2">
+                        <i class="bi bi-bookmark-fill text-warning"></i>
+                        <span>{% trans "Saved Bookmarks" %}</span>
+                    </span>
+                    <i class="bi bi-chevron-right text-muted small"></i>
+                </a>
+                <a href="{% url 'documents:my_downloads' %}"
+                   class="d-flex align-items-center justify-content-between p-2 rounded-3 text-decoration-none context-rail-item-hover text-dark"
+                   hx-get="{% url 'documents:my_downloads' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
+                    <span class="small d-flex align-items-center gap-2">
+                        <i class="bi bi-download text-success"></i>
+                        <span>{% trans "Downloaded Materials" %}</span>
+                    </span>
+                    <i class="bi bi-chevron-right text-muted small"></i>
+                </a>
+                <a href="{% url 'documents:my_history' %}"
+                   class="d-flex align-items-center justify-content-between p-2 rounded-3 text-decoration-none context-rail-item-hover text-dark"
+                   hx-get="{% url 'documents:my_history' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
+                    <span class="small d-flex align-items-center gap-2">
+                        <i class="bi bi-clock-history text-secondary"></i>
+                        <span>{% trans "Viewing History" %}</span>
+                    </span>
+                    <i class="bi bi-chevron-right text-muted small"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Resource Guidelines Card -->
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-body p-3">
+            <h6 class="fw-bold mb-2 text-dark d-flex align-items-center gap-2" style="font-size: 0.9rem;">
+                <i class="bi bi-info-circle-fill text-info"></i>
+                {% trans "Sharing Guidelines" %}
+            </h6>
+            <p class="small text-secondary mb-0" style="font-size: 0.8rem; line-height: 1.5;">
+                {% trans "Ensure uploaded papers, notes, and study guides are clear, properly categorized, and follow university academic integrity standards." %}
+            </p>
+        </div>
+    </div>
+
+    <!-- Quick Footer Links -->
+    <div class="px-2 text-muted small" style="font-size: 0.75rem;">
+        <div class="d-flex flex-wrap gap-2 mb-1">
+            <a href="{% url 'users:settings' %}" class="text-muted text-decoration-none" hx-get="{% url 'users:settings' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">{% trans "Settings" %}</a>
+            <span>&middot;</span>
+            <a href="{% url 'users:settings_privacy' %}" class="text-muted text-decoration-none" hx-get="{% url 'users:settings_privacy' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">{% trans "Privacy" %}</a>
+            <span>&middot;</span>
+            <a href="{% url 'users:settings_about' %}" class="text-muted text-decoration-none" hx-get="{% url 'users:settings_about' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">{% trans "About" %}</a>
+        </div>
+        <div>PwaniNet &copy; 2026 Pwani University</div>
+    </div>
+</div>

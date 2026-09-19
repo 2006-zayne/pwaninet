@@ -13,6 +13,7 @@ from .base import (
     EmbeddingProviderError,
     EmbeddingConfigurationError,
     EmbeddingDimensionMismatchError,
+    EmbeddingQuotaExhaustedError,
 )
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,15 @@ class GeminiEmbeddingProvider(BaseEmbeddingProvider):
             raise EmbeddingProviderError(f"Gemini embedding request timed out after {self.timeout}s: {e}") from e
         except requests.exceptions.RequestException as e:
             raise EmbeddingProviderError(f"Gemini embedding network connection error: {e}") from e
+
+        if response.status_code == 429:
+            retry_after = response.headers.get('Retry-After', 'not provided')
+            err_msg = (
+                f"Gemini quota exhausted (429). Retry-After: {retry_after}. "
+                f"Body: {response.text[:200]}"
+            )
+            logger.warning(err_msg)
+            raise EmbeddingQuotaExhaustedError(err_msg)
 
         if response.status_code != 200:
             err_msg = f"Gemini API error (status {response.status_code}): {response.text[:300]}"

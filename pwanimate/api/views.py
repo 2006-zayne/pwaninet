@@ -25,6 +25,7 @@ from pwanimate.orchestrator import (
     OrchestratorValidationError,
     PwanimateOrchestrator,
 )
+from django.core.exceptions import ValidationError
 from pwanimate.services.conversation import ConversationService
 from pwanimate.ai.gateway.quota_tracker import get_quota_tracker
 
@@ -114,10 +115,14 @@ class PwanimateChatView(APIView):
             # External LLM generation occurs outside database transactions
             response = orchestrator.run(orchestration_req)
 
-            # Persist assistant response turn
+            # Persist assistant response turn with defensive fallback
+            answer_text = (response.answer or "").strip()
+            if not answer_text:
+                answer_text = "I'm sorry, I was unable to generate a response. Please try asking again or rephrasing your question."
+
             asst_msg = ConversationService.persist_assistant_message(
                 conversation=conversation,
-                content=response.answer,
+                content=answer_text,
                 citations=response.citations,
                 sources=response.sources,
             )
@@ -137,11 +142,41 @@ class PwanimateChatView(APIView):
             res_data["quota_info"] = response.quota_info
             res_data["quota_status"] = get_quota_tracker().get_status()
 
+            thoughts_tokens = response.metadata.get("thoughts_tokens")
+            total_output_tokens = response.metadata.get("total_output_tokens")
+            max_output_tokens = response.metadata.get("max_output_tokens")
+
+            logger.info(
+                "PwanimateChatView response: user=%s conv=%s msg_id=%s provider=%s model=%s finish_reason=%s prompt_tokens=%s completion_tokens=%s thoughts_tokens=%s total_output_tokens=%s total_tokens=%s max_output_tokens=%s ans_len=%d",
+                getattr(request.user, "username", "anon"),
+                conversation.id,
+                asst_msg.id,
+                response.provider,
+                response.model,
+                response.finish_reason,
+                response.prompt_tokens,
+                response.completion_tokens,
+                thoughts_tokens,
+                total_output_tokens,
+                response.total_tokens,
+                max_output_tokens,
+                len(response.answer),
+            )
+
             return Response(res_data, status=status.HTTP_200_OK)
 
         except OrchestratorValidationError as exc:
             return Response(
                 {"error": str(exc), "conversation_id": str(conversation.id)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ValidationError as exc:
+            logger.warning("Pwanimate validation error: %s", exc)
+            return Response(
+                {
+                    "error": str(exc.messages if hasattr(exc, "messages") else exc),
+                    "conversation_id": str(conversation.id),
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except AIProviderRateLimitError as exc:

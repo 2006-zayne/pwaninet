@@ -108,6 +108,13 @@ class AIGateway:
                 )
 
                 response = provider.generate(gen_request)
+
+                # Defensive check: if candidate generated empty content, treat as failure and trigger fallback
+                if not response.content or not response.content.strip():
+                    raise AIProviderAPIError(
+                        f"Candidate '{candidate_label}' generated empty content (finish_reason={response.finish_reason}).",
+                        provider=provider_name,
+                    )
             except AIProviderRateLimitError as exc:
                 duration_ms = round((time.perf_counter() - t_start) * 1000, 2)
                 logger.warning(
@@ -194,13 +201,25 @@ class AIGateway:
                     response.model,
                 )
 
+            response.metadata.setdefault("max_output_tokens", request.max_tokens)
+
+            extra_tokens = ""
+            if response.metadata.get("thoughts_tokens") is not None:
+                extra_tokens = (
+                    f" prompt={response.prompt_tokens} completion={response.completion_tokens} "
+                    f"thoughts={response.metadata['thoughts_tokens']} "
+                    f"total_out={response.metadata.get('total_output_tokens')} "
+                    f"max_out={response.metadata.get('max_output_tokens')}"
+                )
+
             logger.info(
-                "AI Gateway generation completed: provider=%s model=%s tokens=%s finish=%s duration_ms=%.2f",
+                "AI Gateway generation completed: provider=%s model=%s tokens=%s finish=%s duration_ms=%.2f%s",
                 response.provider,
                 response.model,
                 response.total_tokens,
                 response.finish_reason,
                 duration_ms,
+                extra_tokens,
             )
 
             return response

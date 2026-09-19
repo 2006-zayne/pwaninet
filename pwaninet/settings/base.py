@@ -191,7 +191,7 @@ X_FRAME_OPTIONS = 'DENY'
 SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
-CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = False  # Must be False so JS can read the csrftoken cookie for AJAX requests
 
 # Two-Factor Authentication (2FA / TOTP) and Recovery Codes
 MFA_ENCRYPTION_KEY = os.environ.get('MFA_ENCRYPTION_KEY', None)
@@ -532,6 +532,11 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'pwanimate': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
     },
 }
 
@@ -548,6 +553,17 @@ PWANIMATE_EMBEDDING_PROVIDER = os.environ.get('PWANIMATE_EMBEDDING_PROVIDER', 'g
 PWANIMATE_EMBEDDING_MODEL = os.environ.get('PWANIMATE_EMBEDDING_MODEL', 'gemini-embedding-2')
 PWANIMATE_EMBEDDING_DIMENSIONS = int(os.environ.get('PWANIMATE_EMBEDDING_DIMENSIONS', '768'))
 PWANIMATE_EMBEDDING_BATCH_SIZE = int(os.environ.get('PWANIMATE_EMBEDDING_BATCH_SIZE', '32'))
+
+# Multi-Provider Embedding Configuration Placeholders
+PWANIMATE_JINA_API_KEY = os.environ.get('PWANIMATE_JINA_API_KEY', os.environ.get('JINA_API_KEY', ''))
+PWANIMATE_JINA_MODEL = os.environ.get('PWANIMATE_JINA_MODEL', 'jina-embeddings-v3')
+
+PWANIMATE_VOYAGE_API_KEY = os.environ.get('PWANIMATE_VOYAGE_API_KEY', os.environ.get('VOYAGE_API_KEY', ''))
+PWANIMATE_VOYAGE_MODEL = os.environ.get('PWANIMATE_VOYAGE_MODEL', 'voyage-3')
+
+PWANIMATE_CLOUDFLARE_API_TOKEN = os.environ.get('PWANIMATE_CLOUDFLARE_API_TOKEN', os.environ.get('CLOUDFLARE_API_TOKEN', ''))
+PWANIMATE_CLOUDFLARE_ACCOUNT_ID = os.environ.get('PWANIMATE_CLOUDFLARE_ACCOUNT_ID', os.environ.get('CLOUDFLARE_ACCOUNT_ID', ''))
+PWANIMATE_CLOUDFLARE_MODEL = os.environ.get('PWANIMATE_CLOUDFLARE_MODEL', os.environ.get('CLOUDFLARE_EMBEDDING_MODEL', '@cf/baai/bge-base-en-v1.5'))
 
 # AI Gateway (LLM Generation)
 PWANIMATE_DEFAULT_LLM_PROVIDER = os.environ.get('PWANIMATE_DEFAULT_LLM_PROVIDER', 'gemini')

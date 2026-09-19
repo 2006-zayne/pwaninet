@@ -341,6 +341,104 @@ class GeminiLLMProviderTestCase(SimpleTestCase):
         with self.assertRaises(AIProviderAPIError):
             provider.generate(req)
 
+    @patch("requests.Session.post")
+    def test_gemini_thinking_token_accounting(self, mock_post):
+        """Test extraction of thoughtsTokenCount, total_output_tokens, and max_output_tokens."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [{"text": "Visible answer text truncated by max_tokens limit"}],
+                        "role": "model",
+                    },
+                    "finishReason": "MAX_TOKENS",
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 1878,
+                "candidatesTokenCount": 131,
+                "thoughtsTokenCount": 889,
+                "totalTokenCount": 2898,
+            },
+        }
+        mock_post.return_value = mock_resp
+
+        provider = GeminiLLMProvider(api_key="test-gemini-key", model_name="gemini-3.6-flash")
+        req = LLMRequest(
+            task="rag",
+            messages=[ChatMessage(role="user", content="Explain subnetting")],
+            temperature=0.2,
+            max_tokens=1024,
+        )
+        resp = provider.generate(req)
+
+        # Provider-neutral contract checks
+        self.assertEqual(resp.provider, "gemini")
+        self.assertEqual(resp.model, "gemini-3.6-flash")
+        self.assertEqual(resp.finish_reason, "max_tokens")
+        self.assertEqual(resp.prompt_tokens, 1878)
+        self.assertEqual(resp.completion_tokens, 131)
+        self.assertEqual(resp.total_tokens, 2898)
+
+        # Diagnostic metadata checks
+        self.assertEqual(resp.metadata.get("thoughts_tokens"), 889)
+        self.assertEqual(resp.metadata.get("total_output_tokens"), 1020)
+        self.assertEqual(resp.metadata.get("max_output_tokens"), 1024)
+        self.assertEqual(resp.metadata.get("gemini_finish_reason"), "MAX_TOKENS")
+
+        # Arithmetic verification: prompt + thoughts + completion == total
+        self.assertEqual(
+            resp.prompt_tokens + resp.metadata["thoughts_tokens"] + resp.completion_tokens,
+            resp.total_tokens,
+        )
+        # Arithmetic verification: thoughts + completion == total_output
+        self.assertEqual(
+            resp.metadata["thoughts_tokens"] + resp.completion_tokens,
+            resp.metadata["total_output_tokens"],
+        )
+        # Ceiling verification: total_output <= max_output_tokens
+        self.assertLessEqual(
+            resp.metadata["total_output_tokens"],
+            resp.metadata["max_output_tokens"],
+        )
+
+    @patch("requests.Session.post")
+    def test_gemini_non_thinking_response(self, mock_post):
+        """Test response handling when thoughtsTokenCount is absent in usageMetadata."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [{"text": "Simple answer"}],
+                        "role": "model",
+                    },
+                    "finishReason": "STOP",
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 20,
+                "candidatesTokenCount": 10,
+                "totalTokenCount": 30,
+            },
+        }
+        mock_post.return_value = mock_resp
+
+        provider = GeminiLLMProvider(api_key="test-gemini-key", model_name="gemini-2.5-flash")
+        req = LLMRequest(
+            messages=[ChatMessage(role="user", content="Hello")],
+            max_tokens=512,
+        )
+        resp = provider.generate(req)
+
+        self.assertIsNone(resp.metadata.get("thoughts_tokens"))
+        self.assertEqual(resp.metadata.get("total_output_tokens"), 10)
+        self.assertEqual(resp.metadata.get("max_output_tokens"), 512)
+        self.assertEqual(resp.finish_reason, "stop")
+
 
 class GroqLLMProviderTestCase(SimpleTestCase):
     """Test GroqLLMProvider with mocked HTTP responses."""
@@ -470,6 +568,208 @@ class OpenRouterLLMProviderTestCase(SimpleTestCase):
         self.assertEqual(call_args[1]["headers"]["Authorization"], "Bearer sk-or-test-key")
         self.assertEqual(call_args[1]["headers"]["HTTP-Referer"], "https://pwaninet.local")
         self.assertEqual(call_args[1]["headers"]["X-Title"], "Pwanimate")
+
+    @patch("requests.Session.post")
+    def test_openrouter_reasoning_model_budget_and_details(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "id": "gen-openrouter-nex",
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "Here is the verified answer.",
+                        "reasoning": "Step 1: Analyzed query. Step 2: Formulated answer.",
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 2330,
+                "completion_tokens": 1200,
+                "total_tokens": 3530,
+                "completion_tokens_details": {
+                    "reasoning_tokens": 900,
+                },
+            },
+        }
+        mock_post.return_value = mock_resp
+
+        provider = OpenRouterLLMProvider(api_key="sk-or-test-key")
+        req = LLMRequest(
+            task="rag",
+            messages=[ChatMessage(role="user", content="Explain subnetting")],
+            model="nex-agi/nex-n2.5-pro:free",
+            max_tokens=1024,
+        )
+        resp = provider.generate(req)
+
+        # Verify payload increased token budget and included reasoning effort
+        call_args = mock_post.call_args
+        sent_payload = call_args[1]["json"]
+        self.assertEqual(sent_payload["max_tokens"], 2048)
+        self.assertEqual(sent_payload["reasoning"], {"effort": "low"})
+
+        # Verify response parsing
+        self.assertEqual(resp.content, "Here is the verified answer.")
+        self.assertEqual(resp.finish_reason, "stop")
+        self.assertEqual(resp.metadata["thoughts_tokens"], 900)
+        self.assertEqual(resp.metadata["total_output_tokens"], 1200)
+        self.assertEqual(resp.metadata["reasoning"], "Step 1: Analyzed query. Step 2: Formulated answer.")
+
+    @patch("requests.Session.post")
+    def test_openrouter_empty_content_length_raises_api_error(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "id": "gen-openrouter-trunc",
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "",
+                        "reasoning": "Thinking process interrupted by length limit...",
+                    },
+                    "finish_reason": "length",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 2330,
+                "completion_tokens": 1024,
+                "total_tokens": 3354,
+                "completion_tokens_details": {
+                    "reasoning_tokens": 1024,
+                },
+            },
+        }
+        mock_post.return_value = mock_resp
+
+        provider = OpenRouterLLMProvider(api_key="sk-or-test-key")
+        req = LLMRequest(
+            task="rag",
+            messages=[ChatMessage(role="user", content="Complex prompt")],
+            model="nex-agi/nex-n2.5-pro:free",
+            max_tokens=1024,
+        )
+        with self.assertRaises(AIProviderAPIError) as cm:
+            provider.generate(req)
+        self.assertIn("reached maximum token limit", str(cm.exception))
+
+    @patch("requests.Session.post")
+    def test_openrouter_fallback_to_reasoning_on_stop(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "id": "gen-openrouter-reasoning-only",
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "",
+                        "reasoning": "This model put its final answer inside the reasoning field.",
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 50,
+                "total_tokens": 150,
+            },
+        }
+        mock_post.return_value = mock_resp
+
+        provider = OpenRouterLLMProvider(api_key="sk-or-test-key")
+        req = LLMRequest(
+            task="chat",
+            messages=[ChatMessage(role="user", content="Hello")],
+        )
+        resp = provider.generate(req)
+        self.assertEqual(resp.content, "This model put its final answer inside the reasoning field.")
+
+    @patch("requests.Session.post")
+    def test_openrouter_empty_content_raises_api_error(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "id": "gen-openrouter-blank",
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "   ",
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 50,
+                "completion_tokens": 5,
+                "total_tokens": 55,
+            },
+        }
+        mock_post.return_value = mock_resp
+
+        provider = OpenRouterLLMProvider(api_key="sk-or-test-key")
+        req = LLMRequest(
+            task="chat",
+            messages=[ChatMessage(role="user", content="Hello")],
+        )
+        with self.assertRaises(AIProviderAPIError) as cm:
+            provider.generate(req)
+        self.assertIn("generated empty content", str(cm.exception))
+
+    @patch("requests.Session.post")
+    def test_groq_reasoning_tokens_and_empty_check(self, mock_post):
+        # 1. Success with reasoning tokens
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "id": "gen-groq-r1",
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "Groq answer.",
+                        "reasoning": "Groq thinking.",
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 500,
+                "completion_tokens": 200,
+                "total_tokens": 700,
+                "completion_tokens_details": {
+                    "reasoning_tokens": 150,
+                },
+            },
+        }
+        mock_post.return_value = mock_resp
+
+        from pwanimate.ai.providers.groq import GroqLLMProvider
+        provider = GroqLLMProvider(api_key="sk-groq-key")
+        req = LLMRequest(messages=[ChatMessage(role="user", content="Hi")])
+        resp = provider.generate(req)
+
+        self.assertEqual(resp.content, "Groq answer.")
+        self.assertEqual(resp.metadata["thoughts_tokens"], 150)
+        self.assertEqual(resp.metadata["total_output_tokens"], 200)
+
+        # 2. Empty content raises error
+        mock_resp.json.return_value = {
+            "id": "gen-groq-empty",
+            "choices": [
+                {
+                    "message": {"role": "assistant", "content": ""},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 50, "completion_tokens": 10, "total_tokens": 60},
+        }
+        with self.assertRaises(AIProviderAPIError):
+            provider.generate(req)
 
 
 class ContextIntegrationTestCase(SimpleTestCase):
@@ -684,4 +984,351 @@ class AutoModelSwitchingTestCase(SimpleTestCase):
             self.assertEqual(skipped[0]["reason"], "rate_limit")
             self.assertEqual(skipped[1]["model"], "model-404")
             self.assertEqual(skipped[1]["reason"], "error: AIProviderAPIError")
+
+
+class TelemetryAndFinishReasonTestCase(SimpleTestCase):
+    """Tests for finish_reason propagation and boundary telemetry contracts."""
+
+    def test_orchestration_response_finish_reason_in_to_dict(self):
+        from pwanimate.orchestrator.types import OrchestrationResponse
+        resp = OrchestrationResponse(
+            answer="Partial answer...",
+            finish_reason="max_tokens",
+            prompt_tokens=50,
+            completion_tokens=1024,
+            total_tokens=1074,
+        )
+        self.assertEqual(resp.finish_reason, "max_tokens")
+        data = resp.to_dict()
+        self.assertIn("finish_reason", data)
+        self.assertEqual(data["finish_reason"], "max_tokens")
+        self.assertEqual(data["completion_tokens"], 1024)
+
+    def test_orchestrator_propagates_finish_reason(self):
+        from pwanimate.orchestrator.service import PwanimateOrchestrator
+        from pwanimate.orchestrator.types import OrchestrationRequest
+        from pwanimate.retrieval.services.unified_retrieval import UnifiedRetrievalService
+
+        class TruncatedMockProvider(MockLLMProvider):
+            def generate(self, request: LLMRequest) -> LLMResponse:
+                return LLMResponse(
+                    content="This explanation was cut off at the limit...",
+                    provider=self.provider_name,
+                    model=self.model_name,
+                    finish_reason="max_tokens",
+                    prompt_tokens=120,
+                    completion_tokens=1024,
+                    total_tokens=1144,
+                )
+
+        mock_prov = TruncatedMockProvider(model_name="mock-truncated")
+        router = LLMRouter(providers={"mock": mock_prov}, default_provider="mock")
+        gateway = AIGateway(router=router)
+
+        mock_retrieval = MagicMock(spec=UnifiedRetrievalService)
+        mock_retrieval.retrieve.return_value = MagicMock(results=[])
+
+        orchestrator = PwanimateOrchestrator(
+            retrieval_service=mock_retrieval,
+            gateway=gateway,
+        )
+
+        req = OrchestrationRequest(query="Explain normalization in detail", task="general", provider="mock")
+        resp = orchestrator.run(req)
+
+        self.assertEqual(resp.finish_reason, "max_tokens")
+        self.assertEqual(resp.completion_tokens, 1024)
+        data = resp.to_dict()
+        self.assertEqual(data["finish_reason"], "max_tokens")
+        self.assertEqual(data["completion_tokens"], 1024)
+
+    def test_orchestrator_propagates_thinking_metadata(self):
+        from pwanimate.orchestrator.service import PwanimateOrchestrator
+        from pwanimate.orchestrator.types import OrchestrationRequest
+        from pwanimate.retrieval.services.unified_retrieval import UnifiedRetrievalService
+
+        class ThinkingMockProvider(MockLLMProvider):
+            def generate(self, request: LLMRequest) -> LLMResponse:
+                return LLMResponse(
+                    content="Thinking response answer",
+                    provider="mock",
+                    model="mock-thinking",
+                    finish_reason="max_tokens",
+                    prompt_tokens=1878,
+                    completion_tokens=131,
+                    total_tokens=2898,
+                    metadata={
+                        "thoughts_tokens": 889,
+                        "total_output_tokens": 1020,
+                        "max_output_tokens": request.max_tokens,
+                    },
+                )
+
+        mock_prov = ThinkingMockProvider()
+        router = LLMRouter(providers={"mock": mock_prov}, default_provider="mock")
+        gateway = AIGateway(router=router)
+
+        mock_retrieval = MagicMock(spec=UnifiedRetrievalService)
+        mock_retrieval.retrieve.return_value = MagicMock(results=[])
+
+        orchestrator = PwanimateOrchestrator(
+            retrieval_service=mock_retrieval,
+            gateway=gateway,
+        )
+
+        req = OrchestrationRequest(
+            query="Explain subnetting",
+            task="general",
+            provider="mock",
+            max_tokens=1024,
+        )
+        resp = orchestrator.run(req)
+
+        self.assertEqual(resp.prompt_tokens, 1878)
+        self.assertEqual(resp.completion_tokens, 131)
+        self.assertEqual(resp.total_tokens, 2898)
+        self.assertEqual(resp.finish_reason, "max_tokens")
+        self.assertEqual(resp.metadata.get("thoughts_tokens"), 889)
+        self.assertEqual(resp.metadata.get("total_output_tokens"), 1020)
+        self.assertEqual(resp.metadata.get("max_output_tokens"), 1024)
+
+        data = resp.to_dict()
+        self.assertEqual(data["metadata"]["thoughts_tokens"], 889)
+        self.assertEqual(data["metadata"]["total_output_tokens"], 1020)
+        self.assertEqual(data["metadata"]["max_output_tokens"], 1024)
+
+
+class TaskAwareGenerationPolicyTestCase(SimpleTestCase):
+    """Tests for Phase 3 task-aware generation policies, overrides, and propagation."""
+
+    def test_task_generation_policies_defaults(self):
+        from pwanimate.ai.gateway import (
+            DEFAULT_GENERATION_POLICY,
+            get_task_policy,
+        )
+
+        self.assertEqual(get_task_policy("conversational").max_output_tokens, 512)
+        self.assertEqual(get_task_policy("general").max_output_tokens, 512)
+        self.assertEqual(get_task_policy("tool").max_output_tokens, 1024)
+        self.assertEqual(get_task_policy("rag").max_output_tokens, 4096)
+        # Safe fallback for unknown task
+        self.assertEqual(get_task_policy("unknown_flow").max_output_tokens, 1024)
+        self.assertEqual(get_task_policy("").max_output_tokens, DEFAULT_GENERATION_POLICY.max_output_tokens)
+
+    def test_orchestrator_budget_resolution_defaults(self):
+        from pwanimate.orchestrator.service import PwanimateOrchestrator
+        from pwanimate.orchestrator.types import OrchestrationRequest
+
+        orchestrator = PwanimateOrchestrator(
+            retrieval_service=MagicMock(),
+            gateway=MagicMock(),
+        )
+
+        # Request without explicit max_tokens (defaults to None)
+        req = OrchestrationRequest(query="What is DNS?")
+        self.assertIsNone(req.max_tokens)
+        self.assertEqual(orchestrator._resolve_effective_budget(req, "conversational"), 512)
+        self.assertEqual(orchestrator._resolve_effective_budget(req, "general"), 512)
+        self.assertEqual(orchestrator._resolve_effective_budget(req, "tool"), 1024)
+        self.assertEqual(orchestrator._resolve_effective_budget(req, "rag"), 4096)
+
+    def test_orchestrator_budget_resolution_explicit_override(self):
+        from pwanimate.orchestrator.service import PwanimateOrchestrator
+        from pwanimate.orchestrator.types import OrchestrationRequest
+
+        orchestrator = PwanimateOrchestrator(
+            retrieval_service=MagicMock(),
+            gateway=MagicMock(),
+        )
+
+        # Explicit request max_tokens takes strict precedence
+        req = OrchestrationRequest(query="Explain TCP", max_tokens=2048)
+        self.assertEqual(req.max_tokens, 2048)
+        self.assertEqual(orchestrator._resolve_effective_budget(req, "conversational"), 2048)
+        self.assertEqual(orchestrator._resolve_effective_budget(req, "tool"), 2048)
+        self.assertEqual(orchestrator._resolve_effective_budget(req, "rag"), 2048)
+
+    @patch("requests.Session.post")
+    def test_provider_propagation_gemini_payloads(self, mock_post):
+        """Verify conversational=512, tool=1024, rag=4096 reach Gemini maxOutputTokens."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Answer text"}], "role": "model"},
+                    "finishReason": "STOP",
+                }
+            ],
+            "usageMetadata": {"promptTokenCount": 50, "candidatesTokenCount": 20, "totalTokenCount": 70},
+        }
+        mock_post.return_value = mock_resp
+
+        provider = GeminiLLMProvider(api_key="test-key", model_name="gemini-3.6-flash")
+
+        # 1. Conversational tier: 512
+        req_conv = LLMRequest(messages=[ChatMessage(role="user", content="Hi")], max_tokens=512)
+        provider.generate(req_conv)
+        payload_conv = mock_post.call_args[1]["json"]
+        self.assertEqual(payload_conv["generationConfig"]["maxOutputTokens"], 512)
+
+        # 2. Tool tier: 1024
+        req_tool = LLMRequest(messages=[ChatMessage(role="user", content="Lookup")], max_tokens=1024)
+        provider.generate(req_tool)
+        payload_tool = mock_post.call_args[1]["json"]
+        self.assertEqual(payload_tool["generationConfig"]["maxOutputTokens"], 1024)
+
+        # 3. RAG tier: 4096
+        req_rag = LLMRequest(messages=[ChatMessage(role="user", content="Explain subnetting")], max_tokens=4096)
+        provider.generate(req_rag)
+        payload_rag = mock_post.call_args[1]["json"]
+        self.assertEqual(payload_rag["generationConfig"]["maxOutputTokens"], 4096)
+
+    @patch("requests.Session.post")
+    def test_groq_and_openrouter_finish_reason_normalization(self, mock_post):
+        """Verify length is normalized to max_tokens across Groq and OpenRouter."""
+        # Groq normalization test
+        mock_groq_resp = MagicMock()
+        mock_groq_resp.status_code = 200
+        mock_groq_resp.json.return_value = {
+            "id": "chatcmpl-groq",
+            "choices": [
+                {
+                    "message": {"content": "Truncated answer"},
+                    "finish_reason": "length",
+                }
+            ],
+            "usage": {"prompt_tokens": 100, "completion_tokens": 1024, "total_tokens": 1124},
+        }
+        mock_post.return_value = mock_groq_resp
+
+        groq_provider = GroqLLMProvider(api_key="test-groq-key")
+        groq_resp = groq_provider.generate(LLMRequest(messages=[ChatMessage(role="user", content="Hi")], max_tokens=1024))
+        self.assertEqual(groq_resp.finish_reason, "max_tokens")
+        self.assertEqual(groq_resp.metadata["provider_finish_reason"], "length")
+
+        # OpenRouter normalization test
+        mock_or_resp = MagicMock()
+        mock_or_resp.status_code = 200
+        mock_or_resp.json.return_value = {
+            "id": "gen-or",
+            "choices": [
+                {
+                    "message": {"content": "Truncated answer"},
+                    "finish_reason": "length",
+                }
+            ],
+            "usage": {"prompt_tokens": 100, "completion_tokens": 1024, "total_tokens": 1124},
+        }
+        mock_post.return_value = mock_or_resp
+
+        or_provider = OpenRouterLLMProvider(api_key="test-or-key")
+        or_resp = or_provider.generate(LLMRequest(messages=[ChatMessage(role="user", content="Hi")], max_tokens=1024))
+        self.assertEqual(or_resp.finish_reason, "max_tokens")
+        self.assertEqual(or_resp.metadata["provider_finish_reason"], "length")
+
+    @patch("requests.Session.post")
+    def test_rag_generation_under_4096_budget(self, mock_post):
+        """Verify RAG request with 4096 ceiling delivers output without exhaustion."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [{"text": "Complete and exhaustive explanation of normalization..."}],
+                        "role": "model",
+                    },
+                    "finishReason": "STOP",
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 1878,
+                "candidatesTokenCount": 850,
+                "thoughtsTokenCount": 889,
+                "totalTokenCount": 3617,
+            },
+        }
+        mock_post.return_value = mock_resp
+
+        provider = GeminiLLMProvider(api_key="test-gemini-key", model_name="gemini-3.6-flash")
+        req = LLMRequest(
+            task="rag",
+            messages=[ChatMessage(role="user", content="Explain normalization in detail")],
+            max_tokens=4096,
+        )
+        resp = provider.generate(req)
+
+        # Verification of payload sent to Gemini
+        call_args = mock_post.call_args
+        self.assertEqual(call_args[1]["json"]["generationConfig"]["maxOutputTokens"], 4096)
+
+        # Verification of usage and finish reason
+        self.assertEqual(resp.finish_reason, "stop")
+        self.assertEqual(resp.prompt_tokens, 1878)
+        self.assertEqual(resp.completion_tokens, 850)
+        self.assertEqual(resp.total_tokens, 3617)
+        self.assertEqual(resp.metadata["thoughts_tokens"], 889)
+        self.assertEqual(resp.metadata["total_output_tokens"], 1739)
+        self.assertEqual(resp.metadata["max_output_tokens"], 4096)
+        self.assertEqual(resp.metadata["provider_finish_reason"], "STOP")
+        # 1739 total output is comfortably within the 4096 ceiling
+        self.assertLess(resp.metadata["total_output_tokens"], resp.metadata["max_output_tokens"])
+
+    def test_gateway_falls_back_when_candidate_returns_empty_content(self):
+        """Verify Gateway detects empty content from candidate and falls back to next candidate."""
+        from pwanimate.ai.gateway.base import BaseLLMProvider
+
+        class EmptyProvider(BaseLLMProvider):
+            provider_name = "mock_empty"
+            def is_available(self):
+                return True
+            def generate(self, request: LLMRequest) -> LLMResponse:
+                return LLMResponse(
+                    content="",  # Empty content!
+                    provider=self.provider_name,
+                    model="empty-model",
+                    finish_reason="length",
+                )
+
+        class GoodProvider(BaseLLMProvider):
+            provider_name = "mock_good"
+            def is_available(self):
+                return True
+            def generate(self, request: LLMRequest) -> LLMResponse:
+                return LLMResponse(
+                    content="Good fallback response.",
+                    provider=self.provider_name,
+                    model="good-model",
+                    finish_reason="stop",
+                )
+
+        router = LLMRouter(
+            providers={"empty": EmptyProvider(), "good": GoodProvider()},
+            default_provider="empty",
+        )
+        router.resolve_fallback_chain = lambda req, quota_tracker=None: [
+            {"provider": "empty", "model": "empty-model"},
+            {"provider": "good", "model": "good-model"},
+        ]
+
+        gateway = AIGateway(router=router)
+        req = LLMRequest(messages=[ChatMessage(role="user", content="Hi")])
+        resp = gateway.generate(req)
+
+        self.assertEqual(resp.content, "Good fallback response.")
+        self.assertEqual(resp.provider, "mock_good")
+        self.assertTrue(resp.metadata.get("fallback_used"))
+        self.assertEqual(resp.metadata.get("original_provider"), "empty")
+
+    def test_llm_request_none_max_tokens_defaults_to_1024(self):
+        req = LLMRequest(max_tokens=None)
+        self.assertEqual(req.max_tokens, 1024)
+
+    def test_orchestration_request_none_max_tokens_defaults_to_none(self):
+        from pwanimate.orchestrator.types import OrchestrationRequest
+        req = OrchestrationRequest(query="Test query", max_tokens=None)
+        self.assertIsNone(req.max_tokens)
+
+
 

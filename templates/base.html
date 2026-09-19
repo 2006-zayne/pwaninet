@@ -786,6 +786,19 @@
             position: relative;
             transition: color 0.15s ease, transform 0.15s ease;
             -webkit-tap-highlight-color: transparent;
+            /* Eliminate the 300ms tap delay — tells browser this element
+               only handles single-tap; no double-tap-to-zoom disambiguation */
+            touch-action: manipulation;
+            /* Prevent ghost text selection on long-press */
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* Navigation in-flight lock: disable nav chips while an HTMX page
+           swap is in progress to prevent double-tap re-fires */
+        body.nav-in-flight .mobile-bottom-nav .nav-chip {
+            pointer-events: none;
+            opacity: 0.7;
         }
 
         .mobile-bottom-nav .nav-chip:active {
@@ -1669,6 +1682,8 @@
                hx-swap="innerHTML"
                hx-push-url="true"
                hx-history="true"
+               hx-sync="#page-content-target:replace"
+               hx-trigger="click delay:10ms"
                aria-label="{% trans 'Home' %}">
                 <i class="bi bi-house-fill"></i>
                 <span>{% trans "Home" %}</span>
@@ -1681,6 +1696,8 @@
                hx-swap="innerHTML"
                hx-push-url="true"
                hx-history="true"
+               hx-sync="#page-content-target:replace"
+               hx-trigger="click delay:10ms"
                aria-label="{% trans 'Groups' %}">
                 <span style="position: relative; display: inline-block;">
                     <i class="bi bi-people-fill"></i>
@@ -1697,6 +1714,8 @@
                    hx-swap="innerHTML"
                    hx-push-url="true"
                    hx-history="true"
+                   hx-sync="#page-content-target:replace"
+                   hx-trigger="click delay:10ms"
                    aria-label="{% trans 'Create Post' %}">
                     <i class="bi bi-plus-circle-fill"></i>
                     <span>{% trans "Post" %}</span>
@@ -1710,6 +1729,8 @@
                    hx-swap="innerHTML"
                    hx-push-url="true"
                    hx-history="true"
+                   hx-sync="#page-content-target:replace"
+                   hx-trigger="click delay:10ms"
                    aria-label="{% trans 'Notifications' %}">
                     <span class="position-relative d-inline-block">
                         <i class="bi bi-bell-fill"></i>
@@ -1735,6 +1756,8 @@
                    hx-swap="innerHTML"
                    hx-push-url="true"
                    hx-history="true"
+                   hx-sync="#page-content-target:replace"
+                   hx-trigger="click delay:10ms"
                    aria-label="{% trans 'Profile' %}">
                     <i class="bi bi-person-circle"></i>
                     <span>{% trans "Profile" %}</span>
@@ -2797,11 +2820,33 @@ window.addEventListener('beforeinstallprompt', (e) => {
         });
 
         // 1. Before HTMX request for page navigation: save Home scroll position if leaving Home
+        //    + lock nav chips to prevent double-tap re-fire during the in-flight request
         document.body.addEventListener('htmx:beforeRequest', function(evt) {
             if (evt.detail.target && evt.detail.target.id === 'page-content-target') {
                 if (isHomeRoute(window.location.pathname)) {
                     sessionStorage.setItem(HOME_SCROLL_KEY, String(window.scrollY));
                 }
+                // Lock nav chips for the duration of this page swap
+                document.body.classList.add('nav-in-flight');
+            }
+        });
+
+        // Release nav lock once the swap is complete or on any failure/abort
+        function releaseNavLock() {
+            document.body.classList.remove('nav-in-flight');
+        }
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            if (evt.detail.target && evt.detail.target.id === 'page-content-target') {
+                releaseNavLock();
+            }
+        });
+        document.body.addEventListener('htmx:responseError', releaseNavLock);
+        document.body.addEventListener('htmx:sendError', releaseNavLock);
+        document.body.addEventListener('htmx:abort', releaseNavLock);
+        // Failsafe: always release after 3s in case an event is missed
+        document.body.addEventListener('htmx:beforeRequest', function(evt) {
+            if (evt.detail.target && evt.detail.target.id === 'page-content-target') {
+                setTimeout(releaseNavLock, 3000);
             }
         });
 

@@ -11,7 +11,13 @@ import re
 import time
 from typing import Any, Dict, List, Optional
 
-from pwanimate.ai.gateway import AIGateway, ChatMessage, LLMRequest, LLMResponse
+from pwanimate.ai.gateway import (
+    AIGateway,
+    ChatMessage,
+    LLMRequest,
+    LLMResponse,
+    get_task_policy,
+)
 from pwanimate.context import ContextEngine, ContextPackage, ContextRequest
 from pwanimate.orchestrator.prompts import (
     SYSTEM_INSTRUCTION_CONVERSATIONAL,
@@ -179,6 +185,18 @@ class PwanimateOrchestrator:
                 return True
         return False
 
+    def _resolve_effective_budget(self, request: OrchestrationRequest, task_category: str) -> int:
+        """
+        Resolve effective output token ceiling following strict precedence:
+        1. Explicit request-level override (if provided)
+        2. Task-aware GenerationPolicy (conversational=512, tool=1024, rag=4096)
+        3. Fallback safe default (1024)
+        """
+        if request.max_tokens is not None and request.max_tokens > 0:
+            return request.max_tokens
+        policy = get_task_policy(task_category)
+        return policy.max_output_tokens
+
     def run(self, request: OrchestrationRequest) -> OrchestrationResponse:
         """
         Execute an end-to-end orchestration turn.
@@ -230,6 +248,8 @@ class PwanimateOrchestrator:
         if request.user_context:
             context_pkg = ContextPackage(query=query, user_context=request.user_context)
 
+        effective_max_tokens = self._resolve_effective_budget(request, "conversational")
+
         llm_request = LLMRequest(
             task="general",
             messages=messages,
@@ -238,7 +258,7 @@ class PwanimateOrchestrator:
             provider=request.provider,
             model=request.model,
             temperature=request.temperature,
-            max_tokens=request.max_tokens,
+            max_tokens=effective_max_tokens,
         )
 
         t_gen = time.perf_counter()
@@ -247,9 +267,33 @@ class PwanimateOrchestrator:
         total_time_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
 
         quota_info = llm_response.metadata.get("quota_info")
+        sanitized_ans = sanitize_llm_response(llm_response.content)
+        if not sanitized_ans or not sanitized_ans.strip():
+            logger.warning("Sanitized answer is empty for provider=%s model=%s; applying fallback response", llm_response.provider, llm_response.model)
+            sanitized_ans = "I'm sorry, I was unable to generate a response. Please try asking again or rephrasing your question."
+
+        thoughts_tokens = llm_response.metadata.get("thoughts_tokens")
+        total_output_tokens = llm_response.metadata.get("total_output_tokens")
+        max_output_tokens = llm_response.metadata.get("max_output_tokens", llm_request.max_tokens)
+
+        logger.info(
+            "Pwanimate Orchestrator [conversational]: provider=%s model=%s finish_reason=%s prompt_tokens=%s completion_tokens=%s thoughts_tokens=%s total_output_tokens=%s total_tokens=%s max_output_tokens=%s raw_len=%d ans_len=%d duration_ms=%.2f",
+            llm_response.provider,
+            llm_response.model,
+            llm_response.finish_reason,
+            llm_response.prompt_tokens,
+            llm_response.completion_tokens,
+            thoughts_tokens,
+            total_output_tokens,
+            llm_response.total_tokens,
+            max_output_tokens,
+            len(llm_response.content),
+            len(sanitized_ans),
+            total_time_ms,
+        )
 
         return OrchestrationResponse(
-            answer=sanitize_llm_response(llm_response.content),
+            answer=sanitized_ans,
             citations=[],
             sources=[],
             provider=llm_response.provider,
@@ -260,8 +304,14 @@ class PwanimateOrchestrator:
             retrieval_time_ms=0.0,
             generation_time_ms=gen_time_ms,
             total_time_ms=total_time_ms,
-            metadata={"intent": "conversational"},
+            metadata={
+                "intent": "conversational",
+                "thoughts_tokens": thoughts_tokens,
+                "total_output_tokens": total_output_tokens,
+                "max_output_tokens": max_output_tokens,
+            },
             quota_info=quota_info,
+            finish_reason=llm_response.finish_reason,
         )
 
     def _run_tool(
@@ -341,6 +391,8 @@ class PwanimateOrchestrator:
 
         messages = list(request.history) + [ChatMessage(role="user", content=query)]
 
+        effective_max_tokens = self._resolve_effective_budget(request, "tool")
+
         llm_request = LLMRequest(
             task="tool",
             messages=messages,
@@ -349,7 +401,7 @@ class PwanimateOrchestrator:
             provider=request.provider,
             model=request.model,
             temperature=request.temperature,
-            max_tokens=request.max_tokens,
+            max_tokens=effective_max_tokens,
         )
 
         t_gen = time.perf_counter()
@@ -359,9 +411,34 @@ class PwanimateOrchestrator:
 
         citations = llm_response.citations or list(context_pkg.citations)
         quota_info = llm_response.metadata.get("quota_info")
+        sanitized_ans = sanitize_llm_response(llm_response.content)
+        if not sanitized_ans or not sanitized_ans.strip():
+            logger.warning("Sanitized answer is empty for tool route provider=%s model=%s; applying fallback response", llm_response.provider, llm_response.model)
+            sanitized_ans = "I'm sorry, I was unable to generate a response. Please try asking again or rephrasing your question."
+
+        thoughts_tokens = llm_response.metadata.get("thoughts_tokens")
+        total_output_tokens = llm_response.metadata.get("total_output_tokens")
+        max_output_tokens = llm_response.metadata.get("max_output_tokens", llm_request.max_tokens)
+
+        logger.info(
+            "Pwanimate Orchestrator [tool:%s]: provider=%s model=%s finish_reason=%s prompt_tokens=%s completion_tokens=%s thoughts_tokens=%s total_output_tokens=%s total_tokens=%s max_output_tokens=%s raw_len=%d ans_len=%d duration_ms=%.2f",
+            tool_route.tool_name,
+            llm_response.provider,
+            llm_response.model,
+            llm_response.finish_reason,
+            llm_response.prompt_tokens,
+            llm_response.completion_tokens,
+            thoughts_tokens,
+            total_output_tokens,
+            llm_response.total_tokens,
+            max_output_tokens,
+            len(llm_response.content),
+            len(sanitized_ans),
+            total_time_ms,
+        )
 
         return OrchestrationResponse(
-            answer=sanitize_llm_response(llm_response.content),
+            answer=sanitized_ans,
             citations=citations,
             sources=sources_summary,
             people=people_results,
@@ -379,8 +456,12 @@ class PwanimateOrchestrator:
                 "tool_success": tool_result.success,
                 "matched_intent": tool_route.matched_intent,
                 "context_items_count": context_pkg.total_items,
+                "thoughts_tokens": thoughts_tokens,
+                "total_output_tokens": total_output_tokens,
+                "max_output_tokens": max_output_tokens,
             },
             quota_info=quota_info,
+            finish_reason=llm_response.finish_reason,
         )
 
     def _run_rag(
@@ -417,6 +498,8 @@ class PwanimateOrchestrator:
         # 3. LLM Generation
         messages = list(request.history) + [ChatMessage(role="user", content=query)]
 
+        effective_max_tokens = self._resolve_effective_budget(request, "rag")
+
         llm_request = LLMRequest(
             task="rag",
             messages=messages,
@@ -425,7 +508,7 @@ class PwanimateOrchestrator:
             provider=request.provider,
             model=request.model,
             temperature=request.temperature,
-            max_tokens=request.max_tokens,
+            max_tokens=effective_max_tokens,
         )
 
         t_gen = time.perf_counter()
@@ -436,9 +519,33 @@ class PwanimateOrchestrator:
         # Citations are drawn from LLMResponse (or ContextPackage fallback)
         citations = llm_response.citations or list(context_pkg.citations)
         quota_info = llm_response.metadata.get("quota_info")
+        sanitized_ans = sanitize_llm_response(llm_response.content)
+        if not sanitized_ans or not sanitized_ans.strip():
+            logger.warning("Sanitized answer is empty for rag provider=%s model=%s; applying fallback response", llm_response.provider, llm_response.model)
+            sanitized_ans = "I'm sorry, I was unable to generate a response. Please try asking again or rephrasing your question."
+
+        thoughts_tokens = llm_response.metadata.get("thoughts_tokens")
+        total_output_tokens = llm_response.metadata.get("total_output_tokens")
+        max_output_tokens = llm_response.metadata.get("max_output_tokens", llm_request.max_tokens)
+
+        logger.info(
+            "Pwanimate Orchestrator [rag]: provider=%s model=%s finish_reason=%s prompt_tokens=%s completion_tokens=%s thoughts_tokens=%s total_output_tokens=%s total_tokens=%s max_output_tokens=%s raw_len=%d ans_len=%d duration_ms=%.2f",
+            llm_response.provider,
+            llm_response.model,
+            llm_response.finish_reason,
+            llm_response.prompt_tokens,
+            llm_response.completion_tokens,
+            thoughts_tokens,
+            total_output_tokens,
+            llm_response.total_tokens,
+            max_output_tokens,
+            len(llm_response.content),
+            len(sanitized_ans),
+            total_time_ms,
+        )
 
         return OrchestrationResponse(
-            answer=sanitize_llm_response(llm_response.content),
+            answer=sanitized_ans,
             citations=citations,
             sources=sources_summary,
             provider=llm_response.provider,
@@ -453,8 +560,12 @@ class PwanimateOrchestrator:
                 "intent": "rag",
                 "retrieved_count": len(retrieval_resp.results),
                 "context_items_count": context_pkg.total_items,
+                "thoughts_tokens": thoughts_tokens,
+                "total_output_tokens": total_output_tokens,
+                "max_output_tokens": max_output_tokens,
             },
             quota_info=quota_info,
+            finish_reason=llm_response.finish_reason,
         )
 
     def _build_sources_summary(self, context_items: list) -> List[Dict[str, Any]]:

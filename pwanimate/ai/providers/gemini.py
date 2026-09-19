@@ -202,8 +202,32 @@ class GeminiLLMProvider(BaseLLMProvider):
         prompt_tokens = usage.get("promptTokenCount")
         completion_tokens = usage.get("candidatesTokenCount")
         total_tokens = usage.get("totalTokenCount")
+        thoughts_tokens = usage.get("thoughtsTokenCount")
+
+        # Total generated output tokens (visible candidate tokens + reasoning/thinking tokens)
+        total_output_tokens = None
+        if completion_tokens is not None or thoughts_tokens is not None:
+            total_output_tokens = (completion_tokens or 0) + (thoughts_tokens or 0)
+
+        logger.debug(
+            "Gemini usageMetadata: prompt=%s candidates=%s thoughts=%s total=%s max_output=%s finish=%s",
+            prompt_tokens,
+            completion_tokens,
+            thoughts_tokens,
+            total_tokens,
+            request.max_tokens,
+            candidate.get("finishReason"),
+        )
 
         citations = list(request.context.citations) if request.context else []
+
+        metadata: Dict[str, Any] = {
+            "gemini_finish_reason": candidate.get("finishReason"),
+            "provider_finish_reason": candidate.get("finishReason"),
+            "max_output_tokens": request.max_tokens,
+            "thoughts_tokens": thoughts_tokens,
+            "total_output_tokens": total_output_tokens,
+        }
 
         return LLMResponse(
             content=text,
@@ -214,7 +238,7 @@ class GeminiLLMProvider(BaseLLMProvider):
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
             citations=citations,
-            metadata={"gemini_finish_reason": candidate.get("finishReason")},
+            metadata=metadata,
         )
 
     def _extract_error_message(self, resp: requests.Response) -> str:

@@ -34,7 +34,7 @@ class OrchestrationRequest:
     provider: Optional[str] = None
     model: Optional[str] = None
     temperature: float = 0.2
-    max_tokens: int = 1024
+    max_tokens: Optional[int] = None
     user_context: Optional[Any] = None
 
     def __post_init__(self):
@@ -65,7 +65,7 @@ class OrchestrationRequest:
             raise OrchestratorValidationError(
                 f"Temperature must be between 0.0 and 2.0, got {self.temperature}"
             )
-        if self.max_tokens <= 0:
+        if self.max_tokens is not None and self.max_tokens <= 0:
             raise OrchestratorValidationError(f"max_tokens must be positive, got {self.max_tokens}")
 
 
@@ -102,6 +102,7 @@ class OrchestrationResponse:
     metadata: Dict[str, Any] = field(default_factory=dict)
     quota_info: Optional[Dict[str, Any]] = None
     people: List[Dict[str, Any]] = field(default_factory=list)
+    finish_reason: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert response to clean JSON-serializable dictionary."""
@@ -112,6 +113,7 @@ class OrchestrationResponse:
             "people": list(self.people),
             "provider": self.provider,
             "model": self.model,
+            "finish_reason": self.finish_reason,
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
             "total_tokens": self.total_tokens,

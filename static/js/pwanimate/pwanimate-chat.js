@@ -1180,6 +1180,23 @@
                 if (userRow && data.user_message_id) {
                     userRow.dataset.messageId = data.user_message_id;
                 }
+
+                const meta = data.metadata || {};
+                console.log('[Pwanimate Telemetry]', {
+                    conversation_id: data.conversation_id,
+                    provider: data.provider,
+                    model: data.model,
+                    finish_reason: data.finish_reason,
+                    prompt_tokens: data.prompt_tokens,
+                    completion_tokens: data.completion_tokens,
+                    thoughts_tokens: meta.thoughts_tokens,
+                    total_output_tokens: meta.total_output_tokens,
+                    total_tokens: data.total_tokens,
+                    max_output_tokens: meta.max_output_tokens,
+                    answer_length: data.answer ? data.answer.length : 0,
+                    fallback_used: data.fallback_info ? data.fallback_info.fallback_used : false
+                });
+
                 this.appendAssistantMessage(data.answer, data.sources, data.citations, data.fallback_info, data.quota_info, data.people, data.message_id);
                 this.scrollToBottom();
                 this.refreshConversationsList();

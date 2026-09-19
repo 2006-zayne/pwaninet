@@ -1,4 +1,5 @@
 {% load static %}
+{% load i18n %}
 
 <!-- Hero Section with Search -->
 <div class="doc-hero" style="text-align: center; padding: 40px 20px 60px 20px;">
@@ -13,6 +14,29 @@
     </p>
     
     {% include 'documents/partials/search_bar.html' with show_recent=True %}
+
+    <div class="doc-hero-actions d-flex align-items-center justify-content-center gap-3 mt-4 flex-wrap">
+        <a href="{% url 'documents:upload' %}"
+           class="btn btn-primary rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 fw-semibold shadow-sm"
+           hx-get="{% url 'documents:upload' %}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-history="true">
+            <i class="bi bi-cloud-arrow-up-fill fs-5"></i>
+            <span>{% trans "Upload Document" %}</span>
+        </a>
+        <a href="{% url 'documents:my_library' %}"
+           class="btn btn-outline-secondary rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 fw-semibold"
+           hx-get="{% url 'documents:my_library' %}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-history="true">
+            <i class="bi bi-journal-bookmark-fill text-primary fs-5"></i>
+            <span>{% trans "My Library" %}</span>
+        </a>
+    </div>
 </div>
 
 <!-- Quick Categories -->

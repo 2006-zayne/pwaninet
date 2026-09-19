@@ -1147,6 +1147,7 @@ body.modal-open .main-composer {
 .groups-dashboard-context-rail,
 .profile-context-rail,
 .document-detail-context-rail,
+.documents-context-rail,
 .context-rail-default {
     width: 100%;
 }
@@ -1260,4 +1261,17 @@ body.modal-open .main-composer {
 
 [data-theme="dark"] .left-rail-post-btn {
     box-shadow: 0 3px 10px rgba(99, 102, 241, 0.35);
+}
+
+/* Context Rail Item Hover Styles */
+.context-rail-item-hover {
+    transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.context-rail-item-hover:hover {
+    background-color: rgba(37, 99, 235, 0.08);
+}
+
+[data-theme="dark"] .context-rail-item-hover:hover {
+    background-color: rgba(99, 102, 241, 0.15);
 }

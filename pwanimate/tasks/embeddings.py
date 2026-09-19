@@ -18,6 +18,7 @@ from ..ai.embeddings.base import (
     BaseEmbeddingProvider,
     EmbeddingProviderError,
     EmbeddingConfigurationError,
+    EmbeddingQuotaExhaustedError,
 )
 
 logger = logging.getLogger(__name__)
@@ -125,6 +126,7 @@ def embed_document_version(
 
         try:
             vectors = provider.embed_texts(texts, task_type="RETRIEVAL_DOCUMENT")
+
         except EmbeddingConfigurationError as e:
             logger.error(f"[PWANIMATE-EMBEDDINGS] Configuration error during embedding: {e}")
             return {
@@ -132,17 +134,31 @@ def embed_document_version(
                 'version_id': version_id,
                 'error': str(e),
             }
+
+        except EmbeddingQuotaExhaustedError as e:
+            # Quota is transient — leave chunks as 'pending' so they can be picked
+            # up on the next attempt. Use exponential back-off:
+            #   retry 0 → 5 min, retry 1 → 30 min, retry 2 → 2 hr,
+            #   retry 3 → 8 hr,  retry 4 → 24 hr
+            attempt = self.request.retries
+            backoff = min(300 * (6 ** attempt), 86400)  # cap at 24 hr
+            logger.warning(
+                f"[PWANIMATE-EMBEDDINGS] Quota exhausted for version {version_id} "
+                f"(attempt {attempt + 1}/6). Retrying in {backoff}s. Error: {e}"
+            )
+            raise self.retry(exc=e, countdown=backoff, max_retries=5)
+
         except Exception as e:
             logger.error(
                 f"[PWANIMATE-EMBEDDINGS] Provider error generating embeddings for version {version_id}: {e}",
                 exc_info=True
             )
-            # Mark this batch as failed
+            # Hard failure — mark this batch as failed so it's not silently stuck
             with transaction.atomic():
                 for c in batch:
                     c.embedding_status = 'failed'
                     c.is_active = False
-                DocumentChunk.objects.bulk_update(batch, fields=['embedding_status', 'is_active', 'updated_at'])
+                DocumentChunk.objects.bulk_update(batch, fields=['embedding_status', 'is_active'])
             raise self.retry(exc=e)
 
         if len(vectors) != len(batch):
@@ -152,7 +168,7 @@ def embed_document_version(
                 for c in batch:
                     c.embedding_status = 'failed'
                     c.is_active = False
-                DocumentChunk.objects.bulk_update(batch, fields=['embedding_status', 'is_active', 'updated_at'])
+                DocumentChunk.objects.bulk_update(batch, fields=['embedding_status', 'is_active'])
             return {'status': 'failed', 'reason': err_msg}
 
         # Persist vectors and transition lifecycle to completed + active
@@ -165,7 +181,7 @@ def embed_document_version(
 
             DocumentChunk.objects.bulk_update(
                 batch,
-                fields=['embedding', 'embedding_status', 'embedding_model', 'is_active', 'updated_at']
+                fields=['embedding', 'embedding_status', 'embedding_model', 'is_active']
             )
 
         total_embedded += len(batch)

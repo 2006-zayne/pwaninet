@@ -8,6 +8,9 @@ from django.conf import settings
 from .base import BaseEmbeddingProvider
 from .gemini import GeminiEmbeddingProvider
 from .mock import MockEmbeddingProvider
+from .jina import JinaEmbeddingProvider
+from .voyage import VoyageEmbeddingProvider
+from .cloudflare import CloudflareEmbeddingProvider
 
 
 def get_embedding_provider(
@@ -18,7 +21,7 @@ def get_embedding_provider(
     Factory function returning an instance of the configured embedding provider.
 
     Args:
-        provider_name: Optional override for provider type ('gemini' or 'mock').
+        provider_name: Optional override for provider type ('gemini', 'mock', 'jina', 'voyage', 'cloudflare').
         **kwargs: Optional constructor arguments passed to the provider.
 
     Returns:
@@ -30,7 +33,13 @@ def get_embedding_provider(
         return GeminiEmbeddingProvider(**kwargs)
     elif name == 'mock':
         return MockEmbeddingProvider(**kwargs)
+    elif name == 'jina':
+        return JinaEmbeddingProvider(**kwargs)
+    elif name == 'voyage':
+        return VoyageEmbeddingProvider(**kwargs)
+    elif name in ('cloudflare', 'cf'):
+        return CloudflareEmbeddingProvider(**kwargs)
     else:
         raise ValueError(
-            f"Unsupported embedding provider: '{name}'. Supported providers are: 'gemini', 'mock'."
+            f"Unsupported embedding provider: '{name}'. Supported providers are: 'gemini', 'mock', 'jina', 'voyage', 'cloudflare'."
         )
