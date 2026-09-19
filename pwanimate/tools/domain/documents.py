@@ -91,6 +91,25 @@ class DocumentDetailTool(BaseDomainTool):
         view_count = doc.views.count()
         download_count = doc.downloads.count()
 
+        # Resolve media and thumbnail
+        thumbnail_url = getattr(doc, "thumbnail_url", "") or ""
+        first_file = doc.latest_version.files.first() if getattr(doc, "latest_version", None) else None
+        media_url = ""
+        file_ext = ""
+        if first_file:
+            try:
+                if getattr(first_file, "file", None):
+                    media_url = first_file.file.url
+            except Exception:
+                media_url = ""
+            file_ext = getattr(first_file, "extension", "") or ""
+
+        author_name = ""
+        uploader = getattr(doc, "uploaded_by", None)
+        if uploader:
+            full_name = f"{uploader.first_name or ''} {uploader.last_name or ''}".strip()
+            author_name = full_name or getattr(uploader, "username", "") or ""
+
         data = {
             "share_id": str(doc.share_id),
             "slug": doc.slug,
@@ -104,6 +123,11 @@ class DocumentDetailTool(BaseDomainTool):
             "view_count": view_count,
             "download_count": download_count,
             "canonical_url": f"/documents/document/{doc.share_id}/",
+            "thumbnail_url": thumbnail_url,
+            "media_url": media_url,
+            "file_type": file_ext,
+            "resource_type": "document",
+            "author": author_name,
         }
 
         return ToolResult.ok(data, share_id=str(doc.share_id))

@@ -5,7 +5,7 @@ The payload is declarative, self-describing, and renderer-independent.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 from enum import Enum
 
 
@@ -42,6 +42,7 @@ class ContextType(Enum):
     PROFILE = "PROFILE"
     WORKSPACE = "WORKSPACE"
     COURSE = "COURSE"
+    FEEDBACK = "FEEDBACK"
 
 
 class ResourceType(Enum):
@@ -109,7 +110,7 @@ class NotificationActor:
 class NotificationContext:
     """Context information"""
     type: ContextType
-    id: int
+    id: Union[int, str]
     name: str
     icon: Optional[str] = None
     avatar_url: Optional[str] = None
@@ -119,7 +120,7 @@ class NotificationContext:
 class NotificationResource:
     """Resource information"""
     type: ResourceType
-    id: int
+    id: Union[int, str]
     url: Optional[str] = None
     title: Optional[str] = None
     image_url: Optional[str] = None
@@ -151,7 +152,7 @@ class NotificationPreview:
     """Preview configuration"""
     enabled: bool = False
     type: PreviewType = PreviewType.NONE
-    resource_id: Optional[int] = None
+    resource_id: Optional[Union[int, str]] = None
 
 
 @dataclass
@@ -179,7 +180,7 @@ class NotificationAction:
 class NavigationTarget:
     """Navigation target"""
     target: str  # POST_DETAIL, DOCUMENT_VIEWER, etc.
-    resource_id: Optional[int] = None
+    resource_id: Optional[Union[int, str]] = None
     url: Optional[str] = None
 
 

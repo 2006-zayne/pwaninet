@@ -433,10 +433,8 @@
             const target = event.detail.target;
             
             // Check if swap contains videos
-            if (target.querySelector('video')) {
-                setTimeout(() => {
-                    initializeVideos(target);
-                }, 100);
+            if (target && target.querySelector && target.querySelector('video')) {
+                initializeVideos(target);
             }
         });
     }

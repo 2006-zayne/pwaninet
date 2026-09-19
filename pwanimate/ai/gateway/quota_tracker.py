@@ -76,7 +76,14 @@ class QuotaTracker:
                         return True
             return False
 
-    def get_cooldown_remaining(self, provider_name: str, model_name: Optional[str] = None) -> float:
+    def clear(self) -> None:
+        """Clear all recorded rate limit hits (useful for testing)."""
+        with self._lock:
+            self._rate_limit_hits.clear()
+
+    def get_cooldown_remaining(
+        self, provider_name: str, model_name: Optional[str] = None
+    ) -> float:
         """Return remaining cooldown seconds, or 0.0 if not rate-limited."""
         keys_to_check = [self._make_key(provider_name, model_name)]
         if model_name:

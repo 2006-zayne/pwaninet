@@ -11,7 +11,7 @@ Tests:
 
 import uuid
 from unittest.mock import patch
-from django.test import TestCase
+from django.test import TestCase, SimpleTestCase
 from django.contrib.auth import get_user_model
 
 from courses.models import School, Programme, OfficialSchoolCode, AcademicLevelType
@@ -37,7 +37,7 @@ from pwanimate.tools import (
 User = get_user_model()
 
 
-class ToolRouterTestCase(TestCase):
+class ToolRouterTestCase(SimpleTestCase):
     """Test ToolRouter deterministic pattern matching and false-positive protection."""
 
     def setUp(self):
@@ -200,8 +200,151 @@ class ToolRouterTestCase(TestCase):
             route = self.router.route(q)
             self.assertIsNone(route, f"False positive on generic query: '{q}'")
 
+    # --- 6. Phase 5: People Discovery Routing ---
 
-class ToolContextAdapterTestCase(TestCase):
+    def test_route_people_collaboration_positive(self):
+        queries = [
+            ("I need a project partner.", "open_to_projects", None),
+            ("Find me a project partner.", "open_to_projects", None),
+            ("I'm looking for a project partner.", "open_to_projects", None),
+            ("Find someone to work with on my project.", "open_to_projects", None),
+            ("I need a collaborator.", "open_to_projects", None),
+            ("Find me a collaborator.", "open_to_projects", None),
+            ("Who can I work with?", "open_to_projects", None),
+            ("Find someone to work with.", "open_to_projects", None),
+            ("Who is open to project work?", "open_to_projects", None),
+            ("Who is open to working on projects?", "open_to_projects", None),
+            ("Find students open to collaboration.", "any_open", None),
+            ("I need a Django partner.", "open_to_projects", "Django"),
+            ("Find a Django project partner.", "open_to_projects", "Django"),
+        ]
+        for q, expected_status, expected_skill in queries:
+            route = self.router.route(q)
+            self.assertIsNotNone(route, f"Failed to match collaboration query: '{q}'")
+            self.assertEqual(route.tool_name, "people_discovery")
+            self.assertEqual(
+                route.parameters.get("collaboration_status"),
+                expected_status,
+                f"Wrong collaboration_status for '{q}': got {route.parameters.get('collaboration_status')}",
+            )
+            if expected_skill:
+                self.assertIn(
+                    expected_skill,
+                    route.parameters.get("skills", []),
+                    f"Expected skill '{expected_skill}' in parameters for '{q}'",
+                )
+
+    def test_route_people_study_positive(self):
+        queries = [
+            ("I'm looking for a study buddy.", None),
+            ("Find me a study buddy.", None),
+            ("Who is available for study groups?", None),
+            ("Who is open to study groups?", None),
+            ("Find someone to study with.", None),
+            ("Find a study buddy interested in AI.", "AI"),
+        ]
+        for q, expected_topic in queries:
+            route = self.router.route(q)
+            self.assertIsNotNone(route, f"Failed to match study query: '{q}'")
+            self.assertEqual(route.tool_name, "people_discovery")
+            self.assertEqual(
+                route.parameters.get("collaboration_status"),
+                "open_to_study_groups",
+                f"Expected 'open_to_study_groups' for '{q}'",
+            )
+            if expected_topic:
+                self.assertIn(
+                    expected_topic,
+                    route.parameters.get("skills", []),
+                    f"Expected topic '{expected_topic}' in skills for '{q}'",
+                )
+
+    def test_route_people_skill_help_positive(self):
+        queries = [
+            ("Find students who know Django.", "Django"),
+            ("Who knows Django?", "Django"),
+            ("Who can help me with Django?", "Django"),
+            ("I need someone who knows Django.", "Django"),
+            ("Find someone who can help with Python.", "Python"),
+            ("Find someone good at Python.", "Python"),
+        ]
+        for q, expected_skill in queries:
+            route = self.router.route(q)
+            self.assertIsNotNone(route, f"Failed to match skill help query: '{q}'")
+            self.assertEqual(route.tool_name, "people_discovery")
+            self.assertIn(
+                expected_skill,
+                route.parameters.get("skills", []),
+                f"Expected skill '{expected_skill}' in parameters for '{q}'",
+            )
+
+    def test_route_people_academic_and_scope_positive(self):
+        # Bare viewer-relative scope without topic
+        route = self.router.route("Find people in my programme.")
+        self.assertIsNotNone(route)
+        self.assertEqual(route.tool_name, "people_discovery")
+        self.assertEqual(route.parameters.get("academic_scope"), "my_programme")
+
+        # Scope + skill
+        route = self.router.route("Find students in my programme who know Python.")
+        self.assertIsNotNone(route)
+        self.assertEqual(route.tool_name, "people_discovery")
+        self.assertEqual(route.parameters.get("academic_scope"), "my_programme")
+        self.assertIn("Python", route.parameters.get("skills", []))
+
+        # Academic scope + skill
+        route = self.router.route("Find CS students who know Django.")
+        self.assertIsNotNone(route)
+        self.assertEqual(route.tool_name, "people_discovery")
+        self.assertEqual(route.parameters.get("academic_scope"), "CS")
+        self.assertIn("Django", route.parameters.get("skills", []))
+
+        # Relative scope + interest
+        route = self.router.route("Find people in my programme interested in AI.")
+        self.assertIsNotNone(route)
+        self.assertEqual(route.tool_name, "people_discovery")
+        self.assertEqual(route.parameters.get("academic_scope"), "my_programme")
+        self.assertIn("AI", route.parameters.get("interests", []))
+
+        # Someone in my programme with contraction
+        route = self.router.route("Find someone in my programme who's interested in AI.")
+        self.assertIsNotNone(route)
+        self.assertEqual(route.tool_name, "people_discovery")
+        self.assertEqual(route.parameters.get("academic_scope"), "my_programme")
+        self.assertIn("AI", route.parameters.get("interests", []))
+
+        # Someone + interest + collaboration
+        route = self.router.route("Find someone interested in AI who is open to projects.")
+        self.assertIsNotNone(route)
+        self.assertEqual(route.tool_name, "people_discovery")
+        self.assertIn("AI", route.parameters.get("skills", []))
+        self.assertEqual(route.parameters.get("collaboration_status"), "open_to_projects")
+
+    def test_route_people_discovery_negative_regressions(self):
+        """Verify that content, document, academic, and non-person queries do not route to people_discovery."""
+        negatives = [
+            "Find Django notes.",
+            "Find materials about normalization.",
+            "Show me documents about Python.",
+            "I need help understanding Django.",
+            "Explain Django to me.",
+            "What is normalization?",
+            "Help me understand my project.",
+            "What units are in second year?",
+            "What courses does Computer Science have?",
+            "What did my group announce?",
+        ]
+        for q in negatives:
+            route = self.router.route(q)
+            if route is not None:
+                self.assertNotEqual(
+                    route.tool_name,
+                    "people_discovery",
+                    f"False positive: '{q}' should NOT route to people_discovery (got intent: {route.matched_intent})",
+                )
+
+
+class ToolContextAdapterTestCase(SimpleTestCase):
     """Test converting ToolResults to ContextItems and assembling ContextPackages."""
 
     def test_academic_lookup_to_context_items(self):

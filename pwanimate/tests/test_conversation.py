@@ -217,10 +217,14 @@ class ConversationAPITestCase(TestCase):
 
         from pwanimate.api.views import PwanimateChatView
         PwanimateChatView.orchestrator = self.orchestrator
+        from pwanimate.ai.gateway.quota_tracker import get_quota_tracker
+        get_quota_tracker().clear()
 
     def tearDown(self):
         from pwanimate.api.views import PwanimateChatView
         PwanimateChatView.orchestrator = None
+        from pwanimate.ai.gateway.quota_tracker import get_quota_tracker
+        get_quota_tracker().clear()
 
     def test_start_conversation_without_id(self):
         self.client.force_authenticate(user=self.user)

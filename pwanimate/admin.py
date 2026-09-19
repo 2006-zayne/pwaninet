@@ -1,7 +1,7 @@
 """Django admin configuration for Pwanimate."""
 
 from django.contrib import admin
-from .models import DocumentChunk
+from .models import DocumentChunk, PwanimatePreferences
 
 
 @admin.register(DocumentChunk)
@@ -35,6 +35,36 @@ class DocumentChunkAdmin(admin.ModelAdmin):
     )
     readonly_fields = (
         'content_hash',
+        'created_at',
+        'updated_at',
+    )
+
+
+@admin.register(PwanimatePreferences)
+class PwanimatePreferencesAdmin(admin.ModelAdmin):
+    list_display = (
+        'user',
+        'nickname',
+        'tone',
+        'response_style',
+        'created_at',
+        'updated_at',
+    )
+    list_filter = (
+        'tone',
+        'response_style',
+        'created_at',
+    )
+    search_fields = (
+        'user__username',
+        'user__email',
+        'nickname',
+        'personal_instructions',
+    )
+    raw_id_fields = (
+        'user',
+    )
+    readonly_fields = (
         'created_at',
         'updated_at',
     )

@@ -1,0 +1,27 @@
+{% load i18n %}
+{% load static %}
+
+<!-- Pwanimate Main Chat Content -->
+{% include 'pwanimate/partials/chat_content.html' %}
+
+{# Out-of-band: swap the navbar to the Pwanimate branded navbar #}
+<nav id="navbar-top" class="navbar navbar-expand-lg navbar-top fixed-top p-0" hx-swap-oob="true">
+    {% include 'pwanimate/partials/pwanimate_top_nav.html' %}
+</nav>
+
+{# Out-of-band: swap the left rail to the Pwanimate conversation sidebar #}
+<aside id="left-nav-rail" class="desktop-left-rail d-none d-lg-block" aria-label="{% trans 'Pwanimate Navigation' %}" hx-swap-oob="true">
+    <div class="left-rail-inner">
+        {% include 'pwanimate/partials/pwanimate_left_rail.html' %}
+    </div>
+</aside>
+
+{# Out-of-band: swap the right context rail to the Pwanimate resource preview panel #}
+<aside id="context-rail-target" class="desktop-context-rail d-none d-xl-block" aria-label="{% trans 'Pwanimate Resources' %}" hx-swap-oob="true">
+    <div class="context-rail-inner" id="context-rail-inner">
+        {% include 'pwanimate/partials/pwanimate_context_rail.html' %}
+    </div>
+</aside>
+
+{# Clear any profile floating actions #}
+<div id="profile-floating-actions" hx-swap-oob="true"></div>

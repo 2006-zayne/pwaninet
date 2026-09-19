@@ -34,7 +34,7 @@ class GeminiEmbeddingProvider(BaseEmbeddingProvider):
         dimensions: int = 768,
         timeout: int = 30
     ):
-        self.api_key = api_key or getattr(settings, 'PWANIMATE_GEMINI_API_KEY', '')
+        self.api_key = api_key if api_key is not None else getattr(settings, 'PWANIMATE_GEMINI_API_KEY', '')
         self.model_name = model_name or getattr(settings, 'PWANIMATE_EMBEDDING_MODEL', 'gemini-embedding-2')
         self.dimensions = dimensions or getattr(settings, 'PWANIMATE_EMBEDDING_DIMENSIONS', 768)
         self.timeout = timeout

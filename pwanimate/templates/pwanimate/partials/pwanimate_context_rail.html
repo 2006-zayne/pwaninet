@@ -1,0 +1,88 @@
+{% load i18n %}
+{% load static %}
+<div class="p-3 d-flex flex-column pwanimate-right-rail" id="pwanimate-resource-preview-panel">
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-shrink-0">
+        <h6 class="fw-bold mb-0 text-muted small text-uppercase"><i class="bi bi-collection me-2 text-primary"></i>{% trans "Resource Preview" %}</h6>
+    </div>
+    
+    <!-- Empty State -->
+    <div class="card border-0 shadow-sm mb-3 flex-shrink-0 pwanimate-preview-empty-card" id="desktopPreviewEmpty">
+        <div class="card-body text-center py-4">
+            <div class="pwanimate-preview-empty-icon mb-2">
+                <i class="bi bi-file-earmark-text text-muted opacity-75" style="font-size: 2.2rem;"></i>
+            </div>
+            <h6 class="fw-semibold mb-1 small">{% trans "No active preview" %}</h6>
+            <p class="x-small text-muted mb-0">{% trans "Click any citation badge in the conversation to preview documents, posts, or media." %}</p>
+        </div>
+    </div>
+
+    <!-- Active Preview State: Structured Card Layout -->
+    <div class="d-none flex-column h-100 pwanimate-preview-card card border shadow-sm overflow-hidden" id="desktopPreviewActive">
+        <!-- 1. Header: Type Badge / Icon + Category Label (Left) | Close Button (Right) -->
+        <div class="pwanimate-preview-card-header px-3 py-2 d-flex justify-content-between align-items-center border-bottom">
+            <div class="d-flex align-items-center gap-2 text-truncate">
+                <span class="pwanimate-preview-badge badge rounded-pill px-2 py-1" id="desktopPreviewCategoryBadge">
+                    <i class="bi bi-file-earmark me-1" id="desktopPreviewCategoryIcon"></i>
+                    <span id="desktopPreviewCategoryText">{% trans "Document" %}</span>
+                </span>
+            </div>
+            <button type="button" id="desktopPreviewCloseBtn" class="btn btn-sm btn-ghost-secondary rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 28px; height: 28px;" aria-label="{% trans 'Close preview' %}" title="{% trans 'Close preview' %}">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <!-- 2. Preview Body -->
+        <div class="pwanimate-preview-card-body flex-grow-1 position-relative overflow-hidden pwanimate-preview-host" style="background-color: var(--pwanimate-card-bg);">
+            <div class="position-absolute top-50 start-50 translate-middle pwanimate-preview-spinner d-none" id="desktopPreviewSpinner">
+                <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+            </div>
+
+            <!-- Video Player Host -->
+            <video id="desktopPreviewVideo" class="w-100 h-100 position-relative d-none" controls style="z-index: 2; object-fit: contain; background: #000;"></video>
+
+            <!-- Fallback Iframe Host -->
+            <iframe id="desktopPreviewIframe" class="w-100 h-100 border-0 position-relative d-none" style="z-index: 2;" src=""></iframe>
+
+            <!-- Image Host -->
+            <div id="desktopPreviewImageContainer" class="pwanimate-preview-img-container w-100 h-100 position-relative d-none d-flex align-items-center justify-content-center p-2" style="z-index: 2; overflow: auto;">
+                <img id="desktopPreviewImage" src="" alt="{% trans 'Preview' %}" class="pwanimate-preview-img img-fluid rounded" style="max-height: 100%; object-fit: contain;">
+            </div>
+
+            <!-- Canonical Document / Post / Link Card Host (No recursive iframe) -->
+            <div id="desktopPreviewDocContainer" class="pwanimate-preview-doc-container w-100 h-100 position-relative d-none d-flex flex-column align-items-center justify-content-center p-4 text-center" style="z-index: 2;">
+                <div class="pwanimate-preview-doc-thumbnail-wrapper mb-3 d-none position-relative overflow-hidden rounded shadow-sm" id="desktopPreviewDocThumbnailWrapper" style="max-width: 100%; max-height: 200px;">
+                    <img id="desktopPreviewDocThumbnail" src="" alt="{% trans 'Thumbnail' %}" class="img-fluid rounded" style="max-height: 200px; object-fit: contain;">
+                </div>
+                <div class="pwanimate-preview-doc-icon mb-3" id="desktopPreviewDocIconWrapper">
+                    <i class="bi bi-file-earmark-pdf-fill text-danger" id="desktopPreviewDocIcon" style="font-size: 3.2rem;"></i>
+                </div>
+                <h6 class="fw-bold mb-1 text-break" id="desktopPreviewDocTitle" style="font-size: 0.95rem;"></h6>
+                <div class="text-muted small mb-2" id="desktopPreviewDocMeta"></div>
+                <p class="small text-muted px-2 mb-0" id="desktopPreviewDocDescription"></p>
+            </div>
+        </div>
+
+        <!-- 3. Footer: Title + Type/Context Subtitle + Actions -->
+        <div class="pwanimate-preview-card-footer px-3 py-3 border-top">
+            <div class="mb-2">
+                <div class="fw-bold text-truncate" id="desktopPreviewTitle" style="font-size: 0.9rem;">Preview</div>
+                <div class="text-muted small text-truncate" id="desktopPreviewSubtitle">Resource</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <!-- Primary Action Button: Canonical HTMX Navigation (Document Viewer / Post) -->
+                <a href="#" id="desktopPreviewPrimaryAction" class="btn btn-sm btn-primary flex-grow-1 rounded-pill d-flex align-items-center justify-content-center gap-1"
+                   hx-get="#"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true">
+                    <i class="bi bi-box-arrow-up-right me-1" id="desktopPreviewPrimaryIcon"></i>
+                    <span id="desktopPreviewPrimaryText">{% trans "Open Document" %}</span>
+                </a>
+                <!-- Secondary Action Button: External / Download / New Tab -->
+                <a href="#" id="desktopPreviewOriginalLink" class="btn btn-sm btn-outline-secondary rounded-pill px-3" target="_blank" rel="noopener" title="{% trans 'Open in new tab' %}">
+                    <i class="bi bi-box-arrow-up-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

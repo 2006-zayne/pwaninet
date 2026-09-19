@@ -6,7 +6,7 @@ abstractions, preserving canonical citations, provenance URLs, and untrusted
 data grounding boundaries.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from pwanimate.context.types import ContextItem, ContextPackage
 from pwanimate.tools.base import ToolResult
 
@@ -184,16 +184,22 @@ def tool_result_to_context_items(tool_name: str, result: ToolResult) -> List[Con
         role = data.get("global_role", "Normal")
         headline = f"Headline: {data['headline']}\n" if data.get("headline") else ""
         bio = f"Bio: {data['bio']}\n" if data.get("bio") else ""
-        course = f"Programme/Course: {data['programme'] or data['course']}\n" if data.get("programme") or data.get("course") else ""
-        year = f"Year: {data['year']}\n" if data.get("year") else ""
+        prog = data.get("programme_name") or data.get("programme") or data.get("course")
+        course = f"Programme/Course: {prog}\n" if prog else ""
+        level_str = data.get("academic_level") or (f"Year {data.get('year')}" if data.get("year") else None)
+        academic_level = f"Academic Level: {level_str}\n" if level_str else ""
+        interests = f"Interests: {data['interests']}\n" if data.get("interests") else ""
+        collab = f"Collaboration Status: {data['collaboration_status']}\n" if data.get("collaboration_status") else ""
         skills = f"Skills: {', '.join(data['skills'])}\n" if data.get("skills") else ""
         email = f"Email: {data['email']}\n" if data.get("email") else ""
 
         body = (
             f"User: {display_name} (@{username})\n"
             f"Role: {role}\n"
-            f"{headline}{bio}{course}{year}{skills}{email}".strip()
+            f"{headline}{bio}{course}{academic_level}{interests}{collab}{skills}{email}".strip()
         )
+
+        profile_url = data.get("profile_url") or data.get("canonical_url") or f"/users/user/{username}/"
 
         return [
             ContextItem(
@@ -202,7 +208,7 @@ def tool_result_to_context_items(tool_name: str, result: ToolResult) -> List[Con
                 title=f"Profile of {display_name} (@{username})",
                 content=body,
                 citation=f"[@{username}]",
-                url=f"/profile/{username}/",
+                url=profile_url,
                 metadata=data,
             )
         ]
@@ -243,6 +249,60 @@ def tool_result_to_context_items(tool_name: str, result: ToolResult) -> List[Con
             )
         ]
 
+    # 6. People Discovery Tool
+    elif tool_name == "people_discovery":
+        if not data or not isinstance(data, list):
+            return [
+                ContextItem(
+                    source="user",
+                    object_id="people_none",
+                    title="People Discovery",
+                    content="No matching students or peers were found for the requested criteria.",
+                    citation=None,
+                    url="/users/",
+                )
+            ]
+        items = []
+        for person in data:
+            username = person.get("username", "user")
+            display_name = person.get("display_name", username)
+            headline = f"Headline: {person['headline']}\n" if person.get("headline") else ""
+            programme = f"Programme: {person['programme_name']}\n" if person.get("programme_name") else ""
+            level = f"Level: {person['academic_level']}\n" if person.get("academic_level") else ""
+            status = f"Collaboration: {person['collaboration_status']}\n" if person.get("collaboration_status") else ""
+            skills = f"Matched Skills: {', '.join(person['matched_skills'])}\n" if person.get("matched_skills") else ""
+            interests = f"Matched Interests: {', '.join(person['matched_interests'])}\n" if person.get("matched_interests") else ""
+
+            evidence = person.get("evidence", {})
+            evidence_lines = []
+            if evidence.get("academic_alignment"):
+                evidence_lines.append(f"Connection: {evidence['academic_alignment']}")
+            if evidence.get("shared_groups_count", 0) > 0:
+                evidence_lines.append(f"Shared Groups: {evidence['shared_groups_count']}")
+            if evidence.get("mutual_connections_count", 0) > 0:
+                evidence_lines.append(f"Mutual Connections: {evidence['mutual_connections_count']}")
+            evidence_str = f"Context: {'; '.join(evidence_lines)}\n" if evidence_lines else ""
+
+            body = (
+                f"Peer: {display_name} (@{username})\n"
+                f"{headline}{programme}{level}{status}{skills}{interests}{evidence_str}".strip()
+            )
+
+            url = person.get("profile_url") or f"/users/user/{username}/"
+
+            items.append(
+                ContextItem(
+                    source="user",
+                    object_id=f"user_{username}",
+                    title=f"{display_name} (@{username})",
+                    content=body,
+                    citation=f"[@{username}]",
+                    url=url,
+                    metadata=person,
+                )
+            )
+        return items
+
     # Fallback for unknown tool
     return [
         ContextItem(
@@ -256,7 +316,11 @@ def tool_result_to_context_items(tool_name: str, result: ToolResult) -> List[Con
     ]
 
 
-def build_tool_context_package(query: str, items: List[ContextItem]) -> ContextPackage:
+def build_tool_context_package(
+    query: str,
+    items: List[ContextItem],
+    user_context: Optional[Any] = None,
+) -> ContextPackage:
     """
     Assemble a list of ContextItems into a bounded ContextPackage ready for
     injection into the LLM system/user grounding prompt.
@@ -283,4 +347,5 @@ def build_tool_context_package(query: str, items: List[ContextItem]) -> ContextP
         total_characters=total_chars,
         truncated=False,
         source_counts=source_counts,
+        user_context=user_context,
     )

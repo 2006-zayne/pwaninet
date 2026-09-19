@@ -480,4 +480,50 @@ class RetrievalTestCase(TestCase):
         self.assertGreater(len(response.results), 0)
         self.assertEqual(response.results[0].title, "Operating Systems Concepts")
 
+    def test_document_semantic_retrieval_metadata_enrichment(self):
+        """Document semantic retrieval results must include thumbnail_url, media_url, file_type, and author."""
+        from documents.models import DocumentFile
+        DocumentFile.objects.create(
+            document_version=self.v_public,
+            original_filename="os_notes.pdf",
+            extension="pdf",
+            size_bytes=1024,
+            uploaded_by=self.uploader,
+            thumbnail_path="documents/thumbnails/os_thumb.png",
+            preview_path="documents/previews/os_preview.png",
+        )
+        req = RetrievalRequest(
+            query="Processes and threads",
+            user=self.student_cs,
+            sources=[SourceType.DOCUMENT],
+            mode=RetrievalMode.SEMANTIC,
+            limit=1
+        )
+        results = self.doc_service.retrieve(req)
+        self.assertEqual(len(results), 1)
+        meta = results[0].metadata
+        self.assertEqual(meta["resource_type"], "document")
+        self.assertEqual(meta["file_type"], "pdf")
+        self.assertIn("os_thumb.png", meta["thumbnail_url"])
+        self.assertEqual(meta["author"], "Alice Uploader")
+
+    def test_post_search_adapter_media_and_hls_metadata(self):
+        """Post search adapter must enrich metadata with HLS stream, media, and resource_type."""
+        post = Post.objects.create(
+            author=self.uploader,
+            content="Check out this physics experiment video on campus.",
+            hls_playlist="posts/videos/hls/exp1/master.m3u8",
+        )
+        req = RetrievalRequest(
+            query="physics experiment video",
+            user=self.student_cs,
+            sources=[SourceType.POST],
+            limit=5
+        )
+        results = self.search_adapter.search_posts(req)
+        self.assertGreater(len(results), 0)
+        p_res = next(r for r in results if r.object_id == post.id)
+        self.assertEqual(p_res.metadata["resource_type"], "video")
+        self.assertIn("master.m3u8", p_res.metadata["hls_url"])
+
 

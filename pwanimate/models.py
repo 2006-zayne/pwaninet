@@ -299,3 +299,113 @@ class PwanimateMessage(models.Model):
     def __str__(self):
         return f"{self.role.capitalize()} message in {self.conversation_id}"
 
+    @property
+    def people(self) -> list:
+        """
+        Extract structured person profiles from persisted sources if present.
+        Returns empty list if no people discovery items were associated with this turn.
+        """
+        if not self.sources or not isinstance(self.sources, list):
+            return []
+        people_list = []
+        for src in self.sources:
+            if isinstance(src, dict) and src.get("source") == "user":
+                person = src.get("person")
+                if isinstance(person, dict) and person.get("username"):
+                    people_list.append(person)
+        return people_list
+
+
+class PwanimateTone(models.TextChoices):
+    """Controlled tone choices for Pwanimate assistant interactions."""
+    NEUTRAL = "neutral", "Neutral"
+    FRIENDLY = "friendly", "Friendly"
+    PROFESSIONAL = "professional", "Professional"
+    ACADEMIC = "academic", "Academic"
+
+
+class PwanimateResponseStyle(models.TextChoices):
+    """Controlled response style choices for Pwanimate assistant interactions."""
+    CONCISE = "concise", "Concise"
+    BALANCED = "balanced", "Balanced"
+    DETAILED = "detailed", "Detailed"
+
+
+class PwanimatePreferences(models.Model):
+    """
+    Dedicated AI assistant personalization preferences for an authenticated student.
+
+    Strictly decoupled from PwaniNet platform account settings.
+    Enforces a strict 1-to-1 relationship with the Django User model.
+    """
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="pwanimate_preferences",
+        primary_key=True,
+    )
+    nickname = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text="Optional preferred name Pwanimate uses when addressing the student",
+    )
+    tone = models.CharField(
+        max_length=20,
+        choices=PwanimateTone.choices,
+        default=PwanimateTone.NEUTRAL,
+        db_index=True,
+        help_text="Assistant conversational tone",
+    )
+    response_style = models.CharField(
+        max_length=20,
+        choices=PwanimateResponseStyle.choices,
+        default=PwanimateResponseStyle.BALANCED,
+        db_index=True,
+        help_text="Assistant response formatting style",
+    )
+    personal_instructions = models.TextField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="User-authored stylistic guidance for Pwanimate (maximum 500 characters)",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Pwanimate Preferences"
+        verbose_name_plural = "Pwanimate Preferences"
+
+    def clean(self):
+        super().clean()
+        if self.nickname:
+            self.nickname = self.nickname.strip()
+            if len(self.nickname) > 50:
+                raise ValidationError({"nickname": "Nickname cannot exceed 50 characters."})
+        else:
+            self.nickname = ""
+
+        if self.tone not in dict(PwanimateTone.choices):
+            raise ValidationError({"tone": f"Invalid tone '{self.tone}'. Allowed choices: {PwanimateTone.values}."})
+
+        if self.response_style not in dict(PwanimateResponseStyle.choices):
+            raise ValidationError(
+                {"response_style": f"Invalid response style '{self.response_style}'. Allowed choices: {PwanimateResponseStyle.values}."}
+            )
+
+        if self.personal_instructions:
+            self.personal_instructions = self.personal_instructions.strip()
+            if len(self.personal_instructions) > 500:
+                raise ValidationError({"personal_instructions": "Personal instructions cannot exceed 500 characters."})
+        else:
+            self.personal_instructions = ""
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        user_ident = getattr(self.user, "username", str(self.user_id)) if hasattr(self, "user") else str(self.pk)
+        return f"PwanimatePreferences({user_ident}, tone={self.tone}, style={self.response_style})"
+

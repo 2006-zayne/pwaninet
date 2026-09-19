@@ -9,6 +9,8 @@ from pwanimate.models import PwanimateConversation, PwanimateMessage
 class MessageSerializer(serializers.ModelSerializer):
     """Serializer for individual conversation messages."""
 
+    people = serializers.ReadOnlyField()
+
     class Meta:
         model = PwanimateMessage
         fields = [
@@ -17,6 +19,7 @@ class MessageSerializer(serializers.ModelSerializer):
             "content",
             "citations",
             "sources",
+            "people",
             "created_at",
         ]
         read_only_fields = fields

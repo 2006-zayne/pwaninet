@@ -203,11 +203,35 @@ class DocumentSemanticRetrievalService:
         # Canonical detail URL
         detail_url = f"/documents/document/{doc.share_id}/"
 
+        # Resolve thumbnail, media file URL, and author
+        thumbnail_url = getattr(doc, 'thumbnail_url', None) or ""
+        first_file = None
+        if version and hasattr(version, 'files'):
+            first_file = version.files.first()
+        elif hasattr(doc, 'latest_version') and doc.latest_version:
+            first_file = doc.latest_version.files.first()
+
+        media_url = ""
+        file_type = ""
+        if first_file:
+            try:
+                if getattr(first_file, 'file', None):
+                    media_url = first_file.file.url
+            except Exception:
+                media_url = ""
+            file_type = getattr(first_file, 'extension', '') or ""
+
+        author_name = ""
+        uploader = getattr(doc, 'uploaded_by', None)
+        if uploader:
+            full_name = f"{uploader.first_name or ''} {uploader.last_name or ''}".strip()
+            author_name = full_name or getattr(uploader, "username", "") or ""
+
         metadata = {
             "document_id": doc.id,
             "document_share_id": str(doc.share_id),
-            "document_version_id": version.id,
-            "version_number": version.version_number,
+            "document_version_id": version.id if version else None,
+            "version_number": version.version_number if version else None,
             "chunk_id": chunk.id,
             "chunk_index": chunk.chunk_index,
             "chunk_type": chunk.chunk_type,
@@ -216,6 +240,11 @@ class DocumentSemanticRetrievalService:
             "slide_number": chunk.slide_number,
             "section_heading": chunk.section_heading,
             "embedding_model": chunk.embedding_model,
+            "thumbnail_url": thumbnail_url,
+            "media_url": media_url,
+            "file_type": file_type,
+            "resource_type": "document",
+            "author": author_name,
         }
 
         return RetrievalResult(

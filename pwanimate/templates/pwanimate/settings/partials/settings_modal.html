@@ -1,0 +1,80 @@
+{% load i18n %}
+{% load static %}
+<div class="modal fade pwanimate-settings-modal"
+     id="pwanimateSettingsModal"
+     tabindex="-1"
+     aria-labelledby="pwanimateSettingsModalTitle"
+     aria-hidden="true"
+     data-bs-backdrop="true"
+     data-bs-keyboard="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content shadow-lg border rounded-4 overflow-hidden" style="background-color: var(--pwanimate-sidebar-bg);">
+            <!-- Modal Header -->
+            <div class="modal-header border-bottom px-4 py-3 d-flex align-items-center justify-content-between" style="border-color: var(--pwanimate-border) !important;">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-gear-fill text-primary fs-5"></i>
+                    <h5 class="modal-title fw-bold mb-0" id="pwanimateSettingsModalTitle">
+                        {% trans "Settings" %}
+                    </h5>
+                </div>
+                <button type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="{% trans 'Close' %}"
+                        style="filter: var(--pwanimate-close-filter, none);"></button>
+            </div>
+
+            <!-- Modal Body with 2-Pane Sidebar & Content Area -->
+            <div class="modal-body p-0 d-flex" style="min-height: 480px; max-height: 75vh;">
+                <!-- Sidebar Nav -->
+                <aside class="pwanimate-settings-sidebar border-end p-3 flex-shrink-0" style="width: 220px; background-color: var(--pwanimate-bg);">
+                    <ul class="nav nav-pills flex-column gap-1" id="pwanimate-modal-tabs">
+                        <li class="nav-item">
+                            <button type="button"
+                                    class="nav-link w-100 text-start {% if active_tab == 'personalization' or not active_tab %}active{% endif %} d-flex align-items-center gap-2 px-3 py-2 rounded-3"
+                                    id="modal-tab-personalization"
+                                    data-tab="personalization"
+                                    onclick="window.switchPwanimateSettingsTab('modal', 'personalization')">
+                                <i class="bi bi-sliders"></i>
+                                <span class="fw-medium">{% trans "Personalization" %}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button type="button"
+                                    class="nav-link w-100 text-start {% if active_tab == 'usage' %}active{% endif %} d-flex align-items-center gap-2 px-3 py-2 rounded-3"
+                                    id="modal-tab-usage"
+                                    data-tab="usage"
+                                    onclick="window.switchPwanimateSettingsTab('modal', 'usage')">
+                                <i class="bi bi-speedometer2"></i>
+                                <span class="fw-medium">{% trans "Usage" %}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button type="button"
+                                    class="nav-link w-100 text-start {% if active_tab == 'about' %}active{% endif %} d-flex align-items-center gap-2 px-3 py-2 rounded-3"
+                                    id="modal-tab-about"
+                                    data-tab="about"
+                                    onclick="window.switchPwanimateSettingsTab('modal', 'about')">
+                                <i class="bi bi-info-circle"></i>
+                                <span class="fw-medium">{% trans "About" %}</span>
+                            </button>
+                        </li>
+                    </ul>
+                </aside>
+
+                <!-- Scrollable Content Pane -->
+                <main class="pwanimate-settings-main p-4 flex-grow-1 overflow-y-auto" id="pwanimate-settings-modal-body">
+                    <div id="pwanimate-modal-pane-personalization" class="pwanimate-settings-pane {% if active_tab == 'personalization' or not active_tab %}active{% else %}d-none{% endif %}">
+                        {% include 'pwanimate/settings/partials/personalization_content.html' %}
+                    </div>
+                    <div id="pwanimate-modal-pane-usage" class="pwanimate-settings-pane {% if active_tab == 'usage' %}active{% else %}d-none{% endif %}">
+                        {% include 'pwanimate/settings/partials/usage_content.html' %}
+                    </div>
+                    <div id="pwanimate-modal-pane-about" class="pwanimate-settings-pane {% if active_tab == 'about' %}active{% else %}d-none{% endif %}">
+                        {% include 'pwanimate/settings/partials/about_content.html' %}
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+</div>

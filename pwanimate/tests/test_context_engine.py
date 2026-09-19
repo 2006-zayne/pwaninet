@@ -346,3 +346,77 @@ class ContextEngineTestCase(TestCase):
         )
         self.assertEqual(pkg.total_items, 1)
         self.assertEqual(pkg.items[0].object_id, 101)
+
+    # -------------------------------------------------------------------------
+    # 7. UserContext Integration
+    # -------------------------------------------------------------------------
+    def test_context_request_and_package_carry_user_context(self):
+        from pwanimate.context.user_context import UserContext
+        user_ctx = UserContext(
+            user_id=42,
+            username="student_alice",
+            display_name="Alice Wambui",
+            programme_name="Bachelor of Science in Computer Science",
+            department_name="Computing",
+            school_name="SPAS",
+            academic_level_name="Year 3",
+            interests=["AI", "Python"],
+            skills=["Django"],
+            collaboration_status="open_for_collaboration",
+            approved_group_ids=[1, 2],
+        )
+
+        req = ContextRequest(
+            query=self.query,
+            results=[self.res_doc_chunk_1],
+            user_context=user_ctx,
+        )
+        pkg = self.engine.build_context(req)
+
+        self.assertIsNotNone(pkg.user_context)
+        self.assertEqual(pkg.user_context.username, "student_alice")
+        self.assertTrue(pkg.has_content())
+
+        # Verify formatting contains both user context and retrieved data
+        formatted = pkg.format_context_text()
+        self.assertIn("<user_context>", formatted)
+        self.assertIn("Alice Wambui", formatted)
+        self.assertIn("Bachelor of Science in Computer Science", formatted)
+        self.assertIn("<retrieved_context", formatted)
+        self.assertIn('<grounding_data source="document"', formatted)
+
+        # Verify serialization
+        data = pkg.to_dict()
+        self.assertIn("user_context", data)
+        self.assertEqual(data["user_context"]["user_id"], 42)
+        self.assertEqual(data["user_context"]["username"], "student_alice")
+
+        # Zero DB queries
+        with CaptureQueriesContext(connection) as query_ctx:
+            self.engine.build_context(req)
+        self.assertEqual(len(query_ctx.captured_queries), 0)
+
+    def test_context_package_with_only_user_context_and_no_items(self):
+        from pwanimate.context.user_context import UserContext
+        user_ctx = UserContext(
+            user_id=1,
+            username="solo_student",
+            display_name="Solo Student",
+        )
+        req = ContextRequest(
+            query=self.query,
+            results=[],
+            user_context=user_ctx,
+        )
+        pkg = self.engine.build_context(req)
+
+        self.assertEqual(pkg.total_items, 0)
+        self.assertEqual(pkg.items, [])
+        self.assertIsNotNone(pkg.user_context)
+        self.assertTrue(pkg.has_content())
+
+        formatted = pkg.format_context_text()
+        self.assertIn("<user_context>", formatted)
+        self.assertIn("Solo Student", formatted)
+        self.assertNotIn("<retrieved_context", formatted)
+

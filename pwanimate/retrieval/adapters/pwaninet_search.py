@@ -38,6 +38,58 @@ class PwaniNetSearchAdapter:
         for item in items:
             raw_post = item.get("obj")
             author_info = item.get("author", {})
+
+            # Resolve media, HLS stream, and poster thumbnail
+            media_url = ""
+            thumbnail_url = ""
+            hls_url = ""
+            resource_type = "post"
+
+            if raw_post:
+                # Video media & HLS
+                if getattr(raw_post, "video", None):
+                    try:
+                        media_url = raw_post.video.url
+                    except Exception:
+                        media_url = ""
+                    resource_type = "video"
+
+                # Video poster
+                poster = getattr(raw_post, "get_video_poster", None)
+                if poster:
+                    thumbnail_url = poster
+
+                # HLS master playlist URL
+                post_hls = getattr(raw_post, "get_hls_url", None)
+                if post_hls:
+                    hls_url = post_hls
+                    resource_type = "video"
+
+                # Image attachments fallback
+                if not media_url and hasattr(raw_post, "images"):
+                    first_img = raw_post.images.first()
+                    if first_img and getattr(first_img, "image", None):
+                        try:
+                            img_url = first_img.image.url
+                            media_url = img_url
+                            if not thumbnail_url:
+                                thumbnail_url = img_url
+                            resource_type = "image"
+                        except Exception:
+                            pass
+
+                # Post thumbnail fallback
+                if not thumbnail_url and getattr(raw_post, "thumbnail", None):
+                    try:
+                        thumbnail_url = raw_post.thumbnail.url
+                    except Exception:
+                        pass
+
+            # Also check item dict fallbacks
+            if not hls_url and item.get("hls_url"):
+                hls_url = item.get("hls_url")
+                resource_type = "video"
+
             metadata = {
                 "author_id": author_info.get("id"),
                 "author_username": author_info.get("username"),
@@ -45,6 +97,10 @@ class PwaniNetSearchAdapter:
                 "created_at": item.get("created_at"),
                 "like_count": item.get("like_count", 0),
                 "comment_count": item.get("comment_count", 0),
+                "thumbnail_url": thumbnail_url,
+                "media_url": media_url,
+                "hls_url": hls_url,
+                "resource_type": resource_type,
             }
             if raw_post and hasattr(raw_post, 'share_id'):
                 canonical_url = f"/post/{raw_post.share_id}/"
@@ -163,6 +219,28 @@ class PwaniNetSearchAdapter:
             share_id = getattr(raw_doc, 'share_id', None)
             url = f"/documents/document/{share_id}/" if share_id else item.get("detail_url", "")
 
+            doc_thumb = ""
+            doc_media = ""
+            doc_ext = item.get("file_type") or ""
+            doc_author = item.get("author") or ""
+            if raw_doc:
+                doc_thumb = getattr(raw_doc, "thumbnail_url", "") or ""
+                first_file = None
+                if hasattr(raw_doc, "latest_version") and raw_doc.latest_version:
+                    first_file = raw_doc.latest_version.files.first()
+                if first_file:
+                    try:
+                        if getattr(first_file, "file", None):
+                            doc_media = first_file.file.url
+                    except Exception:
+                        pass
+                    if not doc_ext:
+                        doc_ext = getattr(first_file, "extension", "") or ""
+                if not doc_author and getattr(raw_doc, "uploaded_by", None):
+                    uploader = raw_doc.uploaded_by
+                    full_name = f"{uploader.first_name or ''} {uploader.last_name or ''}".strip()
+                    doc_author = full_name or getattr(uploader, "username", "") or ""
+
             results.append(
                 RetrievalResult(
                     source=SourceType.DOCUMENT,
@@ -174,9 +252,13 @@ class PwaniNetSearchAdapter:
                     citation=f"Document: {item.get('title', '')}",
                     metadata={
                         "category_display": item.get("category_display"),
-                        "file_type": item.get("file_type"),
+                        "file_type": doc_ext,
                         "download_count": item.get("download_count"),
                         "rating_average": item.get("rating_average"),
+                        "thumbnail_url": doc_thumb,
+                        "media_url": doc_media,
+                        "resource_type": "document",
+                        "author": doc_author,
                     },
                     raw_object=raw_doc,
                 )

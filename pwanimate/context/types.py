@@ -49,6 +49,7 @@ class ContextRequest:
     max_chunks_per_document: int = 4
     max_characters_per_item: int = 3000
     min_score: float = 0.0
+    user_context: Optional[Any] = None
 
     def get_raw_results(self) -> List[RetrievalResult]:
         """Resolve candidate RetrievalResults from response or explicit list."""
@@ -161,10 +162,11 @@ class ContextPackage:
     total_characters: int = 0
     truncated: bool = False
     source_counts: Dict[str, int] = field(default_factory=dict)
+    user_context: Optional[Any] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert package to JSON-serializable dictionary."""
-        return {
+        data = {
             "query": self.query,
             "items": [item.to_dict() for item in self.items],
             "citations": self.citations,
@@ -174,18 +176,33 @@ class ContextPackage:
             "truncated": self.truncated,
             "source_counts": self.source_counts,
         }
+        if self.user_context and hasattr(self.user_context, "to_dict"):
+            data["user_context"] = self.user_context.to_dict()
+        elif self.user_context is not None:
+            data["user_context"] = self.user_context
+        return data
 
     def format_context_text(self) -> str:
         """
         Format the entire context package as structured, machine-readable text.
         Retrieved content is enclosed in unambiguous data boundaries.
         """
-        if not self.items:
-            return ""
+        sections = []
 
-        blocks = [item.format_data_block() for item in self.items]
-        content_section = "\n\n".join(blocks)
+        if self.user_context and hasattr(self.user_context, "format_context_block"):
+            user_text = self.user_context.format_context_block()
+            if user_text:
+                sections.append(user_text)
 
-        header = f"<retrieved_context total_items=\"{self.total_items}\" estimated_tokens=\"{self.estimated_tokens}\">"
-        footer = "</retrieved_context>"
-        return f"{header}\n\n{content_section}\n\n{footer}"
+        if self.items:
+            blocks = [item.format_data_block() for item in self.items]
+            content_section = "\n\n".join(blocks)
+            header = f'<retrieved_context total_items="{self.total_items}" estimated_tokens="{self.estimated_tokens}">'
+            footer = "</retrieved_context>"
+            sections.append(f"{header}\n\n{content_section}\n\n{footer}")
+
+        return "\n\n".join(sections)
+
+    def has_content(self) -> bool:
+        """Check if package contains either grounding items or user context."""
+        return bool(self.items or self.user_context)

@@ -148,17 +148,18 @@ class GeminiLLMProvider(BaseLLMProvider):
                 })
 
         # Inject context into contents if present
-        if request.context and request.context.items:
+        if request.context and (request.context.items or getattr(request.context, "user_context", None)):
             context_text = request.context.format_context_text()
-            # If there's a last user message, prepend context parts
-            if contents and contents[-1]["role"] == "user":
-                contents[-1]["parts"].insert(0, {"text": context_text})
-            else:
-                # Add context as a user part
-                contents.append({
-                    "role": "user",
-                    "parts": [{"text": context_text}],
-                })
+            if context_text:
+                # If there's a last user message, prepend context parts
+                if contents and contents[-1]["role"] == "user":
+                    contents[-1]["parts"].insert(0, {"text": context_text})
+                else:
+                    # Add context as a user part
+                    contents.append({
+                        "role": "user",
+                        "parts": [{"text": context_text}],
+                    })
 
         # Fallback if no messages were provided
         if not contents:

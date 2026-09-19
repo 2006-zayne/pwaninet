@@ -12,6 +12,13 @@ from .types import (
     estimate_tokens,
 )
 from .engine import ContextEngine
+from .user_context import (
+    UserContext,
+    UserContextService,
+    normalize_interests,
+    normalize_skills,
+    resolve_display_name,
+)
 
 __all__ = [
     'ContextRequest',
@@ -19,4 +26,10 @@ __all__ = [
     'ContextPackage',
     'ContextEngine',
     'estimate_tokens',
+    'UserContext',
+    'UserContextService',
+    'normalize_interests',
+    'normalize_skills',
+    'resolve_display_name',
 ]
+

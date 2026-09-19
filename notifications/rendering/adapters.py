@@ -4,7 +4,7 @@ Normalizes notification payloads from NotificationObject
 into the standardized payload contract defined in the Notification Engine Specification.
 """
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from datetime import datetime
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -325,46 +325,77 @@ class NotificationObjectAdapter(PayloadAdapter):
         if not notification.context_type or not notification.context_id:
             return None
         
-        context_name = notification.context_id  # Fallback
-        context_icon = self._get_context_icon(notification.context_type)
+        ctx_type_str = str(notification.context_type or '').upper()
+        context_name = str(notification.context_id)  # Fallback
+        context_icon = self._get_context_icon(ctx_type_str)
+        context_avatar_url = None
+        metadata = notification.metadata or {}
+        
+        if metadata.get('context_name'):
+            context_name = metadata.get('context_name')
         
         # Resolve actual context name based on type
-        context_avatar_url = None
-        if notification.context_type == 'GROUP':
+        if ctx_type_str == 'GROUP':
             from groups.models import Group
             try:
-                group = Group.objects.get(id=notification.context_id)
+                # Group IDs are integers in groups app
+                group = Group.objects.get(id=int(notification.context_id))
                 context_name = group.name
                 context_icon = 'people'
                 # Include group avatar if available
                 if hasattr(group, 'group_pic') and group.group_pic:
                     context_avatar_url = group.group_pic.url
-            except (Group.DoesNotExist, ValueError):
-                if notification.metadata and notification.metadata.get('group_name'):
-                    context_name = notification.metadata.get('group_name')
-            if str(context_name).isdigit() and notification.metadata and notification.metadata.get('group_name'):
-                context_name = notification.metadata.get('group_name')
-        elif notification.context_type == 'WORKSPACE':
+            except Exception:
+                if metadata.get('group_name'):
+                    context_name = metadata.get('group_name')
+            if str(context_name).isdigit() and metadata.get('group_name'):
+                context_name = metadata.get('group_name')
+        elif ctx_type_str == 'FEEDBACK':
+            context_icon = 'chat-square-text'
+            if not metadata.get('context_name'):
+                try:
+                    from admin_dashboard.models import FeedbackTicket
+                    ticket = FeedbackTicket.objects.filter(id=notification.context_id).first()
+                    if ticket and ticket.subject:
+                        context_name = ticket.subject
+                except Exception:
+                    pass
+            if context_name == str(notification.context_id):
+                context_name = 'Feedback'
+        elif ctx_type_str == 'WORKSPACE':
             context_icon = 'grid-3x3'
-        elif notification.context_type == 'COURSE':
+        elif ctx_type_str == 'COURSE':
             context_icon = 'book'
-        elif notification.context_type == 'POST':
+        elif ctx_type_str in ['POST', 'POSTS']:
             context_icon = 'chat-text'
-        elif notification.context_type == 'DOCUMENT':
+            post = _get_post_safely(notification.context_id)
+            if post and post.content:
+                context_name = post.content[:50] + ('...' if len(post.content) > 50 else '')
+            elif metadata.get('post_content'):
+                context_name = metadata.get('post_content')[:50]
+        elif ctx_type_str == 'DOCUMENT':
             context_icon = 'file-earmark-text'
+            if metadata.get('document_title'):
+                context_name = metadata.get('document_title')
         
         # Map context_type to enum
         context_type_enum = None
         try:
-            context_type_enum = ContextType[notification.context_type]
+            context_type_enum = ContextType[ctx_type_str]
         except KeyError:
             # Default to SYSTEM if unknown
             context_type_enum = ContextType.SYSTEM
         
+        # Convert context id to int if numeric, otherwise preserve as str (e.g. UUID)
+        try:
+            ctx_id = int(notification.context_id)
+        except (ValueError, TypeError):
+            ctx_id = str(notification.context_id)
+        
         return NotificationContext(
             type=context_type_enum,
-            id=int(notification.context_id),
-            name=context_name,
+            id=ctx_id,
+            name=str(context_name),
             icon=context_icon,
             avatar_url=context_avatar_url
         )
@@ -399,9 +430,15 @@ class NotificationObjectAdapter(PayloadAdapter):
                 if post:
                     image_url = self._get_post_image_url(post)
             
+            res_id = resource_data.get('id', 0)
+            try:
+                res_id = int(res_id)
+            except (ValueError, TypeError):
+                pass
+            
             return NotificationResource(
                 type=resource_type_enum,
-                id=int(resource_data.get('id', 0)),
+                id=res_id,
                 url=resource_url,
                 title=resource_data.get('title'),
                 image_url=image_url
@@ -572,6 +609,16 @@ class NotificationObjectAdapter(PayloadAdapter):
                 url=target_url,
                 title=metadata.get('post_content', 'Post') or 'Post',
                 image_url=_clean_media_url(thumbnail_url)
+            )
+        
+        # Feedback reply resource
+        if notification.notification_type == 'ADMIN_FEEDBACK_REPLY':
+            ticket_id = metadata.get('ticket_id') or notification.context_id
+            return NotificationResource(
+                type=ResourceType.SYSTEM,
+                id=ticket_id,
+                url=f"/dashboard/feedback/user/{ticket_id}/",
+                title=metadata.get('context_name') or 'Feedback Ticket'
             )
         
         return None
@@ -1038,7 +1085,7 @@ class NotificationObjectAdapter(PayloadAdapter):
         
         return NotificationNavigation(primary=primary, secondary=secondary)
     
-    def _extract_resource_id_from_payload(self, field_path: Optional[str], notification, context: Optional[NotificationContext], resource: Optional[NotificationResource]) -> Optional[int]:
+    def _extract_resource_id_from_payload(self, field_path: Optional[str], notification, context: Optional[NotificationContext], resource: Optional[NotificationResource]) -> Optional[Union[int, str]]:
         """Extract resource ID from notification data using field path."""
         if not field_path:
             return None
@@ -1055,7 +1102,10 @@ class NotificationObjectAdapter(PayloadAdapter):
             # Try to get actor_id from metadata
             actor_id = notification.metadata.get('actor_id')
             if actor_id:
-                value = int(actor_id)
+                try:
+                    value = int(actor_id)
+                except (ValueError, TypeError):
+                    value = actor_id
             else:
                 return None
         else:
@@ -1066,7 +1116,7 @@ class NotificationObjectAdapter(PayloadAdapter):
             for part in parts[1:]:
                 if isinstance(value, dict) and part in value:
                     value = value[part]
-                elif isinstance(value, list) and part.isdigit():
+                elif isinstance(value, list) and str(part).isdigit():
                     index = int(part)
                     if index < len(value):
                         value = value[index]
@@ -1075,7 +1125,14 @@ class NotificationObjectAdapter(PayloadAdapter):
                 else:
                     return None
         
-        return value if isinstance(value, int) else None
+        if isinstance(value, int):
+            return value
+        elif isinstance(value, str):
+            try:
+                return int(value)
+            except (ValueError, TypeError):
+                return value
+        return None
     
     def _build_permissions(self, notification) -> NotificationPermissions:
         """Build permissions configuration."""
@@ -1116,10 +1173,15 @@ class NotificationObjectAdapter(PayloadAdapter):
             'REJECT': 'x-lg',
             'FOLLOW': 'person-plus',
             'UNFOLLOW': 'person-dash',
+            'LIKE': 'heart',
+            'UNLIKE': 'heart-fill',
+            'PINCH': 'hand-index',
             'VIEW': 'eye',
             'OPEN': 'box-arrow-up-right',
             'REPLY': 'reply',
-            'LIKE': 'heart',
+            'JOIN': 'box-arrow-in-right',
+            'LEAVE': 'box-arrow-right',
+            'SHARE': 'share',
             'BOOKMARK': 'bookmark',
             'DOWNLOAD': 'download',
             'DELETE': 'trash',
@@ -1137,9 +1199,12 @@ class NotificationObjectAdapter(PayloadAdapter):
             'COURSE': 'book',
             'ASSIGNMENT': 'clipboard-check',
             'MEETING': 'calendar-check',
-            'PROFILE': 'person'
+            'PROFILE': 'person',
+            'POST': 'chat-text',
+            'DOCUMENT': 'file-earmark-text',
+            'FEEDBACK': 'chat-square-text',
         }
-        return icon_map.get(context_type, 'folder')
+        return icon_map.get(str(context_type).upper(), 'folder')
     
     def _get_resource_icon(self, resource_type: str) -> str:
         """Get icon for resource type."""

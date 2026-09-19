@@ -9,7 +9,7 @@ to Unified Retrieval) over false positives (invoking the wrong tool).
 import re
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 
 @dataclass
@@ -46,9 +46,29 @@ class ToolRouter:
 
     # 2. User Profile Patterns (requires explicit @username to avoid ambiguous name guessing)
     USER_PROFILE_PATTERNS = [
-        r"^(?:who\s+is|tell\s+me\s+about|lookup|show\s+me|view)\s+@([a-zA-Z0-9_\-\.]+)[\s\?\.]*$",
+        # Standard lookups
+        r"^(?:who\s+is|tell\s+me\s+about|can\s+you\s+tell\s+me\s+about|lookup|show\s+me|view|info\s+(?:on|about)|information\s+(?:on|about))\s+@([a-zA-Z0-9_\-\.]+)[\s\?\.]*$",
         r"^(?:profile\s+(?:of|for)|user\s+profile\s+for)\s+@?([a-zA-Z0-9_\-\.]+)[\s\?\.]*$",
         r"^@([a-zA-Z0-9_\-\.]+)[\s\?\.]*$",
+        # Academic / study questions
+        r"^(?:what\s+(?:does|is)\s+)?@([a-zA-Z0-9_\-\.]+)\s+(?:study(?:ing)?|enrolled\s+in|taking)[\s\?\.]*$",
+        r"^what\s+(?:programme|program|course|degree|year|level)\s+is\s+@([a-zA-Z0-9_\-\.]+)(?:\s+in|\s+taking)?[\s\?\.]*$",
+        r"^(?:what\s+is\s+)?(?:the\s+)?(?:programme|program|course|degree|academic\s+level|year)\s+(?:of|for)\s+@([a-zA-Z0-9_\-\.]+)[\s\?\.]*$",
+        # Skills & expertise questions
+        r"^(?:what\s+(?:skills?\s+)?(?:does|do)\s+)?@([a-zA-Z0-9_\-\.]+)\s+(?:have|know|possess|specialize\s+in)[\s\?\.]*$",
+        r"^what\s+are\s+(?:the\s+)?skills?\s+(?:of|for)\s+@([a-zA-Z0-9_\-\.]+)[\s\?\.]*$",
+        r"^what\s+are\s+@([a-zA-Z0-9_\-\.]+)(?:'s|\s+)?skills?[\s\?\.]*$",
+        r"^does\s+@([a-zA-Z0-9_\-\.]+)\s+know\s+([^?\.]+?)[\s\?\.]*$",
+        # Interests questions
+        r"^(?:what\s+is\s+)?@([a-zA-Z0-9_\-\.]+)\s+interested\s+in[\s\?\.]*$",
+        r"^what\s+are\s+(?:the\s+)?interests?\s+(?:of|for)\s+@([a-zA-Z0-9_\-\.]+)[\s\?\.]*$",
+        r"^what\s+are\s+@([a-zA-Z0-9_\-\.]+)(?:'s|\s+)?interests?[\s\?\.]*$",
+        # Collaboration availability questions
+        r"^is\s+@([a-zA-Z0-9_\-\.]+)\s+(?:open\s+to|available\s+for)\s+(?:collaboration|projects?|study\s+groups?|networking)[\s\?\.]*$",
+        r"^(?:what\s+is\s+)?(?:the\s+)?collaboration\s+status\s+(?:of|for)\s+@([a-zA-Z0-9_\-\.]+)[\s\?\.]*$",
+        # Projects inquiry for user
+        r"^(?:what\s+projects?\s+(?:is|does)\s+)?@([a-zA-Z0-9_\-\.]+)\s+(?:working\s+on|have)[\s\?\.]*$",
+        r"^does\s+@([a-zA-Z0-9_\-\.]+)\s+have\s+(?:any\s+)?projects?[\s\?\.]*$",
     ]
 
     # 3. Document Detail Patterns (explicit share_id UUID or explicit document slug)
@@ -65,7 +85,12 @@ class ToolRouter:
     ACADEMIC_CODE_PATTERN = r"^(?:what\s+is|tell\s+me\s+about|lookup)\s+([A-Z]{2,6}(?:-[A-Z0-9]{2,10})?)[\s\?\.]*$"
     ACADEMIC_STRUCTURE_PATTERN = r"^(?:structure|curriculum|units)\s+(?:of|for|in)\s+([a-zA-Z0-9\s\-]+?)\s+(?:programme|program|department|school)[\s\?\.]*$"
 
-    def route(self, query: str, user: Any = None) -> Optional[ToolRoute]:
+    def route(
+        self,
+        query: str,
+        user: Any = None,
+        user_context: Optional[Any] = None,
+    ) -> Optional[ToolRoute]:
         """
         Evaluate query against high-confidence patterns.
         Returns a ToolRoute if matched with high confidence, or None.
@@ -101,6 +126,11 @@ class ToolRouter:
         if route:
             return route
 
+        # 6. People Discovery check
+        route = self._match_people_discovery(clean_query, lower_query)
+        if route:
+            return route
+
         return None
 
     def _match_notifications(self, query: str, lower_query: str) -> Optional[ToolRoute]:
@@ -129,6 +159,26 @@ class ToolRouter:
                     confidence=1.0,
                     matched_intent="user_profile",
                 )
+
+        # Fallback for inquiries targeting an explicit @username
+        m_at = re.search(r"(?:^|\s)@([a-zA-Z0-9_\-\.]+)", query)
+        if m_at:
+            candidate_user = m_at.group(1).strip().lower()
+            if candidate_user not in {"me", "mine", "user", "someone", "system"}:
+                lower_q = query.lower()
+                profile_keywords = (
+                    "profile", "who is", "tell me about", "details", "info", "background",
+                    "bio", "study", "studying", "course", "programme", "program", "degree",
+                    "year", "level", "skill", "skills", "interest", "interests", "collab",
+                    "project", "work with", "reach", "contact"
+                )
+                if any(kw in lower_q for kw in profile_keywords):
+                    return ToolRoute(
+                        tool_name="user_profile",
+                        parameters={"username": candidate_user},
+                        confidence=0.95,
+                        matched_intent="user_profile_by_mention",
+                    )
         return None
 
     def _match_document_detail(self, query: str) -> Optional[ToolRoute]:
@@ -202,3 +252,299 @@ class ToolRouter:
             )
 
         return None
+
+    def _extract_topic_and_status(self, raw_topic: str) -> Tuple[str, Optional[str]]:
+        """
+        Split a topic string that may contain a trailing collaboration clause.
+        e.g. 'tech who are open to collaboration' -> ('tech', 'any_open')
+        e.g. 'python and are open to projects' -> ('python', 'open_to_projects')
+        e.g. 'Django to work with me' -> ('Django', 'open_to_projects')
+        """
+        collab_patterns = [
+            (r"\s+(?:(?:who|and)\s+(?:is|are)\s+)?(?:open\s+to\s+)?(?:working\s+on\s+)?projects?[\s\?\.]*$", "open_to_projects"),
+            (r"\s+(?:(?:who|and)\s+(?:is|are)\s+)?(?:open\s+to\s+)?study\s+groups?[\s\?\.]*$", "open_to_study_groups"),
+            (r"\s+(?:(?:who|and)\s+(?:is|are)\s+)?(?:open\s+to\s+)?networking[\s\?\.]*$", "open_to_networking"),
+            (r"\s+(?:(?:who|and)\s+(?:is|are)\s+)?open\s+to\s+collaborat(?:e|ion)[\s\?\.]*$", "any_open"),
+            (r"\s+(?:who\s+wants?\s+to\s+collaborate|interested\s+in\s+collaborating)[\s\?\.]*$", "any_open"),
+            (r"\s+to\s+work\s+with\s+(?:me|us)[\s\?\.]*$", "open_to_projects"),
+            (r"\s+to\s+study\s+with\s+(?:me|us)[\s\?\.]*$", "open_to_study_groups"),
+            (r"\s+to\s+collaborate\s+with\s+(?:me|us)[\s\?\.]*$", "any_open"),
+        ]
+        cleaned_topic = raw_topic.strip()
+        collab_status = None
+        for pattern, status in collab_patterns:
+            m = re.search(pattern, cleaned_topic, re.IGNORECASE)
+            if m:
+                collab_status = status
+                cleaned_topic = cleaned_topic[:m.start()].strip()
+                break
+        cleaned_topic = re.sub(r"^(?:a|an|the)\s+", "", cleaned_topic, flags=re.IGNORECASE).strip()
+        return cleaned_topic, collab_status
+
+    def _match_people_discovery(self, query: str, lower_query: str) -> Optional[ToolRoute]:
+        """
+        Evaluate natural language queries for people discovery, collaboration,
+        or skill/interest search.
+        """
+        # 1. Coursemates / classmates inquiry
+        if re.search(r"\b(?:coursemates?|classmates?)\b", lower_query):
+            # Check if any skill/topic is mentioned, e.g. "coursemates who know Python"
+            m_course_skill = re.search(
+                r"\b(?:coursemates?|classmates?)\s+(?:who\s+know|interested\s+in|skilled\s+in)\s+([^.]+?)[\s\?\.]*$",
+                query,
+                re.IGNORECASE,
+            )
+            params: Dict[str, Any] = {
+                "academic_scope": "my_programme",
+                "limit": 10,
+                "query": query,
+            }
+            if m_course_skill:
+                raw_topic = m_course_skill.group(1).strip()
+                topic, collab_status = self._extract_topic_and_status(raw_topic)
+                if topic:
+                    params["skills"] = [topic]
+                    params["interests"] = [topic]
+                if collab_status:
+                    params["collaboration_status"] = collab_status
+            return ToolRoute(
+                tool_name="people_discovery",
+                parameters=params,
+                confidence=0.95,
+                matched_intent="people_coursemates_discovery",
+            )
+
+        # 2. Study buddy / study partner / study with / study groups inquiry
+        m_study = re.search(
+            r"\b(?:study\s+budd(?:y|ies)|study\s+partners?|(?:someone|people|peers?|students?)\s+to\s+study\s+with)\b"
+            r"|(?:who\s+is\s+)?(?:open\s+to|available\s+for)\s+study\s+groups?[\s\?\.]*$",
+            query,
+            re.IGNORECASE,
+        )
+        if m_study:
+            params = {
+                "collaboration_status": "open_to_study_groups",
+                "limit": 10,
+                "query": query,
+            }
+            m_topic = re.search(
+                r"\b(?:study\s+budd(?:y|ies)|study\s+partners?)\s+(?:interested\s+in|who\s+knows?|for|in)\s+([^.]+?)[\s\?\.]*$",
+                query,
+                re.IGNORECASE,
+            )
+            if m_topic:
+                raw_topic = m_topic.group(1).strip()
+                topic, _ = self._extract_topic_and_status(raw_topic)
+                if topic and topic.lower() not in ("a", "an", "the", "some"):
+                    params["skills"] = [topic]
+                    params["interests"] = [topic]
+            return ToolRoute(
+                tool_name="people_discovery",
+                parameters=params,
+                confidence=0.95,
+                matched_intent="people_study_partner_discovery",
+            )
+
+        # 3. Collaboration inquiry: "Who should I collaborate with...", "need collaborators...", "project partner...", "someone to work with..."
+        m_collab = (
+            re.search(r"\b(?:need|looking\s+for|find(?:\s+me)?|help\s+me\s+find|suggest|recommend|connect\s+me\s+with)\s+(?:a\s+|an\s+|some\s+)?([a-zA-Z0-9\+\#\.\-]+?\s+)?(?:project\s+)?(?:collaborators?|partners?|teammates?)\b", lower_query)
+            or re.search(r"\b(?:project\s+partners?|project\s+teammates?|partner\s+(?:for|in|on)\s+(?:a|an|my|the)?\s*projects?)\b", lower_query)
+            or re.search(r"\b(?:someone|people|peers?|students?)\s+to\s+work\s+with(?:\s+on\s+(?:a|an|my|the)?\s*projects?)?\b", lower_query)
+            or re.search(r"^(?:who\s+(?:should|can|do)\s+i\s+(?:collaborate|work)\s+with)", lower_query)
+            or re.search(r"\bcollaborators?\s+(?:within|in|at)\s+(?:the\s+)?(?:uni|university|campus|programme|school)\b", lower_query)
+            or re.search(r"\b(?:open\s+to|available\s+for)\s+(?:working\s+on\s+projects?|project\s+work)\b", lower_query)
+        )
+        if m_collab:
+            scope = "my_programme" if ("programme" in lower_query or "program" in lower_query) else None
+            params = {
+                "query": query,
+                "collaboration_status": "open_to_projects",
+                "academic_scope": scope,
+                "limit": 10,
+            }
+            # Check for skill prefix before partner/teammate/collaborator, e.g. "Django partner" or "Django project partner"
+            m_skill_partner = re.search(r"\b([a-zA-Z0-9\+\#\.\-]+?)\s+(?:project\s+)?(?:partner|teammate|collaborator)[s]?\b", query, re.IGNORECASE)
+            if m_skill_partner:
+                cand = m_skill_partner.group(1).strip()
+                if cand.lower() not in ("a", "an", "the", "my", "our", "project", "study", "good", "new", "some"):
+                    params["skills"] = [cand]
+                    params["interests"] = [cand]
+            return ToolRoute(
+                tool_name="people_discovery",
+                parameters=params,
+                confidence=0.95,
+                matched_intent="people_collaboration_recommendation",
+            )
+
+        # 4. Open to collaboration / projects / study groups
+        m_open_proj = re.match(
+            r"^(?:who\s+is|find\s+(?:students|people|peers)\s+(?:who\s+are\s+)?)\s*open\s+to\s+(?:working\s+on\s+)?(?:(?:a|an)\s+)?([a-zA-Z0-9\s\-]+?)\s*project[s]?[\s\?\.]*$",
+            query,
+            re.IGNORECASE,
+        )
+        if m_open_proj:
+            topic = m_open_proj.group(1).strip()
+            topic = re.sub(r"^(?:a|an|the)\s+", "", topic, flags=re.IGNORECASE).strip()
+            params = {
+                "collaboration_status": "open_to_projects",
+                "limit": 10,
+                "query": query,
+            }
+            if topic and topic.lower() not in ("a", "an", "the", "any"):
+                params["skills"] = [topic]
+                params["interests"] = [topic]
+            return ToolRoute(
+                tool_name="people_discovery",
+                parameters=params,
+                confidence=1.0,
+                matched_intent="people_open_to_projects",
+            )
+
+        # "Who is open to collaboration" / "Find people open to collaboration" / "Find students open to collaboration"
+        if re.match(
+            r"^(?:who\s+is|find\s+(?:students|people|peers)\s+(?:who\s+are\s+)?)\s*open\s+to\s+collaborat(?:e|ion)[\s\?\.]*$",
+            query,
+            re.IGNORECASE,
+        ):
+            return ToolRoute(
+                tool_name="people_discovery",
+                parameters={"collaboration_status": "any_open", "limit": 10, "query": query},
+                confidence=1.0,
+                matched_intent="people_open_to_collaboration",
+            )
+
+        # 5. Scope relative to viewer:
+        # Bare scope: "Find people in my programme", "Find someone in my programme"
+        m_prog_exact = re.search(
+            r"^(?:find|search|lookup|show\s+me)\s+(?:students|people|peers|classmates|someone)\s+in\s+my\s+(programme|program|department|school)[\s\?\.]*$",
+            query,
+            re.IGNORECASE,
+        )
+        if m_prog_exact:
+            scope_word = m_prog_exact.group(1).lower()
+            scope = "my_programme"
+            if "department" in scope_word:
+                scope = "my_department"
+            elif "school" in scope_word:
+                scope = "my_school"
+            return ToolRoute(
+                tool_name="people_discovery",
+                parameters={"academic_scope": scope, "limit": 10, "query": query},
+                confidence=0.95,
+                matched_intent="people_programme_relative_discovery",
+            )
+
+        # Scope + skill: "Find people in my programme who are interested in AI", "Find someone in my programme who's interested in AI"
+        m_prog = re.search(
+            r"(?:find|search|lookup|show\s+me)\s+(?:students|people|peers|classmates|someone)\s+in\s+my\s+(?:programme|program|department|school)\s+(?:who(?:'s|\s+(?:are|is))\s+)?(?:interested\s+in|who\s+knows?|skilled\s+in)\s+([^.]+?)[\s\?\.]*$",
+            query,
+            re.IGNORECASE,
+        )
+        if m_prog:
+            raw_topic = m_prog.group(1).strip()
+            topic, collab_status = self._extract_topic_and_status(raw_topic)
+            scope = "my_programme"
+            if "department" in lower_query:
+                scope = "my_department"
+            elif "school" in lower_query:
+                scope = "my_school"
+            params = {
+                "academic_scope": scope,
+                "skills": [topic],
+                "interests": [topic],
+                "limit": 10,
+                "query": query,
+            }
+            if collab_status:
+                params["collaboration_status"] = collab_status
+            return ToolRoute(
+                tool_name="people_discovery",
+                parameters=params,
+                confidence=0.95,
+                matched_intent="people_programme_relative_discovery",
+            )
+
+        # 6. Academic scope + skills / interests
+        # e.g. "Find CS students who know Django" or "Find Computer Science students interested in AI"
+        m_acad_skill = re.search(
+            r"(?:find|search|lookup|show\s+me)\s+([a-zA-Z\s\-]+?)\s+(?:students|peers|classmates|someone)\s+(?:who(?:'s|\s+(?:are|is))\s+)?(?:who\s+knows?|interested\s+in|skilled\s+in)\s+([^.]+?)[\s\?\.]*$",
+            query,
+            re.IGNORECASE,
+        )
+        if m_acad_skill:
+            scope = m_acad_skill.group(1).strip()
+            raw_topic = m_acad_skill.group(2).strip()
+            topic, collab_status = self._extract_topic_and_status(raw_topic)
+            if scope.lower() not in ("all", "other", "some", "the", "many", "any"):
+                params = {
+                    "academic_scope": scope,
+                    "skills": [topic],
+                    "interests": [topic],
+                    "limit": 10,
+                    "query": query,
+                }
+                if collab_status:
+                    params["collaboration_status"] = collab_status
+                return ToolRoute(
+                    tool_name="people_discovery",
+                    parameters=params,
+                    confidence=0.95,
+                    matched_intent="people_academic_and_skill_discovery",
+                )
+
+        # 7. Direct skill-help questions: "Who knows Django?", "Who can help me with Django?", "Who is good at Python?"
+        m_who_skill = re.match(
+            r"^(?:who\s+knows|who\s+is\s+good\s+at|who\s+can\s+help\s+(?:me\s+)?with)\s+([^?\.]+?)[\s\?\.]*$",
+            query,
+            re.IGNORECASE,
+        )
+        if m_who_skill:
+            raw_topic = m_who_skill.group(1).strip()
+            topic, collab_status = self._extract_topic_and_status(raw_topic)
+            # Guard against generic non-skill questions like "who can help me with my project" or "who can help me with homework"
+            if topic and topic.lower() not in ("my project", "a project", "the project", "this project", "homework", "assignment"):
+                params = {
+                    "skills": [topic],
+                    "interests": [topic],
+                    "limit": 10,
+                    "query": query,
+                }
+                if collab_status:
+                    params["collaboration_status"] = collab_status
+                return ToolRoute(
+                    tool_name="people_discovery",
+                    parameters=params,
+                    confidence=0.95,
+                    matched_intent="people_skill_help_discovery",
+                )
+
+        # 8. Standard people discovery with conversational prefixes:
+        # "Find students interested in Python", "I need someone who knows Django", "Find someone who can help with Python",
+        # "Find someone interested in AI who is open to projects"
+        m_general = re.search(
+            r"(?:refer\s+me\s+to|recommend(?:\s+me)?|find(?:\s+me)?|suggest|search\s+for|lookup|show\s+me|i\s+need|need|looking\s+for)?\s*(?:some\s+(?:of\s+the\s+)?)?"
+            r"(?:students|people|peers|classmates|someone)\s+(?:interested\s+in|who\s+knows?|skilled\s+in|with\s+skills\s+in|who\s+are\s+interested\s+in|who\s+can\s+help\s+(?:me\s+)?with|good\s+at)\s+([^.]+?)[\s\?\.]*$",
+            query,
+            re.IGNORECASE,
+        )
+        if m_general:
+            raw_topic = m_general.group(1).strip()
+            topic, collab_status = self._extract_topic_and_status(raw_topic)
+            if topic and topic.lower() not in ("my project", "a project", "homework"):
+                params = {
+                    "skills": [topic],
+                    "interests": [topic],
+                    "limit": 10,
+                    "query": query,
+                }
+                if collab_status:
+                    params["collaboration_status"] = collab_status
+                return ToolRoute(
+                    tool_name="people_discovery",
+                    parameters=params,
+                    confidence=0.95,
+                    matched_intent="people_skill_discovery",
+                )
+
+        return None
+

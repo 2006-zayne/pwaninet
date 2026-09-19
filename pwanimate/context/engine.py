@@ -8,7 +8,7 @@ Operates purely in-memory with zero database queries.
 
 import hashlib
 import logging
-from typing import List, Optional, Set
+from typing import Any, List, Optional, Set
 
 from pwanimate.retrieval.types import RetrievalResponse, RetrievalResult, SourceType
 from pwanimate.context.types import (
@@ -50,6 +50,7 @@ class ContextEngine:
                 total_characters=0,
                 truncated=False,
                 source_counts={},
+                user_context=request.user_context,
             )
 
         selected_items: List[ContextItem] = []
@@ -175,18 +176,21 @@ class ContextEngine:
             total_characters=current_chars,
             truncated=package_truncated,
             source_counts=source_counts,
+            user_context=request.user_context,
         )
 
     def build_from_response(
         self,
         query: str,
         retrieval_response: RetrievalResponse,
+        user_context: Optional[Any] = None,
         **kwargs
     ) -> ContextPackage:
         """Convenience method to construct context directly from a RetrievalResponse."""
         request = ContextRequest(
             query=query,
             retrieval_response=retrieval_response,
+            user_context=user_context,
             **kwargs
         )
         return self.build_context(request)

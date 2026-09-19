@@ -241,6 +241,10 @@ class DocumentDetailToolTestCase(TestCase):
         self.assertEqual(data["category"], "Lecture Notes")
         self.assertEqual(data["view_count"], 2)
         self.assertEqual(data["canonical_url"], f"/documents/document/{self.public_doc.share_id}/")
+        self.assertIn("thumbnail_url", data)
+        self.assertIn("media_url", data)
+        self.assertEqual(data["resource_type"], "document")
+        self.assertEqual(data["author"], "uploader_doc")
 
     def test_public_document_lookup_by_slug(self):
         result = self.tool.execute(user=None, slug="intro-linear-algebra")

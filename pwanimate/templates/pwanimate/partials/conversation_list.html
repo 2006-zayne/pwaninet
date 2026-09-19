@@ -1,7 +1,7 @@
 {% load i18n %}
 {% if conversations %}
     {% for conv in conversations %}
-        <div class="pwanimate-conversation-item {% if active_conversation and active_conversation.id == conv.id %}active{% endif %}"
+        <div class="pwanimate-conversation-item {% if active_conversation and active_conversation.id == conv.id or active_conversation_id and active_conversation_id == conv.id|stringformat:'s' %}active{% endif %}"
              data-id="{{ conv.id }}"
              hx-get="{% url 'pwanimate:conversation_detail' conv.id %}"
              hx-target="#page-content-target"
@@ -22,13 +22,24 @@
                     data-conversation-id="{{ conv.id }}"
                     aria-label="{% trans 'Delete conversation' %}"
                     title="{% trans 'Delete conversation' %}"
-                    onclick="event.stopPropagation();">
+                    onclick="event.stopPropagation(); event.preventDefault(); window.handleDeletePwanimateConversation('{{ conv.id }}');">
                 <i class="bi bi-trash3"></i>
             </button>
         </div>
     {% endfor %}
-{% else %}
+{% elif not is_paginated_chunk %}
     <div class="text-center text-muted p-3 x-small">
         {% trans "No conversations yet. Ask a question to start one!" %}
     </div>
+{% endif %}
+
+{% if has_next %}
+<div class="pwanimate-history-sentinel text-center py-2"
+     hx-get="{% url 'pwanimate:conversation_history' %}?page={{ next_page }}{% if active_conversation_id %}&active_id={{ active_conversation_id }}{% endif %}"
+     hx-trigger="revealed"
+     hx-swap="outerHTML">
+    <div class="spinner-border spinner-border-sm text-primary opacity-50" role="status" style="width: 1rem; height: 1rem;">
+        <span class="visually-hidden">{% trans "Loading more conversations…" %}</span>
+    </div>
+</div>
 {% endif %}

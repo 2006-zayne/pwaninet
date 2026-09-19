@@ -1,0 +1,82 @@
+{% load i18n %}
+{% load static %}
+<div class="pwanimate-settings-about-container">
+    <div class="text-center py-4 border-bottom mb-4 pwanimate-about-header">
+        <img src="{% static 'images/pwanimate/pwanimate-transparent.png' %}"
+             alt="Pwanimate Logo"
+             style="width: 72px; height: 72px; object-fit: contain;"
+             class="mb-3">
+        <h3 class="fw-bold mb-1">
+            <span>PWANI<span class="brand-net text-primary">MATE</span></span>
+        </h3>
+        <p class="text-muted small mb-2">{% trans "The Official Intelligent Assistant for Pwani University Students" %}</p>
+        <span class="badge bg-primary-subtle text-primary px-3 py-1 rounded-pill small" id="pwanimate-about-version-badge">{% blocktrans with ver=pwanimate_version|default:"2.0.0" %}Version {{ ver }}{% endblocktrans %}</span>
+    </div>
+
+    <!-- Mission & Overview -->
+    <div class="mb-4">
+        <h5 class="fw-bold mb-2">{% trans "What is Pwanimate?" %}</h5>
+        <p class="text-muted small">
+            {% trans "Pwanimate is an AI academic companion natively integrated into PwaniNet. Built specifically for Pwani University, Pwanimate bridges campus academic records, lecture materials, student collaboration, and course information to help you navigate your academic journey." %}
+        </p>
+    </div>
+
+    <!-- Core Capabilities -->
+    <div class="mb-4">
+        <h5 class="fw-bold mb-3">{% trans "Key Capabilities" %}</h5>
+        <div class="row g-3">
+            <div class="col-sm-6">
+                <div class="p-3 border rounded-3 h-100 pwanimate-about-feature-card" style="background-color: var(--pwanimate-card-bg);">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-file-earmark-text text-primary fs-5"></i>
+                        <h6 class="fw-bold mb-0">{% trans "Document Retrieval & Citations" %}</h6>
+                    </div>
+                    <p class="text-muted small mb-0">
+                        {% trans "Unified retrieval searches campus documents, course outlines, syllabus, and lecture notes via semantic and keyword search, providing citations with direct source links." %}
+                    </p>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="p-3 border rounded-3 h-100 pwanimate-about-feature-card" style="background-color: var(--pwanimate-card-bg);">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-people text-primary fs-5"></i>
+                        <h6 class="fw-bold mb-0">{% trans "Student Peer Discovery" %}</h6>
+                    </div>
+                    <p class="text-muted small mb-0">
+                        {% trans "Discovers active peers based on shared skills, interests, and collaboration availability, strictly respecting user privacy settings and student profile visibility." %}
+                    </p>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="p-3 border rounded-3 h-100 pwanimate-about-feature-card" style="background-color: var(--pwanimate-card-bg);">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-bell text-primary fs-5"></i>
+                        <h6 class="fw-bold mb-0">{% trans "Campus & Group Awareness" %}</h6>
+                    </div>
+                    <p class="text-muted small mb-0">
+                        {% trans "Contextual summaries of course announcements, departmental notices, and enrolled group updates directly within your chat." %}
+                    </p>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="p-3 border rounded-3 h-100 pwanimate-about-feature-card" style="background-color: var(--pwanimate-card-bg);">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-sliders text-primary fs-5"></i>
+                        <h6 class="fw-bold mb-0">{% trans "Personalized Preferences" %}</h6>
+                    </div>
+                    <p class="text-muted small mb-0">
+                        {% trans "Customizes conversational tone, response style, and personal instructions tailored to your preferences while remaining subordinate to system safety and academic integrity guidelines." %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Security & Boundary Statement -->
+    <div class="card border rounded-3 p-3 shadow-sm" style="background-color: var(--pwanimate-card-bg);">
+        <h6 class="fw-bold mb-1 small text-uppercase text-muted">{% trans "Academic Boundaries & Privacy" %}</h6>
+        <p class="text-muted small mb-0">
+            {% trans "Pwanimate only accesses campus documents and platform records you are authorized to view. Your personal instructions and preference settings are private to your account and never shared with peers or external services. Pwanimate is an advisory assistant and study tool designed to augment your learning, not replace faculty instruction or university grading systems." %}
+        </p>
+    </div>
+</div>

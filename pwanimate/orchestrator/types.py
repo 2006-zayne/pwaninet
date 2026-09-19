@@ -35,6 +35,7 @@ class OrchestrationRequest:
     model: Optional[str] = None
     temperature: float = 0.2
     max_tokens: int = 1024
+    user_context: Optional[Any] = None
 
     def __post_init__(self):
         if not isinstance(self.query, str) or not self.query.strip():
@@ -100,13 +101,15 @@ class OrchestrationResponse:
     total_time_ms: float = 0.0
     metadata: Dict[str, Any] = field(default_factory=dict)
     quota_info: Optional[Dict[str, Any]] = None
+    people: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert response to clean JSON-serializable dictionary."""
-        return {
+        d = {
             "answer": self.answer,
             "citations": list(self.citations),
             "sources": list(self.sources),
+            "people": list(self.people),
             "provider": self.provider,
             "model": self.model,
             "prompt_tokens": self.prompt_tokens,
@@ -120,3 +123,8 @@ class OrchestrationResponse:
             "metadata": dict(self.metadata),
             "quota_info": dict(self.quota_info) if self.quota_info else None,
         }
+        if self.people:
+            d["blocks"] = [{"type": "people", "people": list(self.people)}]
+        else:
+            d["blocks"] = []
+        return d

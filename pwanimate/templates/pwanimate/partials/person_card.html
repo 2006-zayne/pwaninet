@@ -1,0 +1,129 @@
+{% load static %}
+{% load i18n %}
+
+<div class="col-12 col-xl-6 pwanimate-person-col">
+    <div class="card h-100 border rounded-4 p-3 shadow-xs pwanimate-person-card">
+        <div class="d-flex align-items-start gap-3">
+            <a href="{{ person.profile_url }}"
+               class="text-decoration-none flex-shrink-0"
+               hx-get="{{ person.profile_url }}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
+               title="{{ person.display_name|default:person.username }}">
+                <div class="position-relative">
+                    {% if person.avatar_url %}
+                        <img src="{{ person.avatar_url }}"
+                             alt="{{ person.display_name|default:person.username }}"
+                             class="rounded-circle object-fit-cover shadow-xs pwanimate-person-avatar"
+                             style="width: 48px; height: 48px;"
+                             onerror="this.onerror=null; this.src='{% static 'images/default_pic1.jpg' %}';">
+                    {% else %}
+                        <div class="rounded-circle pwanimate-avatar-placeholder d-flex align-items-center justify-content-center fw-bold shadow-xs"
+                             style="width: 48px; height: 48px; font-size: 1.1rem;">
+                            {{ person.display_name|default:person.username|first|upper }}
+                        </div>
+                    {% endif %}
+                </div>
+            </a>
+
+            <div class="flex-grow-1 min-w-0">
+                <div class="d-flex align-items-center justify-content-between gap-1 mb-1">
+                    <div class="min-w-0 flex-grow-1 pe-1">
+                        <a href="{{ person.profile_url }}"
+                           class="text-decoration-none pwanimate-person-name fw-bold text-truncate d-block"
+                           hx-get="{{ person.profile_url }}"
+                           hx-target="#page-content-target"
+                           hx-swap="innerHTML"
+                           hx-push-url="true"
+                           hx-history="true"
+                           style="font-size: 0.95rem;">
+                            {{ person.display_name|default:person.username }}
+                        </a>
+                        <span class="pwanimate-person-handle text-muted small d-block text-truncate" style="font-size: 0.78rem;">
+                            @{{ person.username }}
+                        </span>
+                    </div>
+                </div>
+
+                {% if person.academic_level or person.programme_name %}
+                    <div class="pwanimate-person-academic small pwanimate-line-clamp-2 mb-2">
+                        <i class="bi bi-mortarboard me-1"></i>
+                        {% if person.academic_level %}{{ person.academic_level }}{% if person.programme_name %} • {% endif %}{% endif %}{{ person.programme_name }}
+                    </div>
+                {% endif %}
+
+                {% if person.headline %}
+                    <div class="pwanimate-person-headline small text-muted pwanimate-line-clamp-2 mb-2">
+                        {{ person.headline }}
+                    </div>
+                {% endif %}
+
+                <!-- Badges (Collaboration, Skills, Interests, Evidence) -->
+                <div class="d-flex flex-wrap gap-1 pwanimate-person-badges mb-2">
+                    {% if person.collaboration_status == 'open_to_projects' %}
+                        <span class="badge pwanimate-badge-collab">
+                            <i class="bi bi-code-slash me-1"></i>{% trans "Open to Projects" %}
+                        </span>
+                    {% elif person.collaboration_status == 'open_to_study_groups' %}
+                        <span class="badge pwanimate-badge-collab">
+                            <i class="bi bi-book me-1"></i>{% trans "Open to Study Groups" %}
+                        </span>
+                    {% elif person.collaboration_status == 'open_to_networking' %}
+                        <span class="badge pwanimate-badge-collab">
+                            <i class="bi bi-people me-1"></i>{% trans "Open to Networking" %}
+                        </span>
+                    {% elif person.collaboration_status == 'any_open' %}
+                        <span class="badge pwanimate-badge-collab">
+                            <i class="bi bi-person-check me-1"></i>{% trans "Open to Collaborate" %}
+                        </span>
+                    {% endif %}
+
+                    {% for skill in person.matched_skills %}
+                        <span class="badge pwanimate-badge-skill">
+                            <i class="bi bi-check2 me-1"></i>{{ skill }}
+                        </span>
+                    {% endfor %}
+
+                    {% for interest in person.matched_interests %}
+                        <span class="badge pwanimate-badge-interest">
+                            <i class="bi bi-star me-1"></i>{{ interest }}
+                        </span>
+                    {% endfor %}
+
+                    {% if person.evidence.academic_alignment %}
+                        <span class="badge pwanimate-badge-evidence">
+                            <i class="bi bi-mortarboard-fill me-1"></i>{{ person.evidence.academic_alignment }}
+                        </span>
+                    {% endif %}
+
+                    {% if person.evidence.mutual_connections_count %}
+                        <span class="badge pwanimate-badge-evidence">
+                            <i class="bi bi-people-fill me-1"></i>{{ person.evidence.mutual_connections_count }} {% trans "mutual" %}
+                        </span>
+                    {% endif %}
+
+                    {% if person.evidence.shared_groups_count %}
+                        <span class="badge pwanimate-badge-evidence">
+                            <i class="bi bi-collection-fill me-1"></i>{{ person.evidence.shared_groups_count }} {% trans "groups" %}
+                        </span>
+                    {% endif %}
+                </div>
+
+                <div class="d-flex align-items-center justify-content-end mt-2 pt-1 border-top" style="border-color: var(--pwanimate-border) !important;">
+                    <a href="{{ person.profile_url }}"
+                       class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 pwanimate-view-profile-btn"
+                       hx-get="{{ person.profile_url }}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true"
+                       style="font-size: 0.78rem;">
+                        <i class="bi bi-person me-1"></i>{% trans "View Profile" %}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

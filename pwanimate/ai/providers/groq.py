@@ -130,13 +130,14 @@ class GroqLLMProvider(BaseLLMProvider):
             messages.append({"role": msg.role, "content": msg.content})
 
         # Inject context into messages if present
-        if request.context and request.context.items:
+        if request.context and (request.context.items or getattr(request.context, "user_context", None)):
             context_text = request.context.format_context_text()
-            # If there's a last user message, prepend context
-            if messages and messages[-1]["role"] == "user":
-                messages[-1]["content"] = f"{context_text}\n\n{messages[-1]['content']}"
-            else:
-                messages.append({"role": "user", "content": context_text})
+            if context_text:
+                # If there's a last user message, prepend context
+                if messages and messages[-1]["role"] == "user":
+                    messages[-1]["content"] = f"{context_text}\n\n{messages[-1]['content']}"
+                else:
+                    messages.append({"role": "user", "content": context_text})
 
         if not messages:
             messages.append({"role": "user", "content": "Hello"})

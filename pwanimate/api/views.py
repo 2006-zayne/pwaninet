@@ -125,6 +125,7 @@ class PwanimateChatView(APIView):
             res_data = response.to_dict()
             res_data["conversation_id"] = str(conversation.id)
             res_data["message_id"] = asst_msg.id
+            res_data["user_message_id"] = user_msg.id
 
             # Include fallback info and quota status
             fallback_info = {

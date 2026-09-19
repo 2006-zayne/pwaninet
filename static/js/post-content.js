@@ -112,13 +112,11 @@
         initPostContent(document);
     }
 
-    // Re-initialize when new posts are loaded (HTMX)
+    // Re-initialize when new posts are loaded (HTMX) - run synchronously to eliminate layout shifts
     document.addEventListener('htmx:afterSwap', function(event) {
         const target = event.detail.target;
         if (target) {
-            setTimeout(function() {
-                initPostContent(target);
-            }, 50);
+            initPostContent(target);
         }
     });
 

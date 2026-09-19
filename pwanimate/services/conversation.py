@@ -18,21 +18,62 @@ from pwanimate.models import PwanimateConversation, PwanimateMessage
 logger = logging.getLogger(__name__)
 
 
-def derive_title(content: str, max_length: int = 60) -> str:
+import re
+
+GREETINGS = {
+    "hi", "hello", "hey", "hey there", "hi there", "hello there",
+    "good morning", "good afternoon", "good evening", "greetings",
+    "yo", "sup", "howdy", "habari", "mambo", "sasa", "jambo",
+    "pwanimate", "hello pwanimate", "hi pwanimate", "hey pwanimate",
+}
+
+CONVERSATIONAL_FILLER_REGEX = re.compile(
+    r"^(could\s+you\s+(please\s+)?(help\s+me\s+(to\s+)?(understand|find|get)\s+|tell\s+me\s+about\s+|explain\s+)?|"
+    r"can\s+you\s+(please\s+)?(help\s+me\s+(to\s+)?(understand|find|get)\s+|tell\s+me\s+about\s+|explain\s+|show\s+me\s+)?|"
+    r"please\s+(help\s+me\s+(to\s+)?(understand|find|get)\s+|tell\s+me\s+about\s+|explain\s+|show\s+me\s+)?|"
+    r"i\s+(would\s+like|want)\s+to\s+(know\s+about|find|learn\s+about|understand)\s+|"
+    r"i\s+need\s+help\s+(with|finding|understanding)\s+)\s*",
+    re.IGNORECASE,
+)
+
+
+def derive_title(content: str, max_words: int = 8, max_length: int = 60, fallback: str = "Conversation") -> str:
     """
-    Derive a concise, deterministic conversation title from the first user query.
+    Derive a concise, deterministic 3-8 word conversation title from user query.
+    Returns empty string for pure greetings/filler to defer naming to turn 2.
     """
     if not content:
-        return "Conversation"
+        return fallback
 
-    normalized = " ".join(content.strip().split())
-    if not normalized:
-        return "Conversation"
+    # Strip code blocks, inline code, URLs, HTML tags
+    cleaned = re.sub(r"```[\s\S]*?```", " ", content)
+    cleaned = re.sub(r"`.*?`", " ", cleaned)
+    cleaned = re.sub(r"https?://\S+|www\.\S+", " ", cleaned)
+    cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+    cleaned = " ".join(cleaned.split())
+    if not cleaned:
+        return fallback
 
-    if len(normalized) <= max_length:
-        return normalized
+    # Check for greeting/filler (returns empty string so turn 2 names conversation)
+    greeting_probe = re.sub(r"[^\w\s]", "", cleaned.lower()).strip()
+    if greeting_probe in GREETINGS:
+        return ""
 
-    return normalized[: max_length - 3].rstrip() + "..."
+    # Strip conversational question filler openers
+    stripped = CONVERSATIONAL_FILLER_REGEX.sub("", cleaned).strip()
+    if not stripped:
+        stripped = cleaned
+
+    words = stripped.split()
+    if not words:
+        return fallback
+
+    selected = words[:max_words]
+    raw_title = " ".join(selected)
+    if len(raw_title) > max_length:
+        raw_title = raw_title[:max_length - 3].rstrip() + "..."
+
+    return raw_title[:1].upper() + raw_title[1:]
 
 
 class ConversationService:
@@ -128,8 +169,10 @@ class ConversationService:
             )
             update_fields = ["updated_at"]
             if not conversation.title:
-                conversation.title = derive_title(clean_content)
-                update_fields.append("title")
+                new_title = derive_title(clean_content)
+                if new_title:
+                    conversation.title = new_title
+                    update_fields.append("title")
 
             conversation.save(update_fields=update_fields)
             return msg

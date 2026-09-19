@@ -218,17 +218,9 @@
     }
   }
 
-  #main-content-area {
-    animation: fade-in 0.3s ease;
-  }
-  @keyframes fade-in {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  /* htmx swap animation */
-  #main-content-area.htmx-swapping { opacity: 0; transition: opacity 0.15s ease; }
-  #main-content-area.htmx-settling { animation: fade-in 0.3s ease; }
+  /* htmx swap animation - instant paint matching full reload */
+  #main-content-area.htmx-swapping { opacity: 0; }
+  #main-content-area.htmx-settling { opacity: 1; }
 
   /* ── Groups to Explore Section ── */
   .groups-explore-section {

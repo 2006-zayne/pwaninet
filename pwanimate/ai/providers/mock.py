@@ -72,6 +72,8 @@ class MockLLMProvider(BaseLLMProvider):
             chars = getattr(request.context, "total_characters", 0)
             if isinstance(chars, int):
                 prompt_len += chars
+            if getattr(request.context, "user_context", None) and hasattr(request.context.user_context, "format_context_block"):
+                prompt_len += len(request.context.user_context.format_context_block())
 
         prompt_tokens = max(1, prompt_len // 4)
         completion_tokens = max(1, len(content) // 4)

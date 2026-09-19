@@ -51,13 +51,15 @@ class ToolRegistry:
         """Return JSON schema metadata for all registered tools."""
         return [tool.to_dict() for tool in self._tools.values()]
 
-    def execute(self, name: str, user: Any, **kwargs) -> ToolResult:
+    def execute(self, name: str, user: Any, user_context: Optional[Any] = None, **kwargs) -> ToolResult:
         """
         Dispatch execution to a named tool with parameter validation and error handling.
         """
         tool = self.get(name)
         try:
             validated = tool.validate_parameters(**kwargs)
+            if user_context is not None:
+                validated["user_context"] = user_context
             return tool.execute(user=user, **validated)
         except ToolPermissionError as exc:
             logger.warning("Tool permission denied: %s", exc)
@@ -94,11 +96,13 @@ def get_default_tool_registry() -> ToolRegistry:
             GroupAnnouncementsTool,
             UserProfileTool,
             NotificationSummaryTool,
+            PeopleDiscoveryTool,
         )
         registry.register(AcademicLookupTool())
         registry.register(DocumentDetailTool())
         registry.register(GroupAnnouncementsTool())
         registry.register(UserProfileTool())
         registry.register(NotificationSummaryTool())
+        registry.register(PeopleDiscoveryTool())
         _default_registry = registry
     return _default_registry

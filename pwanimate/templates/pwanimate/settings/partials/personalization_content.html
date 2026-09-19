@@ -1,0 +1,253 @@
+{% load i18n %}
+<form id="pwanimate-personalization-form"
+      hx-post="{% url 'pwanimate:settings_personalization' %}"
+      hx-target="#pwanimate-personalization-form"
+      hx-swap="outerHTML"
+      hx-disabled-elt="#pwanimate-save-pref-btn"
+      class="pwanimate-settings-form">
+    {% csrf_token %}
+
+    <div class="mb-4">
+        <h4 class="fw-bold mb-1">{% trans "Personalization" %}</h4>
+        <p class="text-muted small mb-0">
+            {% trans "Configure how Pwanimate interacts with you across conversations and academic inquiries." %}
+        </p>
+    </div>
+
+    {% if success %}
+    <div class="alert alert-success d-flex align-items-center py-2 px-3 mb-4 rounded-3 shadow-sm border-0" role="alert">
+        <i class="bi bi-check-circle-fill me-2 fs-5 text-success"></i>
+        <div>
+            <strong>{% trans "Saved!" %}</strong> {% trans "Your Pwanimate preferences have been updated." %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if errors %}
+    <div class="alert alert-danger py-2 px-3 mb-4 rounded-3 shadow-sm border-0" role="alert">
+        <div class="d-flex align-items-center mb-1">
+            <i class="bi bi-exclamation-triangle-fill me-2 fs-5 text-danger"></i>
+            <strong>{% trans "Please correct the following errors:" %}</strong>
+        </div>
+        <ul class="mb-0 ps-3 small">
+            {% for field, error_list in errors.items %}
+                {% for err in error_list %}
+                    <li>{{ err }}</li>
+                {% endfor %}
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <!-- 1. Nickname -->
+    <div class="mb-4 pwanimate-settings-section">
+        <label for="pwanimate-nickname-input" class="form-label fw-bold mb-1">
+            {% trans "What should Pwanimate call you?" %}
+        </label>
+        <p class="text-muted small mb-2">
+            {% trans "Optional. This only changes how Pwanimate addresses you in chat, and does not alter your PwaniNet account or display name." %}
+        </p>
+        <input type="text"
+               class="form-control pwanimate-settings-input {% if errors.nickname %}is-invalid{% endif %}"
+               id="pwanimate-nickname-input"
+               name="nickname"
+               maxlength="50"
+               value="{{ preferences.nickname }}"
+               placeholder="{% trans 'e.g. Zayne' %}"
+               autocomplete="off">
+        {% if errors.nickname %}
+        <div class="invalid-feedback d-block">
+            {{ errors.nickname.0 }}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 2. Tone -->
+    <div class="mb-4 pwanimate-settings-section">
+        <label class="form-label fw-bold mb-1">{% trans "Conversational Tone" %}</label>
+        <p class="text-muted small mb-2">
+            {% trans "Select the general manner in which Pwanimate frames its responses." %}
+        </p>
+        <div class="d-flex flex-column gap-2 pwanimate-options-grid">
+            <label class="pwanimate-choice-card d-flex align-items-start gap-3 p-3 rounded-3 border {% if preferences.tone == 'neutral' or not preferences.tone %}selected{% endif %}">
+                <input class="form-check-input mt-1 flex-shrink-0" type="radio" name="tone" value="neutral" {% if preferences.tone == 'neutral' or not preferences.tone %}checked{% endif %}>
+                <div>
+                    <div class="fw-semibold">{% trans "Neutral" %} <span class="badge bg-secondary-subtle text-secondary small ms-1">{% trans "Default" %}</span></div>
+                    <div class="text-muted small">{% trans "Clear, objective, balanced, and straightforward responses." %}</div>
+                </div>
+            </label>
+            <label class="pwanimate-choice-card d-flex align-items-start gap-3 p-3 rounded-3 border {% if preferences.tone == 'friendly' %}selected{% endif %}">
+                <input class="form-check-input mt-1 flex-shrink-0" type="radio" name="tone" value="friendly" {% if preferences.tone == 'friendly' %}checked{% endif %}>
+                <div>
+                    <div class="fw-semibold">{% trans "Friendly" %}</div>
+                    <div class="text-muted small">{% trans "Warm, conversational, relaxed, and encouraging." %}</div>
+                </div>
+            </label>
+            <label class="pwanimate-choice-card d-flex align-items-start gap-3 p-3 rounded-3 border {% if preferences.tone == 'professional' %}selected{% endif %}">
+                <input class="form-check-input mt-1 flex-shrink-0" type="radio" name="tone" value="professional" {% if preferences.tone == 'professional' %}checked{% endif %}>
+                <div>
+                    <div class="fw-semibold">{% trans "Professional" %}</div>
+                    <div class="text-muted small">{% trans "Polished, workplace-appropriate, and formally structured." %}</div>
+                </div>
+            </label>
+            <label class="pwanimate-choice-card d-flex align-items-start gap-3 p-3 rounded-3 border {% if preferences.tone == 'academic' %}selected{% endif %}">
+                <input class="form-check-input mt-1 flex-shrink-0" type="radio" name="tone" value="academic" {% if preferences.tone == 'academic' %}checked{% endif %}>
+                <div>
+                    <div class="fw-semibold">{% trans "Academic" %}</div>
+                    <div class="text-muted small">{% trans "Scholarly, intellectually rigorous, and conceptually precise." %}</div>
+                </div>
+            </label>
+        </div>
+    </div>
+
+    <!-- 3. Response Style -->
+    <div class="mb-4 pwanimate-settings-section">
+        <label class="form-label fw-bold mb-1">{% trans "Response Style" %}</label>
+        <p class="text-muted small mb-2">
+            {% trans "Choose the preferred depth and length of explanations." %}
+        </p>
+        <div class="d-flex flex-column gap-2 pwanimate-options-grid">
+            <label class="pwanimate-choice-card d-flex align-items-start gap-3 p-3 rounded-3 border {% if preferences.response_style == 'concise' %}selected{% endif %}">
+                <input class="form-check-input mt-1 flex-shrink-0" type="radio" name="response_style" value="concise" {% if preferences.response_style == 'concise' %}checked{% endif %}>
+                <div>
+                    <div class="fw-semibold">{% trans "Concise" %}</div>
+                    <div class="text-muted small">{% trans "Brief, direct, and focused to the point without extra fluff." %}</div>
+                </div>
+            </label>
+            <label class="pwanimate-choice-card d-flex align-items-start gap-3 p-3 rounded-3 border {% if preferences.response_style == 'balanced' or not preferences.response_style %}selected{% endif %}">
+                <input class="form-check-input mt-1 flex-shrink-0" type="radio" name="response_style" value="balanced" {% if preferences.response_style == 'balanced' or not preferences.response_style %}checked{% endif %}>
+                <div>
+                    <div class="fw-semibold">{% trans "Balanced" %} <span class="badge bg-secondary-subtle text-secondary small ms-1">{% trans "Default" %}</span></div>
+                    <div class="text-muted small">{% trans "Sufficient explanation and guidance without unnecessary length." %}</div>
+                </div>
+            </label>
+            <label class="pwanimate-choice-card d-flex align-items-start gap-3 p-3 rounded-3 border {% if preferences.response_style == 'detailed' %}selected{% endif %}">
+                <input class="form-check-input mt-1 flex-shrink-0" type="radio" name="response_style" value="detailed" {% if preferences.response_style == 'detailed' %}checked{% endif %}>
+                <div>
+                    <div class="fw-semibold">{% trans "Detailed" %}</div>
+                    <div class="text-muted small">{% trans "Comprehensive, in-depth explanations with additional background context." %}</div>
+                </div>
+            </label>
+        </div>
+    </div>
+
+    <!-- 4. Personal Instructions -->
+    <div class="mb-4 pwanimate-settings-section">
+        <label for="pwanimate-instructions-textarea" class="form-label fw-bold mb-1">
+            {% trans "Personal Instructions" %}
+        </label>
+        <p class="text-muted small mb-2">
+            {% trans "Tell Pwanimate how you would like it to work with you. These instructions guide conversational style, but do not override university policies, safety rules, or privacy boundaries." %}
+        </p>
+        <textarea class="form-control pwanimate-settings-textarea {% if errors.personal_instructions %}is-invalid{% endif %}"
+                  id="pwanimate-instructions-textarea"
+                  name="personal_instructions"
+                  rows="3"
+                  maxlength="500"
+                  placeholder="{% trans 'e.g. Keep technical explanations practical. Provide concrete code examples before abstract theory.' %}">{{ preferences.personal_instructions }}</textarea>
+        <div class="d-flex justify-content-between align-items-center mt-1">
+            {% if errors.personal_instructions %}
+            <div class="invalid-feedback d-block m-0">
+                {{ errors.personal_instructions.0 }}
+            </div>
+            {% else %}
+            <div></div>
+            {% endif %}
+            <div class="text-muted small" id="pwanimate-char-counter">
+                <span id="pwanimate-char-count">{{ preferences.personal_instructions|length }}</span> / 500
+            </div>
+        </div>
+    </div>
+
+    <!-- Submit Action -->
+    <div class="d-flex justify-content-end pt-3 border-top">
+        <button type="submit" id="pwanimate-save-pref-btn" class="btn {% if success %}btn-success{% else %}btn-primary{% endif %} px-4 d-inline-flex align-items-center gap-2">
+            <span class="spinner-border spinner-border-sm d-none pwanimate-save-spinner" role="status" aria-hidden="true"></span>
+            <i class="bi bi-check2 pwanimate-save-icon"></i>
+            <span class="pwanimate-save-text fw-semibold">
+                {% if success %}{% trans "Saved" %}{% else %}{% trans "Save Preferences" %}{% endif %}
+            </span>
+        </button>
+    </div>
+
+    <script>
+        (function() {
+            var currentScript = document.currentScript;
+            var form = currentScript ? currentScript.closest('form') : document.getElementById('pwanimate-personalization-form');
+            if (!form) form = document.getElementById('pwanimate-personalization-form');
+            if (!form) return;
+
+            var textarea = form.querySelector('#pwanimate-instructions-textarea') || document.getElementById('pwanimate-instructions-textarea');
+            var counter = form.querySelector('#pwanimate-char-count') || document.getElementById('pwanimate-char-count');
+            var saveBtn = form.querySelector('#pwanimate-save-pref-btn') || document.getElementById('pwanimate-save-pref-btn');
+
+            if (textarea && counter) {
+                var updateCounter = function() {
+                    counter.textContent = textarea.value.length;
+                    if (textarea.value.length >= 500) {
+                        counter.classList.add('text-danger', 'fw-bold');
+                    } else {
+                        counter.classList.remove('text-danger', 'fw-bold');
+                    }
+                };
+                textarea.addEventListener('input', updateCounter);
+                updateCounter();
+            }
+
+            // Sync choice card radio styles within this form
+            var syncCards = function() {
+                form.querySelectorAll('.pwanimate-choice-card').forEach(function(card) {
+                    var radio = card.querySelector('input[type="radio"]');
+                    if (radio && radio.checked) {
+                        card.classList.add('selected');
+                    } else {
+                        card.classList.remove('selected');
+                    }
+                });
+            };
+            syncCards();
+
+            if (saveBtn) {
+                // When request starts: transition to Saving...
+                form.addEventListener('htmx:beforeRequest', function() {
+                    var textSpan = saveBtn.querySelector('.pwanimate-save-text');
+                    var spinner = saveBtn.querySelector('.pwanimate-save-spinner');
+                    var icon = saveBtn.querySelector('.pwanimate-save-icon');
+                    if (textSpan) textSpan.textContent = '{% trans "Saving..." %}';
+                    if (spinner) spinner.classList.remove('d-none');
+                    if (icon) icon.classList.add('d-none');
+                });
+
+                // On network/server error: reset button
+                var handleErr = function() {
+                    var textSpan = saveBtn.querySelector('.pwanimate-save-text');
+                    var spinner = saveBtn.querySelector('.pwanimate-save-spinner');
+                    var icon = saveBtn.querySelector('.pwanimate-save-icon');
+                    if (textSpan) textSpan.textContent = '{% trans "Save Preferences" %}';
+                    if (spinner) spinner.classList.add('d-none');
+                    if (icon) icon.classList.remove('d-none');
+                    saveBtn.classList.remove('btn-success');
+                    saveBtn.classList.add('btn-primary');
+                    saveBtn.removeAttribute('disabled');
+                };
+                form.addEventListener('htmx:responseError', handleErr);
+                form.addEventListener('htmx:sendError', handleErr);
+
+                // If user changes inputs after a save, reset Saved -> Save Preferences
+                var handleInput = function(e) {
+                    if (e && e.target && e.target.type === 'radio') {
+                        syncCards();
+                    }
+                    var textSpan = saveBtn.querySelector('.pwanimate-save-text');
+                    if (textSpan && textSpan.textContent.trim() === '{% trans "Saved" %}') {
+                        textSpan.textContent = '{% trans "Save Preferences" %}';
+                        saveBtn.classList.remove('btn-success');
+                        saveBtn.classList.add('btn-primary');
+                    }
+                };
+                form.addEventListener('input', handleInput);
+                form.addEventListener('change', handleInput);
+            }
+        })();
+    </script>
+</form>

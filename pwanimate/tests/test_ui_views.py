@@ -75,7 +75,7 @@ class PwanimateUIViewTests(TestCase):
         self.assertIn("/login", response.url)
 
     def test_authenticated_user_accesses_index_full_page(self):
-        """Authenticated access with normal request returns full HTML page."""
+        """Authenticated access with normal request returns full HTML page without OOB duplicate rails."""
         self.client.force_login(self.user)
         url = reverse("pwanimate:index")
         response = self.client.get(url)
@@ -83,21 +83,30 @@ class PwanimateUIViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "pwanimate/index.html")
         self.assertTemplateUsed(response, "pwanimate/partials/chat_content.html")
+        self.assertTemplateUsed(response, "pwanimate/partials/pwanimate_left_rail.html")
+        self.assertTemplateUsed(response, "pwanimate/partials/pwanimate_context_rail.html")
+        self.assertTemplateNotUsed(response, "pwanimate/partials/chat_navigation_partial.html")
         self.assertContains(response, "Pwanimate")
         self.assertContains(response, "Alice Calculus Chat")
         self.assertNotContains(response, "Bob Private Chat")
+        # Ensure hx-swap-oob is NOT in the full-page response to prevent center panel duplication
+        self.assertNotContains(response, 'hx-swap-oob="true"')
 
     def test_htmx_request_renders_partial_only(self):
-        """Request with HX-Request header returns only the partial workspace."""
+        """Request with HX-Request header returns only the partial workspace with OOB rails."""
         self.client.force_login(self.user)
         url = reverse("pwanimate:index")
         response = self.client.get(url, HTTP_HX_REQUEST="true")
 
         self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "pwanimate/partials/chat_navigation_partial.html")
         self.assertTemplateUsed(response, "pwanimate/partials/chat_content.html")
         self.assertTemplateNotUsed(response, "pwanimate/index.html")
         self.assertContains(response, "pwanimate-workspace")
         self.assertContains(response, "Alice Calculus Chat")
+        # Ensure hx-swap-oob IS present for OOB rail swaps
+        self.assertContains(response, 'hx-swap-oob="true"')
+
 
     def test_owned_conversation_detail_url_accessible(self):
         """Authenticated user can load their own conversation by UUID."""

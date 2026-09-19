@@ -12,55 +12,14 @@ from groups.models import Membership, MembershipStatus
 logger = logging.getLogger(__name__)
 
 
-def get_friend_suggestions_for_user(user, limit=10, use_cache=True, context='general'):
-    """
-    Get ranked friend/classmate suggestions for a user.
+from users.services.privacy import apply_user_discovery_exclusions
 
-    Ranking Tiers:
-    - Tier 1: Same programme and academic level (exact classmates: +100pts)
-    - Tier 2: Same department / school (+35pts / +20pts)
-    - Tier 3: Shared approved groups (+20pts each) and Mutual connections (+15pts each)
-    - Tier 4: Profile completeness & active campus peers (+10pts avatar bonus, recency)
 
-    Args:
-        user: The User instance to get suggestions for.
-        limit: Maximum suggestions to return (default 10).
-        use_cache: Whether to read from/write to cache (default True).
-        context: Context tag ('onboarding', 'feed', 'general').
+def build_academic_score_expression(user):
+    """Build Django ORM expression for academic scoring relative to user."""
+    if not user:
+        return Value(0, output_field=IntegerField())
 
-    Returns:
-        List of User instances annotated with recommendation score and reason.
-    """
-    if not user or not user.is_authenticated:
-        return []
-
-    limit = max(1, min(limit, 50))
-    cache_key = f'recommendations:users:{user.id}:limit:{limit}:{context}'
-
-    if use_cache:
-        cached = cache.get(cache_key)
-        if cached is not None:
-            return cached
-
-    # Direct follow exclusion
-    already_following = set(
-        Follow.objects.filter(follower=user).values_list('followed_id', flat=True)
-    )
-
-    # Approved user groups for shared community scoring
-    my_group_ids = list(
-        Membership.objects.filter(
-            user=user,
-            status=MembershipStatus.APPROVED
-        ).values_list('group_id', flat=True)
-    )
-
-    # Base candidate pool: active users excluding self and already followed
-    candidates = User.objects.filter(is_active=True).exclude(
-        Q(id__in=already_following) | Q(id=user.id)
-    )
-
-    # ----------------- ACADEMIC ALIGNMENT SCORING -----------------
     academic_clauses = []
 
     # Modern schema matching
@@ -117,15 +76,42 @@ def get_friend_suggestions_for_user(user, limit=10, use_cache=True, context='gen
         )
 
     if academic_clauses:
-        academic_score_expr = Case(
+        return Case(
             *academic_clauses,
             default=Value(0),
             output_field=IntegerField()
         )
-    else:
-        academic_score_expr = Value(0, output_field=IntegerField())
+    return Value(0, output_field=IntegerField())
 
-    # ----------------- SOCIAL & COMMUNITY SCORING -----------------
+
+def annotate_recommendation_scores(candidates, user, already_following=None, my_group_ids=None):
+    """
+    Annotate candidate queryset with academic, social, mutual, and completeness scores.
+    """
+    if not user or not getattr(user, 'is_authenticated', False):
+        return candidates.annotate(
+            academic_score=Value(0, output_field=IntegerField()),
+            shared_groups_count=Value(0, output_field=IntegerField()),
+            fof_count=Value(0, output_field=IntegerField()),
+            avatar_bonus=Value(0, output_field=IntegerField()),
+            recommendation_score=Value(0, output_field=IntegerField()),
+        )
+
+    if already_following is None:
+        already_following = set(
+            Follow.objects.filter(follower=user).values_list('followed_id', flat=True)
+        )
+
+    if my_group_ids is None:
+        my_group_ids = list(
+            Membership.objects.filter(
+                user=user,
+                status=MembershipStatus.APPROVED
+            ).values_list('group_id', flat=True)
+        )
+
+    academic_score_expr = build_academic_score_expression(user)
+
     if my_group_ids:
         shared_groups_expr = Count(
             'group_memberships',
@@ -147,7 +133,6 @@ def get_friend_suggestions_for_user(user, limit=10, use_cache=True, context='gen
     else:
         fof_expr = Value(0, output_field=IntegerField())
 
-    # Profile completeness signal
     avatar_bonus_expr = Case(
         When(
             ~Q(profile_pic='profile_pic/default_pic1.jpg') &
@@ -159,7 +144,7 @@ def get_friend_suggestions_for_user(user, limit=10, use_cache=True, context='gen
         output_field=IntegerField()
     )
 
-    candidates = candidates.annotate(
+    return candidates.annotate(
         academic_score=academic_score_expr,
         shared_groups_count=shared_groups_expr,
         fof_count=fof_expr,
@@ -171,6 +156,62 @@ def get_friend_suggestions_for_user(user, limit=10, use_cache=True, context='gen
             (F('fof_count') * 15) +
             F('avatar_bonus')
         )
+    )
+
+
+def get_friend_suggestions_for_user(user, limit=10, use_cache=True, context='general'):
+    """
+    Get ranked friend/classmate suggestions for a user.
+
+    Ranking Tiers:
+    - Tier 1: Same programme and academic level (exact classmates: +100pts)
+    - Tier 2: Same department / school (+35pts / +20pts)
+    - Tier 3: Shared approved groups (+20pts each) and Mutual connections (+15pts each)
+    - Tier 4: Profile completeness & active campus peers (+10pts avatar bonus, recency)
+
+    Args:
+        user: The User instance to get suggestions for.
+        limit: Maximum suggestions to return (default 10).
+        use_cache: Whether to read from/write to cache (default True).
+        context: Context tag ('onboarding', 'feed', 'general').
+
+    Returns:
+        List of User instances annotated with recommendation score and reason.
+    """
+    if not user or not user.is_authenticated:
+        return []
+
+    limit = max(1, min(limit, 50))
+    cache_key = f'recommendations:users:{user.id}:limit:{limit}:{context}'
+
+    if use_cache:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+    # Direct follow exclusion
+    already_following = set(
+        Follow.objects.filter(follower=user).values_list('followed_id', flat=True)
+    )
+
+    # Approved user groups for shared community scoring
+    my_group_ids = list(
+        Membership.objects.filter(
+            user=user,
+            status=MembershipStatus.APPROVED
+        ).values_list('group_id', flat=True)
+    )
+
+    # Base candidate pool: discoverable users excluding already followed
+    candidates = apply_user_discovery_exclusions(User.objects.all(), viewer=user).exclude(
+        id__in=already_following
+    )
+
+    candidates = annotate_recommendation_scores(
+        candidates,
+        user=user,
+        already_following=already_following,
+        my_group_ids=my_group_ids,
     ).select_related(
         'programme',
         'academic_level',

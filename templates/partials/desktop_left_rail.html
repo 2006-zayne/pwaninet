@@ -42,11 +42,8 @@
 
         <a href="{% url 'pwanimate:index' %}"
            class="left-rail-link nav-chip {% if request.resolver_match.app_name == 'pwanimate' %}active{% endif %}"
-           hx-get="{% url 'pwanimate:index' %}"
-           hx-target="#page-content-target"
-           hx-swap="innerHTML"
-           hx-push-url="true"
-           hx-history="true">
+           data-bypass-htmx="true"
+           hx-boost="false">
             <img src="{% static 'images/pwanimate/pwanimate-transparent.png' %}" alt="Pwanimate" class="left-rail-icon" style="width: 24px; height: 24px; object-fit: contain;">
             <span class="left-rail-label">{% trans "Pwanimate" %}</span>
         </a>

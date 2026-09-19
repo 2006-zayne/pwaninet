@@ -120,6 +120,7 @@
               </div>
               {% if payload.actors and payload.actors.0 %}
                 {% with actor=payload.actors.0 %}
+                {% if actor.username %}
                 <a href="{% url 'users:profile' actor.username %}"
                    class="rounded-circle border position-absolute d-flex align-items-center justify-content-center"
                    style="width: 24px; height: 24px; background-color: var(--bg-secondary); right: -3px; bottom: -3px; z-index: 10; text-decoration: none;"
@@ -130,11 +131,22 @@
                     <i class="bi bi-person" style="font-size: 0.85rem; color: var(--text-secondary);"></i>
                   {% endif %}
                 </a>
+                {% else %}
+                <div class="rounded-circle border position-absolute d-flex align-items-center justify-content-center"
+                     style="width: 24px; height: 24px; background-color: var(--bg-secondary); right: -3px; bottom: -3px; z-index: 10;">
+                  {% if actor.avatar %}
+                    <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
+                  {% else %}
+                    <i class="bi bi-person" style="font-size: 0.85rem; color: var(--text-secondary);"></i>
+                  {% endif %}
+                </div>
+                {% endif %}
                 {% endwith %}
               {% endif %}
             </div>
           {% else %}
             {% with actor=payload.actors.0 %}
+            {% if actor.username %}
             <a href="{% url 'users:profile' actor.username %}"
                hx-get="{% url 'users:profile' actor.username %}"
                hx-target="#page-content-target"
@@ -150,6 +162,16 @@
                 <i class="bi bi-person" style="font-size: 1.75rem; color: var(--text-secondary);"></i>
               {% endif %}
             </a>
+            {% else %}
+            <div class="rounded-circle border d-flex align-items-center justify-content-center"
+                 style="width: 56px; height: 56px; background-color: var(--bg-secondary);">
+              {% if actor.avatar %}
+                <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
+              {% else %}
+                <i class="bi bi-person" style="font-size: 1.75rem; color: var(--text-secondary);"></i>
+              {% endif %}
+            </div>
+            {% endif %}
             {% endwith %}
           {% endif %}
         {% endif %}
@@ -218,6 +240,7 @@
         <div id="expanded-actors-{{ payload.identity.notification_id }}" class="expanded-actors mt-2" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out, opacity 0.3s ease-out; opacity: 0;">
           <div class="d-flex flex-column gap-2 py-2">
             {% for actor in payload.actors|slice:":5" %}
+              {% if actor.username %}
               <a href="{% url 'users:profile' actor.username %}"
                  hx-get="{% url 'users:profile' actor.username %}"
                  hx-target="#page-content-target"
@@ -242,6 +265,25 @@
                   {% endif %}
                 </div>
               </a>
+              {% else %}
+              <div class="d-flex align-items-center gap-2 p-2 rounded"
+                   style="color: var(--text-primary); background-color: var(--bg-secondary);">
+                <div class="rounded-circle d-flex align-items-center justify-content-center"
+                     style="width: 32px; height: 32px; background-color: var(--bg-tertiary); overflow: hidden;">
+                  {% if actor.avatar %}
+                    <img src="{{ actor.avatar }}" alt="{{ actor.name }}" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" loading="lazy">
+                  {% else %}
+                    <i class="bi bi-person" style="font-size: 1rem; color: var(--text-secondary);"></i>
+                  {% endif %}
+                </div>
+                <div class="d-flex flex-column">
+                  <span style="font-size: 0.85rem;">{{ actor.name }}</span>
+                  {% if actor.timestamp %}
+                    <small class="text-muted" style="font-size: 0.75rem;">{{ actor.timestamp|timesince }}</small>
+                  {% endif %}
+                </div>
+              </div>
+              {% endif %}
             {% endfor %}
             {% if payload.actors|length > 5 %}
               <div class="d-flex align-items-center justify-content-center p-2 rounded"

@@ -520,6 +520,14 @@ class RenderingProfileRegistry:
             component_visibility=ComponentVisibilityConfig(content=True),
             navigation_strategy=None
         )
+        
+        # ADMIN_FEEDBACK_REPLY
+        self._profiles["ADMIN_FEEDBACK_REPLY"] = RenderingProfile(
+            id="ADMIN_FEEDBACK_REPLY", category=ProfileCategory.SYSTEM, intent=ProfileIntent.AWARENESS,
+            message_strategy=MessageStrategy(template="GENERIC", supported_states=["SINGLE"]),
+            component_visibility=ComponentVisibilityConfig(context_header=True, content=True, metadata=True, action_bar=True),
+            navigation_strategy=NavigationStrategy(primary=NavigationConfig(target="FEEDBACK_DETAIL", resource_id_field="context.id"))
+        )
     
     def _register_generic_profile(self):
         """Generic fallback profile for unknown notification types"""

@@ -8,10 +8,12 @@ and masking sensitive authentication and contact attributes.
 
 from typing import Any, Dict, Optional
 from django.contrib.auth import get_user_model
+from django.db.models import Q
+from django.urls import reverse
 
 from pwanimate.tools.base import BaseDomainTool, ToolResult
 from pwanimate.tools.exceptions import ToolValidationError, ToolPermissionError, ToolNotFoundError
-from users.models import PrivacyLevel, Follow
+from users.models import PrivacyLevel, Follow, Block
 
 User = get_user_model()
 
@@ -53,7 +55,7 @@ class UserProfileTool(BaseDomainTool):
                 tool_name=self.name,
             )
 
-        qs = User.objects.filter(is_active=True).select_related("course", "programme", "year")
+        qs = User.objects.filter(is_active=True).select_related("course", "programme", "year", "academic_level")
         target_user = None
         if username:
             target_user = qs.filter(username__iexact=username.strip()).first()
@@ -70,7 +72,18 @@ class UserProfileTool(BaseDomainTool):
         is_self = is_auth and user.id == target_user.id
         is_staff = is_auth and getattr(user, "is_staff", False)
 
-        # Privacy evaluation
+        # 1. Block evaluation (bidirectional)
+        if is_auth and not is_self and not is_staff:
+            has_block = Block.objects.filter(
+                Q(blocker=user, blocked=target_user) | Q(blocker=target_user, blocked=user)
+            ).exists()
+            if has_block:
+                raise ToolPermissionError(
+                    "This profile is not accessible.",
+                    tool_name=self.name,
+                )
+
+        # 2. Privacy evaluation
         privacy = getattr(target_user, "profile_privacy", PrivacyLevel.PUBLIC)
 
         if not is_self and not is_staff:
@@ -109,7 +122,28 @@ class UserProfileTool(BaseDomainTool):
             except Exception:
                 profile_photo_url = str(target_user.profile_pic)
 
+        try:
+            profile_url = reverse("users:profile", kwargs={"username": target_user.username})
+        except Exception:
+            profile_url = f"/users/user/{target_user.username}/"
+
+        programme_name = (
+            target_user.programme.name
+            if target_user.programme
+            else (target_user.course.name if target_user.course else None)
+        )
+        academic_level = (
+            target_user.academic_level.name
+            if getattr(target_user, "academic_level", None)
+            else (f"Year {target_user.year.level}" if getattr(target_user, "year", None) else None)
+        )
+        user_skills = target_user.skills if isinstance(target_user.skills, list) else []
+        user_interests = [
+            i.strip() for i in (target_user.interests or "").split(",") if i.strip()
+        ]
+
         data: Dict[str, Any] = {
+            "id": target_user.id,
             "username": target_user.username,
             "display_name": display_name,
             "global_role": target_user.global_role,
@@ -117,11 +151,17 @@ class UserProfileTool(BaseDomainTool):
             "bio": target_user.bio or "",
             "course": target_user.course.name if target_user.course else None,
             "programme": target_user.programme.name if target_user.programme else None,
+            "programme_name": programme_name,
             "year": target_user.year.level if target_user.year else None,
+            "academic_level": academic_level,
             "interests": target_user.interests or "",
             "collaboration_status": target_user.collaboration_status or "",
-            "skills": target_user.skills if isinstance(target_user.skills, list) else [],
+            "skills": user_skills,
             "profile_photo_url": profile_photo_url,
+            "avatar_url": profile_photo_url,
+            "profile_url": profile_url,
+            "matched_skills": user_skills,
+            "matched_interests": user_interests,
         }
 
         # Include email only if viewing own profile or staff

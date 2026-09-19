@@ -77,7 +77,7 @@ if (!window.homeContentScriptLoaded) {
 
     // Re-observe when new posts are loaded (HTMX)
     document.body.addEventListener('htmx:afterSwap', function(event) {
-        if (event.target.id === 'feed-sector' || event.target.closest('#feed-sector')) {
+        if (event.target && (event.target.id === 'feed-sector' || event.target.closest('#feed-sector') || (event.target.querySelector && event.target.querySelector('.feed-sector, video, audio')))) {
             observeMedia();
         }
     });
