@@ -14,7 +14,7 @@
                     {{ conv.title|default:_("New Conversation") }}
                 </div>
                 <div class="pwanimate-conversation-time">
-                    {{ conv.updated_at|timesince }} {% trans "ago" %}
+                    <time data-ts="{{ conv.updated_at|date:'c' }}">{{ conv.updated_at|timesince }} {% trans "ago" %}</time>
                 </div>
             </div>
             <button type="button"

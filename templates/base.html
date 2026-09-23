@@ -1784,6 +1784,10 @@
     <!-- offline_media_viewer.js handles offline library and fullscreen reels playback -->
     <script src="{% static 'js/downloads/offline_media_viewer.js' %}" defer></script>
 
+    <!-- Document Viewer System & PDF.js for SPA / HTMX preview loading -->
+    <script src="{% static 'vendor/pdfjs/pdf.min.js' %}" defer></script>
+    <script src="{% static 'documents/js/document-viewer.js' %}" defer></script>
+
     {% block page_scripts %}{% endblock %}
 
 
@@ -2730,7 +2734,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
         if (hasPwanimate) {
             document.documentElement.classList.add('pwanimate-active');
             document.body.classList.add('pwanimate-active');
-            if (!window._activePwanimateChat && typeof initPwanimate === 'function') {
+            if (typeof initPwanimate === 'function') {
                 initPwanimate();
             }
         } else {
@@ -2859,7 +2863,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
         // Enforce strict full-page browser navigation across the PwaniNet ↔ Pwanimate boundary
         document.body.addEventListener('htmx:beforeRequest', function(evt) {
-            const path = evt.detail && evt.detail.pathInfo && evt.detail.pathInfo.requestPath;
+            const path = (evt.detail && evt.detail.requestConfig && evt.detail.requestConfig.path) ||
+                         (evt.detail && evt.detail.pathInfo && evt.detail.pathInfo.requestPath) ||
+                         (evt.detail && evt.detail.elt && (evt.detail.elt.getAttribute('hx-get') || evt.detail.elt.getAttribute('href')));
             if (!path) return;
 
             let targetPath;
@@ -2876,7 +2882,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 // Crossing the boundary between PwaniNet and Pwanimate:
                 // Abort HTMX partial swap and trigger clean full-page navigation
                 evt.preventDefault();
-                window.location.href = path;
+                if (evt.detail && evt.detail.xhr && typeof evt.detail.xhr.abort === 'function') {
+                    try { evt.detail.xhr.abort(); } catch (_) {}
+                }
+                window.location.assign(path);
             }
         });
 
@@ -2913,12 +2922,23 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 }
 
                 // If response is a full HTML document (e.g. standard Django template or un-partialed view):
-                // Seamlessly extract #page-content-target to avoid any disruptive full page document reloads!
                 if (responseText.startsWith('<!DOCTYPE') || responseText.startsWith('<html') || responseText.includes('<html lang=')) {
                     // Check if response is redirected to authentication boundary
                     if (responseUrl && (responseUrl.includes('/accounts/login') || responseUrl.includes('/users/login') || responseUrl.includes('/users/register') || responseUrl.includes('/register') || responseUrl.includes('/accounts/logout') || responseUrl.includes('/users/logout'))) {
                         evt.detail.shouldSwap = false;
                         window.location.href = responseUrl;
+                        return;
+                    }
+
+                    // Check if response crosses the PwaniNet ↔ Pwanimate boundary
+                    const incomingIsPwanimate = responseText.includes('pwanimate-workspace') || (responseUrl && responseUrl.includes('/pwanimate'));
+                    const currentIsPwanimate = window.location.pathname.startsWith('/pwanimate');
+                    if (incomingIsPwanimate !== currentIsPwanimate) {
+                        // Crossing the boundary: MUST perform native full-page navigation, not seamless partial swap!
+                        evt.detail.shouldSwap = false;
+                        const dest = responseUrl || (evt.detail.requestConfig && evt.detail.requestConfig.path) || (incomingIsPwanimate ? '/pwanimate/' : '/');
+                        console.log('[Boundary Navigation] Crossing PwaniNet ↔ Pwanimate, forcing full-page navigation to:', dest);
+                        window.location.assign(dest);
                         return;
                     }
 
@@ -2942,7 +2962,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
                             }
 
                             // Sync left-nav-rail from the parsed full document
-                            // This ensures the correct rail (PwaniNet vs Pwanimate) is always shown
                             const incomingLeftRail = doc.getElementById('left-nav-rail');
                             const currentLeftRail = document.getElementById('left-nav-rail');
                             if (incomingLeftRail && currentLeftRail) {
@@ -2989,6 +3008,44 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 }
             }
         });
+
+        // Strict boundary navigation: any link crossing PwaniNet ↔ Pwanimate MUST be a native full-page browser navigation
+        document.addEventListener('click', function(evt) {
+            if (evt.button !== 0 || evt.ctrlKey || evt.metaKey || evt.shiftKey || evt.altKey) {
+                return;
+            }
+
+            const link = evt.target.closest('a');
+            if (!link) return;
+
+            const rawHref = link.getAttribute('href');
+            if (!rawHref || rawHref.startsWith('#') || rawHref.startsWith('javascript:') ||
+                rawHref.startsWith('mailto:') || rawHref.startsWith('tel:')) {
+                return;
+            }
+
+            let targetUrl;
+            try {
+                targetUrl = new URL(link.href, window.location.origin);
+            } catch (_) {
+                return;
+            }
+
+            if (targetUrl.origin !== window.location.origin) return;
+
+            const isTargetPwanimate = targetUrl.pathname.startsWith('/pwanimate');
+            const isCurrentPwanimate = window.location.pathname.startsWith('/pwanimate');
+
+            if (isTargetPwanimate !== isCurrentPwanimate) {
+                // Intercept in capture phase before HTMX or any other listener can touch it
+                evt.preventDefault();
+                evt.stopPropagation();
+                evt.stopImmediatePropagation();
+                console.log('[Boundary Click Capture] Forcing clean native full-page navigation across boundary to:', targetUrl.href);
+                window.location.assign(targetUrl.href);
+                return;
+            }
+        }, true); // Capture phase: runs before all other click listeners on page!
 
 
         // Progressive Enhancement: Route in-app internal links via HTMX

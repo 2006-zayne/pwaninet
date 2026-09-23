@@ -41,9 +41,9 @@
                 {% endif %}
                 
                 <div class="btn-group w-100" role="group" aria-label="Theme toggle">
-                    <button class="btn btn-outline-secondary btn-sm" onclick="setTheme('light')" title="Light Mode"><i class="bi bi-sun-fill text-warning"></i></button>
-                    <button class="btn btn-outline-secondary btn-sm" onclick="setTheme('dark')" title="Dark Mode"><i class="bi bi-moon-stars-fill text-primary"></i></button>
-                    <button class="btn btn-outline-secondary btn-sm" onclick="setTheme('system')" title="System Theme"><i class="bi bi-laptop text-secondary"></i></button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="setTheme('light')" title="Light Mode"><i class="bi bi-sun-fill"></i></button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="setTheme('dark')" title="Dark Mode"><i class="bi bi-moon-stars-fill"></i></button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="setTheme('system')" title="System Theme"><i class="bi bi-laptop"></i></button>
                 </div>
             </div>
 
@@ -80,75 +80,199 @@
         </div>
     </div>
 
-    <!-- Resource Preview Bottom Sheet (Mobile): Structured Card Layout -->
-    <div class="offcanvas offcanvas-bottom pwanimate-offcanvas d-xl-none" tabindex="-1" id="pwanimateResourcePreviewSheet" aria-labelledby="previewSheetTitle" style="height: 80vh; max-height: 85vh; background-color: var(--pwanimate-bg); color: var(--pwanimate-asst-text);">
-        <!-- 1. Header: Type Badge / Icon + Category Label (Left) | Close Button (Right) -->
+    <!-- Resource Preview Bottom Sheet (Mobile): Structured Card Layout with Tabs -->
+    <div class="offcanvas offcanvas-bottom pwanimate-offcanvas d-xl-none" tabindex="-1" id="pwanimateResourcePreviewSheet" aria-labelledby="previewSheetTitle" style="height: 85vh; max-height: 90vh; background-color: var(--pwanimate-bg); color: var(--pwanimate-asst-text);">
+        <!-- 1. Header: Tabs (Left) | Close Button (Right) -->
         <div class="offcanvas-header border-bottom px-3 py-2" style="border-color: var(--pwanimate-border) !important;">
-            <div class="d-flex align-items-center gap-2 text-truncate">
-                <span class="pwanimate-preview-badge badge rounded-pill px-2 py-1" id="previewSheetCategoryBadge">
-                    <i class="bi bi-file-earmark me-1" id="previewSheetCategoryIcon"></i>
-                    <span id="previewSheetCategoryText">{% trans "Document" %}</span>
-                </span>
-            </div>
+            <ul class="nav nav-pills pwanimate-workspace-tabs" id="mobileWorkspaceTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active d-flex align-items-center justify-content-center gap-1 py-1 px-3"
+                            id="mobileTabPreviewBtn"
+                            type="button"
+                            role="tab"
+                            aria-controls="mobileTabPreviewPane"
+                            aria-selected="true"
+                            style="font-size: 0.85rem;">
+                        <i class="bi bi-eye"></i>
+                        <span>{% trans "Preview" %}</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link d-flex align-items-center justify-content-center gap-1 py-1 px-3"
+                            id="mobileTabContextBtn"
+                            type="button"
+                            role="tab"
+                            aria-controls="mobileTabContextPane"
+                            aria-selected="false"
+                            style="font-size: 0.85rem;">
+                        <i class="bi bi-collection"></i>
+                        <span>{% trans "Context" %}</span>
+                        <span class="badge rounded-pill bg-primary ms-1" id="mobileContextCountBadge">0</span>
+                    </button>
+                </li>
+            </ul>
             <button type="button" class="btn btn-sm btn-ghost-secondary rounded-circle d-flex align-items-center justify-content-center p-0" data-bs-dismiss="offcanvas" aria-label="{% trans 'Close' %}" style="width: 32px; height: 32px; color: var(--pwanimate-asst-text);">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
 
-        <!-- 2. Preview Body -->
+        <!-- 2. Body: Tab Content -->
         <div class="offcanvas-body p-0 d-flex flex-column" style="background-color: var(--pwanimate-card-bg);">
-            <div class="flex-grow-1 position-relative pwanimate-preview-host overflow-hidden" id="previewSheetContent">
-                <div class="position-absolute top-50 start-50 translate-middle pwanimate-preview-spinner d-none" id="previewSheetSpinner">
-                    <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
-                </div>
+            <div class="tab-content h-100 d-flex flex-column flex-grow-1 overflow-hidden" id="mobileWorkspaceTabContent">
 
-                <!-- Video Player Host -->
-                <video id="previewSheetVideo" class="w-100 h-100 position-relative d-none" controls style="z-index: 2; object-fit: contain; background: #000;"></video>
-
-                <!-- Fallback Iframe Host -->
-                <iframe id="previewSheetIframe" class="w-100 h-100 border-0 position-relative d-none" style="z-index: 2;" src=""></iframe>
-
-                <!-- Image Host -->
-                <div id="previewSheetImageContainer" class="pwanimate-preview-img-container w-100 h-100 position-relative d-none d-flex align-items-center justify-content-center p-2" style="z-index: 2; overflow: auto;">
-                    <img id="previewSheetImage" src="" alt="{% trans 'Preview' %}" class="pwanimate-preview-img img-fluid rounded" style="max-height: 100%; object-fit: contain;">
-                </div>
-
-                <!-- Canonical Document / Post / Link Card Host (No recursive iframe) -->
-                <div id="previewSheetDocContainer" class="pwanimate-preview-doc-container w-100 h-100 position-relative d-none d-flex flex-column align-items-center justify-content-center p-4 text-center" style="z-index: 2;">
-                    <div class="pwanimate-preview-doc-thumbnail-wrapper mb-3 d-none position-relative overflow-hidden rounded shadow-sm" id="previewSheetDocThumbnailWrapper" style="max-width: 100%; max-height: 200px;">
-                        <img id="previewSheetDocThumbnail" src="" alt="{% trans 'Thumbnail' %}" class="img-fluid rounded" style="max-height: 200px; object-fit: contain;">
+                <!-- TAB 1: PREVIEW -->
+                <div class="tab-pane fade show active h-100 d-flex flex-column overflow-hidden" id="mobileTabPreviewPane" role="tabpanel" aria-labelledby="mobileTabPreviewBtn">
+                    <!-- Subheader: Type Badge, Location Badge, Add to Context -->
+                    <div class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center flex-shrink-0" style="background-color: var(--pwanimate-bg); border-color: var(--pwanimate-border) !important;">
+                        <div class="d-flex align-items-center gap-2 text-truncate">
+                            <span class="pwanimate-preview-badge badge rounded-pill px-2 py-1" id="previewSheetCategoryBadge">
+                                <i class="bi bi-file-earmark me-1" id="previewSheetCategoryIcon"></i>
+                                <span id="previewSheetCategoryText">{% trans "Document" %}</span>
+                            </span>
+                            <span class="badge rounded-pill bg-light text-dark border d-none" id="previewSheetLocationBadge">
+                                <i class="bi bi-bookmark me-1"></i><span id="previewSheetLocationText">p. 1</span>
+                            </span>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-primary rounded-pill px-2 py-0 d-inline-flex align-items-center gap-1" id="previewSheetAddToContextBtn" style="font-size: 0.78rem; height: 26px;">
+                            <i class="bi bi-plus-lg"></i>
+                            <span id="previewSheetAddToContextText">{% trans "+ Add to Context" %}</span>
+                        </button>
                     </div>
-                    <div class="pwanimate-preview-doc-icon mb-3" id="previewSheetDocIconWrapper">
-                        <i class="bi bi-file-earmark-pdf-fill text-danger" id="previewSheetDocIcon" style="font-size: 3.2rem;"></i>
-                    </div>
-                    <h6 class="fw-bold mb-1 text-break" id="previewSheetDocTitle" style="font-size: 0.95rem;"></h6>
-                    <div class="text-muted small mb-2" id="previewSheetDocMeta"></div>
-                    <p class="small text-muted px-2 mb-0" id="previewSheetDocDescription"></p>
-                </div>
-            </div>
 
-            <!-- 3. Footer: Title + Subtitle + Action Buttons -->
-            <div class="p-3 border-top" style="border-color: var(--pwanimate-border) !important; background-color: var(--pwanimate-bg);">
-                <div class="mb-2">
-                    <div class="fw-bold text-truncate" id="previewSheetTitle" style="font-size: 0.92rem;">{% trans "Resource Preview" %}</div>
-                    <div class="text-muted small text-truncate" id="previewSheetSubtitle">Resource</div>
+                    <!-- Preview Content -->
+                    <div class="flex-grow-1 position-relative pwanimate-preview-host overflow-hidden d-flex flex-column" id="previewSheetContent">
+                        <div class="position-absolute top-50 start-50 translate-middle pwanimate-preview-spinner d-none" id="previewSheetSpinner">
+                            <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                        </div>
+
+                        <!-- Video Player Host -->
+                        <video id="previewSheetVideo" class="w-100 h-100 position-relative d-none" controls style="z-index: 2; object-fit: contain; background: #000;"></video>
+
+                        <!-- Fallback Iframe Host -->
+                        <iframe id="previewSheetIframe" class="w-100 h-100 border-0 position-relative d-none" style="z-index: 2;" src=""></iframe>
+
+                        <!-- Image Host -->
+                        <div id="previewSheetImageContainer" class="pwanimate-preview-img-container w-100 h-100 position-relative d-none d-flex align-items-center justify-content-center p-2" style="z-index: 2; overflow: auto;">
+                            <img id="previewSheetImage" src="" alt="{% trans 'Preview' %}" class="pwanimate-preview-img img-fluid rounded" style="max-height: 100%; object-fit: contain;">
+                        </div>
+
+                        <!-- Shared Reusable Document Viewer Host -->
+                        <div id="previewSheetDocViewer" class="pwanimate-surface-viewer-host w-100 h-100 position-relative d-none flex-column flex-grow-1" style="z-index: 2; overflow: hidden;"></div>
+
+                        <!-- Canonical Document / Post / Link Card Host (No recursive iframe) -->
+                        <div id="previewSheetDocContainer" class="pwanimate-preview-doc-container w-100 h-100 position-relative d-none flex-column align-items-center justify-content-center p-4 text-center overflow-y-auto" style="z-index: 2;">
+                            <div class="pwanimate-preview-doc-thumbnail-wrapper mb-3 d-none position-relative overflow-hidden rounded shadow-sm" id="previewSheetDocThumbnailWrapper" style="max-width: 100%; max-height: 200px;">
+                                <img id="previewSheetDocThumbnail" src="" alt="{% trans 'Thumbnail' %}" class="img-fluid rounded" style="max-height: 200px; object-fit: contain;">
+                            </div>
+                            <div class="pwanimate-preview-doc-icon mb-3" id="previewSheetDocIconWrapper">
+                                <i class="bi bi-file-earmark-pdf-fill text-danger" id="previewSheetDocIcon" style="font-size: 3.2rem;"></i>
+                            </div>
+                            <h6 class="fw-bold mb-1 text-break" id="previewSheetDocTitle" style="font-size: 0.95rem;"></h6>
+                            <div class="text-muted small mb-2" id="previewSheetDocMeta"></div>
+                            <p class="small text-muted px-2 mb-0" id="previewSheetDocDescription"></p>
+                        </div>
+                    </div>
+
+                    <!-- Footer: Title + Subtitle + Action Buttons -->
+                    <div class="p-3 border-top flex-shrink-0" style="border-color: var(--pwanimate-border) !important; background-color: var(--pwanimate-bg);">
+                        <div class="mb-2">
+                            <div class="fw-bold text-truncate" id="previewSheetTitle" style="font-size: 0.92rem;">{% trans "Resource Preview" %}</div>
+                            <div class="text-muted small text-truncate" id="previewSheetSubtitle">Resource</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="#" id="previewSheetPrimaryAction" class="btn btn-sm btn-primary flex-grow-1 rounded-pill d-flex align-items-center justify-content-center gap-1"
+                               target="_blank" rel="noopener">
+                                <i class="bi bi-box-arrow-up-right me-1" id="previewSheetPrimaryIcon"></i>
+                                <span id="previewSheetPrimaryText">{% trans "Open Document" %}</span>
+                            </a>
+                            <a href="#" id="previewSheetOriginalLink" class="btn btn-sm btn-outline-secondary rounded-pill px-3" target="_blank" rel="noopener" title="{% trans 'Open in new tab' %}">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </a>
+                        </div>
+                    </div>
                 </div>
-                <div class="d-flex align-items-center gap-2">
-                    <!-- Primary Action Button: Canonical HTMX Navigation (Document Viewer / Post) -->
-                    <a href="#" id="previewSheetPrimaryAction" class="btn btn-sm btn-primary flex-grow-1 rounded-pill d-flex align-items-center justify-content-center gap-1"
-                       data-bs-dismiss="offcanvas"
-                       hx-get="#"
-                       hx-target="#page-content-target"
-                       hx-swap="innerHTML"
-                       hx-push-url="true">
-                        <i class="bi bi-box-arrow-up-right me-1" id="previewSheetPrimaryIcon"></i>
-                        <span id="previewSheetPrimaryText">{% trans "Open Document" %}</span>
-                    </a>
-                    <!-- Secondary Action Button: External / Download / New Tab -->
-                    <a href="#" id="previewSheetOriginalLink" class="btn btn-sm btn-outline-secondary rounded-pill px-3" target="_blank" rel="noopener" title="{% trans 'Open in new tab' %}">
-                        <i class="bi bi-box-arrow-up-right"></i>
-                    </a>
+
+                <!-- TAB 2: CONTEXT -->
+                <div class="tab-pane fade h-100 d-flex flex-column overflow-hidden" id="mobileTabContextPane" role="tabpanel" aria-labelledby="mobileTabContextBtn">
+                    <!-- Empty State for Context -->
+                    <div class="d-flex flex-column align-items-start text-start p-4 pwanimate-preview-empty-card" id="mobileContextEmpty">
+                        <div class="d-flex align-items-center gap-2 mb-2 text-muted">
+                            <i class="bi bi-folder2 text-primary"></i>
+                            <h6 class="fw-semibold mb-0 small text-body">{% trans "Working Context" %}</h6>
+                        </div>
+                        <p class="small text-muted mb-3">{% trans "No working materials attached yet. Inspect citations in the Preview tab and click '+ Add to Context' to keep key references attached while you chat." %}</p>
+                    </div>
+
+                    <!-- Active Context State -->
+                    <div class="d-none flex-column h-100 pwanimate-context-active-wrapper flex-grow-1 overflow-hidden" id="mobileContextActive">
+                        <!-- Chips list -->
+                        <div class="px-3 pt-2 pb-1 border-bottom flex-shrink-0" style="background-color: var(--pwanimate-bg); border-color: var(--pwanimate-border) !important;">
+                            <div class="pwanimate-context-chips-list d-flex gap-2 overflow-x-auto pb-1" id="mobileContextChipsList" role="tablist"></div>
+                        </div>
+
+                        <!-- Subheader: Type Badge, Location Badge, Remove from Context -->
+                        <div class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center flex-shrink-0" style="background-color: var(--pwanimate-bg); border-color: var(--pwanimate-border) !important;">
+                            <div class="d-flex align-items-center gap-2 text-truncate">
+                                <span class="pwanimate-preview-badge badge rounded-pill px-2 py-1" id="mobileContextCategoryBadge">
+                                    <i class="bi bi-file-earmark me-1" id="mobileContextCategoryIcon"></i>
+                                    <span id="mobileContextCategoryText">{% trans "Document" %}</span>
+                                </span>
+                                <span class="badge rounded-pill bg-light text-dark border" id="mobileContextLocationBadge">
+                                    <i class="bi bi-bookmark me-1"></i><span id="mobileContextLocationText">p. 1</span>
+                                </span>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-0 d-inline-flex align-items-center gap-1" id="mobileContextRemoveBtn" style="font-size: 0.78rem; height: 26px;" title="{% trans 'Remove from working context' %}">
+                                <i class="bi bi-trash3"></i>
+                                <span>{% trans "Remove" %}</span>
+                            </button>
+                        </div>
+
+                        <!-- Context Surface Host -->
+                        <div class="flex-grow-1 position-relative pwanimate-preview-host overflow-hidden d-flex flex-column" id="mobileContextContent">
+                            <div class="position-absolute top-50 start-50 translate-middle pwanimate-preview-spinner d-none" id="mobileContextSpinner">
+                                <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                            </div>
+                            <!-- Document Viewer Host -->
+                            <div id="mobileContextDocViewer" class="pwanimate-surface-viewer-host w-100 h-100 position-relative d-none flex-column flex-grow-1" style="z-index: 2; overflow: hidden;"></div>
+                            <!-- Video Host -->
+                            <video id="mobileContextVideo" class="w-100 h-100 position-relative d-none" controls style="z-index: 2; object-fit: contain; background: #000;"></video>
+                            <!-- Image Host -->
+                            <div id="mobileContextImageContainer" class="pwanimate-preview-img-container w-100 h-100 position-relative d-none d-flex align-items-center justify-content-center p-2" style="z-index: 2; overflow: auto;">
+                                <img id="mobileContextImage" src="" alt="{% trans 'Context item' %}" class="pwanimate-preview-img img-fluid rounded" style="max-height: 100%; object-fit: contain;">
+                            </div>
+                            <!-- Doc card host -->
+                            <div id="mobileContextDocContainer" class="pwanimate-preview-doc-container w-100 h-100 position-relative d-none flex-column align-items-center justify-content-center p-4 text-center overflow-y-auto" style="z-index: 2;">
+                                <div class="pwanimate-preview-doc-thumbnail-wrapper mb-3 d-none position-relative overflow-hidden rounded shadow-sm" id="mobileContextDocThumbnailWrapper" style="max-width: 100%; max-height: 200px;">
+                                    <img id="mobileContextDocThumbnail" src="" alt="{% trans 'Thumbnail' %}" class="img-fluid rounded" style="max-height: 200px; object-fit: contain;">
+                                </div>
+                                <div class="pwanimate-preview-doc-icon mb-3" id="mobileContextDocIconWrapper">
+                                    <i class="bi bi-file-earmark-pdf-fill text-danger" id="mobileContextDocIcon" style="font-size: 3.2rem;"></i>
+                                </div>
+                                <h6 class="fw-bold mb-1 text-break" id="mobileContextDocTitle" style="font-size: 0.95rem;"></h6>
+                                <div class="text-muted small mb-2" id="mobileContextDocMeta"></div>
+                                <p class="small text-muted px-2 mb-0" id="mobileContextDocDescription"></p>
+                            </div>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="p-3 border-top flex-shrink-0" style="border-color: var(--pwanimate-border) !important; background-color: var(--pwanimate-bg);">
+                            <div class="mb-2">
+                                <div class="fw-bold text-truncate" id="mobileContextTitle" style="font-size: 0.92rem;">Context Item</div>
+                                <div class="text-muted small text-truncate" id="mobileContextSubtitle">Working Context</div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <a href="#" id="mobileContextPrimaryAction" class="btn btn-sm btn-primary flex-grow-1 rounded-pill d-flex align-items-center justify-content-center gap-1" target="_blank" rel="noopener">
+                                    <i class="bi bi-box-arrow-up-right me-1" id="mobileContextPrimaryIcon"></i>
+                                    <span id="mobileContextPrimaryText">{% trans "Open Original" %}</span>
+                                </a>
+                                <a href="#" id="mobileContextOriginalLink" class="btn btn-sm btn-outline-secondary rounded-pill px-3" target="_blank" rel="noopener" title="{% trans 'Open in new tab' %}">
+                                    <i class="bi bi-box-arrow-up-right"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
             </div>
         </div>
     </div>
@@ -156,6 +280,18 @@
     <!-- Main Chat Workspace -->
     <section class="pwanimate-chat-pane" aria-label="{% trans 'Pwanimate Chat' %}">
 
+        <!-- Context Rail Reopen Toggle (Desktop only, >= 1200px, visible when context rail is closed) -->
+        <div class="pwanimate-context-rail-toggle-wrapper d-none d-xl-flex" id="pwanimateContextRailToggleWrapper">
+            <button type="button"
+                    class="pwanimate-collapse-toggle-btn shadow-sm"
+                    id="pwanimateContextRailToggleBtn"
+                    onclick="if (window.pwanimateWorkspace) window.pwanimateWorkspace.openContextRail();"
+                    title="{% trans 'Open Context Rail' %}"
+                    aria-label="{% trans 'Open Context Rail' %}">
+                <i class="bi bi-layout-sidebar-reverse"></i>
+                <span class="small ms-1">{% trans "Context" %}</span>
+            </button>
+        </div>
 
         <!-- Transcript Area -->
         <div class="pwanimate-transcript" id="pwanimate-transcript" role="log" aria-live="polite">
@@ -219,7 +355,11 @@
                                                                data-thumbnail-url="{{ src.thumbnail_url|default:'' }}"
                                                                data-hls-url="{{ src.hls_url|default:'' }}"
                                                                data-author="{{ src.author|default:'' }}"
-                                                               data-citation="{{ src.citation|default:'' }}">
+                                                               data-citation="{{ src.citation|default:'' }}"
+                                                               data-page-number="{{ src.page_number|default:'' }}"
+                                                               data-document-id="{{ src.document_id|default:'' }}"
+                                                               data-document-share-id="{{ src.document_share_id|default:'' }}"
+                                                               data-file-type="{{ src.file_type|default:src.file_extension|default:'' }}">
                                                                 <i class="bi bi-link-45deg"></i>
                                                                 <span>{% if src.title %}{{ src.title }}{% elif src.citation %}{{ src.citation }}{% else %}{% trans "Document" %}{% endif %}</span>
                                                             </a>
@@ -437,6 +577,9 @@
             scriptsToLoad.push("{% static 'vendor/prism/prism-sql.min.js' %}");
             scriptsToLoad.push("{% static 'vendor/prism/prism-bash.min.js' %}");
             scriptsToLoad.push("{% static 'vendor/prism/prism-json.min.js' %}");
+        }
+        if (!window.DocumentViewer) {
+            scriptsToLoad.push("{% static 'documents/js/document-viewer.js' %}");
         }
         if (typeof window.initPwanimate !== 'function') {
             scriptsToLoad.push("{% static 'js/pwanimate/pwanimate-chat.js' %}");

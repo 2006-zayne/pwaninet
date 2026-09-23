@@ -830,6 +830,13 @@ def home_view(request):
         )
         context['explore_groups'] = explore_groups
 
+    # If arriving via HTMX from Pwanimate, enforce full-page browser navigation
+    current_url = request.headers.get('HX-Current-URL', '')
+    if request.headers.get('HX-Request') and current_url and '/pwanimate' in current_url:
+        response = HttpResponse()
+        response['HX-Redirect'] = reverse('posts:home')
+        return response
+
     # HTMX Navigation Request: Return full navigation partial for page navigation
     # Distinguished from infinite scroll (has cursor) and search (has query)
     if request.headers.get('HX-Request') and not cursor and not request.GET.get('q'):

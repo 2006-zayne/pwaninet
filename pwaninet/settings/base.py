@@ -339,6 +339,20 @@ CELERY_TASK_ROUTES = {
     '*': {'queue': 'default'},
 }
 
+# Celery Beat periodic task schedules
+CELERY_BEAT_SCHEDULE = {
+    'pwanimate-reconcile-document-ingestion': {
+        'task': 'pwanimate.tasks.reconciliation.reconcile_document_ingestion',
+        'schedule': float(os.environ.get('PWANIMATE_RECONCILE_INTERVAL_SECONDS', 600.0)),  # every 10 minutes
+        'options': {'queue': 'docs_queue'},
+    },
+}
+
+# Pwanimate reconciliation operational limits
+PWANIMATE_RECONCILE_MAX_INSPECT = int(os.environ.get('PWANIMATE_RECONCILE_MAX_INSPECT', 50))
+PWANIMATE_RECONCILE_MAX_INGEST = int(os.environ.get('PWANIMATE_RECONCILE_MAX_INGEST', 10))
+PWANIMATE_RECONCILE_MAX_EMBED = int(os.environ.get('PWANIMATE_RECONCILE_MAX_EMBED', 10))
+
 # CORS settings (includes Capacitor origins and CDN)
 _default_cors = [
     'http://localhost',

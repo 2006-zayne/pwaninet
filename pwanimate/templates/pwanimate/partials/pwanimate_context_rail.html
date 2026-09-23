@@ -1,88 +1,252 @@
 {% load i18n %}
 {% load static %}
-<div class="p-3 d-flex flex-column pwanimate-right-rail" id="pwanimate-resource-preview-panel">
-    <div class="d-flex align-items-center justify-content-between mb-3 flex-shrink-0">
-        <h6 class="fw-bold mb-0 text-muted small text-uppercase"><i class="bi bi-collection me-2 text-primary"></i>{% trans "Resource Preview" %}</h6>
+<div class="pwanimate-context-rail-wrapper position-relative h-100 d-flex flex-column">
+    <!-- Draggable Resize Handle (Mouse + Touch + Keyboard) -->
+    <div class="pwanimate-rail-resizer"
+         id="pwanimateRailResizer"
+         role="separator"
+         aria-orientation="vertical"
+         aria-label="{% trans 'Resize context rail' %}"
+         aria-valuenow="360"
+         aria-valuemin="280"
+         aria-valuemax="650"
+         tabindex="0"
+         title="{% trans 'Drag to resize context rail' %}"></div>
+
+    <!-- Context Rail Header: Tabs (Left) | Collapse Toggle (Right) -->
+    <div class="d-flex align-items-center justify-content-between px-3 border-bottom flex-shrink-0 pwanimate-context-rail-header" style="height: 48px; min-height: 48px;">
+        <ul class="nav nav-pills pwanimate-workspace-tabs gap-1" id="desktopWorkspaceTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active d-flex align-items-center justify-content-center gap-1 py-1 px-3"
+                        id="desktopTabPreviewBtn"
+                        type="button"
+                        role="tab"
+                        aria-controls="desktopTabPreviewPane"
+                        aria-selected="true"
+                        onclick="if (window.pwanimateWorkspace) window.pwanimateWorkspace.switchWorkspaceTab('preview');"
+                        style="font-size: 0.82rem;">
+                    <i class="bi bi-eye"></i>
+                    <span>{% trans "Preview" %}</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link d-flex align-items-center justify-content-center gap-1 py-1 px-3"
+                        id="desktopTabContextBtn"
+                        type="button"
+                        role="tab"
+                        aria-controls="desktopTabContextPane"
+                        aria-selected="false"
+                        onclick="if (window.pwanimateWorkspace) window.pwanimateWorkspace.switchWorkspaceTab('context');"
+                        style="font-size: 0.82rem;">
+                    <i class="bi bi-collection"></i>
+                    <span>{% trans "Context" %}</span>
+                    <span class="badge rounded-pill bg-primary ms-1" id="desktopContextCountBadge">0</span>
+                </button>
+            </li>
+        </ul>
+        <button type="button"
+                class="pwanimate-collapse-toggle-btn"
+                id="pwanimateContextRailCloseBtn"
+                onclick="if (window.pwanimateWorkspace) window.pwanimateWorkspace.closeContextRail();"
+                aria-label="{% trans 'Close context rail' %}"
+                title="{% trans 'Close context rail' %}">
+            <i class="bi bi-layout-sidebar-inset-reverse"></i>
+        </button>
     </div>
-    
-    <!-- Empty State -->
-    <div class="card border-0 shadow-sm mb-3 flex-shrink-0 pwanimate-preview-empty-card" id="desktopPreviewEmpty">
-        <div class="card-body text-center py-4">
-            <div class="pwanimate-preview-empty-icon mb-2">
-                <i class="bi bi-file-earmark-text text-muted opacity-75" style="font-size: 2.2rem;"></i>
-            </div>
-            <h6 class="fw-semibold mb-1 small">{% trans "No active preview" %}</h6>
-            <p class="x-small text-muted mb-0">{% trans "Click any citation badge in the conversation to preview documents, posts, or media." %}</p>
-        </div>
-    </div>
 
-    <!-- Active Preview State: Structured Card Layout -->
-    <div class="d-none flex-column h-100 pwanimate-preview-card card border shadow-sm overflow-hidden" id="desktopPreviewActive">
-        <!-- 1. Header: Type Badge / Icon + Category Label (Left) | Close Button (Right) -->
-        <div class="pwanimate-preview-card-header px-3 py-2 d-flex justify-content-between align-items-center border-bottom">
-            <div class="d-flex align-items-center gap-2 text-truncate">
-                <span class="pwanimate-preview-badge badge rounded-pill px-2 py-1" id="desktopPreviewCategoryBadge">
-                    <i class="bi bi-file-earmark me-1" id="desktopPreviewCategoryIcon"></i>
-                    <span id="desktopPreviewCategoryText">{% trans "Document" %}</span>
-                </span>
-            </div>
-            <button type="button" id="desktopPreviewCloseBtn" class="btn btn-sm btn-ghost-secondary rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 28px; height: 28px;" aria-label="{% trans 'Close preview' %}" title="{% trans 'Close preview' %}">
-                <i class="bi bi-x-lg"></i>
-            </button>
-        </div>
+    <div class="p-0 d-flex flex-column flex-grow-1 overflow-hidden pwanimate-right-rail" id="pwanimate-resource-preview-panel">
+        
+        <!-- Tab Content Wrapper -->
+        <div class="tab-content h-100 d-flex flex-column flex-grow-1 overflow-hidden" id="desktopWorkspaceTabContent">
 
-        <!-- 2. Preview Body -->
-        <div class="pwanimate-preview-card-body flex-grow-1 position-relative overflow-hidden pwanimate-preview-host" style="background-color: var(--pwanimate-card-bg);">
-            <div class="position-absolute top-50 start-50 translate-middle pwanimate-preview-spinner d-none" id="desktopPreviewSpinner">
-                <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
-            </div>
-
-            <!-- Video Player Host -->
-            <video id="desktopPreviewVideo" class="w-100 h-100 position-relative d-none" controls style="z-index: 2; object-fit: contain; background: #000;"></video>
-
-            <!-- Fallback Iframe Host -->
-            <iframe id="desktopPreviewIframe" class="w-100 h-100 border-0 position-relative d-none" style="z-index: 2;" src=""></iframe>
-
-            <!-- Image Host -->
-            <div id="desktopPreviewImageContainer" class="pwanimate-preview-img-container w-100 h-100 position-relative d-none d-flex align-items-center justify-content-center p-2" style="z-index: 2; overflow: auto;">
-                <img id="desktopPreviewImage" src="" alt="{% trans 'Preview' %}" class="pwanimate-preview-img img-fluid rounded" style="max-height: 100%; object-fit: contain;">
-            </div>
-
-            <!-- Canonical Document / Post / Link Card Host (No recursive iframe) -->
-            <div id="desktopPreviewDocContainer" class="pwanimate-preview-doc-container w-100 h-100 position-relative d-none d-flex flex-column align-items-center justify-content-center p-4 text-center" style="z-index: 2;">
-                <div class="pwanimate-preview-doc-thumbnail-wrapper mb-3 d-none position-relative overflow-hidden rounded shadow-sm" id="desktopPreviewDocThumbnailWrapper" style="max-width: 100%; max-height: 200px;">
-                    <img id="desktopPreviewDocThumbnail" src="" alt="{% trans 'Thumbnail' %}" class="img-fluid rounded" style="max-height: 200px; object-fit: contain;">
+            <!-- 1. PREVIEW TAB PANE -->
+            <div class="tab-pane fade show active h-100 d-flex flex-column overflow-hidden flex-grow-1" id="desktopTabPreviewPane" role="tabpanel" aria-labelledby="desktopTabPreviewBtn">
+                
+                <!-- Empty Preview State (State B: Rail open + no active preview reference) -->
+                <div class="d-flex flex-column align-items-center justify-content-center text-center p-4 h-100 flex-grow-1 pwanimate-preview-empty-state" id="desktopPreviewEmpty">
+                    <div class="d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 mb-3" style="width: 48px; height: 48px;">
+                        <i class="bi bi-eye text-primary fs-4"></i>
+                    </div>
+                    <h6 class="fw-semibold mb-1 small text-body">{% trans "Reference Inspection" %}</h6>
+                    <p class="small text-muted mb-3" style="max-width: 320px;">{% trans "Click any citation badge in the conversation to inspect documents, posts, or media here without modifying your working context." %}</p>
+                    <div class="p-2 rounded bg-light border text-muted small" style="max-width: 340px;">
+                        <i class="bi bi-info-circle me-1"></i>{% trans "References in Preview do not automatically become AI context until you explicitly add them." %}
+                    </div>
                 </div>
-                <div class="pwanimate-preview-doc-icon mb-3" id="desktopPreviewDocIconWrapper">
-                    <i class="bi bi-file-earmark-pdf-fill text-danger" id="desktopPreviewDocIcon" style="font-size: 3.2rem;"></i>
-                </div>
-                <h6 class="fw-bold mb-1 text-break" id="desktopPreviewDocTitle" style="font-size: 0.95rem;"></h6>
-                <div class="text-muted small mb-2" id="desktopPreviewDocMeta"></div>
-                <p class="small text-muted px-2 mb-0" id="desktopPreviewDocDescription"></p>
-            </div>
-        </div>
 
-        <!-- 3. Footer: Title + Type/Context Subtitle + Actions -->
-        <div class="pwanimate-preview-card-footer px-3 py-3 border-top">
-            <div class="mb-2">
-                <div class="fw-bold text-truncate" id="desktopPreviewTitle" style="font-size: 0.9rem;">Preview</div>
-                <div class="text-muted small text-truncate" id="desktopPreviewSubtitle">Resource</div>
+                <!-- Active Preview State: Structured Card Layout -->
+                <div class="d-none flex-column h-100 flex-grow-1 pwanimate-preview-card border-0 shadow-none overflow-hidden" id="desktopPreviewActive">
+                    <!-- 1. Header: Type Badge (Left) | Add to Context + Close (Right) -->
+                    <div class="pwanimate-preview-card-header px-3 py-2 d-flex justify-content-between align-items-center border-bottom flex-shrink-0">
+                        <div class="d-flex align-items-center gap-2 text-truncate">
+                            <span class="pwanimate-preview-badge badge rounded-pill px-2 py-1" id="desktopPreviewCategoryBadge">
+                                <i class="bi bi-file-earmark me-1" id="desktopPreviewCategoryIcon"></i>
+                                <span id="desktopPreviewCategoryText">{% trans "Document" %}</span>
+                            </span>
+                            <span class="badge rounded-pill bg-light text-dark border d-none" id="desktopPreviewLocationBadge">
+                                <i class="bi bi-bookmark me-1"></i><span id="desktopPreviewLocationText">p. 1</span>
+                            </span>
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <button type="button" class="btn btn-sm btn-primary rounded-pill px-2 py-0 d-inline-flex align-items-center gap-1" id="desktopPreviewAddToContextBtn" style="font-size: 0.78rem; height: 26px;">
+                                <i class="bi bi-plus-lg"></i>
+                                <span id="desktopPreviewAddToContextText">{% trans "+ Add to Context" %}</span>
+                            </button>
+                            <button type="button" id="desktopPreviewCloseBtn" class="btn btn-sm btn-ghost-secondary rounded-circle d-flex align-items-center justify-content-center p-0 ms-1" style="width: 26px; height: 26px;" aria-label="{% trans 'Close preview' %}" title="{% trans 'Close preview' %}">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 2. Preview Body -->
+                    <div class="pwanimate-preview-card-body flex-grow-1 position-relative overflow-hidden pwanimate-preview-host d-flex flex-column" style="background-color: var(--pwanimate-card-bg);">
+                        <div class="position-absolute top-50 start-50 translate-middle pwanimate-preview-spinner d-none" id="desktopPreviewSpinner">
+                            <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                        </div>
+
+                        <!-- Video Player Host -->
+                        <video id="desktopPreviewVideo" class="w-100 h-100 position-relative d-none" controls style="z-index: 2; object-fit: contain; background: #000;"></video>
+
+                        <!-- Fallback Iframe Host -->
+                        <iframe id="desktopPreviewIframe" class="w-100 h-100 border-0 position-relative d-none" style="z-index: 2;" src=""></iframe>
+
+                        <!-- Image Host -->
+                        <div id="desktopPreviewImageContainer" class="pwanimate-preview-img-container w-100 h-100 position-relative d-none d-flex align-items-center justify-content-center p-2" style="z-index: 2; overflow: auto;">
+                            <img id="desktopPreviewImage" src="" alt="{% trans 'Preview' %}" class="pwanimate-preview-img img-fluid rounded" style="max-height: 100%; object-fit: contain;">
+                        </div>
+
+                        <!-- Shared Reusable Document Viewer Host (PDF / DOCX / TXT) -->
+                        <div id="desktopPreviewDocViewer" class="pwanimate-surface-viewer-host w-100 h-100 position-relative d-none flex-column flex-grow-1" style="z-index: 2; overflow: hidden;"></div>
+
+                        <!-- Canonical Document / Post / Link Card Host (No recursive iframe) -->
+                        <div id="desktopPreviewDocContainer" class="pwanimate-preview-doc-container w-100 h-100 position-relative d-none flex-column align-items-center justify-content-center p-4 text-center overflow-y-auto" style="z-index: 2;">
+                            <div class="pwanimate-preview-doc-thumbnail-wrapper mb-3 d-none position-relative overflow-hidden rounded shadow-sm" id="desktopPreviewDocThumbnailWrapper" style="max-width: 100%; max-height: 200px;">
+                                <img id="desktopPreviewDocThumbnail" src="" alt="{% trans 'Thumbnail' %}" class="img-fluid rounded" style="max-height: 200px; object-fit: contain;">
+                            </div>
+                            <div class="pwanimate-preview-doc-icon mb-3" id="desktopPreviewDocIconWrapper">
+                                <i class="bi bi-file-earmark-pdf-fill text-danger" id="desktopPreviewDocIcon" style="font-size: 3.2rem;"></i>
+                            </div>
+                            <h6 class="fw-bold mb-1 text-break" id="desktopPreviewDocTitle" style="font-size: 0.95rem;"></h6>
+                            <div class="text-muted small mb-2" id="desktopPreviewDocMeta"></div>
+                            <p class="small text-muted px-2 mb-0" id="desktopPreviewDocDescription"></p>
+                        </div>
+                    </div>
+
+                    <!-- 3. Footer: Title + Type/Context Subtitle + Actions -->
+                    <div class="pwanimate-preview-card-footer px-3 py-2 border-top flex-shrink-0">
+                        <div class="mb-2">
+                            <div class="fw-bold text-truncate" id="desktopPreviewTitle" style="font-size: 0.88rem;">Preview</div>
+                            <div class="text-muted small text-truncate" id="desktopPreviewSubtitle">Resource</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="#" id="desktopPreviewPrimaryAction" class="btn btn-sm btn-primary flex-grow-1 rounded-pill d-flex align-items-center justify-content-center gap-1"
+                               target="_blank" rel="noopener">
+                                <i class="bi bi-box-arrow-up-right me-1" id="desktopPreviewPrimaryIcon"></i>
+                                <span id="desktopPreviewPrimaryText">{% trans "Open Document" %}</span>
+                            </a>
+                            <a href="#" id="desktopPreviewOriginalLink" class="btn btn-sm btn-outline-secondary rounded-pill px-3" target="_blank" rel="noopener" title="{% trans 'Open in new tab' %}">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="d-flex align-items-center gap-2">
-                <!-- Primary Action Button: Canonical HTMX Navigation (Document Viewer / Post) -->
-                <a href="#" id="desktopPreviewPrimaryAction" class="btn btn-sm btn-primary flex-grow-1 rounded-pill d-flex align-items-center justify-content-center gap-1"
-                   hx-get="#"
-                   hx-target="#page-content-target"
-                   hx-swap="innerHTML"
-                   hx-push-url="true">
-                    <i class="bi bi-box-arrow-up-right me-1" id="desktopPreviewPrimaryIcon"></i>
-                    <span id="desktopPreviewPrimaryText">{% trans "Open Document" %}</span>
-                </a>
-                <!-- Secondary Action Button: External / Download / New Tab -->
-                <a href="#" id="desktopPreviewOriginalLink" class="btn btn-sm btn-outline-secondary rounded-pill px-3" target="_blank" rel="noopener" title="{% trans 'Open in new tab' %}">
-                    <i class="bi bi-box-arrow-up-right"></i>
-                </a>
+
+            <!-- 2. CONTEXT TAB PANE -->
+            <div class="tab-pane fade h-100 d-flex flex-column overflow-hidden flex-grow-1" id="desktopTabContextPane" role="tabpanel" aria-labelledby="desktopTabContextBtn">
+                
+                <!-- Empty Context State (0 attached items) -->
+                <div class="d-flex flex-column align-items-center justify-content-center text-center p-4 h-100 flex-grow-1 pwanimate-preview-empty-state" id="desktopContextEmpty">
+                    <div class="d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 mb-3" style="width: 48px; height: 48px;">
+                        <i class="bi bi-folder2 text-primary fs-4"></i>
+                    </div>
+                    <h6 class="fw-semibold mb-1 small text-body">{% trans "Working Context" %}</h6>
+                    <p class="small text-muted mb-3" style="max-width: 320px;">{% trans "No working materials attached yet. Inspect citations in the Preview tab and click '+ Add to Context' to keep key references attached while you chat." %}</p>
+                    <div class="p-2 rounded bg-light border text-muted small" style="max-width: 340px;">
+                        <i class="bi bi-check2-circle text-success me-1"></i>{% trans "Attached resources remain pinned across tab switches and citations." %}
+                    </div>
+                </div>
+
+                <!-- Active Context State (1+ attached items) -->
+                <div class="d-none flex-column h-100 pwanimate-context-active-wrapper flex-grow-1 overflow-hidden" id="desktopContextActive">
+                    
+                    <!-- Attached Resources Selector Strip -->
+                    <div class="pwanimate-context-strip-wrapper px-3 py-2 border-bottom flex-shrink-0" style="background-color: var(--pwanimate-bg);">
+                        <div class="pwanimate-context-chips-list d-flex gap-2 overflow-x-auto pb-1" id="desktopContextChipsList" role="tablist">
+                            <!-- Populated dynamically by PwanimateChat -->
+                        </div>
+                    </div>
+
+                    <!-- Active Surface Card for Selected Context Resource -->
+                    <div class="pwanimate-preview-card border-0 shadow-none overflow-hidden flex-grow-1 d-flex flex-column h-100" id="desktopContextSurfaceCard">
+                        <!-- Header with Type Badge, Location Badge, and [ Remove ] -->
+                        <div class="pwanimate-preview-card-header px-3 py-2 d-flex justify-content-between align-items-center border-bottom flex-shrink-0">
+                            <div class="d-flex align-items-center gap-2 text-truncate">
+                                <span class="pwanimate-preview-badge badge rounded-pill px-2 py-1" id="desktopContextCategoryBadge">
+                                    <i class="bi bi-file-earmark me-1" id="desktopContextCategoryIcon"></i>
+                                    <span id="desktopContextCategoryText">{% trans "Document" %}</span>
+                                </span>
+                                <span class="badge rounded-pill bg-light text-dark border" id="desktopContextLocationBadge">
+                                    <i class="bi bi-bookmark me-1"></i><span id="desktopContextLocationText">p. 1</span>
+                                </span>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-0 d-inline-flex align-items-center gap-1" id="desktopContextRemoveBtn" style="font-size: 0.78rem; height: 26px;" title="{% trans 'Remove from working context' %}">
+                                <i class="bi bi-trash3"></i>
+                                <span>{% trans "Remove" %}</span>
+                            </button>
+                        </div>
+
+                        <!-- Context Surface Body with Document Viewer Host -->
+                        <div class="pwanimate-preview-card-body flex-grow-1 position-relative overflow-hidden pwanimate-preview-host d-flex flex-column" style="background-color: var(--pwanimate-card-bg);">
+                            <div class="position-absolute top-50 start-50 translate-middle pwanimate-preview-spinner d-none" id="desktopContextSpinner">
+                                <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                            </div>
+
+                            <!-- Shared Reusable Document Viewer Host for Context -->
+                            <div id="desktopContextDocViewer" class="pwanimate-surface-viewer-host w-100 h-100 position-relative d-none flex-column flex-grow-1" style="z-index: 2; overflow: hidden;"></div>
+
+                            <!-- Video Player Host for Context -->
+                            <video id="desktopContextVideo" class="w-100 h-100 position-relative d-none" controls style="z-index: 2; object-fit: contain; background: #000;"></video>
+
+                            <!-- Image Host for Context -->
+                            <div id="desktopContextImageContainer" class="pwanimate-preview-img-container w-100 h-100 position-relative d-none d-flex align-items-center justify-content-center p-2" style="z-index: 2; overflow: auto;">
+                                <img id="desktopContextImage" src="" alt="{% trans 'Context item' %}" class="pwanimate-preview-img img-fluid rounded" style="max-height: 100%; object-fit: contain;">
+                            </div>
+
+                            <!-- Post / Generic Card Host for Context -->
+                            <div id="desktopContextDocContainer" class="pwanimate-preview-doc-container w-100 h-100 position-relative d-none flex-column align-items-center justify-content-center p-4 text-center overflow-y-auto" style="z-index: 2;">
+                                <div class="pwanimate-preview-doc-thumbnail-wrapper mb-3 d-none position-relative overflow-hidden rounded shadow-sm" id="desktopContextDocThumbnailWrapper" style="max-width: 100%; max-height: 200px;">
+                                    <img id="desktopContextDocThumbnail" src="" alt="{% trans 'Thumbnail' %}" class="img-fluid rounded" style="max-height: 200px; object-fit: contain;">
+                                </div>
+                                <div class="pwanimate-preview-doc-icon mb-3" id="desktopContextDocIconWrapper">
+                                    <i class="bi bi-file-earmark-pdf-fill text-danger" id="desktopContextDocIcon" style="font-size: 3.2rem;"></i>
+                                </div>
+                                <h6 class="fw-bold mb-1 text-break" id="desktopContextDocTitle" style="font-size: 0.95rem;"></h6>
+                                <div class="text-muted small mb-2" id="desktopContextDocMeta"></div>
+                                <p class="small text-muted px-2 mb-0" id="desktopContextDocDescription"></p>
+                            </div>
+                        </div>
+
+                        <!-- Footer: Title + Open Action -->
+                        <div class="pwanimate-preview-card-footer px-3 py-2 border-top flex-shrink-0">
+                            <div class="mb-2">
+                                <div class="fw-bold text-truncate" id="desktopContextTitle" style="font-size: 0.88rem;">Context Item</div>
+                                <div class="text-muted small text-truncate" id="desktopContextSubtitle">Working Context</div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <a href="#" id="desktopContextPrimaryAction" class="btn btn-sm btn-primary flex-grow-1 rounded-pill d-flex align-items-center justify-content-center gap-1" target="_blank" rel="noopener">
+                                    <i class="bi bi-box-arrow-up-right me-1" id="desktopContextPrimaryIcon"></i>
+                                    <span id="desktopContextPrimaryText">{% trans "Open Original" %}</span>
+                                </a>
+                                <a href="#" id="desktopContextOriginalLink" class="btn btn-sm btn-outline-secondary rounded-pill px-3" target="_blank" rel="noopener" title="{% trans 'Open in new tab' %}">
+                                    <i class="bi bi-box-arrow-up-right"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
+
         </div>
     </div>
 </div>

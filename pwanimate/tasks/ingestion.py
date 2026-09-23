@@ -62,16 +62,6 @@ def ingest_document_version(self, version_id: int, force: bool = False) -> Dict[
         }
 
     doc = version.document
-    primary_file = version.files.first()
-
-    if not primary_file:
-        logger.warning(f"[PWANIMATE-INGESTION] DocumentVersion {version_id} has no attached files, skipping.")
-        return {
-            'status': 'skipped',
-            'reason': 'no_files_found',
-            'version_id': version_id,
-            'document_id': doc.id,
-        }
 
     # Idempotency check: if not forcing, avoid duplicate chunking
     if not force and version.chunks.exists():
@@ -84,6 +74,17 @@ def ingest_document_version(self, version_id: int, force: bool = False) -> Dict[
             'document_id': doc.id,
             'version_id': version_id,
             'chunk_count': existing_count,
+        }
+
+    primary_file = version.files.first()
+
+    if not primary_file:
+        logger.warning(f"[PWANIMATE-INGESTION] DocumentVersion {version_id} has no attached files, skipping.")
+        return {
+            'status': 'skipped',
+            'reason': 'no_files_found',
+            'version_id': version_id,
+            'document_id': doc.id,
         }
 
     # Phase 2B: Structural Extraction

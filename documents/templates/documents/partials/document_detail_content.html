@@ -55,9 +55,10 @@
                 {% if first_file and first_file.file %}
                     <div id="document-viewer"
                          data-file-url="{{ first_file.file.url }}"
-                         data-file-type="{{ first_file.extension }}"
-                         data-file-name="{{ document.title }}.{{ first_file.extension }}"
+                         data-file-type="{{ first_file.extension|default:''|cut:'.'|lower }}"
+                         data-file-name="{{ document.title }}.{{ first_file.extension|default:''|cut:'.' }}"
                          data-document-id="{{ document.share_id }}"
+                         data-document-version-id="{% if document.latest_version %}{{ document.latest_version.id }}{% endif %}"
                          data-file-id="{{ first_file.id }}"
                          data-thumbnail="{% if first_file.preview_url %}{{ first_file.preview_url }}{% elif first_file.preview_path %}/media/{{ first_file.preview_path }}{% elif first_file.thumbnail_path %}/media/{{ first_file.thumbnail_path }}{% endif %}"
                          style="min-height: 70vh; height: 70vh;"></div>
@@ -470,60 +471,175 @@
 (function() {
     function initDocumentDetailViewer() {
         const viewerContainer = document.getElementById('document-viewer');
-        if (viewerContainer && !viewerContainer.dataset.initialized) {
-            viewerContainer.dataset.initialized = 'true';
-            const fileUrl = viewerContainer.dataset.fileUrl;
-            const fileType = viewerContainer.dataset.fileType;
-            const fileName = viewerContainer.dataset.fileName;
-            const documentId = viewerContainer.dataset.documentId;
-            const fileId = viewerContainer.dataset.fileId;
-            
-            function startViewer() {
-                if (typeof DocumentViewer !== 'undefined') {
-                    const viewer = new DocumentViewer(viewerContainer, fileUrl, fileType, fileName, documentId, fileId);
-                    viewer.initialize();
-                }
-            }
+        if (!viewerContainer) {
+            return;
+        }
+        // Only return if already initialized AND viewer instance exists
+        if (viewerContainer.dataset.initialized === 'true' && viewerContainer._documentViewer) {
+            return;
+        }
+        viewerContainer.dataset.initialized = 'true';
+        
+        const options = {
+            fileUrl: viewerContainer.dataset.fileUrl,
+            fileType: viewerContainer.dataset.fileType,
+            fileName: viewerContainer.dataset.fileName,
+            documentId: viewerContainer.dataset.documentId,
+            documentVersionId: viewerContainer.dataset.documentVersionId || null,
+            fileId: viewerContainer.dataset.fileId || null,
+            thumbnail: viewerContainer.dataset.thumbnail || '',
+            fitContainer: false,
+            showFullscreen: true,
+            showDownload: true
+        };
 
-            if (typeof DocumentViewer === 'undefined') {
-                const s = document.createElement('script');
-                s.src = "{% static 'documents/js/document-viewer.js' %}";
-                s.onload = startViewer;
-                document.head.appendChild(s);
+        function startViewer() {
+            if (typeof DocumentViewer !== 'undefined') {
+                if (viewerContainer._documentViewer && typeof viewerContainer._documentViewer.destroy === 'function') {
+                    try {
+                        viewerContainer._documentViewer.destroy();
+                    } catch (e) {}
+                }
+                const viewer = new DocumentViewer(viewerContainer, options);
+                viewerContainer._documentViewer = viewer;
+                viewer.initialize();
             } else {
-                startViewer();
+                // Poll briefly if script is still parsing
+                let attempts = 0;
+                const interval = setInterval(function() {
+                    attempts++;
+                    if (typeof DocumentViewer !== 'undefined') {
+                        clearInterval(interval);
+                        startViewer();
+                    } else if (attempts > 30) {
+                        clearInterval(interval);
+                        console.error('[DocumentViewer] Failed to load DocumentViewer script.');
+                        delete viewerContainer.dataset.initialized;
+                        viewerContainer.innerHTML = `
+                            <div class="viewer-error" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 70vh; min-height: 280px; gap: 14px; text-align: center; padding: 24px;">
+                                <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(220, 53, 69, 0.1); display: flex; align-items: center; justify-content: center;">
+                                    <i class="bi bi-exclamation-triangle" style="font-size: 1.75rem; color: var(--error, #dc3545);"></i>
+                                </div>
+                                <h3 style="font-size: 1.15rem; font-weight: 600; color: var(--text-dark, #212529); margin: 0;">Preview Unavailable</h3>
+                                <p style="color: var(--text-secondary, #6c757d); font-size: 0.9rem; max-width: 420px; line-height: 1.5; margin: 0;">The document viewer script is taking longer than usual to load. Click Reload Document to retry.</p>
+                                <div style="display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; margin-top: 4px;">
+                                    <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 py-2 d-inline-flex align-items-center gap-2 viewer-retry-btn" id="viewer-script-retry-btn" style="cursor: pointer; font-weight: 600;" onclick="window.reloadDocumentDetailViewer()">
+                                        <i class="bi bi-arrow-clockwise"></i> Reload Document
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }, 50);
             }
         }
-        
-        const documentId = "{{ document.share_id }}";
-        const viewCountElement = document.querySelector('.doc-stats div:nth-child(2) p:first-child');
-        const downloadCountElement = document.querySelector('.doc-stats div:nth-child(1) p:first-child');
-        const bookmarkCountElement = document.querySelector('.doc-stats div:nth-child(3) p:first-child');
-        
-        if (window._docDetailStatsInterval) {
-            clearInterval(window._docDetailStatsInterval);
+
+        if (typeof DocumentViewer === 'undefined') {
+            const s = document.createElement('script');
+            s.src = "{% static 'documents/js/document-viewer.js' %}";
+            s.onload = startViewer;
+            s.onerror = () => {
+                console.error('[DocumentViewer] Failed to dynamically load document-viewer.js');
+            };
+            document.head.appendChild(s);
+        } else {
+            startViewer();
         }
-        window._docDetailStatsInterval = setInterval(function() {
-            if (!document.getElementById('document-viewer')) {
-                clearInterval(window._docDetailStatsInterval);
-                return;
+    }
+
+    // Expose global reload function for error buttons, toolbar reload, and manual retry
+    window.reloadDocumentDetailViewer = function() {
+        const vc = document.getElementById('document-viewer');
+        if (vc) {
+            delete vc.dataset.initialized;
+            if (vc._documentViewer && typeof vc._documentViewer.destroy === 'function') {
+                try {
+                    vc._documentViewer.destroy();
+                } catch (e) {}
             }
-            fetch('/documents/document/' + documentId + '/stats/')
-                .then(response => response.json())
-                .then(data => {
-                    if (viewCountElement) viewCountElement.textContent = data.view_count;
-                    if (downloadCountElement) downloadCountElement.textContent = data.download_count;
-                    if (bookmarkCountElement) bookmarkCountElement.textContent = data.bookmark_count;
-                })
-                .catch(error => console.log('Error fetching stats:', error));
-        }, 30000);
+            vc.innerHTML = '';
+            scheduleInit();
+        }
+    };
+
+    function scheduleInit() {
+        if (window.requestAnimationFrame) {
+            window.requestAnimationFrame(initDocumentDetailViewer);
+        } else {
+            setTimeout(initDocumentDetailViewer, 16);
+        }
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initDocumentDetailViewer);
+        document.addEventListener('DOMContentLoaded', scheduleInit);
     } else {
-        initDocumentDetailViewer();
+        scheduleInit();
     }
+
+    // Handle HTMX navigation and content loads
+    document.addEventListener('htmx:load', function onHtmxLoad() {
+        if (document.getElementById('document-viewer')) {
+            scheduleInit();
+        }
+    });
+    document.addEventListener('htmx:afterSwap', function onHtmxAfterSwap() {
+        if (document.getElementById('document-viewer')) {
+            scheduleInit();
+        }
+    });
+    document.addEventListener('htmx:historyRestore', function onHtmxHistoryRestore() {
+        const vc = document.getElementById('document-viewer');
+        if (vc) {
+            delete vc.dataset.initialized;
+            scheduleInit();
+        }
+    });
+    document.addEventListener('htmx:beforeHistorySave', function onHtmxBeforeHistorySave() {
+        const vc = document.getElementById('document-viewer');
+        if (vc) {
+            delete vc.dataset.initialized;
+        }
+    });
+    window.addEventListener('popstate', function onPopState() {
+        const vc = document.getElementById('document-viewer');
+        if (vc) {
+            delete vc.dataset.initialized;
+            scheduleInit();
+        }
+    });
+
+    // Cleanup viewer on HTMX swap
+    document.body.addEventListener('htmx:beforeSwap', function onHtmxSwap() {
+        const vc = document.getElementById('document-viewer');
+        if (vc && vc._documentViewer && typeof vc._documentViewer.destroy === 'function') {
+            try {
+                vc._documentViewer.destroy();
+            } catch (e) {}
+        }
+    });
+    
+    const documentId = "{{ document.share_id }}";
+    const viewCountElement = document.querySelector('.doc-stats div:nth-child(2) p:first-child');
+    const downloadCountElement = document.querySelector('.doc-stats div:nth-child(1) p:first-child');
+    const bookmarkCountElement = document.querySelector('.doc-stats div:nth-child(3) p:first-child');
+    
+    if (window._docDetailStatsInterval) {
+        clearInterval(window._docDetailStatsInterval);
+    }
+    window._docDetailStatsInterval = setInterval(function() {
+        if (!document.getElementById('document-viewer')) {
+            clearInterval(window._docDetailStatsInterval);
+            return;
+        }
+        fetch('/documents/document/' + documentId + '/stats/')
+            .then(response => response.json())
+            .then(data => {
+                if (viewCountElement) viewCountElement.textContent = data.view_count;
+                if (downloadCountElement) downloadCountElement.textContent = data.download_count;
+                if (bookmarkCountElement) bookmarkCountElement.textContent = data.bookmark_count;
+            })
+            .catch(error => console.log('Error fetching stats:', error));
+    }, 30000);
 })();
 
 function toggleShareDropdown() {

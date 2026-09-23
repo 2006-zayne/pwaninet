@@ -7,6 +7,7 @@ and citation generation.
 """
 
 import logging
+import uuid
 from typing import Any, List, Optional
 from django.db.models import Q
 from pgvector.django import CosineDistance
@@ -189,6 +190,104 @@ class DocumentSemanticRetrievalService:
                 continue
 
             results.append(self._format_chunk_result(chunk, similarity))
+
+        return results
+
+    def get_page_chunks(
+        self,
+        user: Any,
+        document_share_id: Any,
+        page_number: int,
+        document_version_id: Optional[int] = None,
+    ) -> List[RetrievalResult]:
+        """
+        Deterministic, authorized retrieval of chunks spanning a specific page.
+
+        Enforces strict authorization invariants by anchoring to build_candidate_queryset(user).
+        Handles multi-page spanning chunks where page_number <= P <= page_end.
+
+        Args:
+            user: Authenticated Django user instance.
+            document_share_id: Public UUID or UUID string of the document.
+            page_number: Positive 1-indexed page number (int).
+            document_version_id: Optional specific DocumentVersion primary key.
+                If omitted, defaults to the latest version (`document_version__is_latest=True`).
+
+        Returns:
+            List[RetrievalResult] ordered deterministically by chunk_index, or empty list
+            if unauthorized, invalid input, or no matching content.
+        """
+        # 1. Validate user authentication
+        if not user or not getattr(user, 'is_authenticated', False):
+            return []
+
+        # 2. Validate document_share_id
+        if not document_share_id:
+            return []
+        if isinstance(document_share_id, uuid.UUID):
+            share_uuid = document_share_id
+        else:
+            try:
+                share_uuid = uuid.UUID(str(document_share_id).strip())
+            except (ValueError, TypeError, AttributeError):
+                return []
+
+        # 3. Validate page_number (must be positive integer, not bool or float)
+        if isinstance(page_number, bool) or isinstance(page_number, float):
+            return []
+        try:
+            page_num = int(page_number)
+            if page_num <= 0:
+                return []
+        except (ValueError, TypeError):
+            return []
+
+        # 4. Validate optional document_version_id
+        version_id = None
+        if document_version_id is not None:
+            if isinstance(document_version_id, bool) or isinstance(document_version_id, float):
+                return []
+            try:
+                version_id = int(document_version_id)
+                if version_id <= 0:
+                    return []
+            except (ValueError, TypeError):
+                return []
+
+        # 5. Anchor to existing authorized candidate queryset
+        candidate_qs = self.build_candidate_queryset(user=user)
+
+        # 6. Scope strictly to the requested document share_id
+        qs = candidate_qs.filter(document__share_id=share_uuid)
+
+        # 7. Apply version filtering
+        if version_id is not None:
+            qs = qs.filter(document_version_id=version_id)
+        else:
+            qs = qs.filter(document_version__is_latest=True)
+
+        # 8. Filter chunks spanning the requested page: page_number <= P <= page_end
+        # Handles both explicit page_end and single-page chunks where page_end is NULL
+        page_filter = (
+            Q(page_number__lte=page_num, page_end__gte=page_num) |
+            Q(page_number=page_num, page_end__isnull=True)
+        )
+        qs = qs.filter(page_filter)
+
+        # 9. Deterministic ordering by chunk_index with relation prefetching
+        chunks = list(
+            qs.select_related('document', 'document_version')
+            .prefetch_related('document_version__files')
+            .order_by('chunk_index')
+        )
+
+        # 10. Format results using standard RetrievalResult
+        results = []
+        for chunk in chunks:
+            res = self._format_chunk_result(chunk, similarity=1.0)
+            res.metadata['retrieval_mode'] = 'explicit_page'
+            res.metadata['match_type'] = 'exact_page'
+            results.append(res)
 
         return results
 

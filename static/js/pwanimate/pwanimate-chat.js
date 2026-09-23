@@ -27,6 +27,49 @@
                window.matchMedia('(hover: hover) and (pointer: fine)').matches;
     }
 
+    function isPwanimateCitationLink(element) {
+        if (!element) return false;
+        const anchor = (element.tagName === 'A') ? element : (typeof element.closest === 'function' ? element.closest('a') : null);
+        if (!anchor) return false;
+        if (anchor.classList && anchor.classList.contains('pwanimate-citation-badge')) return true;
+        if (typeof anchor.closest === 'function') {
+            if (anchor.closest('.pwanimate-citations') || anchor.closest('.pwanimate-citation-list')) return true;
+        }
+        if (typeof anchor.hasAttribute === 'function') {
+            if (anchor.hasAttribute('data-pwanimate-resource') || anchor.hasAttribute('data-citation')) return true;
+        }
+        const ds = anchor.dataset || {};
+        if (ds.resourceType || ds.sourceType || ds.documentShareId || ds.documentId || ds.postId) return true;
+        return false;
+    }
+
+    /**
+     * Returns a human-readable relative time string for a given ISO 8601 timestamp.
+     * e.g. "just now", "2 minutes ago", "3 hours ago", "yesterday", "5 days ago"
+     */
+    function formatRelativeTime(isoString) {
+        if (!isoString) return '';
+        let date;
+        try { date = new Date(isoString); } catch (e) { return ''; }
+        if (isNaN(date.getTime())) return '';
+        const diffMs = Date.now() - date.getTime();
+        const diffSec = Math.floor(diffMs / 1000);
+        if (diffSec < 60) return 'just now';
+        const diffMin = Math.floor(diffSec / 60);
+        if (diffMin < 60) return diffMin === 1 ? '1 minute ago' : diffMin + ' minutes ago';
+        const diffHr = Math.floor(diffMin / 60);
+        if (diffHr < 24) return diffHr === 1 ? '1 hour ago' : diffHr + ' hours ago';
+        const diffDay = Math.floor(diffHr / 24);
+        if (diffDay === 1) return 'yesterday';
+        if (diffDay < 7) return diffDay + ' days ago';
+        const diffWk = Math.floor(diffDay / 7);
+        if (diffWk < 5) return diffWk === 1 ? '1 week ago' : diffWk + ' weeks ago';
+        const diffMo = Math.floor(diffDay / 30);
+        if (diffMo < 12) return diffMo === 1 ? '1 month ago' : diffMo + ' months ago';
+        const diffYr = Math.floor(diffDay / 365);
+        return diffYr === 1 ? '1 year ago' : diffYr + ' years ago';
+    }
+
     class PwanimateChat {
         constructor(workspace) {
             this.workspace = workspace;
@@ -47,6 +90,26 @@
             this._onDocumentClick = null;
             this._onKeyDown = null;
 
+            // Phase 1 Workspace Geometry & State Contract
+            this.leftRailCollapsed = localStorage.getItem('pwanimate_left_rail_collapsed') === 'true';
+            const parsedPreferred = parseInt(localStorage.getItem('pwanimate_context_rail_width'), 10);
+            this.savedPreferredWidth = (!isNaN(parsedPreferred) && parsedPreferred >= 280 && parsedPreferred <= 650) ? parsedPreferred : 360;
+            this.currentRenderedWidth = 0;
+            this.contextRailOpen = localStorage.getItem('pwanimateContextRailOpen') === 'true';
+            this.activeResourceDetails = null;
+            this.resizerEl = null;
+            this.isResizing = false;
+            this._onWindowResize = null;
+            this._resizerCleanup = null;
+
+            // Phase 2A Context Workspace & Multi-Resource State
+            this.previewResourceState = null;
+            this.contextResources = [];
+            this.activeWorkspaceTab = 'preview'; // 'preview' | 'context'
+            this.activeContextIndex = -1;
+            this.previewDocViewer = null;
+            this.contextDocViewer = null;
+
             // Model selection & Quota modal state
             this.selectedProvider = localStorage.getItem('pwanimate_selected_provider') || '';
             this.selectedModel = localStorage.getItem('pwanimate_selected_model') || '';
@@ -64,6 +127,7 @@
         }
 
         init() {
+            this.initWorkspaceGeometry();
             this.initMarkdown();
             this.renderExistingMarkdown();
             this.checkCollapsibleUserBubbles();
@@ -77,6 +141,8 @@
             }
             this.scrollToBottom(false);
             this.fetchQuotaStatus();
+            this.updateTimestamps(); // apply relative time to any server-rendered timestamps
+            this.startTimestampTicker();
         }
 
         initMarkdown() {
@@ -481,8 +547,8 @@
                         return;
                     }
 
-                    const badge = e.target.closest('a.pwanimate-citation-badge');
-                    if (badge) {
+                    const badge = e.target.closest('a');
+                    if (badge && isPwanimateCitationLink(badge)) {
                         e.preventDefault();
                         const url = badge.getAttribute('href');
                         let title = badge.dataset.title || 'Resource Preview';
@@ -490,6 +556,8 @@
                             const span = badge.querySelector('span');
                             if (span && span.textContent.trim()) {
                                 title = span.textContent.trim();
+                            } else if (badge.textContent && badge.textContent.trim()) {
+                                title = badge.textContent.trim();
                             }
                         }
                         const meta = {
@@ -500,6 +568,11 @@
                             hlsUrl: badge.dataset.hlsUrl || '',
                             author: badge.dataset.author || '',
                             citation: badge.dataset.citation || '',
+                            pageNumber: badge.dataset.pageNumber || null,
+                            documentId: badge.dataset.documentId || '',
+                            documentShareId: badge.dataset.documentShareId || '',
+                            fileType: badge.dataset.fileType || '',
+                            postId: badge.dataset.postId || '',
                             triggerEl: badge
                         };
                         this.previewResource(url, title, meta);
@@ -587,11 +660,98 @@
                     return;
                 }
 
-                // Close desktop preview button
+                // Close desktop preview button (closes active card, leaves rail open in State B)
                 const closeDesktopPreview = e.target.closest('#desktopPreviewCloseBtn');
                 if (closeDesktopPreview) {
                     e.preventDefault();
                     this.closePreview();
+                    return;
+                }
+
+                // Workspace Tab Switching: Preview vs Context (Desktop & Mobile)
+                const previewTabBtn = e.target.closest('#desktopTabPreviewBtn, #mobileTabPreviewBtn');
+                if (previewTabBtn) {
+                    e.preventDefault();
+                    this.switchWorkspaceTab('preview');
+                    return;
+                }
+
+                const contextTabBtn = e.target.closest('#desktopTabContextBtn, #mobileTabContextBtn');
+                if (contextTabBtn) {
+                    e.preventDefault();
+                    this.switchWorkspaceTab('context');
+                    return;
+                }
+
+                // Add to Context buttons (Desktop & Mobile)
+                const addContextBtn = e.target.closest('#desktopPreviewAddToContextBtn, #previewSheetAddToContextBtn');
+                if (addContextBtn) {
+                    e.preventDefault();
+                    this.addResourceToContext(this.previewResourceState);
+                    return;
+                }
+
+                // Remove from Context buttons (Surface header)
+                const removeContextBtn = e.target.closest('#desktopContextRemoveBtn, #mobileContextRemoveBtn');
+                if (removeContextBtn) {
+                    e.preventDefault();
+                    this.removeResourceFromContext(this.activeContextIndex);
+                    return;
+                }
+
+                // Context chip remove button (X icon on chip)
+                const chipRemoveBtn = e.target.closest('.pwanimate-chip-remove');
+                if (chipRemoveBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const idx = parseInt(chipRemoveBtn.dataset.index, 10);
+                    if (!isNaN(idx)) {
+                        this.removeResourceFromContext(idx);
+                    }
+                    return;
+                }
+
+                // Context chip selection
+                const chipItem = e.target.closest('.pwanimate-context-chip');
+                if (chipItem) {
+                    e.preventDefault();
+                    const idx = parseInt(chipItem.dataset.index, 10);
+                    if (!isNaN(idx)) {
+                        this.selectContextResource(idx);
+                    }
+                    return;
+                }
+
+                // Close context rail button (closes entire rail)
+                const closeContextRail = e.target.closest('#pwanimateContextRailCloseBtn');
+                if (closeContextRail) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.closeContextRail();
+                    return;
+                }
+
+                // Open context rail button (workspace top-right toggle)
+                const toggleContextRail = e.target.closest('#pwanimateContextRailToggleBtn');
+                if (toggleContextRail) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.openContextRail();
+                    return;
+                }
+
+                // Left rail toggle buttons (delegated on document so they work across OOB rail swaps)
+                const collapseBtn = e.target.closest('#pwanimateLeftRailCollapseBtn');
+                if (collapseBtn) {
+                    e.preventDefault();
+                    this.toggleLeftRail(true);
+                    return;
+                }
+
+                const expandBtn = e.target.closest('#pwanimateLeftRailExpandBtn');
+                if (expandBtn) {
+                    e.preventDefault();
+                    this.toggleLeftRail(false);
                     return;
                 }
 
@@ -612,7 +772,9 @@
             // Escape key listener to close preview
             this._onKeyDown = (e) => {
                 if (e.key === 'Escape' || e.key === 'Esc') {
-                    this.closePreview();
+                    if (this.activeWorkspaceTab === 'preview' && (this.previewResourceState || this.activeResourceDetails)) {
+                        this.closePreview();
+                    }
                 }
             };
             document.addEventListener('keydown', this._onKeyDown);
@@ -622,6 +784,14 @@
             if (previewSheet) {
                 previewSheet.addEventListener('hidden.bs.offcanvas', () => {
                     this.resetMediaElements(previewSheet);
+                    if (this.previewDocViewer) {
+                        try { this.previewDocViewer.destroy(); } catch (err) {}
+                        this.previewDocViewer = null;
+                    }
+                    if (this.contextDocViewer) {
+                        try { this.contextDocViewer.destroy(); } catch (err) {}
+                        this.contextDocViewer = null;
+                    }
                     if (this.lastPreviewTriggerEl && typeof this.lastPreviewTriggerEl.focus === 'function') {
                         this.lastPreviewTriggerEl.focus();
                         this.lastPreviewTriggerEl = null;
@@ -703,32 +873,114 @@
             }
         }
 
-        previewResource(url, title, meta = {}) {
-            this.lastPreviewTriggerEl = meta.triggerEl || null;
+        updateLocationBadge(prefix, page, totalPages = null) {
+            let container = null;
+            if (prefix === 'desktopPreview') {
+                container = document.getElementById('desktopPreviewActive');
+            } else if (prefix === 'previewSheet') {
+                container = document.getElementById('pwanimateResourcePreviewSheet');
+            } else if (prefix === 'desktopContext') {
+                container = document.getElementById('desktopContextSurfaceCard');
+            } else if (prefix === 'mobileContext') {
+                container = document.getElementById('mobileContextActive');
+            }
+            if (!container) container = document;
 
-            const targetUrl = url || meta.mediaUrl || '#';
-            const isVideo = (meta.resourceType === 'video') ||
-                Boolean(meta.hlsUrl) ||
-                /\.(mp4|webm|ogg)$/i.test(targetUrl) ||
-                /\.(mp4|webm|ogg)$/i.test(meta.mediaUrl || '') ||
-                /\.m3u8$/i.test(targetUrl) ||
-                /\.m3u8$/i.test(meta.hlsUrl || '');
+            const locBadge = container.querySelector(`#${prefix}LocationBadge`);
+            const locText = container.querySelector(`#${prefix}LocationText`);
+            if (locBadge && locText) {
+                if (page) {
+                    locBadge.classList.remove('d-none');
+                    locText.textContent = totalPages ? `p. ${page} / ${totalPages}` : `p. ${page}`;
+                } else {
+                    locBadge.classList.add('d-none');
+                }
+            }
+        }
 
-            const isImage = !isVideo && ((meta.resourceType === 'image') ||
-                /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(targetUrl) ||
-                /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(meta.mediaUrl || ''));
+        static normalizeResource(url, title, meta = {}) {
+            meta = meta || {};
+            const rawUrl = url || meta.mediaUrl || meta.media_url || meta.url || '#';
+            const cleanUrl = typeof rawUrl === 'string' ? rawUrl : '#';
 
-            const isDoc = (meta.resourceType === 'document') ||
-                (meta.sourceType === 'document') ||
-                targetUrl.includes('/documents/') ||
-                /\.(pdf|docx?|pptx?|xlsx?)$/i.test(targetUrl);
+            // Extract authoritative IDs
+            let documentShareId = meta.documentShareId || meta.document_share_id || '';
+            if (!documentShareId) {
+                const docMatch = cleanUrl.match(/\/documents\/document\/([0-9a-fA-F-]+)/i);
+                if (docMatch) documentShareId = docMatch[1];
+            }
 
-            const isPost = (meta.sourceType === 'post') ||
-                targetUrl.includes('/post/') ||
-                targetUrl.includes('/posts/');
+            const documentId = meta.documentId || meta.document_id || documentShareId || '';
+            const documentVersionId = meta.documentVersionId || meta.document_version_id || meta.versionId || '';
+            const fileId = meta.fileId || meta.file_id || '';
 
-            const isPerson = (meta.sourceType === 'user') ||
-                targetUrl.includes('/users/');
+            let postId = meta.postId || meta.post_id || '';
+            if (!postId) {
+                const postMatch = cleanUrl.match(/\/(?:posts\/)?post\/([0-9a-fA-F-]+)/i);
+                if (postMatch) postId = postMatch[1];
+            }
+
+            // Media URLs
+            const mediaUrl = meta.mediaUrl || meta.media_url || '';
+            const hlsUrl = meta.hlsUrl || meta.hls_url || '';
+            const thumbnailUrl = meta.thumbnailUrl || meta.thumbnail_url || '';
+
+            // File type derivation & normalization
+            let fileType = (meta.fileType || meta.file_type || meta.file_extension || meta.extension || '').toLowerCase().trim();
+            if (fileType.startsWith('.')) fileType = fileType.substring(1);
+            if (!fileType) {
+                const candidate = (mediaUrl || cleanUrl || '').split('?')[0].split('#')[0];
+                const extMatch = candidate.match(/\.([a-zA-Z0-9]+)$/);
+                if (extMatch && extMatch[1].length <= 5) fileType = extMatch[1].toLowerCase();
+            }
+
+            // Classification
+            const isVideo = (meta.resourceType === 'video' || meta.resource_type === 'video' || Boolean(hlsUrl) ||
+                /\.(mp4|webm|ogg|m3u8)(\?|#|$)/i.test(mediaUrl || cleanUrl));
+
+            const isImage = !isVideo && (meta.resourceType === 'image' || meta.resource_type === 'image' ||
+                /\.(jpg|jpeg|png|gif|webp|svg)(\?|#|$)/i.test(mediaUrl || cleanUrl) ||
+                ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(fileType));
+
+            const isDoc = !isVideo && !isImage && (meta.resourceType === 'document' || meta.resource_type === 'document' ||
+                meta.sourceType === 'document' || meta.source_type === 'document' ||
+                Boolean(documentShareId) || cleanUrl.includes('/documents/') ||
+                ['pdf', 'docx', 'doc', 'pptx', 'ppt', 'txt', 'md', 'csv', 'log'].includes(fileType));
+
+            const isPost = !isVideo && !isImage && !isDoc && (meta.sourceType === 'post' || meta.source_type === 'post' ||
+                meta.resourceType === 'post' || meta.resource_type === 'post' ||
+                cleanUrl.includes('/post/') || cleanUrl.includes('/posts/'));
+
+            let previewType = 'document';
+            if (isVideo) previewType = 'video';
+            else if (isImage) previewType = 'image';
+            else if (isDoc) previewType = 'document';
+            else if (isPost) previewType = 'post';
+
+            // Deterministic Page Number Resolution Order:
+            // 1. Explicit structured metadata (highest priority)
+            // 2. URL query parameter or hash (?page=12, #page=12)
+            // 3. Fallback: parse citation text ("Page 12", "p. 12")
+            let pageNumber = null;
+            const rawPage = (meta.pageNumber !== undefined && meta.pageNumber !== null && meta.pageNumber !== '') ? meta.pageNumber :
+                           ((meta.page_number !== undefined && meta.page_number !== null && meta.page_number !== '') ? meta.page_number : meta.page);
+            if (rawPage !== undefined && rawPage !== null && String(rawPage).trim() !== '' && !isNaN(rawPage)) {
+                pageNumber = Math.max(1, parseInt(rawPage, 10));
+            } else {
+                const queryMatch = cleanUrl.match(/[?&](?:page|p)=(\d+)/i);
+                const hashMatch = cleanUrl.match(/#(?:page=?|p=?)(\d+)/i);
+                if (queryMatch) {
+                    pageNumber = Math.max(1, parseInt(queryMatch[1], 10));
+                } else if (hashMatch) {
+                    pageNumber = Math.max(1, parseInt(hashMatch[1], 10));
+                } else {
+                    const citText = meta.citation || meta.description || title || '';
+                    const textMatch = citText.match(/\b(?:page|p\.|pp\.)\s*(\d+)\b/i);
+                    if (textMatch) {
+                        pageNumber = Math.max(1, parseInt(textMatch[1], 10));
+                    }
+                }
+            }
 
             let category = 'Resource';
             let icon = 'bi-link-45deg';
@@ -737,39 +989,32 @@
             let primaryIcon = 'bi-box-arrow-up-right';
             let docIcon = 'bi-file-earmark-text';
 
-            if (isVideo) {
+            if (previewType === 'video') {
                 category = 'Video';
                 icon = 'bi-play-circle-fill';
                 badgeClass = 'bg-danger-subtle text-danger';
                 primaryText = 'Watch Video';
                 primaryIcon = 'bi-play-btn-fill';
-            } else if (isImage) {
+            } else if (previewType === 'image') {
                 category = 'Image';
                 icon = 'bi-image-fill';
                 badgeClass = 'bg-info-subtle text-info';
                 primaryText = 'View Full Image';
                 primaryIcon = 'bi-arrows-fullscreen';
-            } else if (isDoc) {
+            } else if (previewType === 'document') {
                 category = 'Document';
                 icon = 'bi-file-earmark-pdf-fill';
                 badgeClass = 'bg-primary-subtle text-primary';
                 primaryText = 'Open Document';
                 primaryIcon = 'bi-file-earmark-arrow-up';
                 docIcon = 'bi-file-earmark-pdf-fill text-danger';
-            } else if (isPost) {
+            } else if (previewType === 'post') {
                 category = 'Post';
                 icon = 'bi-chat-square-text-fill';
                 badgeClass = 'bg-success-subtle text-success';
                 primaryText = 'View Post';
                 primaryIcon = 'bi-chat-square-text';
                 docIcon = 'bi-chat-quote-fill text-success';
-            } else if (isPerson) {
-                category = 'Peer Profile';
-                icon = 'bi-person-fill';
-                badgeClass = 'bg-info-subtle text-info';
-                primaryText = 'View Profile';
-                primaryIcon = 'bi-person-badge';
-                docIcon = 'bi-person-circle text-primary';
             }
 
             let subtitle = category;
@@ -781,57 +1026,327 @@
                 subtitle = `${category} · PwaniNet Repository`;
             }
 
-            const targetSrc = isVideo
-                ? (meta.mediaUrl || meta.hlsUrl || targetUrl)
-                : ((isImage && meta.mediaUrl) ? meta.mediaUrl : targetUrl);
-            const previewType = isVideo ? 'video' : (isImage ? 'image' : 'doc');
+            const targetSrc = previewType === 'video'
+                ? (hlsUrl || mediaUrl || cleanUrl)
+                : (mediaUrl || cleanUrl);
 
-            const details = {
-                title: title || 'Resource Preview',
-                subtitle: subtitle,
-                url: targetUrl,
-                targetSrc: targetSrc,
-                mediaUrl: meta.mediaUrl || '',
-                hlsUrl: meta.hlsUrl || '',
-                thumbnailUrl: meta.thumbnailUrl || '',
-                previewType: previewType,
+            const cleanTitle = title || meta.title || (previewType === 'document' ? 'Document' : (previewType === 'post' ? 'Post' : 'Resource'));
+            const description = meta.description || meta.content || meta.snippet || meta.citation ||
+                (previewType === 'document' ? 'Official course or academic document from PwaniNet repository.' :
+                (previewType === 'post' ? 'Discussion post on PwaniNet.' : 'Resource referenced in this conversation.'));
+
+            return {
+                id: documentShareId || postId || cleanUrl,
+                type: previewType,
                 category: category,
+                title: cleanTitle,
+                subtitle: subtitle,
+                url: cleanUrl,
+                targetSrc: targetSrc,
+                mediaUrl: mediaUrl,
+                hlsUrl: hlsUrl,
+                thumbnailUrl: thumbnailUrl,
+                previewType: previewType,
+                documentId: documentId,
+                documentShareId: documentShareId,
+                documentVersionId: documentVersionId,
+                fileId: fileId,
+                fileType: fileType,
+                pageNumber: pageNumber,
+                description: description,
+                author: meta.author || '',
+                citation: meta.citation || '',
+                postId: postId,
                 icon: icon,
                 badgeClass: badgeClass,
                 primaryText: primaryText,
                 primaryIcon: primaryIcon,
                 docIcon: docIcon,
-                description: meta.citation || (isDoc ? 'Official course or academic document from PwaniNet repository.' : (isPost ? 'Discussion post on PwaniNet.' : 'Resource referenced in this conversation.'))
+                rawMeta: meta
             };
+        }
 
-            if (window.innerWidth >= 1200) {
-                // Desktop Right Rail
+        normalizeResource(url, title, meta = {}) {
+            return PwanimateChat.normalizeResource(url, title, meta);
+        }
+
+        previewResource(url, title, meta = {}) {
+            this.lastPreviewTriggerEl = meta.triggerEl || null;
+            const resource = this.normalizeResource(url, title, meta);
+
+            const isDesktop = (window.innerWidth >= 1200);
+            const prefix = isDesktop ? 'desktopPreview' : 'previewSheet';
+
+            // Check if same document is already mounted in Preview
+            const isSameDoc = Boolean(
+                this.previewDocViewer && this.previewResourceState &&
+                this.previewResourceState.previewType === 'document' && resource.previewType === 'document' &&
+                ((resource.documentShareId && this.previewResourceState.documentShareId === resource.documentShareId) ||
+                 (resource.documentId && this.previewResourceState.documentId === resource.documentId) ||
+                 (resource.mediaUrl && this.previewResourceState.mediaUrl === resource.mediaUrl && resource.mediaUrl !== ''))
+            );
+
+            this.activeResourceDetails = resource;
+            this.previewResourceState = resource;
+
+            // Switch workspace tab to Preview (non-destructive)
+            this.switchWorkspaceTab('preview');
+
+            if (isDesktop) {
+                this.openContextRail();
                 const emptyState = document.getElementById('desktopPreviewEmpty');
                 const activeState = document.getElementById('desktopPreviewActive');
                 if (emptyState && activeState) {
                     emptyState.classList.add('d-none');
                     activeState.classList.remove('d-none');
                     activeState.classList.add('d-flex');
-                    this.populatePreviewCard(activeState, details, 'desktop');
                 }
             } else {
-                // Mobile Bottom Sheet
                 const sheetEl = document.getElementById('pwanimateResourcePreviewSheet');
-                if (sheetEl) {
-                    this.populatePreviewCard(sheetEl, details, 'mobile');
-                    if (window.bootstrap) {
-                        let offcanvas = bootstrap.Offcanvas.getInstance(sheetEl);
-                        if (!offcanvas) offcanvas = new bootstrap.Offcanvas(sheetEl);
-                        offcanvas.show();
-                    }
+                if (sheetEl && window.bootstrap) {
+                    let offcanvas = bootstrap.Offcanvas.getInstance(sheetEl);
+                    if (!offcanvas) offcanvas = new bootstrap.Offcanvas(sheetEl);
+                    offcanvas.show();
+                }
+            }
+
+            if (isSameDoc) {
+                // Same document already mounted: navigate to page without rebuilding viewer
+                if (resource.pageNumber && typeof this.previewDocViewer.goToPage === 'function') {
+                    this.previewDocViewer.goToPage(resource.pageNumber);
+                }
+                this.updateLocationBadge(prefix, resource.pageNumber, this.previewDocViewer.getTotalPages());
+            } else {
+                // Render or update surface for resource
+                this.renderSurface(prefix, resource, false);
+            }
+
+            this.updateAddToContextButtons();
+        }
+
+        switchWorkspaceTab(tabName) {
+            const targetTab = (tabName === 'context') ? 'context' : 'preview';
+            this.activeWorkspaceTab = targetTab;
+
+            // Desktop Tab Buttons & Panes
+            const deskPrevBtn = document.getElementById('desktopTabPreviewBtn');
+            const deskCtxBtn = document.getElementById('desktopTabContextBtn');
+            const deskPrevPane = document.getElementById('desktopTabPreviewPane');
+            const deskCtxPane = document.getElementById('desktopTabContextPane');
+
+            // Mobile Tab Buttons & Panes
+            const mobPrevBtn = document.getElementById('mobileTabPreviewBtn');
+            const mobCtxBtn = document.getElementById('mobileTabContextBtn');
+            const mobPrevPane = document.getElementById('mobileTabPreviewPane');
+            const mobCtxPane = document.getElementById('mobileTabContextPane');
+
+            if (targetTab === 'preview') {
+                if (deskPrevBtn) { deskPrevBtn.classList.add('active'); deskPrevBtn.setAttribute('aria-selected', 'true'); }
+                if (deskCtxBtn) { deskCtxBtn.classList.remove('active'); deskCtxBtn.setAttribute('aria-selected', 'false'); }
+                if (deskPrevPane) { deskPrevPane.classList.add('show', 'active'); }
+                if (deskCtxPane) { deskCtxPane.classList.remove('show', 'active'); }
+
+                if (mobPrevBtn) { mobPrevBtn.classList.add('active'); mobPrevBtn.setAttribute('aria-selected', 'true'); }
+                if (mobCtxBtn) { mobCtxBtn.classList.remove('active'); mobCtxBtn.setAttribute('aria-selected', 'false'); }
+                if (mobPrevPane) { mobPrevPane.classList.add('show', 'active'); }
+                if (mobCtxPane) { mobCtxPane.classList.remove('show', 'active'); }
+
+                if (this.previewDocViewer && typeof this.previewDocViewer.handleResize === 'function') {
+                    requestAnimationFrame(() => {
+                        if (this.previewDocViewer && typeof this.previewDocViewer.handleResize === 'function') {
+                            this.previewDocViewer.handleResize();
+                        }
+                    });
+                }
+            } else {
+                if (deskPrevBtn) { deskPrevBtn.classList.remove('active'); deskPrevBtn.setAttribute('aria-selected', 'false'); }
+                if (deskCtxBtn) { deskCtxBtn.classList.add('active'); deskCtxBtn.setAttribute('aria-selected', 'true'); }
+                if (deskPrevPane) { deskPrevPane.classList.remove('show', 'active'); }
+                if (deskCtxPane) { deskCtxPane.classList.add('show', 'active'); }
+
+                if (mobPrevBtn) { mobPrevBtn.classList.remove('active'); mobPrevBtn.setAttribute('aria-selected', 'false'); }
+                if (mobCtxBtn) { mobCtxBtn.classList.add('active'); mobCtxBtn.setAttribute('aria-selected', 'true'); }
+                if (mobPrevPane) { mobPrevPane.classList.remove('show', 'active'); }
+                if (mobCtxPane) { mobCtxPane.classList.add('show', 'active'); }
+
+                if (this.contextResources.length > 0 && this.activeContextIndex < 0) {
+                    this.activeContextIndex = 0;
+                }
+                this.syncContextView();
+
+                if (this.contextDocViewer && typeof this.contextDocViewer.handleResize === 'function') {
+                    requestAnimationFrame(() => {
+                        if (this.contextDocViewer && typeof this.contextDocViewer.handleResize === 'function') {
+                            this.contextDocViewer.handleResize();
+                        }
+                    });
                 }
             }
         }
 
-        populatePreviewCard(container, details, mode) {
-            const prefix = mode === 'desktop' ? 'desktopPreview' : 'previewSheet';
 
-            // Header category badge
+        addResourceToContext(resource) {
+            if (!resource) return;
+
+            // Deduplicate
+            const existingIndex = this.contextResources.findIndex(item =>
+                (resource.documentId && item.documentId === resource.documentId) ||
+                (resource.mediaUrl && item.mediaUrl === resource.mediaUrl) ||
+                (resource.url && item.url === resource.url && item.title === resource.title)
+            );
+
+            if (existingIndex >= 0) {
+                this.activeContextIndex = existingIndex;
+            } else {
+                const contextItem = Object.assign({}, resource, {
+                    pageNumber: resource.pageNumber || 1
+                });
+                this.contextResources.push(contextItem);
+                this.activeContextIndex = this.contextResources.length - 1;
+            }
+
+            this.updateContextCountBadges();
+            this.updateAddToContextButtons();
+            this.syncContextView();
+        }
+
+        removeResourceFromContext(index) {
+            if (index < 0 || index >= this.contextResources.length) return;
+
+            if (this.contextDocViewer && index === this.activeContextIndex) {
+                try { this.contextDocViewer.destroy(); } catch (e) {}
+                this.contextDocViewer = null;
+            }
+
+            this.contextResources.splice(index, 1);
+
+            if (this.contextResources.length === 0) {
+                this.activeContextIndex = -1;
+            } else if (this.activeContextIndex >= this.contextResources.length) {
+                this.activeContextIndex = this.contextResources.length - 1;
+            }
+
+            this.updateContextCountBadges();
+            this.updateAddToContextButtons();
+            this.syncContextView();
+        }
+
+        selectContextResource(index) {
+            if (index < 0 || index >= this.contextResources.length) return;
+            if (this.activeContextIndex === index) return;
+
+            this.activeContextIndex = index;
+            this.syncContextView();
+        }
+
+        updateContextCountBadges() {
+            const countStr = this.contextResources.length.toString();
+            const deskBadge = document.getElementById('desktopContextCountBadge');
+            const mobBadge = document.getElementById('mobileContextCountBadge');
+            if (deskBadge) deskBadge.textContent = countStr;
+            if (mobBadge) mobBadge.textContent = countStr;
+        }
+
+        updateAddToContextButtons() {
+            const isAdded = Boolean(this.previewResourceState && this.contextResources.some(item =>
+                (this.previewResourceState.documentId && item.documentId === this.previewResourceState.documentId) ||
+                (this.previewResourceState.mediaUrl && item.mediaUrl === this.previewResourceState.mediaUrl) ||
+                (this.previewResourceState.url && item.url === this.previewResourceState.url && item.title === this.previewResourceState.title)
+            ));
+
+            const deskBtn = document.getElementById('desktopPreviewAddToContextBtn');
+            const mobBtn = document.getElementById('previewSheetAddToContextBtn');
+
+            if (deskBtn) {
+                if (isAdded) {
+                    deskBtn.className = 'btn btn-sm btn-outline-success rounded-pill px-2 py-0 d-inline-flex align-items-center gap-1 disabled';
+                    deskBtn.innerHTML = '<i class="bi bi-check-lg"></i> <span>In Context</span>';
+                } else {
+                    deskBtn.className = 'btn btn-sm btn-primary rounded-pill px-2 py-0 d-inline-flex align-items-center gap-1';
+                    deskBtn.innerHTML = '<i class="bi bi-plus-lg"></i> <span id="desktopPreviewAddToContextText">+ Add to Context</span>';
+                }
+            }
+
+            if (mobBtn) {
+                if (isAdded) {
+                    mobBtn.className = 'btn btn-sm btn-outline-success rounded-pill px-2 py-0 d-inline-flex align-items-center gap-1 disabled';
+                    mobBtn.innerHTML = '<i class="bi bi-check-lg"></i> <span>In Context</span>';
+                } else {
+                    mobBtn.className = 'btn btn-sm btn-primary rounded-pill px-2 py-0 d-inline-flex align-items-center gap-1';
+                    mobBtn.innerHTML = '<i class="bi bi-plus-lg"></i> <span id="previewSheetAddToContextText">+ Add to Context</span>';
+                }
+            }
+        }
+
+        syncContextView() {
+            const deskEmpty = document.getElementById('desktopContextEmpty');
+            const deskActive = document.getElementById('desktopContextActive');
+            const mobEmpty = document.getElementById('mobileContextEmpty');
+            const mobActive = document.getElementById('mobileContextActive');
+
+            if (this.contextResources.length === 0) {
+                if (deskEmpty) deskEmpty.classList.remove('d-none');
+                if (deskActive) { deskActive.classList.remove('d-flex'); deskActive.classList.add('d-none'); }
+                if (mobEmpty) mobEmpty.classList.remove('d-none');
+                if (mobActive) { mobActive.classList.remove('d-flex'); mobActive.classList.add('d-none'); }
+
+                if (this.contextDocViewer) {
+                    try { this.contextDocViewer.destroy(); } catch (e) {}
+                    this.contextDocViewer = null;
+                }
+                return;
+            }
+
+            if (deskEmpty) deskEmpty.classList.add('d-none');
+            if (deskActive) { deskActive.classList.remove('d-none'); deskActive.classList.add('d-flex'); }
+            if (mobEmpty) mobEmpty.classList.add('d-none');
+            if (mobActive) { mobActive.classList.remove('d-none'); mobActive.classList.add('d-flex'); }
+
+            const deskChips = document.getElementById('desktopContextChipsList');
+            const mobChips = document.getElementById('mobileContextChipsList');
+
+            const chipsHtml = this.contextResources.map((res, idx) => {
+                const isActive = idx === this.activeContextIndex;
+                const safeTitle = escapeHtml(res.title || 'Resource');
+                const safeIcon = escapeHtml(res.icon || 'bi-file-earmark');
+                return `
+                    <div class="pwanimate-context-chip ${isActive ? 'active' : ''}" data-index="${idx}" role="button" tabindex="0">
+                        <i class="bi ${safeIcon} me-1"></i>
+                        <span class="pwanimate-chip-title" title="${safeTitle}">${safeTitle}</span>
+                        <button type="button" class="pwanimate-chip-remove" data-index="${idx}" aria-label="Remove ${safeTitle}">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+
+            if (deskChips) deskChips.innerHTML = chipsHtml;
+            if (mobChips) mobChips.innerHTML = chipsHtml;
+
+            const activeResource = this.contextResources[this.activeContextIndex];
+            if (activeResource) {
+                if (window.innerWidth >= 1200) {
+                    this.renderSurface('desktopContext', activeResource, true);
+                } else {
+                    this.renderSurface('mobileContext', activeResource, true);
+                }
+            }
+        }
+
+        renderSurface(prefix, details, isContext = false) {
+            let container = null;
+            if (prefix === 'desktopPreview') {
+                container = document.getElementById('desktopPreviewActive');
+            } else if (prefix === 'previewSheet') {
+                container = document.getElementById('pwanimateResourcePreviewSheet');
+            } else if (prefix === 'desktopContext') {
+                container = document.getElementById('desktopContextSurfaceCard');
+            } else if (prefix === 'mobileContext') {
+                container = document.getElementById('mobileContextActive');
+            }
+            if (!container || !details) return;
+
+            // 1. Header category badge
             const categoryBadge = container.querySelector(`#${prefix}CategoryBadge`);
             const categoryIcon = container.querySelector(`#${prefix}CategoryIcon`);
             const categoryText = container.querySelector(`#${prefix}CategoryText`);
@@ -845,19 +1360,26 @@
                 categoryText.textContent = details.category;
             }
 
-            // Body hosts
+            // Location badge (e.g. p. 1)
+            const locBadge = container.querySelector(`#${prefix}LocationBadge`);
+            const locText = container.querySelector(`#${prefix}LocationText`);
+            if (locBadge && locText) {
+                if (details.pageNumber) {
+                    locBadge.classList.remove('d-none');
+                    locText.textContent = `p. ${details.pageNumber}`;
+                } else {
+                    locBadge.classList.add('d-none');
+                }
+            }
+
+            // 2. Body hosts
             const video = container.querySelector(`#${prefix}Video`);
             const imgContainer = container.querySelector(`#${prefix}ImageContainer`);
             const img = container.querySelector(`#${prefix}Image`);
+            const docViewer = container.querySelector(`#${prefix}DocViewer`);
             const docContainer = container.querySelector(`#${prefix}DocContainer`);
-            const docThumbWrapper = container.querySelector(`#${prefix}DocThumbnailWrapper`);
-            const docThumb = container.querySelector(`#${prefix}DocThumbnail`);
-            const docIconWrapper = container.querySelector(`#${prefix}DocIconWrapper`);
-            const docIcon = container.querySelector(`#${prefix}DocIcon`);
-            const docTitle = container.querySelector(`#${prefix}DocTitle`);
-            const docMeta = container.querySelector(`#${prefix}DocMeta`);
-            const docDesc = container.querySelector(`#${prefix}DocDescription`);
             const spinner = container.querySelector(`#${prefix}Spinner`);
+            const iframe = container.querySelector(`#${prefix}Iframe`);
 
             // Reset hosts
             if (video) {
@@ -874,8 +1396,31 @@
                 video.classList.add('d-none');
             }
             if (imgContainer) { imgContainer.classList.add('d-none'); if (img) img.src = ''; }
+            if (iframe) { iframe.classList.add('d-none'); iframe.src = ''; }
             if (docContainer) { docContainer.classList.add('d-none'); }
             if (spinner) spinner.classList.add('d-none');
+
+            // Clean up previous doc viewer if present for this pane
+            if (isContext && this.contextDocViewer) {
+                try { this.contextDocViewer.destroy(); } catch (e) {}
+                this.contextDocViewer = null;
+            } else if (!isContext && this.previewDocViewer) {
+                try { this.previewDocViewer.destroy(); } catch (e) {}
+                this.previewDocViewer = null;
+            }
+            if (docViewer) {
+                docViewer.innerHTML = '';
+                docViewer.classList.add('d-none');
+                docViewer.classList.remove('d-flex');
+            }
+
+            const fileType = (details.fileType || this.inferFileType(details.mediaUrl || details.url || '')).toLowerCase();
+            const canUseDocViewer = Boolean(
+                window.DocumentViewer &&
+                docViewer &&
+                details.mediaUrl &&
+                ['pdf', 'docx', 'pptx', 'txt', 'text', 'csv', 'log'].includes(fileType)
+            );
 
             if (details.previewType === 'video' && video) {
                 if (details.thumbnailUrl) {
@@ -915,24 +1460,59 @@
                 img.onerror = () => { if (spinner) spinner.classList.add('d-none'); };
                 img.src = details.targetSrc;
                 imgContainer.classList.remove('d-none');
-            } else if (docContainer) {
-                if (details.thumbnailUrl && docThumb && docThumbWrapper) {
-                    docThumb.src = details.thumbnailUrl;
-                    docThumbWrapper.classList.remove('d-none');
-                    if (docIconWrapper) docIconWrapper.classList.add('d-none');
+            } else if (canUseDocViewer) {
+                docViewer.classList.remove('d-none');
+                docViewer.classList.add('d-flex');
+
+                const initialPage = (details.pageNumber && !isNaN(details.pageNumber)) ? parseInt(details.pageNumber, 10) : 1;
+                const options = {
+                    compact: true,
+                    fitContainer: true,
+                    initialPage: initialPage,
+                    showDownload: true,
+                    showFullscreen: true,
+                    onPageChange: (page, totalPages) => {
+                        details.pageNumber = page;
+                        if (locBadge && locText) {
+                            locBadge.classList.remove('d-none');
+                            locText.textContent = totalPages ? `p. ${page} / ${totalPages}` : `p. ${page}`;
+                        }
+                    }
+                };
+                const viewerInstance = new window.DocumentViewer(
+                    docViewer,
+                    details.mediaUrl,
+                    fileType,
+                    details.title || 'Document',
+                    details.documentId || null,
+                    details.documentShareId || null,
+                    options
+                );
+                if (isContext) {
+                    this.contextDocViewer = viewerInstance;
                 } else {
-                    if (docThumbWrapper) docThumbWrapper.classList.add('d-none');
-                    if (docThumb) docThumb.src = '';
-                    if (docIconWrapper) docIconWrapper.classList.remove('d-none');
+                    this.previewDocViewer = viewerInstance;
                 }
-                if (docIcon) docIcon.className = `bi ${details.docIcon}`;
-                if (docTitle) docTitle.textContent = details.title;
-                if (docMeta) docMeta.textContent = details.subtitle;
-                if (docDesc) docDesc.textContent = details.description;
-                docContainer.classList.remove('d-none');
+                viewerInstance.initialize().then(() => {
+                    if (window.ResizeObserver && !docViewer._resizeObs) {
+                        docViewer._resizeObs = new ResizeObserver(() => {
+                            if (typeof viewerInstance.handleResize === 'function') {
+                                viewerInstance.handleResize();
+                            }
+                        });
+                        docViewer._resizeObs.observe(docViewer);
+                    }
+                }).catch((err) => {
+                    console.warn('[Pwanimate] DocumentViewer initialization failed, falling back to doc card:', err);
+                    docViewer.classList.remove('d-flex');
+                    docViewer.classList.add('d-none');
+                    this.renderDocCard(container, prefix, details);
+                });
+            } else if (docContainer) {
+                this.renderDocCard(container, prefix, details);
             }
 
-            // Footer info
+            // 3. Footer info
             const titleEl = container.querySelector(`#${prefix}Title`);
             const subtitleEl = container.querySelector(`#${prefix}Subtitle`);
             if (titleEl) titleEl.textContent = details.title;
@@ -957,7 +1537,7 @@
                     primaryAction.setAttribute('hx-boost', 'false');
                     primaryAction.removeAttribute('target');
                     primaryAction.onclick = (e) => {
-                        if (mode === 'mobile') {
+                        if (prefix.startsWith('previewSheet') || prefix.startsWith('mobileContext')) {
                             const sheet = document.getElementById('pwanimateResourcePreviewSheet');
                             if (sheet && window.bootstrap) {
                                 const inst = bootstrap.Offcanvas.getInstance(sheet);
@@ -983,7 +1563,55 @@
             }
         }
 
+        renderDocCard(container, prefix, details) {
+            const docContainer = container.querySelector(`#${prefix}DocContainer`);
+            if (!docContainer) return;
+            const docThumbWrapper = container.querySelector(`#${prefix}DocThumbnailWrapper`);
+            const docThumb = container.querySelector(`#${prefix}DocThumbnail`);
+            const docIconWrapper = container.querySelector(`#${prefix}DocIconWrapper`);
+            const docIcon = container.querySelector(`#${prefix}DocIcon`);
+            const docTitle = container.querySelector(`#${prefix}DocTitle`);
+            const docMeta = container.querySelector(`#${prefix}DocMeta`);
+            const docDesc = container.querySelector(`#${prefix}DocDescription`);
+
+            if (details.thumbnailUrl && docThumb && docThumbWrapper) {
+                docThumb.src = details.thumbnailUrl;
+                docThumbWrapper.classList.remove('d-none');
+                if (docIconWrapper) docIconWrapper.classList.add('d-none');
+            } else {
+                if (docThumbWrapper) docThumbWrapper.classList.add('d-none');
+                if (docThumb) docThumb.src = '';
+                if (docIconWrapper) docIconWrapper.classList.remove('d-none');
+            }
+            if (docIcon) docIcon.className = `bi ${details.docIcon}`;
+            if (docTitle) docTitle.textContent = details.title;
+            if (docMeta) docMeta.textContent = details.subtitle;
+            if (docDesc) docDesc.textContent = details.description;
+            docContainer.classList.remove('d-none');
+        }
+
+        inferFileType(url) {
+            if (!url || typeof url !== 'string') return '';
+            const cleanUrl = url.split('?')[0].split('#')[0];
+            const ext = cleanUrl.split('.').pop().toLowerCase();
+            return ext && ext.length <= 5 ? ext : '';
+        }
+
+        populatePreviewCard(container, details, mode) {
+            const prefix = mode === 'desktop' ? 'desktopPreview' : 'previewSheet';
+            this.renderSurface(prefix, details, false);
+        }
+
         closePreview() {
+            // Dismiss active preview card without closing the context rail (transitions State C -> State B)
+            this.activeResourceDetails = null;
+            this.previewResourceState = null;
+
+            if (this.previewDocViewer) {
+                try { this.previewDocViewer.destroy(); } catch (e) {}
+                this.previewDocViewer = null;
+            }
+
             // Desktop
             const emptyState = document.getElementById('desktopPreviewEmpty');
             const activeState = document.getElementById('desktopPreviewActive');
@@ -1002,11 +1630,333 @@
                 this.resetMediaElements(sheet);
             }
 
+            this.updateAddToContextButtons();
+
             // Restore focus
             if (this.lastPreviewTriggerEl && typeof this.lastPreviewTriggerEl.focus === 'function') {
                 this.lastPreviewTriggerEl.focus();
                 this.lastPreviewTriggerEl = null;
             }
+        }
+
+        /* ==========================================================================
+           Phase 1 Workspace Geometry, State & Drag Resizer Implementation
+           ========================================================================== */
+
+        initWorkspaceGeometry() {
+            // 1. Synchronize Left Rail Collapsed State
+            this.syncLeftRailState(this.leftRailCollapsed);
+
+            // 2. Bind Left Rail Toggle Buttons
+            const collapseBtn = document.getElementById('pwanimateLeftRailCollapseBtn');
+            const expandBtn = document.getElementById('pwanimateLeftRailExpandBtn');
+            if (collapseBtn) {
+                collapseBtn.onclick = (e) => {
+                    e.preventDefault();
+                    this.toggleLeftRail(true);
+                };
+            }
+            if (expandBtn) {
+                expandBtn.onclick = (e) => {
+                    e.preventDefault();
+                    this.toggleLeftRail(false);
+                };
+            }
+
+            // 3. Initialize Context Rail Drag Resizer
+            this.initRailResizer();
+
+            // 4. Apply Initial Context Rail State on Desktop
+            if (this.contextRailOpen && window.innerWidth >= 1200) {
+                this.openContextRail();
+            } else {
+                this.closeContextRail();
+            }
+
+            // 6. Bind Responsive Window Resize (dynamic viewport constraint handling)
+            this._onWindowResize = () => {
+                if (this.contextRailOpen && window.innerWidth >= 1200) {
+                    this.updateContextRailWidth(false); // does NOT overwrite savedPreferredWidth
+                }
+                this.syncContextRailUI();
+                if (this.previewDocViewer && typeof this.previewDocViewer.handleResize === 'function') {
+                    this.previewDocViewer.handleResize();
+                }
+                if (this.contextDocViewer && typeof this.contextDocViewer.handleResize === 'function') {
+                    this.contextDocViewer.handleResize();
+                }
+            };
+            window.addEventListener('resize', this._onWindowResize);
+        }
+
+        toggleLeftRail(collapsed) {
+            this.leftRailCollapsed = (collapsed !== undefined) ? collapsed : !this.leftRailCollapsed;
+            try {
+                localStorage.setItem('pwanimate_left_rail_collapsed', this.leftRailCollapsed ? 'true' : 'false');
+            } catch (e) {}
+            this.syncLeftRailState(this.leftRailCollapsed);
+            if (this.contextRailOpen && window.innerWidth >= 1200) {
+                this.updateContextRailWidth(false);
+            }
+        }
+
+        syncLeftRailState(collapsed) {
+            if (collapsed) {
+                document.documentElement.classList.add('pwanimate-left-collapsed');
+                document.body.classList.add('pwanimate-left-collapsed');
+            } else {
+                document.documentElement.classList.remove('pwanimate-left-collapsed');
+                document.body.classList.remove('pwanimate-left-collapsed');
+            }
+        }
+
+        calculateEffectiveContextLimits() {
+            const availableWidth = window.innerWidth;
+            const leftWidth = this.leftRailCollapsed ? 56 : 240;
+            const minCenterWidth = 480;
+            const configuredMax = 650;
+            const configuredMin = 280;
+
+            const effectiveMax = Math.max(configuredMin, Math.min(configuredMax, availableWidth - leftWidth - minCenterWidth));
+            return { min: configuredMin, max: effectiveMax };
+        }
+
+        updateContextRailWidth(saveToStorage = false) {
+            const limits = this.calculateEffectiveContextLimits();
+            this.currentRenderedWidth = Math.max(limits.min, Math.min(this.savedPreferredWidth, limits.max));
+            document.documentElement.style.setProperty('--pwanimate-context-rail-width', `${this.currentRenderedWidth}px`);
+            document.body.style.setProperty('--pwanimate-context-rail-width', `${this.currentRenderedWidth}px`);
+            if (this.resizerEl) {
+                this.resizerEl.setAttribute('aria-valuenow', this.currentRenderedWidth.toString());
+                this.resizerEl.setAttribute('aria-valuemin', limits.min.toString());
+                this.resizerEl.setAttribute('aria-valuemax', limits.max.toString());
+            }
+            if (saveToStorage) {
+                this.savedPreferredWidth = this.currentRenderedWidth;
+                try {
+                    localStorage.setItem('pwanimate_context_rail_width', this.savedPreferredWidth.toString());
+                } catch (e) {}
+            }
+        }
+
+        toggleContextRail(open) {
+            const shouldOpen = (open !== undefined) ? open : !this.contextRailOpen;
+            if (shouldOpen) {
+                this.openContextRail();
+            } else {
+                this.closeContextRail();
+            }
+        }
+
+        openContextRail() {
+            this.contextRailOpen = true;
+            try {
+                localStorage.setItem('pwanimateContextRailOpen', 'true');
+            } catch (e) {}
+            document.documentElement.classList.add('pwanimate-context-rail-open');
+            document.body.classList.add('pwanimate-context-rail-open');
+            this.updateContextRailWidth(false);
+            this.syncContextRailUI();
+
+            if (this.activeWorkspaceTab === 'context') {
+                this.syncContextView();
+            } else {
+                // Restore preview if active details exist (State D -> State C), otherwise show empty state (State B)
+                const emptyState = document.getElementById('desktopPreviewEmpty');
+                const activeState = document.getElementById('desktopPreviewActive');
+                if (emptyState && activeState) {
+                    if (this.previewResourceState || this.activeResourceDetails) {
+                        emptyState.classList.add('d-none');
+                        activeState.classList.remove('d-none');
+                        activeState.classList.add('d-flex');
+                    } else {
+                        activeState.classList.remove('d-flex');
+                        activeState.classList.add('d-none');
+                        emptyState.classList.remove('d-none');
+                    }
+                }
+            }
+        }
+
+        closeContextRail() {
+            this.contextRailOpen = false;
+            try {
+                localStorage.setItem('pwanimateContextRailOpen', 'false');
+            } catch (e) {}
+            document.documentElement.classList.remove('pwanimate-context-rail-open');
+            document.body.classList.remove('pwanimate-context-rail-open');
+            document.documentElement.style.setProperty('--pwanimate-context-rail-width', '0px');
+            document.body.style.setProperty('--pwanimate-context-rail-width', '0px');
+            this.syncContextRailUI();
+
+            // Pause any playing media without clearing active preview or context state (preserves State D)
+            const activeState = document.getElementById('desktopPreviewActive');
+            if (activeState) {
+                const video = activeState.querySelector('video');
+                if (video && !video.paused) {
+                    try { video.pause(); } catch (err) {}
+                }
+            }
+            const contextCard = document.getElementById('desktopContextSurfaceCard');
+            if (contextCard) {
+                const video = contextCard.querySelector('video');
+                if (video && !video.paused) {
+                    try { video.pause(); } catch (err) {}
+                }
+            }
+        }
+
+        syncContextRailUI() {
+            const toggleBtn = document.getElementById('pwanimateContextRailToggleBtn');
+            if (toggleBtn) {
+                toggleBtn.setAttribute('aria-expanded', this.contextRailOpen ? 'true' : 'false');
+                toggleBtn.setAttribute('title', this.contextRailOpen ? 'Close Context Rail' : 'Open Context Rail');
+                const icon = toggleBtn.querySelector('i');
+                if (icon) {
+                    icon.className = this.contextRailOpen ? 'bi bi-layout-sidebar-inset-reverse' : 'bi bi-layout-sidebar-reverse';
+                }
+            }
+        }
+
+        initRailResizer() {
+            if (typeof this._resizerCleanup === 'function') {
+                try { this._resizerCleanup(); } catch (_) {}
+                this._resizerCleanup = null;
+            }
+
+            this.resizerEl = document.getElementById('pwanimateRailResizer');
+            if (!this.resizerEl) return;
+
+            let isDragging = false;
+            let startX = 0;
+            let startWidth = 0;
+
+            const onPointerDown = (e) => {
+                if (e.button !== 0 && e.pointerType === 'mouse') return;
+                isDragging = true;
+                this.isResizing = true;
+                document.body.classList.add('pwanimate-resizing');
+                startX = e.clientX;
+                startWidth = this.currentRenderedWidth || this.savedPreferredWidth;
+
+                const resizerNode = document.getElementById('pwanimateRailResizer') || this.resizerEl;
+                if (resizerNode && typeof resizerNode.setPointerCapture === 'function') {
+                    try {
+                        resizerNode.setPointerCapture(e.pointerId);
+                    } catch (err) {}
+                }
+
+                e.preventDefault();
+            };
+
+            const onPointerMove = (e) => {
+                if (!isDragging) return;
+                const deltaX = startX - e.clientX; // dragging left widens the right rail
+                const targetWidth = startWidth + deltaX;
+                const limits = this.calculateEffectiveContextLimits();
+                const clampedWidth = Math.max(limits.min, Math.min(targetWidth, limits.max));
+
+                if (this.resizeFrame) cancelAnimationFrame(this.resizeFrame);
+                this.resizeFrame = requestAnimationFrame(() => {
+                    this.currentRenderedWidth = clampedWidth;
+                    document.documentElement.style.setProperty('--pwanimate-context-rail-width', `${clampedWidth}px`);
+                    document.body.style.setProperty('--pwanimate-context-rail-width', `${clampedWidth}px`);
+                    const resizerNode = document.getElementById('pwanimateRailResizer');
+                    if (resizerNode) {
+                        resizerNode.setAttribute('aria-valuenow', clampedWidth.toString());
+                    }
+                });
+            };
+
+            const onPointerUp = (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                this.isResizing = false;
+                document.body.classList.remove('pwanimate-resizing');
+
+                const resizerNode = document.getElementById('pwanimateRailResizer') || this.resizerEl;
+                if (resizerNode && typeof resizerNode.releasePointerCapture === 'function') {
+                    try {
+                        resizerNode.releasePointerCapture(e.pointerId);
+                    } catch (err) {}
+                }
+
+                // Commit user-preferred width to savedPreferredWidth and localStorage
+                this.savedPreferredWidth = this.currentRenderedWidth;
+                try {
+                    localStorage.setItem('pwanimate_context_rail_width', this.savedPreferredWidth.toString());
+                } catch (err) {}
+
+                if (this.previewDocViewer && typeof this.previewDocViewer.handleResize === 'function') {
+                    this.previewDocViewer.handleResize();
+                }
+                if (this.contextDocViewer && typeof this.contextDocViewer.handleResize === 'function') {
+                    this.contextDocViewer.handleResize();
+                }
+            };
+
+            const delegatedPointerDown = (e) => {
+                const targetResizer = e.target.closest('#pwanimateRailResizer');
+                if (targetResizer) {
+                    onPointerDown(e);
+                }
+            };
+
+            document.addEventListener('pointerdown', delegatedPointerDown);
+            window.addEventListener('pointermove', onPointerMove);
+            window.addEventListener('pointerup', onPointerUp);
+            window.addEventListener('pointercancel', onPointerUp);
+
+            // Keyboard accessibility for resizer (ArrowLeft, ArrowRight, Home, End)
+            const onKeyDown = (e) => {
+                const targetResizer = e.target.closest('#pwanimateRailResizer');
+                if (!targetResizer || !this.contextRailOpen) return;
+                const limits = this.calculateEffectiveContextLimits();
+                let step = 16;
+                let updated = false;
+
+                if (e.key === 'ArrowLeft') {
+                    this.currentRenderedWidth = Math.min(limits.max, this.currentRenderedWidth + step);
+                    updated = true;
+                } else if (e.key === 'ArrowRight') {
+                    this.currentRenderedWidth = Math.max(limits.min, this.currentRenderedWidth - step);
+                    updated = true;
+                } else if (e.key === 'Home') {
+                    this.currentRenderedWidth = limits.min;
+                    updated = true;
+                } else if (e.key === 'End') {
+                    this.currentRenderedWidth = limits.max;
+                    updated = true;
+                }
+
+                if (updated) {
+                    e.preventDefault();
+                    this.savedPreferredWidth = this.currentRenderedWidth;
+                    document.documentElement.style.setProperty('--pwanimate-context-rail-width', `${this.currentRenderedWidth}px`);
+                    document.body.style.setProperty('--pwanimate-context-rail-width', `${this.currentRenderedWidth}px`);
+                    targetResizer.setAttribute('aria-valuenow', this.currentRenderedWidth.toString());
+                    try {
+                        localStorage.setItem('pwanimate_context_rail_width', this.savedPreferredWidth.toString());
+                    } catch (err) {}
+
+                    if (this.previewDocViewer && typeof this.previewDocViewer.handleResize === 'function') {
+                        this.previewDocViewer.handleResize();
+                    }
+                    if (this.contextDocViewer && typeof this.contextDocViewer.handleResize === 'function') {
+                        this.contextDocViewer.handleResize();
+                    }
+                }
+            };
+            document.addEventListener('keydown', onKeyDown);
+
+            this._resizerCleanup = () => {
+                document.removeEventListener('pointerdown', delegatedPointerDown);
+                window.removeEventListener('pointermove', onPointerMove);
+                window.removeEventListener('pointerup', onPointerUp);
+                window.removeEventListener('pointercancel', onPointerUp);
+                document.removeEventListener('keydown', onKeyDown);
+                document.body.classList.remove('pwanimate-resizing');
+            };
         }
 
         resetMediaElements(container) {
@@ -1028,6 +1978,11 @@
             if (img) { img.src = ''; }
             const docThumb = container.querySelector('.pwanimate-preview-doc-thumbnail-wrapper img');
             if (docThumb) { docThumb.src = ''; }
+            const docViewer = container.querySelector('.pwanimate-surface-viewer-host');
+            if (docViewer && docViewer._resizeObs) {
+                try { docViewer._resizeObs.disconnect(); } catch (e) {}
+                delete docViewer._resizeObs;
+            }
         }
 
         scrollToBottom(smooth = true) {
@@ -1344,11 +2299,47 @@
             typingRows.forEach(r => r.remove());
         }
 
+        /**
+         * Updates all conversation timestamp elements ([data-ts]) in both
+         * desktop and mobile sidebars with live-calculated relative time strings.
+         * Safe to call at any time; skips elements with no/invalid timestamp.
+         */
+        updateTimestamps() {
+            const containers = [
+                this.sidebarList || document.getElementById('pwanimate-sidebar-list'),
+                this.mobileList  || document.getElementById('pwanimate-mobile-list'),
+            ];
+            containers.forEach((container) => {
+                if (!container) return;
+                container.querySelectorAll('time[data-ts]').forEach((el) => {
+                    const rel = formatRelativeTime(el.getAttribute('data-ts'));
+                    if (rel) el.textContent = rel;
+                });
+            });
+        }
+
+        /**
+         * Starts a 60-second interval that keeps all sidebar timestamps current.
+         * Clears any previously running ticker first to avoid duplicates.
+         */
+        startTimestampTicker() {
+            if (this._timestampTicker) {
+                clearInterval(this._timestampTicker);
+            }
+            this._timestampTicker = setInterval(() => {
+                this.updateTimestamps();
+            }, 60000);
+        }
+
         destroy() {
             if (this.isGenerating && this.abortController) {
                 try { this.abortController.abort(); } catch (e) {}
             }
             this.removeTypingIndicator();
+            if (this._timestampTicker) {
+                clearInterval(this._timestampTicker);
+                this._timestampTicker = null;
+            }
             if (this.resizeFrame) {
                 cancelAnimationFrame(this.resizeFrame);
                 this.resizeFrame = null;
@@ -1361,7 +2352,28 @@
                 document.removeEventListener('keydown', this._onKeyDown);
                 this._onKeyDown = null;
             }
+            if (this._onWindowResize) {
+                window.removeEventListener('resize', this._onWindowResize);
+                this._onWindowResize = null;
+            }
+            if (typeof this._resizerCleanup === 'function') {
+                this._resizerCleanup();
+                this._resizerCleanup = null;
+            }
+            if (this.previewDocViewer && typeof this.previewDocViewer.destroy === 'function') {
+                try { this.previewDocViewer.destroy(); } catch (_) {}
+                this.previewDocViewer = null;
+            }
+            if (this.contextDocViewer && typeof this.contextDocViewer.destroy === 'function') {
+                try { this.contextDocViewer.destroy(); } catch (_) {}
+                this.contextDocViewer = null;
+            }
+            document.body.classList.remove('pwanimate-resizing');
+            if (window._activePwanimateChat === this) {
+                window._activePwanimateChat = null;
+            }
         }
+
 
         appendAssistantMessage(answer, sources, citations, fallbackInfo, quotaInfo, people = [], messageId = null) {
             const row = document.createElement('div');
@@ -1395,7 +2407,11 @@
                             data-thumbnail-url="${escapeHtml(src.thumbnail_url || '')}"
                             data-hls-url="${escapeHtml(src.hls_url || '')}"
                             data-author="${escapeHtml(src.author || '')}"
-                            data-citation="${escapeHtml(src.citation || '')}">
+                            data-citation="${escapeHtml(src.citation || '')}"
+                            data-page-number="${escapeHtml(src.page_number || '')}"
+                            data-document-id="${escapeHtml(src.document_id || '')}"
+                            data-document-share-id="${escapeHtml(src.document_share_id || '')}"
+                            data-file-type="${escapeHtml(src.file_type || src.file_extension || '')}">
                             <i class="bi bi-link-45deg"></i>
                             <span>${title}</span>
                         </a>`;
@@ -1718,6 +2734,9 @@
                 html = conversations.map((c) => {
                     const isActive = this.conversationId === c.id ? 'active' : '';
                     const title = escapeHtml(c.title || 'New Conversation');
+                    const ts = c.updated_at || c.created_at || '';
+                    const relTime = ts ? formatRelativeTime(ts) : 'just now';
+                    const tsAttr = ts ? ` data-ts="${escapeHtml(ts)}"` : '';
                     return `
                         <div class="pwanimate-conversation-item ${isActive}"
                              data-id="${c.id}"
@@ -1729,7 +2748,7 @@
                              tabindex="0">
                             <div class="pwanimate-conversation-info">
                                 <div class="pwanimate-conversation-title" title="${title}">${title}</div>
-                                <div class="pwanimate-conversation-time">just now</div>
+                                <div class="pwanimate-conversation-time"><time${tsAttr}>${relTime}</time></div>
                             </div>
                             <button type="button"
                                     class="pwanimate-conversation-delete"
@@ -2125,15 +3144,65 @@
         }
         document.documentElement.classList.add('pwanimate-active');
         document.body.classList.add('pwanimate-active');
-        if (workspace.dataset.initialized === 'true') return;
-        workspace.dataset.initialized = 'true';
+        // Guard against double-init on the *same* workspace node (e.g. DOMContentLoaded
+        // firing alongside an htmx:afterSwap). We intentionally do NOT block re-init
+        // when the workspace element itself has changed (HTMX navigation between conversations),
+        // which is why we compare by reference rather than a data-initialized attribute.
+        if (window._activePwanimateChat && window._activePwanimateChat.workspace === workspace) {
+            window._activePwanimateChat.initWorkspaceGeometry();
+            return;
+        }
         if (window._activePwanimateChat) {
             window._activePwanimateChat.destroy();
+            window._activePwanimateChat = null;
         }
         window._activePwanimateChat = new PwanimateChat(workspace);
     }
 
     window.initPwanimate = initPwanimate;
+
+    window.pwanimateWorkspace = {
+        toggleContextRail: () => {
+            if (window._activePwanimateChat) {
+                window._activePwanimateChat.toggleContextRail();
+            } else {
+                const workspace = document.getElementById('pwanimate-workspace');
+                if (workspace) workspace.classList.toggle('pwanimate-context-open');
+            }
+        },
+        openContextRail: () => {
+            if (window._activePwanimateChat) {
+                window._activePwanimateChat.openContextRail();
+            } else {
+                const workspace = document.getElementById('pwanimate-workspace');
+                if (workspace) workspace.classList.add('pwanimate-context-open');
+            }
+        },
+        closeContextRail: () => {
+            if (window._activePwanimateChat) {
+                window._activePwanimateChat.closeContextRail();
+            } else {
+                const workspace = document.getElementById('pwanimate-workspace');
+                if (workspace) workspace.classList.remove('pwanimate-context-open');
+            }
+        },
+        switchWorkspaceTab: (tab) => {
+            if (window._activePwanimateChat) {
+                window._activePwanimateChat.switchWorkspaceTab(tab);
+            }
+        },
+        toggleLeftRail: (collapse) => {
+            if (window._activePwanimateChat) {
+                window._activePwanimateChat.toggleLeftRail(collapse);
+            } else {
+                const workspace = document.getElementById('pwanimate-workspace');
+                if (workspace) {
+                    if (collapse) workspace.classList.add('pwanimate-left-collapsed');
+                    else workspace.classList.remove('pwanimate-left-collapsed');
+                }
+            }
+        }
+    };
 
     window.handleDeletePwanimateConversation = function (convId) {
         if (!convId) return;
@@ -2270,6 +3339,7 @@
             if (evt.detail && evt.detail.target && evt.detail.target.id === 'page-content-target') {
                 if (window._activePwanimateChat) {
                     window._activePwanimateChat.destroy();
+                    window._activePwanimateChat = null;
                 }
                 cleanupPwanimateModals();
                 if (!evt.detail.xhr || !evt.detail.xhr.responseText.includes('pwanimate-workspace')) {

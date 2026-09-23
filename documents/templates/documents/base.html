@@ -9,6 +9,12 @@
 <div id="document-modal-container"></div>
 {% endblock %}
 
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'vendor/pdfjs/pdf.min.js' %}" defer></script>
+<script src="{% static 'documents/js/document-viewer.js' %}" defer></script>
+{% endblock %}
+
 {% block floating_actions %}
     {% include 'documents/partials/document_floating_actions.html' with oob=False %}
 {% endblock %}

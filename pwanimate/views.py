@@ -100,6 +100,11 @@ class PwanimateUIView(View):
         }
 
         if request.headers.get("HX-Request"):
+            current_url = request.headers.get("HX-Current-URL", "")
+            if current_url and "/pwanimate" not in current_url:
+                response = HttpResponse()
+                response["HX-Redirect"] = request.get_full_path()
+                return response
             return render(request, "pwanimate/partials/chat_navigation_partial.html", context)
         return render(request, "pwanimate/index.html", context)
 

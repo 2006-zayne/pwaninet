@@ -604,6 +604,10 @@ class PwanimateOrchestrator:
                 "hls_url": meta.get("hls_url") or "",
                 "author": author_val,
                 "created_at": str(created_val) if created_val else "",
+                "page_number": meta.get("page_number"),
+                "document_id": meta.get("document_id"),
+                "document_share_id": meta.get("document_share_id") or "",
+                "file_type": meta.get("file_type") or file_ext or "",
             }
 
             if (

@@ -154,11 +154,15 @@ def embed_document_version(
                 exc_info=True
             )
             # Hard failure — mark this batch as failed so it's not silently stuck
+            err_text = str(e)[:250]
             with transaction.atomic():
                 for c in batch:
                     c.embedding_status = 'failed'
                     c.is_active = False
-                DocumentChunk.objects.bulk_update(batch, fields=['embedding_status', 'is_active'])
+                    if c.metadata is None:
+                        c.metadata = {}
+                    c.metadata['last_embedding_error'] = err_text
+                DocumentChunk.objects.bulk_update(batch, fields=['embedding_status', 'is_active', 'metadata'])
             raise self.retry(exc=e)
 
         if len(vectors) != len(batch):
@@ -168,23 +172,38 @@ def embed_document_version(
                 for c in batch:
                     c.embedding_status = 'failed'
                     c.is_active = False
-                DocumentChunk.objects.bulk_update(batch, fields=['embedding_status', 'is_active'])
+                    if c.metadata is None:
+                        c.metadata = {}
+                    c.metadata['last_embedding_error'] = err_msg
+                DocumentChunk.objects.bulk_update(batch, fields=['embedding_status', 'is_active', 'metadata'])
             return {'status': 'failed', 'reason': err_msg}
 
         # Persist vectors and transition lifecycle to completed + active
         with transaction.atomic():
             for chunk, vec in zip(batch, vectors):
-                chunk.embedding = vec
-                chunk.embedding_status = 'completed'
-                chunk.embedding_model = active_model
-                chunk.is_active = True  # Now validated and retrieval-ready
+                if vec is not None and len(vec) == expected_dim:
+                    chunk.embedding = vec
+                    chunk.embedding_status = 'completed'
+                    chunk.embedding_model = active_model
+                    chunk.is_active = True  # Validated and retrieval-ready
+                    if chunk.metadata and 'last_embedding_error' in chunk.metadata:
+                        chunk.metadata.pop('last_embedding_error', None)
+                else:
+                    chunk.embedding = None
+                    chunk.embedding_status = 'failed'
+                    chunk.is_active = False
+                    if chunk.metadata is None:
+                        chunk.metadata = {}
+                    dim_found = len(vec) if vec else 0
+                    chunk.metadata['last_embedding_error'] = f"Vector dimension mismatch: expected {expected_dim}, got {dim_found}"
 
             DocumentChunk.objects.bulk_update(
                 batch,
-                fields=['embedding', 'embedding_status', 'embedding_model', 'is_active']
+                fields=['embedding', 'embedding_status', 'embedding_model', 'is_active', 'metadata']
             )
 
-        total_embedded += len(batch)
+        successful_in_batch = sum(1 for c in batch if c.embedding_status == 'completed')
+        total_embedded += successful_in_batch
 
     logger.info(
         f"[PWANIMATE-EMBEDDINGS] SUCCESS: Embedded and activated {total_embedded} chunks for "

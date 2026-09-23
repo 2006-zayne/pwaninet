@@ -4,6 +4,15 @@
    ========================================================================== */
 
 :root {
+    /* Phase 1 Workspace Layout Contract */
+    --pwanimate-left-rail-width: 240px;
+    --pwanimate-left-rail-collapsed-width: 56px;
+    --pwanimate-current-left-rail-width: 240px;
+    --pwanimate-context-rail-width: 0px;
+    --pwanimate-context-min-width: 280px;
+    --pwanimate-context-max-width: 650px;
+    --pwanimate-center-resting-max: 1050px;
+
     --pwanimate-bg: #f8fafc;
     --pwanimate-sidebar-bg: #ffffff;
     --pwanimate-border: #e2e8f0;
@@ -128,6 +137,93 @@
         border-radius: 0;
         margin-bottom: 0;
     }
+}
+
+/* Left Rail Expanded / Collapsed State Transitions */
+body.pwanimate-left-collapsed,
+html.pwanimate-left-collapsed {
+    --pwanimate-current-left-rail-width: var(--pwanimate-left-rail-collapsed-width);
+}
+
+body.pwanimate-left-collapsed .pwanimate-left-rail-expanded {
+    display: none !important;
+}
+
+body.pwanimate-left-collapsed .pwanimate-left-rail-collapsed {
+    display: flex !important;
+}
+
+body:not(.pwanimate-left-collapsed) .pwanimate-left-rail-expanded {
+    display: flex !important;
+}
+
+body:not(.pwanimate-left-collapsed) .pwanimate-left-rail-collapsed {
+    display: none !important;
+}
+
+.pwanimate-left-rail-collapsed {
+    width: 100%;
+    height: 100%;
+    padding: 0.75rem 0.5rem;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    box-sizing: border-box;
+}
+
+.pwanimate-rail-icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--pwanimate-muted);
+    font-size: 1.15rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s ease-in-out;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.pwanimate-rail-icon-btn:hover {
+    background-color: var(--pwanimate-hover-bg);
+    color: var(--pwanimate-asst-text);
+    border-color: var(--pwanimate-border);
+}
+
+.pwanimate-rail-icon-btn.btn-primary {
+    background-color: var(--primary, #2563eb);
+    color: #ffffff;
+    border-color: var(--primary, #2563eb);
+}
+
+.pwanimate-rail-icon-btn.btn-primary:hover {
+    background-color: #1d4ed8;
+    color: #ffffff;
+}
+
+.pwanimate-collapse-toggle-btn {
+    background: transparent;
+    border: 1px solid var(--pwanimate-border);
+    border-radius: 6px;
+    color: var(--pwanimate-muted);
+    padding: 4px 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pwanimate-collapse-toggle-btn:hover {
+    background-color: var(--pwanimate-hover-bg);
+    color: var(--pwanimate-asst-text);
+    border-color: var(--pwanimate-border);
 }
 
 /* Sidebar (Desktop) */
@@ -365,10 +461,13 @@
     transform: translateY(-1px);
 }
 
-/* Messages */
+/* Messages (Center Resting Maximum & Decoupled Assistant Canvas) */
 .pwanimate-message-row {
     display: flex;
     width: 100%;
+    max-width: var(--pwanimate-center-resting-max, 1050px);
+    margin-left: auto;
+    margin-right: auto;
     margin-bottom: 0.5rem;
 }
 
@@ -380,14 +479,22 @@
     justify-content: flex-start;
 }
 
-.pwanimate-message-content {
-    max-width: 82%;
+/* User Message: Conversational bubble constraint */
+.pwanimate-message-row.user .pwanimate-message-content {
+    max-width: 80%;
+    min-width: 0;
+}
+
+/* Assistant Message: Decoupled to 100% full canvas width */
+.pwanimate-message-row.assistant .pwanimate-message-content {
+    width: 100%;
+    max-width: 100%;
     min-width: 0;
 }
 
 @media (max-width: 767.98px) {
-    .pwanimate-message-content {
-        max-width: 92%;
+    .pwanimate-message-row.user .pwanimate-message-content {
+        max-width: 85%;
         min-width: 0;
     }
 }
@@ -537,6 +644,27 @@
 }
 
 /* Markdown typography inside assistant messages */
+/* Readable measure for normal prose (~70-75ch) */
+.pwanimate-markdown-body > p,
+.pwanimate-markdown-body > ul,
+.pwanimate-markdown-body > ol,
+.pwanimate-markdown-body > h1,
+.pwanimate-markdown-body > h2,
+.pwanimate-markdown-body > h3,
+.pwanimate-markdown-body > h4,
+.pwanimate-markdown-body > blockquote {
+    max-width: 72ch;
+}
+
+/* Image Containment: Never cause horizontal canvas breakout */
+.pwanimate-markdown-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    display: block;
+    margin: 0.75rem 0;
+}
+
 .pwanimate-markdown-body h1,
 .pwanimate-markdown-body h2,
 .pwanimate-markdown-body h3,
@@ -1642,23 +1770,98 @@ body.keyboard-open .pwanimate-composer-wrapper {
 .pwanimate-offcanvas .offcanvas-body::-webkit-scrollbar-thumb:hover {
     background-color: rgba(100, 116, 139, 0.45);
 }
-/* Resizable Right Rail */
+/* Context Rail Drag Resizer & Panel Styles */
+.pwanimate-context-rail-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.pwanimate-context-rail-header {
+    height: 48px;
+    min-height: 48px;
+    max-height: 48px;
+    background-color: var(--pwanimate-sidebar-bg);
+    box-sizing: border-box;
+}
+
+.pwanimate-preview-empty-card,
+.pwanimate-preview-empty-state {
+    background-color: var(--pwanimate-card-bg);
+    border: none;
+    width: 100%;
+    height: 100%;
+}
+
+
+.pwanimate-rail-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -5px;
+    width: 10px;
+    cursor: col-resize;
+    user-select: none;
+    touch-action: none;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pwanimate-rail-resizer::after {
+    content: '';
+    width: 2px;
+    height: 48px;
+    border-radius: 2px;
+    background-color: var(--pwanimate-border);
+    transition: background-color 0.15s, height 0.15s, width 0.15s;
+}
+
+.pwanimate-rail-resizer:hover::after,
+.pwanimate-rail-resizer:focus-visible::after,
+body.pwanimate-resizing .pwanimate-rail-resizer::after {
+    background-color: var(--primary, #2563eb);
+    width: 3px;
+    height: 64px;
+}
+
+.pwanimate-rail-resizer:focus-visible {
+    outline: 2px solid var(--primary, #2563eb);
+    outline-offset: 1px;
+}
+
+body.pwanimate-resizing,
+body.pwanimate-resizing * {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+
+body.pwanimate-resizing iframe,
+body.pwanimate-resizing video {
+    pointer-events: none !important;
+}
+
 .pwanimate-right-rail {
     height: 100%;
+    width: 100%;
+    max-width: 100%;
     overflow-y: auto;
     overflow-x: hidden;
-    resize: horizontal;
-    direction: rtl; /* resize handle on left side */
-    min-width: 250px;
-    max-width: 600px;
-    width: 320px;
-    /* Custom scrollbar for right rail */
+    resize: none;
+    direction: ltr;
     scrollbar-width: thin;
     scrollbar-color: rgba(100, 116, 139, 0.25) transparent;
 }
 
 .pwanimate-right-rail > * {
-    direction: ltr; /* reset content direction */
+    direction: ltr;
 }
 
 .pwanimate-right-rail::-webkit-scrollbar {
@@ -1757,13 +1960,16 @@ body.pwanimate-active .app-shell-layout {
     body.pwanimate-active .desktop-left-rail {
         display: none !important;
     }
+    body.pwanimate-active .desktop-context-rail {
+        display: none !important;
+    }
     body.pwanimate-active .navbar-top .d-lg-none,
     body.pwanimate-active .navbar-top .d-xl-none {
         display: flex !important;
     }
     body.pwanimate-active .desktop-center-panel {
         width: 100% !important;
-        max-width: 800px !important;
+        max-width: 100% !important;
         margin-left: auto !important;
         margin-right: auto !important;
     }
@@ -1788,7 +1994,7 @@ body.pwanimate-active .app-shell-layout {
 @media (min-width: 1200px) {
     body.pwanimate-active .app-shell-layout {
         display: grid !important;
-        grid-template-columns: minmax(250px, 1fr) minmax(0, 800px) minmax(250px, 1fr) !important;
+        grid-template-columns: var(--pwanimate-current-left-rail-width, 240px) minmax(0, 1fr) var(--pwanimate-context-rail-width, 0px) !important;
         width: 100% !important;
         max-width: 100% !important;
         margin: 0 !important;
@@ -1799,6 +2005,15 @@ body.pwanimate-active .app-shell-layout {
         overflow: hidden !important;
         box-sizing: border-box !important;
         gap: 0 !important;
+        transition: grid-template-columns 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body.pwanimate-active.pwanimate-resizing .app-shell-layout,
+    body.pwanimate-active.pwanimate-resizing .desktop-context-rail,
+    body.pwanimate-active.pwanimate-resizing #context-rail-target,
+    body.pwanimate-active.pwanimate-resizing .desktop-left-rail,
+    body.pwanimate-active.pwanimate-resizing .desktop-center-panel {
+        transition: none !important;
     }
 
     /* 1. Left Rail: anchored flush to left viewport wall */
@@ -1806,8 +2021,8 @@ body.pwanimate-active .app-shell-layout {
         display: block !important;
         grid-column: 1 !important;
         justify-self: start !important;
-        width: 240px !important;
-        max-width: 260px !important;
+        width: var(--pwanimate-current-left-rail-width, 240px) !important;
+        max-width: var(--pwanimate-current-left-rail-width, 240px) !important;
         height: 100% !important;
         max-height: 100% !important;
         position: static !important;
@@ -1817,16 +2032,17 @@ body.pwanimate-active .app-shell-layout {
         border-right: 1px solid var(--pwanimate-border);
         background-color: var(--pwanimate-sidebar-bg);
         z-index: 10;
+        transition: width 0.15s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* 2. Center Panel: locked to grid column 2, mathematically centered in viewport */
+    /* 2. Center Panel: locked to grid column 2, fluid full width */
     body.pwanimate-active .desktop-center-panel {
         display: flex !important;
         flex-direction: column !important;
         grid-column: 2 !important;
         width: 100% !important;
-        max-width: 800px !important;
-        justify-self: center !important;
+        max-width: none !important;
+        justify-self: stretch !important;
         height: 100% !important;
         max-height: 100% !important;
         margin: 0 !important;
@@ -1837,21 +2053,55 @@ body.pwanimate-active .app-shell-layout {
         flex: 1 1 auto !important;
     }
 
-    /* 3. Right Rail: anchored flush to right viewport wall */
-    body.pwanimate-active .desktop-context-rail {
-        display: block !important;
+    /* 3. Right Context Rail: anchored flush to right viewport wall */
+    body.pwanimate-active .desktop-context-rail,
+    body.pwanimate-active #context-rail-target {
+        display: none !important;
         grid-column: 3 !important;
         justify-self: end !important;
-        width: auto !important;
+        width: var(--pwanimate-context-rail-width, 0px) !important;
+        max-width: var(--pwanimate-context-rail-width, 0px) !important;
         height: 100% !important;
         max-height: 100% !important;
+        min-height: 100% !important;
         position: static !important;
+        top: 0 !important;
+        bottom: 0 !important;
         margin: 0 !important;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
         padding: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        box-sizing: border-box !important;
         overflow: visible !important;
         border-left: 1px solid var(--pwanimate-border);
         background-color: var(--pwanimate-sidebar-bg);
         z-index: 10;
+        transition: width 0.15s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body.pwanimate-active.pwanimate-context-rail-open .desktop-context-rail,
+    body.pwanimate-active.pwanimate-context-rail-open #context-rail-target {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        min-height: 100% !important;
+        position: static !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        margin: 0 !important;
+        margin-top: 0 !important;
+        padding: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
     }
 }
 
@@ -1905,7 +2155,7 @@ body.pwanimate-active .pwanimate-composer-wrapper {
     position: relative !important;
     z-index: 10 !important;
     width: 100% !important;
-    max-width: 800px !important;
+    max-width: var(--pwanimate-center-resting-max, 1050px) !important;
     margin-left: auto !important;
     margin-right: auto !important;
 }
@@ -1913,12 +2163,18 @@ body.pwanimate-active .pwanimate-composer-wrapper {
 /* Right Rail: isolation and sizing */
 body.pwanimate-active .desktop-context-rail {
     flex: 0 0 auto !important;
-    width: auto !important;
+    width: var(--pwanimate-context-rail-width, 0px) !important;
 }
 
 body.pwanimate-active .pwanimate-right-rail {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
     height: 100% !important;
+    max-height: 100% !important;
+    width: 100% !important;
     max-width: 100% !important;
+    padding: 0 !important;
+    overflow: hidden !important;
 }
 
 /* Scrollbar & Flex Geometry for left rail & mobile offcanvas conversation list */
@@ -1936,14 +2192,103 @@ body.pwanimate-active .pwanimate-right-rail {
 .pwanimate-left-rail-list::-webkit-scrollbar-thumb { background-color: rgba(100, 116, 139, 0.25); border-radius: 10px; }
 .pwanimate-left-rail-list::-webkit-scrollbar-thumb:hover { background-color: rgba(100, 116, 139, 0.45); }
 
-/* Force left rail to not scroll globally so inner chat list can scroll independently */
+/* Force rails to not scroll globally so inner surfaces can scroll independently */
 body.pwanimate-active .desktop-left-rail {
     overflow: hidden !important;
+    margin: 0 !important;
+    margin-top: 0 !important;
+    padding: 0 !important;
+    padding-top: 0 !important;
+    top: 0 !important;
+}
+body.pwanimate-active .desktop-context-rail,
+body.pwanimate-active #context-rail-target {
+    overflow: visible !important;
+    margin: 0 !important;
+    margin-top: 0 !important;
+    padding: 0 !important;
+    padding-top: 0 !important;
+    top: 0 !important;
 }
 body.pwanimate-active .left-rail-inner {
     height: 100% !important;
     max-height: 100% !important;
+    min-height: 100% !important;
     overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    position: static !important;
+    top: 0 !important;
+    margin: 0 !important;
+    margin-top: 0 !important;
+    padding: 0 !important;
+    padding-top: 0 !important;
+}
+body.pwanimate-active .desktop-context-rail .context-rail-inner,
+body.pwanimate-active #context-rail-inner {
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 100% !important;
+    overflow: visible !important;
+    display: flex !important;
+    flex-direction: column !important;
+    position: static !important;
+    top: 0 !important;
+    margin: 0 !important;
+    margin-top: 0 !important;
+    padding: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* Global resizing interactions (suppress selection and iframe event interception) */
+body.pwanimate-resizing,
+body.pwanimate-resizing * {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+body.pwanimate-resizing {
+    cursor: col-resize !important;
+}
+body.pwanimate-resizing iframe,
+body.pwanimate-resizing video,
+body.pwanimate-resizing canvas {
+    pointer-events: none !important;
+}
+
+/* Context rail reopen toggle inside workspace (top-right of chat pane) */
+.pwanimate-context-rail-toggle-wrapper {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.pwanimate-context-rail-toggle-wrapper button {
+    pointer-events: auto;
+    background-color: var(--pwanimate-sidebar-bg);
+    border: 1px solid var(--pwanimate-border);
+    color: var(--pwanimate-muted);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    transition: all 0.15s ease-in-out;
+    display: inline-flex;
+    align-items: center;
+}
+
+.pwanimate-context-rail-toggle-wrapper button:hover {
+    background-color: var(--pwanimate-hover-bg);
+    color: var(--pwanimate-asst-text);
+    border-color: var(--pwanimate-border);
+}
+
+/* Hide workspace toggle when context rail is open */
+body.pwanimate-active.pwanimate-context-rail-open .pwanimate-context-rail-toggle-wrapper,
+body.pwanimate-active.pwanimate-context-rail-open #pwanimateContextRailToggleBtn {
+    display: none !important;
 }
 
 /* Ensure offcanvas backdrop overlays the navbar */
@@ -2690,6 +3035,9 @@ body.pwanimate-active .left-rail-inner {
     flex-direction: column;
     width: 100%;
     height: 100%;
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow: hidden;
 }
 
 .pwanimate-preview-img-container {
@@ -2699,18 +3047,21 @@ body.pwanimate-active .left-rail-inner {
 
 .pwanimate-preview-card {
     background-color: var(--pwanimate-card-bg);
-    border: 1px solid var(--pwanimate-border) !important;
-    border-radius: 16px !important;
-    height: calc(100% - 40px);
+    border: none !important;
+    border-radius: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
     display: flex;
     flex-direction: column;
-    transition: box-shadow 0.2s ease;
+    box-shadow: none !important;
 }
 
 .pwanimate-preview-card-header {
     background-color: var(--pwanimate-bg);
     border-color: var(--pwanimate-border) !important;
-    min-height: 44px;
+    min-height: 40px;
 }
 
 .pwanimate-preview-card-footer {
@@ -2718,10 +3069,14 @@ body.pwanimate-active .left-rail-inner {
     border-color: var(--pwanimate-border) !important;
 }
 
-.pwanimate-preview-empty-card {
+.pwanimate-preview-empty-card,
+.pwanimate-preview-empty-state {
     background-color: var(--pwanimate-card-bg);
-    border: 1px dashed var(--pwanimate-border) !important;
-    border-radius: 16px !important;
+    border: none !important;
+    border-radius: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    width: 100% !important;
 }
 
 .pwanimate-preview-doc-container {
@@ -3122,4 +3477,205 @@ body.pwanimate-active .pwanimate-settings-mobile,
     color: #fca5a5 !important;
     border: 1px solid rgba(239, 68, 68, 0.3) !important;
 }
+
+/* ==========================================================================
+   Phase 2A: Context Workspace Separation & Reusable Document Viewer
+   ========================================================================== */
+
+/* 1. Workspace Tabs */
+.pwanimate-workspace-tab-bar {
+    background-color: var(--pwanimate-bg);
+}
+
+.pwanimate-workspace-tabs {
+    gap: 4px;
+}
+
+.pwanimate-workspace-tabs .nav-link {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--pwanimate-asst-text);
+    border-radius: 8px;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+    opacity: 0.75;
+}
+
+.pwanimate-workspace-tabs .nav-link:hover {
+    opacity: 1;
+    background-color: rgba(37, 99, 235, 0.06);
+    color: var(--pwanimate-primary, #2563eb);
+}
+
+.pwanimate-workspace-tabs .nav-link.active {
+    background-color: var(--pwanimate-primary, #2563eb) !important;
+    color: #ffffff !important;
+    opacity: 1;
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+}
+
+.pwanimate-workspace-tabs .nav-link.active .badge {
+    background-color: #ffffff !important;
+    color: var(--pwanimate-primary, #2563eb) !important;
+}
+
+/* 2. Context Strip & Chips */
+.pwanimate-context-strip-wrapper {
+    overflow: hidden;
+}
+
+.pwanimate-context-chips-list {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    padding-bottom: 2px;
+}
+
+.pwanimate-context-chips-list::-webkit-scrollbar {
+    height: 4px;
+}
+
+.pwanimate-context-chips-list::-webkit-scrollbar-thumb {
+    background-color: var(--pwanimate-border);
+    border-radius: 4px;
+}
+
+.pwanimate-context-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 9999px;
+    background: var(--pwanimate-bubble-user-bg, rgba(37, 99, 235, 0.08));
+    border: 1px solid var(--pwanimate-border);
+    font-size: 0.76rem;
+    color: var(--pwanimate-asst-text);
+    cursor: pointer;
+    white-space: nowrap;
+    max-width: 170px;
+    transition: all 0.15s ease;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.pwanimate-context-chip:hover {
+    border-color: var(--pwanimate-primary, #2563eb);
+}
+
+.pwanimate-context-chip.active {
+    background: var(--pwanimate-primary, #2563eb);
+    color: #ffffff;
+    border-color: var(--pwanimate-primary, #2563eb);
+    font-weight: 500;
+}
+
+.pwanimate-context-chip .pwanimate-chip-title {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pwanimate-context-chip .pwanimate-chip-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    color: inherit;
+    opacity: 0.7;
+    padding: 0;
+    cursor: pointer;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.pwanimate-context-chip .pwanimate-chip-remove:hover {
+    opacity: 1;
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+.pwanimate-context-chip.active .pwanimate-chip-remove:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+}
+
+/* 3. Surface Viewer Host & Integrated DocumentViewer */
+.pwanimate-surface-viewer-host {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: var(--pwanimate-card-bg);
+}
+
+.pwanimate-surface-viewer-host .viewer-toolbar {
+    flex-shrink: 0;
+    border-radius: 0 !important;
+    border-top: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--pwanimate-border) !important;
+    background-color: var(--pwanimate-bg) !important;
+    padding: 4px 8px !important;
+    gap: 4px !important;
+}
+
+.pwanimate-surface-viewer-host .viewer-btn {
+    border-radius: 6px !important;
+    border: 1px solid var(--pwanimate-border) !important;
+    background-color: var(--pwanimate-card-bg) !important;
+    color: var(--pwanimate-asst-text) !important;
+    transition: background-color 0.15s ease;
+}
+
+.pwanimate-surface-viewer-host .viewer-btn:hover {
+    background-color: rgba(37, 99, 235, 0.08) !important;
+    color: var(--pwanimate-primary, #2563eb) !important;
+}
+
+.pwanimate-surface-viewer-host .pdf-viewer-container,
+.pwanimate-surface-viewer-host .docx-viewer-container,
+.pwanimate-surface-viewer-host .text-viewer-container,
+.pwanimate-surface-viewer-host .image-viewer-container {
+    width: 100% !important;
+    height: 100% !important;
+    flex: 1 1 auto !important;
+    overflow: auto !important;
+    min-height: 0 !important;
+    border-radius: 0 !important;
+}
+
+.pwanimate-surface-viewer-host .pdf-viewer-container canvas {
+    max-width: 100% !important;
+    height: auto !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    border-radius: 4px;
+}
+
+.pwanimate-surface-viewer-host .text-viewer-container pre {
+    font-size: 0.78rem !important;
+    padding: 10px !important;
+    margin: 0 !important;
+    color: var(--pwanimate-asst-text) !important;
+    background: transparent !important;
+}
+
+/* 4. Persistent Tab Pane Visibility Rules (Overrides Bootstrap .d-flex) */
+#desktopWorkspaceTabContent > .tab-pane:not(.active),
+#mobileWorkspaceTabContent > .tab-pane:not(.active) {
+    display: none !important;
+}
+
+#desktopWorkspaceTabContent > .tab-pane.active,
+#mobileWorkspaceTabContent > .tab-pane.active {
+    display: flex !important;
+}
+
+
 
