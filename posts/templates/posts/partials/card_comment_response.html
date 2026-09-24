@@ -1,0 +1,6 @@
+{% load i18n %}
+{% if comment %}
+<span id="comment-count-{{ post.share_id }}" hx-swap-oob="true" class="fw-bold">
+    {{ comment_count }}
+</span>
+{% endif %}

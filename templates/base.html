@@ -297,6 +297,293 @@
                 padding-right: 24px;
                 box-sizing: border-box;
             }
+        /* ── Critical Postcard & Engagement Button Pills (Ensures styles always apply on hard reload / first paint) ── */
+        .post-card {
+            background-color: var(--card-bg, #ffffff) !important;
+            border: 1px solid var(--card-border, #e4e6eb) !important;
+            border-radius: 8px !important;
+            overflow: hidden;
+        }
+        .postcard-actions {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            gap: 8px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            padding: 8px 16px !important;
+            background-color: var(--card-bg, #ffffff) !important;
+            border-top: 1px solid var(--card-border-subtle, #e4e6eb) !important;
+        }
+        .postcard-actions > div,
+        .postcard-actions > button,
+        .postcard-actions > a,
+        .postcard-actions > span {
+            flex: 1 1 0px !important;
+            min-width: 0 !important;
+            width: 100% !important;
+            display: flex !important;
+        }
+        .postcard-actions .engagement-button,
+        .engagement-button {
+            width: 100% !important;
+            height: 38px !important;
+            border-radius: 999px !important;
+            background-color: var(--engagement-bg, #e9ecef) !important;
+            color: var(--text-secondary, #65676b) !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 6px !important;
+            padding: 0 4px !important;
+            font-size: 0.875rem !important;
+            font-weight: 600 !important;
+            border: none !important;
+            outline: none !important;
+            white-space: nowrap !important;
+            text-decoration: none !important;
+            user-select: none !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+            line-height: 1 !important;
+            box-sizing: border-box !important;
+        }
+        .postcard-actions .engagement-button:hover,
+        .engagement-button:hover {
+            background-color: var(--engagement-hover, #dee2e6) !important;
+            color: var(--text-primary, #050505) !important;
+            transform: scale(1.02);
+        }
+        .postcard-actions .engagement-button:active,
+        .engagement-button:active {
+            transform: scale(0.98);
+        }
+        .postcard-actions .engagement-button i,
+        .engagement-button i {
+            font-size: 1.1rem !important;
+            line-height: 1 !important;
+            flex-shrink: 0 !important;
+        }
+        .postcard-actions .engagement-button span,
+        .engagement-button span {
+            font-weight: 600 !important;
+            font-size: inherit !important;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        [data-theme="dark"] .postcard-actions {
+            background-color: var(--card-bg, #242526) !important;
+            border-top-color: var(--card-border-subtle, #393a3b) !important;
+        }
+        [data-theme="dark"] .engagement-button {
+            background-color: var(--engagement-bg, #3a3b3c) !important;
+            color: var(--text-primary, #e4e6eb) !important;
+        }
+        [data-theme="dark"] .engagement-button:hover {
+            background-color: var(--engagement-hover, #4e4f50) !important;
+            color: #ffffff !important;
+        }
+        .like-button.text-danger,
+        .like-button.text-danger i {
+            color: #ef4444 !important;
+        }
+        [data-theme="dark"] .like-button.text-danger,
+        [data-theme="dark"] .like-button.text-danger i {
+            color: #ef4444 !important;
+        }
+        @keyframes heartPop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.35); }
+            100% { transform: scale(1); }
+        }
+        .heart-pop {
+            animation: heartPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @media (max-width: 480px) {
+            .postcard-actions {
+                gap: 4px !important;
+                padding: 6px 8px !important;
+            }
+            .postcard-actions .engagement-button,
+            .engagement-button {
+                height: 34px !important;
+                font-size: 0.75rem !important;
+                gap: 3px !important;
+                padding: 0 2px !important;
+            }
+            .postcard-actions .engagement-button i,
+            .engagement-button i {
+                font-size: 0.95rem !important;
+            }
+        }
+
+        /* ── Critical Search Header & Avatar Styles ── */
+        .search-header {
+            position: relative !important;
+            top: auto !important;
+            z-index: 10 !important;
+            background: var(--header-blur-bg, rgba(255, 255, 255, 0.88)) !important;
+            backdrop-filter: blur(14px) !important;
+            -webkit-backdrop-filter: blur(14px) !important;
+            border-bottom: 1px solid var(--border-soft, #e2e8f0) !important;
+            padding: 8px 16px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        [data-theme="dark"] .search-header {
+            background: var(--header-blur-bg, rgba(24, 25, 31, 0.88)) !important;
+            border-bottom-color: var(--border-soft, #3a3b3c) !important;
+        }
+        .search-inner {
+            max-width: 640px;
+            margin: 0 auto;
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        @media (min-width: 992px) {
+            .search-inner { max-width: 100% !important; }
+        }
+        .avatar-link {
+            flex-shrink: 0 !important;
+            display: block !important;
+            position: relative !important;
+        }
+        .avatar-img {
+            width: 38px !important;
+            height: 38px !important;
+            min-width: 38px !important;
+            min-height: 38px !important;
+            max-width: 38px !important;
+            max-height: 38px !important;
+            border-radius: 50% !important;
+            object-fit: cover !important;
+            display: block !important;
+            border: 2px solid #ffffff !important;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12) !important;
+        }
+        [data-theme="dark"] .avatar-img {
+            border-color: #242526 !important;
+        }
+        .search-form {
+            flex: 1 !important;
+            position: relative !important;
+            min-width: 0 !important;
+        }
+        .search-icon {
+            position: absolute !important;
+            left: 14px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            color: var(--text-muted, #64748b) !important;
+            font-size: 15px !important;
+            pointer-events: none !important;
+            z-index: 2 !important;
+        }
+        .search-input {
+            width: 100% !important;
+            background: var(--search-bg, #e9ecef) !important;
+            border: 0 !important;
+            border-radius: 999px !important;
+            padding: 11px 38px 11px 38px !important;
+            font-size: 14px !important;
+            font-weight: 500 !important;
+            color: var(--text-main, #0f172a) !important;
+            outline: none !important;
+            line-height: 1.4 !important;
+            box-sizing: border-box !important;
+        }
+        [data-theme="dark"] .search-input {
+            background: var(--search-bg, #3a3b3c) !important;
+            color: var(--text-main, #e4e6eb) !important;
+        }
+        .search-input:focus {
+            background: var(--search-bg-focus, #ffffff) !important;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
+        }
+        [data-theme="dark"] .search-input:focus {
+            background: var(--search-bg-focus, #4e4f50) !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
+        }
+
+        /* ── Critical Groups to Explore Section Styles ── */
+        .groups-explore-section {
+            margin-bottom: 24px !important;
+            width: 100% !important;
+        }
+        .groups-explore-header {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            margin-bottom: 16px !important;
+        }
+        .groups-explore-title {
+            font-size: 14px !important;
+            font-weight: 700 !important;
+            color: var(--text-muted, #64748b) !important;
+            letter-spacing: 0.5px !important;
+            text-transform: uppercase !important;
+        }
+        [data-theme="dark"] .groups-explore-title {
+            color: var(--text-muted, #e4e6eb) !important;
+        }
+        .groups-explore-link {
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            color: var(--primary, #2563eb) !important;
+            text-decoration: none !important;
+        }
+        .groups-explore-list {
+            display: flex !important;
+            gap: 16px !important;
+            overflow-x: auto !important;
+            padding-bottom: 8px !important;
+            scrollbar-width: none !important;
+            -webkit-overflow-scrolling: touch;
+        }
+        .groups-explore-list::-webkit-scrollbar {
+            display: none !important;
+        }
+        .group-explore-item {
+            flex-shrink: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            gap: 8px !important;
+            width: 70px !important;
+        }
+        .group-explore-avatar {
+            width: 56px !important;
+            height: 56px !important;
+            min-width: 56px !important;
+            min-height: 56px !important;
+            max-width: 56px !important;
+            max-height: 56px !important;
+            border-radius: 50% !important;
+            object-fit: cover !important;
+            border: 2px solid #ffffff !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+            display: block !important;
+        }
+        [data-theme="dark"] .group-explore-avatar {
+            border-color: #3a3b3c !important;
+        }
+        .group-explore-name {
+            font-size: 12px !important;
+            font-weight: 500 !important;
+            color: var(--text-main, #0f172a) !important;
+            text-align: center !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            width: 100% !important;
+            display: block !important;
+        }
+        [data-theme="dark"] .group-explore-name {
+            color: var(--text-main, #e4e6eb) !important;
         }
     </style>
 
@@ -323,8 +610,8 @@
     </script>
 
     <!-- Preload critical CSS -->
-    <link rel="preload" href="{% static 'css/custom.css' %}" as="style">
-    <link rel="preload" href="{% static 'css/postcard.css' %}" as="style">
+    <link rel="preload" href="{% static 'css/custom.css' %}?v={{ app_version }}-{{ app_build }}" as="style">
+    <link rel="preload" href="{% static 'css/postcard.css' %}?v={{ app_version }}-{{ app_build }}" as="style">
     <link rel="preload" href="{% static 'css/bootstrap.min.css' %}" as="style">
     <link rel="preload" href="{% static 'css/bootstrap-icons.css' %}" as="style">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -386,8 +673,8 @@
     <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
-    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
-    <link rel="stylesheet" href="{% static 'css/postcard.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}?v={{ app_version }}-{{ app_build }}">
+    <link rel="stylesheet" href="{% static 'css/postcard.css' %}?v={{ app_version }}-{{ app_build }}">
     <link rel="stylesheet" href="{% static 'css/people-modal.css' %}">
     <link rel="stylesheet" href="{% static 'css/comments.css' %}">
     <link rel="stylesheet" href="{% static 'css/profile.css' %}">
@@ -412,7 +699,7 @@
         // Snapshots keyed by URL persist across deployments unless explicitly cleared.
         (function evictStaleHtmxSnapshots() {
             try {
-                var SW_CSS_VERSION = '1.3.2-2'; // bump this whenever CSS/template structure changes
+                var SW_CSS_VERSION = '{{ app_version }}-{{ app_build }}'; // bound to dynamic app release version
                 var storedVersion = sessionStorage.getItem('htmx_css_version');
                 if (storedVersion !== SW_CSS_VERSION) {
                     // Clear all htmx history entries from localStorage

@@ -13,63 +13,6 @@
 (function() {
     'use strict';
 
-    const MAX_CHARS = 200; // Maximum characters before truncation
-    const TRUNCATION_SUFFIX = '...';
-
-    function truncateWrapper(wrapper) {
-        const fullTextSpan = wrapper.querySelector('.post-content-full');
-        const truncatedSpan = wrapper.querySelector('.post-content-truncated');
-        const seeMoreBtn = wrapper.querySelector('.see-more-btn');
-        
-        if (!fullTextSpan || !truncatedSpan || !seeMoreBtn) return;
-        
-        // Cache original text so re-truncation doesn't lose content
-        if (!wrapper._fullText) {
-            wrapper._fullText = fullTextSpan.textContent.trim();
-        }
-        const fullText = wrapper._fullText;
-        
-        // Only truncate if content is long enough
-        if (fullText.length <= MAX_CHARS) {
-            fullTextSpan.style.display = 'inline';
-            truncatedSpan.style.display = 'none';
-            seeMoreBtn.style.display = 'none';
-            return;
-        }
-        
-        // Create truncated version if not already set
-        if (!truncatedSpan.innerHTML.trim()) {
-            const truncatedText = fullText.substring(0, MAX_CHARS) + TRUNCATION_SUFFIX;
-            truncatedSpan.textContent = truncatedText;
-        }
-        
-        // Respect existing expanded state (or check sessionStorage)
-        const postId = wrapper.dataset.postId;
-        const isSavedExpanded = postId && sessionStorage.getItem(`post-expanded-${postId}`) === 'true';
-        const isCurrentlyExpanded = fullTextSpan.style.display === 'inline' || isSavedExpanded;
-        
-        if (isCurrentlyExpanded) {
-            fullTextSpan.style.display = 'inline';
-            truncatedSpan.style.display = 'none';
-            seeMoreBtn.textContent = 'See less';
-            seeMoreBtn.style.display = 'inline';
-        } else {
-            fullTextSpan.style.display = 'none';
-            truncatedSpan.style.display = 'inline';
-            seeMoreBtn.textContent = 'See more';
-            seeMoreBtn.style.display = 'inline';
-        }
-    }
-
-    function initPostContent(root) {
-        const container = root instanceof Element || root instanceof Document ? root : document;
-        const wrappers = container.querySelectorAll ? container.querySelectorAll('.post-content-wrapper') : [];
-        wrappers.forEach(truncateWrapper);
-        if (container.classList && container.classList.contains('post-content-wrapper')) {
-            truncateWrapper(container);
-        }
-    }
-
     // Single delegated click listener on document handles all current and future see-more-btn clicks
     document.addEventListener('click', function(e) {
         const seeMoreBtn = e.target.closest('.see-more-btn');
@@ -81,55 +24,17 @@
         const wrapper = seeMoreBtn.closest('.post-content-wrapper');
         if (!wrapper) return;
         
-        const fullTextSpan = wrapper.querySelector('.post-content-full');
-        const truncatedSpan = wrapper.querySelector('.post-content-truncated');
-        if (!fullTextSpan || !truncatedSpan) return;
+        const textBody = wrapper.querySelector('.post-text-body');
+        if (!textBody) return;
         
-        const postId = wrapper.dataset.postId;
-        const isCurrentlyExpanded = fullTextSpan.style.display !== 'none';
-        
-        if (isCurrentlyExpanded) {
-            // Collapse
-            fullTextSpan.style.display = 'none';
-            truncatedSpan.style.display = 'inline';
-            seeMoreBtn.textContent = 'See more';
-            if (postId) sessionStorage.setItem(`post-expanded-${postId}`, 'false');
-        } else {
-            // Expand
-            fullTextSpan.style.display = 'inline';
-            truncatedSpan.style.display = 'none';
-            seeMoreBtn.textContent = 'See less';
-            if (postId) sessionStorage.setItem(`post-expanded-${postId}`, 'true');
-        }
-    });
-
-    // Initialize on DOM ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            initPostContent(document);
-        });
-    } else {
-        initPostContent(document);
-    }
-
-    // Re-initialize when new posts are loaded (HTMX) - run synchronously to eliminate layout shifts
-    document.addEventListener('htmx:afterSwap', function(event) {
-        const target = event.detail.target;
-        if (target) {
-            initPostContent(target);
-        }
-    });
-
-    document.addEventListener('htmx:load', function(event) {
-        const elt = event.detail.elt;
-        if (elt) {
-            initPostContent(elt);
-        }
+        const isExpanded = textBody.classList.toggle('is-expanded');
+        seeMoreBtn.textContent = isExpanded ? 'See less' : 'See more';
+        seeMoreBtn.setAttribute('aria-expanded', isExpanded);
     });
 
     // Public API
     window.PwaniNetPostContent = {
-        init: initPostContent
+        init: function() {}
     };
 
 })();

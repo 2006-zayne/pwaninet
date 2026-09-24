@@ -1,8 +1,7 @@
 {% load i18n %}
 {% load static %}
 <!-- HTMX Navigation Partial for Home Page -->
-<link rel="stylesheet" href="{% static 'css/postcard.css' %}">
-
+<div class="container-fluid p-0">
 <style>
   :root, [data-theme="light"] {
     --primary: #2563eb;
@@ -300,8 +299,6 @@
   }
 </style>
 
-<div class="container-fluid p-0">
-
   <!-- Sticky Search Header -->
   <header class="search-header">
     <div class="search-inner">
@@ -315,6 +312,7 @@
 
       <!-- Search Form -->
       <form id="global-search-form"
+            method="GET"
             action="{% url 'search:unified_search' %}"
             hx-get="{% url 'search:unified_search' %}"
             hx-target="#page-content-target"
@@ -542,6 +540,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function handlePostCommentUpdate(data) {
         const shareId = data.share_id;
         if (!shareId) return;
+
+        const commentCountEl = document.getElementById(`comment-count-${shareId}`);
+        if (commentCountEl && data.comment_count !== undefined) {
+            commentCountEl.textContent = data.comment_count;
+        }
 
         const card = document.getElementById(`post-card-${shareId}`);
         if (card) {

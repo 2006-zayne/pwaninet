@@ -9,19 +9,22 @@
 
 :root, [data-theme="light"] {
   --card-bg: #ffffff;
-  --card-border: #e2e8f0;
-  --card-border-subtle: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
-  --hover-bg: #f8fafc;
-  --active-bg: #f1f5f9;
-  --hitbox-min: 44px;
-  --postcard-radius: 0.75rem;
+  --card-border: #e4e6eb;
+  --card-border-subtle: #f0f2f5;
+  --text-primary: #050505;
+  --text-secondary: #65676b;
+  --text-muted: #8a8d91;
+  --hover-bg: #f2f2f2;
+  --active-bg: #e4e6eb;
+  --hitbox-min: 36px;
+  --postcard-radius: 8px;
   --btn-pill-radius: 999px;
-  --engagement-bg: #f1f5f9;
-  --engagement-hover: #e2e8f0;
+  --engagement-bg: #f0f2f5;
+  --engagement-hover: #e4e6eb;
   --gradient-text-color: #ffffff;
+  --fb-blue: #1877f2;
+  --fb-blue-hover: #166fe5;
+  --fb-comment-bg: #f0f2f5;
 }
 
 [data-theme="dark"] {
@@ -31,11 +34,14 @@
   --text-primary: #e4e6eb;
   --text-secondary: #b0b3b8;
   --text-muted: #94a3b8;
-  --hover-bg: #2d2e30;
-  --active-bg: #3a3b3c;
+  --hover-bg: #3a3b3c;
+  --active-bg: #4e4f50;
   --engagement-bg: #3a3b3c;
   --engagement-hover: #4e4f50;
   --gradient-text-color: #ffffff;
+  --fb-blue: #2d88ff;
+  --fb-blue-hover: #1877f2;
+  --fb-comment-bg: #3a3b3c;
 }
 
 /* ==========================================================================
@@ -46,23 +52,21 @@
   background-color: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: var(--postcard-radius);
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.75rem;
   overflow: hidden;
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 0.2s ease,
-              background-color 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
   position: relative;
   width: 100%;
 }
 
 .post-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  /* Facebook cards remain flat to ensure feed scrolling stability */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
 [data-theme="dark"] .post-card:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 @media (max-width: 767px) {
@@ -70,10 +74,7 @@
     border-radius: 0;
     border-left: 0;
     border-right: 0;
-    margin-bottom: 0.25rem;
-  }
-  .post-card:hover {
-    transform: none;
+    margin-bottom: 0.5rem;
     box-shadow: none;
   }
 }
@@ -228,6 +229,15 @@
   overflow: visible;
 }
 
+.fb-text-large {
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--text-primary);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
 /* ==========================================================================
    5. FLEXIBLE GRADIENT CANVAS
    ========================================================================== */
@@ -291,84 +301,260 @@
 }
 
 /* ==========================================================================
-   6. ENGAGEMENT ACTION BAR — Equal-distribution, single-row layout
+   6. FACEBOOK TWO-TIER ENGAGEMENT ARCHITECTURE
    ========================================================================== */
 
-.postcard-actions {
+/* ── Tier 1: Metrics & Interaction Counter Row ── */
+.fb-metrics-row {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.5rem;
-  border-top: 1px solid var(--card-border-subtle);
-  background-color: var(--card-bg);
-  width: 100%;
-  box-sizing: border-box;
+  justify-content: space-between;
+  padding: 8px 16px 6px;
+  font-size: 0.8125rem; /* 13px */
+  color: var(--text-muted);
 }
 
-/* Every direct child of the action bar (buttons + HTMX like wrapper) shares width equally */
-.postcard-actions > .engagement-button,
-.postcard-actions > .engagement-flex-item {
-  flex: 1 1 0px;
-  min-width: 0;
+.fb-reactions-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  user-select: none;
 }
 
-/* Transparent HTMX swap wrapper — passes flex sizing to the button inside it */
-.engagement-flex-item {
-  display: flex;
-  align-items: stretch;
-  flex: 1 1 0px;
-  min-width: 0;
+.fb-reactions-cluster:hover .fb-reaction-count {
+  text-decoration: underline;
 }
 
-.engagement-flex-item > .engagement-button {
-  flex: 1 1 0px;
-  width: 100%;
-  min-width: 0;
-}
-
-/* Engagement Pill Buttons */
-.engagement-button {
-  background-color: var(--engagement-bg);
-  color: var(--text-secondary);
-  border-radius: 999px;
-  min-height: 2.25rem;
-  padding: 0 0.625rem;
+.fb-reaction-pill {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.375rem;
-  font-size: clamp(0.75rem, 2.2vw, 0.8125rem);
-  font-weight: 600;
-  border: none;
-  text-decoration: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 9px;
+  color: #ffffff;
+  border: 1.5px solid var(--card-bg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.fb-pill-like {
+  background: linear-gradient(135deg, #1877f2 0%, #0d6efd 100%);
+  z-index: 2;
+}
+
+.fb-pill-love {
+  background: linear-gradient(135deg, #fa3e3e 0%, #e41e3f 100%);
+  margin-left: -5px;
+  z-index: 1;
+}
+
+.fb-reaction-count {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.fb-counts-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.fb-counts-link {
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: background-color 0.15s ease, transform 0.1s ease, color 0.15s ease;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.engagement-button:hover {
-  background-color: var(--engagement-hover);
-  color: var(--text-primary);
   text-decoration: none;
+  transition: color 0.15s ease;
 }
 
-.engagement-button:active {
-  transform: scale(0.97);
+.fb-counts-link:hover {
+  text-decoration: underline;
+  color: var(--text-primary);
 }
 
-/* Icons scale in lockstep with button font-size */
-.engagement-button i,
-.engagement-button svg {
-  font-size: 1.15em;
+/* ── Tier 2: Facebook Action Buttons Bar ── */
+.fb-action-buttons {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 4px 8px;
+  border-top: 1px solid var(--card-border-subtle);
+  border-bottom: 1px solid var(--card-border-subtle);
+  margin: 0 8px;
+  gap: 4px;
+}
+
+.fb-action-btn {
+  flex: 1 1 0px !important;
+  min-width: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px;
+  height: 36px !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  color: var(--text-secondary);
+  font-size: 0.875rem !important; /* 14px */
+  font-weight: 600 !important;
+  cursor: pointer;
+  text-decoration: none !important;
+  padding: 0 4px !important;
+  user-select: none;
+  box-shadow: none !important;
+  outline: none !important;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.fb-action-btn:hover {
+  background-color: var(--hover-bg) !important;
+  color: var(--text-primary) !important;
+  text-decoration: none !important;
+}
+
+.fb-action-btn:active {
+  transform: scale(0.98);
+}
+
+.fb-action-btn:focus,
+.fb-action-btn:focus-visible {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.fb-action-btn.active,
+.fb-action-btn.text-primary,
+.like-button.active {
+  color: var(--fb-blue) !important;
+}
+
+.fb-action-btn.active i,
+.like-button.active i {
+  color: var(--fb-blue) !important;
+}
+
+.fb-action-btn i {
+  font-size: 1.15rem;
   flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .fb-action-btn {
+    font-size: 0.8125rem !important;
+    gap: 4px;
+    padding: 0 2px !important;
+  }
+  .fb-action-btn i {
+    font-size: 1rem;
+  }
+}
+
+/* Postcard Actions & Equal Pill Distribution */
+.postcard-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 8px 16px !important;
+  background-color: var(--card-bg, #ffffff) !important;
+  border-top: 1px solid var(--card-border-subtle, #e4e6eb) !important;
+}
+
+.postcard-actions > div,
+.postcard-actions > button,
+.postcard-actions > a,
+.postcard-actions > span {
+  flex: 1 1 0px !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  display: flex !important;
+}
+
+.postcard-actions .engagement-button,
+.engagement-button {
+  width: 100% !important;
+  height: 38px !important;
+  border-radius: 999px !important;
+  background-color: var(--engagement-bg, #e9ecef) !important;
+  color: var(--text-secondary, #65676b) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 0 4px !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  border: none !important;
+  outline: none !important;
+  white-space: nowrap !important;
+  text-decoration: none !important;
+  user-select: none !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
+}
+
+.postcard-actions .engagement-button:hover,
+.engagement-button:hover {
+  background-color: var(--engagement-hover, #dee2e6) !important;
+  color: var(--text-primary, #050505) !important;
+  transform: scale(1.02);
+}
+
+.postcard-actions .engagement-button:active,
+.engagement-button:active {
+  transform: scale(0.98);
+}
+
+.postcard-actions .engagement-button i,
+.engagement-button i {
+  font-size: 1.1rem !important;
+  line-height: 1 !important;
+  flex-shrink: 0 !important;
+}
+
+.postcard-actions .engagement-button span,
+.engagement-button span {
+  font-weight: 600 !important;
+  font-size: inherit !important;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .postcard-actions {
+  background-color: var(--card-bg, #242526) !important;
+  border-top-color: var(--card-border-subtle, #393a3b) !important;
+}
+
+[data-theme="dark"] .engagement-button {
+  background-color: var(--engagement-bg, #3a3b3c) !important;
+  color: var(--text-primary, #e4e6eb) !important;
+}
+
+[data-theme="dark"] .engagement-button:hover {
+  background-color: var(--engagement-hover, #4e4f50) !important;
+  color: #ffffff !important;
 }
 
 .like-button.text-danger,
 .like-button.text-danger i {
+  color: #ef4444 !important;
+}
+
+[data-theme="dark"] .like-button.text-danger,
+[data-theme="dark"] .like-button.text-danger i {
   color: #ef4444 !important;
 }
 
@@ -382,56 +568,163 @@
   animation: heartPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-/* Tighten padding on tiny screens (<=360px) — flex: 1 keeps buttons in one row */
-@media (max-width: 360px) {
+@media (max-width: 480px) {
   .postcard-actions {
-    padding: 0.25rem 0.25rem;
-    gap: 0.125rem;
+    gap: 4px !important;
+    padding: 6px 8px !important;
   }
+  .postcard-actions .engagement-button,
   .engagement-button {
-    padding: 0 0.25rem;
-    min-height: 2rem;
+    height: 34px !important;
+    font-size: 0.75rem !important;
+    gap: 3px !important;
+    padding: 0 2px !important;
+  }
+  .postcard-actions .engagement-button i,
+  .engagement-button i {
+    font-size: 0.95rem !important;
   }
 }
 
 /* ==========================================================================
-   7. PERSISTENT INLINE COMMENT BAR
+   7. IN-FEED COMMENTS & FEEDBACK STREAM (FACEBOOK STYLE)
    ========================================================================== */
 
+.fb-card-comments-wrap {
+  background-color: var(--card-bg);
+  padding: 8px 16px 12px;
+}
+
+.fb-view-more-comments {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fb-view-more-comments:hover {
+  text-decoration: underline;
+  color: var(--text-primary);
+}
+
+.card-comments-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.fb-comment-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  animation: fadeInDown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.fb-comment-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.fb-comment-bubble {
+  background-color: var(--fb-comment-bg);
+  border-radius: 18px;
+  padding: 8px 14px;
+  display: inline-block;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.fb-comment-author-name {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: block;
+  line-height: 1.25;
+  margin-bottom: 2px;
+}
+
+.fb-comment-author-name:hover {
+  text-decoration: underline;
+}
+
+.fb-comment-text {
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.fb-comment-meta {
+  font-size: 0.6875rem; /* 11px */
+  color: var(--text-muted);
+}
+
+.fb-comment-act-btn {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.fb-comment-act-btn:hover {
+  text-decoration: underline;
+  color: var(--text-primary);
+}
+
+/* ── Inline Comment Input Bar ── */
+.fb-comment-input-box {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.fb-comment-input-box .form-control {
+  background-color: var(--fb-comment-bg) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid transparent !important;
+  font-size: 0.8125rem !important;
+  border-radius: 20px !important;
+  padding: 7px 38px 7px 14px !important;
+  height: 36px !important;
+  transition: all 0.2s ease;
+}
+
+.fb-comment-input-box .form-control:focus {
+  background-color: var(--card-bg) !important;
+  border-color: var(--fb-blue) !important;
+  box-shadow: 0 0 0 2px rgba(24, 119, 242, 0.2) !important;
+}
+
+.fb-comment-input-box .form-control::placeholder {
+  color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .fb-comment-input-box .form-control {
+  background-color: #3a3b3c !important;
+  color: #e4e6eb !important;
+}
+
+[data-theme="dark"] .fb-comment-input-box .form-control:focus {
+  background-color: #242526 !important;
+  border-color: var(--fb-blue) !important;
+}
+
+/* Legacy input bar compatibility */
 .postcard-comment-bar {
   padding: 0.375rem 0.75rem 0.5rem;
   border-top: 1px solid var(--card-border-subtle);
   background-color: var(--card-bg);
 }
 
-.postcard-comment-bar input.form-control {
-  background-color: var(--engagement-bg, #f1f5f9) !important;
-  color: var(--text-primary, #0f172a);
-  border: 1px solid transparent;
-  transition: all 0.2s ease;
-}
-
-.postcard-comment-bar input.form-control:focus {
-  background-color: #ffffff !important;
-  border-color: var(--primary, #0d6efd) !important;
-  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15) !important;
-}
-
-[data-theme="dark"] .postcard-comment-bar input.form-control {
-  background-color: rgba(255, 255, 255, 0.08) !important;
-  color: #f8fafc;
-}
-
-[data-theme="dark"] .postcard-comment-bar input.form-control:focus {
-  background-color: rgba(255, 255, 255, 0.14) !important;
-  border-color: var(--primary, #3b82f6) !important;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
-}
-
 @keyframes fadeInDown {
   from {
     opacity: 0;
-    transform: translateY(-6px);
+    transform: translateY(-4px);
   }
   to {
     opacity: 1;
@@ -511,6 +804,106 @@
   height: 100%;
   object-fit: contain;       /* show the full image, never crop */
   display: block;
+}
+
+/* ── Facebook Adaptive Image Collages ── */
+.fb-image-collage {
+  display: grid;
+  gap: 2px;
+  background-color: var(--card-border-subtle);
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.fb-collage-1 {
+  display: block;
+  max-height: 550px;
+  background-color: #000000;
+}
+
+.fb-collage-1 img {
+  width: 100%;
+  max-height: 550px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+
+.fb-collage-2 {
+  grid-template-columns: 1fr 1fr;
+  aspect-ratio: 2 / 1;
+  max-height: 440px;
+}
+
+.fb-collage-3 {
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  aspect-ratio: 3 / 2;
+  max-height: 460px;
+}
+
+.fb-collage-3 .collage-item-1 {
+  grid-row: span 2;
+}
+
+.fb-collage-4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  aspect-ratio: 1 / 1;
+  max-height: 480px;
+}
+
+.fb-collage-5 {
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: 1.4fr 1fr;
+  aspect-ratio: 4 / 3;
+  max-height: 480px;
+}
+
+.fb-collage-5 .collage-item-1,
+.fb-collage-5 .collage-item-2 {
+  grid-column: span 3;
+}
+
+.fb-collage-5 .collage-item-3,
+.fb-collage-5 .collage-item-4,
+.fb-collage-5 .collage-item-5 {
+  grid-column: span 2;
+}
+
+.fb-collage-item {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  background-color: #000000;
+}
+
+.fb-collage-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.2s ease;
+}
+
+.fb-collage-item:hover img {
+  transform: scale(1.02);
+}
+
+.fb-more-photos-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 1.75rem;
+  font-weight: 700;
+  z-index: 2;
+  pointer-events: none;
 }
 
 /* ==========================================================================

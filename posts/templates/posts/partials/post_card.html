@@ -3,131 +3,66 @@
 {% if post.is_reel and not is_detail %}
     {% include "posts/partials/reel_card.html" with post=post %}
 {% else %}
-<style>
-.post-card {
-  margin-bottom: 0.25rem !important;
-}
-.engagement-button {
-  background-color: #f1f5f9 !important;
-  color: #475569 !important;
-  border-radius: 999px !important;
-  height: 38px !important;
-  min-height: 38px !important;
-  padding: 0 14px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 6px !important;
-  font-size: 0.8125rem !important;
-  font-weight: 600 !important;
-  border: none !important;
-  text-decoration: none !important;
-  transition: all 0.15s ease !important;
-}
-.engagement-button:hover {
-  background-color: #e2e8f0 !important;
-  color: #0f172a !important;
-}
-[data-theme="dark"] .engagement-button {
-  background-color: #3a3b3c !important;
-  color: #e4e6eb !important;
-}
-[data-theme="dark"] .engagement-button:hover {
-  background-color: #4e4f50 !important;
-  color: #ffffff !important;
-}
-</style>
-<div id="post-card-{{ post.share_id }}" class="post-card mb-1 shadow-sm bg-white rounded-3 overflow-hidden border-0">
+<div id="post-card-{{ post.share_id }}" class="post-card fb-post-card mb-3 bg-white rounded-3 overflow-hidden border">
     {% if post.repost_of %}
-    <!-- Repost Header -->
-    <div class="d-flex align-items-center p-2 border-bottom bg-light">
-        <div class="position-relative me-3 flex-shrink-0" style="width: 120px; height: 72px;">
-            <a href="{% url 'users:profile' post.author.username %}"
-               hx-get="{% url 'users:profile' post.author.username %}"
-               hx-target="#page-content-target"
-               hx-swap="innerHTML"
-               hx-push-url="true"
-               hx-history="true">
-                <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm position-absolute" style="width: 72px; height: 72px; object-fit: cover; left: 0; top: 0;" alt="{{ post.author.username }}">
-            </a>
-            <a href="{% url 'users:profile' post.repost_of.author.username %}"
-               hx-get="{% url 'users:profile' post.repost_of.author.username %}"
-               hx-target="#page-content-target"
-               hx-swap="innerHTML"
-               hx-push-url="true"
-               hx-history="true">
-                <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm position-absolute" style="width: 72px; height: 72px; object-fit: cover; left: 48px; top: 0;" alt="{{ post.repost_of.author.username }}">
-            </a>
-        </div>
-        <div class="d-flex align-items-center flex-grow-1 min-w-0" style="min-width: 0;">
-            <div class="min-w-0" style="min-width: 0;">
-                <small class="fw-bold text-dark text-truncate d-block">{{ post.author.get_full_name|default:post.author.username }}</small>
-                <div class="d-flex align-items-center text-truncate" style="font-size: 11px;">
-                    <i class="bi bi-repeat text-primary me-1"></i>
-                    <span class="text-muted">reposted</span>
-                    <i class="bi bi-dot mx-1"></i>
-                    <span class="text-muted">{{ post.created_at|timesince }} ago</span>
-                </div>
-            </div>
-        </div>
+    <!-- Facebook Style Repost Header -->
+    <div class="fb-repost-banner d-flex align-items-center px-3 pt-2 pb-1 text-muted" style="font-size: 13px;">
+        <i class="bi bi-repeat me-2 text-primary fs-6"></i>
+        <a href="{% url 'users:profile' post.author.username %}"
+           hx-get="{% url 'users:profile' post.author.username %}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-history="true"
+           class="fw-semibold text-dark text-decoration-none fb-reposter-link">
+            {{ post.author.get_full_name|default:post.author.username }}
+        </a>
+        <span class="ms-1">{% trans "reposted this" %}</span>
+        <span class="mx-1">&middot;</span>
+        <span class="text-muted" style="font-size: 11px;">{{ post.created_at|timesince }} ago</span>
     </div>
     {% endif %}
 
-    <div class="post-card-header d-flex align-items-center p-3">
-        <div class="position-relative me-3 flex-shrink-0" style="width: 72px; height: 72px;">
+    <div class="post-card-header d-flex align-items-center px-3 pt-3 pb-2">
+        <!-- Facebook Style 40px Compact Avatar -->
+        <div class="fb-avatar-container position-relative flex-shrink-0 me-2" style="width: 40px; height: 40px;">
             {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
                 <a href="{% url 'groups:groups_detail' post.group.id %}"
                    hx-get="{% url 'groups:groups_detail' post.group.id %}"
                    hx-target="#page-content-target"
                    hx-swap="innerHTML"
                    hx-push-url="true"
-                   hx-history="true">
-                    <img src="{{ post.group.get_photo_url }}" class="rounded-circle border border-2 border-white shadow-sm" style="width: 72px; height: 72px; object-fit: cover;" alt="{{ post.group.name }}">
+                   hx-history="true"
+                   class="d-block w-100 h-100">
+                    <img src="{{ post.group.get_photo_url }}" class="rounded-circle border" style="width: 40px; height: 40px; object-fit: cover;" alt="{{ post.group.name }}">
                 </a>
-                {% if post.repost_of %}
-                    <a href="{% url 'users:profile' post.repost_of.author.username %}"
-                       hx-get="{% url 'users:profile' post.repost_of.author.username %}"
-                       hx-target="#page-content-target"
-                       hx-swap="innerHTML"
-                       hx-push-url="true"
-                       hx-history="true">
-                        <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 36px; height: 36px; object-fit: cover; transform: translate(15%, 15%);" alt="{{ post.repost_of.author.username }}">
-                    </a>
-                {% else %}
-                    <a href="{% url 'users:profile' post.author.username %}"
-                       hx-get="{% url 'users:profile' post.author.username %}"
-                       hx-target="#page-content-target"
-                       hx-swap="innerHTML"
-                       hx-push-url="true"
-                       hx-history="true">
-                        <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 36px; height: 36px; object-fit: cover; transform: translate(15%, 15%);" alt="{{ post.author.username }}">
-                    </a>
-                {% endif %}
+                {% with author_pic=post.repost_of.author.profile_pic.url|default:post.author.profile_pic.url %}
+                <a href="{% url 'users:profile' post.author.username %}"
+                   hx-get="{% url 'users:profile' post.author.username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
+                    <img src="{{ author_pic }}" class="rounded-circle position-absolute bottom-0 end-0 border border-2" style="width: 22px; height: 22px; object-fit: cover; border-color: var(--card-bg, #fff) !important; transform: translate(15%, 15%);" alt="{{ post.author.username }}">
+                </a>
+                {% endwith %}
             {% else %}
-                {% if post.repost_of %}
-                    <a href="{% url 'users:profile' post.repost_of.author.username %}"
-                       hx-get="{% url 'users:profile' post.repost_of.author.username %}"
-                       hx-target="#page-content-target"
-                       hx-swap="innerHTML"
-                       hx-push-url="true"
-                       hx-history="true">
-                        <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 72px; height: 72px; object-fit: cover;" alt="{{ post.repost_of.author.username }}">
-                    </a>
-                {% else %}
-                    <a href="{% url 'users:profile' post.author.username %}"
-                       hx-get="{% url 'users:profile' post.author.username %}"
-                       hx-target="#page-content-target"
-                       hx-swap="innerHTML"
-                       hx-push-url="true"
-                       hx-history="true">
-                        <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 72px; height: 72px; object-fit: cover;" alt="{{ post.author.username }}">
-                    </a>
-                {% endif %}
+                {% with header_author=post.repost_of.author|default:post.author %}
+                <a href="{% url 'users:profile' header_author.username %}"
+                   hx-get="{% url 'users:profile' header_author.username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
+                   class="d-block w-100 h-100">
+                    <img src="{{ header_author.profile_pic.url|default:'/static/images/default-avatar.png' }}" class="rounded-circle border" style="width: 40px; height: 40px; object-fit: cover;" alt="{{ header_author.username }}">
+                </a>
+                {% endwith %}
             {% endif %}
         </div>
 
-        <div class="post-header-meta flex-grow-1 min-w-0" style="min-width: 0;">
-            <h6 class="mb-0 fw-bold small text-truncate" style="min-width: 0;">
+        <div class="fb-header-meta flex-grow-1 min-w-0" style="min-width: 0;">
+            <div class="fb-author-row text-truncate" style="line-height: 1.25;">
                 {% if post.repost_of %}
                     <a href="{% url 'users:profile' post.repost_of.author.username %}"
                        hx-get="{% url 'users:profile' post.repost_of.author.username %}"
@@ -135,7 +70,7 @@
                        hx-swap="innerHTML"
                        hx-push-url="true"
                        hx-history="true"
-                       class="text-dark text-decoration-none text-truncate d-inline-block mw-100 align-bottom">
+                       class="fb-author-name fw-semibold text-dark text-decoration-none">
                         {{ post.repost_of.author.get_full_name|default:post.repost_of.author.username }}
                     </a>
                 {% else %}
@@ -145,24 +80,24 @@
                        hx-swap="innerHTML"
                        hx-push-url="true"
                        hx-history="true"
-                       class="text-dark text-decoration-none text-truncate d-inline-block mw-100 align-bottom">
+                       class="fb-author-name fw-semibold text-dark text-decoration-none">
                         {{ post.author.get_full_name|default:post.author.username }}
                     </a>
                 {% endif %}
                 {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
-                    <span class="text-muted fw-normal mx-1">posted in</span>
+                    <span class="fb-context-arrow mx-1 text-muted" style="font-size: 11px;">&blacktriangleright;</span>
                     <a href="{% url 'groups:groups_detail' post.group.id %}"
                        hx-get="{% url 'groups:groups_detail' post.group.id %}"
                        hx-target="#page-content-target"
                        hx-swap="innerHTML"
                        hx-push-url="true"
                        hx-history="true"
-                       class="text-primary text-decoration-none text-truncate d-inline-block mw-100 align-bottom">{{ post.group.name }}</a>
+                       class="fb-group-name fw-semibold text-primary text-decoration-none">{{ post.group.name }}</a>
                 {% endif %}
-            </h6>
-            <div class="post-header-subtitle text-muted d-flex align-items-center text-truncate" style="font-size: 11px;">
+            </div>
+            <div class="fb-sub-meta text-muted d-flex align-items-center text-truncate mt-1" style="font-size: 12px; line-height: 1;">
                 {% if post.unit.code %}
-                    <span class="badge bg-light text-primary border-0 me-1">{{ post.unit.code }}</span>
+                    <span class="badge bg-light text-primary border-0 me-1 py-0 px-1" style="font-size: 10px;">{{ post.unit.code }}</span>
                     <span class="mx-1">&middot;</span>
                 {% endif %}
                 <span>{% if post.repost_of %}{{ post.repost_of.created_at|timesince }}{% else %}{{ post.created_at|timesince }}{% endif %} ago</span>
@@ -172,17 +107,17 @@
         </div>
 
         <div class="dropdown flex-shrink-0 ms-2">
-            <button class="btn btn-ghost btn-icon-hitbox rounded-circle text-muted"
+            <button class="btn btn-ghost btn-icon-hitbox rounded-circle text-muted fb-more-btn"
                     data-bs-toggle="dropdown"
                     aria-expanded="false"
                     aria-label="{% trans 'Post options' %}">
                 <i class="bi bi-three-dots fs-5"></i>
             </button>
-            <ul class="dropdown-menu dropdown-menu-end shadow">
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                 <li>
                     <button class="dropdown-item d-flex align-items-center gap-2"
                             data-bs-toggle="modal" data-bs-target="#globalRepostModal" data-post-id="{{ post.share_id }}">
-                        <i class="bi bi-repeat"></i> Repost
+                        <i class="bi bi-repeat"></i> {% trans "Repost" %}
                     </button>
                 </li>
                 <li>
@@ -190,7 +125,7 @@
                             hx-post="/api/posts/{{ post.share_id }}/hide/"
                             hx-target="#post-card-{{ post.share_id }}"
                             hx-swap="outerHTML">
-                        <i class="bi bi-eye-slash"></i> Hide post
+                        <i class="bi bi-eye-slash"></i> {% trans "Hide post" %}
                     </button>
                 </li>
                 <li>
@@ -199,7 +134,7 @@
                             hx-vals='{"author": {{ post.author.id }}, "preference": "less"}'
                             hx-target="body"
                             hx-swap="none">
-                        <i class="bi bi-person-dash"></i> See less from {{ post.author.username }}
+                        <i class="bi bi-person-dash"></i> {% trans "See less from" %} {{ post.author.username }}
                     </button>
                 </li>
                 <li>
@@ -208,11 +143,10 @@
                         <i class="bi bi-share"></i> {% trans "Share to profile" %}
                     </button>
                 </li>
-                
                 <li>
                     <button class="dropdown-item d-flex align-items-center gap-2"
                             onclick="copyLinkToClipboard(window.location.origin + '{% url 'posts:post_details' post.share_id %}')">
-                        <i class="bi bi-link-45deg"></i> Copy Link
+                        <i class="bi bi-link-45deg"></i> {% trans "Copy Link" %}
                     </button>
                 </li>
                 <li>
@@ -275,7 +209,7 @@
         </div>
     </div>
         {% else %}
-    <div class="px-3 pb-3">
+    <div class="px-3 pb-2">
         {% include "posts/partials/post_content.html" %}
     </div>
         {% endif %}
@@ -303,13 +237,28 @@
     {% endif %}
 
     {% if post.images.exists %}
-    <div class="post-media-wrapper post-media border-top border-bottom bg-light position-relative" data-post-id="{{ post.share_id }}" data-media-type="image">
+    <!-- Facebook Style Adaptive Image Collage -->
+    <div class="post-media-wrapper post-media position-relative" data-post-id="{{ post.share_id }}" data-media-type="image">
         <button class="media-download-btn" data-post-id="{{ post.share_id }}" data-media-type="image" data-url="{{ post.images.first.image.url }}" data-thumbnail="{% if post.images.first.get_thumbnail_url %}{{ post.images.first.get_thumbnail_url }}{% elif post.images.first.image %}{{ post.images.first.image.url }}{% endif %}" title="Download">
             <i class="bi bi-download"></i>
         </button>
-        <div class="image-grid-{{ post.share_id }}" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px; max-height: 400px;">
-            {% for post_image in post.images.all|slice:":3" %}
-                <div class="image-grid-item position-relative overflow-hidden" style="{% if forloop.counter == 1 %}grid-column: span 2; grid-row: span 2; aspect-ratio: 2/1;{% elif forloop.counter == 2 %}aspect-ratio: 1/1;{% else %}aspect-ratio: 1/1;{% endif %}">
+        {% with img_count=post.images.count %}
+            {% if img_count == 1 %}
+            <div class="fb-image-collage fb-collage-1">
+                <a href="{% url 'posts:post_details' post.share_id %}"
+                   hx-get="{% url 'posts:post_details' post.share_id %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
+                   class="d-block w-100 text-decoration-none">
+                    <img src="{{ post.images.first.image.url }}" loading="lazy" class="w-100" style="max-height: 550px; object-fit: contain; background: #000;" alt="Post image">
+                </a>
+            </div>
+            {% elif img_count == 2 %}
+            <div class="fb-image-collage fb-collage-2">
+                {% for post_image in post.images.all %}
+                <div class="fb-collage-item">
                     <a href="{% url 'posts:post_details' post.share_id %}"
                        hx-get="{% url 'posts:post_details' post.share_id %}"
                        hx-target="#page-content-target"
@@ -317,16 +266,67 @@
                        hx-push-url="true"
                        hx-history="true"
                        class="d-block w-100 h-100 text-decoration-none">
-                        <img src="{{ post_image.get_thumbnail_url }}" loading="lazy" class="w-100 h-100" style="object-fit: cover;" alt="Post image">
-                        {% if forloop.last and post.images.count > 3 %}
-                            <div class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background: rgba(0,0,0,0.5);">
-                                <span class="text-white fw-bold fs-4">+{{ post.images.count|add:"-3" }}</span>
-                            </div>
+                        <img src="{{ post_image.get_thumbnail_url }}" loading="lazy" alt="Post image">
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+            {% elif img_count == 3 %}
+            <div class="fb-image-collage fb-collage-3">
+                {% for post_image in post.images.all %}
+                <div class="fb-collage-item collage-item-{{ forloop.counter }}">
+                    <a href="{% url 'posts:post_details' post.share_id %}"
+                       hx-get="{% url 'posts:post_details' post.share_id %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true"
+                       class="d-block w-100 h-100 text-decoration-none">
+                        <img src="{{ post_image.get_thumbnail_url }}" loading="lazy" alt="Post image">
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+            {% elif img_count == 4 %}
+            <div class="fb-image-collage fb-collage-4">
+                {% for post_image in post.images.all %}
+                <div class="fb-collage-item collage-item-{{ forloop.counter }}">
+                    <a href="{% url 'posts:post_details' post.share_id %}"
+                       hx-get="{% url 'posts:post_details' post.share_id %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true"
+                       class="d-block w-100 h-100 text-decoration-none">
+                        <img src="{{ post_image.get_thumbnail_url }}" loading="lazy" alt="Post image">
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <!-- 5 or more photos with +N overlay -->
+            <div class="fb-image-collage fb-collage-5">
+                {% for post_image in post.images.all|slice:":5" %}
+                <div class="fb-collage-item collage-item-{{ forloop.counter }}">
+                    <a href="{% url 'posts:post_details' post.share_id %}"
+                       hx-get="{% url 'posts:post_details' post.share_id %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true"
+                       class="d-block w-100 h-100 text-decoration-none position-relative">
+                        <img src="{{ post_image.get_thumbnail_url }}" loading="lazy" alt="Post image">
+                        {% if forloop.last and img_count > 5 %}
+                        <div class="fb-more-photos-overlay">
+                            <span>+{{ img_count|add:"-5" }}</span>
+                        </div>
                         {% endif %}
                     </a>
                 </div>
-            {% endfor %}
-        </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
     </div>
     {% elif post.video or post.get_intel_file_is_video %}
     <div class="post-media-wrapper post-media border-top border-bottom bg-black position-relative">
@@ -407,69 +407,59 @@
     </div>
     {% endif %}
 
-    <!-- Engagement Action Bar -->
-    <div class="postcard-actions d-flex align-items-center justify-content-between px-3 py-2 border-top">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <div id="like-section-{{ post.share_id }}">
-                {% include "posts/partials/like_button.html" with post=post %}
-            </div>
-
-            <button type="button"
-                    class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button"
-                    aria-label="{% trans 'Comments' %}"
-                    onclick="(function(){
-                        var input = document.getElementById('comment-input-{{ post.share_id }}');
-                        if (input) {
-                            input.focus();
-                        } else {
-                            window.location.href = '{% url 'posts:post_details' post.share_id %}';
-                        }
-                    })();">
-                <i class="bi bi-chat-dots fs-5"></i>
-                <span class="fw-bold">{{ post.comments.count }}</span>
-            </button>
-
-            <button id="repost-btn-{{ post.share_id }}"
-                    class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button"
-                    data-bs-toggle="modal"
-                    data-bs-target="#globalRepostModal"
-                    data-post-id="{{ post.share_id }}"
-                    aria-label="{% trans 'Repost' %}">
-                <i class="bi bi-repeat fs-5"></i>
-                <span class="fw-bold">{{ post.repost_count }}</span>
-            </button>
-
-            <button type="button"
-                    class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button"
-                    data-bs-toggle="modal"
-                    data-bs-target="#globalShareModal"
-                    data-post-id="{{ post.share_id }}"
-                    data-post-url="{% url 'posts:post_details' post.share_id %}"
-                    data-post-content="{{ post.content|truncatechars:80|escapejs }}"
-                    aria-label="{% trans 'Share post' %}">
-                <i class="bi bi-share fs-5"></i>
-                <span class="fw-bold">{% trans "Share" %}</span>
-            </button>
-
-            {% if post.shared_document %}
-                <span class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button" title="Positive Rating">
-                    <i class="bi bi-hand-thumbs-up fs-5"></i>
-                    <span class="fw-bold">{% if post.shared_document.analytics %}{{ post.shared_document.analytics.positive_rating_percentage }}{% else %}0{% endif %}%</span>
-                </span>
-                <span class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button" title="Negative Rating">
-                    <i class="bi bi-hand-thumbs-down fs-5"></i>
-                    <span class="fw-bold">{% if post.shared_document.analytics %}{{ post.shared_document.analytics.negative_rating_percentage }}{% else %}0{% endif %}%</span>
-                </span>
-            {% endif %}
+    {% if not is_shared %}
+    <!-- Engagement Buttons with Pills (Equally Distributed) -->
+    <div class="postcard-actions px-3 py-2 border-top d-flex align-items-center justify-content-between gap-2">
+        <div id="like-section-{{ post.share_id }}" class="flex-grow-1 d-flex" style="flex: 1 1 0px; min-width: 0;">
+            {% include "posts/partials/like_button.html" with post=post %}
         </div>
+        <button type="button"
+                class="btn btn-sm border-0 text-muted d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1"
+                style="flex: 1 1 0px; min-width: 0;"
+                onclick="(function(){ var input = document.getElementById('comment-input-{{ post.share_id }}'); if(input){ input.focus(); } else { window.location.href = '{% url 'posts:post_details' post.share_id %}'; } })();"
+                aria-label="{% trans 'Comment' %}">
+            <i class="bi bi-chat-dots fs-5"></i>
+            <span id="comment-count-{{ post.share_id }}" class="fw-bold">{{ post.comments.count }}</span>
+        </button>
+        <button id="repost-btn-{{ post.share_id }}"
+                class="btn btn-sm border-0 text-muted d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1"
+                style="flex: 1 1 0px; min-width: 0;"
+                data-bs-toggle="modal"
+                data-bs-target="#globalRepostModal"
+                data-post-id="{{ post.share_id }}"
+                aria-label="{% trans 'Repost' %}">
+            <i class="bi bi-repeat fs-5"></i>
+            <span class="fw-bold repost-count">{{ post.repost_count }}</span>
+        </button>
+        <button class="btn btn-sm border-0 text-muted d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1"
+                style="flex: 1 1 0px; min-width: 0;"
+                data-bs-toggle="modal"
+                data-bs-target="#globalShareModal"
+                data-post-id="{{ post.share_id }}"
+                data-post-url="{% url 'posts:post_details' post.share_id %}"
+                data-post-content="{{ post.content|truncatechars:80|escapejs }}"
+                aria-label="{% trans 'Share post' %}">
+            <i class="bi bi-share fs-5"></i>
+            <span class="fw-bold">{% trans "Share" %}</span>
+        </button>
+        {% if post.shared_document %}
+            <span class="btn btn-sm border-0 text-muted d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1" style="flex: 1 1 0px; min-width: 0;">
+                <i class="bi bi-hand-thumbs-up fs-5"></i>
+                <span class="fw-bold">{% if post.shared_document.analytics %}{{ post.shared_document.analytics.positive_rating_percentage }}{% else %}0{% endif %}%</span>
+            </span>
+            <span class="btn btn-sm border-0 text-muted d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1" style="flex: 1 1 0px; min-width: 0;">
+                <i class="bi bi-hand-thumbs-down fs-5"></i>
+                <span class="fw-bold">{% if post.shared_document.analytics %}{{ post.shared_document.analytics.negative_rating_percentage }}{% else %}0{% endif %}%</span>
+            </span>
+        {% endif %}
     </div>
 
     {% if not is_detail %}
-    <!-- Persistent Inline Comment Input Bar -->
-    <div id="comment-area-{{ post.share_id }}" class="postcard-comment-bar px-3 pb-3 pt-2 border-top bg-white">
+    <!-- Inline Comment Composer -->
+    <div id="comment-area-{{ post.share_id }}" class="px-3 pb-3 pt-2 border-top bg-white">
         <form hx-post="{% url 'posts:add_comment' post.share_id %}?from_card=1"
               hx-swap="none"
-              class="d-flex align-items-center gap-2"
+              class="d-flex align-items-center gap-2 w-100"
               hx-on::after-request="if(event.detail.successful) this.reset();">
             {% csrf_token %}
             <img src="{{ request.user.profile_pic.url|default:'/static/images/default-avatar.png' }}"
@@ -482,17 +472,18 @@
                        id="comment-input-{{ post.share_id }}"
                        class="form-control border-0 rounded-pill"
                        placeholder="{% trans 'Write a comment...' %}"
-                       style="font-size: 13px; background-color: #f1f5f9; padding-right: 40px; height: 38px;"
+                       style="font-size: 13px; background-color: var(--search-bg, #e9ecef); padding-right: 40px; height: 38px;"
                        required>
                 <button type="submit"
                         class="btn border-0 rounded-circle position-absolute"
-                        style="width: 32px; height: 32px; right: 3px; top: 50%; transform: translateY(-50%); padding: 0; display: flex; align-items: center; justify-content: center; background: transparent;"
+                        style="width: 32px; height: 32px; right: 4px; top: 50%; transform: translateY(-50%); padding: 0; display: flex; align-items: center; justify-content: center; background: transparent;"
                         aria-label="{% trans 'Submit comment' %}">
-                    <i class="bi bi-send-fill" style="font-size: 16px; color: var(--primary, #0d6efd);"></i>
+                    <i class="bi bi-send-fill text-primary" style="font-size: 15px;"></i>
                 </button>
             </div>
         </form>
     </div>
+    {% endif %}
     {% endif %}
 </div>
 {% endif %}

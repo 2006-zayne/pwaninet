@@ -519,25 +519,40 @@ document.addEventListener('DOMContentLoaded', function () {
         const likeButtons = document.querySelectorAll(selectors.join(', '));
 
         likeButtons.forEach(likeButton => {
+            const isReel = likeButton.classList.contains('reel-action-btn');
             const likeCountElement = likeButton.querySelector('.like-count');
             if (likeCountElement && data.like_count !== undefined) {
                 likeCountElement.textContent = data.like_count;
             }
             if (isCurrentUser && data.is_liked !== undefined) {
                 const icon = likeButton.querySelector('i');
-                if (data.is_liked) {
-                    likeButton.classList.add('text-danger');
-                    likeButton.classList.remove('text-muted');
-                    likeButton.setAttribute('aria-label', 'Unlike');
-                    if (icon) {
-                        icon.className = 'bi bi-heart-fill fs-5';
+                if (isReel) {
+                    if (data.is_liked) {
+                        likeButton.classList.add('text-danger', 'liked');
+                        likeButton.classList.remove('text-white');
+                        likeButton.setAttribute('aria-label', 'Unlike');
+                        if (icon) icon.className = 'bi bi-heart-fill text-danger';
+                    } else {
+                        likeButton.classList.remove('text-danger', 'liked');
+                        likeButton.classList.add('text-white');
+                        likeButton.setAttribute('aria-label', 'Like');
+                        if (icon) icon.className = 'bi bi-heart';
                     }
                 } else {
-                    likeButton.classList.remove('text-danger');
-                    likeButton.classList.add('text-muted');
-                    likeButton.setAttribute('aria-label', 'Like');
-                    if (icon) {
-                        icon.className = 'bi bi-heart fs-5';
+                    if (data.is_liked) {
+                        likeButton.classList.add('text-danger');
+                        likeButton.classList.remove('text-muted');
+                        likeButton.setAttribute('aria-label', 'Unlike');
+                        if (icon) {
+                            icon.className = 'bi bi-heart-fill text-danger fs-5 heart-pop';
+                        }
+                    } else {
+                        likeButton.classList.remove('text-danger');
+                        likeButton.classList.add('text-muted');
+                        likeButton.setAttribute('aria-label', 'Like');
+                        if (icon) {
+                            icon.className = 'bi bi-heart fs-5';
+                        }
                     }
                 }
             }
@@ -561,7 +576,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const repostButtons = document.querySelectorAll(selectors.join(', '));
 
         repostButtons.forEach(repostButton => {
-            const repostCountElement = repostButton.querySelector('.repost-count') || repostButton.querySelector('span');
+            const repostCountElement = repostButton.querySelector('.repost-count') || repostButton.querySelector('span.fw-bold') || repostButton.querySelector('span');
             if (repostCountElement && data.repost_count !== undefined) {
                 repostCountElement.textContent = data.repost_count;
             }
@@ -585,12 +600,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const shareId = data.share_id;
         if (!shareId) return;
 
-        const card = document.getElementById(`post-card-${shareId}`);
-        if (card) {
-            const commentCountElement = card.querySelector('.comment-count') || card.querySelector('a[href*="/post/"] span');
-            if (commentCountElement && data.comment_count !== undefined) {
-                commentCountElement.textContent = data.comment_count;
-            }
+        const commentCountEl = document.getElementById(`comment-count-${shareId}`);
+        if (commentCountEl && data.comment_count !== undefined) {
+            commentCountEl.textContent = data.comment_count;
         }
     }
     

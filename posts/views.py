@@ -1007,14 +1007,18 @@ def post_detail_view(request, share_id):
 def add_comment(request, share_id):
     post = get_object_or_404(Post, share_id=share_id)
     if request.method == 'POST':
-        handle_add_comment_request(request, post)
+        comment = handle_add_comment_request(request, post)
         if request.headers.get('HX-Request'):
             if request.GET.get('from_card'):
-                return HttpResponse(status=204)
+                return render(request, 'posts/partials/card_comment_response.html', {
+                    'post': post,
+                    'comment': comment,
+                    'comment_count': post.comments.count(),
+                })
             context = build_comments_context(post, request.user, show_all_comments=True)
             context['post'] = post
             return render(request, 'posts/partials/comments_section.html', context)
-    return redirect('posts:post_details', share_share_id=share_id)
+    return redirect('posts:post_details', share_id=share_id)
 
 
 @login_required

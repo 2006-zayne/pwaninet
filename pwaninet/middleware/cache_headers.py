@@ -16,9 +16,19 @@ class CacheHeadersMiddleware:
         
         from django.utils.cache import patch_vary_headers
 
-        # Cache static assets for 1 year
-        if request.path.startswith('/static/') or request.path.startswith('/media/'):
-            response['Cache-Control'] = 'public, max-age=31536000, immutable'
+        # Cache static assets
+        if request.path.startswith('/static/'):
+            # If asset is versioned with a query param (e.g. ?v=1.6.2-96), safe to cache immutably
+            if request.GET.get('v'):
+                response['Cache-Control'] = 'public, max-age=31536000, immutable'
+            else:
+                # Unversioned static files must revalidate to prevent stale styles on reload
+                response['Cache-Control'] = 'public, max-age=0, must-revalidate'
+            return response
+
+        # Media files
+        if request.path.startswith('/media/'):
+            response['Cache-Control'] = 'public, max-age=86400'
             return response
 
         # Don't cache dynamic content (API, POST, and all HTML pages)

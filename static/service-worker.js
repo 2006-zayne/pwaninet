@@ -5,8 +5,8 @@
  */
 
 'use strict';
-let CACHE_VERSION = '1.3.2';
-let CACHE_BUILD = '2';
+let CACHE_VERSION = '1.6.2';
+let CACHE_BUILD = '100';
 let CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}`;
 let OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}`;
 
@@ -16,8 +16,8 @@ const SW_VERSION = {
     build: CACHE_BUILD,
     buildDate: new Date().toISOString(),
     cacheName: CACHE_NAME,
-    environment: 'development',
-    description: 'Postcard CSS refactor — avatar & engagement bar redesign'
+    environment: 'production',
+    description: 'Global styles for search header, avatar, and groups to explore on HTMX navigation'
 };
 
 // Set version from message (called during registration)
@@ -94,13 +94,8 @@ self.addEventListener('install', (event) => {
                 return cache.addAll(CORE_ASSETS);
             })
             .then(() => {
-                console.log('Service Worker: Core assets cached');
-                // Only skip waiting on first install when there is no active controller yet
-                if (!self.registration.active) {
-                    console.log('Service Worker: First install, activating immediately');
-                    return self.skipWaiting();
-                }
-                console.log('Service Worker: New version installed, waiting for user activation');
+                console.log('Service Worker: Core assets cached, activating immediately');
+                return self.skipWaiting();
             })
             .catch((error) => {
                 console.error('Service Worker: Failed to cache core assets:', error);
@@ -389,14 +384,16 @@ async function handleStaticAssetRequest(request) {
     if (url.pathname.includes('.css')) {
         try {
             const networkResponse = await fetch(request);
-            if (networkResponse.ok) {
-                const cache = await caches.open(CACHE_NAME);
-                cache.put(request, networkResponse.clone());
+            if (networkResponse && (networkResponse.ok || networkResponse.status === 304)) {
+                if (networkResponse.ok) {
+                    const cache = await caches.open(CACHE_NAME);
+                    cache.put(request, networkResponse.clone());
+                }
                 return networkResponse;
             }
         } catch (error) {
             console.log('Service Worker: Network failed for CSS, trying cache');
-            const cachedResponse = await caches.match(request);
+            const cachedResponse = await caches.match(request, { ignoreSearch: true });
             if (cachedResponse) {
                 return cachedResponse;
             }

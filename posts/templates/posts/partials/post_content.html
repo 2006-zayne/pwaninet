@@ -8,12 +8,12 @@
 
     {% with content_to_show=post.repost_of.content|default:post.content %}
         {% if content_to_show %}
-            <div id="post-text-{{ post.share_id }}" class="post-text-body post-text-clamp">
+            <div id="post-text-{{ post.share_id }}" class="post-text-body {% if content_to_show|length <= 85 and not post.images.exists and not post.video and not post.audio and not post.docs and not post.shared_document and not post.get_intel_file %}fb-text-large{% else %}post-text-clamp{% endif %}">
                 {{ content_to_show|urlize|linebreaksbr }}
             </div>
-            {% if content_to_show|length > 200 %}
+            {% if content_to_show|length > 200 and not content_to_show|length <= 85 %}
                 <button type="button"
-                        class="btn btn-link p-0 text-primary fw-semibold see-more-btn text-decoration-none mt-1"
+                        class="btn btn-link p-0 text-muted fw-semibold see-more-btn text-decoration-none mt-1"
                         style="font-size: 0.875rem;"
                         aria-expanded="false"
                         onclick="(function(btn){
