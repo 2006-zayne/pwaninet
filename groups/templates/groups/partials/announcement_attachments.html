@@ -19,7 +19,7 @@
                     <!-- Image attachment - use thumbnail with full-screen viewer -->
                     <div class="position-relative">
                         <a href="{{ attachment.file.url }}" data-lightbox="announcement-{{ announcement.id }}" class="text-decoration-none">
-                            <img src="{% if attachment.thumbnail %}{{ attachment.thumbnail.url }}{% else %}{{ attachment.file.url }}{% endif %}" 
+                            <img src="{{ attachment.thumbnail_url }}" 
                                  alt="{{ attachment.file.name }}" 
                                  class="img-fluid rounded-2"
                                  style="aspect-ratio: 16/10; object-fit: cover; width: 100%;">

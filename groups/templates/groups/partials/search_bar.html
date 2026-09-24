@@ -1,5 +1,5 @@
 {% load static %}
-<div class="group-search-container" style="max-width: 400px; margin: 0;">
+<div class="group-search-container" style="max-width: 400px; min-width: 0; flex-shrink: 1; margin: 0;">
     <form action="{% url 'groups:groups_dashboard' %}" method="get" class="group-search-wrapper" 
          style="position: relative;">
         <input type="text" 

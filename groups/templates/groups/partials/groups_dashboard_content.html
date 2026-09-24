@@ -429,6 +429,7 @@
     align-items: center;
     gap: 0.75rem;
     padding: 1rem 1rem 1rem 0.75rem;
+    min-width: 0;
   }
   .group-card-avatar {
     width: 56px;
@@ -461,7 +462,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 0.5rem;
     margin-bottom: 0.5rem;
+    min-width: 0;
   }
 
   /* Badge: official vs community */
@@ -473,6 +476,8 @@
     border-radius: var(--radius-pill);
     padding: 3px 10px;
     text-transform: uppercase; letter-spacing: 0.07em;
+    flex-shrink: 0;
+    white-space: nowrap;
   }
   .badge-community {
     display: inline-flex; align-items: center; gap: 4px;
@@ -483,6 +488,8 @@
     padding: 3px 10px;
     text-transform: uppercase; letter-spacing: 0.07em;
     border: 1px solid var(--border);
+    flex-shrink: 0;
+    white-space: nowrap;
   }
   .member-count {
     display: flex; align-items: center; gap: 4px;
@@ -496,6 +503,10 @@
     color: var(--text-primary);
     margin: 0;
     line-height: 1.3;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .group-card-desc {
     font-size: 0.85rem;
@@ -583,7 +594,7 @@
       </div>
       <h1 class="page-title">Groups</h1>
     </div>
-    <div style="display: flex; align-items: center; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex-shrink: 1;">
       {% include 'groups/partials/search_bar.html' with show_recent=True value=query %}
       <a href="{% url 'groups:create_group' %}"
          hx-get="{% url 'groups:create_group' %}"

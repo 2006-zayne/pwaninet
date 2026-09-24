@@ -40,6 +40,9 @@ class PostSerializer(serializers.ModelSerializer):
     share_id = serializers.UUIDField(read_only=True)
     video_status = serializers.CharField(read_only=True)
     video_duration = serializers.IntegerField(read_only=True)
+    video_width = serializers.IntegerField(read_only=True)
+    video_height = serializers.IntegerField(read_only=True)
+    is_reel = serializers.BooleanField(read_only=True)
     hls_playlist = serializers.CharField(read_only=True)
 
     class Meta:
@@ -47,11 +50,14 @@ class PostSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'post_id', 'share_id', 'author', 'group', 'course', 'unit', 'content',
             'video', 'docs', 'audio', 'gradient_class', 'has_signature',
-            'video_status', 'video_duration', 'hls_playlist',
+            'video_status', 'video_duration', 'video_width', 'video_height', 'is_reel', 'hls_playlist',
             'created_at', 'updated_at', 'like_count', 'is_liked',
             'repost_count', 'is_reposted', 'repost_of'
         ]
-        read_only_fields = ['author', 'created_at', 'updated_at', 'post_id', 'share_id', 'video_status', 'video_duration', 'hls_playlist']
+        read_only_fields = [
+            'author', 'created_at', 'updated_at', 'post_id', 'share_id',
+            'video_status', 'video_duration', 'video_width', 'video_height', 'is_reel', 'hls_playlist'
+        ]
 
     def get_is_liked(self, obj):
         request = self.context.get('request')

@@ -568,11 +568,6 @@
         top: var(--navbar-height, 60px) !important;
     }
 
-    /* Adjust card padding on tablets */
-    .post-card {
-        padding: 1rem !important;
-    }
-
     /* Ensure proper spacing between elements */
     .profile-card {
         margin-bottom: 1rem !important;

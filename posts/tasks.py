@@ -175,7 +175,7 @@ def process_large_video(self, post_id):
             logger.warning('Could not emit video progress for user %s: %s', user_id, exc)
 
     def _probe(video_path):
-        """Return (duration_seconds, width, height) via ffprobe."""
+        """Return (duration_seconds, width, height) via ffprobe, accounting for rotation metadata."""
         cmd = [
             FFPROBE, '-v', 'quiet', '-print_format', 'json',
             '-show_streams', video_path,
@@ -189,6 +189,30 @@ def process_large_video(self, post_id):
         duration = float(video_stream.get('duration', 0) or info.get('format', {}).get('duration', 0))
         width  = int(video_stream.get('width',  0))
         height = int(video_stream.get('height', 0))
+
+        # Check rotation tags and side data
+        rotate = 0
+        tags = video_stream.get('tags', {}) or {}
+        if 'rotate' in tags:
+            try:
+                rotate = int(tags['rotate'])
+            except (ValueError, TypeError):
+                pass
+
+        if not rotate:
+            side_data_list = video_stream.get('side_data_list', []) or []
+            for sd in side_data_list:
+                if 'rotation' in sd:
+                    try:
+                        rotate = int(sd['rotation'])
+                        break
+                    except (ValueError, TypeError):
+                        pass
+
+        rotate = abs(rotate) % 360
+        if rotate in (90, 270):
+            width, height = height, width
+
         return duration, width, height
 
     # ------------------------------------------------------------------
@@ -243,9 +267,15 @@ def process_large_video(self, post_id):
         duration, src_width, src_height = _probe(source_path)
         logger.info('[HLS] Post %s: duration=%.1fs  %dx%d', post_id, duration, src_width, src_height)
 
-        # Update duration on post
+        # Update duration and dimensions on post
+        update_fields = {}
         if duration:
-            Post.objects.filter(id=post_id).update(video_duration=int(duration))
+            update_fields['video_duration'] = int(duration)
+        if src_width and src_height:
+            update_fields['video_width'] = src_width
+            update_fields['video_height'] = src_height
+        if update_fields:
+            Post.objects.filter(id=post_id).update(**update_fields)
 
         # ------------------------------------------------------------------
         # Prepare output directory

@@ -1032,10 +1032,12 @@ def toggle_comment_like(request, comment_id):
 def toggle_like(request, share_id):
     post = get_object_or_404(Post, share_id=share_id)
     result = toggle_post_like_for_user(post, request.user)
+    is_reel = request.GET.get('is_reel') == '1' or request.POST.get('is_reel') == '1'
     return render(request, 'posts/partials/like_button.html', {
         'post': result['post'],
         'is_liked': result['is_liked'],
         'like_count': result['like_count'],
+        'is_reel': is_reel,
     })
 
 

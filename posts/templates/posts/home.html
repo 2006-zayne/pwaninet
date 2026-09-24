@@ -36,22 +36,13 @@
 
   body { background-color: var(--background); color: var(--text-main); }
 
-  /* ── Sticky Search Header ── */
+  /* ── Search Header (Scrolls with home content) ── */
   .search-header {
-    position: sticky;
-    top: var(--navbar-height, 56px); /* Sits below fixed navbar-top */
-    z-index: 100;
+    position: relative;
+    z-index: 10;
     background: var(--header-blur-bg);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
     border-bottom: 1px solid var(--border-soft);
     padding: 8px 16px;
-  }
-
-  /* Adjust for native app safe area at the top */
-  .is-native-app .search-header,
-  body.is-native-app .search-header {
-    top: calc(var(--navbar-height, 56px) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)));
   }
 
   .search-inner {

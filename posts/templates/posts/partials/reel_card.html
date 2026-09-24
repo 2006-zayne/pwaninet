@@ -1,0 +1,279 @@
+{% load i18n %}
+{% load static %}
+{% load post_filters %}
+
+<div id="reel-card-{{ post.share_id }}"
+     class="reel-card-container position-relative overflow-hidden bg-black"
+     data-post-id="{{ post.share_id }}"
+     data-reel="true">
+
+    <!-- Ambient / Blurred Backdrop for Wide/Square Videos -->
+    <div class="reel-ambient-backdrop" aria-hidden="true">
+        <img src="{{ post.get_video_poster|default:post.thumbnail_url|default:'' }}"
+             class="reel-ambient-img"
+             alt=""
+             loading="lazy">
+    </div>
+
+    <!-- Main Video Element -->
+    <video class="reel-video-element feed-video"
+           id="video-{{ post.share_id }}"
+           playsinline
+           muted
+           loop
+           preload="metadata"
+           poster="{{ post.get_video_poster|default:post.thumbnail_url|default:'' }}"
+           {% if post.hls_playlist %}data-hls-url="{{ post.get_hls_url }}"{% endif %}
+           data-video-url="{{ post.get_video_for_feed.url }}"
+           data-autoplay="true">
+        <source src="{{ post.get_video_for_feed.url }}" type="video/mp4">
+    </video>
+
+    <!-- Central Interactive Hitbox (Single tap play/pause, Double tap heart like) -->
+    <button type="button"
+            class="reel-center-hitbox reel-tap-hitbox"
+            id="reel-hitbox-{{ post.share_id }}"
+            data-post-id="{{ post.share_id }}"
+            aria-label="{% trans 'Play or pause reel' %}">
+    </button>
+
+    <!-- Transient Play/Pause HUD Indicator -->
+    <div id="reel-play-hud-{{ post.share_id }}" class="reel-play-hud" aria-hidden="true">
+        <i class="bi bi-play-fill"></i>
+    </div>
+
+    <!-- Heart Burst Animation Target -->
+    <div id="reel-heart-{{ post.share_id }}" class="reel-heart-burst" aria-hidden="true">
+        <i class="bi bi-heart-fill"></i>
+    </div>
+
+    <!-- Minimal Top Header & Scrim -->
+    <div class="reel-scrim-top position-absolute top-0 start-0 w-100 d-flex align-items-center justify-content-between px-2.5 pt-2 pb-1">
+        <!-- Top Left: Unit Badge (if present) -->
+        <div class="d-flex align-items-center gap-2">
+            {% if post.unit.code %}
+            <span class="reel-unit-badge d-inline-flex align-items-center gap-1">
+                <i class="bi bi-mortarboard-fill"></i>
+                <span>{{ post.unit.code }}</span>
+            </span>
+            {% endif %}
+        </div>
+
+        <!-- Top Right Actions: Fullscreen & Glassmorphic Menu -->
+        <div class="d-flex align-items-center gap-2">
+            <button type="button"
+                    class="reel-control-btn-subtle reel-expand-btn"
+                    data-post-id="{{ post.share_id }}"
+                    data-action="fullscreen"
+                    title="{% trans 'Full Screen' %}"
+                    aria-label="{% trans 'Expand reel' %}">
+                <i class="bi bi-arrows-fullscreen"></i>
+            </button>
+
+            <div class="dropdown">
+                <button class="reel-control-btn-subtle"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        aria-label="{% trans 'Reel options' %}">
+                    <i class="bi bi-three-dots"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end reel-glass-dropdown shadow-lg">
+                    <li>
+                        <button class="dropdown-item d-flex align-items-center gap-2"
+                                data-bs-toggle="modal" data-bs-target="#globalRepostModal" data-post-id="{{ post.share_id }}">
+                            <i class="bi bi-repeat"></i> {% trans "Repost" %}
+                        </button>
+                    </li>
+                    <li>
+                        <button class="dropdown-item d-flex align-items-center gap-2"
+                                hx-post="/api/posts/{{ post.share_id }}/hide/"
+                                hx-target="#reel-card-{{ post.share_id }}"
+                                hx-swap="outerHTML">
+                            <i class="bi bi-eye-slash"></i> {% trans "Hide post" %}
+                        </button>
+                    </li>
+                    <li>
+                        <button class="dropdown-item d-flex align-items-center gap-2"
+                                hx-post="/api/author-preferences/"
+                                hx-vals='{"author": {{ post.author.id }}, "preference": "less"}'
+                                hx-target="body"
+                                hx-swap="none">
+                            <i class="bi bi-person-dash"></i> {% trans "See less from" %} {{ post.author.username }}
+                        </button>
+                    </li>
+                    <li>
+                        <button class="dropdown-item d-flex align-items-center gap-2"
+                                data-bs-toggle="modal" data-bs-target="#globalShareModal" data-post-id="{{ post.share_id }}" data-post-url="{% url 'posts:post_details' post.share_id %}" data-post-content="{{ post.content|truncatechars:80|escapejs }}">
+                            <i class="bi bi-share"></i> {% trans "Share" %}
+                        </button>
+                    </li>
+                    <li>
+                        <button class="dropdown-item d-flex align-items-center gap-2"
+                                onclick="copyLinkToClipboard(window.location.origin + '{% url 'posts:post_details' post.share_id %}')">
+                            <i class="bi bi-link-45deg"></i> {% trans "Copy Link" %}
+                        </button>
+                    </li>
+                    <li>
+                        <button class="dropdown-item d-flex align-items-center gap-2"
+                                data-bs-toggle="modal" data-bs-target="#globalReportModal" data-post-id="{{ post.share_id }}">
+                            <i class="bi bi-flag"></i> {% trans "Report reel" %}
+                        </button>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <button class="dropdown-item d-flex align-items-center gap-2"
+                                data-action="download-media"
+                                data-post-id="{{ post.share_id }}"
+                                data-media-type="video"
+                                data-url="{{ post.get_video_for_feed.url }}"
+                                data-filename="reel_{{ post.share_id }}.mp4"
+                                data-thumbnail="{{ post.get_video_poster|default:post.thumbnail_url|default:'' }}">
+                            <i class="bi bi-download"></i> {% trans "Download Reel" %}
+                        </button>
+                    </li>
+                    {% if post.author == request.user or request.user.global_role == 'PRESIDENT' or request.user.global_role == 'DELEGATE' %}
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <button class="dropdown-item d-flex align-items-center gap-2 text-danger"
+                                hx-delete="/api/posts/{{ post.share_id }}/"
+                                hx-confirm="{% trans 'Are you sure you want to delete this reel?' %}"
+                                hx-target="#reel-card-{{ post.share_id }}"
+                                hx-swap="outerHTML">
+                            <i class="bi bi-trash"></i> {% trans "Delete reel" %}
+                        </button>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Right Engagement Stack -->
+    <div class="reel-actions-stack">
+        <!-- Like Action (Targeted replacement for live count updates) -->
+        {% include "posts/partials/like_button.html" with post=post is_reel=True %}
+
+        <!-- Comments Action -->
+        <div class="reel-action-item">
+            <a href="{% url 'posts:post_details' post.share_id %}"
+               hx-get="{% url 'posts:post_details' post.share_id %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               class="reel-action-icon-btn text-white text-decoration-none"
+               aria-label="{% trans 'Comments' %}">
+                <i class="bi bi-chat-dots-fill"></i>
+            </a>
+            <span class="reel-action-label">{{ post.comments.count }}</span>
+        </div>
+
+        <!-- Repost Action -->
+        <div class="reel-action-item">
+            <button type="button"
+                    class="reel-action-icon-btn text-white"
+                    data-bs-toggle="modal"
+                    data-bs-target="#globalRepostModal"
+                    data-post-id="{{ post.share_id }}"
+                    aria-label="{% trans 'Repost' %}">
+                <i class="bi bi-repeat"></i>
+            </button>
+            <span class="reel-action-label">{{ post.repost_count|default:"0" }}</span>
+        </div>
+
+        <!-- Share Trigger -->
+        <div class="reel-action-item">
+            <button type="button"
+                    class="reel-action-icon-btn text-white"
+                    data-bs-toggle="modal"
+                    data-bs-target="#globalShareModal"
+                    data-post-id="{{ post.share_id }}"
+                    data-post-url="{% url 'posts:post_details' post.share_id %}"
+                    data-post-content="{{ post.content|truncatechars:80|escapejs }}"
+                    aria-label="{% trans 'Share reel' %}">
+                <i class="bi bi-send-fill"></i>
+            </button>
+        </div>
+
+        <!-- Mute/Sound Toggle Button -->
+        <div class="reel-action-item">
+            <button type="button"
+                    class="reel-action-icon-btn reel-mute-btn text-white"
+                    id="reel-mute-btn-{{ post.share_id }}"
+                    data-post-id="{{ post.share_id }}"
+                    data-action="mute-toggle"
+                    aria-label="{% trans 'Toggle mute' %}">
+                <i class="bi bi-volume-mute-fill"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Bottom Scrim & Consolidated Author / Caption Overlay -->
+    <div class="reel-scrim-bottom position-absolute bottom-0 start-0 w-100">
+        <div class="reel-bottom-content">
+            <!-- Author Row (Unified Avatar + Name + Meta) -->
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <a href="{% url 'users:profile' post.author.username %}"
+                   hx-get="{% url 'users:profile' post.author.username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   class="flex-shrink-0 text-decoration-none">
+                    <img src="{{ post.author.profile_pic.url|default:'/static/images/default-avatar.png' }}"
+                         class="rounded-circle border border-2 border-white shadow-sm reel-author-avatar"
+                         alt="{{ post.author.username }}">
+                </a>
+                <div class="min-w-0 flex-grow-1">
+                    <div class="d-flex align-items-center gap-1.5">
+                        <a href="{% url 'users:profile' post.author.username %}"
+                           hx-get="{% url 'users:profile' post.author.username %}"
+                           hx-target="#page-content-target"
+                           hx-swap="innerHTML"
+                           hx-push-url="true"
+                           class="text-white fw-bold text-decoration-none reel-author-name text-truncate">
+                            @{{ post.author.username }}
+                        </a>
+                    </div>
+                    <div class="text-white-50 d-flex align-items-center reel-meta-row">
+                        <span>{{ post.created_at|timesince }} ago</span>
+                        <span class="mx-1">&middot;</span>
+                        <i class="bi bi-globe-americas" title="{% trans 'Public' %}" aria-label="{% trans 'Public' %}"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clamped Caption with More Toggle -->
+            {% if post.content %}
+            <div class="reel-caption-wrap mb-2">
+                <div id="reel-caption-{{ post.share_id }}" class="reel-caption-text post-text-clamp-2">
+                    {{ post.content|urlize|linebreaksbr }}
+                </div>
+                {% if post.content|length > 70 %}
+                <button type="button"
+                        class="reel-caption-toggle"
+                        data-target="#reel-caption-{{ post.share_id }}"
+                        aria-expanded="false">
+                    {% trans "more" %}
+                </button>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Animated Audio Track Pill -->
+            <div class="reel-audio-wrapper">
+                <div class="reel-audio-pill">
+                    <div class="reel-audio-waves" aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <span class="reel-audio-title text-truncate">Original Audio &bull; {{ post.author.username }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Playback Progress Line -->
+        <div class="reel-progress-track">
+            <div class="reel-progress-bar" id="reel-progress-{{ post.share_id }}"></div>
+        </div>
+    </div>
+</div>

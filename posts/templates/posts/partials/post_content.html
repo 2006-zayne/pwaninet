@@ -1,14 +1,31 @@
-{% load static %}
-<div class="post-content-wrapper" data-post-id="{{ post.share_id }}" data-post.share_id="{{ post.share_id }}">
-    <p class="mb-0 text-dark post-content-text" style="font-size: 16px; line-height: 1.5;">
-        {% if post.repost_of %}
-            {% if post.content %}<p class="mb-2 text-dark" style="font-size: 16px;">{{ post.content|urlize|linebreaksbr }}</p>{% endif %}
-            <span class="post-content-full">{{ post.repost_of.content|urlize|linebreaksbr }}</span>
-            <span class="post-content-truncated" style="display: none;">{{ post.repost_of.content|truncatechars:200|urlize|linebreaksbr }}</span>
-        {% else %}
-            <span class="post-content-full">{{ post.content|urlize|linebreaksbr }}</span>
-            <span class="post-content-truncated" style="display: none;">{{ post.content|truncatechars:200|urlize|linebreaksbr }}</span>
+{% load static i18n %}
+<div class="post-content-wrapper" data-post-id="{{ post.share_id }}">
+    {% if post.repost_of and post.content %}
+        <div class="mb-2 post-repost-comment post-text-body">
+            {{ post.content|urlize|linebreaksbr }}
+        </div>
+    {% endif %}
+
+    {% with content_to_show=post.repost_of.content|default:post.content %}
+        {% if content_to_show %}
+            <div id="post-text-{{ post.share_id }}" class="post-text-body post-text-clamp">
+                {{ content_to_show|urlize|linebreaksbr }}
+            </div>
+            {% if content_to_show|length > 200 %}
+                <button type="button"
+                        class="btn btn-link p-0 text-primary fw-semibold see-more-btn text-decoration-none mt-1"
+                        style="font-size: 0.875rem;"
+                        aria-expanded="false"
+                        onclick="(function(btn){
+                            var target = document.getElementById('post-text-{{ post.share_id }}');
+                            if (!target) return;
+                            var expanded = target.classList.toggle('is-expanded');
+                            btn.textContent = expanded ? '{% trans "See less" %}' : '{% trans "See more" %}';
+                            btn.setAttribute('aria-expanded', expanded);
+                        })(this);">
+                    {% trans "See more" %}
+                </button>
+            {% endif %}
         {% endif %}
-    </p>
-    <button class="btn btn-link p-0 text-primary see-more-btn" style="font-size: 14px; display: none;" data-post-id="{{ post.share_id }}" data-post.share_id="{{ post.share_id }}">See more</button>
+    {% endwith %}
 </div>

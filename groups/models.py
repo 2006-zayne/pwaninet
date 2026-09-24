@@ -254,6 +254,22 @@ class AnnouncementAttachment(models.Model):
             return f"{self.document.title} - {self.announcement.title}"
         return f"{self.file.name} - {self.announcement.title}"
 
+    @property
+    def thumbnail_url(self):
+        try:
+            if self.thumbnail and hasattr(self.thumbnail, 'url'):
+                url = self.thumbnail.url
+                if url:
+                    return url
+        except Exception:
+            pass
+        try:
+            if self.file and hasattr(self.file, 'url'):
+                return self.file.url
+        except Exception:
+            pass
+        return ''
+
 
 class GroupPhotoLike(models.Model):
     """Likes for group profile and cover photos"""

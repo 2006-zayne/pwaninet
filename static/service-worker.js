@@ -5,7 +5,7 @@
  */
 
 'use strict';
-let CACHE_VERSION = '1.3.1';
+let CACHE_VERSION = '1.3.2';
 let CACHE_BUILD = '2';
 let CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}`;
 let OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}`;
@@ -16,7 +16,8 @@ const SW_VERSION = {
     build: CACHE_BUILD,
     buildDate: new Date().toISOString(),
     cacheName: CACHE_NAME,
-    environment: 'development'
+    environment: 'development',
+    description: 'Postcard CSS refactor — avatar & engagement bar redesign'
 };
 
 // Set version from message (called during registration)
@@ -43,6 +44,7 @@ const CORE_ASSETS = [
     '/static/css/bootstrap.min.css',
     '/static/css/bootstrap-icons.css',
     '/static/css/custom.css',
+    '/static/css/postcard.css',
     '/static/css/fonts.css',
     '/static/css/profile.css',
     '/static/css/comments.css',

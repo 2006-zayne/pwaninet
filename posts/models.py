@@ -7,12 +7,34 @@ from PIL import Image
 from io import BytesIO
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.core.files.storage import FileSystemStorage
+from django.db.models.fields.files import ImageFieldFile
 import sys
 
 # Spool uploaded raw videos to local disk to keep web request latency < 1s
 # and prevent Cloudflare HTTP 524 timeouts. Celery handles HLS transcoding
 # and uploads all HLS chunks + the raw video file to Cloudflare R2 asynchronously.
 raw_video_storage = FileSystemStorage()
+
+
+class SafeImageFieldFile(ImageFieldFile):
+    """FieldFile that returns empty string instead of raising ValueError when no file is associated."""
+    @property
+    def url(self):
+        try:
+            if not self.name:
+                return ''
+            return super().url
+        except (ValueError, Exception):
+            return ''
+
+
+class SafeImageField(models.ImageField):
+    """ImageField using SafeImageFieldFile to prevent template crashes when file is missing."""
+    attr_class = SafeImageFieldFile
+
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        return name, 'django.db.models.ImageField', args, kwargs
 
 
 GRADIENT_CHOICES = [
@@ -77,10 +99,20 @@ class Post(models.Model):
         blank=True,
         help_text='Duration of the video in seconds (populated by ffprobe)',
     )
+    video_width = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Width of the video in pixels',
+    )
+    video_height = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Height of the video in pixels',
+    )
 
     docs = models.FileField(upload_to='posts/docs', max_length=500, blank=True, null=True)
     audio = models.FileField(upload_to='posts/audio', max_length=500, blank=True, null=True, help_text='Attach music/audio to post')
-    thumbnail = models.ImageField(upload_to='posts/thumbnails', max_length=500, blank=True, null=True, help_text='Thumbnail for gradient/text posts')
+    thumbnail = SafeImageField(upload_to='posts/thumbnails', max_length=500, blank=True, null=True, help_text='Thumbnail for gradient/text posts')
     gradient_class = models.CharField(max_length=50, choices=GRADIENT_CHOICES, default='grad-ocean', blank=True)
     has_signature = models.BooleanField(default=False)
     custom_gradient_text = models.CharField(max_length=100, blank=True, null=True, help_text='Custom text for gradient patterns')
@@ -115,7 +147,7 @@ class Post(models.Model):
     
     @property
     def get_intel_file(self):
-        if self.images.exists():
+        if self.pk and self.images.exists():
             return self.images.first().image
         if self.video:
             return self.video
@@ -126,11 +158,12 @@ class Post(models.Model):
     @property
     def thumbnail_url(self):
         """Safely retrieve thumbnail URL without raising ValueError if file is missing."""
-        if self.thumbnail:
-            try:
-                return self.thumbnail.url
-            except ValueError:
-                return None
+        try:
+            if self.thumbnail and hasattr(self.thumbnail, 'url'):
+                url = self.thumbnail.url
+                return url if url else None
+        except (ValueError, Exception):
+            return None
         return None
 
     @property
@@ -168,14 +201,64 @@ class Post(models.Model):
         media_url = getattr(settings, 'MEDIA_URL', '/media/')
         return f"{media_url.rstrip('/')}/{self.hls_playlist.lstrip('/')}"
 
+    @property
+    def is_reel(self):
+        """Check if post is a vertical portrait video / reel."""
+        # 1. Dimension-based check if stored
+        if self.video_width and self.video_height:
+            return self.video_height > self.video_width
+
+        # 2. Explicit post_type check if present
+        if hasattr(self, 'post_type') and self.post_type == 'reel':
+            return True
+
+        # 3. Filename heuristics
+        video_field = self.video or self.video_preview
+        if video_field:
+            try:
+                name = video_field.name.lower()
+                if any(k in name for k in ['reel', 'portrait', 'short', 'tiktok', 'story', '9_16', '9x16', 'vertical']):
+                    return True
+            except Exception:
+                pass
+
+        try:
+            intel = self.get_intel_file
+            if intel:
+                name = intel.name.lower()
+                if any(k in name for k in ['reel', 'portrait', 'short', 'tiktok', 'story', '9_16', '9x16', 'vertical']):
+                    return True
+        except Exception:
+            pass
+
+        return False
+
+    @property
+    def get_intel_file_is_video(self):
+        """Check if the post has a video file attached directly or via get_intel_file."""
+        if self.video or self.video_preview:
+            return True
+        try:
+            intel = self.get_intel_file
+            if intel:
+                url = intel.url.lower()
+                return any(ext in url for ext in ['.mp4', '.mov', '.webm', '.m4v'])
+        except Exception:
+            pass
+        return False
+
     
     def is_liked_by(self, user):
+        if not self.pk:
+            return False
         if user.is_authenticated:
             return self.likes.filter(user=user).exists()
         return False
 
     @property
     def like_count(self):
+        if not self.pk:
+            return 0
         # Cache the count on the instance to avoid repeated queries
         if not hasattr(self, '_like_count'):
             self._like_count = self.likes.count()

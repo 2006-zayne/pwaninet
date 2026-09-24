@@ -239,14 +239,6 @@
             /* Default fallback - will be overridden by inline styles */
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
-        .gradient-intel-bg {
-            width: 100%;
-            aspect-ratio: 1 / 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2.5rem;
-        }
 
         /* Critical App Shell Layout (zero layout shift / clean 3-zone desktop geometry) */
         .app-shell-layout {
@@ -332,6 +324,7 @@
 
     <!-- Preload critical CSS -->
     <link rel="preload" href="{% static 'css/custom.css' %}" as="style">
+    <link rel="preload" href="{% static 'css/postcard.css' %}" as="style">
     <link rel="preload" href="{% static 'css/bootstrap.min.css' %}" as="style">
     <link rel="preload" href="{% static 'css/bootstrap-icons.css' %}" as="style">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -394,6 +387,7 @@
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+    <link rel="stylesheet" href="{% static 'css/postcard.css' %}">
     <link rel="stylesheet" href="{% static 'css/people-modal.css' %}">
     <link rel="stylesheet" href="{% static 'css/comments.css' %}">
     <link rel="stylesheet" href="{% static 'css/profile.css' %}">
@@ -405,9 +399,50 @@
     <script>
         // Configure HTMX for proper history handling
         htmx.config.historyEnabled = true;
-        htmx.config.historyCacheSize = 10;
-        htmx.config.refreshOnHistoryMiss = false; // Restore content via AJAX request instead of full page reload
-        console.log('[HTMX Config] History caching enabled without full page reload on miss');
+        // Disable the localStorage snapshot cache entirely.
+        // HTMX snapshots store raw innerHTML of #page-content-target.
+        // When restored, old snapshots may have stale markup (pre-refactor inline styles,
+        // old class names, etc.) that mis-matches the current CSS. Setting cacheSize to 0
+        // makes HTMX always re-fetch content on back/forward via a cheap AJAX request,
+        // guaranteeing the DOM always matches the live stylesheet.
+        htmx.config.historyCacheSize = 0;
+        htmx.config.refreshOnHistoryMiss = false; // Re-fetch via AJAX, not full reload
+
+        // Evict any stale HTMX localStorage snapshots from previous builds.
+        // Snapshots keyed by URL persist across deployments unless explicitly cleared.
+        (function evictStaleHtmxSnapshots() {
+            try {
+                var SW_CSS_VERSION = '1.3.2-2'; // bump this whenever CSS/template structure changes
+                var storedVersion = sessionStorage.getItem('htmx_css_version');
+                if (storedVersion !== SW_CSS_VERSION) {
+                    // Clear all htmx history entries from localStorage
+                    var keysToRemove = [];
+                    for (var i = 0; i < localStorage.length; i++) {
+                        var key = localStorage.key(i);
+                        if (key && key.startsWith('htmx-history-')) {
+                            keysToRemove.push(key);
+                        }
+                    }
+                    keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+                    sessionStorage.setItem('htmx_css_version', SW_CSS_VERSION);
+                    console.log('[HTMX] Evicted ' + keysToRemove.length + ' stale history snapshot(s) for CSS version', SW_CSS_VERSION);
+                }
+            } catch (e) {
+                // localStorage may be unavailable in private mode — safe to ignore
+            }
+        })();
+
+        // After HTMX restores content from history, re-process the restored element
+        // so all hx-* attribute bindings (like buttons, comment forms, etc.) re-attach.
+        document.addEventListener('htmx:historyRestore', function(evt) {
+            var target = evt.detail && evt.detail.elt ? evt.detail.elt : document.getElementById('page-content-target');
+            if (target && window.htmx) {
+                window.htmx.process(target);
+                console.log('[HTMX] Re-processed restored history content on', target.id || target.tagName);
+            }
+        });
+
+        console.log('[HTMX Config] History caching configured — snapshot cache disabled, snapshot eviction active');
     </script>
     <script defer src="{% static 'js/device_manager.js' %}"></script>
     <!-- Unified Haptics Engine (Ultra-responsive tactile feedback) -->
@@ -948,8 +983,7 @@
                 [data-mobile-nav-position="top"] body {
                     padding-top: calc(var(--navbar-height, 56px) + 44px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
                 }
-                [data-mobile-nav-position="top"] #navigation-progress,
-                [data-mobile-nav-position="top"] .search-header {
+                [data-mobile-nav-position="top"] #navigation-progress {
                     top: calc(var(--navbar-height, 56px) + 44px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
                 }
             }
@@ -961,11 +995,6 @@
 
             /* Navigation progress bar positioned under combined unified header */
             [data-mobile-nav-position="top"] #navigation-progress {
-                top: calc(var(--navbar-height, 56px) + 48px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
-            }
-
-            /* Sticky search header on feed sits cleanly below combined unified header */
-            [data-mobile-nav-position="top"] .search-header {
                 top: calc(var(--navbar-height, 56px) + 48px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
             }
 
@@ -1668,6 +1697,205 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Global Repost Modal -->
+        <div class="modal fade" id="globalRepostModal" tabindex="-1" aria-labelledby="globalRepostModalTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="globalRepostModalTitle">{% trans "Repost" %}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="globalRepostForm" method="POST" hx-post="" hx-target="" hx-swap="outerHTML"
+                              hx-on::after-request="const m = bootstrap.Modal.getInstance(document.getElementById('globalRepostModal')); if(m) m.hide();">
+                            {% csrf_token %}
+                            <input type="hidden" name="post_id" value="">
+                            <div class="mb-3">
+                                <label class="form-label">{% trans "Add a comment (optional)" %}</label>
+                                <textarea name="content" class="form-control" rows="3" placeholder="{% trans 'What do you think?' %}"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">{% trans "Repost" %}</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Report Modal -->
+        <div class="modal fade" id="globalReportModal" tabindex="-1" aria-labelledby="globalReportModalTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="globalReportModalTitle">{% trans "Report post" %}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="globalReportForm" method="POST" hx-post="/api/reports/" hx-target="" hx-swap="outerHTML"
+                              hx-on::after-request="const m = bootstrap.Modal.getInstance(document.getElementById('globalReportModal')); if(m) m.hide();">
+                            {% csrf_token %}
+                            <input type="hidden" name="post" value="">
+                            <input type="hidden" name="post_id" value="">
+                            <div class="mb-3">
+                                <label class="form-label">{% trans "Reason for reporting" %}</label>
+                                <select name="reason" class="form-select" required>
+                                    <option value="">{% trans "Select a reason" %}</option>
+                                    <option value="spam">{% trans "Spam" %}</option>
+                                    <option value="inappropriate">{% trans "Inappropriate content" %}</option>
+                                    <option value="harassment">{% trans "Harassment" %}</option>
+                                    <option value="false_information">{% trans "False information" %}</option>
+                                    <option value="other">{% trans "Other" %}</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">{% trans "Additional details (optional)" %}</label>
+                                <textarea name="description" class="form-control" rows="3" placeholder="{% trans 'Please provide more details about why you are reporting this post...' %}"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-danger w-100">{% trans "Submit Report" %}</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Share Modal -->
+        <div class="modal fade" id="globalShareModal" tabindex="-1" aria-labelledby="globalShareModalTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="globalShareModalTitle">{% trans "Share Post" %}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+                    </div>
+                    <div class="modal-body" id="globalShareModalBody">
+                        <input type="hidden" name="post_id" id="globalSharePostId" value="">
+
+                        <div class="mb-3 d-grid">
+                            <button type="button" class="btn btn-outline-primary" id="globalCopyLinkBtn">
+                                <i class="bi bi-link-45deg"></i> {% trans "Copy Link to Clipboard" %}
+                            </button>
+                        </div>
+
+                        <!-- External / Native Share -->
+                        <div class="mb-3" id="globalExternalShareContainer">
+                            <button type="button"
+                                    class="btn btn-outline-secondary w-100 mb-2 d-none"
+                                    id="globalNativeShareBtn">
+                                <i class="bi bi-share-fill me-1"></i> {% trans "Share to Other Apps" %}
+                            </button>
+                            <div id="globalPlatformShareLinks" class="d-flex gap-2 flex-wrap justify-content-center d-none">
+                                <a href="#" target="_blank" rel="noopener noreferrer"
+                                   class="btn btn-sm btn-outline-success platform-share-btn"
+                                   data-platform="whatsapp">
+                                    <i class="bi bi-whatsapp me-1"></i>WhatsApp
+                                </a>
+                                <a href="#" target="_blank" rel="noopener noreferrer"
+                                   class="btn btn-sm btn-outline-primary platform-share-btn"
+                                   data-platform="telegram">
+                                    <i class="bi bi-telegram me-1"></i>Telegram
+                                </a>
+                                <a href="#" target="_blank" rel="noopener noreferrer"
+                                   class="btn btn-sm btn-outline-dark platform-share-btn"
+                                   data-platform="twitter">
+                                    <i class="bi bi-twitter-x me-1"></i>X
+                                </a>
+                            </div>
+                        </div>
+
+                        <hr>
+                        <ul class="nav nav-tabs mb-3" id="globalShareTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="global-user-tab" data-bs-toggle="tab" data-bs-target="#global-user-share" type="button" role="tab">{% trans "Share to Users" %}</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="global-group-tab" data-bs-toggle="tab" data-bs-target="#global-group-share" type="button" role="tab">{% trans "Share to Groups" %}</button>
+                            </li>
+                        </ul>
+                        <div class="tab-content" id="globalShareTabContent">
+                            <!-- Share to Users Tab -->
+                            <div class="tab-pane fade show active" id="global-user-share" role="tabpanel">
+                                <form id="global-share-user-form" method="POST" hx-post="" hx-target="#global-share-user-result" hx-swap="innerHTML">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="share_type" value="user">
+                                    <div class="mb-3">
+                                        <input type="text"
+                                               class="form-control"
+                                               placeholder="{% trans 'Search users you follow...' %}"
+                                               name="user_search"
+                                               hx-get="{% url 'posts:search_following_users' %}"
+                                               hx-target="#global-user-results"
+                                               hx-trigger="keyup changed delay:300ms">
+                                    </div>
+                                    <div id="global-user-results" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
+                                        <div class="p-3 text-center text-muted">
+                                            <small>{% trans "Start typing to search users you follow" %}</small>
+                                        </div>
+                                    </div>
+                                    <div id="global-selected-users" class="mb-3">
+                                        <small class="text-muted">{% trans "Selected users will appear here" %}</small>
+                                    </div>
+                                    <input type="hidden" name="shared_to_usernames" id="global-shared-to-usernames">
+                                    <div class="mb-3">
+                                        <label class="form-label">{% trans "Add a message (optional)" %}</label>
+                                        <textarea name="message" class="form-control" rows="3" placeholder="{% trans 'Check this out!' %}"></textarea>
+                                    </div>
+                                    <button type="submit"
+                                            class="btn btn-primary w-100"
+                                            hx-on::after-request="if(this.closest('form').querySelector('.alert-success')) { const m = bootstrap.Modal.getInstance(document.getElementById('globalShareModal')); if(m) m.hide(); this.closest('form').querySelector('.alert-success').remove(); }">
+                                        {% trans "Share to Selected Users" %}
+                                    </button>
+                                    <div id="global-share-user-result"></div>
+                                </form>
+                            </div>
+                            <!-- Share to Groups Tab -->
+                            <div class="tab-pane fade" id="global-group-share" role="tabpanel">
+                                <form id="global-share-group-form" method="POST" hx-post="" hx-target="#global-share-group-result" hx-swap="innerHTML">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="share_type" value="group">
+                                    <div class="mb-3">
+                                        <input type="text"
+                                               class="form-control"
+                                               placeholder="{% trans 'Search your groups...' %}"
+                                               name="group_search"
+                                               hx-get="{% url 'posts:search_user_groups' %}"
+                                               hx-target="#global-group-results"
+                                               hx-trigger="keyup changed delay:300ms">
+                                    </div>
+                                    <div id="global-group-results" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
+                                        <div class="p-3 text-center text-muted">
+                                            <small>{% trans "Start typing to search your groups" %}</small>
+                                        </div>
+                                    </div>
+                                    <div id="global-selected-groups" class="mb-3">
+                                        <small class="text-muted">{% trans "Selected groups will appear here" %}</small>
+                                    </div>
+                                    <input type="hidden" name="shared_to_group_ids" id="global-shared-to-group-ids">
+                                    <div class="mb-3">
+                                        <label class="form-label">{% trans "Add a message (optional)" %}</label>
+                                        <textarea name="message" class="form-control" rows="3" placeholder="{% trans 'Check this out!' %}"></textarea>
+                                    </div>
+                                    <button type="submit"
+                                            class="btn btn-primary w-100"
+                                            hx-on::after-request="if(this.closest('form').querySelector('.alert-success')) { const m = bootstrap.Modal.getInstance(document.getElementById('globalShareModal')); if(m) m.hide(); this.closest('form').querySelector('.alert-success').remove(); }">
+                                        {% trans "Share to Selected Groups" %}
+                                    </button>
+                                    <div id="global-share-group-result"></div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dedicated Full-Screen Reels Continuous Player -->
+        <div id="fullscreenReelsOverlay" class="fullscreen-reels-modal d-none" aria-hidden="true" role="dialog" aria-label="{% trans 'Reels viewer' %}">
+            <button type="button" class="reel-control-btn-subtle close-fs-reels-btn position-absolute" id="closeReelsOverlay" style="z-index: 2015;" title="{% trans 'Back to feed' %}" aria-label="{% trans 'Close Reels' %}">
+                <i class="bi bi-arrow-left"></i>
+            </button>
+            <div class="reels-snap-viewport" id="reelsSnapViewport">
+                <!-- Dynamically populated continuous snap items -->
+            </div>
         </div>
     {% endblock %}
 
@@ -3437,6 +3665,198 @@ window.addEventListener('beforeinstallprompt', (e) => {
         document.addEventListener('htmx:sendError', function(e) {
             const btn = (e.detail && e.detail.elt && e.detail.elt.matches && e.detail.elt.matches('.like-button')) ? e.detail.elt : null;
             if (btn) revertLikeOptimistic(btn);
+        });
+    })();
+    </script>
+
+    <!-- Global Modal Hydration & Share Controller -->
+    <script>
+    (function () {
+        'use strict';
+
+        var selectedUsers = new Set();
+        var selectedGroups = new Set();
+
+        function updateSelectedUsers() {
+            var container = document.getElementById('global-selected-users');
+            var input = document.getElementById('global-shared-to-usernames');
+            if (!container || !input) return;
+
+            if (selectedUsers.size === 0) {
+                container.innerHTML = '<small class="text-muted">Selected users will appear here</small>';
+                input.value = '';
+            } else {
+                container.innerHTML = Array.from(selectedUsers).map(function (u) {
+                    return '<span class="badge bg-primary me-1 mb-1">' + u +
+                        ' <button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.5rem" ' +
+                        'onclick="window.removeGlobalShareUser(\'' + u + '\')">&times;</button></span>';
+                }).join('');
+                input.value = Array.from(selectedUsers).join(',');
+            }
+        }
+
+        function updateSelectedGroups() {
+            var container = document.getElementById('global-selected-groups');
+            var input = document.getElementById('global-shared-to-group-ids');
+            if (!container || !input) return;
+
+            if (selectedGroups.size === 0) {
+                container.innerHTML = '<small class="text-muted">Selected groups will appear here</small>';
+                input.value = '';
+            } else {
+                container.innerHTML = Array.from(selectedGroups).map(function (gid) {
+                    var label = document.querySelector('#group-' + gid);
+                    var bold = label ? label.querySelector('.fw-bold') : null;
+                    var name = bold ? bold.textContent : gid;
+                    return '<span class="badge bg-success me-1 mb-1">' + name +
+                        ' <button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.5rem" ' +
+                        'onclick="window.removeGlobalShareGroup(\'' + gid + '\')">&times;</button></span>';
+                }).join('');
+                input.value = Array.from(selectedGroups).join(',');
+            }
+        }
+
+        window.removeGlobalShareUser = function (username) {
+            selectedUsers.delete(username);
+            var cb = document.querySelector('#globalShareModal .user-checkbox[value="' + username + '"]');
+            if (cb) cb.checked = false;
+            updateSelectedUsers();
+        };
+
+        window.removeGlobalShareGroup = function (groupId) {
+            selectedGroups.delete(groupId);
+            var cb = document.querySelector('#globalShareModal .group-checkbox[value="' + groupId + '"]');
+            if (cb) cb.checked = false;
+            updateSelectedGroups();
+        };
+
+        document.addEventListener('change', function (e) {
+            if (!e.target.closest('#globalShareModal')) return;
+            if (e.target.classList.contains('user-checkbox')) {
+                e.target.checked ? selectedUsers.add(e.target.value) : selectedUsers.delete(e.target.value);
+                updateSelectedUsers();
+            }
+            if (e.target.classList.contains('group-checkbox')) {
+                e.target.checked ? selectedGroups.add(e.target.value) : selectedGroups.delete(e.target.value);
+                updateSelectedGroups();
+            }
+        });
+
+        document.addEventListener('submit', function (e) {
+            if (e.target.id === 'global-share-user-form') updateSelectedUsers();
+            if (e.target.id === 'global-share-group-form') updateSelectedGroups();
+        }, true);
+
+        document.addEventListener('htmx:configRequest', function (e) {
+            var elt = e.detail && e.detail.elt;
+            if (!elt) return;
+            var fid = elt.id || (elt.closest && elt.closest('form') && elt.closest('form').id) || '';
+            if (fid === 'global-share-user-form') updateSelectedUsers();
+            if (fid === 'global-share-group-form') updateSelectedGroups();
+        });
+
+        window.pwaniPrepareShareModal = function (postId, button) {
+            var modal = document.getElementById('globalShareModal');
+            if (!modal) return;
+            var postUrl = button.getAttribute('data-post-url') || (window.location.origin + '/posts/' + postId + '/');
+            var fullUrl = postUrl.startsWith('http') ? postUrl : (window.location.origin + postUrl);
+            var postContent = button.getAttribute('data-post-content') || '';
+
+            var copyBtn = document.getElementById('globalCopyLinkBtn');
+            if (copyBtn) {
+                copyBtn.onclick = function () {
+                    if (typeof copyLinkToClipboard === 'function') {
+                        copyLinkToClipboard(fullUrl);
+                    } else if (navigator.clipboard) {
+                        navigator.clipboard.writeText(fullUrl);
+                    }
+                };
+            }
+
+            var nativeBtn = document.getElementById('globalNativeShareBtn');
+            if (nativeBtn) {
+                nativeBtn.onclick = function () {
+                    if (typeof window.pwaniShare === 'function') {
+                        window.pwaniShare(postUrl, postContent);
+                    }
+                };
+            }
+
+            var platformLinks = modal.querySelectorAll('.platform-share-btn');
+            platformLinks.forEach(function (link) {
+                link.setAttribute('data-share-url', fullUrl);
+            });
+            if (typeof window.pwaniShareInit === 'function') {
+                window.pwaniShareInit();
+            }
+
+            var shareEndpoint = '/posts/' + postId + '/share/';
+            var userForm = document.getElementById('global-share-user-form');
+            if (userForm) {
+                userForm.setAttribute('hx-post', shareEndpoint);
+                if (window.htmx) htmx.process(userForm);
+            }
+            var groupForm = document.getElementById('global-share-group-form');
+            if (groupForm) {
+                groupForm.setAttribute('hx-post', shareEndpoint);
+                if (window.htmx) htmx.process(groupForm);
+            }
+
+            selectedUsers.clear();
+            selectedGroups.clear();
+            updateSelectedUsers();
+            updateSelectedGroups();
+            var userResults = document.getElementById('global-user-results');
+            if (userResults) userResults.innerHTML = '<div class="p-3 text-center text-muted"><small>Start typing to search users you follow</small></div>';
+            var groupResults = document.getElementById('global-group-results');
+            if (groupResults) groupResults.innerHTML = '<div class="p-3 text-center text-muted"><small>Start typing to search your groups</small></div>';
+            var userSearchInput = modal.querySelector('input[name="user_search"]');
+            if (userSearchInput) userSearchInput.value = '';
+            var groupSearchInput = modal.querySelector('input[name="group_search"]');
+            if (groupSearchInput) groupSearchInput.value = '';
+            var userResultContainer = document.getElementById('global-share-user-result');
+            if (userResultContainer) userResultContainer.innerHTML = '';
+            var groupResultContainer = document.getElementById('global-share-group-result');
+            if (groupResultContainer) groupResultContainer.innerHTML = '';
+        };
+
+        // Bootstrap modal hydration listener
+        document.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            if (!button) return;
+            const postId = button.getAttribute('data-post-id') || button.getAttribute('data-share-id');
+            const modal = event.target;
+
+            if (postId && modal.querySelector('[name="post_id"]')) {
+                modal.querySelector('[name="post_id"]').value = postId;
+            }
+
+            if (modal.id === 'globalRepostModal' && postId) {
+                const form = modal.querySelector('#globalRepostForm');
+                if (form) {
+                    form.setAttribute('hx-post', '/api/posts/' + postId + '/repost/');
+                    form.setAttribute('hx-target', '#post-card-' + postId);
+                    if (window.htmx) htmx.process(form);
+                    const textarea = form.querySelector('textarea[name="content"]');
+                    if (textarea) textarea.value = '';
+                }
+            }
+
+            if (modal.id === 'globalReportModal' && postId) {
+                const form = modal.querySelector('#globalReportForm');
+                if (form) {
+                    const postInput = form.querySelector('[name="post"]');
+                    if (postInput) postInput.value = postId;
+                    form.setAttribute('hx-target', '#post-card-' + postId);
+                    if (window.htmx) htmx.process(form);
+                    form.reset();
+                    if (postInput) postInput.value = postId;
+                }
+            }
+
+            if (modal.id === 'globalShareModal' && window.pwaniPrepareShareModal) {
+                window.pwaniPrepareShareModal(postId, button);
+            }
         });
     })();
     </script>
