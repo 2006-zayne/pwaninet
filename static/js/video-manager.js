@@ -130,11 +130,6 @@
         if (playPromise !== undefined) {
             playPromise.then(() => {
                 state.currentPlayingVideo = video;
-                if (!state.isFullScreenActive && isReelElement(video)) {
-                    document.body.classList.add('has-active-reel');
-                } else if (!isReelElement(video)) {
-                    document.body.classList.remove('has-active-reel');
-                }
             }).catch(err => {
                 console.warn('[VideoManager] Play rejected:', err);
                 if (isAutoplay && !video.muted) {
@@ -142,9 +137,6 @@
                     video.muted = true;
                     video.play().then(() => {
                         state.currentPlayingVideo = video;
-                        if (!state.isFullScreenActive && isReelElement(video)) {
-                            document.body.classList.add('has-active-reel');
-                        }
                     }).catch(silentErr => {
                         console.log('[VideoManager] Muted retry also rejected:', silentErr);
                     });
@@ -168,7 +160,6 @@
 
         if (state.currentPlayingVideo === video) {
             state.currentPlayingVideo = null;
-            document.body.classList.remove('has-active-reel');
         }
     }
 
@@ -176,7 +167,6 @@
         document.querySelectorAll('video').forEach(vid => {
             pauseVideo(vid);
         });
-        document.body.classList.remove('has-active-reel');
     }
 
     function cleanupVideo(video) {
@@ -324,7 +314,18 @@
     }
 
     function handleHitboxTap(hitbox, event) {
-        const container = hitbox.closest('.reel-card-container') || hitbox.closest('.reel-fullscreen-content') || hitbox.closest('.reels-snap-item');
+        const isInlineReel = hitbox.closest('.reel-card-container') && !hitbox.closest('.reel-fullscreen-content') && !hitbox.closest('.reels-snap-item');
+        if (isInlineReel) {
+            // Clicking an inline feed ReelCard opens the Fullscreen Reels Player
+            const container = hitbox.closest('.reel-card-container');
+            const postId = extractPostId(container);
+            if (postId) {
+                openFullscreenReels(postId);
+            }
+            return;
+        }
+
+        const container = hitbox.closest('.reel-fullscreen-content') || hitbox.closest('.reels-snap-item');
         if (!container) return;
 
         const video = container.querySelector('video');
@@ -410,39 +411,30 @@
         const hlsUrl = video.dataset.hlsUrl || '';
 
         // Extract author info
-        const authorLink = card.querySelector('a[href*="profile"]');
-        const authorAvatar = card.querySelector('.reel-author-avatar')?.getAttribute('src') || authorLink?.querySelector('img')?.getAttribute('src') || '/static/images/default-avatar.png';
-        const authorName = card.querySelector('.reel-author-name')?.textContent?.trim() || authorLink?.textContent?.trim() || '@author';
+        const authorLink = card.querySelector('.reel-scrim-top a[href*="profile"]') || card.querySelector('a[href*="profile"]');
+        const authorAvatar = authorLink?.querySelector('img')?.getAttribute('src') || '/static/images/default-avatar.png';
+        const authorName = authorLink?.textContent?.trim() || 'Author';
         const authorHref = authorLink?.getAttribute('href') || '#';
-        const timeAgo = card.querySelector('.reel-meta-row span')?.textContent?.trim() || '';
 
         // Extract caption
-        const captionEl = card.querySelector('.reel-caption-text') || card.querySelector('.post-text-clamp-2') || card.querySelector('.post-content-text');
+        const captionEl = card.querySelector('.post-text-clamp-2') || card.querySelector('.post-content-text');
         const captionHtml = captionEl ? captionEl.innerHTML : '';
-        const hasCaption = captionHtml.trim().length > 0;
-        const isLongCaption = (captionEl?.textContent?.trim()?.length || 0) > 70;
 
-        // Extract counts & state
+        // Extract like count & state
         const likeBtn = card.querySelector('.like-button');
         const likeCount = card.querySelector('.reel-action-item .reel-action-label')?.textContent?.trim() || '0';
         const isLiked = likeBtn?.classList?.contains('liked') || false;
 
+        // Extract comment count
         const commentCount = card.querySelectorAll('.reel-action-item .reel-action-label')[1]?.textContent?.trim() || '0';
-        const repostCount = card.querySelectorAll('.reel-action-item .reel-action-label')[2]?.textContent?.trim() || '0';
-
-        // Extract badges & audio
-        const unitBadge = card.querySelector('.reel-unit-badge')?.outerHTML || '';
-        const dropdownMenu = card.querySelector('.dropdown')?.innerHTML || '';
-        const audioTitle = card.querySelector('.reel-audio-title')?.textContent?.trim() || ('Original Audio • ' + authorName);
 
         const snapItem = document.createElement('div');
         snapItem.className = 'reels-snap-item';
         snapItem.dataset.postId = postId;
 
         snapItem.innerHTML = `
-            <div class="reel-fullscreen-content position-relative overflow-hidden w-100 h-100 bg-black">
-                <!-- Main Video Element -->
-                <video class="fullscreen-reel-video feed-video w-100 h-100"
+            <div class="reel-fullscreen-content">
+                <video class="fullscreen-reel-video w-100 h-100"
                        id="fs-video-${postId}"
                        playsinline loop preload="metadata"
                        poster="${poster}"
@@ -452,129 +444,74 @@
                     <source src="${videoSrc}" type="video/mp4">
                 </video>
 
-                <!-- Central Interactive Hitbox (Single tap play/pause, Double tap heart like) -->
                 <button type="button"
                         class="reel-center-hitbox reel-tap-hitbox"
                         data-post-id="${postId}"
                         aria-label="Play or pause reel">
                 </button>
 
-                <!-- Transient Play/Pause HUD Indicator -->
                 <div class="reel-play-hud" aria-hidden="true">
                     <i class="bi bi-play-fill"></i>
                 </div>
 
-                <!-- Heart Burst Animation Target -->
-                <div class="reel-heart-burst" aria-hidden="true">
+                <div class="reel-heart-burst">
                     <i class="bi bi-heart-fill"></i>
                 </div>
 
                 <!-- Top Scrim -->
-                <div class="reel-scrim-top position-absolute top-0 start-0 w-100 d-flex align-items-center justify-content-between px-2.5 pt-2 pb-1" style="z-index: 4;">
-                    <div class="d-flex align-items-center gap-2" style="margin-left: 52px;">
-                        ${unitBadge}
+                <div class="reel-scrim-top position-absolute top-0 start-0 w-100 d-flex align-items-center justify-content-between p-3" style="z-index: 4;">
+                    <div class="d-flex align-items-center gap-2 min-w-0">
+                        <a href="${authorHref}" class="flex-shrink-0 text-decoration-none">
+                            <img src="${authorAvatar}" class="rounded-circle border border-2 border-white shadow-sm" style="width: 38px; height: 38px; object-fit: cover;" alt="${authorName}">
+                        </a>
+                        <div class="min-w-0">
+                            <a href="${authorHref}" class="text-white fw-bold text-decoration-none small text-truncate d-inline-block mw-100" style="text-shadow: 0 1px 3px rgba(0,0,0,0.85);">
+                                ${authorName}
+                            </a>
+                        </div>
                     </div>
-                    <div class="d-flex align-items-center gap-2">
-                        ${dropdownMenu ? `<div class="dropdown">${dropdownMenu}</div>` : ''}
-                    </div>
+                    <button type="button" class="btn btn-icon-hitbox text-white fs-4 close-fs-reels-btn" title="Close" aria-label="Close">
+                        <i class="bi bi-x-lg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));"></i>
+                    </button>
                 </div>
 
                 <!-- Floating Right Engagement Stack -->
                 <div class="reel-actions-stack">
                     <div class="reel-action-item">
-                        <button type="button" class="reel-action-icon-btn fs-like-proxy-btn text-white ${isLiked ? 'liked text-danger' : ''}" data-post-id="${postId}" aria-label="Like reel">
+                        <button type="button" class="reel-action-btn fs-like-proxy-btn text-white ${isLiked ? 'liked text-danger' : ''}" data-post-id="${postId}">
                             <i class="bi ${isLiked ? 'bi-heart-fill text-danger' : 'bi-heart'}"></i>
                         </button>
                         <span class="reel-action-label">${likeCount}</span>
                     </div>
 
                     <div class="reel-action-item">
-                        <a href="/posts/${postId}/" class="reel-action-icon-btn text-white text-decoration-none" aria-label="Comments">
+                        <a href="/posts/${postId}/" class="reel-action-btn text-white text-decoration-none">
                             <i class="bi bi-chat-dots-fill"></i>
                         </a>
                         <span class="reel-action-label">${commentCount}</span>
                     </div>
 
                     <div class="reel-action-item">
-                        <button type="button"
-                                class="reel-action-icon-btn text-white"
-                                data-bs-toggle="modal"
-                                data-bs-target="#globalRepostModal"
-                                data-post-id="${postId}"
-                                aria-label="Repost">
-                            <i class="bi bi-repeat"></i>
+                        <button type="button" class="reel-action-btn text-white" data-bs-toggle="modal" data-bs-target="#globalShareModal" data-post-id="${postId}">
+                            <i class="bi bi-share-fill"></i>
                         </button>
-                        <span class="reel-action-label">${repostCount}</span>
+                        <span class="reel-action-label">Share</span>
                     </div>
 
                     <div class="reel-action-item">
-                        <button type="button"
-                                class="reel-action-icon-btn text-white"
-                                data-bs-toggle="modal"
-                                data-bs-target="#globalShareModal"
-                                data-post-id="${postId}"
-                                aria-label="Share reel">
-                            <i class="bi bi-send-fill"></i>
-                        </button>
-                    </div>
-
-                    <div class="reel-action-item">
-                        <button type="button" class="reel-action-icon-btn reel-mute-btn text-white" data-action="mute-toggle" aria-label="Toggle sound">
+                        <button type="button" class="reel-action-btn reel-mute-btn text-white" data-action="mute-toggle">
                             <i class="bi ${isGlobalMuted ? 'bi-volume-mute-fill' : 'bi-volume-up-fill'}"></i>
                         </button>
+                        <span class="reel-action-label reel-mute-label">${isGlobalMuted ? 'Mute' : 'Sound'}</span>
                     </div>
                 </div>
 
-                <!-- Bottom Scrim & Consolidated Author / Caption Overlay -->
-                <div class="reel-scrim-bottom position-absolute bottom-0 start-0 w-100">
-                    <div class="reel-bottom-content">
-                        <!-- Author Row -->
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <a href="${authorHref}" class="flex-shrink-0 text-decoration-none">
-                                <img src="${authorAvatar}" class="rounded-circle border border-2 border-white shadow-sm reel-author-avatar" alt="${authorName}">
-                            </a>
-                            <div class="min-w-0 flex-grow-1">
-                                <div class="d-flex align-items-center gap-1.5">
-                                    <a href="${authorHref}" class="text-white fw-bold text-decoration-none reel-author-name text-truncate">
-                                        ${authorName}
-                                    </a>
-                                </div>
-                                <div class="text-white-50 d-flex align-items-center reel-meta-row">
-                                    <span>${timeAgo}</span>
-                                    <span class="mx-1">&middot;</span>
-                                    <i class="bi bi-globe-americas" title="Public" aria-label="Public"></i>
-                                </div>
-                            </div>
+                <!-- Bottom Scrim & Caption -->
+                <div class="reel-scrim-bottom position-absolute bottom-0 start-0 w-100 p-3 d-flex flex-column justify-content-end" style="pointer-events: none; z-index: 4;">
+                    <div style="pointer-events: auto; max-width: calc(100% - 64px);">
+                        <div class="post-text-clamp-2 fs-6 mb-2" onclick="this.classList.toggle('is-expanded');">
+                            ${captionHtml}
                         </div>
-
-                        <!-- Clamped Caption with Controlled Height & Composer Scroll -->
-                        ${hasCaption ? `
-                        <div class="reel-caption-wrap mb-2">
-                            <div id="fs-caption-${postId}" class="reel-caption-text post-text-clamp-2">
-                                ${captionHtml}
-                            </div>
-                            ${isLongCaption ? `
-                            <button type="button" class="reel-caption-toggle" data-target="#fs-caption-${postId}" aria-expanded="false">
-                                more
-                            </button>` : ''}
-                        </div>` : ''}
-
-                        <!-- Animated Audio Track Pill -->
-                        <div class="reel-audio-wrapper">
-                            <div class="reel-audio-pill">
-                                <div class="reel-audio-waves" aria-hidden="true">
-                                    <span></span>
-                                    <span></span>
-                                    <span></span>
-                                </div>
-                                <span class="reel-audio-title text-truncate">${audioTitle}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Video Playback Progress Bar Line -->
-                    <div class="reel-progress-track">
-                        <div class="reel-progress-bar" id="fs-progress-${postId}"></div>
                     </div>
                 </div>
             </div>
@@ -626,18 +563,6 @@
                 }
             }
         });
-
-        // Continuous infinite-scroll hook: when user scrolls near bottom of viewport, trigger feed load
-        viewport.onscroll = function() {
-            if (!state.isFullScreenActive) return;
-            const remainingScroll = viewport.scrollHeight - (viewport.scrollTop + viewport.clientHeight);
-            if (remainingScroll < viewport.clientHeight * 1.5) {
-                const loadTrigger = document.getElementById('feed-load-trigger');
-                if (loadTrigger && typeof htmx !== 'undefined') {
-                    htmx.trigger(loadTrigger, 'revealed');
-                }
-            }
-        };
 
         // Scroll to target reel and start playback
         if (targetSnapItem) {
@@ -747,21 +672,6 @@
                 return;
             }
 
-            // Caption expand toggle
-            const captionToggle = event.target.closest('.reel-caption-toggle');
-            if (captionToggle) {
-                event.preventDefault();
-                event.stopPropagation();
-                const targetSelector = captionToggle.dataset.target;
-                const captionEl = document.querySelector(targetSelector);
-                if (captionEl) {
-                    const isExp = captionEl.classList.toggle('is-expanded');
-                    captionToggle.textContent = isExp ? 'less' : 'more';
-                    captionToggle.setAttribute('aria-expanded', isExp ? 'true' : 'false');
-                }
-                return;
-            }
-
             // Proxy like button in fullscreen modal -> triggers inline like button
             const fsLikeBtn = event.target.closest('.fs-like-proxy-btn');
             if (fsLikeBtn) {
@@ -778,30 +688,9 @@
                 if (icon) {
                     icon.className = wasLiked ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
                 }
-                const label = fsLikeBtn.parentElement?.querySelector('.reel-action-label');
-                if (label) {
-                    let count = parseInt(label.textContent.trim(), 10) || 0;
-                    count = wasLiked ? count + 1 : Math.max(0, count - 1);
-                    label.textContent = count;
-                }
                 return;
             }
         });
-
-        // Video scrubber progress update
-        document.addEventListener('timeupdate', function(event) {
-            const video = event.target;
-            if (video.tagName !== 'VIDEO') return;
-            if (!video.duration || isNaN(video.duration)) return;
-            const percent = (video.currentTime / video.duration) * 100;
-            const container = video.closest('.reel-card-container') || video.closest('.reels-snap-item');
-            if (container) {
-                const bar = container.querySelector('.reel-progress-bar');
-                if (bar) {
-                    bar.style.width = `${percent}%`;
-                }
-            }
-        }, true);
 
         // Close fullscreen on ESC key
         document.addEventListener('keydown', function(event) {
@@ -827,62 +716,6 @@
                 pauseVideo(state.currentPlayingVideo);
             }
         });
-
-        // Desktop firm reel-card scroll snap locking:
-        // Guarantees desktop users never get stuck in an unclipped, half-visible reel position
-        let desktopSnapTimeout = null;
-        let isAutoSnapping = false;
-
-        function checkAndSnapDesktopReel() {
-            if (state.isFullScreenActive || window.innerWidth < 768 || isAutoSnapping) return;
-
-            clearTimeout(desktopSnapTimeout);
-            desktopSnapTimeout = setTimeout(() => {
-                if (state.isFullScreenActive || isAutoSnapping) return;
-
-                const reelCards = document.querySelectorAll('.reel-card-container');
-                if (reelCards.length === 0) return;
-
-                const navbarHeight = 56;
-                const targetOffsetTop = navbarHeight + 8; // Snap position directly under navbar
-
-                let bestCard = null;
-                let minDistance = Infinity;
-
-                reelCards.forEach(card => {
-                    const rect = card.getBoundingClientRect();
-                    const visibleHeight = Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, targetOffsetTop);
-                    if (visibleHeight > 0) {
-                        const dist = Math.abs(rect.top - targetOffsetTop);
-                        if (dist < minDistance) {
-                            minDistance = dist;
-                            bestCard = card;
-                        }
-                    }
-                });
-
-                // If a reel card is within snap attraction range and not yet perfectly aligned
-                if (bestCard && minDistance > 6 && minDistance < window.innerHeight * 0.45) {
-                    const rect = bestCard.getBoundingClientRect();
-                    const deltaY = rect.top - targetOffsetTop;
-
-                    isAutoSnapping = true;
-                    window.scrollBy({
-                        top: deltaY,
-                        behavior: 'smooth'
-                    });
-
-                    setTimeout(() => {
-                        isAutoSnapping = false;
-                    }, 450);
-                }
-            }, 90);
-        }
-
-        window.addEventListener('scroll', checkAndSnapDesktopReel, { passive: true });
-        if ('onscrollend' in window) {
-            window.addEventListener('scrollend', checkAndSnapDesktopReel, { passive: true });
-        }
     }
 
     function initializeVideos(container = document.body) {
@@ -911,29 +744,6 @@
         });
 
         syncMuteButtons();
-
-        // If fullscreen is active, continuously append newly loaded reels into reelsSnapViewport
-        if (state.isFullScreenActive) {
-            const viewport = document.getElementById('reelsSnapViewport');
-            if (viewport) {
-                const currentPostIds = new Set(Array.from(viewport.querySelectorAll('.reels-snap-item')).map(c => c.dataset.postId));
-                const allInlineReels = document.querySelectorAll('.reel-card-container');
-                allInlineReels.forEach(card => {
-                    const pid = card.dataset.postId || extractPostId(card);
-                    if (pid && !currentPostIds.has(pid)) {
-                        const newSnapItem = buildSnapItemFromReelCard(card);
-                        if (newSnapItem) {
-                            viewport.appendChild(newSnapItem);
-                            if (state.fullscreenObserver) {
-                                state.fullscreenObserver.observe(newSnapItem);
-                            }
-                            const v = newSnapItem.querySelector('video');
-                            if (v) v.muted = isGlobalMuted;
-                        }
-                    }
-                });
-            }
-        }
     }
 
     function setupMutationObserver() {

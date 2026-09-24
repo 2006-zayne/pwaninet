@@ -3,18 +3,52 @@
 {% if post.is_reel and not is_detail %}
     {% include "posts/partials/reel_card.html" with post=post %}
 {% else %}
-<div id="post-card-{{ post.share_id }}" class="post-card shadow-sm mb-1 bg-white rounded-3 overflow-hidden border-0">
+<style>
+.post-card {
+  margin-bottom: 0.25rem !important;
+}
+.engagement-button {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+  border-radius: 999px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 14px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  border: none !important;
+  text-decoration: none !important;
+  transition: all 0.15s ease !important;
+}
+.engagement-button:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+[data-theme="dark"] .engagement-button {
+  background-color: #3a3b3c !important;
+  color: #e4e6eb !important;
+}
+[data-theme="dark"] .engagement-button:hover {
+  background-color: #4e4f50 !important;
+  color: #ffffff !important;
+}
+</style>
+<div id="post-card-{{ post.share_id }}" class="post-card mb-1 shadow-sm bg-white rounded-3 overflow-hidden border-0">
     {% if post.repost_of %}
     <!-- Repost Header -->
     <div class="d-flex align-items-center p-2 border-bottom bg-light">
-        <div class="position-relative me-3" style="width: 120px; height: 72px;">
+        <div class="position-relative me-3 flex-shrink-0" style="width: 120px; height: 72px;">
             <a href="{% url 'users:profile' post.author.username %}"
                hx-get="{% url 'users:profile' post.author.username %}"
                hx-target="#page-content-target"
                hx-swap="innerHTML"
                hx-push-url="true"
                hx-history="true">
-                <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm position-absolute" style="width: 72px; height: 72px; object-fit: cover; left: 0; top: 0;">
+                <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm position-absolute" style="width: 72px; height: 72px; object-fit: cover; left: 0; top: 0;" alt="{{ post.author.username }}">
             </a>
             <a href="{% url 'users:profile' post.repost_of.author.username %}"
                hx-get="{% url 'users:profile' post.repost_of.author.username %}"
@@ -22,13 +56,13 @@
                hx-swap="innerHTML"
                hx-push-url="true"
                hx-history="true">
-                <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm position-absolute" style="width: 72px; height: 72px; object-fit: cover; left: 48px; top: 0;">
+                <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border border-2 border-white shadow-sm position-absolute" style="width: 72px; height: 72px; object-fit: cover; left: 48px; top: 0;" alt="{{ post.repost_of.author.username }}">
             </a>
         </div>
-        <div class="d-flex align-items-center flex-grow-1">
-            <div>
-                <small class="fw-bold text-dark">{{ post.author.get_full_name|default:post.author.username }}</small>
-                <div class="d-flex align-items-center" style="font-size: 11px;">
+        <div class="d-flex align-items-center flex-grow-1 min-w-0" style="min-width: 0;">
+            <div class="min-w-0" style="min-width: 0;">
+                <small class="fw-bold text-dark text-truncate d-block">{{ post.author.get_full_name|default:post.author.username }}</small>
+                <div class="d-flex align-items-center text-truncate" style="font-size: 11px;">
                     <i class="bi bi-repeat text-primary me-1"></i>
                     <span class="text-muted">reposted</span>
                     <i class="bi bi-dot mx-1"></i>
@@ -39,8 +73,8 @@
     </div>
     {% endif %}
 
-    <div class="d-flex align-items-center p-3">
-        <div class="position-relative me-3" style="width: 72px; height: 72px;">
+    <div class="post-card-header d-flex align-items-center p-3">
+        <div class="position-relative me-3 flex-shrink-0" style="width: 72px; height: 72px;">
             {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
                 <a href="{% url 'groups:groups_detail' post.group.id %}"
                    hx-get="{% url 'groups:groups_detail' post.group.id %}"
@@ -48,7 +82,7 @@
                    hx-swap="innerHTML"
                    hx-push-url="true"
                    hx-history="true">
-                    <img src="{{ post.group.get_photo_url }}" class="rounded-circle border border-2 border-white shadow-sm" style="width: 72px; height: 72px; object-fit: cover;">
+                    <img src="{{ post.group.get_photo_url }}" class="rounded-circle border border-2 border-white shadow-sm" style="width: 72px; height: 72px; object-fit: cover;" alt="{{ post.group.name }}">
                 </a>
                 {% if post.repost_of %}
                     <a href="{% url 'users:profile' post.repost_of.author.username %}"
@@ -57,7 +91,7 @@
                        hx-swap="innerHTML"
                        hx-push-url="true"
                        hx-history="true">
-                        <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 36px; height: 36px; object-fit: cover; transform: translate(15%, 15%);">
+                        <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 36px; height: 36px; object-fit: cover; transform: translate(15%, 15%);" alt="{{ post.repost_of.author.username }}">
                     </a>
                 {% else %}
                     <a href="{% url 'users:profile' post.author.username %}"
@@ -66,7 +100,7 @@
                        hx-swap="innerHTML"
                        hx-push-url="true"
                        hx-history="true">
-                        <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 36px; height: 36px; object-fit: cover; transform: translate(15%, 15%);">
+                        <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border border-2 border-white position-absolute bottom-0 end-0 shadow-sm" style="width: 36px; height: 36px; object-fit: cover; transform: translate(15%, 15%);" alt="{{ post.author.username }}">
                     </a>
                 {% endif %}
             {% else %}
@@ -77,7 +111,7 @@
                        hx-swap="innerHTML"
                        hx-push-url="true"
                        hx-history="true">
-                        <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 72px; height: 72px; object-fit: cover;">
+                        <img src="{{ post.repost_of.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 72px; height: 72px; object-fit: cover;" alt="{{ post.repost_of.author.username }}">
                     </a>
                 {% else %}
                     <a href="{% url 'users:profile' post.author.username %}"
@@ -86,14 +120,14 @@
                        hx-swap="innerHTML"
                        hx-push-url="true"
                        hx-history="true">
-                        <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 72px; height: 72px; object-fit: cover;">
+                        <img src="{{ post.author.profile_pic.url }}" class="rounded-circle border shadow-sm" style="width: 72px; height: 72px; object-fit: cover;" alt="{{ post.author.username }}">
                     </a>
                 {% endif %}
             {% endif %}
         </div>
 
-        <div class="flex-grow-1">
-            <h6 class="mb-0 fw-bold small">
+        <div class="post-header-meta flex-grow-1 min-w-0" style="min-width: 0;">
+            <h6 class="mb-0 fw-bold small text-truncate" style="min-width: 0;">
                 {% if post.repost_of %}
                     <a href="{% url 'users:profile' post.repost_of.author.username %}"
                        hx-get="{% url 'users:profile' post.repost_of.author.username %}"
@@ -101,7 +135,7 @@
                        hx-swap="innerHTML"
                        hx-push-url="true"
                        hx-history="true"
-                       class="text-dark text-decoration-none">
+                       class="text-dark text-decoration-none text-truncate d-inline-block mw-100 align-bottom">
                         {{ post.repost_of.author.get_full_name|default:post.repost_of.author.username }}
                     </a>
                 {% else %}
@@ -111,37 +145,43 @@
                        hx-swap="innerHTML"
                        hx-push-url="true"
                        hx-history="true"
-                       class="text-dark text-decoration-none">
+                       class="text-dark text-decoration-none text-truncate d-inline-block mw-100 align-bottom">
                         {{ post.author.get_full_name|default:post.author.username }}
                     </a>
                 {% endif %}
                 {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
-                    {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
-                        <span class="text-muted fw-normal mx-1">posted in</span>
-                        <a href="{% url 'groups:groups_detail' post.group.id %}"
-                           hx-get="{% url 'groups:groups_detail' post.group.id %}"
-                           hx-target="#page-content-target"
-                           hx-swap="innerHTML"
-                           hx-push-url="true"
-                           hx-history="true"
-                           class="text-primary text-decoration-none">{{ post.group.name }}</a>
-                    {% endif %}
+                    <span class="text-muted fw-normal mx-1">posted in</span>
+                    <a href="{% url 'groups:groups_detail' post.group.id %}"
+                       hx-get="{% url 'groups:groups_detail' post.group.id %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true"
+                       class="text-primary text-decoration-none text-truncate d-inline-block mw-100 align-bottom">{{ post.group.name }}</a>
                 {% endif %}
             </h6>
-            <small class="text-muted d-flex align-items-center" style="font-size: 11px;">
-                <span class="badge bg-light text-primary border-0 me-1">{{ post.unit.code|default:"GLOBAL" }}</span>
-                <i class="bi bi-dot"></i> {% if post.repost_of %}{{ post.repost_of.created_at|timesince }}{% else %}{{ post.created_at|timesince }}{% endif %} ago
-            </small>
+            <div class="post-header-subtitle text-muted d-flex align-items-center text-truncate" style="font-size: 11px;">
+                {% if post.unit.code %}
+                    <span class="badge bg-light text-primary border-0 me-1">{{ post.unit.code }}</span>
+                    <span class="mx-1">&middot;</span>
+                {% endif %}
+                <span>{% if post.repost_of %}{{ post.repost_of.created_at|timesince }}{% else %}{{ post.created_at|timesince }}{% endif %} ago</span>
+                <span class="mx-1">&middot;</span>
+                <i class="bi bi-globe-americas text-muted" title="{% trans 'Public' %}" aria-label="{% trans 'Public' %}" style="font-size: 11px;"></i>
+            </div>
         </div>
 
-        <div class="dropdown">
-            <button class="btn btn-sm border-0 text-muted" data-bs-toggle="dropdown" aria-expanded="false">
+        <div class="dropdown flex-shrink-0 ms-2">
+            <button class="btn btn-ghost btn-icon-hitbox rounded-circle text-muted"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    aria-label="{% trans 'Post options' %}">
                 <i class="bi bi-three-dots fs-5"></i>
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow">
                 <li>
                     <button class="dropdown-item d-flex align-items-center gap-2"
-                            data-bs-toggle="modal" data-bs-target="#repostModal-{{ post.share_id }}">
+                            data-bs-toggle="modal" data-bs-target="#globalRepostModal" data-post-id="{{ post.share_id }}">
                         <i class="bi bi-repeat"></i> Repost
                     </button>
                 </li>
@@ -164,7 +204,7 @@
                 </li>
                 <li>
                     <button class="dropdown-item d-flex align-items-center gap-2"
-                            data-bs-toggle="modal" data-bs-target="#shareModal-{{ post.share_id }}">
+                            data-bs-toggle="modal" data-bs-target="#globalShareModal" data-post-id="{{ post.share_id }}" data-post-url="{% url 'posts:post_details' post.share_id %}" data-post-content="{{ post.content|truncatechars:80|escapejs }}">
                         <i class="bi bi-share"></i> {% trans "Share to profile" %}
                     </button>
                 </li>
@@ -175,9 +215,9 @@
                         <i class="bi bi-link-45deg"></i> Copy Link
                     </button>
                 </li>
-<li>
+                <li>
                     <button class="dropdown-item d-flex align-items-center gap-2"
-                            data-bs-toggle="modal" data-bs-target="#reportModal-{{ post.share_id }}">
+                            data-bs-toggle="modal" data-bs-target="#globalReportModal" data-post-id="{{ post.share_id }}">
                         <i class="bi bi-flag"></i> {% trans "Report post" %}
                     </button>
                 </li>
@@ -191,7 +231,7 @@
                             data-media-type="{% if post_obj.video %}video{% elif post_obj.images.exists %}image{% elif post_obj.audio %}audio{% elif post_obj.docs or post_obj.shared_document %}document{% elif post_obj.get_intel_file %}{% with f_url=post_obj.get_intel_file.url|lower %}{% if '.mp4' in f_url or '.mov' in f_url or '.webm' in f_url %}video{% elif '.mp3' in f_url or '.wav' in f_url or '.ogg' in f_url or '.m4a' in f_url %}audio{% elif '.pdf' in f_url or '.doc' in f_url or '.ppt' in f_url or '.xls' in f_url %}document{% else %}image{% endif %}{% endwith %}{% endif %}"
                             data-url="{% if post_obj.video %}{{ post_obj.get_video_for_feed.url }}{% elif post_obj.images.exists %}{{ post_obj.images.first.image.url }}{% elif post_obj.audio %}{{ post_obj.audio.url }}{% elif post_obj.docs %}{{ post_obj.docs.url }}{% elif post_obj.shared_document %}{{ post_obj.shared_document.file.url }}{% elif post_obj.get_intel_file %}{{ post_obj.get_intel_file.url }}{% endif %}"
                             data-filename="{% if post_obj.video %}video_{{ post_obj.share_id }}.mp4{% elif post_obj.images.exists %}image_{{ post_obj.share_id }}.jpg{% elif post_obj.audio %}audio_{{ post_obj.share_id }}.mp3{% elif post_obj.docs %}{{ post_obj.docs.name|default:'document' }}{% elif post_obj.shared_document %}{{ post_obj.shared_document.title|default:'document' }}{% elif post_obj.get_intel_file %}{{ post_obj.get_intel_file.name|default:'media_file' }}{% endif %}"
-                            data-thumbnail="{% if post_obj.video %}{% if post_obj.get_video_poster %}{{ post_obj.get_video_poster }}{% elif post_obj.thumbnail %}{{ post_obj.thumbnail.url }}{% endif %}{% elif post_obj.images.exists %}{% if post_obj.images.first.get_thumbnail_url %}{{ post_obj.images.first.get_thumbnail_url }}{% elif post_obj.images.first.image %}{{ post_obj.images.first.image.url }}{% endif %}{% elif post_obj.thumbnail %}{{ post_obj.thumbnail.url }}{% elif post_obj.shared_document %}{% with doc_file=post_obj.shared_document.latest_version.files.first %}{% if doc_file.preview_url %}{{ doc_file.preview_url }}{% elif doc_file.preview_path %}/media/{{ doc_file.preview_path }}{% elif doc_file.thumbnail_path %}/media/{{ doc_file.thumbnail_path }}{% endif %}{% endwith %}{% endif %}">
+                            data-thumbnail="{% if post_obj.video %}{{ post_obj.get_video_poster|default:post_obj.thumbnail_url|default:'' }}{% elif post_obj.images.exists %}{% if post_obj.images.first.get_thumbnail_url %}{{ post_obj.images.first.get_thumbnail_url }}{% elif post_obj.images.first.image %}{{ post_obj.images.first.image.url }}{% endif %}{% elif post_obj.thumbnail_url %}{{ post_obj.thumbnail_url }}{% elif post_obj.shared_document %}{% with doc_file=post_obj.shared_document.latest_version.files.first %}{% if doc_file.preview_url %}{{ doc_file.preview_url }}{% elif doc_file.preview_path %}/media/{{ doc_file.preview_path }}{% elif doc_file.thumbnail_path %}/media/{{ doc_file.thumbnail_path }}{% endif %}{% endwith %}{% endif %}">
                         <i class="bi bi-download"></i> {% trans "Download Media" %}
                     </button>
                 </li>
@@ -216,22 +256,23 @@
     {% with post_obj=post.repost_of|default:post %}
         {% if post_obj.gradient_class != 'none' and not post_obj.images.exists and not post_obj.video and not post_obj.docs and not post_obj.audio and not post_obj.shared_document %}
     <div class="{{ post_obj.gradient_class }} gradient-intel-bg text-center {% if post_obj.has_signature %}signature-overlay{% endif %}"
-         {% if post_obj.gradient_class == 'bg-username-pattern' %}
-             style="background: linear-gradient(135deg, {{ post_obj.custom_gradient_color1|default:'#141E30' }} 0%, {{ post_obj.custom_gradient_color2|default:'#243B55' }} 100%); color: {{ post_obj.custom_gradient_text_color|default:'#ffffff' }};"
-         {% endif %}>
+         style="--gradient-text-color: {{ post_obj.custom_gradient_text_color|default:'#ffffff' }}; color: var(--gradient-text-color); {% if post_obj.gradient_class == 'bg-username-pattern' %}background: linear-gradient(135deg, {{ post_obj.custom_gradient_color1|default:'#141E30' }} 0%, {{ post_obj.custom_gradient_color2|default:'#243B55' }} 100%);{% endif %}">
         {% if post_obj.gradient_class == 'bg-username-pattern' %}
             {% include "posts/partials/username_pattern_svg.html" with author_name=post_obj.custom_gradient_text|default:post_obj.author.username color1=post_obj.custom_gradient_color1 color2=post_obj.custom_gradient_color2 text_color=post_obj.custom_gradient_text_color %}
         {% elif post_obj.has_signature %}
             {% include "posts/partials/signature_svg.html" with author_name=post_obj.author.username %}
         {% endif %}
-        <p class="mb-0 text-white fw-bold fs-3" style="line-height: 1.5; position: relative; z-index: 1;">
-            {% if post.repost_of %}
-                {% if post.content %}<p class="mb-2 text-dark" style="font-size: 14px;">{{ post.content|urlize|linebreaksbr }}</p>{% endif %}
-                {{ post.repost_of.content|urlize|linebreaksbr }}
-            {% else %}
-                {{ post.content|urlize|linebreaksbr }}
+        <div class="gradient-text-content {% if post_obj.content|length <= 60 %}font-scale-short{% elif post_obj.content|length <= 150 %}font-scale-medium{% else %}font-scale-long{% endif %}"
+             style="line-height: 1.45; position: relative; z-index: 1; color: inherit; max-width: 100%; word-break: break-word;">
+            {% if post.repost_of and post.content %}
+                <div class="mb-2 text-dark bg-white bg-opacity-75 p-2 rounded-2 small text-start" style="color: #0f172a !important;">
+                    {{ post.content|urlize|linebreaksbr }}
+                </div>
             {% endif %}
-        </p>
+            <div class="gradient-text-body">
+                {{ post_obj.content|urlize|linebreaksbr }}
+            </div>
+        </div>
     </div>
         {% else %}
     <div class="px-3 pb-3">
@@ -241,16 +282,16 @@
     {% endwith %}
 
     {% if post.audio %}
-    <div class="post-media border-top border-bottom bg-light position-relative" data-media-type="audio" data-post.share_id="{{ post.share_id }}">
-        <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="audio" data-url="{{ post.audio.url }}" data-thumbnail="{% if post.thumbnail %}{{ post.thumbnail.url }}{% endif %}" title="Download">
+    <div class="post-media-wrapper post-media border-top border-bottom bg-light position-relative" data-media-type="audio" data-post-id="{{ post.share_id }}">
+        <button class="media-download-btn" data-post-id="{{ post.share_id }}" data-media-type="audio" data-url="{{ post.audio.url }}" data-thumbnail="{{ post.thumbnail_url|default:'' }}" title="Download">
             <i class="bi bi-download"></i>
         </button>
         <div class="p-3 d-flex align-items-center gap-3">
             <div class="bg-primary bg-opacity-10 p-3 rounded-3 flex-shrink-0">
                 <i class="bi bi-music-note-fill text-primary fs-3"></i>
             </div>
-            <div class="flex-grow-1">
-                <h6 class="mb-0 fw-bold small">Music/Audio</h6>
+            <div class="flex-grow-1 min-w-0" style="min-width: 0;">
+                <h6 class="mb-0 fw-bold small text-truncate">Music/Audio</h6>
                 <small class="text-muted">Attached audio</small>
             </div>
             <audio id="audio-{{ post.share_id }}" class="w-100" style="max-width: 300px;" controls muted loop>
@@ -262,176 +303,160 @@
     {% endif %}
 
     {% if post.images.exists %}
-    <a href="{% url 'posts:post_details' post.share_id %}"
-       hx-get="{% url 'posts:post_details' post.share_id %}"
-       hx-target="#page-content-target"
-       hx-swap="innerHTML"
-       hx-push-url="true"
-       hx-history="true">
-        <div class="post-media border-top border-bottom bg-light" data-post.share_id="{{ post.share_id }}" data-media-type="image">
-            <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="image" data-url="{{ post.images.first.image.url }}" data-thumbnail="{% if post.images.first.get_thumbnail_url %}{{ post.images.first.get_thumbnail_url }}{% elif post.images.first.image %}{{ post.images.first.image.url }}{% endif %}" title="Download">
-                <i class="bi bi-download"></i>
-            </button>
-            <div class="image-grid-{{ post.share_id }}" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px; max-height: 400px;">
-                {% for post_image in post.images.all|slice:":3" %}
-                    <div class="image-grid-item position-relative overflow-hidden" style="{% if forloop.counter == 1 %}grid-column: span 2; grid-row: span 2; aspect-ratio: 2/1;{% elif forloop.counter == 2 %}aspect-ratio: 1/1;{% else %}aspect-ratio: 1/1;{% endif %}">
+    <div class="post-media-wrapper post-media border-top border-bottom bg-light position-relative" data-post-id="{{ post.share_id }}" data-media-type="image">
+        <button class="media-download-btn" data-post-id="{{ post.share_id }}" data-media-type="image" data-url="{{ post.images.first.image.url }}" data-thumbnail="{% if post.images.first.get_thumbnail_url %}{{ post.images.first.get_thumbnail_url }}{% elif post.images.first.image %}{{ post.images.first.image.url }}{% endif %}" title="Download">
+            <i class="bi bi-download"></i>
+        </button>
+        <div class="image-grid-{{ post.share_id }}" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px; max-height: 400px;">
+            {% for post_image in post.images.all|slice:":3" %}
+                <div class="image-grid-item position-relative overflow-hidden" style="{% if forloop.counter == 1 %}grid-column: span 2; grid-row: span 2; aspect-ratio: 2/1;{% elif forloop.counter == 2 %}aspect-ratio: 1/1;{% else %}aspect-ratio: 1/1;{% endif %}">
+                    <a href="{% url 'posts:post_details' post.share_id %}"
+                       hx-get="{% url 'posts:post_details' post.share_id %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true"
+                       class="d-block w-100 h-100 text-decoration-none">
                         <img src="{{ post_image.get_thumbnail_url }}" loading="lazy" class="w-100 h-100" style="object-fit: cover;" alt="Post image">
                         {% if forloop.last and post.images.count > 3 %}
                             <div class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background: rgba(0,0,0,0.5);">
                                 <span class="text-white fw-bold fs-4">+{{ post.images.count|add:"-3" }}</span>
                             </div>
                         {% endif %}
-                    </div>
-                {% endfor %}
-            </div>
+                    </a>
+                </div>
+            {% endfor %}
         </div>
-    </a>
+    </div>
+    {% elif post.video or post.get_intel_file_is_video %}
+    <div class="post-media-wrapper post-media border-top border-bottom bg-black position-relative">
+        {% include "posts/partials/media_video_player.html" with post=post %}
+    </div>
     {% elif post.get_intel_file and not post.shared_document %}
-    <a href="{% url 'posts:post_details' post.share_id %}"
-       hx-get="{% url 'posts:post_details' post.share_id %}"
-       hx-target="#page-content-target"
-       hx-swap="innerHTML"
-       hx-push-url="true"
-       hx-history="true">
-        <div class="post-media border-top border-bottom bg-light">
-            {% with f_url=post.get_intel_file.url|lower %}
-                {% if ".jpg" in f_url or ".png" in f_url or ".jpeg" in f_url or ".webp" in f_url %}
-                    <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="image" data-url="{{ post.get_intel_file.url }}" data-thumbnail="{{ post.get_intel_file.url }}" title="Download">
-                        <i class="bi bi-download"></i>
-                    </button>
+    <div class="post-media-wrapper post-media border-top border-bottom bg-light position-relative">
+        {% with f_url=post.get_intel_file.url|lower %}
+            {% if ".jpg" in f_url or ".png" in f_url or ".jpeg" in f_url or ".webp" in f_url %}
+                <button class="media-download-btn" data-post-id="{{ post.share_id }}" data-media-type="image" data-url="{{ post.get_intel_file.url }}" data-thumbnail="{{ post.get_intel_file.url }}" title="Download">
+                    <i class="bi bi-download"></i>
+                </button>
+                <a href="{% url 'posts:post_details' post.share_id %}"
+                   hx-get="{% url 'posts:post_details' post.share_id %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
+                   class="d-block text-decoration-none">
                     <img src="{{ post.get_intel_file.url }}" loading="lazy" class="img-fluid w-100" style="max-height: 550px; object-fit: cover;" alt="Post image">
-                {% elif ".mp4" in f_url or ".mov" in f_url or ".webm" in f_url %}
-                    <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="video" data-url="{{ post.get_video_for_feed.url }}" data-thumbnail="{% if post.get_video_poster %}{{ post.get_video_poster }}{% elif post.thumbnail %}{{ post.thumbnail.url }}{% endif %}" title="Download">
-                        <i class="bi bi-download"></i>
-                    </button>
-                    <div class="ratio ratio-16x9 bg-black position-relative" data-media-type="video" data-post.share_id="{{ post.share_id }}">
-                        <video id="video-{{ post.share_id }}"
-                               preload="metadata"
-                               class="w-100 h-100 {% if not disable_autoplay and not in_search %}feed-video{% endif %}"
-                               muted loop playsinline controls
-                               data-post.share_id="{{ post.share_id }}"
-                               {% if disable_autoplay or in_search %}
-                               data-autoplay="false"
-                               data-disable-autoplay="true"
-                               {% else %}
-                               data-autoplay="true"
-                               {% endif %}
-                               poster="{{ post.get_video_poster|default:'' }}"
-                               {# HLS adaptive streaming — hls.js picks up data-hls-url when present #}
-                               {% if post.hls_playlist %}
-                               data-hls-url="{{ post.get_hls_url }}"
-                               {% endif %}
-                               data-video-url="{{ post.get_video_for_feed.url }}">
-                            {# Fallback source for browsers without hls.js and for non-HLS posts #}
-                            <source src="{{ post.get_video_for_feed.url }}" type="video/mp4">
-                        </video>
-                        {% if post.video and post.video_status != 'ready' %}
-                        <div class="position-absolute bottom-0 start-0 m-2">
-                            <span class="badge bg-dark bg-opacity-75 text-white small">
-                                {% if post.video_status == 'transcoding' %}
-                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>HD processing…
-                                {% elif post.video_status == 'failed' %}
-                                <i class="bi bi-exclamation-triangle me-1"></i>Processing failed
-                                {% else %}
-                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Preparing…
-                                {% endif %}
-                            </span>
-                        </div>
-                        {% endif %}
-                    </div>
+                </a>
 
-                {% elif ".mp3" in f_url or ".wav" in f_url or ".ogg" in f_url or ".m4a" in f_url %}
-                    <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="audio" data-url="{{ post.get_intel_file.url }}" data-thumbnail="{% if post.thumbnail %}{{ post.thumbnail.url }}{% endif %}" title="Download">
+            {% elif ".mp3" in f_url or ".wav" in f_url or ".ogg" in f_url or ".m4a" in f_url %}
+                <button class="media-download-btn" data-post-id="{{ post.share_id }}" data-media-type="audio" data-url="{{ post.get_intel_file.url }}" data-thumbnail="{{ post.thumbnail_url|default:'' }}" title="Download">
+                    <i class="bi bi-download"></i>
+                </button>
+                <div class="p-3 d-flex align-items-center justify-content-between" style="background: transparent;" data-media-type="audio" data-post-id="{{ post.share_id }}">
+                    <div class="d-flex align-items-center flex-grow-1 min-w-0 me-2" style="min-width: 0;">
+                        <div class="me-2 flex-shrink-0">
+                            <i class="bi bi-music-note-fill text-muted fs-4"></i>
+                        </div>
+                        <div class="flex-grow-1 min-w-0" style="min-width: 0;">
+                            <h6 class="mb-0 fw-bold small text-muted text-truncate">Audio File</h6>
+                            <small class="text-muted">MUSIC/AUDIO</small>
+                        </div>
+                    </div>
+                    <audio id="audio-{{ post.share_id }}" controls preload="metadata" class="w-100 flex-shrink-0" style="max-width: 200px; background: transparent; background-color: transparent;" muted loop {% if not disable_autoplay and not in_search %}autoplay{% endif %}>
+                        <source src="{{ post.get_intel_file.url }}" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+            {% elif ".pdf" in f_url %}
+                <div class="p-4 d-flex align-items-center justify-content-between bg-white position-relative">
+                    <button class="media-download-btn" data-post-id="{{ post.share_id }}" data-media-type="document" data-url="{{ post.get_intel_file.url }}" data-thumbnail="{{ post.thumbnail_url|default:'' }}" title="Download">
                         <i class="bi bi-download"></i>
                     </button>
-                    <div class="p-3 d-flex align-items-center justify-content-between" style="background: transparent;" data-media-type="audio" data-post.share_id="{{ post.share_id }}">
-                        <div class="d-flex align-items-center flex-grow-1">
-                            <div class="me-2">
-                                <i class="bi bi-music-note-fill text-muted fs-4"></i>
+                    <a href="{{ post.get_intel_file.url }}" target="_blank" rel="noopener noreferrer" class="d-flex align-items-center min-w-0 me-2 text-decoration-none text-dark">
+                        {% if post.thumbnail_url %}
+                            <img src="{{ post.thumbnail_url }}" class="rounded-3 me-3 flex-shrink-0" style="width: 48px; height: 48px; object-fit: cover;" alt="Thumbnail">
+                        {% else %}
+                            <div class="bg-danger bg-opacity-10 p-3 rounded-3 me-3 flex-shrink-0">
+                                <i class="bi bi-file-earmark-pdf-fill text-danger fs-3"></i>
                             </div>
-                            <div class="flex-grow-1">
-                                <h6 class="mb-0 fw-bold small text-muted">Audio File</h6>
-                                <small class="text-muted">MUSIC/AUDIO</small>
-                            </div>
-                        </div>
-                        <audio id="audio-{{ post.share_id }}" controls preload="metadata" class="w-100" style="max-width: 200px; background: transparent; background-color: transparent;" muted loop {% if not disable_autoplay and not in_search %}autoplay{% endif %}>
-                            <source src="{{ post.get_intel_file.url }}" type="audio/mpeg">
-                            Your browser does not support the audio element.
-                        </audio>
-                    </div>
-                {% elif ".pdf" in f_url %}
-                    <a href="{{ post.get_intel_file.url }}" target="_blank" class="text-decoration-none">
-                        <div class="p-4 d-flex align-items-center justify-content-between bg-white position-relative">
-                            <button class="media-download-btn" data-post.share_id="{{ post.share_id }}" data-media-type="document" data-url="{{ post.get_intel_file.url }}" data-thumbnail="{% if post.thumbnail %}{{ post.thumbnail.url }}{% endif %}" title="Download">
-                                <i class="bi bi-download"></i>
-                            </button>
-                            <div class="d-flex align-items-center">
-                                {% if post.thumbnail %}
-                                    <img src="{{ post.thumbnail.url }}" class="rounded-3 me-3" style="width: 48px; height: 48px; object-fit: cover;" alt="Thumbnail">
-                                {% else %}
-                                    <div class="bg-danger bg-opacity-10 p-3 rounded-3 me-3">
-                                        <i class="bi bi-file-earmark-pdf-fill text-danger fs-3"></i>
-                                    </div>
-                                {% endif %}
-                                <div>
-                                    <h6 class="mb-0 fw-bold small">Academic Files</h6>
-                                    <small class="text-muted">PDF DOCUMENT</small>
-                                </div>
-                            </div>
-                            <span class="btn btn-outline-dark btn-sm rounded-pill px-3 fw-bold">VIEW PDF</span>
+                        {% endif %}
+                        <div class="min-w-0" style="min-width: 0;">
+                            <h6 class="mb-0 fw-bold small text-truncate">Academic Files</h6>
+                            <small class="text-muted">PDF DOCUMENT</small>
                         </div>
                     </a>
-                {% endif %}
-            {% endwith %}
-        </div>
-    </a>
+                    <a href="{{ post.get_intel_file.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-dark btn-sm rounded-pill px-3 fw-bold flex-shrink-0 text-decoration-none">VIEW PDF</a>
+                </div>
+            {% endif %}
+        {% endwith %}
+    </div>
     {% endif %}
 
     {% if post.shared_document %}
-    <a href="{% url 'documents:document_detail' post.shared_document.share_id %}"
-       hx-get="{% url 'documents:document_detail' post.shared_document.share_id %}"
-       hx-target="#page-content-target"
-       hx-swap="innerHTML"
-       hx-push-url="true"
-       hx-history="true"
-       class="text-decoration-none">
-        <div class="post-media border-top border-bottom bg-light position-relative" style="padding: 0;">
+    <div class="post-media-wrapper post-media border-top border-bottom bg-light position-relative" style="padding: 0;">
+        <a href="{% url 'documents:document_detail' post.shared_document.share_id %}"
+           hx-get="{% url 'documents:document_detail' post.shared_document.share_id %}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-history="true"
+           class="text-decoration-none d-block">
             {% include "documents/partials/document_preview_full.html" with document=post.shared_document %}
-        </div>
-    </a>
+        </a>
+    </div>
     {% endif %}
 
-    <div class="d-flex align-items-center justify-content-between px-3 py-2 border-top">
-        <div class="d-flex align-items-center gap-2">
+    <!-- Engagement Action Bar -->
+    <div class="postcard-actions d-flex align-items-center justify-content-between px-3 py-2 border-top">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
             <div id="like-section-{{ post.share_id }}">
                 {% include "posts/partials/like_button.html" with post=post %}
             </div>
-            <a href="{% url 'posts:post_details' post.share_id %}"
-               hx-get="{% url 'posts:post_details' post.share_id %}"
-               hx-target="#page-content-target"
-               hx-swap="innerHTML"
-               hx-push-url="true"
-               hx-history="true"
-               class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button">
+
+            <button type="button"
+                    class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button"
+                    aria-label="{% trans 'Comments' %}"
+                    onclick="(function(){
+                        var input = document.getElementById('comment-input-{{ post.share_id }}');
+                        if (input) {
+                            input.focus();
+                        } else {
+                            window.location.href = '{% url 'posts:post_details' post.share_id %}';
+                        }
+                    })();">
                 <i class="bi bi-chat-dots fs-5"></i>
                 <span class="fw-bold">{{ post.comments.count }}</span>
-            </a>
-            <button id="repost-btn-{{ post.share_id }}" class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button"
-                    data-bs-toggle="modal" data-bs-target="#repostModal-{{ post.share_id }}">
+            </button>
+
+            <button id="repost-btn-{{ post.share_id }}"
+                    class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button"
+                    data-bs-toggle="modal"
+                    data-bs-target="#globalRepostModal"
+                    data-post-id="{{ post.share_id }}"
+                    aria-label="{% trans 'Repost' %}">
                 <i class="bi bi-repeat fs-5"></i>
                 <span class="fw-bold">{{ post.repost_count }}</span>
             </button>
-            <button class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button"
-                    data-bs-toggle="modal" data-bs-target="#shareModal-{{ post.share_id }}">
+
+            <button type="button"
+                    class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button"
+                    data-bs-toggle="modal"
+                    data-bs-target="#globalShareModal"
+                    data-post-id="{{ post.share_id }}"
+                    data-post-url="{% url 'posts:post_details' post.share_id %}"
+                    data-post-content="{{ post.content|truncatechars:80|escapejs }}"
+                    aria-label="{% trans 'Share post' %}">
                 <i class="bi bi-share fs-5"></i>
                 <span class="fw-bold">{% trans "Share" %}</span>
             </button>
+
             {% if post.shared_document %}
-                <span class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button">
+                <span class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button" title="Positive Rating">
                     <i class="bi bi-hand-thumbs-up fs-5"></i>
                     <span class="fw-bold">{% if post.shared_document.analytics %}{{ post.shared_document.analytics.positive_rating_percentage }}{% else %}0{% endif %}%</span>
                 </span>
-                <span class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button">
+                <span class="btn btn-sm border-0 text-muted d-flex align-items-center gap-1 text-decoration-none engagement-button" title="Negative Rating">
                     <i class="bi bi-hand-thumbs-down fs-5"></i>
                     <span class="fw-bold">{% if post.shared_document.analytics %}{{ post.shared_document.analytics.negative_rating_percentage }}{% else %}0{% endif %}%</span>
                 </span>
@@ -439,459 +464,35 @@
         </div>
     </div>
 
-    <!-- Inline comment input -->
-    <div class="px-3 pb-3 pt-1 border-top bg-white">
+    {% if not is_detail %}
+    <!-- Persistent Inline Comment Input Bar -->
+    <div id="comment-area-{{ post.share_id }}" class="postcard-comment-bar px-3 pb-3 pt-2 border-top bg-white">
         <form hx-post="{% url 'posts:add_comment' post.share_id %}?from_card=1"
               hx-swap="none"
               class="d-flex align-items-center gap-2"
               hx-on::after-request="if(event.detail.successful) this.reset();">
             {% csrf_token %}
-            <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border flex-shrink-0" style="width: 32px; height: 32px; object-fit: cover;">
+            <img src="{{ request.user.profile_pic.url|default:'/static/images/default-avatar.png' }}"
+                 class="rounded-circle border flex-shrink-0"
+                 style="width: 32px; height: 32px; object-fit: cover;"
+                 alt="{{ request.user.username }}">
             <div class="flex-grow-1 position-relative">
-                <input type="text" name="content"
+                <input type="text"
+                       name="content"
+                       id="comment-input-{{ post.share_id }}"
                        class="form-control border-0 rounded-pill"
                        placeholder="{% trans 'Write a comment...' %}"
-                       style="font-size: 13px; background-color: #e9ecef; padding-right: 40px; height: 42px;">
-                <button type="submit" class="btn border-0 rounded-circle position-absolute"
-                        style="width: 32px; height: 32px; right: 4px; top: 50%; transform: translateY(-50%); padding: 0; display: flex; align-items: center; justify-content: center; background: transparent;">
-                    <i class="bi bi-send-fill" style="font-size: 20px; color: #0f172a;"></i>
+                       style="font-size: 13px; background-color: #f1f5f9; padding-right: 40px; height: 38px;"
+                       required>
+                <button type="submit"
+                        class="btn border-0 rounded-circle position-absolute"
+                        style="width: 32px; height: 32px; right: 3px; top: 50%; transform: translateY(-50%); padding: 0; display: flex; align-items: center; justify-content: center; background: transparent;"
+                        aria-label="{% trans 'Submit comment' %}">
+                    <i class="bi bi-send-fill" style="font-size: 16px; color: var(--primary, #0d6efd);"></i>
                 </button>
             </div>
         </form>
     </div>
+    {% endif %}
 </div>
-
-<!-- Repost Modal -->
-<div class="modal fade" id="repostModal-{{ post.share_id }}" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Repost</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form hx-post="/api/posts/{{ post.share_id }}/repost/"
-                      hx-target="#post-card-{{ post.share_id }}"
-                      hx-swap="outerHTML"
-                      hx-on::after-request="bootstrap.Modal.getInstance(document.getElementById('repostModal-{{ post.share_id }}')).hide()">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label class="form-label">{% trans "Add a comment (optional)" %}</label>
-                        <textarea name="content" class="form-control" rows="3" placeholder="{% trans 'What do you think?' %}"></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">{% trans "Repost" %}</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Share Modal -->
-<div class="modal fade" id="shareModal-{{ post.share_id }}" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{% trans "Share Post" %}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                
-                <div class="mb-3 d-grid">
-                    <button type="button" class="btn btn-outline-primary"
-                            onclick="copyLinkToClipboard(window.location.origin + '{% url 'posts:post_details' post.share_id %}')">
-                        <i class="bi bi-link-45deg"></i> Copy Link to Clipboard
-                    </button>
-                </div>
-
-                <!-- External / Native Share -->
-                <div class="mb-3" id="external-share-{{ post.share_id }}">
-                    <!-- Native share button: shown when navigator.share or Capacitor.Plugins.Share is available -->
-                    <button type="button"
-                            class="btn btn-outline-secondary w-100 mb-2 d-none"
-                            id="native-share-btn-{{ post.share_id }}"
-                            onclick="window.pwaniShare('{% url 'posts:post_details' post.share_id %}', '{{ post.content|truncatechars:80|escapejs }}')">
-                        <i class="bi bi-share-fill me-1"></i> {% trans "Share to Other Apps" %}
-                    </button>
-                    <!-- Fallback platform links: shown on desktop where no share API exists -->
-                    <div id="platform-share-links-{{ post.share_id }}" class="d-flex gap-2 flex-wrap justify-content-center d-none">
-                        <a href="#" target="_blank" rel="noopener noreferrer"
-                           class="btn btn-sm btn-outline-success platform-share-btn"
-                           data-platform="whatsapp"
-                           data-share-url="{{ request.scheme }}://{{ request.get_host }}{% url 'posts:post_details' post.share_id %}">
-                            <i class="bi bi-whatsapp me-1"></i>WhatsApp
-                        </a>
-                        <a href="#" target="_blank" rel="noopener noreferrer"
-                           class="btn btn-sm btn-outline-primary platform-share-btn"
-                           data-platform="telegram"
-                           data-share-url="{{ request.scheme }}://{{ request.get_host }}{% url 'posts:post_details' post.share_id %}">
-                            <i class="bi bi-telegram me-1"></i>Telegram
-                        </a>
-                        <a href="#" target="_blank" rel="noopener noreferrer"
-                           class="btn btn-sm btn-outline-dark platform-share-btn"
-                           data-platform="twitter"
-                           data-share-url="{{ request.scheme }}://{{ request.get_host }}{% url 'posts:post_details' post.share_id %}">
-                            <i class="bi bi-twitter-x me-1"></i>X
-                        </a>
-                    </div>
-                </div>
-
-                <hr>
-<ul class="nav nav-tabs mb-3" id="shareTabs-{{ post.share_id }}" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="user-tab-{{ post.share_id }}" data-bs-toggle="tab" data-bs-target="#user-share-{{ post.share_id }}" type="button" role="tab">{% trans "Share to Users" %}</button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="group-tab-{{ post.share_id }}" data-bs-toggle="tab" data-bs-target="#group-share-{{ post.share_id }}" type="button" role="tab">{% trans "Share to Groups" %}</button>
-                    </li>
-                </ul>
-                <div class="tab-content" id="shareTabContent-{{ post.share_id }}">
-                    <!-- Share to Users Tab -->
-                    <div class="tab-pane fade show active" id="user-share-{{ post.share_id }}" role="tabpanel">
-                        <form id="share-user-form-{{ post.share_id }}" hx-post="{% url 'posts:share_post' post.share_id %}" hx-target="#share-result-{{ post.share_id }}" hx-swap="innerHTML">
-                            {% csrf_token %}
-                            <input type="hidden" name="share_type" value="user">
-                            <div class="mb-3">
-                                <input type="text"
-                                       class="form-control"
-                                       placeholder="{% trans 'Search users you follow...' %}"
-                                       name="user_search"
-                                       hx-get="{% url 'posts:search_following_users' %}"
-                                       hx-target="#user-results-{{ post.share_id }}"
-                                       hx-trigger="keyup changed delay:300ms">
-                                <!-- HTMX indicator disabled to prevent continuous loading spinners -->
-                                <!--
-                                <span id="user-search-indicator-{{ post.share_id }}" class="htmx-indicator">
-                                    <span class="spinner-border spinner-border-sm" role="status"></span>
-                                </span>
-                                -->
-                            </div>
-                            <div id="user-results-{{ post.share_id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
-                                <div class="p-3 text-center text-muted">
-                                    <small>{% trans "Start typing to search users you follow" %}</small>
-                                </div>
-                            </div>
-                            <div id="selected-users-{{ post.share_id }}" class="mb-3">
-                                <small class="text-muted">{% trans "Selected users will appear here" %}</small>
-                            </div>
-                            <input type="hidden" name="shared_to_usernames" id="shared-to-usernames-{{ post.share_id }}">
-                            <div class="mb-3">
-                                <label class="form-label">{% trans "Add a message (optional)" %}</label>
-                                <textarea name="message" class="form-control" rows="3" placeholder="{% trans 'Check this out!' %}"></textarea>
-                            </div>
-                            <button type="submit"
-                                    class="btn btn-primary w-100"
-                                    hx-on::after-request="if(this.closest('form').querySelector('.alert-success')) { const modal = bootstrap.Modal.getInstance(document.getElementById('shareModal-{{ post.share_id }}')); if(modal) modal.hide(); this.closest('form').querySelector('.alert-success').remove(); }">
-                                {% trans "Share to Selected Users" %}
-                            </button>
-                            <div id="share-result-{{ post.share_id }}"></div>
-                        </form>
-                    </div>
-                    <!-- Share to Groups Tab -->
-                    <div class="tab-pane fade" id="group-share-{{ post.share_id }}" role="tabpanel">
-                        <form id="share-group-form-{{ post.share_id }}" hx-post="{% url 'posts:share_post' post.share_id %}" hx-target="#share-result-group-{{ post.share_id }}" hx-swap="innerHTML">
-                            {% csrf_token %}
-                            <input type="hidden" name="share_type" value="group">
-                            <div class="mb-3">
-                                <input type="text" 
-                                       class="form-control" 
-                                       placeholder="Search your groups..." 
-                                       name="group_search"
-                                       hx-get="{% url 'posts:search_user_groups' %}"
-                                       hx-target="#group-results-{{ post.share_id }}"
-                                       hx-trigger="keyup changed delay:300ms">
-                                <!-- HTMX indicator disabled to prevent continuous loading spinners -->
-                                <!--
-                                <span id="group-search-indicator-{{ post.share_id }}" class="htmx-indicator">
-                                    <span class="spinner-border spinner-border-sm" role="status"></span>
-                                </span>
-                                -->
-                            </div>
-                            <div id="group-results-{{ post.share_id }}" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
-                                <div class="p-3 text-center text-muted">
-                                    <small>Start typing to search your groups</small>
-                                </div>
-                            </div>
-                            <div id="selected-groups-{{ post.share_id }}" class="mb-3">
-                                <small class="text-muted">Selected groups will appear here</small>
-                            </div>
-                            <input type="hidden" name="shared_to_group_ids" id="shared-to-group-ids-{{ post.share_id }}">
-                            <div class="mb-3">
-                                <label class="form-label">Add a message (optional)</label>
-                                <textarea name="message" class="form-control" rows="3" placeholder="Check this out!"></textarea>
-                            </div>
-                            <button type="submit" 
-                                    class="btn btn-primary w-100"
-                                    hx-on::after-request="if(this.closest('form').querySelector('.alert-success')) { const modal = bootstrap.Modal.getInstance(document.getElementById('shareModal-{{ post.share_id }}')); if(modal) modal.hide(); this.closest('form').querySelector('.alert-success').remove(); }">
-                                Share to Selected Groups
-                            </button>
-                            <div id="share-result-group-{{ post.share_id }}"></div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-{% with sid=post.share_id|cut:"-" %}
-(function () {
-    var modalId = 'shareModal-{{ post.share_id }}';
-    var selectedUsers = new Set();
-    var selectedGroups = new Set();
-
-    /* ── Sync hidden inputs ─────────────────────────────────────────── */
-    function updateSelectedUsers() {
-        var container = document.getElementById('selected-users-{{ post.share_id }}');
-        var input = document.getElementById('shared-to-usernames-{{ post.share_id }}');
-        if (!container || !input) return;
-
-        if (selectedUsers.size === 0) {
-            container.innerHTML = '<small class="text-muted">Selected users will appear here</small>';
-            input.value = '';
-        } else {
-            container.innerHTML = Array.from(selectedUsers).map(function (u) {
-                return '<span class="badge bg-primary me-1 mb-1">' + u +
-                    ' <button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.5rem" ' +
-                    'onclick="window[\'removeUser_{{ sid }}\'](\'' + u + '\')">&times;</button></span>';
-            }).join('');
-            input.value = Array.from(selectedUsers).join(',');
-        }
-    }
-
-    function updateSelectedGroups() {
-        var container = document.getElementById('selected-groups-{{ post.share_id }}');
-        var input = document.getElementById('shared-to-group-ids-{{ post.share_id }}');
-        if (!container || !input) return;
-
-        if (selectedGroups.size === 0) {
-            container.innerHTML = '<small class="text-muted">Selected groups will appear here</small>';
-            input.value = '';
-        } else {
-            container.innerHTML = Array.from(selectedGroups).map(function (gid) {
-                var label = document.querySelector('#group-' + gid);
-                var bold = label ? label.querySelector('.fw-bold') : null;
-                var name = bold ? bold.textContent : gid;
-                return '<span class="badge bg-success me-1 mb-1">' + name +
-                    ' <button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.5rem" ' +
-                    'onclick="window[\'removeGroup_{{ sid }}\'](\'' + gid + '\')">&times;</button></span>';
-            }).join('');
-            input.value = Array.from(selectedGroups).join(',');
-        }
-    }
-
-    /* ── Document-level event delegation (works for HTMX-injected cards) ─ */
-    document.addEventListener('change', function (e) {
-        if (!e.target.closest('#' + modalId)) return;
-
-        if (e.target.classList.contains('user-checkbox')) {
-            e.target.checked ? selectedUsers.add(e.target.value) : selectedUsers.delete(e.target.value);
-            updateSelectedUsers();
-        }
-        if (e.target.classList.contains('group-checkbox')) {
-            e.target.checked ? selectedGroups.add(e.target.value) : selectedGroups.delete(e.target.value);
-            updateSelectedGroups();
-        }
-    });
-
-    // Click fallback for mobile reliability
-    document.addEventListener('click', function (e) {
-        if (!e.target.closest || !e.target.closest('#' + modalId)) return;
-        var cb = e.target.classList.contains('group-checkbox')
-            ? e.target
-            : (e.target.closest && e.target.closest('.group-checkbox'));
-        if (!cb) return;
-        setTimeout(function () {
-            cb.checked ? selectedGroups.add(cb.value) : selectedGroups.delete(cb.value);
-            updateSelectedGroups();
-        }, 10);
-    });
-
-    /* ── Sync hidden inputs BEFORE HTMX serialises the form ─────────── */
-    // Capture phase fires before HTMX's bubble-phase listener
-    document.addEventListener('submit', function (e) {
-        if (e.target.id === 'share-user-form-{{ post.share_id }}') updateSelectedUsers();
-        if (e.target.id === 'share-group-form-{{ post.share_id }}') updateSelectedGroups();
-    }, true);
-
-    // Belt-and-suspenders: also sync on htmx:configRequest
-    document.addEventListener('htmx:configRequest', function (e) {
-        var elt = e.detail && e.detail.elt;
-        if (!elt) return;
-        var fid = elt.id || (elt.closest && elt.closest('form') && elt.closest('form').id) || '';
-        if (fid === 'share-user-form-{{ post.share_id }}') updateSelectedUsers();
-        if (fid === 'share-group-form-{{ post.share_id }}') updateSelectedGroups();
-    });
-
-    /* ── Expose globals with valid JS-identifier-safe keys ─────────── */
-    window['updateSelectedUsers_{{ sid }}'] = updateSelectedUsers;
-    window['updateSelectedGroups_{{ sid }}'] = updateSelectedGroups;
-
-    window['removeUser_{{ sid }}'] = function (username) {
-        selectedUsers.delete(username);
-        var cb = document.querySelector('.user-checkbox[value="' + username + '"]');
-        if (cb) cb.checked = false;
-        updateSelectedUsers();
-    };
-
-    window['removeGroup_{{ sid }}'] = function (groupId) {
-        selectedGroups.delete(groupId);
-        var cb = document.querySelector('.group-checkbox[value="' + groupId + '"]');
-        if (cb) cb.checked = false;
-        updateSelectedGroups();
-    };
-})();
-{% endwith %}
-</script>
-
-
-<script>
-(function() {
-    // Enhanced post card interactions
-    const postCard = document.getElementById('post-card-{{ post.share_id }}');
-    if (!postCard) return;
-
-    // Touch feedback for mobile
-    postCard.addEventListener('touchstart', function() {
-        this.style.transform = 'translateY(-1px)';
-    });
-    
-    postCard.addEventListener('touchend', function() {
-        this.style.transform = '';
-    });
-
-    // Enhanced button interactions
-    const buttons = postCard.querySelectorAll('.btn');
-    buttons.forEach(button => {
-        button.addEventListener('click', function() {
-            if (this.classList.contains('start-conversation') || 
-                this.id === 'repost-btn-{{ post.share_id }}' ||
-                this.closest('[data-bs-toggle="modal"]')) {
-                return;
-            }
-
-            this.style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                this.style.transform = '';
-            }, 100);
-        });
-    });
-
-    // Enhanced comment input interactions
-    const commentInput = postCard.querySelector('input[name="content"]');
-    if (commentInput) {
-        commentInput.addEventListener('focus', function() {
-            this.parentElement.style.transform = 'translateY(-1px)';
-        });
-        
-        commentInput.addEventListener('blur', function() {
-            this.parentElement.style.transform = '';
-        });
-    }
-
-    // Media hover effects
-    const mediaElements = postCard.querySelectorAll('.post-media');
-    mediaElements.forEach(media => {
-        media.addEventListener('mouseenter', function() {
-            this.style.transform = 'scale(1.02)';
-        });
-
-        media.addEventListener('mouseleave', function() {
-            this.style.transform = '';
-        });
-    });
-
-    // Download media functionality
-    const downloadButtons = postCard.querySelectorAll('.media-download-btn');
-    downloadButtons.forEach(button => {
-        button.addEventListener('click', async function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const postId = this.getAttribute('data-post.share_id');
-            const mediaType = this.getAttribute('data-media-type');
-            const mediaUrl = this.getAttribute('data-url');
-            
-            if (!mediaUrl) {
-                alert('Could not find media to download');
-                return;
-            }
-            
-            const filename = mediaUrl.split('/').pop();
-            let category = 'document';
-            if (mediaType === 'image') {
-                category = 'image';
-            } else if (mediaType === 'video') {
-                category = 'video';
-            } else if (mediaType === 'audio') {
-                category = 'audio';
-            }
-            
-            if (window.downloadsManager) {
-                try {
-                    await window.downloadsManager.download({
-                        url: mediaUrl,
-                        type: category,
-                        filename: filename,
-                        postId: postId
-                    });
-                    alert('Downloaded successfully');
-                } catch (error) {
-                    console.error('Download failed:', error);
-                    directDownload(mediaUrl, filename);
-                }
-            } else {
-                directDownload(mediaUrl, filename);
-            }
-        });
-    });
-    
-    function directDownload(url, filename) {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-    }
-})();
-</script>
-
-<!-- Report Modal -->
-<div class="modal fade" id="reportModal-{{ post.share_id }}" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Report post</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form hx-post="/api/reports/"
-                      hx-target="#post-card-{{ post.share_id }}"
-                      hx-swap="outerHTML"
-                      hx-on::after-request="bootstrap.Modal.getInstance(document.getElementById('reportModal-{{ post.share_id }}')).hide()">
-                    {% csrf_token %}
-                    <input type="hidden" name="post" value="{{ post.share_id }}">
-                    <div class="mb-3">
-                        <label class="form-label">Reason for reporting</label>
-                        <select name="reason" class="form-select" required>
-                            <option value="">Select a reason</option>
-                            <option value="spam">Spam</option>
-                            <option value="inappropriate">Inappropriate content</option>
-                            <option value="harassment">Harassment</option>
-                            <option value="false_information">False information</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Additional details (optional)</label>
-                        <textarea name="description" class="form-control" rows="3" placeholder="Please provide more details about why you're reporting this post..."></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-danger w-100">Submit Report</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
 {% endif %}

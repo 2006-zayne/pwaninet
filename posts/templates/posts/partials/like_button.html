@@ -2,27 +2,24 @@
 {% load post_filters %}
 {% check_is_liked post as user_has_liked %}
 {% if is_reel %}
-<div class="reel-action-item" id="reel-like-wrap-{{ post.share_id }}">
-    <button class="reel-action-icon-btn like-button {% if user_has_liked %}text-danger liked{% else %}text-white{% endif %}"
-            hx-post="{% url 'posts:toggle_like' post.share_id %}?is_reel=1"
-            hx-target="#reel-like-wrap-{{ post.share_id }}"
-            hx-swap="outerHTML"
-            data-share-id="{{ post.share_id }}"
-            data-post-id="{{ post.id }}"
-            aria-label="{% if user_has_liked %}{% trans 'Unlike post' %}{% else %}{% trans 'Like post' %}{% endif %}">
-        <i class="bi {% if user_has_liked %}bi-heart-fill text-danger{% else %}bi-heart{% endif %}"></i>
-    </button>
-    <span class="reel-action-label">{{ like_count|default:post.like_count }}</span>
-</div>
+<button class="reel-action-btn like-button {% if user_has_liked %}text-danger{% else %}text-white{% endif %}"
+        hx-post="{% url 'posts:toggle_like' post.share_id %}?is_reel=1"
+        hx-target="this"
+        hx-swap="outerHTML"
+        data-share-id="{{ post.share_id }}"
+        data-post-id="{{ post.id }}"
+        aria-label="{% if user_has_liked %}{% trans 'Unlike post' %}{% else %}{% trans 'Like post' %}{% endif %}">
+    <i class="bi {% if user_has_liked %}bi-heart-fill{% else %}bi-heart{% endif %} fs-4"></i>
+</button>
 {% else %}
-<button class="like-button btn {% if user_has_liked %}text-danger{% else %}text-muted{% endif %} btn-sm border-0 d-flex align-items-center engagement-button"
+<button class="like-button engagement-button {% if user_has_liked %}text-danger{% else %}text-muted{% endif %}"
         hx-post="{% url 'posts:toggle_like' post.share_id %}"
         hx-target="this"
         hx-swap="outerHTML"
         data-share-id="{{ post.share_id }}"
         data-post-id="{{ post.id }}"
         aria-label="{% if user_has_liked %}{% trans 'Unlike post' %}{% else %}{% trans 'Like post' %}{% endif %}">
-    <i class="bi {% if user_has_liked %}bi-heart-fill{% else %}bi-heart{% endif %} fs-5"></i>
-    <span class="like-count ms-2 fw-bold">{{ like_count|default:post.like_count }}</span>
+    <i class="bi {% if user_has_liked %}bi-heart-fill{% else %}bi-heart{% endif %}"></i>
+    <span class="like-count fw-bold">{{ like_count|default:post.like_count }}</span>
 </button>
 {% endif %}

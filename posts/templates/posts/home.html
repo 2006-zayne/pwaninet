@@ -36,13 +36,22 @@
 
   body { background-color: var(--background); color: var(--text-main); }
 
-  /* ── Search Header (Scrolls with home content) ── */
+  /* ── Search Header (Scrolls naturally with home feed content) ── */
   .search-header {
-    position: relative;
+    position: relative !important;
+    top: auto !important;
     z-index: 10;
     background: var(--header-blur-bg);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     border-bottom: 1px solid var(--border-soft);
     padding: 8px 16px;
+  }
+
+  /* Adjust for native app safe area at the top */
+  .is-native-app .search-header,
+  body.is-native-app .search-header {
+    top: auto !important;
   }
 
   .search-inner {

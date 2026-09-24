@@ -14,22 +14,7 @@ def get_user_group_ids(user):
     return list(Membership.objects.filter(user=user, status=MembershipStatus.APPROVED).values_list('group_id', flat=True))
 
 
-def get_reel_q_filter():
-    """Build a Q filter that matches portrait video reels."""
-    has_video = (Q(video__isnull=False) & ~Q(video='')) | (Q(video_preview__isnull=False) & ~Q(video_preview=''))
-    reel_aspect = Q(video_height__isnull=False, video_width__isnull=False, video_height__gt=F('video_width'))
-    reel_keywords = (
-        Q(video__icontains='reel') | Q(video__icontains='portrait') |
-        Q(video__icontains='short') | Q(video__icontains='tiktok') |
-        Q(video__icontains='story') | Q(video__icontains='9_16') |
-        Q(video__icontains='9x16') | Q(video__icontains='vertical') |
-        Q(video_preview__icontains='reel') | Q(video_preview__icontains='portrait') |
-        Q(video_preview__icontains='short') | Q(video_preview__icontains='vertical')
-    )
-    return has_video & (reel_aspect | reel_keywords)
-
-
-def get_prioritized_feed_queryset(user, following_ids, user_group_ids, exclude_reels=False):
+def get_prioritized_feed_queryset(user, following_ids, user_group_ids):
     """Improved feed algorithm with time decay, author affinity, and view counts."""
     hours_since_creation = Cast(
         (timezone.now() - F('created_at')) / timedelta(hours=1),
@@ -52,10 +37,6 @@ def get_prioritized_feed_queryset(user, following_ids, user_group_ids, exclude_r
     hidden_post_ids = HiddenPost.objects.filter(user=user).values_list('post_id', flat=True)
     if hidden_post_ids:
         filters &= ~Q(id__in=hidden_post_ids)
-
-    # Exclude reels if building the standard postcard feed
-    if exclude_reels:
-        filters &= ~get_reel_q_filter()
 
     return Post.objects.filter(filters).select_related('author', 'unit', 'group').prefetch_related('likes', 'comments').annotate(
         like_count_annotated=Count('likes', distinct=True),
@@ -92,62 +73,6 @@ def get_prioritized_feed_queryset(user, following_ids, user_group_ids, exclude_r
         )
     ).annotate(
         # Comprehensive engagement score with weighted factors
-        engagement_score=(
-            F('like_count_annotated') * 1.0 +
-            F('comment_count_annotated') * 2.0 +
-            F('repost_count_annotated') * 3.0 +
-            F('author_affinity') +
-            F('recency_score')
-        )
-    ).distinct().order_by('-priority_tier', '-engagement_score', '-created_at', '-id')
-
-
-def get_prioritized_reels_queryset(user, following_ids, user_group_ids):
-    """Queryset for portrait reels with prioritization for user's network and campus community."""
-    reel_q = get_reel_q_filter()
-    
-    # Exclude hidden posts
-    hidden_post_ids = HiddenPost.objects.filter(user=user).values_list('post_id', flat=True) if user.is_authenticated else []
-    
-    # Reels can come from followed users, groups, or public campus feed
-    base_filter = reel_q & (Q(group__isnull=True) | Q(group_id__in=user_group_ids))
-    if hidden_post_ids:
-        base_filter &= ~Q(id__in=hidden_post_ids)
-        
-    return Post.objects.filter(base_filter).select_related('author', 'unit', 'group').prefetch_related('likes', 'comments').annotate(
-        like_count_annotated=Count('likes', distinct=True),
-        comment_count_annotated=Count('comments', distinct=True),
-        repost_count_annotated=Count('repost_children', distinct=True),
-        
-        # Author affinity: boost posts from authors user frequently engages with
-        author_affinity=Case(
-            When(author_id__in=following_ids, then=Value(30)),
-            default=Value(0),
-            output_field=IntegerField()
-        ),
-        
-        # Priority tier based on source
-        priority_tier=Case(
-            When(author_id__in=following_ids, then=Value(100)), 
-            When(group_id__in=user_group_ids, then=Value(80)), 
-            When(course=getattr(user, 'course', None), unit__year=getattr(user, 'year', None), then=Value(70)),
-            When(course=getattr(user, 'course', None), then=Value(50)),
-            When(unit__year=getattr(user, 'year', None), then=Value(40)),
-            default=Value(20), 
-            output_field=IntegerField()
-        ),
-        
-        # Recency score
-        recency_score=Case(
-            When(created_at__gte=timezone.now() - timedelta(hours=6), then=Value(50)),
-            When(created_at__gte=timezone.now() - timedelta(days=1), then=Value(40)),
-            When(created_at__gte=timezone.now() - timedelta(days=3), then=Value(30)),
-            When(created_at__gte=timezone.now() - timedelta(days=7), then=Value(20)),
-            When(created_at__gte=timezone.now() - timedelta(days=30), then=Value(10)),
-            default=Value(5),
-            output_field=IntegerField()
-        )
-    ).annotate(
         engagement_score=(
             F('like_count_annotated') * 1.0 +
             F('comment_count_annotated') * 2.0 +
