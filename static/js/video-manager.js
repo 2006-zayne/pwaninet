@@ -237,6 +237,7 @@
         }
 
         state.videos.delete(video);
+        delete video.dataset.pwaniObserved;
 
         // Free decoder memory on unmount/teardown
         try {
@@ -350,6 +351,9 @@
             const snapItem = buildSnapItemFromReelCard(card);
             if (snapItem) {
                 viewport.appendChild(snapItem);
+                if (window.htmx) {
+                    window.htmx.process(snapItem);
+                }
                 if (state.fullscreenObserver) {
                     state.fullscreenObserver.observe(snapItem);
                 }
@@ -583,7 +587,12 @@
             creatorRowHtml = `
                 <div class="reel-creator-row d-flex align-items-center gap-2 mb-2">
                     <div class="position-relative flex-shrink-0">
-                        <a href="${profileUrl}" class="d-block text-decoration-none">
+                        <a href="${profileUrl}"
+                           hx-get="${profileUrl}"
+                           hx-target="#page-content-target"
+                           hx-swap="innerHTML"
+                           hx-push-url="true"
+                           class="d-block text-decoration-none">
                             <img src="${authorAvatar}"
                                  class="rounded-circle border border-2 border-white shadow-sm"
                                  style="width: 40px; height: 40px; object-fit: cover;"
@@ -593,6 +602,10 @@
                     <div class="min-w-0">
                         <div class="d-flex align-items-center gap-2">
                             <a href="${profileUrl}"
+                               hx-get="${profileUrl}"
+                               hx-target="#page-content-target"
+                               hx-swap="innerHTML"
+                               hx-push-url="true"
                                class="text-white fw-bold text-decoration-none text-truncate d-inline-block mw-100"
                                style="font-size: 0.92rem; text-shadow: 0 1px 3px rgba(0,0,0,0.9);">
                                 @${authorUsername}
@@ -1616,6 +1629,9 @@
             const snapItem = buildSnapItemFromReelCard(card);
             if (snapItem) {
                 viewport.appendChild(snapItem);
+                if (window.htmx) {
+                    window.htmx.process(snapItem);
+                }
                 state.fullscreenObserver.observe(snapItem);
 
                 const video = snapItem.querySelector('video');
@@ -2309,7 +2325,25 @@
                 const commentEl = document.getElementById(`comment-${commentId}`);
                 const profileLink = commentEl?.querySelector('.comment-author-link') || commentEl?.querySelector('.comment-avatar-link') || commentEl?.querySelector('a');
                 if (profileLink && profileLink.href) {
-                    window.location.href = profileLink.href;
+                    if (state.isFullScreenActive) {
+                        closeFullscreenReels();
+                    }
+                    const modalEl = document.getElementById('commentsModal');
+                    if (modalEl && typeof bootstrap !== 'undefined') {
+                        try { bootstrap.Modal.getInstance(modalEl)?.hide(); } catch (_) {}
+                    }
+                    if (window.htmx && document.getElementById('page-content-target')) {
+                        window.htmx.ajax('GET', profileLink.href, {
+                            target: '#page-content-target',
+                            swap: 'innerHTML',
+                            headers: {
+                                'HX-Request': 'true',
+                                'HX-Target': 'page-content-target'
+                            }
+                        });
+                    } else {
+                        profileLink.click();
+                    }
                 }
                 return;
             }
@@ -3302,6 +3336,9 @@
         }
 
         shelves.forEach(shelf => {
+            if (carouselShelfObserver) {
+                try { carouselShelfObserver.observe(shelf); } catch (_) {}
+            }
             if (shelf.dataset.carouselInit === 'true') return;
             shelf.dataset.carouselInit = 'true';
 
@@ -3365,11 +3402,18 @@
     }, { passive: true });
 
     function initializeVideos(container = document.body) {
+        if (!container) container = document.body;
         if (!state.feedObserver) {
             createFeedObserver();
         }
 
-        const videos = container.querySelectorAll('video');
+        const videos = [];
+        if (container.tagName === 'VIDEO') {
+            videos.push(container);
+        } else if (container.querySelectorAll) {
+            videos.push(...container.querySelectorAll('video'));
+        }
+
         videos.forEach(video => {
             if (!video.dataset.pwaniObserved) {
                 video.dataset.pwaniObserved = 'true';
@@ -3392,6 +3436,10 @@
                     // Check if vertical video trapped in landscape container
                     checkAndPromoteLegacyVideo(video);
                 }
+            } else if (isReelElement(video) && state.feedObserver) {
+                try {
+                    state.feedObserver.observe(video);
+                } catch (_) {}
             }
         });
 
@@ -3455,8 +3503,8 @@
         });
 
         document.addEventListener('htmx:afterSwap', function(event) {
-            const target = event.detail.target;
-            if (target && target.querySelector && target.querySelector('video')) {
+            const target = event.detail?.target;
+            if (target) {
                 initializeVideos(target);
                 if (state.isFullScreenActive) {
                     appendNewVideosToFullscreenViewport();
@@ -3466,12 +3514,16 @@
 
         document.addEventListener('htmx:load', function(event) {
             const elt = event.detail?.elt || document.body;
-            if (elt && elt.querySelector && elt.querySelector('video')) {
+            if (elt) {
                 initializeVideos(elt);
                 if (state.isFullScreenActive) {
                     appendNewVideosToFullscreenViewport();
                 }
             }
+        });
+
+        document.addEventListener('htmx:historyRestore', function() {
+            initializeVideos(document.body);
         });
     }
 

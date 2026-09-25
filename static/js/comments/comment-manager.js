@@ -376,6 +376,9 @@ const CommentManager = {
     });
     
     repliesContainer.insertAdjacentHTML('beforeend', replyHtml);
+    if (window.htmx) {
+      window.htmx.process(repliesContainer);
+    }
     
     // Expand if collapsed
     repliesContainer.classList.add('expanded');
@@ -746,10 +749,29 @@ const CommentManager = {
         try { window.videoManager.closeFullscreenReels(); } catch (_) {}
       }
       if (window.htmx && document.getElementById('page-content-target')) {
-        window.htmx.ajax('GET', profileLink.href, { target: '#page-content-target', swap: 'innerHTML' });
+        window.htmx.ajax('GET', profileLink.href, {
+          target: '#page-content-target',
+          swap: 'innerHTML',
+          headers: {
+            'HX-Request': 'true',
+            'HX-Target': 'page-content-target'
+          }
+        });
       } else {
-        window.location.href = profileLink.href;
+        profileLink.click();
       }
+    }
+  },
+
+  /**
+   * Close active WebSocket
+   */
+  closeWebSocket() {
+    if (this.ws) {
+      try {
+        this.ws.close();
+      } catch (e) {}
+      this.ws = null;
     }
   },
 
@@ -757,20 +779,38 @@ const CommentManager = {
    * Initialize WebSocket for real-time updates
    */
   initWebSocket() {
+    this.closeWebSocket();
+    if (!this.postId) return;
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/post/${this.postId}/comments/`;
     
-    const ws = new WebSocket(wsUrl);
-    
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+    try {
+      const ws = new WebSocket(wsUrl);
+      this.ws = ws;
       
-      if (data.type === 'new_comment') {
-        this.handleNewComment(data.comment);
-      } else if (data.type === 'comment_like_update') {
-        this.handleLikeUpdate(data);
-      }
-    };
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          if (data.type === 'new_comment') {
+            this.handleNewComment(data.comment);
+          } else if (data.type === 'comment_like_update') {
+            this.handleLikeUpdate(data);
+          }
+        } catch (err) {
+          console.warn('[CommentManager] WS parse error:', err);
+        }
+      };
+
+      ws.onclose = () => {
+        if (this.ws === ws) {
+          this.ws = null;
+        }
+      };
+    } catch (e) {
+      console.warn('[CommentManager] WS init error:', e);
+    }
   },
 
   /**
@@ -808,6 +848,9 @@ const CommentManager = {
     }
     
     stream.insertAdjacentHTML('afterbegin', commentHtml);
+    if (window.htmx) {
+      window.htmx.process(stream);
+    }
   },
 
   /**
@@ -821,6 +864,15 @@ const CommentManager = {
     countSpan.textContent = data.likes_count;
   }
 };
+
+// Auto-cleanup comment websocket when HTMX swaps page-content-target
+document.addEventListener('htmx:beforeSwap', function(evt) {
+  if (evt.detail?.target?.id === 'page-content-target') {
+    if (typeof CommentManager !== 'undefined' && CommentManager.closeWebSocket) {
+      CommentManager.closeWebSocket();
+    }
+  }
+});
 
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {

@@ -195,7 +195,8 @@
     
     // Run after HTMX updates
     document.body.addEventListener('htmx:afterSwap', function(event) {
-        if (event.target.querySelector('.comment-body')) {
+        const target = event.detail?.target || event.target;
+        if (target && target.querySelector && target.querySelector('.comment-body')) {
             truncateLongComments();
         }
     });
