@@ -57,7 +57,7 @@
     function isReelElement(video) {
         if (!video) return false;
         if (video.classList.contains('reel-video-element') || video.classList.contains('fullscreen-reel-video')) return true;
-        if (video.closest('.reel-card-container') || video.closest('.reels-snap-item')) return true;
+        if (video.closest('.reel-card-container, .reel-post-card, .reel-stage-container') || video.closest('.reels-snap-item')) return true;
         if (video.dataset && video.dataset.reel === 'true') return true;
         return false;
     }
@@ -98,8 +98,12 @@
             console.warn('[VideoManager] LocalStorage unavailable for audio preference', e);
         }
 
-        // Sync all video elements across feed and overlays
+        // Sync all video elements across feed and overlays (excluding carousel preview videos)
         document.querySelectorAll('video').forEach(vid => {
+            if (vid.classList.contains('reels-carousel-video') || vid.closest('.reels-carousel-shelf')) {
+                vid.muted = true;
+                return;
+            }
             vid.muted = isGlobalMuted;
         });
 
@@ -123,8 +127,13 @@
             pauseVideo(state.currentPlayingVideo);
         }
 
-        // Apply global mute
-        video.muted = isGlobalMuted;
+        // Apply global mute (carousel previews are always strictly muted)
+        if (video.classList.contains('reels-carousel-video') || video.closest('.reels-carousel-shelf')) {
+            video.muted = true;
+            video.volume = 0;
+        } else {
+            video.muted = isGlobalMuted;
+        }
 
         // Resume HLS buffer loading if active
         if (video._hlsInstance && typeof video._hlsInstance.startLoad === 'function') {
@@ -169,6 +178,7 @@
     }
 
     function pauseAllVideos() {
+        stopCarouselAutoplay();
         document.querySelectorAll('video').forEach(vid => {
             pauseVideo(vid);
         });
@@ -252,6 +262,9 @@
                 playVideo(video, true);
                 const vinyl = snapItem.querySelector('.reel-vinyl-disc');
                 if (vinyl) vinyl.classList.add('is-playing');
+
+                // Near end of queue: append more videos dynamically
+                checkAndAppendMoreFullscreenVideos(snapItem);
             } else if (!entry.isIntersecting || entry.intersectionRatio < 0.5) {
                 if (video === state.currentPlayingVideo) {
                     pauseVideo(video);
@@ -282,6 +295,57 @@
             rootMargin: '0px',
             threshold: 0.5
         });
+    }
+
+    function appendNewVideosToFullscreenViewport() {
+        if (!state.isFullScreenActive) return;
+        const viewport = document.getElementById('reelsSnapViewport');
+        if (!viewport) return;
+
+        const existingIds = new Set(Array.from(viewport.children).map(item => String(item.dataset.postId).trim()));
+
+        const cardSelectors = [
+            '.reel-card-container',
+            '.reel-post-card',
+            '.reels-carousel-card',
+            '.post-card',
+            '.landscape-video-container'
+        ];
+
+        document.querySelectorAll(cardSelectors.join(', ')).forEach(card => {
+            const vid = card.querySelector('video') || (card.tagName === 'VIDEO' ? card : null);
+            if (!vid || card.classList.contains('reels-carousel-shelf')) return;
+
+            const cardPostId = String(extractPostId(card) || vid.dataset.postId || '').trim();
+            if (!cardPostId || existingIds.has(cardPostId)) return;
+
+            existingIds.add(cardPostId);
+            const snapItem = buildSnapItemFromReelCard(card);
+            if (snapItem) {
+                viewport.appendChild(snapItem);
+                if (state.fullscreenObserver) {
+                    state.fullscreenObserver.observe(snapItem);
+                }
+            }
+        });
+    }
+
+    function checkAndAppendMoreFullscreenVideos(currentSnapItem) {
+        if (!state.isFullScreenActive) return;
+        const viewport = document.getElementById('reelsSnapViewport');
+        if (!viewport) return;
+
+        const items = Array.from(viewport.children);
+        const idx = items.indexOf(currentSnapItem);
+
+        if (idx >= items.length - 2) {
+            appendNewVideosToFullscreenViewport();
+
+            const trigger = document.getElementById('feed-load-trigger');
+            if (trigger && typeof htmx !== 'undefined') {
+                htmx.trigger(trigger, 'revealed');
+            }
+        }
     }
 
     // ============================================================================
@@ -328,7 +392,7 @@
             return;
         }
 
-        const container = hitbox.closest('.reel-card-container, .reel-fullscreen-content, .reels-snap-item');
+        const container = hitbox.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reel-fullscreen-content, .reels-snap-item');
         if (!container) return;
 
         const video = container.querySelector('video');
@@ -408,48 +472,169 @@
         if (!video) return null;
 
         const videoSrc = video.dataset.videoUrl || (video.querySelector('source') ? video.querySelector('source').getAttribute('src') : '') || video.currentSrc || video.getAttribute('src') || '';
-        const poster = video.getAttribute('poster') || card.querySelector('.reel-ambient-img')?.getAttribute('src') || '';
+        const poster = video.getAttribute('poster') ||
+                       card.querySelector('.reel-ambient-img')?.getAttribute('src') ||
+                       card.querySelector('.media-download-btn')?.dataset?.thumbnail ||
+                       '';
         const hlsUrl = video.dataset.hlsUrl || '';
 
-        // Extract author avatar & details
-        const authorImg = card.querySelector('.reel-creator-row img') || card.querySelector('.reel-scrim-bottom img') || card.querySelector('.reel-vinyl-art');
-        const authorAvatar = authorImg?.getAttribute('src') || '/static/images/default-avatar.png';
-        const authorLink = card.querySelector('.reel-creator-row a') || card.querySelector('.reel-scrim-bottom a[href*="profile"]');
-        const authorName = authorLink?.textContent?.trim() || card.querySelector('.reel-options-btn')?.dataset.author || 'Author';
+        // Extract author avatar & details (supports datasets from carousel, reel cards, and standard postcards)
+        const authorImg = card.querySelector('.reel-creator-row img') ||
+                          card.querySelector('.fb-avatar-container img') ||
+                          card.querySelector('.reel-scrim-bottom img') ||
+                          card.querySelector('.post-avatar-img') ||
+                          card.querySelector('.reel-vinyl-art');
+        const authorAvatar = card.dataset.authorAvatar || authorImg?.getAttribute('src') || '/static/images/default-avatar.png';
+
+        const authorLink = card.querySelector('.fb-author-name') ||
+                           card.querySelector('.reel-creator-row a') ||
+                           card.querySelector('.reel-scrim-bottom a[href*="profile"]') ||
+                           card.querySelector('a[href*="/users/profile/"]');
+        const authorName = card.dataset.author || authorLink?.textContent?.trim() || card.querySelector('.reel-options-btn')?.dataset.author || 'Author';
+        const profileUrlHref = authorLink?.getAttribute('href') || '';
+        const hrefMatch = profileUrlHref.match(/\/users\/profile\/([^\/]+)/);
+        const authorUsername = card.dataset.authorUsername ||
+                               (hrefMatch ? hrefMatch[1] : null) ||
+                               (authorName.startsWith('@') ? authorName.slice(1) : authorName);
+        const profileUrl = card.dataset.authorProfile ||
+                           profileUrlHref ||
+                           `/users/profile/${authorUsername}/`;
 
         // Extract campus unit badge and time if present
-        const unitBadge = card.querySelector('.reel-unit-badge');
-        const unitHtml = unitBadge ? unitBadge.outerHTML : '';
-        const timeEl = card.querySelector('.reel-scrim-top .text-white-50');
-        const timeHtml = timeEl ? timeEl.outerHTML : '';
+        const unitBadge = card.querySelector('.reel-unit-badge') || card.querySelector('.fb-sub-meta .badge');
+        const unitCode = card.dataset.unit || unitBadge?.textContent?.trim() || '';
+        const unitHtml = unitCode ?
+            `<span class="badge bg-white bg-opacity-25 text-white border border-white border-opacity-20 px-2 py-1 reel-unit-badge"><i class="bi bi-mortarboard-fill me-1"></i>${unitCode}</span>` : '';
 
-        // Extract creator row (avatar, name, handle, follow chip)
+        const timeAgo = card.dataset.time ||
+                        card.querySelector('.fb-sub-meta span:not(.badge)')?.textContent?.trim() ||
+                        card.querySelector('.reel-scrim-top .text-white-50')?.textContent?.trim() ||
+                        '';
+
+        // Extract or construct follow chip
+        const isFollowing = card.dataset.isFollowing === 'true';
+        const isSelf = card.dataset.isSelf === 'true';
+        let followBtnHtml = '';
+        if (!isSelf && !isFollowing && authorUsername && authorUsername !== 'Author') {
+            const followUrl = card.dataset.followUrl || `/users/follow/${authorUsername}/`;
+            followBtnHtml = `
+                <button type="button"
+                        class="reel-follow-chip"
+                        hx-post="${followUrl}"
+                        hx-swap="none"
+                        title="Follow"
+                        aria-label="Follow"
+                        onclick="event.stopPropagation(); this.remove();">
+                    Follow
+                </button>
+            `;
+        }
+
+        // Extract or construct creator row (Avatar + Name + Handle + Follow chip + Time)
         const creatorRow = card.querySelector('.reel-creator-row');
-        const creatorRowHtml = creatorRow ? creatorRow.outerHTML : '';
+        let creatorRowHtml = '';
+        if (creatorRow) {
+            creatorRowHtml = creatorRow.outerHTML;
+        } else {
+            creatorRowHtml = `
+                <div class="reel-creator-row d-flex align-items-center gap-2 mb-2">
+                    <div class="position-relative flex-shrink-0">
+                        <a href="${profileUrl}" class="d-block text-decoration-none">
+                            <img src="${authorAvatar}"
+                                 class="rounded-circle border border-2 border-white shadow-sm"
+                                 style="width: 40px; height: 40px; object-fit: cover;"
+                                 alt="${authorUsername}">
+                        </a>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="${profileUrl}"
+                               class="text-white fw-bold text-decoration-none text-truncate d-inline-block mw-100"
+                               style="font-size: 0.92rem; text-shadow: 0 1px 3px rgba(0,0,0,0.9);">
+                                @${authorUsername}
+                            </a>
+                            ${followBtnHtml}
+                        </div>
+                        <div class="text-white-50 small text-truncate d-flex align-items-center gap-1" style="font-size: 11px; text-shadow: 0 1px 2px rgba(0,0,0,0.85); line-height: 1.2;">
+                            <span>${timeAgo}</span>
+                            <span>&middot;</span>
+                            <i class="bi bi-globe-americas" style="font-size: 10px;" title="Public"></i>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
 
-        // Extract caption
+        // Extract caption with expander
         const captionWrap = card.querySelector('.reel-caption-wrap');
         let captionHtml = '';
         if (captionWrap) {
             captionHtml = captionWrap.outerHTML;
         } else {
-            const rawCaption = card.querySelector('.reel-caption-text') || card.querySelector('.post-text-clamp-2') || card.querySelector('.post-content-text');
-            if (rawCaption && rawCaption.textContent.trim()) {
-                captionHtml = `<div class="reel-caption-wrap mb-2"><div class="reel-caption-text post-text-clamp-2">${rawCaption.innerHTML}</div></div>`;
+            const rawCaption = card.dataset.caption ||
+                               card.querySelector('.reel-caption-text')?.innerHTML ||
+                               card.querySelector('.post-content-text')?.innerHTML ||
+                               card.querySelector('.post-text-body')?.innerHTML ||
+                               '';
+            const cleanText = rawCaption.trim();
+            if (cleanText) {
+                const needsMore = cleanText.length > 70;
+                captionHtml = `
+                    <div class="reel-caption-wrap mb-2">
+                        <div id="fs-reel-caption-${postId}" class="reel-caption-text post-text-clamp-2">
+                            ${cleanText}
+                        </div>
+                        ${needsMore ? `
+                        <button type="button"
+                                class="reel-caption-toggle"
+                                onclick="event.stopPropagation(); (function(btn){
+                                    var c = btn.parentElement.querySelector('.reel-caption-text');
+                                    if (!c) return;
+                                    var exp = c.classList.toggle('is-expanded');
+                                    btn.textContent = exp ? 'less' : '... more';
+                                })(this);">
+                            ... more
+                        </button>` : ''}
+                    </div>
+                `;
             }
         }
 
-        // Extract audio pill
-        const audioWrap = card.querySelector('.reel-audio-wrap') || card.querySelector('.reel-audio-pill')?.parentElement;
-        const audioWrapHtml = audioWrap ? audioWrap.outerHTML : '';
+        // Audio pill
+        let audioWrapHtml = '';
+        const existingAudioWrap = card.querySelector('.reel-audio-wrap');
+        if (existingAudioWrap) {
+            audioWrapHtml = existingAudioWrap.outerHTML;
+        } else {
+            audioWrapHtml = `
+                <div class="reel-audio-wrap d-inline-flex align-items-center">
+                    <span class="badge bg-dark bg-opacity-60 rounded-pill text-white small px-2.5 py-1 d-inline-flex align-items-center gap-1.5 reel-audio-pill" style="font-size: 11px; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.18);">
+                        <i class="bi bi-music-note-beamed text-primary"></i>
+                        <span class="text-truncate reel-audio-ticker-text" style="max-width: 220px;">Original Audio - ${authorUsername}</span>
+                    </span>
+                </div>
+            `;
+        }
 
         // Extract like count & state
         const likeBtn = card.querySelector('.like-button');
-        const likeCount = card.querySelector(`[id^="reel-like-count-"]`)?.textContent?.trim() || card.querySelector('.reel-action-label')?.textContent?.trim() || '0';
-        const isLiked = likeBtn?.classList?.contains('liked') || likeBtn?.classList?.contains('text-danger') || false;
+        const likeCount = card.dataset.likes ||
+                          card.querySelector(`[id^="reel-like-count-"]`)?.textContent?.trim() ||
+                          card.querySelector('.postcard-like-count')?.textContent?.trim() ||
+                          card.querySelector('.like-count')?.textContent?.trim() ||
+                          card.querySelector(`[id^="like-section-"] .fw-bold`)?.textContent?.trim() ||
+                          '0';
+        const isLiked = card.dataset.isLiked === 'true' ||
+                        likeBtn?.classList?.contains('liked') ||
+                        likeBtn?.classList?.contains('text-danger') ||
+                        false;
 
         // Extract comment count
-        const commentCount = card.querySelector(`[id^="reel-comment-count-"]`)?.textContent?.trim() || card.querySelectorAll('.reel-action-unit .reel-action-label')[1]?.textContent?.trim() || '0';
+        const commentCount = card.dataset.comments ||
+                             card.querySelector(`[id^="reel-comment-count-"]`)?.textContent?.trim() ||
+                             card.querySelector(`[id^="comment-count-"]`)?.textContent?.trim() ||
+                             card.querySelector('.postcard-comment-btn span')?.textContent?.trim() ||
+                             '0';
 
         const snapItem = document.createElement('div');
         snapItem.className = 'reels-snap-item';
@@ -583,17 +768,38 @@
         // Clear previous snap tracks
         viewport.innerHTML = '';
 
-        // Query all inline reels
-        const inlineReels = document.querySelectorAll('.reel-card-container');
-        if (inlineReels.length === 0) {
-            console.warn('[VideoManager] No inline reels found to populate fullscreen viewer');
+        // Query all video cards on the page: vertical reels, carousel cards, and landscape video postcards
+        const allVideoCards = [];
+        const seenPostIds = new Set();
+
+        const cardSelectors = [
+            '.reel-card-container',
+            '.reel-post-card',
+            '.reels-carousel-card',
+            '.post-card',
+            '.landscape-video-container'
+        ];
+
+        document.querySelectorAll(cardSelectors.join(', ')).forEach(card => {
+            const vid = card.querySelector('video') || (card.tagName === 'VIDEO' ? card : null);
+            if (!vid || card.classList.contains('reels-carousel-shelf')) return;
+
+            const cardPostId = String(extractPostId(card) || vid.dataset.postId || '').trim();
+            if (!cardPostId || seenPostIds.has(cardPostId)) return;
+
+            seenPostIds.add(cardPostId);
+            allVideoCards.push(card);
+        });
+
+        if (allVideoCards.length === 0) {
+            console.warn('[VideoManager] No video cards found to populate fullscreen viewer');
             return;
         }
 
         createFullscreenObserver();
 
         let targetSnapItem = null;
-        inlineReels.forEach(card => {
+        allVideoCards.forEach(card => {
             const snapItem = buildSnapItemFromReelCard(card);
             if (snapItem) {
                 viewport.appendChild(snapItem);
@@ -683,7 +889,7 @@
         const modalEl = document.getElementById('reelQuickToolsModal');
         if (!modalEl || typeof bootstrap === 'undefined') return;
 
-        const card = targetEl ? targetEl.closest('.reel-card-container, .reels-snap-item') : document.getElementById(`reel-card-${postId}`);
+        const card = targetEl ? targetEl.closest('.reel-card-container, .reel-post-card, .reels-snap-item') : document.getElementById(`reel-card-${postId}`);
         if (!card) return;
 
         const optionsBtn = card.querySelector('.reel-options-btn');
@@ -1554,7 +1760,7 @@
     }
 
     function startScrubbing(container, clientX) {
-        const card = container.closest('.reel-card-container, .reels-snap-item');
+        const card = container.closest('.reel-card-container, .reel-post-card, .reels-snap-item');
         const video = card?.querySelector('video');
         if (!video) return;
 
@@ -1593,7 +1799,7 @@
         if (rect.width === 0) return;
         const clickX = event.clientX - rect.left;
         const ratio = Math.max(0, Math.min(1, clickX / rect.width));
-        const card = container.closest('.reel-card-container, .reels-snap-item');
+        const card = container.closest('.reel-card-container, .reel-post-card, .reels-snap-item');
         const video = card?.querySelector('video');
         if (video && video.duration) {
             video.currentTime = ratio * video.duration;
@@ -1624,6 +1830,28 @@
                 event.preventDefault();
                 event.stopPropagation();
                 toggleGlobalMute();
+                return;
+            }
+
+            // Carousel Card Click -> Open Fullscreen Reel
+            const carouselCard = event.target.closest('.reels-carousel-card');
+            if (carouselCard) {
+                event.preventDefault();
+                event.stopPropagation();
+                const postId = carouselCard.dataset.postId || extractPostId(carouselCard);
+                openFullscreenReels(postId);
+                return;
+            }
+
+            // Carousel View All Link Click -> Open Fullscreen Reel
+            const viewAllLink = event.target.closest('.reels-view-all-link');
+            if (viewAllLink) {
+                event.preventDefault();
+                event.stopPropagation();
+                const shelf = viewAllLink.closest('.reels-carousel-shelf');
+                const firstCard = shelf?.querySelector('.reels-carousel-card');
+                const postId = firstCard ? (firstCard.dataset.postId || extractPostId(firstCard)) : null;
+                openFullscreenReels(postId);
                 return;
             }
 
@@ -1787,7 +2015,7 @@
         let touchStartY = 0;
 
         document.addEventListener('touchstart', function(event) {
-            const hitbox = event.target.closest('.reel-center-hitbox, .reel-tap-hitbox, .reel-card-container');
+            const hitbox = event.target.closest('.reel-center-hitbox, .reel-tap-hitbox, .reel-stage-container, .reel-card-container');
             if (!hitbox) return;
 
             const touch = event.touches[0];
@@ -1823,7 +2051,7 @@
 
         // Right click context menu on desktop -> opens quick tools
         document.addEventListener('contextmenu', function(event) {
-            const card = event.target.closest('.reel-card-container');
+            const card = event.target.closest('.reel-stage-container, .reel-card-container, .reel-post-card, .reels-carousel-card');
             if (card) {
                 event.preventDefault();
                 const postId = extractPostId(card);
@@ -1890,7 +2118,7 @@
             if (!video.duration) return;
 
             const pct = (video.currentTime / video.duration) * 100;
-            const card = video.closest('.reel-card-container, .reels-snap-item');
+            const card = video.closest('.reel-card-container, .reel-post-card, .reels-snap-item');
             if (card) {
                 const bar = card.querySelector('.reel-progress-bar');
                 if (bar) {
@@ -1909,7 +2137,7 @@
             }
             state.currentPlayingVideo = video;
 
-            const card = video.closest('.reel-card-container, .reels-snap-item');
+            const card = video.closest('.reel-card-container, .reel-post-card, .reels-snap-item');
             if (card) {
                 const vinyl = card.querySelector('.reel-vinyl-disc');
                 if (vinyl) vinyl.classList.add('is-playing');
@@ -1921,7 +2149,7 @@
             const video = event.target;
             if (video.tagName !== 'VIDEO') return;
 
-            const card = video.closest('.reel-card-container, .reels-snap-item');
+            const card = video.closest('.reel-card-container, .reel-post-card, .reels-snap-item');
             if (card) {
                 const vinyl = card.querySelector('.reel-vinyl-disc');
                 if (vinyl) vinyl.classList.remove('is-playing');
@@ -1936,6 +2164,202 @@
         });
     }
 
+    // ============================================================================
+    // REELS CAROUSEL STICK-AUTOPLAY ENGINE
+    // ============================================================================
+
+    let carouselShelfObserver = null;
+    let activeCarouselCard = null;
+    let carouselStickDebounceTimer = null;
+
+    function stopCarouselAutoplay(resetActive = true) {
+        if (carouselStickDebounceTimer) {
+            clearTimeout(carouselStickDebounceTimer);
+            carouselStickDebounceTimer = null;
+        }
+
+        if (activeCarouselCard) {
+            const vid = activeCarouselCard.querySelector('video.reels-carousel-video');
+            if (vid) {
+                try {
+                    vid.pause();
+                    vid.currentTime = 0;
+                    vid.style.opacity = '0';
+                } catch (e) {}
+            }
+            if (resetActive) {
+                activeCarouselCard = null;
+            }
+        }
+    }
+
+    function playCarouselCard(card) {
+        if (!card || state.isFullScreenActive) return;
+        if (activeCarouselCard === card) {
+            const vid = card.querySelector('video.reels-carousel-video');
+            if (vid && !vid.paused) return; // already playing
+        }
+
+        stopCarouselAutoplay(false);
+
+        const video = card.querySelector('video.reels-carousel-video');
+        if (!video) return;
+
+        activeCarouselCard = card;
+        video.muted = true;
+        video.volume = 0;
+        video.style.opacity = '1';
+
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(() => {
+                video.muted = true;
+                video.volume = 0;
+                video.play().catch(() => {});
+            });
+        }
+    }
+
+    function findCenterCarouselCard(track) {
+        if (!track) return null;
+        const cards = Array.from(track.querySelectorAll('.reels-carousel-card'));
+        if (cards.length === 0) return null;
+
+        const trackRect = track.getBoundingClientRect();
+        const centerLine = trackRect.left + trackRect.width / 2;
+
+        let closestCard = null;
+        let minDiff = Infinity;
+
+        cards.forEach(card => {
+            const rect = card.getBoundingClientRect();
+            if (rect.right < trackRect.left || rect.left > trackRect.right) return;
+
+            const cardCenter = rect.left + rect.width / 2;
+            const diff = Math.abs(cardCenter - centerLine);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestCard = card;
+            }
+        });
+
+        return closestCard || cards[0];
+    }
+
+    function scheduleCarouselStickCheck(shelf, delayMs = 1200) {
+        if (state.isFullScreenActive) return;
+        if (carouselStickDebounceTimer) {
+            clearTimeout(carouselStickDebounceTimer);
+        }
+
+        carouselStickDebounceTimer = setTimeout(() => {
+            if (state.isFullScreenActive) return;
+            if (!shelf || !shelf.isConnected) return;
+
+            const rect = shelf.getBoundingClientRect();
+            const vh = window.innerHeight || document.documentElement.clientHeight;
+            const visibleHeight = Math.min(rect.bottom, vh) - Math.max(rect.top, 0);
+            if (visibleHeight <= 0 || visibleHeight / rect.height < 0.4) {
+                stopCarouselAutoplay();
+                return;
+            }
+
+            const track = shelf.querySelector('.reels-carousel-track');
+            const targetCard = findCenterCarouselCard(track);
+            if (targetCard) {
+                playCarouselCard(targetCard);
+            }
+        }, delayMs);
+    }
+
+    function initializeCarouselShelves(container = document.body) {
+        const shelves = container.querySelectorAll('.reels-carousel-shelf');
+        if (shelves.length === 0) return;
+
+        if (!carouselShelfObserver) {
+            carouselShelfObserver = new IntersectionObserver((entries) => {
+                if (state.isFullScreenActive) return;
+                entries.forEach(entry => {
+                    const shelf = entry.target;
+                    if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+                        shelf.dataset.inView = 'true';
+                        scheduleCarouselStickCheck(shelf, 1200);
+                    } else if (!entry.isIntersecting || entry.intersectionRatio < 0.35) {
+                        shelf.dataset.inView = 'false';
+                        if (activeCarouselCard && activeCarouselCard.closest('.reels-carousel-shelf') === shelf) {
+                            stopCarouselAutoplay();
+                        }
+                    }
+                });
+            }, {
+                root: null,
+                threshold: [0.1, 0.35, 0.5, 0.7]
+            });
+        }
+
+        shelves.forEach(shelf => {
+            if (shelf.dataset.carouselInit === 'true') return;
+            shelf.dataset.carouselInit = 'true';
+
+            carouselShelfObserver.observe(shelf);
+
+            const track = shelf.querySelector('.reels-carousel-track');
+            if (track) {
+                track.addEventListener('scroll', () => {
+                    if (activeCarouselCard) {
+                        stopCarouselAutoplay(false);
+                    }
+                    if (shelf.dataset.inView === 'true') {
+                        scheduleCarouselStickCheck(shelf, 1000);
+                    }
+                }, { passive: true });
+            }
+
+            const cards = shelf.querySelectorAll('.reels-carousel-card');
+            cards.forEach(card => {
+                let hoverTimer = null;
+                card.addEventListener('mouseenter', () => {
+                    if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
+                    hoverTimer = setTimeout(() => {
+                        playCarouselCard(card);
+                    }, 350);
+                });
+
+                card.addEventListener('mouseleave', () => {
+                    if (hoverTimer) {
+                        clearTimeout(hoverTimer);
+                        hoverTimer = null;
+                    }
+                    if (activeCarouselCard === card) {
+                        stopCarouselAutoplay();
+                        if (shelf.dataset.inView === 'true') {
+                            scheduleCarouselStickCheck(shelf, 800);
+                        }
+                    }
+                });
+            });
+        });
+    }
+
+    // Scroll listener on window: debounces stick timer and stops video if shelf leaves viewport
+    window.addEventListener('scroll', () => {
+        if (state.isFullScreenActive) return;
+        if (activeCarouselCard) {
+            const shelf = activeCarouselCard.closest('.reels-carousel-shelf');
+            if (shelf) {
+                const r = shelf.getBoundingClientRect();
+                const vh = window.innerHeight || document.documentElement.clientHeight;
+                if (r.bottom < 60 || r.top > vh - 60) {
+                    stopCarouselAutoplay();
+                }
+            }
+        }
+        const visibleShelf = document.querySelector('.reels-carousel-shelf[data-in-view="true"]');
+        if (visibleShelf) {
+            scheduleCarouselStickCheck(visibleShelf, 1200);
+        }
+    }, { passive: true });
+
     function initializeVideos(container = document.body) {
         if (!state.feedObserver) {
             createFeedObserver();
@@ -1946,6 +2370,12 @@
             if (!video.dataset.pwaniObserved) {
                 video.dataset.pwaniObserved = 'true';
                 video.muted = isGlobalMuted;
+
+                // Carousel videos are controlled exclusively by the carousel stick-autoplay engine
+                if (video.classList.contains('reels-carousel-video') || video.closest('.reels-carousel-shelf')) {
+                    video.dataset.autoplay = 'false';
+                    return;
+                }
 
                 const isReel = isReelElement(video);
                 if (isReel) {
@@ -1960,6 +2390,9 @@
                 }
             }
         });
+
+        // Initialize carousel shelves inside this container
+        initializeCarouselShelves(container);
 
         syncMuteButtons();
     }
@@ -2016,6 +2449,9 @@
             const target = event.detail.target;
             if (target && target.querySelector && target.querySelector('video')) {
                 initializeVideos(target);
+                if (state.isFullScreenActive) {
+                    appendNewVideosToFullscreenViewport();
+                }
             }
         });
 
@@ -2023,6 +2459,9 @@
             const elt = event.detail?.elt || document.body;
             if (elt && elt.querySelector && elt.querySelector('video')) {
                 initializeVideos(elt);
+                if (state.isFullScreenActive) {
+                    appendNewVideosToFullscreenViewport();
+                }
             }
         });
     }
@@ -2063,6 +2502,8 @@
         get isGlobalMuted() { return isGlobalMuted; },
         get state() { return state; }
     };
+
+    window.videoManager = window.PwaniNetVideoManager;
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);

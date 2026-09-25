@@ -1,6 +1,10 @@
 {% for post in posts %}
     {% include 'posts/partials/post_card.html' %}
 
+    {% if forloop.counter == reels_carousel_index|default:3 and reels_carousel %}
+        {% include 'posts/partials/reels_carousel.html' with reels=reels_carousel %}
+    {% endif %}
+
 {% empty %}
     {% if not cursor %}
         <div class="card border-0 shadow-sm rounded-4 p-4 my-3 text-center feed-empty-card">

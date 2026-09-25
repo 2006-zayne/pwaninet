@@ -105,6 +105,37 @@ def get_ranked_feed(user, cursor=None, limit=10):
     }
 
 
+def get_reels_carousel(user, limit=8, offset=0):
+    """Fetch recent vertical reels for the in-feed carousel shelf."""
+    cache_key = f'feed:reels_carousel:{user.id if user and user.is_authenticated else "anon"}:{offset}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        from posts.models import HiddenPost
+        filters = (
+            Q(video__isnull=False) & ~Q(video='') |
+            Q(video_preview__isnull=False) & ~Q(video_preview='')
+        )
+        if user and user.is_authenticated:
+            hidden_ids = HiddenPost.objects.filter(user=user).values_list('post_id', flat=True)
+            if hidden_ids:
+                filters &= ~Q(id__in=hidden_ids)
+
+        candidate_qs = (
+            Post.objects.filter(filters)
+            .select_related('author', 'unit', 'group')
+            .order_by('-created_at')[offset:offset + 40]
+        )
+
+        reels = [p for p in candidate_qs if p.is_reel][:limit]
+        cache.set(cache_key, reels, timeout=120)
+        return reels
+    except Exception:
+        return []
+
+
 def build_home_feed_context(user, cursor=None, limit=10):
     """Build context for home feed with cursor-based pagination."""
     feed_data = get_ranked_feed(user, cursor=cursor, limit=limit)
@@ -137,6 +168,19 @@ def build_home_feed_context(user, cursor=None, limit=10):
             user, limit=5, context='feed'
         )
         context['suggested_groups'] = suggested_groups
+
+        reels_carousel = get_reels_carousel(user, limit=8, offset=0)
+        if reels_carousel:
+            context['reels_carousel'] = reels_carousel
+            context['reels_carousel_index'] = 3
+    else:
+        # Periodic carousel injection during infinite scroll pagination
+        cursor_data = decode_cursor(cursor)
+        offset = ((cursor_data.get('id', 0) % 4) * 3) if cursor_data else 3
+        reels_carousel = get_reels_carousel(user, limit=8, offset=offset)
+        if reels_carousel and len(reels_carousel) >= 2:
+            context['reels_carousel'] = reels_carousel
+            context['reels_carousel_index'] = 5
 
     # Friend suggestions appear in feed on all loads (initial and paginated)
     from recommendations.services.engine import UnifiedRecommendationEngine

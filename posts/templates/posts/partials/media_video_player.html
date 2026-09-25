@@ -8,6 +8,15 @@
             title="{% trans 'Download' %}">
         <i class="bi bi-download"></i>
     </button>
+    <button type="button"
+            class="reel-stage-overlay-btn reel-expand-btn text-white position-absolute top-0 end-0 m-2"
+            data-action="fullscreen"
+            data-post-id="{{ post.share_id }}"
+            title="{% trans 'Watch Fullscreen' %}"
+            aria-label="{% trans 'Expand to fullscreen' %}"
+            style="z-index: 4; width: 34px; height: 34px; font-size: 13px;">
+        <i class="bi bi-arrows-fullscreen"></i>
+    </button>
     <div class="landscape-video-container bg-black position-relative"
          data-media-type="video"
          data-post-id="{{ post.share_id }}"

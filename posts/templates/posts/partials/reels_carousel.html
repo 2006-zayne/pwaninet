@@ -1,0 +1,102 @@
+{% load i18n %}
+{% load static %}
+{% load user_extras %}
+
+{% if reels %}
+<div class="post-card fb-post-card reels-carousel-shelf mb-3 bg-white rounded-3 border overflow-hidden">
+    <!-- Shelf Header: Title alone on left, View All & scroll controls on right -->
+    <div class="d-flex align-items-center justify-content-between px-3 pt-3 pb-2">
+        <div>
+            <h6 class="fw-bold mb-0 text-dark" style="font-size: 16px; letter-spacing: -0.02em;">{% trans "Campus Reels" %}</h6>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <!-- Scroll navigation arrows for desktop -->
+            <div class="d-none d-md-flex align-items-center gap-1">
+                <button type="button" class="btn btn-sm btn-light rounded-circle reels-carousel-arrow reels-carousel-prev p-0 d-flex align-items-center justify-content-center" style="width: 26px; height: 26px;" aria-label="{% trans 'Scroll left' %}" onclick="(function(btn){ const track = btn.closest('.reels-carousel-shelf').querySelector('.reels-carousel-track'); if(track) track.scrollBy({left: -320, behavior: 'smooth'}); })(this);">
+                    <i class="bi bi-chevron-left" style="font-size: 11px;"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-light rounded-circle reels-carousel-arrow reels-carousel-next p-0 d-flex align-items-center justify-content-center" style="width: 26px; height: 26px;" aria-label="{% trans 'Scroll right' %}" onclick="(function(btn){ const track = btn.closest('.reels-carousel-shelf').querySelector('.reels-carousel-track'); if(track) track.scrollBy({left: 320, behavior: 'smooth'}); })(this);">
+                    <i class="bi bi-chevron-right" style="font-size: 11px;"></i>
+                </button>
+            </div>
+
+            <!-- View All Link -->
+            <a href="javascript:void(0)"
+               class="text-primary text-decoration-none fw-semibold small d-inline-flex align-items-center gap-1 reels-view-all-link"
+               style="font-size: 13px;"
+               data-action="fullscreen"
+               onclick="(function(el){ const shelf = el.closest('.reels-carousel-shelf'); const firstCard = shelf?.querySelector('.reels-carousel-card'); const vm = window.videoManager || window.PwaniNetVideoManager; if (firstCard && vm) { vm.openFullscreenReels(firstCard.dataset.postId); } })(this);">
+                {% trans "View all" %} <i class="bi bi-chevron-right" style="font-size: 10px;"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- Carousel Horizontal Track: Reduced padding and thin card separation -->
+    <div class="reels-carousel-track-wrapper">
+        <div class="reels-carousel-track d-flex overflow-x-auto" style="scrollbar-width: none; scroll-snap-type: x mandatory;">
+            {% for reel in reels %}
+            <div class="reels-carousel-card position-relative rounded-3 overflow-hidden flex-shrink-0"
+                 data-post-id="{{ reel.share_id }}"
+                 data-reel="true"
+                 data-action="fullscreen"
+                 data-author="{{ reel.author.get_full_name|default:reel.author.username }}"
+                 data-author-username="{{ reel.author.username }}"
+                 data-author-avatar="{{ reel.author.profile_pic.url|default:'/static/images/default-avatar.png' }}"
+                 data-author-profile="{% url 'users:profile' reel.author.username %}"
+                 data-caption="{{ reel.content|default:'' }}"
+                 data-likes="{{ reel.likes.count|default:0 }}"
+                 data-comments="{{ reel.comments.count|default:0 }}"
+                 data-unit="{{ reel.unit.code|default:'' }}"
+                 data-time="{{ reel.created_at|timesince }} ago"
+                 data-is-following="{% if request.user.is_authenticated and reel.author|is_following:request.user %}true{% else %}false{% endif %}"
+                 data-is-self="{% if reel.author == request.user %}true{% else %}false{% endif %}"
+                 role="button"
+                 tabindex="0"
+                 onclick="const vm = window.videoManager || window.PwaniNetVideoManager; if(vm) vm.openFullscreenReels('{{ reel.share_id }}');"
+                 onkeydown="if(event.key==='Enter'||event.key===' '){ const vm = window.videoManager || window.PwaniNetVideoManager; if(vm) vm.openFullscreenReels('{{ reel.share_id }}'); event.preventDefault(); }">
+                
+                <!-- Poster Thumbnail Image -->
+                {% with poster=reel.get_video_poster|default:reel.thumbnail_url %}
+                    {% if poster %}
+                        <img src="{{ poster }}" class="reels-carousel-poster w-100 h-100 object-fit-cover" alt="" loading="lazy">
+                    {% else %}
+                        <div class="w-100 h-100 bg-dark d-flex align-items-center justify-content-center">
+                            <i class="bi bi-film text-white-50 fs-2"></i>
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Preview Video element (used for carousel stick autoplay & fullscreen extraction) -->
+                <video class="reels-carousel-video position-absolute top-0 start-0 w-100 h-100 object-fit-cover"
+                       preload="none"
+                       muted
+                       loop
+                       playsinline
+                       poster="{{ reel.get_video_poster|default:reel.thumbnail_url|default:'' }}"
+                       data-post-id="{{ reel.share_id }}"
+                       data-video-url="{{ reel.get_video_for_feed.url }}"
+                       {% if reel.hls_playlist %}data-hls-url="{{ reel.get_hls_url }}"{% endif %}
+                       style="opacity: 0; pointer-events: none; transition: opacity 0.25s ease;">
+                    <source src="{{ reel.get_video_for_feed.url }}" type="video/mp4">
+                </video>
+
+                <!-- Subtle Bottom Scrim: Author Avatar & Username (Option A) -->
+                <div class="reels-card-scrim-bottom position-absolute bottom-0 start-0 w-100 p-2" style="pointer-events: none; z-index: 2;">
+                    <div class="d-flex align-items-center min-w-0" style="gap: 6px;">
+                        <img src="{{ reel.author.profile_pic.url|default:'/static/images/default-avatar.png' }}"
+                             class="rounded-circle border border-white flex-shrink-0"
+                             style="width: 22px; height: 22px; object-fit: cover; box-shadow: 0 1px 3px rgba(0,0,0,0.5);"
+                             alt="{{ reel.author.username }}">
+                        <span class="text-white fw-bold text-truncate"
+                              style="font-size: 11.5px; line-height: 1.2; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);">
+                            @{{ reel.author.username }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}

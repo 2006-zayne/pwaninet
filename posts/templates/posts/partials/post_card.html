@@ -23,7 +23,7 @@
     </div>
     {% endif %}
 
-    <div class="post-card-header d-flex align-items-center px-3 pt-3 pb-2">
+    <div class="post-card-header d-flex align-items-center px-3 py-2">
         <!-- Facebook Style 40px Compact Avatar -->
         <div class="fb-avatar-container position-relative flex-shrink-0 me-2" style="width: 40px; height: 40px;">
             {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
@@ -114,6 +114,17 @@
                 <i class="bi bi-three-dots fs-5"></i>
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                {% with post_obj=post.repost_of|default:post %}
+                {% if post_obj.video or post.get_intel_file_is_video %}
+                <li>
+                    <button class="dropdown-item d-flex align-items-center gap-2"
+                            data-action="fullscreen"
+                            data-post-id="{{ post.share_id }}">
+                        <i class="bi bi-arrows-fullscreen"></i> {% trans "Watch Fullscreen" %}
+                    </button>
+                </li>
+                {% endif %}
+                {% endwith %}
                 <li>
                     <button class="dropdown-item d-flex align-items-center gap-2"
                             data-bs-toggle="modal" data-bs-target="#globalRepostModal" data-post-id="{{ post.share_id }}">
