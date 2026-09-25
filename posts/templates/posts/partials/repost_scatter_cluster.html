@@ -1,0 +1,30 @@
+{% load i18n %}
+{% if repost_users %}
+<div class="reel-repost-scatter-cluster {% if repost_users|length == 1 %}scatter-single{% elif repost_users|length == 2 %}scatter-curve{% else %}scatter-triangle{% endif %} d-inline-flex align-items-center">
+    <div class="scatter-items-group position-relative">
+        {% for ru in repost_users %}
+        <div class="scatter-item position-relative" title="{{ ru.get_full_name|default:ru.username }} reposted">
+            <a href="{% url 'users:profile' ru.username %}"
+               hx-get="{% url 'users:profile' ru.username %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               class="d-block text-decoration-none">
+                <img src="{{ ru.profile_pic.url|default:'/static/images/default-avatar.png' }}"
+                     class="scatter-avatar-img"
+                     alt="{{ ru.username }}"
+                     onerror="this.src='/static/images/default-avatar.png'">
+            </a>
+            <span class="scatter-repost-icon" title="{% trans 'Repost' %}">
+                <i class="bi bi-repeat"></i>
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+    {% if repost_count > repost_users|length %}
+    <span class="badge bg-dark bg-opacity-75 text-white rounded-pill px-2 py-1 ms-2 fw-semibold" style="font-size: 11px; backdrop-filter: blur(4px);">
+        +{{ repost_count|add:"-3" }}
+    </span>
+    {% endif %}
+</div>
+{% endif %}

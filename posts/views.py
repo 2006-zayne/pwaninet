@@ -28,7 +28,7 @@ from posts.forms import PostForm
 from posts.services.comment_service import build_comments_context, handle_add_comment_request, toggle_comment_like_for_user, add_comment_to_image
 from posts.services.feed_service import build_home_feed_context
 from posts.services.post_service import toggle_post_like_for_user, create_post_for_user
-from posts.services.repost_service import create_repost, delete_repost, get_post_reposts
+from posts.services.repost_service import create_repost, delete_repost, get_post_reposts, toggle_repost
 from posts.services.hide_service import hide_post, unhide_post, is_post_hidden
 from posts.services.author_preference_service import set_author_preference, get_author_preference, get_all_preferences
 from posts.services.share_service import share_post, get_shared_posts, mark_share_as_viewed, get_user_received_shares
@@ -111,7 +111,7 @@ class PostViewSet(viewsets.ModelViewSet):
         })
 
     @action(detail=True, methods=['post'], url_path='report')
-    def report(self, request, pk=None):
+    def report(self, request, *args, **kwargs):
         """
         POST /posts/{id}/report/
         Report a post.
@@ -138,7 +138,7 @@ class PostViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=['post'], url_path='like')
-    def like(self, request, pk=None):
+    def like(self, request, *args, **kwargs):
         """
         POST /posts/{id}/like/
         Like a post.
@@ -178,7 +178,7 @@ class PostViewSet(viewsets.ModelViewSet):
             )
 
     @action(detail=True, methods=['post'], url_path='images/(?P<image_id>[^/.]+)/like')
-    def image_like(self, request, pk=None, image_id=None):
+    def image_like(self, request, image_id=None, *args, **kwargs):
         """
         POST /posts/{id}/images/{image_id}/like/
         Like or unlike a specific post image.
@@ -228,7 +228,7 @@ class PostViewSet(viewsets.ModelViewSet):
             )
 
     @action(detail=True, methods=['get', 'post'], url_path='images/(?P<image_id>[^/.]+)/comments')
-    def image_comments(self, request, pk=None, image_id=None):
+    def image_comments(self, request, image_id=None, *args, **kwargs):
         """
         GET /posts/{id}/images/{image_id}/comments/
         List all comments for a specific post image.
@@ -314,7 +314,7 @@ class PostViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['get'], url_path='comments')
-    def comments(self, request, pk=None):
+    def comments(self, request, *args, **kwargs):
         """
         GET /posts/{id}/comments/
         List all comments for a post.
@@ -325,66 +325,73 @@ class PostViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='repost')
-    def repost(self, request, pk=None):
+    def repost(self, request, *args, **kwargs):
         """
-        POST /posts/{id}/repost/
-        Repost a post by creating a new post that references the original.
+        POST /posts/{share_id}/repost/
+        Toggle repost for user on the original post.
+        Does NOT duplicate the Post object - references original post.
         """
         original_post = self.get_object()
-        content = request.data.get('content', '')
+        content = request.data.get('content', '') or request.POST.get('content', '')
+        group_id = request.data.get('group_id') or request.POST.get('group_id')
+        group = None
+        if group_id:
+            from groups.models import Group
+            group = Group.objects.filter(id=group_id).first()
 
-        # Create a new post as a repost
-        repost = Post.objects.create(
-            author=request.user,
-            content=content,
-            group=original_post.group,
-            course=original_post.course,
-            unit=original_post.unit,
-            video=original_post.video,
-            docs=original_post.docs,
-            gradient_class=original_post.gradient_class,
-            repost_of=original_post
-        )
+        try:
+            result = toggle_repost(request.user, original_post, group=group, content=content)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Copy images from original post
-        for image in original_post.images.all():
-            from posts.models import PostImage
-            PostImage.objects.create(post=repost, image=image.image)
+        # Support HTMX response
+        if request.headers.get('HX-Request') and not (request.headers.get('Accept') == 'application/json'):
+            context = {
+                'post': original_post,
+                'user_has_reposted': result['is_reposted'],
+                'request': request,
+            }
+            template = 'posts/partials/reel_card.html' if original_post.is_reel else 'posts/partials/post_card.html'
+            return render(request, template, context)
 
-        return Response(
-            PostSerializer(repost, context={'request': request}).data,
-            status=status.HTTP_201_CREATED
-        )
+        user_avatar = '/static/images/default-avatar.png'
+        if request.user.is_authenticated and request.user.profile_pic:
+            try:
+                user_avatar = request.user.profile_pic.url
+            except Exception:
+                pass
+
+        return Response({
+            'status': 'success',
+            'is_reposted': result['is_reposted'],
+            'repost_count': result['repost_count'],
+            'share_id': str(original_post.share_id),
+            'post_id': original_post.id,
+            'user_id': request.user.id,
+            'user_username': request.user.username,
+            'user_name': request.user.get_full_name() or request.user.username,
+            'user_avatar': user_avatar,
+        }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['delete'], url_path='repost')
-    def delete_repost(self, request, pk=None):
+    def delete_repost(self, request, *args, **kwargs):
         """
-        DELETE /posts/{id}/repost/
-        Delete a repost (delete the reposted post).
+        DELETE /posts/{share_id}/repost/
+        Delete a repost.
         """
-        post = self.get_object()
-
-        # Only allow deleting if this is a repost and the user is the reposter
-        if not post.repost_of:
-            return Response(
-                {'detail': 'This is not a repost.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if post.author != request.user:
-            return Response(
-                {'detail': 'You can only delete your own reposts.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        post.delete()
-        return Response(
-            {'detail': 'Repost deleted.'},
-            status=status.HTTP_200_OK
-        )
+        original_post = self.get_object()
+        from posts.services.repost_service import delete_repost as svc_delete_repost
+        deleted = svc_delete_repost(request.user, original_post)
+        return Response({
+            'status': 'success',
+            'is_reposted': False,
+            'repost_count': original_post.repost_count,
+            'share_id': str(original_post.share_id),
+            'post_id': original_post.id,
+        }, status=status.HTTP_200_OK if deleted else status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['get'], url_path='reposts')
-    def reposts(self, request, pk=None):
+    def reposts(self, request, *args, **kwargs):
         """
         GET /posts/{id}/reposts/
         List all reposts of a post.
@@ -395,7 +402,7 @@ class PostViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='hide')
-    def hide(self, request, pk=None):
+    def hide(self, request, *args, **kwargs):
         """
         POST /posts/{id}/hide/
         Hide a post from feed.
@@ -414,7 +421,7 @@ class PostViewSet(viewsets.ModelViewSet):
             )
 
     @action(detail=True, methods=['delete'], url_path='hide')
-    def unhide(self, request, pk=None):
+    def unhide(self, request, *args, **kwargs):
         """
         DELETE /posts/{id}/hide/
         Unhide a post.
@@ -433,7 +440,7 @@ class PostViewSet(viewsets.ModelViewSet):
             )
 
     @action(detail=True, methods=['post'], url_path='share')
-    def share(self, request, pk=None):
+    def share(self, request, *args, **kwargs):
         """
         POST /posts/{id}/share/
         Share a post to multiple users or groups.
@@ -849,6 +856,18 @@ def home_view(request):
     cursor = request.GET.get('cursor')
     context = build_home_feed_context(request.user, cursor=cursor)
 
+    # If arrived via shared reel link, ensure target reel is in posts and set auto launch
+    target_reel_id = request.GET.get('reel')
+    shared_by = request.GET.get('shared_by', '')
+    if target_reel_id:
+        target_reel = Post.objects.filter(share_id=target_reel_id).first()
+        if target_reel:
+            existing_ids = {p.id for p in context['posts']}
+            if target_reel.id not in existing_ids:
+                context['posts'] = [target_reel] + list(context['posts'])
+            context['auto_launch_reel_id'] = str(target_reel.share_id)
+            context['shared_by'] = shared_by
+
     # Add explore_groups for initial page load and HTMX navigation (no cursor)
     # Exclude for infinite scroll (has cursor) and search (has query)
     if cursor is None and not request.GET.get('q'):
@@ -990,10 +1009,26 @@ def _is_safe_previous_page(url_str, request_host, share_id):
 
 def post_detail_view(request, share_id):
     post = get_object_or_404(Post, share_id=share_id)
+    shared_by = request.GET.get('shared_by', '')
     show_all = request.GET.get('show_all') == '1'
+    is_reel_requested = (post.is_reel or request.GET.get('reel') == '1') and not show_all
+
+    # If post is a reel, opening from external platform should open in fullscreen reel player on exact reel
+    if is_reel_requested:
+        if request.user.is_authenticated:
+            target_url = reverse('posts:home') + f"?reel={post.share_id}"
+            if shared_by:
+                target_url += f"&shared_by={shared_by}"
+            if request.headers.get('HX-Request'):
+                return htmx_location_response(target_url)
+            return redirect(target_url)
+
     context = build_comments_context(post, request.user, show_all_comments=show_all)
     context['is_liked'] = post.is_liked_by(request.user)
     context['unread_notifications_count'] = get_cached_unread_count(request.user)
+    if is_reel_requested:
+        context['auto_launch_reel_id'] = str(post.share_id)
+        context['shared_by'] = shared_by
 
     # Track previous page for back button logic
     is_new_post = request.session.pop('is_new_post', False)
@@ -1020,8 +1055,8 @@ def post_detail_view(request, share_id):
 
     context['previous_page'] = candidate_prev
 
-    # For HTMX requests to show all comments, return only the comments section
-    if request.headers.get('HX-Request') and show_all:
+    # Return comments section whenever show_all=1 is requested
+    if show_all:
         return render(request, 'posts/partials/comments_section.html', context)
 
     # For HTMX page navigation requests, return navigation partial
@@ -1065,6 +1100,17 @@ def toggle_like(request, share_id):
     post = get_object_or_404(Post, share_id=share_id)
     result = toggle_post_like_for_user(post, request.user)
     is_reel = request.GET.get('is_reel') == '1' or request.POST.get('is_reel') == '1'
+
+    if request.headers.get('Accept') == 'application/json' or request.GET.get('format') == 'json' or request.POST.get('format') == 'json':
+        from django.http import JsonResponse
+        return JsonResponse({
+            'status': 'success',
+            'is_liked': result['is_liked'],
+            'like_count': result['like_count'],
+            'share_id': str(post.share_id),
+            'post_id': post.id
+        })
+
     return render(request, 'posts/partials/like_button.html', {
         'post': result['post'],
         'is_liked': result['is_liked'],

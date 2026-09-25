@@ -1,0 +1,39 @@
+{% load i18n %}
+{% load post_filters %}
+{% with r_header=post|repost_header_info:request.user %}
+<div id="fb-repost-banner-{{ post.share_id }}"
+     class="fb-repost-banner d-flex align-items-center px-3 pt-2 pb-1 text-muted {% if not r_header.show %}d-none{% endif %}"
+     style="font-size: 13px;">
+    <i class="bi bi-repeat me-2 text-primary fs-6"></i>
+    <span class="fb-repost-banner-text">
+        {% if r_header.show %}
+            {% if r_header.is_self %}
+                <span class="fw-semibold text-dark">{% trans "You" %}</span>{% if r_header.primary_user %}{% if r_header.others_count > 0 %}, {% else %} {% trans "and" %} {% endif %}<a href="{% url 'users:profile' r_header.primary_username %}"
+                   hx-get="{% url 'users:profile' r_header.primary_username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
+                   class="fw-semibold text-dark text-decoration-none fb-reposter-link">{{ r_header.primary_name }}</a>{% endif %}{% if r_header.others_count > 0 %} {% trans "and" %} <span class="fw-semibold text-dark">{{ r_header.others_count }} {{ r_header.others_count|pluralize:"other,others" }}</span>{% endif %}
+            {% else %}
+                <a href="{% url 'users:profile' r_header.primary_username %}"
+                   hx-get="{% url 'users:profile' r_header.primary_username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
+                   class="fw-semibold text-dark text-decoration-none fb-reposter-link">{{ r_header.primary_name }}</a>{% if r_header.second_user %} {% trans "and" %} <a href="{% url 'users:profile' r_header.second_username %}"
+                   hx-get="{% url 'users:profile' r_header.second_username %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
+                   class="fw-semibold text-dark text-decoration-none fb-reposter-link">{{ r_header.second_name }}</a>{% elif r_header.others_count > 0 %} {% trans "and" %} <span class="fw-semibold text-dark">{{ r_header.others_count }} {{ r_header.others_count|pluralize:"other,others" }}</span>{% endif %}
+            {% endif %}
+            <span class="ms-1">{% trans "reposted this" %}</span>
+            <span class="mx-1">&middot;</span>
+            <span class="text-muted fb-repost-banner-time" style="font-size: 11px;">{% if r_header.created_at %}{{ r_header.created_at|timesince }} ago{% else %}just now{% endif %}</span>
+        {% endif %}
+    </span>
+</div>
+{% endwith %}

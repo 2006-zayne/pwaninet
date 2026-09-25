@@ -24,6 +24,10 @@
     const storageKey = username ? `pwaninet_audio_preference_${username}` : 'pwaninet_audio_preference';
     let isGlobalMuted = (localStorage.getItem(storageKey) || window.PwaniNetUserAudioPreference || 'muted') === 'muted';
 
+    // Auto-scroll preference (persisted per user)
+    const autoScrollKey = username ? `pwaninet_autoscroll_${username}` : 'pwaninet_autoscroll';
+    let isAutoScrollEnabled = localStorage.getItem(autoScrollKey) === 'true';
+
     const state = {
         videos: new Map(), // video element -> video metadata
         feedObserver: null,
@@ -92,6 +96,542 @@
     }
 
     // ============================================================================
+    // REEL ENGAGEMENT & SHARING SYNC (LIKES, REPOSTS, EXTERNAL AUTO-LAUNCH)
+    // ============================================================================
+
+    function getCsrfToken() {
+        return (document.querySelector('[name=csrfmiddlewaretoken]') && document.querySelector('[name=csrfmiddlewaretoken]').value) ||
+               (document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content')) ||
+               '';
+    }
+
+    function syncLikeUiAcrossSite(postId, isLiked, likeCount) {
+        if (!postId) return;
+        postId = String(postId).trim();
+
+        // 1. Update fullscreen snap items
+        const snapItems = document.querySelectorAll(`.reels-snap-item[data-post-id="${postId}"]`);
+        snapItems.forEach(snapItem => {
+            if (isLiked !== undefined && isLiked !== null) {
+                snapItem.dataset.isLiked = isLiked ? 'true' : 'false';
+            }
+            if (likeCount !== undefined && likeCount !== null) {
+                snapItem.dataset.likes = likeCount;
+            }
+            const proxyBtn = snapItem.querySelector('.fs-like-proxy-btn');
+            if (proxyBtn && isLiked !== undefined && isLiked !== null) {
+                proxyBtn.classList.toggle('liked', isLiked);
+                proxyBtn.classList.toggle('text-danger', isLiked);
+                const icon = proxyBtn.querySelector('i');
+                if (icon) icon.className = isLiked ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+            }
+            const countEl = snapItem.querySelector(`#fs-reel-like-count-${postId}`);
+            if (countEl && likeCount !== undefined && likeCount !== null) {
+                countEl.textContent = likeCount;
+            }
+        });
+
+        // 2. Update desktop exterior engagement rail
+        const desktopLikeBtn = document.getElementById('fsDesktopLikeBtn');
+        const desktopLikeCount = document.getElementById('fsDesktopLikeCount');
+        if (desktopLikeBtn && (desktopLikeBtn.dataset.postId === postId || currentDesktopRailPostId === postId)) {
+            if (isLiked !== undefined && isLiked !== null) {
+                desktopLikeBtn.classList.toggle('liked', isLiked);
+                desktopLikeBtn.classList.toggle('text-danger', isLiked);
+                const icon = desktopLikeBtn.querySelector('i');
+                if (icon) icon.className = isLiked ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+            }
+        }
+        if (desktopLikeCount && (desktopLikeBtn?.dataset.postId === postId || currentDesktopRailPostId === postId)) {
+            if (likeCount !== undefined && likeCount !== null) {
+                desktopLikeCount.textContent = likeCount;
+            }
+        }
+
+        // 3. Update all feed cards and carousel cards
+        const cardSelectors = [
+            `#post-card-${postId}`,
+            `#reel-card-${postId}`,
+            `.post-card[data-post-id="${postId}"]`,
+            `.reel-post-card[data-post-id="${postId}"]`,
+            `.reels-carousel-card[data-post-id="${postId}"]`
+        ];
+        document.querySelectorAll(cardSelectors.join(', ')).forEach(card => {
+            if (isLiked !== undefined && isLiked !== null) {
+                card.setAttribute('data-is-liked', isLiked ? 'true' : 'false');
+            }
+            if (likeCount !== undefined && likeCount !== null) {
+                card.setAttribute('data-likes', likeCount);
+            }
+        });
+
+        // 4. Update inline feed like buttons
+        const btnSelectors = [
+            `.like-button[data-share-id="${postId}"]`,
+            `.like-button[data-post-id="${postId}"]`,
+            `#reel-like-wrap-${postId} .like-button`,
+            `#post-card-${postId} .like-button`
+        ];
+        document.querySelectorAll(btnSelectors.join(', ')).forEach(btn => {
+            const isReel = btn.classList.contains('reel-action-btn');
+            const icon = btn.querySelector('i');
+            if (isLiked !== undefined && isLiked !== null) {
+                if (isReel) {
+                    btn.classList.toggle('liked', isLiked);
+                    btn.classList.toggle('text-danger', isLiked);
+                    btn.classList.toggle('text-white', !isLiked);
+                    if (icon) icon.className = isLiked ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+                } else {
+                    btn.classList.toggle('text-danger', isLiked);
+                    btn.classList.toggle('text-muted', !isLiked);
+                    if (icon) icon.className = isLiked ? 'bi bi-heart-fill text-danger heart-pop fs-5' : 'bi bi-heart fs-5';
+                }
+            }
+            const countSpan = btn.querySelector('.like-count') || document.getElementById(`reel-like-count-${postId}`) || btn.querySelector('span');
+            if (countSpan && likeCount !== undefined && likeCount !== null) {
+                countSpan.textContent = likeCount;
+            }
+        });
+    }
+
+    function toggleReelLike(postId) {
+        if (!postId) return;
+        postId = String(postId).trim();
+
+        const snapItem = document.querySelector(`.reels-snap-item[data-post-id="${postId}"]`);
+        const fsLikeBtn = snapItem?.querySelector('.fs-like-proxy-btn') || document.querySelector(`.fs-like-proxy-btn[data-post-id="${postId}"]`);
+        const isCurrentlyLiked = snapItem ? (snapItem.dataset.isLiked === 'true') : (fsLikeBtn?.classList.contains('liked') || false);
+        const willBeLiked = !isCurrentlyLiked;
+
+        let currentCount = parseInt(snapItem?.dataset?.likes || document.getElementById(`fs-reel-like-count-${postId}`)?.textContent || '0', 10) || 0;
+        let optimisticCount = willBeLiked ? currentCount + 1 : Math.max(0, currentCount - 1);
+
+        syncLikeUiAcrossSite(postId, willBeLiked, optimisticCount);
+
+        const csrfToken = getCsrfToken();
+        fetch(`/like/${postId}/?format=json`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.status === 'success') {
+                syncLikeUiAcrossSite(postId, data.is_liked, data.like_count);
+            }
+        })
+        .catch(err => {
+            console.warn('[VideoManager] Like toggle error, reverting:', err);
+            syncLikeUiAcrossSite(postId, isCurrentlyLiked, currentCount);
+        });
+    }
+
+    function renderRepostScatterClusterHtml(badgeData, isFullscreen) {
+        if (!badgeData || !badgeData.avatars || badgeData.avatars.length === 0) {
+            return '';
+        }
+        const avatars = badgeData.avatars.slice(0, 3);
+        const count = badgeData.repost_count || avatars.length;
+        const formationClass = avatars.length === 1 ? 'scatter-single' : (avatars.length === 2 ? 'scatter-curve' : 'scatter-triangle');
+
+        let itemsHtml = '';
+        avatars.forEach((ru) => {
+            const avatarUrl = ru.avatar || '/static/images/default-avatar.png';
+            const username = ru.username || '';
+            const name = ru.name || username || 'User';
+            itemsHtml += `
+                <div class="scatter-item position-relative" title="${name} reposted">
+                    <a href="/users/user/${username}/"
+                       hx-get="/users/user/${username}/"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       class="d-block text-decoration-none">
+                        <img src="${avatarUrl}"
+                             class="scatter-avatar-img"
+                             alt="${username}"
+                             onerror="this.src='/static/images/default-avatar.png'">
+                    </a>
+                    <span class="scatter-repost-icon" title="Repost">
+                        <i class="bi bi-repeat"></i>
+                    </span>
+                </div>
+            `;
+        });
+
+        let overflowHtml = '';
+        if (count > avatars.length) {
+            overflowHtml = `
+                <span class="badge bg-dark bg-opacity-75 text-white rounded-pill px-2 py-1 ms-2 fw-semibold" style="font-size: 11px; backdrop-filter: blur(4px);">
+                    +${count - avatars.length}
+                </span>
+            `;
+        }
+
+        return `
+            <div class="reel-repost-scatter-cluster ${formationClass} d-inline-flex align-items-center">
+                <div class="scatter-items-group position-relative">
+                    ${itemsHtml}
+                </div>
+                ${overflowHtml}
+            </div>
+        `;
+    }
+
+    function updateRepostBadgeDom(postId, isReposted, repostCount, userProfile) {
+        if (!postId) return;
+        postId = String(postId).trim();
+
+        const user = {
+            id: userProfile?.user_id || userProfile?.id || document.body.dataset.userId || '',
+            username: userProfile?.user_username || userProfile?.username || document.body.dataset.userUsername || '',
+            name: userProfile?.user_name || userProfile?.name || document.body.dataset.userName || document.body.dataset.userUsername || 'You',
+            avatar: userProfile?.user_avatar || userProfile?.avatar || document.body.dataset.userAvatar || '/static/images/default-avatar.png'
+        };
+
+        const card = document.getElementById(`reel-card-${postId}`) ||
+                     document.querySelector(`.reel-post-card[data-post-id="${postId}"]`) ||
+                     document.querySelector(`[data-post-id="${postId}"]`);
+
+        let badgeData = { repost_count: 0, is_reposted: false, avatars: [], followed_friend: null };
+        if (card && card.dataset.repostBadge) {
+            try {
+                badgeData = typeof card.dataset.repostBadge === 'string'
+                    ? JSON.parse(card.dataset.repostBadge)
+                    : card.dataset.repostBadge;
+            } catch (e) {
+                badgeData = { repost_count: 0, is_reposted: false, avatars: [], followed_friend: null };
+            }
+        }
+        if (!badgeData.avatars) badgeData.avatars = [];
+
+        const userRepostAction = (isReposted !== undefined && isReposted !== null) ? isReposted : userProfile?.is_reposted;
+
+        if (userRepostAction !== undefined && userRepostAction !== null) {
+            if (userRepostAction) {
+                if (isReposted) badgeData.is_reposted = true;
+                if (repostCount !== undefined && repostCount !== null) {
+                    badgeData.repost_count = repostCount;
+                } else {
+                    badgeData.repost_count = (badgeData.repost_count || 0) + 1;
+                }
+                const alreadyIn = badgeData.avatars.some(a =>
+                    (user.id && String(a.id) === String(user.id)) ||
+                    (user.username && a.username === user.username)
+                );
+                if (!alreadyIn && (user.username || user.id)) {
+                    badgeData.avatars.unshift({
+                        id: user.id,
+                        username: user.username,
+                        name: user.name || user.username,
+                        avatar: user.avatar || '/static/images/default-avatar.png',
+                        is_self: Boolean(isReposted)
+                    });
+                }
+            } else {
+                if (isReposted === false) badgeData.is_reposted = false;
+                if (repostCount !== undefined && repostCount !== null) {
+                    badgeData.repost_count = repostCount;
+                } else {
+                    badgeData.repost_count = Math.max(0, (badgeData.repost_count || 1) - 1);
+                }
+                badgeData.avatars = badgeData.avatars.filter(a =>
+                    !(user.id && String(a.id) === String(user.id)) &&
+                    !(user.username && a.username === user.username)
+                );
+            }
+        } else if (repostCount !== undefined && repostCount !== null) {
+            badgeData.repost_count = repostCount;
+        }
+
+        document.querySelectorAll(`[data-post-id="${postId}"]`).forEach(c => {
+            c.dataset.repostBadge = JSON.stringify(badgeData);
+        });
+
+        // 1. Update Top Text-Only Repost Banner (#fb-repost-banner-${postId}) on both Reel Cards & Post Cards
+        const topBanners = document.querySelectorAll(`#fb-repost-banner-${postId}`);
+        topBanners.forEach(banner => {
+            const textEl = banner.querySelector('.fb-repost-banner-text');
+            if (!textEl) return;
+            const totalCount = Math.max(badgeData.repost_count || 0, badgeData.avatars.length);
+            const friend = badgeData.followed_friend;
+
+            if (badgeData.is_reposted) {
+                let headerHtml = '<strong>You</strong>';
+                if (friend && friend.username) {
+                    const friendName = friend.name || friend.username;
+                    const friendLink = `<a href="/users/user/${friend.username}/" hx-get="/users/user/${friend.username}/" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" class="text-decoration-none text-dark fw-semibold">${friendName}</a>`;
+                    const othersCount = Math.max(0, totalCount - 2);
+                    if (othersCount > 0) {
+                        headerHtml = `<strong>You</strong>, ${friendLink} and ${othersCount} ${othersCount === 1 ? 'other' : 'others'} reposted this`;
+                    } else {
+                        headerHtml = `<strong>You</strong> and ${friendLink} reposted this`;
+                    }
+                } else {
+                    const othersCount = Math.max(0, totalCount - 1);
+                    if (othersCount > 0) {
+                        headerHtml = `<strong>You</strong> and ${othersCount} ${othersCount === 1 ? 'other' : 'others'} reposted this`;
+                    } else {
+                        headerHtml = `<strong>You</strong> reposted this`;
+                    }
+                }
+                textEl.innerHTML = `${headerHtml} <span class="text-muted fw-normal">&middot; just now</span>`;
+                banner.classList.remove('d-none');
+                if (window.htmx) htmx.process(banner);
+            } else if (friend && friend.username && totalCount > 0) {
+                const friendName = friend.name || friend.username;
+                const friendLink = `<a href="/users/user/${friend.username}/" hx-get="/users/user/${friend.username}/" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" class="text-decoration-none text-dark fw-semibold">${friendName}</a>`;
+                const othersCount = Math.max(0, totalCount - 1);
+                let headerHtml = `${friendLink} reposted this`;
+                if (othersCount > 0) {
+                    headerHtml = `${friendLink} and ${othersCount} ${othersCount === 1 ? 'other' : 'others'} reposted this`;
+                }
+                textEl.innerHTML = `${headerHtml} <span class="text-muted fw-normal">&middot; just now</span>`;
+                banner.classList.remove('d-none');
+                if (window.htmx) htmx.process(banner);
+            } else {
+                banner.classList.add('d-none');
+            }
+        });
+
+        // 2. Update Video Stage Bottom-Left Repost Cluster (Reel Cards only)
+        const feedClusterWrap = document.getElementById(`reel-card-repost-cluster-${postId}`) ||
+                                document.querySelector(`#reel-card-${postId} .reel-card-repost-cluster-wrap`);
+        if (feedClusterWrap) {
+            if (badgeData.avatars.length > 0) {
+                feedClusterWrap.innerHTML = renderRepostScatterClusterHtml(badgeData, false);
+                feedClusterWrap.classList.remove('d-none');
+                if (window.htmx) htmx.process(feedClusterWrap);
+            } else {
+                feedClusterWrap.innerHTML = '';
+                feedClusterWrap.classList.add('d-none');
+            }
+        }
+
+        // 3. Update Fullscreen Snap Item Repost Badge
+        const fsBadgeContainers = document.querySelectorAll(`#fs-repost-badge-${postId}`);
+        fsBadgeContainers.forEach(fsContainer => {
+            if (badgeData.avatars.length > 0) {
+                fsContainer.innerHTML = renderRepostScatterClusterHtml(badgeData, true);
+                fsContainer.classList.remove('d-none');
+                if (window.htmx) htmx.process(fsContainer);
+            } else {
+                fsContainer.innerHTML = '';
+                fsContainer.classList.add('d-none');
+            }
+        });
+    }
+
+    function syncRepostUiAcrossSite(postId, isReposted, repostCount, userProfile) {
+        if (!postId) return;
+        postId = String(postId).trim();
+
+        // 1. Update fullscreen snap items
+        const snapItems = document.querySelectorAll(`.reels-snap-item[data-post-id="${postId}"]`);
+        snapItems.forEach(snapItem => {
+            if (isReposted !== undefined && isReposted !== null) {
+                snapItem.dataset.isReposted = isReposted ? 'true' : 'false';
+            }
+            if (repostCount !== undefined && repostCount !== null) {
+                snapItem.dataset.repostCount = repostCount;
+            }
+            const proxyBtn = snapItem.querySelector('.fs-repost-proxy-btn');
+            if (proxyBtn && isReposted !== undefined && isReposted !== null) {
+                proxyBtn.classList.toggle('is-reposted', isReposted);
+                proxyBtn.classList.toggle('text-primary', isReposted);
+                const icon = proxyBtn.querySelector('i');
+                if (icon) icon.className = isReposted ? 'bi bi-repeat text-primary' : 'bi bi-repeat';
+            }
+            const countEl = snapItem.querySelector(`#fs-reel-repost-count-${postId}`);
+            if (countEl && repostCount !== undefined && repostCount !== null) {
+                countEl.textContent = repostCount;
+            }
+        });
+
+        // 2. Update desktop exterior engagement rail
+        const desktopRepostBtn = document.getElementById('fsDesktopRepostBtn');
+        const desktopRepostCount = document.getElementById('fsDesktopRepostCount');
+        if (desktopRepostBtn && (desktopRepostBtn.dataset.postId === postId || currentDesktopRailPostId === postId)) {
+            if (isReposted !== undefined && isReposted !== null) {
+                desktopRepostBtn.classList.toggle('is-reposted', isReposted);
+                desktopRepostBtn.classList.toggle('text-primary', isReposted);
+                const icon = desktopRepostBtn.querySelector('i');
+                if (icon) icon.className = isReposted ? 'bi bi-repeat text-primary' : 'bi bi-repeat';
+            }
+        }
+        if (desktopRepostCount && (desktopRepostBtn?.dataset.postId === postId || currentDesktopRailPostId === postId)) {
+            if (repostCount !== undefined && repostCount !== null) {
+                desktopRepostCount.textContent = repostCount;
+            }
+        }
+
+        // 3. Update global share modal repost chip if open for this post
+        const modalPostId = document.getElementById('globalSharePostId')?.value;
+        if (modalPostId === postId) {
+            const modalRepostBtn = document.getElementById('globalShareRepostBtn');
+            const modalRepostIcon = document.getElementById('globalShareRepostIcon');
+            const modalRepostLabel = document.getElementById('globalShareRepostLabel');
+            if (isReposted !== undefined && isReposted !== null) {
+                if (modalRepostBtn) modalRepostBtn.classList.toggle('active', isReposted);
+                if (modalRepostIcon) modalRepostIcon.className = isReposted ? 'bi bi-repeat fs-5 text-primary' : 'bi bi-repeat fs-5 text-dark';
+                if (modalRepostLabel) modalRepostLabel.textContent = isReposted ? 'Reposted' : 'Repost';
+            }
+        }
+
+        // 4. Update all feed cards and carousel cards
+        const cardSelectors = [
+            `#post-card-${postId}`,
+            `#reel-card-${postId}`,
+            `.post-card[data-post-id="${postId}"]`,
+            `.reel-post-card[data-post-id="${postId}"]`,
+            `.reels-carousel-card[data-post-id="${postId}"]`
+        ];
+        document.querySelectorAll(cardSelectors.join(', ')).forEach(card => {
+            if (isReposted !== undefined && isReposted !== null) {
+                card.setAttribute('data-is-reposted', isReposted ? 'true' : 'false');
+            }
+            if (repostCount !== undefined && repostCount !== null) {
+                card.setAttribute('data-repost-count', repostCount);
+            }
+        });
+
+        // 5. Update feed repost action buttons
+        const repostBtnSelectors = [
+            `#repost-btn-${postId}`,
+            `[data-post-id="${postId}"] .repost-button`,
+            `#post-card-${postId} .repost-button`,
+            `#reel-card-${postId} .repost-button`
+        ];
+        document.querySelectorAll(repostBtnSelectors.join(', ')).forEach(btn => {
+            if (isReposted !== undefined && isReposted !== null) {
+                btn.classList.toggle('text-primary', isReposted);
+                btn.classList.toggle('text-muted', !isReposted);
+                const icon = btn.querySelector('i');
+                if (icon) icon.className = isReposted ? 'bi bi-repeat fs-5 text-primary' : 'bi bi-repeat fs-5';
+            }
+            const countSpan = btn.querySelector('.repost-count') || btn.querySelector('span.fw-bold') || btn.querySelector('span');
+            if (countSpan && repostCount !== undefined && repostCount !== null) {
+                countSpan.textContent = repostCount;
+            }
+        });
+
+        // 6. Update Repost Badge Cluster in DOM immediately
+        updateRepostBadgeDom(postId, isReposted, repostCount, userProfile);
+    }
+
+    function toggleReelRepost(postId) {
+        if (!postId) return;
+        postId = String(postId).trim();
+
+        const snapItem = document.querySelector(`.reels-snap-item[data-post-id="${postId}"]`);
+        const feedCard = document.getElementById(`reel-card-${postId}`) ||
+                         document.getElementById(`post-card-${postId}`) ||
+                         document.querySelector(`[data-post-id="${postId}"]`);
+        const feedBtn = document.getElementById(`repost-btn-${postId}`);
+        const fsRepostBtn = snapItem?.querySelector('.fs-repost-proxy-btn') || document.querySelector(`.fs-repost-proxy-btn[data-post-id="${postId}"]`);
+
+        const isCurrentlyReposted = snapItem ? (snapItem.dataset.isReposted === 'true') :
+                                    (feedCard && feedCard.dataset.isReposted !== undefined) ? (feedCard.dataset.isReposted === 'true') :
+                                    (feedBtn?.classList.contains('text-primary') || fsRepostBtn?.classList.contains('is-reposted') || false);
+        const willBeReposted = !isCurrentlyReposted;
+
+        let currentCount = parseInt(
+            snapItem?.dataset?.repostCount ||
+            feedCard?.dataset?.repostCount ||
+            document.getElementById(`fs-reel-repost-count-${postId}`)?.textContent ||
+            feedBtn?.querySelector('.repost-count')?.textContent ||
+            '0', 10
+        ) || 0;
+        let optimisticCount = willBeReposted ? currentCount + 1 : Math.max(0, currentCount - 1);
+
+        syncRepostUiAcrossSite(postId, willBeReposted, optimisticCount);
+
+        const csrfToken = getCsrfToken();
+        fetch(`/api/posts/${postId}/repost/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.status === 'success') {
+                syncRepostUiAcrossSite(postId, data.is_reposted, data.repost_count, data);
+            }
+        })
+        .catch(err => {
+            console.warn('[VideoManager] Repost toggle error, reverting:', err);
+            syncRepostUiAcrossSite(postId, isCurrentlyReposted, currentCount);
+        });
+    }
+
+    function showSharedByNote(sharedBy) {
+        if (!sharedBy) return;
+        const noteEl = document.getElementById('fsReelSharedNote');
+        const noteText = document.getElementById('fsReelSharedNoteText');
+        if (noteEl && noteText) {
+            const cleanUser = sharedBy.startsWith('@') ? sharedBy : `@${sharedBy}`;
+            noteText.textContent = `${cleanUser} shared this reel with you`;
+            noteEl.classList.remove('d-none');
+            noteEl.style.opacity = '1';
+
+            setTimeout(() => {
+                noteEl.style.opacity = '0';
+                setTimeout(() => {
+                    noteEl.classList.add('d-none');
+                }, 400);
+            }, 5000);
+        }
+    }
+
+    function checkAutoLaunchReel() {
+        if (state.isFullScreenActive) return;
+
+        let targetReelId = null;
+        let sharedBy = null;
+
+        const autoLaunchEl = document.getElementById('pwaniAutoLaunchReel');
+        if (autoLaunchEl) {
+            targetReelId = autoLaunchEl.dataset.reelId;
+            sharedBy = autoLaunchEl.dataset.sharedBy;
+            autoLaunchEl.remove();
+        }
+
+        if (!targetReelId) {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const reelParam = urlParams.get('reel');
+                if (reelParam && reelParam !== '1' && reelParam !== 'true') {
+                    targetReelId = reelParam;
+                } else if (reelParam === '1' || reelParam === 'true') {
+                    const pathMatch = window.location.pathname.match(/\/post\/([0-9a-f-]{36})/i);
+                    if (pathMatch) {
+                        targetReelId = pathMatch[1];
+                    } else {
+                        const detailEl = document.querySelector('.post-detail-container[data-post-id], .reel-post-card[data-post-id], .post-card[data-post-id]');
+                        if (detailEl) targetReelId = detailEl.dataset.postId;
+                    }
+                }
+                sharedBy = urlParams.get('shared_by');
+            } catch (e) {}
+        }
+
+        if (targetReelId) {
+            console.log('[VideoManager] Auto-launching fullscreen reel:', targetReelId, 'shared by:', sharedBy);
+            setTimeout(() => {
+                openFullscreenReels(targetReelId, sharedBy);
+            }, 120);
+        }
+    }
+
+    // ============================================================================
     // GLOBAL MUTE SYNCHRONIZATION
     // ============================================================================
 
@@ -139,8 +679,69 @@
     }
 
     // ============================================================================
+    // AUTO-SCROLL CONTROLLER
+    // ============================================================================
+
+    function syncAutoScrollUI() {
+        // Sync the quick tools modal toggle
+        const toggleBtn = document.getElementById('quickToolsAutoScrollBtn');
+        const statusBadge = document.getElementById('quickToolsAutoScrollStatus');
+        if (toggleBtn) {
+            toggleBtn.classList.toggle('active', isAutoScrollEnabled);
+            const icon = toggleBtn.querySelector('i');
+            if (icon) {
+                icon.className = isAutoScrollEnabled ? 'bi bi-collection-play-fill text-primary' : 'bi bi-collection-play';
+            }
+        }
+        if (statusBadge) {
+            statusBadge.textContent = isAutoScrollEnabled ? 'On' : 'Off';
+            statusBadge.className = isAutoScrollEnabled
+                ? 'badge rounded-pill bg-primary text-white ms-auto auto-scroll-status-badge'
+                : 'badge rounded-pill bg-secondary bg-opacity-25 text-muted ms-auto auto-scroll-status-badge';
+        }
+    }
+
+    function setAutoScroll(enabled) {
+        isAutoScrollEnabled = !!enabled;
+        try {
+            localStorage.setItem(autoScrollKey, isAutoScrollEnabled ? 'true' : 'false');
+        } catch (e) {
+            console.warn('[VideoManager] LocalStorage unavailable for auto-scroll preference', e);
+        }
+        syncAutoScrollUI();
+        console.log('[VideoManager] Auto-scroll toggled to:', isAutoScrollEnabled);
+    }
+
+    function toggleAutoScroll() {
+        setAutoScroll(!isAutoScrollEnabled);
+    }
+
+    function scrollToNextReel() {
+        if (!state.isFullScreenActive) return;
+        const viewport = document.getElementById('reelsSnapViewport');
+        if (!viewport || viewport.children.length === 0) return;
+
+        const h = viewport.clientHeight || 1;
+        const curIdx = Math.round(viewport.scrollTop / h);
+        const nextIdx = curIdx + 1;
+
+        if (nextIdx >= viewport.children.length) {
+            // At the last reel — try to load more
+            const trigger = document.getElementById('feed-load-trigger');
+            if (trigger && typeof htmx !== 'undefined') {
+                htmx.trigger(trigger, 'revealed');
+            }
+            return;
+        }
+
+        viewport.scrollTo({ top: nextIdx * h, behavior: 'smooth' });
+        updateFullscreenNavButtons(nextIdx);
+    }
+
+    // ============================================================================
     // PLAYBACK CONTROLLER
     // ============================================================================
+
 
     function playVideo(video, isAutoplay = false) {
         if (!video) return;
@@ -161,6 +762,18 @@
         // Resume HLS buffer loading if active
         if (video._hlsInstance && typeof video._hlsInstance.startLoad === 'function') {
             video._hlsInstance.startLoad();
+        }
+
+        const container = video.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reel-fullscreen-content, .reels-snap-item');
+        if (container) {
+            const hud = container.querySelector('.reel-play-hud');
+            if (hud) {
+                if (hud._hideTimer) {
+                    clearTimeout(hud._hideTimer);
+                    hud._hideTimer = null;
+                }
+                hud.classList.remove('show', 'is-paused');
+            }
         }
 
         const playPromise = video.play();
@@ -405,18 +1018,25 @@
         const hud = container.querySelector('.reel-play-hud');
         if (!hud) return;
 
-        const icon = hud.querySelector('i');
-        if (icon) {
-            icon.className = isPlaying ? 'bi bi-play-fill' : 'bi bi-pause-fill';
+        if (hud._hideTimer) {
+            clearTimeout(hud._hideTimer);
+            hud._hideTimer = null;
         }
 
-        hud.classList.remove('show');
-        void hud.offsetWidth;
-        hud.classList.add('show');
+        const icon = hud.querySelector('i');
+        if (icon) {
+            icon.className = 'bi bi-play-fill';
+        }
 
-        setTimeout(() => {
+        if (!isPlaying) {
+            // Persistently show Play button indicator while reel is paused
             hud.classList.remove('show');
-        }, 550);
+            void hud.offsetWidth;
+            hud.classList.add('show', 'is-paused');
+        } else {
+            // Hide Play button indicator when reel resumes playing
+            hud.classList.remove('is-paused', 'show');
+        }
     }
 
     function handleHitboxTap(hitbox, event) {
@@ -440,18 +1060,12 @@
 
             triggerHeartBurst(container, event.clientX, event.clientY);
 
-            const fsLikeBtn = container.querySelector('.fs-like-proxy-btn') ||
-                              (postId ? document.querySelector(`.fs-like-proxy-btn[data-post-id="${postId}"]`) : null) ||
-                              document.getElementById('fsDesktopLikeBtn');
-            if (fsLikeBtn) {
-                if (!fsLikeBtn.classList.contains('liked')) {
-                    fsLikeBtn.click();
-                }
-            } else {
-                const likeBtn = container.querySelector('.like-button') ||
-                               (postId ? document.querySelector(`#reel-like-wrap-${postId} .like-button`) : null);
-                if (likeBtn && !likeBtn.classList.contains('liked') && !likeBtn.classList.contains('text-danger')) {
-                    likeBtn.click();
+            if (postId) {
+                const snapItem = container.closest('.reels-snap-item');
+                const isCurrentlyLiked = snapItem ? (snapItem.dataset.isLiked === 'true') :
+                    Boolean(container.querySelector('.fs-like-proxy-btn.liked') || container.querySelector('.like-button.liked') || container.querySelector('.like-button.text-danger'));
+                if (!isCurrentlyLiked) {
+                    toggleReelLike(postId);
                 }
             }
             return;
@@ -693,6 +1307,29 @@
                              card.querySelector('.postcard-comment-btn span')?.textContent?.trim() ||
                              '0';
 
+        // Extract repost count & state
+        const repostBtn = card.querySelector('.repost-button');
+        const repostCount = card.dataset.repostCount ||
+                            card.querySelector(`[id^="repost-count-"]`)?.textContent?.trim() ||
+                            card.querySelector('.repost-count')?.textContent?.trim() ||
+                            '0';
+        const isReposted = card.dataset.isReposted === 'true' ||
+                           repostBtn?.classList?.contains('text-primary') ||
+                           false;
+
+        // Extract or construct scattered repost badge
+        let repostBadgeHtml = '';
+        if (card.dataset.repostBadge) {
+            try {
+                const badgeData = typeof card.dataset.repostBadge === 'string' ? JSON.parse(card.dataset.repostBadge) : card.dataset.repostBadge;
+                if (badgeData && badgeData.avatars && badgeData.avatars.length > 0) {
+                    repostBadgeHtml = renderRepostScatterClusterHtml(badgeData, true);
+                }
+            } catch (e) {
+                console.warn('[VideoManager] Error parsing repost badge dataset:', e);
+            }
+        }
+
         const snapItem = document.createElement('div');
         snapItem.className = 'reels-snap-item';
         snapItem.dataset.postId = postId;
@@ -705,6 +1342,8 @@
         snapItem.dataset.likes = likeCount;
         snapItem.dataset.isLiked = isLiked ? 'true' : 'false';
         snapItem.dataset.comments = commentCount;
+        snapItem.dataset.repostCount = repostCount;
+        snapItem.dataset.isReposted = isReposted ? 'true' : 'false';
         snapItem.dataset.videoUrl = videoSrc;
         snapItem.dataset.poster = poster;
         const rawCaptionText = (card.dataset.caption || card.querySelector('.reel-caption-text')?.textContent || card.querySelector('.post-content-text')?.textContent || card.querySelector('.post-text-body')?.textContent || '').trim();
@@ -766,28 +1405,35 @@
                 <!-- Floating Right Engagement Rail (Pure floating icons, no backdrop bubbles) -->
                 <div class="reel-actions-stack">
                     <div class="reel-action-unit text-center">
-                        <button type="button" class="reel-action-btn fs-like-proxy-btn text-white ${isLiked ? 'liked text-danger' : ''}" data-post-id="${postId}">
+                        <button type="button" class="reel-action-btn fs-like-proxy-btn text-white ${isLiked ? 'liked text-danger' : ''}" data-post-id="${postId}" title="Like" aria-label="Like">
                             <i class="bi ${isLiked ? 'bi-heart-fill text-danger' : 'bi-heart'}"></i>
                         </button>
                         <span class="reel-action-label" id="fs-reel-like-count-${postId}">${likeCount}</span>
                     </div>
 
                     <div class="reel-action-unit text-center">
-                        <button type="button" class="reel-action-btn text-white reel-comment-trigger" data-post-id="${postId}">
+                        <button type="button" class="reel-action-btn text-white reel-comment-trigger" data-post-id="${postId}" title="Comment" aria-label="Comment">
                             <i class="bi bi-chat-dots-fill"></i>
                         </button>
                         <span class="reel-action-label" id="fs-reel-comment-count-${postId}">${commentCount}</span>
                     </div>
 
                     <div class="reel-action-unit text-center">
-                        <button type="button" class="reel-action-btn text-white" data-bs-toggle="modal" data-bs-target="#globalShareModal" data-post-id="${postId}" data-post-url="/post/${postId}/" data-video-url="${videoSrc}" data-poster-url="${poster}" data-post-content="${rawCaptionText.replace(/"/g, '&quot;')}">
+                        <button type="button" class="reel-action-btn fs-repost-proxy-btn text-white ${isReposted ? 'text-primary is-reposted' : ''}" data-post-id="${postId}" title="Repost" aria-label="Repost">
+                            <i class="bi ${isReposted ? 'bi-repeat text-primary' : 'bi-repeat'}"></i>
+                        </button>
+                        <span class="reel-action-label" id="fs-reel-repost-count-${postId}">${repostCount}</span>
+                    </div>
+
+                    <div class="reel-action-unit text-center">
+                        <button type="button" class="reel-action-btn text-white" data-bs-toggle="modal" data-bs-target="#globalShareModal" data-post-id="${postId}" data-post-url="/post/${postId}/" data-video-url="${videoSrc}" data-poster-url="${poster}" data-post-content="${rawCaptionText.replace(/"/g, '&quot;')}" data-reel="true" title="Share" aria-label="Share">
                             <i class="bi bi-share-fill"></i>
                         </button>
                         <span class="reel-action-label">Share</span>
                     </div>
 
                     <div class="reel-action-unit text-center">
-                        <button type="button" class="reel-action-btn reel-mute-btn text-white" data-action="mute-toggle">
+                        <button type="button" class="reel-action-btn reel-mute-btn text-white" data-action="mute-toggle" title="Sound" aria-label="Sound">
                             <i class="bi ${isGlobalMuted ? 'bi-volume-mute-fill' : 'bi-volume-up-fill'}"></i>
                         </button>
                         <span class="reel-action-label reel-mute-label">${isGlobalMuted ? 'Mute' : 'Sound'}</span>
@@ -803,6 +1449,10 @@
                 <!-- Bottom Scrim: Creator Identity, Caption, and Audio Pill (Option C) -->
                 <div class="reel-scrim-bottom position-absolute bottom-0 start-0 w-100 d-flex flex-column justify-content-end" style="pointer-events: none; z-index: 4;">
                     <div class="reel-scrim-content">
+                        <!-- Repost Badge sitting just slightly on top of author's avatar and username -->
+                        <div id="fs-repost-badge-${postId}" class="reel-fullscreen-repost-badge ${repostBadgeHtml ? '' : 'd-none'}">
+                            ${repostBadgeHtml}
+                        </div>
                         ${creatorRowHtml}
                         ${captionHtml}
                         ${audioWrapHtml}
@@ -1072,11 +1722,8 @@
             if (commentsLoading) commentsLoading.style.display = 'none';
 
             if (commentsList) {
-                delete commentsList.dataset.eventsBound;
                 commentsList.innerHTML = html;
-                if (window.htmx) {
-                    htmx.process(commentsList);
-                }
+                reinitHtmxElement(commentsList);
                 initSheetCommentsInteractions(commentsList, postId);
 
                 const countFromDom = commentsList.querySelectorAll('.comment-item:not(.comment-reply)').length;
@@ -1097,6 +1744,24 @@
             if (icon) icon.classList.remove('spinning');
             if (refreshBtn) refreshBtn.disabled = false;
         });
+    }
+
+    function reinitHtmxElement(el) {
+        if (!el || !window.htmx) return;
+        try {
+            const clearCache = (node) => {
+                if (node && node['htmx-internal-data']) {
+                    delete node['htmx-internal-data'];
+                }
+            };
+            clearCache(el);
+            if (el.querySelectorAll) {
+                el.querySelectorAll('[hx-get], [hx-post], [hx-put], [hx-patch], [hx-delete], [hx-boost]').forEach(clearCache);
+            }
+            window.htmx.process(el);
+        } catch (e) {
+            console.warn('[VideoManager] HTMX process error:', e);
+        }
     }
 
     function repositionDesktopActionsRail(content) {
@@ -1248,7 +1913,7 @@
             updateFullscreenNavButtons(activeItem);
             repositionDesktopActionsRail(activeItem.querySelector('.reel-fullscreen-content'));
         }
-        if (!activeItem || window.innerWidth < 992) return;
+        if (!activeItem) return;
 
         const rawPostId = activeItem.dataset.postId || extractPostId(activeItem);
         const postId = rawPostId ? String(rawPostId).trim() : '';
@@ -1265,6 +1930,12 @@
         const commentCount = activeItem.dataset.comments ||
                              activeItem.querySelector('.reel-action-unit [id^="fs-reel-comment-count-"]')?.textContent?.trim() ||
                              '0';
+        const repostCount = activeItem.dataset.repostCount ||
+                            activeItem.querySelector('.reel-action-unit [id^="fs-reel-repost-count-"]')?.textContent?.trim() ||
+                            '0';
+        const isReposted = activeItem.dataset.isReposted === 'true' ||
+                           activeItem.querySelector('.fs-repost-proxy-btn')?.classList.contains('is-reposted') ||
+                           false;
 
         // 1. Update Exterior Engagement Stack (Desktop/Tablet Floating Rail)
         const fsLikeBtn = document.getElementById('fsDesktopLikeBtn');
@@ -1294,6 +1965,20 @@
         }
         if (fsCommentCount) {
             fsCommentCount.textContent = commentCount;
+        }
+
+        const fsRepostBtn = document.getElementById('fsDesktopRepostBtn');
+        const fsRepostCount = document.getElementById('fsDesktopRepostCount');
+        if (fsRepostBtn) {
+            fsRepostBtn.dataset.postId = postId;
+            fsRepostBtn.setAttribute('data-post-id', postId);
+            fsRepostBtn.classList.toggle('text-primary', isReposted);
+            fsRepostBtn.classList.toggle('is-reposted', isReposted);
+            const rIcon = fsRepostBtn.querySelector('i');
+            if (rIcon) rIcon.className = isReposted ? 'bi bi-repeat text-primary' : 'bi bi-repeat';
+        }
+        if (fsRepostCount) {
+            fsRepostCount.textContent = repostCount;
         }
 
         const fsShareBtn = document.getElementById('fsDesktopShareBtn');
@@ -1424,10 +2109,10 @@
             };
         }
 
-        // Process HTMX on side rail header links
+        // Process HTMX on side rail header links cleanly
         const railHeader = document.querySelector('.reel-rail-header');
-        if (railHeader && window.htmx) {
-            htmx.process(railHeader);
+        if (railHeader) {
+            reinitHtmxElement(railHeader);
         }
 
         // 3. Update Comments Stream in Side Rail
@@ -1457,7 +2142,8 @@
         if (commentsLoading) commentsLoading.style.display = 'block';
         if (commentsList) {
             commentsList.innerHTML = '';
-            delete commentsList.dataset.eventsBound;
+            commentsList.dataset.activePostId = postId;
+            initSheetCommentsInteractions(commentsList, postId);
         }
 
         fetch(`/post/${postId}/?show_all=1`, {
@@ -1465,17 +2151,17 @@
         })
         .then(res => res.text())
         .then(html => {
+            if (currentDesktopRailPostId !== postId) return;
             if (commentsLoading) commentsLoading.style.display = 'none';
             if (commentsList) {
                 commentsList.innerHTML = html;
-                if (window.htmx) {
-                    htmx.process(commentsList);
-                }
+                reinitHtmxElement(commentsList);
                 initSheetCommentsInteractions(commentsList, postId);
                 initSideRailWebSocket(postId);
             }
         })
         .catch(err => {
+            if (currentDesktopRailPostId !== postId) return;
             console.warn('[DesktopSideRail] Failed to load comments:', err);
             if (commentsLoading) commentsLoading.style.display = 'none';
             if (commentsList) commentsList.innerHTML = '<div class="text-center py-4 text-muted small">Could not load comments.</div>';
@@ -1522,11 +2208,8 @@
                     if (replyBanner) replyBanner.classList.add('d-none');
 
                     if (commentsList) {
-                        delete commentsList.dataset.eventsBound;
                         commentsList.innerHTML = html;
-                        if (window.htmx) {
-                            htmx.process(commentsList);
-                        }
+                        reinitHtmxElement(commentsList);
                         initSheetCommentsInteractions(commentsList, curPostId);
                     }
 
@@ -1543,10 +2226,20 @@
                     if (inlineReelCount) inlineReelCount.textContent = newN;
                     if (fsReelCount) fsReelCount.textContent = newN;
 
-                    // Scroll to bottom
-                    const scrollContainer = document.getElementById('fsRailCommentsBody');
-                    if (scrollContainer) {
-                        scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+                    if (targetParentId && commentsList) {
+                        const parentEl = commentsList.querySelector(`#comment-${targetParentId}, [data-comment-id="${targetParentId}"]`);
+                        const toggleBtn = parentEl?.querySelector('[data-action="toggle-replies"]');
+                        if (toggleBtn) {
+                            toggleBtn.click();
+                            setTimeout(() => {
+                                parentEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            }, 250);
+                        }
+                    } else {
+                        const scrollContainer = document.getElementById('fsRailCommentsBody');
+                        if (scrollContainer) {
+                            scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+                        }
                     }
                 })
                 .catch(err => {
@@ -1572,7 +2265,7 @@
         }
     }
 
-    function openFullscreenReels(targetPostId) {
+    function openFullscreenReels(targetPostId, sharedBy = null) {
         const overlay = document.getElementById('fullscreenReelsOverlay');
         const viewport = document.getElementById('reelsSnapViewport');
         if (!overlay || !viewport) return;
@@ -1590,6 +2283,17 @@
         document.body.classList.add('reels-active');
         overlay.classList.remove('d-none');
         overlay.setAttribute('aria-hidden', 'false');
+
+        // Check and display subtle shared-by note if arriving via shared reel link
+        if (!sharedBy) {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                sharedBy = urlParams.get('shared_by');
+            } catch (e) {}
+        }
+        if (sharedBy) {
+            showSharedByNote(sharedBy);
+        }
 
         // Clear previous snap tracks
         viewport.innerHTML = '';
@@ -1619,6 +2323,7 @@
 
         if (allVideoCards.length === 0) {
             console.warn('[VideoManager] No video cards found to populate fullscreen viewer');
+            closeFullscreenReels();
             return;
         }
 
@@ -1629,10 +2334,7 @@
             const snapItem = buildSnapItemFromReelCard(card);
             if (snapItem) {
                 viewport.appendChild(snapItem);
-                if (window.htmx) {
-                    window.htmx.process(snapItem);
-                }
-                state.fullscreenObserver.observe(snapItem);
+                reinitHtmxElement(snapItem);
 
                 const video = snapItem.querySelector('video');
                 if (video) {
@@ -1652,7 +2354,7 @@
         // Initialize nav button visibility immediately
         updateFullscreenNavButtons(targetSnapItem || viewport.firstElementChild);
 
-        // Request animation frame ensures DOM reflow is complete before scrolling/playing
+        // Request animation frame ensures DOM reflow is complete before scrolling/playing and observing
         requestAnimationFrame(() => {
             const activeItem = targetSnapItem || viewport.firstElementChild;
             if (activeItem) {
@@ -1674,6 +2376,13 @@
                 updateFullscreenNavButtons(activeItem);
             } else {
                 updateFullscreenNavButtons();
+            }
+
+            // Observe snap items AFTER scrollTop is set so observer does not falsely trigger on item 0 first
+            if (state.fullscreenObserver) {
+                Array.from(viewport.children).forEach(item => {
+                    state.fullscreenObserver.observe(item);
+                });
             }
         });
 
@@ -1706,6 +2415,12 @@
         document.body.classList.remove('reels-active');
         state.isFullScreenActive = false;
 
+        const noteEl = document.getElementById('fsReelSharedNote');
+        if (noteEl) {
+            noteEl.classList.add('d-none');
+            noteEl.style.opacity = '0';
+        }
+
         // Restore exact previous scroll position
         window.scrollTo({
             top: state.previousScrollY,
@@ -1731,7 +2446,28 @@
         const modalEl = document.getElementById('reelQuickToolsModal');
         if (!modalEl || typeof bootstrap === 'undefined') return;
 
-        const card = targetEl ? targetEl.closest('.reel-card-container, .reel-post-card, .reels-snap-item') : document.getElementById(`reel-card-${postId}`);
+        // Resolve the card context: try closest ancestor, then active snap item, then feed card
+        let card = targetEl
+            ? targetEl.closest('.reel-card-container, .reel-post-card, .reels-snap-item')
+            : null;
+
+        if (!card) {
+            // targetEl lives outside a snap/card (e.g. fsRailOptionsBtn in the desktop side rail)
+            // — find the currently active snap item in the fullscreen viewport
+            const viewport = document.getElementById('reelsSnapViewport');
+            if (viewport && viewport.children.length > 0) {
+                const h = viewport.clientHeight || 1;
+                const curIdx = Math.round(viewport.scrollTop / h);
+                card = viewport.children[curIdx] || viewport.firstElementChild || null;
+            }
+        }
+
+        if (!card) {
+            // Last resort: find the feed card or any element with this postId
+            card = document.getElementById(`reel-card-${postId}`) ||
+                   document.querySelector(`[data-post-id="${postId}"]`);
+        }
+
         if (!card) return;
 
         const optionsBtn = card.querySelector('.reel-options-btn');
@@ -1900,6 +2636,37 @@
             }
         }
 
+        // 9. Auto-Scroll Toggle Button
+        const autoScrollBtn = document.getElementById('quickToolsAutoScrollBtn');
+        if (autoScrollBtn) {
+            // Sync initial state immediately
+            syncAutoScrollUI();
+            autoScrollBtn.onclick = function() {
+                toggleAutoScroll();
+                // Visual feedback toast
+                const isNowOn = isAutoScrollEnabled;
+                let toastEl = document.getElementById('autoScrollToast');
+                if (!toastEl) {
+                    toastEl = document.createElement('div');
+                    toastEl.id = 'autoScrollToast';
+                    toastEl.className = 'position-fixed bottom-0 start-50 translate-middle-x mb-5 px-3 py-2 rounded-pill shadow text-white text-center';
+                    toastEl.style.cssText = 'z-index:10999;font-size:13px;pointer-events:none;transition:opacity 0.2s ease,transform 0.2s ease;';
+                    document.body.appendChild(toastEl);
+                }
+                toastEl.style.background = isNowOn ? '#0d6efd' : '#6c757d';
+                toastEl.textContent = isNowOn ? '▶ Auto-scroll On' : '⏸ Auto-scroll Off';
+                toastEl.style.opacity = '1';
+                toastEl.style.transform = 'translate(-50%, 0)';
+                clearTimeout(toastEl._t);
+                toastEl._t = setTimeout(() => {
+                    toastEl.style.opacity = '0';
+                    toastEl.style.transform = 'translate(-50%, 10px)';
+                }, 1800);
+            };
+        }
+
+        // Sync auto-scroll UI state before showing
+        syncAutoScrollUI();
         new bootstrap.Modal(modalEl).show();
     }
 
@@ -1917,7 +2684,7 @@
             toast = document.createElement('div');
             toast.id = 'pwaninetCommentsToast';
             toast.className = 'position-fixed bottom-0 start-50 translate-middle-x mb-4 px-3 py-2 rounded-pill shadow bg-dark text-white text-center';
-            toast.style.zIndex = '10060';
+            toast.style.zIndex = '10950';
             toast.style.fontSize = '13px';
             toast.style.pointerEvents = 'none';
             toast.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
@@ -1978,32 +2745,65 @@
 
     function initSheetCommentsInteractions(listEl, postId) {
         if (!listEl) return;
+        if (postId) {
+            listEl.dataset.activePostId = String(postId).trim();
+        }
         truncateLongComments(listEl);
+        reinitHtmxElement(listEl);
         if (listEl.dataset.eventsBound === 'true') return;
         listEl.dataset.eventsBound = 'true';
 
         listEl.addEventListener('click', async function(e) {
+            const curPostId = listEl.dataset.activePostId || currentDesktopRailPostId || activeCommentsPostId || postId || '';
+
+            const findCommentEl = (commentId, triggerEl) => {
+                if (triggerEl) {
+                    const closest = triggerEl.closest('.comment-item');
+                    if (closest) return closest;
+                }
+                return listEl.querySelector(`#comment-${commentId}, [data-comment-id="${commentId}"]`) ||
+                       document.getElementById(`comment-${commentId}`);
+            };
+
+            const findBodyEl = (commentId, commentEl) => {
+                return commentEl?.querySelector(`#comment-body-${commentId}, .comment-body`) ||
+                       listEl.querySelector(`#comment-body-${commentId}`) ||
+                       document.getElementById(`comment-body-${commentId}`);
+            };
+
             // A. Comment Like
             const likeBtn = e.target.closest('[data-action="like"]');
             if (likeBtn) {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 const commentId = likeBtn.dataset.commentId;
                 if (!commentId) return;
 
                 const icon = likeBtn.querySelector('i');
                 const countSpan = likeBtn.querySelector('span');
                 const wasLiked = likeBtn.classList.contains('liked');
-                const curCount = parseInt(countSpan?.textContent || '0', 10);
+                const curCount = parseInt(countSpan?.textContent || '0', 10) || 0;
+                const optimisticLiked = !wasLiked;
+                const optimisticCount = wasLiked ? Math.max(0, curCount - 1) : curCount + 1;
 
-                // Optimistic UI toggle
-                likeBtn.classList.toggle('liked', !wasLiked);
-                if (icon) {
-                    icon.className = wasLiked ? 'bi bi-heart' : 'bi bi-heart-fill text-danger';
-                }
-                if (countSpan) {
-                    countSpan.textContent = wasLiked ? Math.max(0, curCount - 1) : curCount + 1;
-                }
+                const applyCommentLikeUi = (likedState, countVal) => {
+                    document.querySelectorAll(`[data-action="like"][data-comment-id="${commentId}"]`).forEach(btn => {
+                        btn.classList.toggle('liked', likedState);
+                        btn.classList.toggle('text-danger', likedState);
+                        const ic = btn.querySelector('i');
+                        if (ic) {
+                            ic.className = likedState ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+                        }
+                        const sp = btn.querySelector('span');
+                        if (sp) {
+                            sp.textContent = countVal;
+                        }
+                    });
+                };
+
+                // Optimistic UI toggle across all instances of this comment
+                applyCommentLikeUi(optimisticLiked, optimisticCount);
 
                 try {
                     const res = await fetch(`/api/comments/${commentId}/like/`, {
@@ -2013,7 +2813,16 @@
                             'Content-Type': 'application/json'
                         }
                     });
-                    if (!res.ok) {
+                    if (res.ok) {
+                        const data = await res.json().catch(() => null);
+                        if (data) {
+                            const serverLiked = data.detail === 'Comment liked.'
+                                ? true
+                                : (data.detail === 'Comment unliked.' ? false : optimisticLiked);
+                            const serverCount = (typeof data.likes_count === 'number') ? data.likes_count : optimisticCount;
+                            applyCommentLikeUi(serverLiked, serverCount);
+                        }
+                    } else {
                         await fetch(`/comment/${commentId}/like/`, {
                             method: 'POST',
                             headers: {
@@ -2024,9 +2833,7 @@
                     }
                 } catch (err) {
                     console.warn('[CommentsSheet] Like toggle error:', err);
-                    likeBtn.classList.toggle('liked', wasLiked);
-                    if (icon) icon.className = wasLiked ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
-                    if (countSpan) countSpan.textContent = curCount;
+                    applyCommentLikeUi(wasLiked, curCount);
                 }
                 return;
             }
@@ -2036,8 +2843,9 @@
             if (replyBtn) {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 const commentId = replyBtn.dataset.commentId;
-                const commentItem = replyBtn.closest('.comment-item');
+                const commentItem = findCommentEl(commentId, replyBtn);
                 // Enforce 1-level maximum nesting: if replying to a reply, anchor to its root parent comment
                 const rootParentId = commentItem?.dataset?.parentId || commentItem?.dataset?.parentCommentId || commentId;
                 const authorLink = commentItem?.querySelector('.comment-author-link');
@@ -2046,7 +2854,13 @@
                                        (authorLink?.getAttribute('href') || '').match(/\/users\/(?:user\/)?([^\/]+)/)?.[1] ||
                                        authorLink?.textContent?.trim() || '';
 
-                const isRail = (listEl && listEl.id === 'fsRailCommentsList') || (listEl && listEl.closest('#fsRailCommentsBody, .reel-desktop-side-rail')) || Boolean(document.getElementById('fsRailCommentInput')?.offsetParent);
+                const isRail = (listEl && listEl.id === 'fsRailCommentsList') ||
+                               (listEl && Boolean(listEl.closest('#fsRailCommentsBody, .reel-desktop-side-rail'))) ||
+                               Boolean(document.getElementById('fsRailCommentInput')?.offsetParent);
+
+                if (isRail) {
+                    toggleDesktopCommentRail(true);
+                }
 
                 const parentInput = isRail ? document.getElementById('fsRailParentId') : document.getElementById('commentsModalParentId');
                 const replyBanner = isRail ? document.getElementById('fsRailReplyBanner') : document.getElementById('commentsModalReplyBanner');
@@ -2072,12 +2886,15 @@
             if (toggleBtn) {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 if (toggleBtn.dataset.loading === 'true') return;
                 const commentId = toggleBtn.dataset.commentId;
-                const parentComment = listEl.querySelector(`#comment-${commentId}`) || document.getElementById(`comment-${commentId}`);
+                const parentComment = findCommentEl(commentId, toggleBtn);
                 if (!parentComment) return;
 
-                let repliesContainer = parentComment.querySelector('.replies-container') || parentComment.querySelector(`#replies-${commentId}`) || document.getElementById(`replies-${commentId}`);
+                let repliesContainer = parentComment.querySelector('.replies-container') ||
+                                       parentComment.querySelector(`#replies-${commentId}`) ||
+                                       listEl.querySelector(`#replies-${commentId}`);
                 const isExpanded = toggleBtn.classList.contains('expanded');
 
                 if (isExpanded) {
@@ -2168,9 +2985,7 @@
                                     `;
                                     repliesContainer.insertAdjacentHTML('beforeend', replyHtml);
                                 });
-                                if (window.htmx) {
-                                    window.htmx.process(repliesContainer);
-                                }
+                                reinitHtmxElement(repliesContainer);
                                 truncateLongComments(repliesContainer);
                                 repliesContainer.style.display = 'block';
                             }
@@ -2197,19 +3012,21 @@
             if (menuBtn) {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 const commentId = menuBtn.dataset.commentId;
                 if (!commentId) return;
 
-                const existingMenu = document.getElementById(`menu-${commentId}`);
+                const commentEl = findCommentEl(commentId, menuBtn);
+                if (!commentEl) return;
+
+                const existingMenu = commentEl.querySelector('.comment-menu-dropdown') ||
+                                     listEl.querySelector(`#menu-${commentId}`);
                 closeAllSheetCommentMenus();
                 if (existingMenu) return;
 
-                const commentEl = document.getElementById(`comment-${commentId}`);
-                if (!commentEl) return;
-
-                const currentUserId = window.PwaniNetUserId;
-                const currentUsername = window.PwaniNetUsername;
-                const currentUserRole = window.PwaniNetUserRole;
+                const currentUserId = window.PwaniNetUserId || document.body.dataset.userId;
+                const currentUsername = window.PwaniNetUsername || document.body.dataset.userUsername;
+                const currentUserRole = window.PwaniNetUserRole || document.body.dataset.userRole;
 
                 const authorId = commentEl.dataset.authorId;
                 const authorLink = commentEl.querySelector('.comment-author-link');
@@ -2264,13 +3081,20 @@
                 wrapper.insertAdjacentHTML('beforeend', menuHtml);
                 menuBtn.setAttribute('aria-expanded', 'true');
 
-                const menuEl = document.getElementById(`menu-${commentId}`);
+                const menuEl = wrapper.querySelector('.comment-menu-dropdown') || listEl.querySelector(`#menu-${commentId}`);
                 if (menuEl) {
                     const rect = menuEl.getBoundingClientRect();
-                    const modalBody = document.getElementById('commentsModalBody') || window;
-                    const bottomEdge = modalBody.getBoundingClientRect ? modalBody.getBoundingClientRect().bottom : window.innerHeight;
-                    if (rect.bottom > bottomEdge - 20) {
+                    const scrollContainer = menuBtn.closest('#fsRailCommentsBody, #commentsModalBody, .modal-body');
+                    const containerRect = (scrollContainer && scrollContainer.offsetParent !== null)
+                        ? scrollContainer.getBoundingClientRect()
+                        : { top: 0, bottom: window.innerHeight, left: 0, right: window.innerWidth };
+
+                    if (rect.bottom > containerRect.bottom - 16 && (rect.top - rect.height) > containerRect.top) {
                         menuEl.classList.add('menu-dropup');
+                    }
+                    if (rect.left < containerRect.left + 8) {
+                        menuEl.style.left = '0';
+                        menuEl.style.right = 'auto';
                     }
                 }
                 return;
@@ -2281,10 +3105,11 @@
             if (copyTextBtn) {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 const commentId = copyTextBtn.dataset.commentId;
+                const commentEl = findCommentEl(commentId, copyTextBtn);
                 closeAllSheetCommentMenus();
-                const bodyEl = document.getElementById(`comment-body-${commentId}`) ||
-                               document.querySelector(`#comment-${commentId} .comment-body`);
+                const bodyEl = findBodyEl(commentId, commentEl);
                 const text = bodyEl ? bodyEl.textContent.trim() : '';
                 if (navigator.clipboard && text) {
                     navigator.clipboard.writeText(text).then(() => {
@@ -2301,10 +3126,10 @@
             if (copyLinkBtn) {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 const commentId = copyLinkBtn.dataset.commentId;
                 closeAllSheetCommentMenus();
-                const curPostId = activeCommentsPostId || postId;
-                const url = `${window.location.origin}/posts/${curPostId}/#comment-${commentId}`;
+                const url = `${window.location.origin}/post/${curPostId}/#comment-${commentId}`;
                 if (navigator.clipboard) {
                     navigator.clipboard.writeText(url).then(() => {
                         showCommentsToast('Comment link copied to clipboard');
@@ -2320,11 +3145,13 @@
             if (viewProfileBtn) {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 const commentId = viewProfileBtn.dataset.commentId;
+                const commentEl = findCommentEl(commentId, viewProfileBtn);
                 closeAllSheetCommentMenus();
-                const commentEl = document.getElementById(`comment-${commentId}`);
                 const profileLink = commentEl?.querySelector('.comment-author-link') || commentEl?.querySelector('.comment-avatar-link') || commentEl?.querySelector('a');
-                if (profileLink && profileLink.href) {
+                const targetHref = profileLink?.getAttribute('hx-get') || profileLink?.getAttribute('href') || profileLink?.href;
+                if (targetHref) {
                     if (state.isFullScreenActive) {
                         closeFullscreenReels();
                     }
@@ -2333,7 +3160,7 @@
                         try { bootstrap.Modal.getInstance(modalEl)?.hide(); } catch (_) {}
                     }
                     if (window.htmx && document.getElementById('page-content-target')) {
-                        window.htmx.ajax('GET', profileLink.href, {
+                        window.htmx.ajax('GET', targetHref, {
                             target: '#page-content-target',
                             swap: 'innerHTML',
                             headers: {
@@ -2341,8 +3168,9 @@
                                 'HX-Target': 'page-content-target'
                             }
                         });
+                        try { window.history.pushState({}, '', targetHref); } catch (_) {}
                     } else {
-                        profileLink.click();
+                        window.location.href = targetHref;
                     }
                 }
                 return;
@@ -2353,14 +3181,16 @@
             if (editBtn) {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 const commentId = editBtn.dataset.commentId;
+                const commentEl = findCommentEl(commentId, editBtn);
                 closeAllSheetCommentMenus();
-                const bodyEl = document.getElementById(`comment-body-${commentId}`) ||
-                               document.querySelector(`#comment-${commentId} .comment-body`);
+                const bodyEl = findBodyEl(commentId, commentEl);
                 if (!bodyEl) return;
-                if (document.getElementById(`edit-mode-${commentId}`)) return;
+                if (commentEl?.querySelector(`#edit-mode-${commentId}`)) return;
 
-                const curText = bodyEl.textContent.trim();
+                const fullContentSpan = bodyEl.querySelector('.comment-content-full');
+                const curText = (fullContentSpan ? fullContentSpan.textContent : bodyEl.textContent).trim();
                 bodyEl.dataset.originalText = curText;
                 bodyEl.style.display = 'none';
 
@@ -2374,7 +3204,7 @@
                     </div>
                 `;
                 bodyEl.insertAdjacentHTML('afterend', editHtml);
-                const textarea = document.getElementById(`edit-input-${commentId}`);
+                const textarea = commentEl?.querySelector(`#edit-input-${commentId}`) || document.getElementById(`edit-input-${commentId}`);
                 if (textarea) textarea.focus();
                 return;
             }
@@ -2384,10 +3214,11 @@
             if (cancelEditBtn) {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 const commentId = cancelEditBtn.dataset.commentId;
-                const editMode = document.getElementById(`edit-mode-${commentId}`);
-                const bodyEl = document.getElementById(`comment-body-${commentId}`) ||
-                               document.querySelector(`#comment-${commentId} .comment-body`);
+                const commentEl = findCommentEl(commentId, cancelEditBtn);
+                const editMode = commentEl?.querySelector(`#edit-mode-${commentId}`) || document.getElementById(`edit-mode-${commentId}`);
+                const bodyEl = findBodyEl(commentId, commentEl);
                 if (bodyEl) bodyEl.style.display = '';
                 if (editMode) editMode.remove();
                 return;
@@ -2398,8 +3229,10 @@
             if (saveEditBtn) {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 const commentId = saveEditBtn.dataset.commentId;
-                const textarea = document.getElementById(`edit-input-${commentId}`);
+                const commentEl = findCommentEl(commentId, saveEditBtn);
+                const textarea = commentEl?.querySelector(`#edit-input-${commentId}`) || document.getElementById(`edit-input-${commentId}`);
                 const newText = textarea ? textarea.value.trim() : '';
                 if (!newText) return;
 
@@ -2417,13 +3250,12 @@
                     });
                     if (res.ok) {
                         const data = await res.json();
-                        const bodyEl = document.getElementById(`comment-body-${commentId}`) ||
-                                       document.querySelector(`#comment-${commentId} .comment-body`);
-                        if (bodyEl) {
-                            bodyEl.textContent = data.content || newText;
-                            bodyEl.style.display = '';
-                        }
-                        const editMode = document.getElementById(`edit-mode-${commentId}`);
+                        const updatedText = data.content || newText;
+                        document.querySelectorAll(`#comment-body-${commentId}, #comment-${commentId} .comment-body`).forEach(bEl => {
+                            bEl.textContent = updatedText;
+                            bEl.style.display = '';
+                        });
+                        const editMode = commentEl?.querySelector(`#edit-mode-${commentId}`) || document.getElementById(`edit-mode-${commentId}`);
                         if (editMode) editMode.remove();
                         showCommentsToast('Comment updated');
                     } else {
@@ -2445,7 +3277,9 @@
             if (deleteBtn) {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 const commentId = deleteBtn.dataset.commentId;
+                const commentEl = findCommentEl(commentId, deleteBtn);
                 closeAllSheetCommentMenus();
 
                 if (!confirm('Are you sure you want to delete this comment?')) {
@@ -2460,46 +3294,49 @@
                         }
                     });
                     if (res.ok) {
-                        const commentEl = document.getElementById(`comment-${commentId}`);
-                        if (commentEl) {
-                            const parentId = commentEl.dataset.parentId;
+                        const parentId = commentEl?.dataset?.parentId || commentEl?.dataset?.parentCommentId;
+                        document.querySelectorAll(`#comment-${commentId}, [data-comment-id="${commentId}"]`).forEach(el => {
+                            if (!el.classList.contains('comment-item')) return;
+                            el.style.transition = 'all 0.25s ease';
+                            el.style.opacity = '0';
+                            el.style.transform = 'translateX(20px)';
+                            setTimeout(() => el.remove(), 250);
+                        });
 
-                            commentEl.style.transition = 'all 0.25s ease';
-                            commentEl.style.opacity = '0';
-                            commentEl.style.transform = 'translateX(20px)';
-                            setTimeout(() => {
-                                commentEl.remove();
-
-                                // If reply, decrement parent reply count
-                                if (parentId) {
-                                    const parentComment = document.getElementById(`comment-${parentId}`);
-                                    const toggle = parentComment?.querySelector('[data-action="toggle-replies"]');
-                                    if (toggle) {
-                                        let rCount = Math.max(0, (parseInt(toggle.dataset.replyCount, 10) || 1) - 1);
-                                        toggle.dataset.replyCount = rCount;
-                                        const span = toggle.querySelector('span');
-                                        if (rCount === 0) {
-                                            toggle.style.display = 'none';
-                                        } else if (span) {
-                                            span.textContent = `View ${rCount} ${rCount === 1 ? 'reply' : 'replies'}`;
-                                        }
+                        setTimeout(() => {
+                            if (parentId) {
+                                const parentComment = listEl.querySelector(`#comment-${parentId}, [data-comment-id="${parentId}"]`) ||
+                                                      document.getElementById(`comment-${parentId}`);
+                                const toggle = parentComment?.querySelector('[data-action="toggle-replies"]');
+                                if (toggle) {
+                                    let rCount = Math.max(0, (parseInt(toggle.dataset.replyCount, 10) || 1) - 1);
+                                    toggle.dataset.replyCount = rCount;
+                                    const span = toggle.querySelector('span');
+                                    if (rCount === 0) {
+                                        toggle.style.display = 'none';
+                                    } else if (span) {
+                                        span.textContent = `View ${rCount} ${rCount === 1 ? 'reply' : 'replies'}`;
                                     }
                                 }
+                            }
 
-                                // Decrement total comment counter
-                                const countEl = document.getElementById('commentsModalCount');
-                                let curN = Math.max(0, (parseInt(countEl?.textContent || '1', 10) || 1) - 1);
-                                if (countEl) countEl.textContent = curN;
+                            const railCountEl = document.getElementById('fsRailCommentCount');
+                            const fsDesktopCountEl = document.getElementById('fsDesktopCommentCount');
+                            const modalCountEl = document.getElementById('commentsModalCount');
+                            const baseEl = railCountEl || modalCountEl || fsDesktopCountEl;
+                            let curN = Math.max(0, (parseInt(baseEl?.textContent || '1', 10) || 1) - 1);
+                            if (railCountEl) railCountEl.textContent = curN;
+                            if (fsDesktopCountEl) fsDesktopCountEl.textContent = curN;
+                            if (modalCountEl) modalCountEl.textContent = curN;
 
-                                const curPostId = activeCommentsPostId || postId;
-                                const inlinePostCount = document.getElementById(`comment-count-${curPostId}`);
-                                const inlineReelCount = document.getElementById(`reel-comment-count-${curPostId}`);
-                                const fsReelCount = document.getElementById(`fs-reel-comment-count-${curPostId}`);
-                                if (inlinePostCount) inlinePostCount.textContent = curN;
-                                if (inlineReelCount) inlineReelCount.textContent = curN;
-                                if (fsReelCount) fsReelCount.textContent = curN;
-                            }, 250);
-                        }
+                            const inlinePostCount = document.getElementById(`comment-count-${curPostId}`);
+                            const inlineReelCount = document.getElementById(`reel-comment-count-${curPostId}`);
+                            const fsReelCount = document.getElementById(`fs-reel-comment-count-${curPostId}`);
+                            if (inlinePostCount) inlinePostCount.textContent = curN;
+                            if (inlineReelCount) inlineReelCount.textContent = curN;
+                            if (fsReelCount) fsReelCount.textContent = curN;
+                        }, 250);
+
                         showCommentsToast('Comment deleted');
                     } else {
                         showCommentsToast('Could not delete comment');
@@ -2546,7 +3383,8 @@
         if (loadingEl) loadingEl.style.display = 'block';
         if (listEl) {
             listEl.innerHTML = '';
-            delete listEl.dataset.eventsBound;
+            listEl.dataset.activePostId = postId;
+            initSheetCommentsInteractions(listEl, postId);
         }
 
         // Read current count from postcard or reelcard
@@ -2562,16 +3400,16 @@
         })
         .then(res => res.text())
         .then(html => {
+            if (activeCommentsPostId !== postId) return;
             if (loadingEl) loadingEl.style.display = 'none';
             if (listEl) {
                 listEl.innerHTML = html;
-                if (window.htmx) {
-                    htmx.process(listEl);
-                }
+                reinitHtmxElement(listEl);
                 initSheetCommentsInteractions(listEl, postId);
             }
         })
         .catch(err => {
+            if (activeCommentsPostId !== postId) return;
             console.warn('[CommentsSheet] Error loading comments:', err);
             if (loadingEl) loadingEl.style.display = 'none';
             if (listEl) listEl.innerHTML = '<div class="text-center py-4 text-muted small">Could not load comments.</div>';
@@ -2617,11 +3455,8 @@
                     if (replyBanner) replyBanner.classList.add('d-none');
 
                     if (listEl) {
-                        delete listEl.dataset.eventsBound;
                         listEl.innerHTML = html;
-                        if (window.htmx) {
-                            htmx.process(listEl);
-                        }
+                        reinitHtmxElement(listEl);
                         initSheetCommentsInteractions(listEl, curPostId);
                     }
 
@@ -2895,57 +3730,51 @@
                 return;
             }
 
-            // Proxy like button in fullscreen modal -> triggers inline like button & updates counter
+            // Fullscreen Like button
             const fsLikeBtn = event.target.closest('.fs-like-proxy-btn');
             if (fsLikeBtn) {
                 event.preventDefault();
                 event.stopPropagation();
                 const postId = fsLikeBtn.dataset.postId || currentDesktopRailPostId;
                 if (!postId) return;
-                const inlineLikeBtn = document.querySelector(`#reel-like-wrap-${postId} .like-button`) ||
-                                      document.querySelector(`.like-button[data-post-id="${postId}"]`);
-                if (inlineLikeBtn) {
-                    inlineLikeBtn.click();
-                }
-                const wasLiked = fsLikeBtn.classList.toggle('liked');
-                fsLikeBtn.classList.toggle('text-danger', wasLiked);
-                const icon = fsLikeBtn.querySelector('i');
-                if (icon) {
-                    icon.className = wasLiked ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
-                }
-
-                // Sync desktop exterior like button
-                const desktopLikeBtn = document.getElementById('fsDesktopLikeBtn');
-                if (desktopLikeBtn && desktopLikeBtn !== fsLikeBtn) {
-                    desktopLikeBtn.classList.toggle('liked', wasLiked);
-                    const dIcon = desktopLikeBtn.querySelector('i');
-                    if (dIcon) dIcon.className = wasLiked ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
-                }
-
-                // Sync in-video proxy like button
-                const inVideoLikeBtn = document.querySelector(`.reels-snap-item[data-post-id="${postId}"] .fs-like-proxy-btn`);
-                if (inVideoLikeBtn && inVideoLikeBtn !== fsLikeBtn) {
-                    inVideoLikeBtn.classList.toggle('liked', wasLiked);
-                    inVideoLikeBtn.classList.toggle('text-danger', wasLiked);
-                    const ivIcon = inVideoLikeBtn.querySelector('i');
-                    if (ivIcon) ivIcon.className = wasLiked ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
-                }
-
-                const fsCountEl = document.getElementById(`fs-reel-like-count-${postId}`);
-                const desktopCountEl = document.getElementById('fsDesktopLikeCount');
-                const inlineCountEl = document.getElementById(`reel-like-count-${postId}`);
-                let cur = parseInt(fsCountEl?.textContent || desktopCountEl?.textContent || inlineCountEl?.textContent || '0', 10) || 0;
-                let newCount = wasLiked ? cur + 1 : Math.max(0, cur - 1);
-                if (fsCountEl) fsCountEl.textContent = newCount;
-                if (desktopCountEl) desktopCountEl.textContent = newCount;
-                if (inlineCountEl) inlineCountEl.textContent = newCount;
-
-                const activeSnapItem = document.querySelector(`.reels-snap-item[data-post-id="${postId}"]`);
-                if (activeSnapItem) {
-                    activeSnapItem.dataset.isLiked = wasLiked ? 'true' : 'false';
-                    activeSnapItem.dataset.likes = newCount;
-                }
+                toggleReelLike(postId);
                 return;
+            }
+
+            // Fullscreen Repost button
+            const fsRepostBtn = event.target.closest('.fs-repost-proxy-btn');
+            if (fsRepostBtn) {
+                event.preventDefault();
+                event.stopPropagation();
+                const postId = fsRepostBtn.dataset.postId || currentDesktopRailPostId;
+                if (!postId) return;
+                toggleReelRepost(postId);
+                return;
+            }
+        });
+
+        // Real-time WebSocket Feed Metric Listeners
+        window.addEventListener('feedPostLikeUpdate', function(e) {
+            const data = e.detail;
+            if (!data) return;
+            const targetId = data.share_id || data.post_id;
+            const currentUserId = window.PwaniNetUserId || document.body.dataset.userId;
+            const isCurrentUser = Boolean(data.user_id && currentUserId && String(data.user_id) === String(currentUserId));
+            if (targetId) {
+                const isLiked = isCurrentUser ? data.is_liked : undefined;
+                syncLikeUiAcrossSite(targetId, isLiked, data.like_count);
+            }
+        });
+
+        window.addEventListener('feedPostRepostUpdate', function(e) {
+            const data = e.detail;
+            if (!data) return;
+            const targetId = data.share_id || data.post_id;
+            const currentUserId = window.PwaniNetUserId || document.body.dataset.userId;
+            const isCurrentUser = Boolean(data.user_id && currentUserId && String(data.user_id) === String(currentUserId));
+            if (targetId) {
+                const isReposted = isCurrentUser ? data.is_reposted : undefined;
+                syncRepostUiAcrossSite(targetId, isReposted, data.repost_count, data);
             }
         });
 
@@ -3154,6 +3983,43 @@
             }
         }, true);
 
+        // Auto-scroll: advance to next reel when video ends (fullscreen mode only)
+        // For looping videos (loop attr), we detect near-completion instead of 'ended'
+        document.addEventListener('ended', function(event) {
+            const video = event.target;
+            if (video.tagName !== 'VIDEO') return;
+            if (!isAutoScrollEnabled || !state.isFullScreenActive) return;
+            if (video.closest('.reels-carousel-shelf')) return;
+
+            // Small delay so the last frame doesn't snap away too abruptly
+            setTimeout(scrollToNextReel, 400);
+        }, true);
+
+        // For videos with loop=true, 'ended' never fires — detect loop restart via timeupdate
+        // We schedule the scroll right before the video would loop (last 0.35 s)
+        let _autoScrollLoopTimer = null;
+        document.addEventListener('timeupdate', function(event) {
+            const video = event.target;
+            if (video.tagName !== 'VIDEO') return;
+            if (!isAutoScrollEnabled || !state.isFullScreenActive) return;
+            if (!video.loop || !video.duration) return;
+            if (video.closest('.reels-carousel-shelf')) return;
+
+            const remaining = video.duration - video.currentTime;
+            if (remaining <= 0.35 && remaining > 0 && !_autoScrollLoopTimer) {
+                _autoScrollLoopTimer = setTimeout(() => {
+                    _autoScrollLoopTimer = null;
+                    if (isAutoScrollEnabled && state.isFullScreenActive) {
+                        scrollToNextReel();
+                    }
+                }, Math.max(0, remaining * 1000));
+            } else if (video.currentTime < 0.5 && _autoScrollLoopTimer) {
+                // Video looped before our timer fired — clear it
+                clearTimeout(_autoScrollLoopTimer);
+                _autoScrollLoopTimer = null;
+            }
+        }, true);
+
         // Pause on visibility change
         document.addEventListener('visibilitychange', function() {
             if (document.hidden && state.currentPlayingVideo) {
@@ -3195,6 +4061,7 @@
                         } else {
                             adaptSnapItemOrientation(activeSnap);
                             repositionDesktopActionsRail(content);
+                            updateDesktopSideRail(activeSnap);
                         }
                     }
                 }
@@ -3454,17 +4321,34 @@
             state.mutationObserver.disconnect();
         }
 
+        const htmxSelector = '[hx-get], [hx-post], [hx-put], [hx-patch], [hx-delete], [hx-boost], [hx-trigger]';
+
         state.mutationObserver = new MutationObserver(mutations => {
             let hasNewVideos = false;
+            const htmxRoots = new Set();
+
             mutations.forEach(mutation => {
                 mutation.addedNodes.forEach(node => {
                     if (node.nodeType === Node.ELEMENT_NODE) {
                         if (node.tagName === 'VIDEO' || (node.querySelector && node.querySelector('video'))) {
                             hasNewVideos = true;
                         }
+                        if (window.htmx) {
+                            if ((node.matches && node.matches(htmxSelector)) || (node.querySelector && node.querySelector(htmxSelector))) {
+                                htmxRoots.add(node);
+                            }
+                        }
                     }
                 });
             });
+
+            if (htmxRoots.size > 0 && window.htmx) {
+                htmxRoots.forEach(root => {
+                    try {
+                        window.htmx.process(root);
+                    } catch (_) {}
+                });
+            }
 
             if (hasNewVideos) {
                 initializeVideos(document.body);
@@ -3505,7 +4389,11 @@
         document.addEventListener('htmx:afterSwap', function(event) {
             const target = event.detail?.target;
             if (target) {
+                reinitHtmxElement(target);
                 initializeVideos(target);
+                if (target.closest && (target.closest('#fsRailCommentsList') || target.closest('#commentsModalList') || target.id === 'comments-section')) {
+                    truncateLongComments(target);
+                }
                 if (state.isFullScreenActive) {
                     appendNewVideosToFullscreenViewport();
                 }
@@ -3520,9 +4408,11 @@
                     appendNewVideosToFullscreenViewport();
                 }
             }
+            checkAutoLaunchReel();
         });
 
         document.addEventListener('htmx:historyRestore', function() {
+            reinitHtmxElement(document.body);
             initializeVideos(document.body);
         });
     }
@@ -3535,6 +4425,17 @@
         setupMutationObserver();
         initHTMXIntegration();
         initializeVideos(document.body);
+
+        const railCommentsList = document.getElementById('fsRailCommentsList');
+        if (railCommentsList) {
+            initSheetCommentsInteractions(railCommentsList, '');
+        }
+        const modalCommentsList = document.getElementById('commentsModalList');
+        if (modalCommentsList) {
+            initSheetCommentsInteractions(modalCommentsList, '');
+        }
+
+        checkAutoLaunchReel();
 
         state.isInitialized = true;
         console.log('[VideoManager] Unified video playback engine initialized');
@@ -3555,12 +4456,21 @@
         cleanupVideo,
         setGlobalMute,
         toggleGlobalMute,
+        setAutoScroll,
+        toggleAutoScroll,
+        syncAutoScrollUI,
         checkAndPromoteLegacyVideo,
         openFullscreenReels,
         closeFullscreenReels,
         openCommentsSheet,
         openReelComments,
+        toggleReelLike,
+        toggleReelRepost,
+        syncLikeUiAcrossSite,
+        syncRepostUiAcrossSite,
+        showSharedByNote,
         get isGlobalMuted() { return isGlobalMuted; },
+        get isAutoScrollEnabled() { return isAutoScrollEnabled; },
         get state() { return state; }
     };
 

@@ -583,7 +583,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (isCurrentUser && data.is_reposted !== undefined) {
                 const icon = repostButton.querySelector('i');
                 if (data.is_reposted) {
-                    if (icon) icon.className = 'bi bi-repeat-fill fs-5';
+                    if (icon) icon.className = 'bi bi-repeat fs-5';
                     repostButton.classList.add('text-primary');
                     repostButton.classList.remove('text-muted');
                 } else {

@@ -4,6 +4,7 @@ from django.core.cache import cache
 from django.db.models import Q, Count
 from posts.queries.feed_queries import (
     get_following_ids, get_liked_post_ids_for_user,
+    get_reposted_post_ids_for_user,
     get_suggested_groups, get_user_group_ids,
     get_user_suggestions_from_groups
 )
@@ -139,46 +140,68 @@ def get_reels_carousel(user, limit=8, offset=0):
 def build_home_feed_context(user, cursor=None, limit=10):
     """Build context for home feed with cursor-based pagination."""
     feed_data = get_ranked_feed(user, cursor=cursor, limit=limit)
-    
     posts = feed_data['posts']
-    post_ids = [p.id for p in posts]
-    liked_post_ids = get_liked_post_ids_for_user(user, post_ids)
-    
+
     # Cache following_ids for 60 seconds to reduce database queries
-    following_ids_cache_key = f'feed:following_ids:{user.id}'
+    following_ids_cache_key = f'feed:following_ids:{user.id if user and user.is_authenticated else "anon"}'
     following_ids = cache.get(following_ids_cache_key)
     if following_ids is None:
-        following_ids = get_following_ids(user)
+        following_ids = get_following_ids(user) if (user and user.is_authenticated) else []
         cache.set(following_ids_cache_key, following_ids, timeout=60)
-    
-    # Only include group suggestions on initial load (no cursor)
+
+    # Attach repost_context to posts if they appeared via a repost from someone followed
+    following_set = set(following_ids)
+    for p in posts:
+        if hasattr(p, 'reposts'):
+            repost_candidates = [r for r in p.reposts.all() if r.reposter_id in following_set]
+            if repost_candidates and (p.author_id not in following_set or repost_candidates[0].created_at > p.created_at):
+                repost_candidates.sort(key=lambda r: r.created_at, reverse=True)
+                r = repost_candidates[0]
+                p.repost_context = {
+                    'reposter': r.reposter,
+                    'created_at': r.created_at,
+                    'content': r.content
+                }
+
     is_initial_load = cursor is None
-    
+    reels_carousel = None
+    if is_initial_load:
+        reels_carousel = get_reels_carousel(user, limit=8, offset=0)
+    else:
+        cursor_data = decode_cursor(cursor)
+        offset = ((cursor_data.get('id', 0) % 4) * 3) if cursor_data else 3
+        cand = get_reels_carousel(user, limit=8, offset=offset)
+        if cand and len(cand) >= 2:
+            reels_carousel = cand
+
+    # Collect ALL post and carousel IDs for complete and accurate like/repost state
+    all_post_ids = [p.id for p in posts]
+    if reels_carousel:
+        all_post_ids.extend([r.id for r in reels_carousel])
+
+    liked_post_ids = get_liked_post_ids_for_user(user, all_post_ids)
+    reposted_post_ids = get_reposted_post_ids_for_user(user, all_post_ids)
+
     context = {
         'posts': posts,
         'liked_post_ids': liked_post_ids,
+        'reposted_post_ids': reposted_post_ids,
         'following_ids': following_ids,
         'next_cursor': feed_data['next_cursor'],
         'has_more': feed_data['has_more'],
     }
-    
+
     if is_initial_load:
         from recommendations.services.engine import UnifiedRecommendationEngine
         suggested_groups = UnifiedRecommendationEngine.get_recommended_groups(
             user, limit=5, context='feed'
         )
         context['suggested_groups'] = suggested_groups
-
-        reels_carousel = get_reels_carousel(user, limit=8, offset=0)
         if reels_carousel:
             context['reels_carousel'] = reels_carousel
             context['reels_carousel_index'] = 3
     else:
-        # Periodic carousel injection during infinite scroll pagination
-        cursor_data = decode_cursor(cursor)
-        offset = ((cursor_data.get('id', 0) % 4) * 3) if cursor_data else 3
-        reels_carousel = get_reels_carousel(user, limit=8, offset=offset)
-        if reels_carousel and len(reels_carousel) >= 2:
+        if reels_carousel:
             context['reels_carousel'] = reels_carousel
             context['reels_carousel_index'] = 5
 
@@ -187,9 +210,7 @@ def build_home_feed_context(user, cursor=None, limit=10):
     user_suggestions = UnifiedRecommendationEngine.get_recommended_users(
         user, limit=5, context='feed'
     )
-    
     context['suggested_users'] = user_suggestions
-    context['following_ids'] = following_ids
     context['suggestion_index'] = random.randint(2, 6) if user_suggestions else None
-    
+
     return context

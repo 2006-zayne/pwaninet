@@ -34,6 +34,11 @@ const CommentManager = {
    * Handle click events
    */
   handleClick(e) {
+    // Fullscreen side rail and comments modal sheet manage their own comment interactions
+    if (e.target.closest('#fsRailCommentsList, #commentsModalList')) {
+      return;
+    }
+
     // Close menu when clicking outside of any comment menu dropdown or menu trigger
     if (!e.target.closest('.comment-menu-dropdown') && !e.target.closest('[data-action="menu"]')) {
       this.closeAllMenus();
@@ -150,17 +155,28 @@ const CommentManager = {
   async handleLike(commentId) {
     try {
       const button = document.querySelector(`[data-action="like"][data-comment-id="${commentId}"]`);
+      if (!button) return;
       const icon = button.querySelector('i');
       const countSpan = button.querySelector('span');
       
       // Optimistic update
       const wasLiked = button.classList.contains('liked');
-      const currentCount = parseInt(countSpan.textContent);
-      
-      button.classList.toggle('liked');
-      icon.classList.toggle('bi-heart-fill');
-      icon.classList.toggle('bi-heart');
-      countSpan.textContent = wasLiked ? currentCount - 1 : currentCount + 1;
+      const currentCount = parseInt(countSpan?.textContent || '0', 10) || 0;
+      const optimisticLiked = !wasLiked;
+      const optimisticCount = wasLiked ? Math.max(0, currentCount - 1) : currentCount + 1;
+
+      const syncButtons = (likedState, countVal) => {
+        document.querySelectorAll(`[data-action="like"][data-comment-id="${commentId}"]`).forEach(btn => {
+          btn.classList.toggle('liked', likedState);
+          btn.classList.toggle('text-danger', likedState);
+          const ic = btn.querySelector('i');
+          if (ic) ic.className = likedState ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+          const sp = btn.querySelector('span');
+          if (sp) sp.textContent = countVal;
+        });
+      };
+
+      syncButtons(optimisticLiked, optimisticCount);
       
       // Play like sound when liking (not unliking)
       if (!wasLiked) {
@@ -170,26 +186,14 @@ const CommentManager = {
       const result = await CommentApi.toggleLike(commentId);
       
       // Update with actual result
-      if (result.detail === 'Post unliked.') {
-        button.classList.remove('liked');
-        icon.classList.remove('bi-heart-fill');
-        icon.classList.add('bi-heart');
-        countSpan.textContent = currentCount - 1;
-      } else {
-        button.classList.add('liked');
-        icon.classList.remove('bi-heart');
-        icon.classList.add('bi-heart-fill');
-        countSpan.textContent = currentCount + 1;
-      }
+      const isUnliked = result.detail === 'Comment unliked.' || result.detail === 'Post unliked.';
+      const finalLiked = !isUnliked;
+      const finalCount = (typeof result.likes_count === 'number')
+        ? result.likes_count
+        : (finalLiked ? currentCount + 1 : Math.max(0, currentCount - 1));
+      syncButtons(finalLiked, finalCount);
     } catch (error) {
       console.error('Failed to toggle like:', error);
-      // Revert optimistic update on error
-      const button = document.querySelector(`[data-action="like"][data-comment-id="${commentId}"]`);
-      const icon = button.querySelector('i');
-      const countSpan = button.querySelector('span');
-      button.classList.toggle('liked');
-      icon.classList.toggle('bi-heart-fill');
-      icon.classList.toggle('bi-heart');
     }
   },
 

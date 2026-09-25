@@ -21,9 +21,9 @@ def get_prioritized_feed_queryset(user, following_ids, user_group_ids):
         FloatField()
     )
 
-    # Build query - always include posts from followed users
+    # Build query - always include posts from followed users OR reposted by followed users
     # BUT filter out group posts from groups the user is not a member of
-    filters = Q(author_id__in=following_ids) & (Q(group__isnull=True) | Q(group_id__in=user_group_ids))
+    filters = (Q(author_id__in=following_ids) | Q(reposts__reposter_id__in=following_ids)) & (Q(group__isnull=True) | Q(group_id__in=user_group_ids))
 
     # Add optional filters (only if they exist)
     if user_group_ids:
@@ -38,10 +38,10 @@ def get_prioritized_feed_queryset(user, following_ids, user_group_ids):
     if hidden_post_ids:
         filters &= ~Q(id__in=hidden_post_ids)
 
-    return Post.objects.filter(filters).select_related('author', 'unit', 'group').prefetch_related('likes', 'comments').annotate(
+    return Post.objects.filter(filters).select_related('author', 'unit', 'group').prefetch_related('likes', 'comments', 'reposts', 'reposts__reposter').annotate(
         like_count_annotated=Count('likes', distinct=True),
         comment_count_annotated=Count('comments', distinct=True),
-        repost_count_annotated=Count('repost_children', distinct=True),
+        repost_count_annotated=Count('reposts', distinct=True),
         
         # Author affinity: boost posts from authors user frequently engages with
         author_affinity=Case(
@@ -97,6 +97,18 @@ def get_liked_post_ids_for_user(user, post_ids):
         liked_ids.add(share_id)
         liked_ids.add(str(share_id))
     return liked_ids
+
+
+def get_reposted_post_ids_for_user(user, post_ids):
+    if not user or not user.is_authenticated or not post_ids:
+        return set()
+    reposts = Repost.objects.filter(reposter=user, original_post_id__in=post_ids).values_list('original_post_id', 'original_post__share_id')
+    reposted_ids = set()
+    for pid, share_id in reposts:
+        reposted_ids.add(pid)
+        reposted_ids.add(share_id)
+        reposted_ids.add(str(share_id))
+    return reposted_ids
 
 
 def get_suggested_groups(user, following_ids, limit = 5):

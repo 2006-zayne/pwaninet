@@ -3,7 +3,9 @@
 {% load post_filters %}
 {% load user_extras %}
 
-{% with header_author=post.repost_of.author|default:post.author %}
+{% check_is_liked post as user_has_liked %}
+{% check_is_reposted post as user_has_reposted %}
+{% with header_author=post.original_author repost_users=post|repost_avatars:request.user %}
 <div id="reel-card-{{ post.share_id }}"
      class="post-card fb-post-card reel-post-card mb-3 bg-white rounded-3 overflow-hidden border position-relative"
      data-post-id="{{ post.share_id }}"
@@ -11,26 +13,15 @@
      data-author-username="{{ header_author.username }}"
      data-author-avatar="{{ header_author.profile_pic.url|default:'/static/images/default-avatar.png' }}"
      data-author-profile="{% url 'users:profile' header_author.username %}"
+     data-is-liked="{% if user_has_liked %}true{% else %}false{% endif %}"
+     data-likes="{{ post.like_count }}"
+     data-is-reposted="{% if user_has_reposted %}true{% else %}false{% endif %}"
+     data-repost-count="{{ post.repost_count }}"
+     data-comments="{{ post.comments.count }}"
+     data-repost-badge="{{ post|repost_badge_json:request.user|escape }}"
      data-reel="true">
 
-    {% if post.repost_of %}
-    <!-- Facebook Style Repost Header -->
-    <div class="fb-repost-banner d-flex align-items-center px-3 pt-2 pb-1 text-muted" style="font-size: 13px;">
-        <i class="bi bi-repeat me-2 text-primary fs-6"></i>
-        <a href="{% url 'users:profile' post.author.username %}"
-           hx-get="{% url 'users:profile' post.author.username %}"
-           hx-target="#page-content-target"
-           hx-swap="innerHTML"
-           hx-push-url="true"
-           hx-history="true"
-           class="fw-semibold text-dark text-decoration-none fb-reposter-link">
-            {{ post.author.get_full_name|default:post.author.username }}
-        </a>
-        <span class="ms-1">{% trans "reposted this" %}</span>
-        <span class="mx-1">&middot;</span>
-        <span class="text-muted" style="font-size: 11px;">{{ post.created_at|timesince }} ago</span>
-    </div>
-    {% endif %}
+    {% include "posts/partials/repost_header_banner.html" with post=post %}
 
     <!-- Standard Facebook-Style Post Header -->
     <div class="post-card-header d-flex align-items-center px-3 py-2">
@@ -288,6 +279,13 @@
             </button>
         </div>
 
+        <!-- Bottom Left Overlay: Scattered Repost Avatar Cluster -->
+        <div id="reel-card-repost-cluster-{{ post.share_id }}"
+             class="reel-card-repost-cluster-wrap position-absolute bottom-0 start-0 m-3 {% if not repost_users %}d-none{% endif %}"
+             style="z-index: 5; pointer-events: auto; width: auto;">
+            {% include "posts/partials/repost_scatter_cluster.html" with repost_users=repost_users repost_count=post.repost_count %}
+        </div>
+
         <!-- Bottom Right Overlay: Mute toggle button -->
         <div class="position-absolute bottom-0 end-0 m-3" style="z-index: 4;">
             <button type="button"
@@ -324,14 +322,14 @@
             <i class="bi bi-chat-dots fs-5"></i>
             <span id="comment-count-{{ post.share_id }}" class="fw-bold">{{ post.comments.count }}</span>
         </button>
-        <button id="repost-btn-{{ post.share_id }}"
-                class="btn btn-sm border-0 text-muted d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1"
+        <button type="button"
+                id="repost-btn-{{ post.share_id }}"
+                class="btn btn-sm border-0 {% if user_has_reposted %}text-primary{% else %}text-muted{% endif %} d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1 repost-button"
                 style="flex: 1 1 0px; min-width: 0;"
-                data-bs-toggle="modal"
-                data-bs-target="#globalRepostModal"
                 data-post-id="{{ post.share_id }}"
+                onclick="const vm = window.videoManager || window.PwaniNetVideoManager; if (vm && vm.toggleReelRepost) { event.preventDefault(); event.stopPropagation(); vm.toggleReelRepost('{{ post.share_id }}'); }"
                 aria-label="{% trans 'Repost' %}">
-            <i class="bi bi-repeat fs-5"></i>
+            <i class="bi bi-repeat fs-5 {% if user_has_reposted %}text-primary{% endif %}"></i>
             <span class="fw-bold repost-count">{{ post.repost_count }}</span>
         </button>
         <button class="btn btn-sm border-0 text-muted d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1"

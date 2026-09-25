@@ -15,7 +15,7 @@ from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
 from django.db.models import Q
 from users.models import User, Follow, DeviceAccount, Pinch, UserSession, Block, HiddenAuthor, PrivacyLevel
-from posts.models import Post, Like
+from posts.models import Post, Like, Repost
 from users.forms import PwaniSignupForm, ProfileUpdateForm
 from django.contrib import messages
 from django.utils.translation import gettext_lazy as _
@@ -605,7 +605,8 @@ def profile_view(request, username):
     ).values_list('group_id', flat=True))
 
     posts_queryset = Post.objects.filter(
-        author=profile_user
+        author=profile_user,
+        repost_of__isnull=True,  # exclude legacy-style reposts — they go in the Reposts tab
     ).filter(
         Q(group__isnull=True) | Q(group_id__in=viewer_group_ids)
     ).select_related('author', 'group', 'course', 'unit', 'repost_of').prefetch_related('likes', 'images', 'comments').order_by('-created_at')
@@ -629,6 +630,23 @@ def profile_view(request, username):
 
     # Count unseen shared posts for the badge
     unseen_shared_count = shared_posts.filter(is_viewed=False).count()
+
+    # Get all reposts made by this profile user (newest first)
+    reposted_posts = Repost.objects.filter(
+        reposter=profile_user
+    ).select_related(
+        'original_post__author',
+        'original_post__group',
+        'original_post__course',
+        'original_post__unit',
+        'original_post__repost_of',
+        'reposter',
+    ).prefetch_related(
+        'original_post__likes',
+        'original_post__images',
+        'original_post__comments',
+    ).order_by('-created_at')
+    repost_count = reposted_posts.count()
 
     # Determine if viewing own profile
     is_own_profile = request.user == profile_user
@@ -654,6 +672,8 @@ def profile_view(request, username):
             'profile_completion': profile_completion,
             'has_more_posts': posts_page.has_next(),
             'liked_post_ids': liked_post_ids,
+            'reposted_posts': reposted_posts,
+            'repost_count': repost_count,
         }
         return render(request, 'users/partials/profile_navigation_partial.html', context)
 
@@ -682,6 +702,8 @@ def profile_view(request, username):
         'profile_completion': profile_completion,
         'has_more_posts': posts_page.has_next(),
         'liked_post_ids': liked_post_ids,
+        'reposted_posts': reposted_posts,
+        'repost_count': repost_count,
     })
 
 

@@ -247,7 +247,17 @@ class Post(models.Model):
             pass
         return False
 
-    
+    @property
+    def original_author(self):
+        """Return original post author, handling legacy repost_of if present."""
+        if self.repost_of_id:
+            try:
+                if self.repost_of:
+                    return self.repost_of.author
+            except Exception:
+                pass
+        return self.author
+
     def is_liked_by(self, user):
         if not self.pk:
             return False
@@ -268,13 +278,212 @@ class Post(models.Model):
     @property
     def repost_count(self):
         if not hasattr(self, '_repost_count'):
-            self._repost_count = self.repost_children.count()
+            self._repost_count = self.reposts.count() + self.repost_children.count()
         return self._repost_count
 
     def is_reposted_by(self, user):
-        if user.is_authenticated:
-            return self.repost_children.filter(author=user).exists()
-        return False
+        if not self.pk or not user or not user.is_authenticated:
+            return False
+        return self.reposts.filter(reposter=user).exists() or self.repost_children.filter(author=user).exists()
+
+    def get_repost_avatars(self, viewer=None, max_avatars=3):
+        """
+        Get avatar user objects for users who reposted this reel/post.
+        Prioritizes:
+        1. Current viewer (if viewer reposted)
+        2. Users the viewer follows (social proof)
+        3. Other reposters up to max_avatars
+        """
+        if not self.pk:
+            return []
+
+        reposters_list = []
+        for r in self.reposts.select_related('reposter').all():
+            if r.reposter:
+                reposters_list.append(r.reposter)
+        for rc in self.repost_children.select_related('author').all():
+            if rc.author:
+                reposters_list.append(rc.author)
+        if getattr(self, 'repost_context', None) and isinstance(self.repost_context, dict):
+            ctx_reposter = self.repost_context.get('reposter')
+            if ctx_reposter:
+                reposters_list.append(ctx_reposter)
+
+        if not reposters_list:
+            return []
+
+        viewer_id = viewer.id if (viewer and viewer.is_authenticated) else None
+        following_ids = set()
+        if viewer and viewer.is_authenticated:
+            try:
+                from users.models import Follow
+                following_ids = set(Follow.objects.filter(follower=viewer).values_list('followed_id', flat=True))
+            except Exception:
+                following_ids = set()
+
+        self_users = []
+        followed_users = []
+        other_users = []
+
+        for reposter in reposters_list:
+            if viewer_id and reposter.id == viewer_id:
+                self_users.append(reposter)
+            elif reposter.id in following_ids:
+                followed_users.append(reposter)
+            else:
+                other_users.append(reposter)
+
+        seen_ids = set()
+        result = []
+        for u in (self_users + followed_users + other_users):
+            if u.id not in seen_ids:
+                seen_ids.add(u.id)
+                result.append(u)
+            if len(result) >= max_avatars:
+                break
+        return result
+
+    def get_repost_header_info(self, viewer=None):
+        """
+        Determine top postcard header text ("reposted this") using Option A:
+        Only show when the current viewer OR a friend the viewer follows reposted it
+        (or if the post is a direct repost_of / has repost_context).
+        """
+        if not self.pk:
+            return {'show': False}
+
+        viewer_id = viewer.id if (viewer and viewer.is_authenticated) else None
+        following_ids = set()
+        if viewer and viewer.is_authenticated:
+            try:
+                from users.models import Follow
+                following_ids = set(Follow.objects.filter(follower=viewer).values_list('followed_id', flat=True))
+            except Exception:
+                following_ids = set()
+
+        entries = []
+        seen_uids = set()
+
+        for r in self.reposts.select_related('reposter').order_by('-created_at'):
+            if r.reposter and r.reposter.id not in seen_uids:
+                seen_uids.add(r.reposter.id)
+                entries.append((r.reposter, r.created_at))
+
+        for rc in self.repost_children.select_related('author').order_by('-created_at'):
+            if rc.author and rc.author.id not in seen_uids:
+                seen_uids.add(rc.author.id)
+                entries.append((rc.author, rc.created_at))
+
+        if getattr(self, 'repost_context', None) and isinstance(self.repost_context, dict):
+            ctx_user = self.repost_context.get('reposter')
+            ctx_time = self.repost_context.get('created_at') or self.created_at
+            if ctx_user and ctx_user.id not in seen_uids:
+                seen_uids.add(ctx_user.id)
+                entries.append((ctx_user, ctx_time))
+
+        if self.repost_of_id and self.author and self.author.id not in seen_uids:
+            seen_uids.add(self.author.id)
+            entries.append((self.author, self.created_at))
+
+        total_count = max(self.repost_count, len(entries))
+        if total_count == 0 or not entries:
+            return {'show': False}
+
+        self_entry = None
+        followed_entries = []
+        for u, dt in entries:
+            if viewer_id and u.id == viewer_id:
+                self_entry = (u, dt)
+            elif u.id in following_ids:
+                followed_entries.append((u, dt))
+
+        if not self_entry and not followed_entries and not self.repost_of_id:
+            return {'show': False}
+
+        if self_entry and followed_entries:
+            friend_user, friend_dt = followed_entries[0]
+            others_count = max(0, total_count - 2)
+            return {
+                'show': True,
+                'is_self': True,
+                'self_user': self_entry[0],
+                'primary_user': friend_user,
+                'primary_name': friend_user.get_full_name() or friend_user.username,
+                'primary_username': friend_user.username,
+                'second_user': None,
+                'others_count': others_count,
+                'created_at': self_entry[1] or friend_dt,
+            }
+        elif self_entry:
+            others_count = max(0, total_count - 1)
+            return {
+                'show': True,
+                'is_self': True,
+                'self_user': self_entry[0],
+                'primary_user': None,
+                'primary_name': '',
+                'primary_username': '',
+                'second_user': None,
+                'others_count': others_count,
+                'created_at': self_entry[1],
+            }
+        else:
+            primary_user, primary_dt = followed_entries[0] if followed_entries else entries[0]
+            second_user = followed_entries[1][0] if (len(followed_entries) >= 2 and total_count == 2) else None
+            others_count = 0 if second_user else max(0, total_count - 1)
+            return {
+                'show': True,
+                'is_self': False,
+                'self_user': None,
+                'primary_user': primary_user,
+                'primary_name': primary_user.get_full_name() or primary_user.username,
+                'primary_username': primary_user.username,
+                'second_user': second_user,
+                'second_name': (second_user.get_full_name() or second_user.username) if second_user else '',
+                'second_username': second_user.username if second_user else '',
+                'others_count': others_count,
+                'created_at': primary_dt,
+            }
+
+    def get_repost_badge_data(self, viewer=None, max_avatars=3):
+        """
+        Structured metadata for front-end floating repost badge.
+        """
+        reposters = self.get_repost_avatars(viewer=viewer, max_avatars=max_avatars)
+        total_count = self.repost_count
+        is_reposted = self.is_reposted_by(viewer) if viewer else False
+        header_info = self.get_repost_header_info(viewer=viewer)
+
+        avatars = []
+        for u in reposters:
+            pic_url = '/static/images/default-avatar.png'
+            try:
+                if u.profile_pic and hasattr(u.profile_pic, 'url'):
+                    pic_url = u.profile_pic.url
+            except Exception:
+                pass
+            avatars.append({
+                'id': u.id,
+                'username': u.username,
+                'name': u.get_full_name() or u.username,
+                'avatar': pic_url,
+                'is_self': viewer.id == u.id if (viewer and viewer.is_authenticated) else False,
+            })
+
+        followed_friend = None
+        if header_info.get('primary_user'):
+            followed_friend = {
+                'name': header_info.get('primary_name', ''),
+                'username': header_info.get('primary_username', ''),
+            }
+
+        return {
+            'repost_count': total_count,
+            'is_reposted': is_reposted,
+            'avatars': avatars,
+            'has_more': max(0, total_count - len(avatars)),
+            'followed_friend': followed_friend,
+        }
     
     def save(self, *args, **kwargs):
         super(Post, self).save(*args, **kwargs)

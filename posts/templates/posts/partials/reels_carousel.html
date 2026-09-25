@@ -1,6 +1,7 @@
 {% load i18n %}
 {% load static %}
 {% load user_extras %}
+{% load post_filters %}
 
 {% if reels %}
 <div class="post-card fb-post-card reels-carousel-shelf mb-3 bg-white rounded-3 border overflow-hidden">
@@ -36,6 +37,8 @@
     <div class="reels-carousel-track-wrapper">
         <div class="reels-carousel-track d-flex overflow-x-auto" style="scrollbar-width: none; scroll-snap-type: x mandatory;">
             {% for reel in reels %}
+            {% check_is_liked reel as user_has_liked %}
+            {% check_is_reposted reel as user_has_reposted %}
             <div class="reels-carousel-card position-relative rounded-3 overflow-hidden flex-shrink-0"
                  data-post-id="{{ reel.share_id }}"
                  data-reel="true"
@@ -46,6 +49,10 @@
                  data-author-profile="{% url 'users:profile' reel.author.username %}"
                  data-caption="{{ reel.content|default:'' }}"
                  data-likes="{{ reel.likes.count|default:0 }}"
+                 data-is-liked="{% if user_has_liked %}true{% else %}false{% endif %}"
+                 data-is-reposted="{% if user_has_reposted %}true{% else %}false{% endif %}"
+                 data-repost-count="{{ reel.repost_count }}"
+                 data-repost-badge="{{ reel|repost_badge_json:request.user|escape }}"
                  data-comments="{{ reel.comments.count|default:0 }}"
                  data-unit="{{ reel.unit.code|default:'' }}"
                  data-time="{{ reel.created_at|timesince }} ago"
@@ -80,6 +87,8 @@
                        style="opacity: 0; pointer-events: none; transition: opacity 0.25s ease;">
                     <source src="{{ reel.get_video_for_feed.url }}" type="video/mp4">
                 </video>
+
+
 
                 <!-- Subtle Bottom Scrim: Author Avatar & Username (Option A) -->
                 <div class="reels-card-scrim-bottom position-absolute bottom-0 start-0 w-100 p-2" style="pointer-events: none; z-index: 2;">

@@ -14,10 +14,11 @@
            hx-push-url="true"
            hx-history="true"
            class="comment-avatar-link">
-            <img src="{{ comment.author.profile_pic.url }}" 
+            <img src="{{ comment.author.profile_pic.url|default:'/static/images/default-avatar.png' }}" 
                  alt="{{ comment.author.get_full_name|default:comment.author.username }}" 
                  class="comment-avatar"
-                 loading="lazy">
+                 loading="lazy"
+                 onerror="this.src='/static/images/default-avatar.png'">
         </a>
         
         <div class="comment-content">

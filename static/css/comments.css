@@ -711,7 +711,8 @@
   right: 0;
   top: 100%;
   margin-top: 4px;
-  z-index: 10050 !important;
+  z-index: 10850 !important;
+  pointer-events: auto !important;
   min-width: 170px;
   background: var(--card-bg, #ffffff) !important;
   border: 1px solid var(--border, #e2e8f0) !important;
@@ -741,7 +742,7 @@
 
 .comment-item:has(.comment-menu-dropdown),
 .comment-item.menu-open {
-  z-index: 10010 !important;
+  z-index: 10840 !important;
   position: relative;
 }
 

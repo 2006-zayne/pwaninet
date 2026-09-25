@@ -1744,7 +1744,10 @@
 </head>
 <body class="{% block body_class %}{% endblock %}"
       hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-      data-user-id="{{ request.user.id }}"
+      data-user-id="{{ request.user.id|default:'' }}"
+      data-user-username="{{ request.user.username|default:'' }}"
+      data-user-avatar="{% if request.user.is_authenticated and request.user.profile_pic %}{{ request.user.profile_pic.url }}{% else %}/static/images/default-avatar.png{% endif %}"
+      data-user-name="{% if request.user.is_authenticated %}{{ request.user.get_full_name|default:request.user.username }}{% endif %}"
       data-app-version="{{ app_version }}"
       data-app-build="{{ app_build }}"
       data-app-environment="{{ app_environment }}">
@@ -2126,11 +2129,19 @@
                                 <span class="small fw-semibold text-muted text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">{% trans "Send on PwaniNet" %}</span>
                                 <span id="globalShareTargetStatus" class="small text-primary fw-medium" style="font-size: 11px;"></span>
                             </div>
-                            <div class="share-users-tray d-flex gap-3 overflow-x-auto pb-2 px-1" id="globalShareTargetsTray" style="scrollbar-width: none; -webkit-overflow-scrolling: touch;">
-                                <div class="text-center py-3 text-muted small w-100" id="globalShareTrayLoading">
-                                    <div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>
-                                    <span>{% trans "Loading friends & groups..." %}</span>
+                            <div class="share-tray-carousel-wrapper position-relative">
+                                <button type="button" class="btn btn-sm btn-light rounded-circle shadow-sm position-absolute start-0 top-50 translate-middle-y z-3 d-none d-md-flex align-items-center justify-content-center share-scroll-btn share-tray-scroll-prev" id="shareTrayPrevBtn" aria-label="{% trans 'Scroll left' %}" style="width: 28px; height: 28px; left: -10px; opacity: 0; pointer-events: none; transition: opacity 0.2s ease;">
+                                    <i class="bi bi-chevron-left" style="font-size: 11px;"></i>
+                                </button>
+                                <div class="share-users-tray d-flex gap-3 overflow-x-auto pb-2 px-1" id="globalShareTargetsTray" style="scrollbar-width: none; -webkit-overflow-scrolling: touch;">
+                                    <div class="text-center py-3 text-muted small w-100" id="globalShareTrayLoading">
+                                        <div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>
+                                        <span>{% trans "Loading friends & groups..." %}</span>
+                                    </div>
                                 </div>
+                                <button type="button" class="btn btn-sm btn-light rounded-circle shadow-sm position-absolute end-0 top-50 translate-middle-y z-3 d-none d-md-flex align-items-center justify-content-center share-scroll-btn share-tray-scroll-next" id="shareTrayNextBtn" aria-label="{% trans 'Scroll right' %}" style="width: 28px; height: 28px; right: -10px; transition: opacity 0.2s ease;">
+                                    <i class="bi bi-chevron-right" style="font-size: 11px;"></i>
+                                </button>
                             </div>
                         </div>
 
@@ -2139,69 +2150,85 @@
                         <!-- Bottom Section: External Platform Share & Actions (TikTok Style Row) -->
                         <div class="share-actions-section pt-1">
                             <div class="small fw-semibold text-muted text-uppercase px-1 mb-2" style="font-size: 11px; letter-spacing: 0.5px;">{% trans "Share via" %}</div>
-                            <div class="d-flex gap-3 overflow-x-auto pb-2 px-1" id="globalShareActionChips" style="scrollbar-width: none; -webkit-overflow-scrolling: touch;">
-                                <!-- 1. Bookmark / Save -->
-                                <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0" id="globalShareBookmarkBtn" title="{% trans 'Save to Library' %}" aria-label="{% trans 'Save to Library' %}">
-                                    <div class="share-action-icon rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-1">
-                                        <i class="bi bi-bookmark fs-5 text-dark"></i>
-                                    </div>
-                                    <span class="share-action-label small text-muted">{% trans "Save" %}</span>
+                            <div class="share-tools-carousel-wrapper position-relative">
+                                <button type="button" class="btn btn-sm btn-light rounded-circle shadow-sm position-absolute start-0 top-50 translate-middle-y z-3 d-none d-md-flex align-items-center justify-content-center share-scroll-btn share-tools-scroll-prev" id="shareToolsPrevBtn" aria-label="{% trans 'Scroll left' %}" style="width: 28px; height: 28px; left: -10px; opacity: 0; pointer-events: none; transition: opacity 0.2s ease;">
+                                    <i class="bi bi-chevron-left" style="font-size: 11px;"></i>
                                 </button>
+                                <div class="d-flex gap-3 overflow-x-auto pb-2 px-1" id="globalShareActionChips" style="scrollbar-width: none; -webkit-overflow-scrolling: touch;">
+                                    <!-- 0. Repost Action Chip -->
+                                    <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0" id="globalShareRepostBtn" title="{% trans 'Repost' %}" aria-label="{% trans 'Repost' %}">
+                                        <div class="share-action-icon rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-1">
+                                            <i class="bi bi-repeat fs-5 text-dark" id="globalShareRepostIcon"></i>
+                                        </div>
+                                        <span class="share-action-label small text-muted" id="globalShareRepostLabel">{% trans "Repost" %}</span>
+                                    </button>
 
-                                <!-- 2. Download Reel -->
-                                <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0" id="globalShareDownloadBtn" title="{% trans 'Download Video' %}" aria-label="{% trans 'Download Video' %}">
-                                    <div class="share-action-icon rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-1">
-                                        <i class="bi bi-download fs-5 text-dark"></i>
-                                    </div>
-                                    <span class="share-action-label small text-muted">{% trans "Download" %}</span>
-                                </button>
+                                    <!-- 1. Bookmark / Save -->
+                                    <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0" id="globalShareBookmarkBtn" title="{% trans 'Save to Library' %}" aria-label="{% trans 'Save to Library' %}">
+                                        <div class="share-action-icon rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-1">
+                                            <i class="bi bi-bookmark fs-5 text-dark"></i>
+                                        </div>
+                                        <span class="share-action-label small text-muted">{% trans "Save" %}</span>
+                                    </button>
 
-                                <!-- 3. Copy Link -->
-                                <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0" id="globalCopyLinkBtn" title="{% trans 'Copy Link' %}" aria-label="{% trans 'Copy Link' %}">
-                                    <div class="share-action-icon rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-1">
-                                        <i class="bi bi-link-45deg fs-4 text-dark"></i>
-                                    </div>
-                                    <span class="share-action-label small text-muted">{% trans "Copy Link" %}</span>
-                                </button>
+                                    <!-- 2. Download Reel -->
+                                    <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0" id="globalShareDownloadBtn" title="{% trans 'Download Video' %}" aria-label="{% trans 'Download Video' %}">
+                                        <div class="share-action-icon rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-1">
+                                            <i class="bi bi-download fs-5 text-dark"></i>
+                                        </div>
+                                        <span class="share-action-label small text-muted">{% trans "Download" %}</span>
+                                    </button>
 
-                                <!-- 4. WhatsApp -->
-                                <a href="#" target="_blank" rel="noopener noreferrer" class="share-action-chip text-decoration-none text-center p-0 flex-shrink-0 platform-share-btn" data-platform="whatsapp" title="WhatsApp" aria-label="WhatsApp">
-                                    <div class="share-action-icon rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-1">
-                                        <i class="bi bi-whatsapp fs-5 text-success"></i>
-                                    </div>
-                                    <span class="share-action-label small text-muted">WhatsApp</span>
-                                </a>
+                                    <!-- 3. Copy Link -->
+                                    <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0" id="globalCopyLinkBtn" title="{% trans 'Copy Link' %}" aria-label="{% trans 'Copy Link' %}">
+                                        <div class="share-action-icon rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-1">
+                                            <i class="bi bi-link-45deg fs-4 text-dark"></i>
+                                        </div>
+                                        <span class="share-action-label small text-muted">{% trans "Copy Link" %}</span>
+                                    </button>
 
-                                <!-- 5. Facebook -->
-                                <a href="#" target="_blank" rel="noopener noreferrer" class="share-action-chip text-decoration-none text-center p-0 flex-shrink-0 platform-share-btn" data-platform="facebook" title="Facebook" aria-label="Facebook">
-                                    <div class="share-action-icon rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-1">
-                                        <i class="bi bi-facebook fs-5 text-primary"></i>
-                                    </div>
-                                    <span class="share-action-label small text-muted">Facebook</span>
-                                </a>
+                                    <!-- 4. WhatsApp -->
+                                    <a href="#" target="_blank" rel="noopener noreferrer" class="share-action-chip text-decoration-none text-center p-0 flex-shrink-0 platform-share-btn" data-platform="whatsapp" title="WhatsApp" aria-label="WhatsApp">
+                                        <div class="share-action-icon rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-1">
+                                            <i class="bi bi-whatsapp fs-5 text-success"></i>
+                                        </div>
+                                        <span class="share-action-label small text-muted">WhatsApp</span>
+                                    </a>
 
-                                <!-- 6. X (Twitter) -->
-                                <a href="#" target="_blank" rel="noopener noreferrer" class="share-action-chip text-decoration-none text-center p-0 flex-shrink-0 platform-share-btn" data-platform="twitter" title="X" aria-label="X">
-                                    <div class="share-action-icon rounded-circle bg-dark bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-1">
-                                        <i class="bi bi-twitter-x fs-5 text-dark"></i>
-                                    </div>
-                                    <span class="share-action-label small text-muted">X</span>
-                                </a>
+                                    <!-- 5. Facebook -->
+                                    <a href="#" target="_blank" rel="noopener noreferrer" class="share-action-chip text-decoration-none text-center p-0 flex-shrink-0 platform-share-btn" data-platform="facebook" title="Facebook" aria-label="Facebook">
+                                        <div class="share-action-icon rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-1">
+                                            <i class="bi bi-facebook fs-5 text-primary"></i>
+                                        </div>
+                                        <span class="share-action-label small text-muted">Facebook</span>
+                                    </a>
 
-                                <!-- 7. Telegram -->
-                                <a href="#" target="_blank" rel="noopener noreferrer" class="share-action-chip text-decoration-none text-center p-0 flex-shrink-0 platform-share-btn" data-platform="telegram" title="Telegram" aria-label="Telegram">
-                                    <div class="share-action-icon rounded-circle bg-info bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-1">
-                                        <i class="bi bi-telegram fs-5 text-info"></i>
-                                    </div>
-                                    <span class="share-action-label small text-muted">Telegram</span>
-                                </a>
+                                    <!-- 6. X (Twitter) -->
+                                    <a href="#" target="_blank" rel="noopener noreferrer" class="share-action-chip text-decoration-none text-center p-0 flex-shrink-0 platform-share-btn" data-platform="twitter" title="X" aria-label="X">
+                                        <div class="share-action-icon rounded-circle bg-dark bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-1">
+                                            <i class="bi bi-twitter-x fs-5 text-dark"></i>
+                                        </div>
+                                        <span class="share-action-label small text-muted">X</span>
+                                    </a>
 
-                                <!-- 8. Native System Share -->
-                                <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0 d-none" id="globalNativeShareBtn" title="{% trans 'More' %}" aria-label="{% trans 'More options' %}">
-                                    <div class="share-action-icon rounded-circle bg-secondary bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-1">
-                                        <i class="bi bi-share-fill fs-5 text-secondary"></i>
-                                    </div>
-                                    <span class="share-action-label small text-muted">{% trans "More" %}</span>
+                                    <!-- 7. Telegram -->
+                                    <a href="#" target="_blank" rel="noopener noreferrer" class="share-action-chip text-decoration-none text-center p-0 flex-shrink-0 platform-share-btn" data-platform="telegram" title="Telegram" aria-label="Telegram">
+                                        <div class="share-action-icon rounded-circle bg-info bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-1">
+                                            <i class="bi bi-telegram fs-5 text-info"></i>
+                                        </div>
+                                        <span class="share-action-label small text-muted">Telegram</span>
+                                    </a>
+
+                                    <!-- 8. Native System Share -->
+                                    <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0 d-none" id="globalNativeShareBtn" title="{% trans 'More' %}" aria-label="{% trans 'More options' %}">
+                                        <div class="share-action-icon rounded-circle bg-secondary bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-1">
+                                            <i class="bi bi-share-fill fs-5 text-secondary"></i>
+                                        </div>
+                                        <span class="share-action-label small text-muted">{% trans "More" %}</span>
+                                    </button>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-light rounded-circle shadow-sm position-absolute end-0 top-50 translate-middle-y z-3 d-none d-md-flex align-items-center justify-content-center share-scroll-btn share-tools-scroll-next" id="shareToolsNextBtn" aria-label="{% trans 'Scroll right' %}" style="width: 28px; height: 28px; right: -10px; transition: opacity 0.2s ease;">
+                                    <i class="bi bi-chevron-right" style="font-size: 11px;"></i>
                                 </button>
                             </div>
                         </div>
@@ -2300,6 +2327,18 @@
                                     <div class="small text-muted">{% trans "Permanently remove your reel" %}</div>
                                 </div>
                             </button>
+
+                            <hr class="my-1 opacity-25">
+
+                            <!-- 9. Auto-Scroll Toggle (Playback Preference) -->
+                            <button type="button" class="reel-tool-btn" id="quickToolsAutoScrollBtn" aria-pressed="false">
+                                <i class="bi bi-collection-play"></i>
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">{% trans "Auto-scroll" %}</div>
+                                    <div class="small text-muted">{% trans "Automatically advance to the next reel when it ends" %}</div>
+                                </div>
+                                <span id="quickToolsAutoScrollStatus" class="badge rounded-pill bg-secondary bg-opacity-25 text-muted ms-auto auto-scroll-status-badge">{% trans "Off" %}</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -2349,6 +2388,9 @@
                 </div>
             </div>
         </div>
+        {% if auto_launch_reel_id %}
+        <div id="pwaniAutoLaunchReel" data-reel-id="{{ auto_launch_reel_id }}" data-shared-by="{{ shared_by|default:'' }}" style="display:none;"></div>
+        {% endif %}
 
         <!-- Dedicated Full-Screen Reels Continuous Player (TikTok Style) -->
         <div id="fullscreenReelsOverlay" class="fullscreen-reels-modal d-none" aria-hidden="true" role="dialog" aria-label="{% trans 'Reels viewer' %}">
@@ -2360,7 +2402,13 @@
             <!-- Main Flex Layout Container -->
             <div class="reel-player-layout">
                 <!-- Center Video Stage -->
-                <div class="reel-desktop-stage">
+                <div class="reel-desktop-stage position-relative">
+                    <!-- Subtle Floating Shared-by Note Pill -->
+                    <div id="fsReelSharedNote" class="reel-shared-note-pill d-none position-absolute top-0 start-50 translate-middle-x mt-3 z-3 px-3 py-1.5 rounded-pill shadow-sm d-flex align-items-center gap-1.5" style="background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.15); pointer-events: none; transition: opacity 0.3s ease;">
+                        <i class="bi bi-send-fill text-primary" style="font-size: 12px;"></i>
+                        <span id="fsReelSharedNoteText" class="text-white small fw-medium" style="font-size: 12px; letter-spacing: 0.2px;"></span>
+                    </div>
+
                     <div class="reels-snap-viewport" id="reelsSnapViewport">
                         <!-- Dynamically populated continuous snap items -->
                     </div>
@@ -2379,6 +2427,13 @@
                                 <i class="bi bi-chat-dots-fill"></i>
                             </button>
                             <span class="reel-desktop-action-label" id="fsDesktopCommentCount">0</span>
+                        </div>
+
+                        <div class="reel-desktop-action-unit text-center">
+                            <button type="button" class="reel-desktop-action-btn fs-repost-proxy-btn" id="fsDesktopRepostBtn" title="{% trans 'Repost' %}" aria-label="{% trans 'Repost' %}">
+                                <i class="bi bi-repeat"></i>
+                            </button>
+                            <span class="reel-desktop-action-label" id="fsDesktopRepostCount">0</span>
                         </div>
 
                         <div class="reel-desktop-action-unit text-center">
@@ -3723,7 +3778,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
             }
         });
 
-        // Close modal and fullscreen reels immediately when clicking internal navigation links inside any modal
+        // Close modal and fullscreen reels seamlessly when clicking page navigation links inside any modal or fullscreen viewer
         document.addEventListener('click', function(e) {
             const link = e.target.closest('a[href]');
             if (!link) return;
@@ -3732,6 +3787,17 @@ window.addEventListener('beforeinstallprompt', (e) => {
             const href = link.getAttribute('href') || '';
             if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
             if (link.dataset.bsToggle || link.hasAttribute('data-bs-toggle')) return;
+            if (link.hasAttribute('download') || link.getAttribute('target') === '_blank') return;
+
+            // Do not close overlay/modal for in-place HTMX partial swaps (e.g., "View all comments" targeting #comments-section)
+            const hxTarget = link.getAttribute('hx-target');
+            if (hxTarget && hxTarget !== '#page-content-target' && hxTarget !== 'body' && hxTarget !== 'main') {
+                return;
+            }
+
+            const targetUrl = link.getAttribute('hx-get') || href;
+            e.preventDefault();
+            e.stopPropagation();
 
             const bsModal = link.closest('.modal');
             if (bsModal && typeof bootstrap !== 'undefined') {
@@ -3744,6 +3810,22 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 try {
                     window.videoManager.closeFullscreenReels();
                 } catch (_) {}
+            }
+
+            if (window.htmx && document.getElementById('page-content-target')) {
+                window.htmx.ajax('GET', targetUrl, {
+                    target: '#page-content-target',
+                    swap: 'innerHTML',
+                    headers: {
+                        'HX-Request': 'true',
+                        'HX-Target': 'page-content-target'
+                    }
+                });
+                try {
+                    window.history.pushState({}, '', targetUrl);
+                } catch (_) {}
+            } else {
+                window.location.href = targetUrl;
             }
         }, true);
 
@@ -4623,6 +4705,28 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 }
             }
 
+            // Check if active target is a vertical reel or video
+            var isReel = Boolean(
+                activeVideoUrl ||
+                (button && (button.getAttribute('data-reel') === 'true' || button.closest('[data-reel="true"]'))) ||
+                (modal && modal.getAttribute('data-reel') === 'true') ||
+                document.querySelector('.reels-snap-item[data-post-id="' + activePostId + '"]') ||
+                document.querySelector('.reel-post-card[data-post-id="' + activePostId + '"]')
+            );
+
+            // Format reel share URL with shared_by and reel=1 params
+            var currentUsername = document.body.dataset.userUsername || '{{ request.user.username|escapejs }}';
+            if (isReel) {
+                try {
+                    var urlObj = new URL(activePostUrl, window.location.origin);
+                    urlObj.searchParams.set('reel', '1');
+                    if (currentUsername) {
+                        urlObj.searchParams.set('shared_by', currentUsername);
+                    }
+                    activePostUrl = urlObj.toString();
+                } catch (e) {}
+            }
+
             var feedbackEl = document.getElementById('globalShareFeedback');
             if (feedbackEl) feedbackEl.innerHTML = '';
             var searchInput = document.getElementById('globalShareSearchInput');
@@ -4630,6 +4734,70 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
             sentTargets = new Set();
             loadTargets();
+
+            // Setup Repost Action Chip
+            var cardEl = document.querySelector('[data-post-id="' + activePostId + '"]');
+            var isReposted = (cardEl && cardEl.getAttribute('data-is-reposted') === 'true') || false;
+            var repostBtn = document.getElementById('globalShareRepostBtn');
+            var repostLabel = document.getElementById('globalShareRepostLabel');
+            var repostIcon = document.getElementById('globalShareRepostIcon');
+
+            function updateRepostVisual(reposted) {
+                if (repostBtn) {
+                    repostBtn.classList.toggle('text-primary', reposted);
+                }
+                if (repostIcon) {
+                    repostIcon.className = reposted ? 'bi bi-repeat fs-5 text-primary' : 'bi bi-repeat fs-5 text-dark';
+                }
+                if (repostLabel) {
+                    repostLabel.textContent = reposted ? '{% trans "Reposted" %}' : '{% trans "Repost" %}';
+                    repostLabel.className = reposted ? 'share-action-label small text-primary fw-bold' : 'share-action-label small text-muted';
+                }
+            }
+            updateRepostVisual(isReposted);
+
+            if (repostBtn) {
+                repostBtn.onclick = function () {
+                    var csrfToken = (document.querySelector('[name=csrfmiddlewaretoken]') && document.querySelector('[name=csrfmiddlewaretoken]').value) || '';
+                    fetch('/api/posts/' + activePostId + '/repost/', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrfToken,
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({})
+                    })
+                    .then(function(res) { return res.json(); })
+                    .then(function(data) {
+                        if (data && data.status === 'success') {
+                            var nowReposted = data.is_reposted;
+                            updateRepostVisual(nowReposted);
+                            showFeedback(nowReposted ? '{% trans "Reposted to your profile!" %}' : '{% trans "Repost removed" %}', 'success');
+
+                            var vm = window.videoManager || window.PwaniNetVideoManager;
+                            if (vm && typeof vm.syncRepostUiAcrossSite === 'function') {
+                                vm.syncRepostUiAcrossSite(activePostId, nowReposted, data.repost_count, data);
+                            } else {
+                                if (cardEl) {
+                                    cardEl.setAttribute('data-is-reposted', nowReposted ? 'true' : 'false');
+                                    cardEl.setAttribute('data-repost-count', data.repost_count);
+                                }
+                                var rBtns = document.querySelectorAll('#repost-btn-' + activePostId + ', [data-post-id="' + activePostId + '"] .repost-button, #fsDesktopRepostBtn');
+                                rBtns.forEach(function(rb) {
+                                    rb.classList.toggle('text-primary', nowReposted);
+                                    rb.classList.toggle('text-muted', !nowReposted);
+                                    var countSpan = rb.querySelector('.repost-count') || rb.parentElement.querySelector('#fsDesktopRepostCount');
+                                    if (countSpan) countSpan.textContent = data.repost_count;
+                                });
+                            }
+                        }
+                    })
+                    .catch(function() {
+                        showFeedback('{% trans "Could not update repost" %}', 'danger');
+                    });
+                };
+            }
 
             // Setup Bookmark Action Chip
             var isSaved = window.pwaniSavedPosts.isPostSaved(activePostId);
@@ -4701,7 +4869,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
             }
 
             // Setup Platform Links
-            var shareText = activePostContent || 'Check this out on PwaniNet!';
+            var shareText = activePostContent || (isReel ? 'Watch this reel on PwaniNet!' : 'Check this out on PwaniNet!');
             var encodedText = encodeURIComponent(shareText);
             var encodedUrl = encodeURIComponent(activePostUrl);
 
@@ -4739,6 +4907,37 @@ window.addEventListener('beforeinstallprompt', (e) => {
                     nativeBtn.classList.add('d-none');
                 }
             }
+
+            // Setup Desktop Left/Right Navigation on Share Trays
+            function setupTrayNavigation(containerId, prevBtnId, nextBtnId) {
+                var container = document.getElementById(containerId);
+                var prevBtn = document.getElementById(prevBtnId);
+                var nextBtn = document.getElementById(nextBtnId);
+                if (!container || !prevBtn || !nextBtn) return;
+
+                function updateArrows() {
+                    var sl = container.scrollLeft;
+                    var maxScroll = container.scrollWidth - container.clientWidth;
+                    prevBtn.style.opacity = sl > 8 ? '1' : '0';
+                    prevBtn.style.pointerEvents = sl > 8 ? 'auto' : 'none';
+                    nextBtn.style.opacity = (sl < maxScroll - 8) ? '1' : '0';
+                    nextBtn.style.pointerEvents = (sl < maxScroll - 8) ? 'auto' : 'none';
+                }
+
+                prevBtn.onclick = function(e) {
+                    e.preventDefault();
+                    container.scrollBy({ left: -220, behavior: 'smooth' });
+                };
+                nextBtn.onclick = function(e) {
+                    e.preventDefault();
+                    container.scrollBy({ left: 220, behavior: 'smooth' });
+                };
+
+                container.onscroll = updateArrows;
+                setTimeout(updateArrows, 200);
+            }
+            setupTrayNavigation('globalShareTargetsTray', 'shareTrayPrevBtn', 'shareTrayNextBtn');
+            setupTrayNavigation('globalShareActionChips', 'shareToolsPrevBtn', 'shareToolsNextBtn');
         };
 
         // ── Bootstrap Modal Hydration Listener ──
@@ -4756,8 +4955,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
             if (modal.id === 'globalRepostModal' && postId) {
                 var form = modal.querySelector('#globalRepostForm');
                 if (form) {
+                    var targetSel = document.getElementById('reel-card-' + postId) ? '#reel-card-' + postId : '#post-card-' + postId;
                     form.setAttribute('hx-post', '/api/posts/' + postId + '/repost/');
-                    form.setAttribute('hx-target', '#post-card-' + postId);
+                    form.setAttribute('hx-target', targetSel);
                     if (window.htmx) htmx.process(form);
                     var textarea = form.querySelector('textarea[name="content"]');
                     if (textarea) textarea.value = '';
@@ -4767,9 +4967,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
             if (modal.id === 'globalReportModal' && postId) {
                 var rForm = modal.querySelector('#globalReportForm');
                 if (rForm) {
+                    var rTargetSel = document.getElementById('reel-card-' + postId) ? '#reel-card-' + postId : '#post-card-' + postId;
                     var postInput = rForm.querySelector('[name="post"]');
                     if (postInput) postInput.value = postId;
-                    rForm.setAttribute('hx-target', '#post-card-' + postId);
+                    rForm.setAttribute('hx-target', rTargetSel);
                     if (window.htmx) htmx.process(rForm);
                     rForm.reset();
                     if (postInput) postInput.value = postId;
