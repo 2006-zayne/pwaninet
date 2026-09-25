@@ -1,4 +1,4 @@
-<div class="modal fade comments-modal" id="commentsModal" tabindex="-1" aria-hidden="true" role="dialog" aria-labelledby="commentsModalTitle" data-bs-backdrop="true" data-bs-keyboard="true">
+<div class="modal fade comments-modal" id="imageCommentsModal" tabindex="-1" aria-hidden="true" role="dialog" aria-labelledby="imageCommentsModalTitle" data-bs-backdrop="true" data-bs-keyboard="true">
   <style>
     [data-theme="dark"] .comments-modal .modal-content {
       background-color: var(--card-bg) !important;
@@ -19,13 +19,13 @@
       <!-- Sticky Header -->
       <div class="modal-header comments-modal-header border-0 pb-0 sticky-top" style="position: relative;">
         <div class="comments-modal-handle d-md-none" aria-hidden="true"></div>
-        <h5 class="modal-title fw-bold w-100 text-center pt-2" id="commentsModalTitle">Comments</h5>
+        <h5 class="modal-title fw-bold w-100 text-center pt-2" id="imageCommentsModalTitle">Comments</h5>
         <button type="button" class="btn-close comments-modal-close" data-bs-dismiss="modal" aria-label="Close" style="position: absolute; right: 12px; top: 8px; z-index: 10; font-size: 1.25rem; opacity: 1; background-image: none;">✕</button>
       </div>
 
       <!-- Scrollable Content -->
-      <div class="modal-body comments-modal-body pt-2" id="commentsModalBody">
-        <div class="comment-stream" id="commentsModalList">
+      <div class="modal-body comments-modal-body pt-2" id="imageCommentsModalBody">
+        <div class="comment-stream" id="imageCommentsModalList">
           <!-- Comments will be loaded here -->
           <div id="commentsEmptyState" class="comments-empty" style="display: none;">
             <i class="bi bi-chat-dots"></i>
@@ -35,7 +35,7 @@
       </div>
 
       <!-- View All Comments Link -->
-      <div class="modal-footer comments-modal-footer border-0" id="commentsModalFooter" style="display: none;">
+      <div class="modal-footer comments-modal-footer border-0" id="imageCommentsModalFooter" style="display: none;">
         <a href="#" class="view-all-comments-link w-100 text-center py-2" style="color: var(--primary); text-decoration: none; font-weight: 600;">
           View all <span id="totalCommentsCount">0</span> comments
         </a>

@@ -243,11 +243,16 @@ const CommentManager = {
       return;
     }
     
-    // Get parent author name
-    const authorName = commentEl.querySelector('.comment-author-link').textContent;
+    // Get parent author username
+    const authorLink = commentEl.querySelector('.comment-author-link');
+    const authorUsername = commentEl.dataset.authorUsername ||
+                           authorLink?.dataset?.username ||
+                           (authorLink?.getAttribute('href') || '').match(/\/users\/(?:user\/)?([^\/]+)/)?.[1] ||
+                           authorLink?.textContent?.trim() || '';
+    const displayAuthor = authorUsername ? `@${authorUsername}` : (authorLink?.textContent?.trim() || 'User');
     
     // Create composer
-    const composerHtml = CommentRenderer.renderComposer(commentId, authorName);
+    const composerHtml = CommentRenderer.renderComposer(commentId, displayAuthor);
     const contentDiv = commentEl.querySelector('.comment-content');
     contentDiv.insertAdjacentHTML('beforeend', composerHtml);
     
@@ -428,6 +433,7 @@ const CommentManager = {
    * Handle toggle replies
    */
   async handleToggleReplies(commentId, button) {
+    if (button.dataset.loading === 'true') return;
     const repliesContainer = document.getElementById(`replies-${commentId}`);
     const isExpanded = button.classList.contains('expanded');
     
@@ -438,28 +444,35 @@ const CommentManager = {
         repliesContainer.classList.add('collapsed');
       }
       button.classList.remove('expanded');
-      button.querySelector('i').classList.remove('bi-chevron-up');
-      button.querySelector('i').classList.add('bi-chevron-down');
-      button.querySelector('span').textContent = `View ${button.dataset.replyCount} replies`;
+      button.querySelector('i')?.classList.remove('bi-chevron-up');
+      button.querySelector('i')?.classList.add('bi-chevron-down');
+      const span = button.querySelector('span');
+      if (span) span.textContent = `View ${button.dataset.replyCount || ''} replies`;
       button.setAttribute('aria-expanded', 'false');
       this.expandedReplies.delete(commentId);
     } else {
       // Expand
-      if (repliesContainer && repliesContainer.children.length > 0) {
-        // Already loaded, just show
-        repliesContainer.classList.remove('collapsed');
-        repliesContainer.classList.add('expanded');
-      } else {
-        // Load replies
-        await this.loadReplies(commentId);
+      button.dataset.loading = 'true';
+      try {
+        if (repliesContainer && repliesContainer.children.length > 0) {
+          // Already loaded, just show
+          repliesContainer.classList.remove('collapsed');
+          repliesContainer.classList.add('expanded');
+        } else {
+          // Load replies
+          await this.loadReplies(commentId);
+        }
+        
+        button.classList.add('expanded');
+        button.querySelector('i')?.classList.remove('bi-chevron-down');
+        button.querySelector('i')?.classList.add('bi-chevron-up');
+        const span = button.querySelector('span');
+        if (span) span.textContent = 'Hide replies';
+        button.setAttribute('aria-expanded', 'true');
+        this.expandedReplies.add(commentId);
+      } finally {
+        button.dataset.loading = 'false';
       }
-      
-      button.classList.add('expanded');
-      button.querySelector('i').classList.remove('bi-chevron-down');
-      button.querySelector('i').classList.add('bi-chevron-up');
-      button.querySelector('span').textContent = 'Hide replies';
-      button.setAttribute('aria-expanded', 'true');
-      this.expandedReplies.add(commentId);
     }
   },
 
@@ -473,15 +486,17 @@ const CommentManager = {
       const parentComment = document.getElementById(`comment-${commentId}`);
       if (!parentComment) return;
       
-      // Create replies container
+      // Create or clear replies container
       let repliesContainer = document.getElementById(`replies-${commentId}`);
       if (!repliesContainer) {
         repliesContainer = document.createElement('div');
         repliesContainer.id = `replies-${commentId}`;
         repliesContainer.className = 'replies-container';
         
-        const contentDiv = parentComment.querySelector('.comment-content');
+        const contentDiv = parentComment.querySelector('.comment-content') || parentComment;
         contentDiv.appendChild(repliesContainer);
+      } else {
+        repliesContainer.innerHTML = '';
       }
       
       // Add thread line
@@ -489,8 +504,12 @@ const CommentManager = {
       threadLine.className = 'thread-line';
       repliesContainer.appendChild(threadLine);
       
-      // Render replies
-      data.results.forEach(reply => {
+      // Render replies with deduplication
+      const results = data.results || (Array.isArray(data) ? data : []);
+      const seenIds = new Set();
+      results.forEach(reply => {
+        if (seenIds.has(reply.id) || repliesContainer.querySelector(`#comment-${reply.id}`)) return;
+        seenIds.add(reply.id);
         const replyHtml = CommentRenderer.renderComment(reply, {
           isReply: true,
           nestingLevel: 1,
@@ -499,6 +518,10 @@ const CommentManager = {
         repliesContainer.insertAdjacentHTML('beforeend', replyHtml);
       });
       
+      if (window.htmx) {
+        window.htmx.process(repliesContainer);
+      }
+
       repliesContainer.classList.add('expanded');
       
     } catch (error) {
@@ -712,10 +735,21 @@ const CommentManager = {
     this.closeAllMenus();
     
     const commentEl = document.getElementById(`comment-${commentId}`);
-    const profileLink = commentEl.querySelector('.comment-avatar-link');
+    const profileLink = commentEl?.querySelector('.comment-author-link') || commentEl?.querySelector('.comment-avatar-link');
     
-    if (profileLink) {
-      window.location.href = profileLink.href;
+    if (profileLink && profileLink.href) {
+      const modalEl = commentEl.closest('.modal');
+      if (modalEl && typeof bootstrap !== 'undefined') {
+        try { bootstrap.Modal.getInstance(modalEl)?.hide(); } catch (_) {}
+      }
+      if (typeof window.videoManager?.closeFullscreenReels === 'function') {
+        try { window.videoManager.closeFullscreenReels(); } catch (_) {}
+      }
+      if (window.htmx && document.getElementById('page-content-target')) {
+        window.htmx.ajax('GET', profileLink.href, { target: '#page-content-target', swap: 'innerHTML' });
+      } else {
+        window.location.href = profileLink.href;
+      }
     }
   },
 

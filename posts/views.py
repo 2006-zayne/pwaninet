@@ -1227,13 +1227,18 @@ def share_post_view(request, share_id):
                     except User.DoesNotExist:
                         continue  # Skip invalid usernames
 
+                is_json = request.headers.get('Accept') == 'application/json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'application/json'
                 if shared_count > 0:
+                    if is_json:
+                        return JsonResponse({'status': 'success', 'message': f'Post shared to {shared_count} user(s) successfully.'})
                     if request.headers.get('HX-Request'):
                         return HttpResponse(
                             f'<div class="alert alert-success">Post shared to {shared_count} user(s) successfully.</div>'
                         )
                     messages.success(request, f'Post shared to {shared_count} user(s) successfully.')
                 else:
+                    if is_json:
+                        return JsonResponse({'status': 'error', 'message': 'No valid users found.'}, status=400)
                     if request.headers.get('HX-Request'):
                         return HttpResponse(
                             '<div class="alert alert-danger">No valid users found.</div>'
@@ -1260,7 +1265,10 @@ def share_post_view(request, share_id):
                         errors.append(str(e))
                         continue  # Skip groups that can't be shared to
 
+                is_json = request.headers.get('Accept') == 'application/json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'application/json'
                 if shared_count > 0:
+                    if is_json:
+                        return JsonResponse({'status': 'success', 'message': f'Post shared to {shared_count} group(s) successfully.'})
                     if request.headers.get('HX-Request'):
                         return HttpResponse(
                             f'<div class="alert alert-success">Post shared to {shared_count} group(s) successfully.</div>'
@@ -1268,12 +1276,17 @@ def share_post_view(request, share_id):
                     messages.success(request, f'Post shared to {shared_count} group(s) successfully.')
                 else:
                     error_msg = errors[0] if errors else 'No valid groups found.'
+                    if is_json:
+                        return JsonResponse({'status': 'error', 'message': error_msg}, status=400)
                     if request.headers.get('HX-Request'):
                         return HttpResponse(
                             f'<div class="alert alert-danger">{error_msg}</div>'
                         )
                     messages.error(request, error_msg)
             else:
+                is_json = request.headers.get('Accept') == 'application/json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+                if is_json:
+                    return JsonResponse({'status': 'error', 'message': f'Invalid share type: {share_type}'}, status=400)
                 if request.headers.get('HX-Request'):
                     return HttpResponse(
                         f'<div class="alert alert-danger">Invalid share type: {share_type}</div>'
@@ -1282,6 +1295,9 @@ def share_post_view(request, share_id):
         except Exception as e:
             import traceback
             logger.error(f"Share error: {str(e)}\n{traceback.format_exc()}")
+            is_json = request.headers.get('Accept') == 'application/json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+            if is_json:
+                return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
             if request.headers.get('HX-Request'):
                 return HttpResponse(
                     f'<div class="alert alert-danger">Error: {str(e)}</div>'
@@ -1362,6 +1378,103 @@ def search_user_groups(request):
     groups = groups.order_by('name')[:15]
 
     return render(request, 'posts/partials/share_group_results.html', {'groups': groups})
+
+
+@login_required
+def get_share_targets(request):
+    """Returns following users and user groups for the TikTok-style share sheet"""
+    try:
+        from django.db.models import Q
+        query = request.GET.get('q', '').strip()
+
+        # 1. Following users (friends)
+        from users.models import Follow
+        following_ids = list(Follow.objects.filter(follower=request.user).values_list('followed_id', flat=True))
+
+        if query:
+            users_qs = User.objects.filter(id__in=following_ids).filter(
+                Q(username__icontains=query) | Q(first_name__icontains=query) | Q(last_name__icontains=query)
+            )
+            # If search in followings returns few/no results, search all active users
+            if users_qs.count() < 5:
+                extra_qs = User.objects.exclude(id=request.user.id).filter(is_active=True).filter(
+                    Q(username__icontains=query) | Q(first_name__icontains=query) | Q(last_name__icontains=query)
+                ).exclude(id__in=following_ids)
+                users_qs = list(users_qs) + list(extra_qs[:10])
+        elif following_ids:
+            users_qs = User.objects.filter(id__in=following_ids)[:20]
+        else:
+            # Fallback to active users if user is not following anyone yet
+            users_qs = User.objects.exclude(id=request.user.id).filter(is_active=True).order_by('-date_joined')[:20]
+
+        users_data = []
+        for u in users_qs[:20]:
+            try:
+                pic_url = u.profile_pic.url if (u.profile_pic and hasattr(u.profile_pic, 'url')) else '/static/images/default_avatar.png'
+            except Exception:
+                pic_url = '/static/images/default_avatar.png'
+            users_data.append({
+                'id': u.id,
+                'username': u.username,
+                'name': u.get_full_name() or u.username,
+                'avatar': pic_url,
+                'type': 'user',
+            })
+
+        # 2. User's approved groups
+        from groups.models import Membership, MembershipStatus, Group
+        group_ids = list(Membership.objects.filter(
+            user=request.user,
+            status=MembershipStatus.APPROVED
+        ).values_list('group_id', flat=True))
+
+        if query:
+            groups_qs = Group.objects.filter(id__in=group_ids).filter(
+                Q(name__icontains=query) | Q(description__icontains=query)
+            )
+            if groups_qs.count() < 5:
+                extra_groups = Group.objects.filter(is_official=True).filter(
+                    Q(name__icontains=query) | Q(description__icontains=query)
+                ).exclude(id__in=group_ids)
+                groups_qs = list(groups_qs) + list(extra_groups[:10])
+        elif group_ids:
+            groups_qs = Group.objects.filter(id__in=group_ids).order_by('name')[:15]
+        else:
+            # Fallback: public or official groups
+            groups_qs = Group.objects.filter(is_official=True).order_by('name')[:15]
+
+        groups_data = []
+        for g in groups_qs[:15]:
+            try:
+                photo_attr = getattr(g, 'get_photo_url', None)
+                pic_url = photo_attr() if callable(photo_attr) else photo_attr
+                if not pic_url:
+                    pic_url = g.group_pic.url if (g.group_pic and hasattr(g.group_pic, 'url')) else '/static/images/default_group.jpg'
+            except Exception:
+                pic_url = '/static/images/default_group.jpg'
+
+            groups_data.append({
+                'id': g.id,
+                'name': g.name,
+                'avatar': pic_url,
+                'is_official': getattr(g, 'is_official', False),
+                'type': 'group',
+            })
+
+        return JsonResponse({
+            'status': 'success',
+            'users': users_data,
+            'groups': groups_data
+        })
+    except Exception as e:
+        import traceback
+        logger.error(f"[get_share_targets] Error: {str(e)}\n{traceback.format_exc()}")
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e),
+            'users': [],
+            'groups': []
+        }, status=500)
 
 
 

@@ -18,6 +18,7 @@ urlpatterns = [
     path('shares/', views.shared_posts_view, name='shared_posts'),
     path('share/search-users/', views.search_following_users, name='search_following_users'),
     path('share/search-groups/', views.search_user_groups, name='search_user_groups'),
+    path('share/targets/', views.get_share_targets, name='get_share_targets'),
     # API endpoints
     path('api/posts/', views.PostViewSet.as_view({'get': 'list', 'post': 'create'}), name='post_list'),
     path('api/posts/<uuid:share_id>/', views.PostViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='post_detail_api'),

@@ -19,8 +19,8 @@ websocket_urlpatterns = [
     re_path(r'ws/feed/$', FeedConsumer.as_asgi()),
     # Online status consumer
     re_path(r'ws/online/$', OnlineStatusConsumer.as_asgi()),
-    # Comment updates consumer
-    re_path(r'ws/post/(?P<post_id>\d+)/comments/$', CommentConsumer.as_asgi()),
+    # Comment updates consumer (supports both integer ID and UUID share_id)
+    re_path(r'ws/post/(?P<post_id>[a-zA-Z0-9_-]+)/comments/$', CommentConsumer.as_asgi()),
     # Group chat consumer
     re_path(r'ws/groups/chat/(?P<group_id>\d+)/$', GroupChatConsumer.as_asgi()),
 ] + messaging_websocket_urlpatterns

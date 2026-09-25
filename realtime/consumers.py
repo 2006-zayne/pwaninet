@@ -308,11 +308,7 @@ class CommentConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
         """Handle WebSocket connection."""
-        if self.scope["user"].is_anonymous:
-            await self.close()
-            return
-
-        self.user = self.scope["user"]
+        self.user = self.scope.get("user")
         # Get post_id from URL
         self.post_id = self.scope['url_route']['kwargs'].get('post_id')
         
@@ -320,22 +316,45 @@ class CommentConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
-        self.post_group_name = f"post_comments_{self.post_id}"
+        raw_post_id = str(self.post_id)
+        numeric_post_id = raw_post_id
+        if not raw_post_id.isdigit():
+            from posts.models import Post
+            try:
+                post = await database_sync_to_async(
+                    lambda: Post.objects.filter(share_id=raw_post_id).only('id').first()
+                )()
+                if post:
+                    numeric_post_id = str(post.id)
+            except Exception as e:
+                logger.warning(f"[COMMENTS] Error resolving post share_id {raw_post_id}: {e}")
 
-        print(f'[COMMENTS] User {self.user.id} connecting to post {self.post_id} group {self.post_group_name}')
+        self.post_groups = [f"post_comments_{numeric_post_id}"]
+        if raw_post_id != numeric_post_id:
+            self.post_groups.append(f"post_comments_{raw_post_id}")
 
-        # Join post's comment group
-        await self.channel_layer.group_add(
-            self.post_group_name,
-            self.channel_name
-        )
+        user_info = getattr(self.user, 'id', 'anonymous')
+        print(f'[COMMENTS] User {user_info} connecting to post {self.post_id} groups {self.post_groups}')
+
+        # Join post's comment groups
+        for grp in self.post_groups:
+            await self.channel_layer.group_add(
+                grp,
+                self.channel_name
+            )
 
         await self.accept()
 
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection."""
-        # Leave post's comment group
-        if hasattr(self, 'post_group_name'):
+        # Leave post's comment groups
+        if hasattr(self, 'post_groups'):
+            for grp in self.post_groups:
+                await self.channel_layer.group_discard(
+                    grp,
+                    self.channel_name
+                )
+        elif hasattr(self, 'post_group_name'):
             await self.channel_layer.group_discard(
                 self.post_group_name,
                 self.channel_name

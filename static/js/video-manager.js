@@ -43,15 +43,38 @@
 
     function extractPostId(element) {
         if (!element) return null;
-        if (element.dataset && element.dataset.postId) return element.dataset.postId;
+        if (element.dataset && element.dataset.postId) {
+            const id = String(element.dataset.postId).trim();
+            if (id && id !== 'null' && id !== 'undefined') return id;
+        }
         if (element.id) {
-            if (element.id.startsWith('video-')) return element.id.replace('video-', '');
-            if (element.id.startsWith('fs-video-')) return element.id.replace('fs-video-', '');
-            if (element.id.startsWith('reel-card-')) return element.id.replace('reel-card-', '');
-            if (element.id.startsWith('reel-hitbox-')) return element.id.replace('reel-hitbox-', '');
+            if (element.id.startsWith('post-card-')) {
+                const id = element.id.replace('post-card-', '').trim();
+                if (id && id !== 'null' && id !== 'undefined') return id;
+            }
+            if (element.id.startsWith('video-')) {
+                const id = element.id.replace('video-', '').trim();
+                if (id && id !== 'null' && id !== 'undefined') return id;
+            }
+            if (element.id.startsWith('fs-video-')) {
+                const id = element.id.replace('fs-video-', '').trim();
+                if (id && id !== 'null' && id !== 'undefined') return id;
+            }
+            if (element.id.startsWith('reel-card-')) {
+                const id = element.id.replace('reel-card-', '').trim();
+                if (id && id !== 'null' && id !== 'undefined') return id;
+            }
+            if (element.id.startsWith('reel-hitbox-')) {
+                const id = element.id.replace('reel-hitbox-', '').trim();
+                if (id && id !== 'null' && id !== 'undefined') return id;
+            }
         }
         const parent = element.closest('[data-post-id]');
-        return parent ? parent.dataset.postId : null;
+        if (parent && parent.dataset && parent.dataset.postId) {
+            const id = String(parent.dataset.postId).trim();
+            if (id && id !== 'null' && id !== 'undefined') return id;
+        }
+        return null;
     }
 
     function isReelElement(video) {
@@ -265,6 +288,10 @@
 
                 // Near end of queue: append more videos dynamically
                 checkAndAppendMoreFullscreenVideos(snapItem);
+
+                // Update TikTok desktop rail and exterior engagement buttons
+                updateDesktopSideRail(snapItem);
+                updateFullscreenNavButtons(snapItem);
             } else if (!entry.isIntersecting || entry.intersectionRatio < 0.5) {
                 if (video === state.currentPlayingVideo) {
                     pauseVideo(video);
@@ -316,8 +343,8 @@
             const vid = card.querySelector('video') || (card.tagName === 'VIDEO' ? card : null);
             if (!vid || card.classList.contains('reels-carousel-shelf')) return;
 
-            const cardPostId = String(extractPostId(card) || vid.dataset.postId || '').trim();
-            if (!cardPostId || existingIds.has(cardPostId)) return;
+            const cardPostId = String(extractPostId(card) || vid.dataset.postId || card.dataset.postId || '').trim();
+            if (!cardPostId || cardPostId === 'null' || cardPostId === 'undefined' || existingIds.has(cardPostId)) return;
 
             existingIds.add(cardPostId);
             const snapItem = buildSnapItemFromReelCard(card);
@@ -328,6 +355,8 @@
                 }
             }
         });
+
+        updateFullscreenNavButtons();
     }
 
     function checkAndAppendMoreFullscreenVideos(currentSnapItem) {
@@ -407,10 +436,19 @@
 
             triggerHeartBurst(container, event.clientX, event.clientY);
 
-            const likeBtn = container.querySelector('.like-button') ||
-                           (postId ? document.querySelector(`#reel-like-wrap-${postId} .like-button`) : null);
-            if (likeBtn) {
-                likeBtn.click();
+            const fsLikeBtn = container.querySelector('.fs-like-proxy-btn') ||
+                              (postId ? document.querySelector(`.fs-like-proxy-btn[data-post-id="${postId}"]`) : null) ||
+                              document.getElementById('fsDesktopLikeBtn');
+            if (fsLikeBtn) {
+                if (!fsLikeBtn.classList.contains('liked')) {
+                    fsLikeBtn.click();
+                }
+            } else {
+                const likeBtn = container.querySelector('.like-button') ||
+                               (postId ? document.querySelector(`#reel-like-wrap-${postId} .like-button`) : null);
+                if (likeBtn && !likeBtn.classList.contains('liked') && !likeBtn.classList.contains('text-danger')) {
+                    likeBtn.click();
+                }
             }
             return;
         }
@@ -467,7 +505,10 @@
     // ============================================================================
 
     function buildSnapItemFromReelCard(card) {
-        const postId = card.dataset.postId || extractPostId(card);
+        const rawPostId = card.dataset.postId || extractPostId(card);
+        const postId = rawPostId ? String(rawPostId).trim() : '';
+        if (!postId || postId === 'null' || postId === 'undefined') return null;
+
         const video = card.querySelector('video');
         if (!video) return null;
 
@@ -479,7 +520,8 @@
         const hlsUrl = video.dataset.hlsUrl || '';
 
         // Extract author avatar & details (supports datasets from carousel, reel cards, and standard postcards)
-        const authorImg = card.querySelector('.reel-creator-row img') ||
+        const authorImg = card.querySelector('.fb-author-avatar-img') ||
+                          card.querySelector('.reel-creator-row img') ||
                           card.querySelector('.fb-avatar-container img') ||
                           card.querySelector('.reel-scrim-bottom img') ||
                           card.querySelector('.post-avatar-img') ||
@@ -489,16 +531,18 @@
         const authorLink = card.querySelector('.fb-author-name') ||
                            card.querySelector('.reel-creator-row a') ||
                            card.querySelector('.reel-scrim-bottom a[href*="profile"]') ||
+                           card.querySelector('a[href*="/users/user/"]') ||
                            card.querySelector('a[href*="/users/profile/"]');
         const authorName = card.dataset.author || authorLink?.textContent?.trim() || card.querySelector('.reel-options-btn')?.dataset.author || 'Author';
         const profileUrlHref = authorLink?.getAttribute('href') || '';
-        const hrefMatch = profileUrlHref.match(/\/users\/profile\/([^\/]+)/);
+        const hrefMatch = profileUrlHref.match(/\/users\/user\/([^\/]+)/) || profileUrlHref.match(/\/users\/profile\/([^\/]+)/);
         const authorUsername = card.dataset.authorUsername ||
                                (hrefMatch ? hrefMatch[1] : null) ||
+                               card.querySelector('.fb-author-username')?.textContent?.replace(/^@/, '')?.trim() ||
                                (authorName.startsWith('@') ? authorName.slice(1) : authorName);
         const profileUrl = card.dataset.authorProfile ||
                            profileUrlHref ||
-                           `/users/profile/${authorUsername}/`;
+                           `/users/user/${authorUsername}/`;
 
         // Extract campus unit badge and time if present
         const unitBadge = card.querySelector('.reel-unit-badge') || card.querySelector('.fb-sub-meta .badge');
@@ -639,6 +683,19 @@
         const snapItem = document.createElement('div');
         snapItem.className = 'reels-snap-item';
         snapItem.dataset.postId = postId;
+        snapItem.dataset.authorName = authorName;
+        snapItem.dataset.authorUsername = authorUsername;
+        snapItem.dataset.authorAvatar = authorAvatar;
+        snapItem.dataset.profileUrl = profileUrl;
+        snapItem.dataset.unitCode = unitCode;
+        snapItem.dataset.timeAgo = timeAgo;
+        snapItem.dataset.likes = likeCount;
+        snapItem.dataset.isLiked = isLiked ? 'true' : 'false';
+        snapItem.dataset.comments = commentCount;
+        snapItem.dataset.videoUrl = videoSrc;
+        snapItem.dataset.poster = poster;
+        const rawCaptionText = (card.dataset.caption || card.querySelector('.reel-caption-text')?.textContent || card.querySelector('.post-content-text')?.textContent || card.querySelector('.post-text-body')?.textContent || '').trim();
+        snapItem.dataset.caption = rawCaptionText;
 
         snapItem.innerHTML = `
             <div class="reel-fullscreen-content">
@@ -710,7 +767,7 @@
                     </div>
 
                     <div class="reel-action-unit text-center">
-                        <button type="button" class="reel-action-btn text-white" data-bs-toggle="modal" data-bs-target="#globalShareModal" data-post-id="${postId}">
+                        <button type="button" class="reel-action-btn text-white" data-bs-toggle="modal" data-bs-target="#globalShareModal" data-post-id="${postId}" data-post-url="/post/${postId}/" data-video-url="${videoSrc}" data-poster-url="${poster}" data-post-content="${rawCaptionText.replace(/"/g, '&quot;')}">
                             <i class="bi bi-share-fill"></i>
                         </button>
                         <span class="reel-action-label">Share</span>
@@ -746,7 +803,760 @@
             </div>
         `;
 
+        adaptSnapItemOrientation(snapItem, card);
         return snapItem;
+    }
+
+    let currentDesktopRailPostId = null;
+    let sideRailWebSocket = null;
+    let sideRailWsPostId = null;
+
+    function closeSideRailWebSocket() {
+        if (sideRailWebSocket) {
+            try {
+                sideRailWebSocket.onclose = null;
+                sideRailWebSocket.onerror = null;
+                sideRailWebSocket.onmessage = null;
+                sideRailWebSocket.close();
+            } catch (e) {}
+            sideRailWebSocket = null;
+            sideRailWsPostId = null;
+        }
+    }
+
+    function initSideRailWebSocket(postId) {
+        postId = postId ? String(postId).trim() : '';
+        if (!postId || postId === 'null' || postId === 'undefined') return;
+        if (sideRailWebSocket && sideRailWsPostId === postId && sideRailWebSocket.readyState === WebSocket.OPEN) {
+            return;
+        }
+        closeSideRailWebSocket();
+
+        sideRailWsPostId = postId;
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/post/${postId}/comments/`;
+
+        try {
+            const ws = new WebSocket(wsUrl);
+            sideRailWebSocket = ws;
+
+            ws.onopen = function() {
+                console.log(`[DesktopSideRail] Live comments WebSocket connected for post ${postId}`);
+            };
+
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleSideRailWsMessage(data, postId);
+                } catch (err) {
+                    console.warn('[DesktopSideRail] WS message error:', err);
+                }
+            };
+
+            ws.onerror = function(err) {
+                console.warn('[DesktopSideRail] WS error for post', postId, err);
+            };
+
+            ws.onclose = function() {
+                if (sideRailWsPostId === postId) {
+                    sideRailWebSocket = null;
+                }
+            };
+        } catch (e) {
+            console.warn('[DesktopSideRail] Could not initialize WebSocket:', e);
+        }
+    }
+
+    function handleSideRailWsMessage(data, postId) {
+        if (!data) return;
+
+        // 1. Comment Like Update
+        if (data.type === 'comment_like_update' && data.comment_id) {
+            const commentEl = document.getElementById(`comment-${data.comment_id}`);
+            if (commentEl) {
+                const likeBtn = commentEl.querySelector('[data-action="like"]');
+                if (likeBtn) {
+                    const countSpan = likeBtn.querySelector('span');
+                    if (countSpan) countSpan.textContent = data.likes_count;
+                }
+            }
+            return;
+        }
+
+        // 2. New Comment Live Push
+        if (data.type === 'new_comment' && data.comment) {
+            const comment = data.comment;
+            if (document.getElementById(`comment-${comment.id}`)) {
+                return; // Already rendered
+            }
+
+            const commentsList = document.getElementById('fsRailCommentsList');
+            if (!commentsList) return;
+
+            // Remove empty state if present
+            const emptyState = commentsList.querySelector('.comments-empty');
+            if (emptyState) emptyState.remove();
+
+            if (comment.parent_comment_id) {
+                // Threaded reply
+                if (typeof CommentManager !== 'undefined' && typeof CommentManager.addReplyToDom === 'function') {
+                    CommentManager.addReplyToDom(comment.parent_comment_id, comment);
+                    if (typeof CommentManager.updateReplyCount === 'function') {
+                        CommentManager.updateReplyCount(comment.parent_comment_id, 1);
+                    }
+                } else {
+                    let repliesContainer = document.getElementById(`replies-${comment.parent_comment_id}`) ||
+                                           commentsList.querySelector(`#replies-${comment.parent_comment_id}`);
+                    if (!repliesContainer) {
+                        const parentEl = document.getElementById(`comment-${comment.parent_comment_id}`);
+                        if (parentEl) {
+                            repliesContainer = document.createElement('div');
+                            repliesContainer.id = `replies-${comment.parent_comment_id}`;
+                            repliesContainer.className = 'comment-replies expanded ms-4 mt-2 ps-2 border-start';
+                            parentEl.appendChild(repliesContainer);
+                        }
+                    }
+                    if (repliesContainer) {
+                        const replyHtml = renderSideRailCommentHtml(comment, true);
+                        repliesContainer.insertAdjacentHTML('beforeend', replyHtml);
+                    }
+                }
+            } else {
+                // Top-level comment
+                let stream = commentsList.querySelector('.comment-stream') || commentsList;
+                const commentHtml = (typeof CommentRenderer !== 'undefined' && typeof CommentRenderer.renderComment === 'function')
+                    ? CommentRenderer.renderComment(comment, { isReply: false, nestingLevel: 0 })
+                    : renderSideRailCommentHtml(comment, false);
+
+                stream.insertAdjacentHTML('afterbegin', commentHtml);
+            }
+
+            if (window.htmx) {
+                window.htmx.process(commentsList);
+            }
+            initSheetCommentsInteractions(commentsList, postId);
+
+            // Increment all comment counters
+            const railCommentCount = document.getElementById('fsRailCommentCount');
+            const fsCommentCount = document.getElementById('fsDesktopCommentCount');
+            let curN = parseInt(railCommentCount?.textContent || '0', 10) || 0;
+            let newN = curN + 1;
+            if (railCommentCount) railCommentCount.textContent = newN;
+            if (fsCommentCount) fsCommentCount.textContent = newN;
+
+            const inlinePostCount = document.getElementById(`comment-count-${postId}`);
+            const inlineReelCount = document.getElementById(`reel-comment-count-${postId}`);
+            const fsReelCount = document.getElementById(`fs-reel-comment-count-${postId}`);
+            if (inlinePostCount) inlinePostCount.textContent = newN;
+            if (inlineReelCount) inlineReelCount.textContent = newN;
+            if (fsReelCount) fsReelCount.textContent = newN;
+        }
+    }
+
+    function renderSideRailCommentHtml(comment, isReply) {
+        const authorName = comment.author?.full_name || comment.author?.username || 'User';
+        const authorUsername = comment.author?.username || 'user';
+        const avatar = comment.author?.profile_pic || '/static/images/default_avatar.png';
+        const content = (comment.content || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const timeAgo = 'just now';
+        return `
+            <div class="comment-item ${isReply ? 'comment-reply ms-4' : ''}" id="comment-${comment.id}"
+                 data-comment-id="${comment.id}"
+                 data-author-id="${comment.author?.id || ''}"
+                 data-parent-comment-id="${comment.parent_comment_id || ''}"
+                 data-reply-count="${comment.reply_count || 0}">
+                <a href="/users/user/${authorUsername}/"
+                   hx-get="/users/user/${authorUsername}/"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   class="comment-avatar-link">
+                    <img src="${avatar}" alt="${authorName}" class="comment-avatar" loading="lazy" onerror="this.src='/static/images/default_avatar.png'">
+                </a>
+                <div class="comment-content">
+                    <div class="comment-header">
+                        <a href="/users/user/${authorUsername}/"
+                           hx-get="/users/user/${authorUsername}/"
+                           hx-target="#page-content-target"
+                           hx-swap="innerHTML"
+                           hx-push-url="true"
+                           class="comment-author-link fw-bold text-decoration-none">
+                            ${authorName}
+                        </a>
+                        <span class="comment-timestamp">${timeAgo}</span>
+                    </div>
+                    <div class="comment-body" id="comment-body-${comment.id}">
+                        ${content}
+                    </div>
+                    <div class="comment-actions">
+                        <button class="comment-action" data-action="like" data-comment-id="${comment.id}" aria-label="Like comment">
+                            <i class="bi bi-heart"></i>
+                            <span>${comment.likes_count || 0}</span>
+                        </button>
+                        <button class="comment-action" data-action="reply" data-comment-id="${comment.id}" aria-label="Reply to comment">
+                            <i class="bi bi-chat-dots"></i>
+                            Reply
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function toggleDesktopCommentRail(forceOpen) {
+        const rail = document.getElementById('reelDesktopSideRail');
+        if (!rail) return;
+
+        const isCurrentlyCollapsed = rail.classList.contains('rail-collapsed');
+        const shouldOpen = (typeof forceOpen === 'boolean') ? forceOpen : isCurrentlyCollapsed;
+
+        if (shouldOpen) {
+            rail.classList.remove('rail-collapsed');
+            const input = document.getElementById('fsRailCommentInput');
+            if (input) {
+                setTimeout(() => input.focus(), 120);
+            }
+        } else {
+            rail.classList.add('rail-collapsed');
+        }
+
+        // Smoothly adjust exterior action buttons positioning
+        const repositionActive = () => {
+            const viewport = document.getElementById('reelsSnapViewport');
+            if (viewport) {
+                const h = viewport.clientHeight || 1;
+                const curIdx = Math.round(viewport.scrollTop / h);
+                const activeSnap = viewport.children[curIdx] || viewport.firstElementChild;
+                if (activeSnap) {
+                    repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
+                }
+            }
+        };
+
+        setTimeout(repositionActive, 100);
+        setTimeout(repositionActive, 320);
+    }
+
+    function refreshDesktopSideRailComments() {
+        const postId = currentDesktopRailPostId;
+        if (!postId) return;
+
+        const refreshBtn = document.getElementById('fsRailRefreshBtn');
+        const icon = refreshBtn?.querySelector('i');
+        if (icon) icon.classList.add('spinning');
+        if (refreshBtn) refreshBtn.disabled = true;
+
+        const commentsList = document.getElementById('fsRailCommentsList');
+        const commentsLoading = document.getElementById('fsRailCommentsLoading');
+
+        fetch(`/post/${postId}/?show_all=1`, {
+            headers: { 'HX-Request': 'true' }
+        })
+        .then(res => res.text())
+        .then(html => {
+            if (icon) icon.classList.remove('spinning');
+            if (refreshBtn) refreshBtn.disabled = false;
+            if (commentsLoading) commentsLoading.style.display = 'none';
+
+            if (commentsList) {
+                delete commentsList.dataset.eventsBound;
+                commentsList.innerHTML = html;
+                if (window.htmx) {
+                    htmx.process(commentsList);
+                }
+                initSheetCommentsInteractions(commentsList, postId);
+
+                const countFromDom = commentsList.querySelectorAll('.comment-item:not(.comment-reply)').length;
+                if (countFromDom > 0) {
+                    const railCommentCount = document.getElementById('fsRailCommentCount');
+                    const fsCommentCount = document.getElementById('fsDesktopCommentCount');
+                    if (railCommentCount && parseInt(railCommentCount.textContent, 10) < countFromDom) {
+                        railCommentCount.textContent = countFromDom;
+                    }
+                    if (fsCommentCount && parseInt(fsCommentCount.textContent, 10) < countFromDom) {
+                        fsCommentCount.textContent = countFromDom;
+                    }
+                }
+            }
+        })
+        .catch(err => {
+            console.warn('[DesktopSideRail] Refresh comments error:', err);
+            if (icon) icon.classList.remove('spinning');
+            if (refreshBtn) refreshBtn.disabled = false;
+        });
+    }
+
+    function repositionDesktopActionsRail(content) {
+        if (window.innerWidth < 992) return;
+        const rail = document.getElementById('reelDesktopActionsRail');
+        const stage = document.querySelector('.reel-desktop-stage');
+        if (!rail || !stage) return;
+
+        const activeContent = content || document.querySelector('.reels-snap-item .reel-fullscreen-content');
+        if (!activeContent) return;
+
+        const contentRect = activeContent.getBoundingClientRect();
+        const stageRect = stage.getBoundingClientRect();
+        if (stageRect.width === 0) return;
+
+        // Position rail 20px to the right of the active card
+        const desiredLeft = contentRect.right - stageRect.left + 20;
+
+        // Ensure it doesn't overlap the up/down nav group (docked at right: 28px)
+        const maxLeft = stageRect.width - 85;
+        const finalLeft = Math.max(16, Math.min(desiredLeft, maxLeft));
+
+        rail.style.left = `${Math.round(finalLeft)}px`;
+    }
+
+    function adaptSnapItemOrientation(snapItem, initialCard) {
+        if (!snapItem) return;
+        const content = snapItem.querySelector('.reel-fullscreen-content');
+        const video = snapItem.querySelector('video');
+        if (!content || !video) return;
+
+        // On mobile (<992px): ALWAYS full-bleed edge-to-edge 100% width and 100% height
+        if (window.innerWidth < 992) {
+            content.style.width = '';
+            content.style.height = '';
+            content.style.maxWidth = '';
+            content.style.maxHeight = '';
+            content.style.aspectRatio = '';
+            content.classList.remove('is-portrait', 'is-landscape', 'is-square');
+            return;
+        }
+
+        const isInitialLandscape = initialCard && (
+            initialCard.classList.contains('landscape-video-container') ||
+            initialCard.querySelector('.landscape-video-container') ||
+            initialCard.querySelector('.landscape-video-wrapper')
+        );
+
+        if (isInitialLandscape) {
+            content.classList.remove('is-portrait', 'is-square');
+            content.classList.add('is-landscape');
+        }
+
+        function checkMetadata() {
+            if (window.innerWidth < 992) {
+                content.style.width = '';
+                content.style.height = '';
+                content.style.maxWidth = '';
+                content.style.maxHeight = '';
+                content.style.aspectRatio = '';
+                content.classList.remove('is-portrait', 'is-landscape', 'is-square');
+                return;
+            }
+
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            if (!vw || !vh) return;
+
+            const ratio = vw / vh;
+            content.classList.remove('is-portrait', 'is-landscape', 'is-square');
+            if (ratio >= 1.15) {
+                content.classList.add('is-landscape');
+                content.style.aspectRatio = `${vw} / ${vh}`;
+                content.style.width = 'min(calc(100% - 150px), 920px)';
+                content.style.height = 'auto';
+            } else if (ratio >= 0.88 && ratio < 1.15) {
+                content.classList.add('is-square');
+                content.style.aspectRatio = '1 / 1';
+                const sz = 'min(calc(100vh - 40px), calc(100% - 150px), 720px)';
+                content.style.width = sz;
+                content.style.height = sz;
+            } else {
+                content.classList.add('is-portrait');
+                content.style.aspectRatio = `${vw} / ${vh}`;
+                content.style.height = 'min(calc(100vh - 40px), 940px)';
+                content.style.width = `calc(min(calc(100vh - 40px), 940px) * ${vw} / ${vh})`;
+                content.style.maxWidth = 'min(calc(100% - 150px), 940px)';
+            }
+
+            repositionDesktopActionsRail(content);
+        }
+
+        if (video.videoWidth && video.videoHeight) {
+            checkMetadata();
+        } else {
+            video.addEventListener('loadedmetadata', checkMetadata, { once: true });
+        }
+    }
+
+    function updateFullscreenNavButtons(target) {
+        const viewport = document.getElementById('reelsSnapViewport');
+        const navPrev = document.getElementById('reelsNavPrev');
+        const navNext = document.getElementById('reelsNavNext');
+        if (!viewport || !navPrev || !navNext) return;
+
+        const items = Array.from(viewport.children);
+        const total = items.length;
+        if (total <= 1) {
+            navPrev.classList.add('d-none');
+            navNext.classList.add('d-none');
+            return;
+        }
+
+        let currentIndex = 0;
+        if (typeof target === 'number') {
+            currentIndex = target;
+        } else if (target && target instanceof Element) {
+            const idx = items.indexOf(target);
+            if (idx !== -1) {
+                currentIndex = idx;
+            } else {
+                const h = viewport.clientHeight || 1;
+                currentIndex = Math.round(viewport.scrollTop / h);
+            }
+        } else {
+            const h = viewport.clientHeight || 1;
+            currentIndex = Math.round(viewport.scrollTop / h);
+        }
+
+        currentIndex = Math.max(0, Math.min(total - 1, currentIndex));
+
+        // If it's the first reel, hide the up button
+        if (currentIndex <= 0) {
+            navPrev.classList.add('d-none');
+        } else {
+            navPrev.classList.remove('d-none');
+        }
+
+        // If it's the last reel, hide the down button
+        if (currentIndex >= total - 1) {
+            navNext.classList.add('d-none');
+        } else {
+            navNext.classList.remove('d-none');
+        }
+    }
+
+    function updateDesktopSideRail(activeItem) {
+        if (activeItem) {
+            updateFullscreenNavButtons(activeItem);
+            repositionDesktopActionsRail(activeItem.querySelector('.reel-fullscreen-content'));
+        }
+        if (!activeItem || window.innerWidth < 992) return;
+
+        const rawPostId = activeItem.dataset.postId || extractPostId(activeItem);
+        const postId = rawPostId ? String(rawPostId).trim() : '';
+        if (!postId || postId === 'null' || postId === 'undefined') return;
+
+        const authorName = activeItem.dataset.authorName || 'Author';
+        const authorUsername = activeItem.dataset.authorUsername || 'author';
+        const authorAvatar = activeItem.dataset.authorAvatar || '/static/images/default_avatar.png';
+        const profileUrl = activeItem.dataset.profileUrl || `/users/user/${authorUsername}/`;
+        const unitCode = activeItem.dataset.unitCode || '';
+        const timeAgo = activeItem.dataset.timeAgo || '';
+        const likeCount = activeItem.dataset.likes || '0';
+        const isLiked = activeItem.dataset.isLiked === 'true' || activeItem.querySelector('.fs-like-proxy-btn')?.classList.contains('liked');
+        const commentCount = activeItem.dataset.comments ||
+                             activeItem.querySelector('.reel-action-unit [id^="fs-reel-comment-count-"]')?.textContent?.trim() ||
+                             '0';
+
+        // 1. Update Exterior Engagement Stack (Desktop/Tablet Floating Rail)
+        const fsLikeBtn = document.getElementById('fsDesktopLikeBtn');
+        const fsLikeCount = document.getElementById('fsDesktopLikeCount');
+        if (fsLikeBtn) {
+            fsLikeBtn.dataset.postId = postId;
+            fsLikeBtn.setAttribute('data-post-id', postId);
+            fsLikeBtn.classList.toggle('liked', isLiked);
+            const icon = fsLikeBtn.querySelector('i');
+            if (icon) icon.className = isLiked ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+        }
+        if (fsLikeCount) {
+            fsLikeCount.textContent = likeCount;
+        }
+
+        const fsCommentBtn = document.getElementById('fsDesktopCommentBtn');
+        const fsCommentCount = document.getElementById('fsDesktopCommentCount');
+        if (fsCommentBtn) {
+            fsCommentBtn.dataset.postId = postId;
+            fsCommentBtn.onclick = function(e) {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                toggleDesktopCommentRail();
+            };
+        }
+        if (fsCommentCount) {
+            fsCommentCount.textContent = commentCount;
+        }
+
+        const fsShareBtn = document.getElementById('fsDesktopShareBtn');
+        if (fsShareBtn) {
+            fsShareBtn.dataset.postId = postId;
+            fsShareBtn.setAttribute('data-post-id', postId);
+            fsShareBtn.setAttribute('data-post-url', `/post/${postId}/`);
+            fsShareBtn.setAttribute('data-video-url', activeItem.dataset.videoUrl || '');
+            fsShareBtn.setAttribute('data-poster-url', activeItem.dataset.poster || '');
+            fsShareBtn.setAttribute('data-post-content', activeItem.dataset.caption || '');
+        }
+
+        const fsBookmarkBtn = document.getElementById('fsDesktopBookmarkBtn');
+        const fsBookmarkLabel = document.getElementById('fsDesktopBookmarkLabel');
+        if (fsBookmarkBtn) {
+            fsBookmarkBtn.dataset.postId = postId;
+            const isSaved = window.pwaniSavedPosts ? window.pwaniSavedPosts.isPostSaved(postId) : fsBookmarkBtn.classList.contains('active');
+            fsBookmarkBtn.classList.toggle('active', isSaved);
+            const icon = fsBookmarkBtn.querySelector('i');
+            if (icon) icon.className = isSaved ? 'bi bi-bookmark-fill text-warning' : 'bi bi-bookmark';
+            if (fsBookmarkLabel) fsBookmarkLabel.textContent = isSaved ? 'Saved' : 'Save';
+            fsBookmarkBtn.onclick = function() {
+                const nowSaved = window.pwaniSavedPosts ? window.pwaniSavedPosts.togglePostSaved(postId) : fsBookmarkBtn.classList.toggle('active');
+                fsBookmarkBtn.classList.toggle('active', nowSaved);
+                if (icon) icon.className = nowSaved ? 'bi bi-bookmark-fill text-warning' : 'bi bi-bookmark';
+                if (fsBookmarkLabel) fsBookmarkLabel.textContent = nowSaved ? 'Saved' : 'Save';
+            };
+        }
+
+        // 2. Update Right Side Rail Header
+        const avatarEl = document.getElementById('fsRailAuthorAvatar');
+        const nameLink = document.getElementById('fsRailAuthorNameLink');
+        const profileLink = document.getElementById('fsRailAuthorProfileLink');
+        const nameEl = document.getElementById('fsRailAuthorName');
+        const handleEl = document.getElementById('fsRailAuthorHandle');
+        const unitEl = document.getElementById('fsRailUnitBadge');
+        const timeEl = document.getElementById('fsRailTime');
+        const captionEl = document.getElementById('fsRailCaption');
+        const soundTextEl = document.getElementById('fsRailSoundText');
+        const optionsBtn = document.getElementById('fsRailOptionsBtn');
+        const closeBtn = document.getElementById('fsRailCloseBtn');
+        const refreshBtn = document.getElementById('fsRailRefreshBtn');
+
+        if (avatarEl) avatarEl.src = authorAvatar;
+        if (nameLink) {
+            nameLink.href = profileUrl;
+            nameLink.setAttribute('hx-get', profileUrl);
+            nameLink.setAttribute('hx-target', '#page-content-target');
+            nameLink.setAttribute('hx-swap', 'innerHTML');
+            nameLink.setAttribute('hx-push-url', 'true');
+        }
+        if (profileLink) {
+            profileLink.href = profileUrl;
+            profileLink.setAttribute('hx-get', profileUrl);
+            profileLink.setAttribute('hx-target', '#page-content-target');
+            profileLink.setAttribute('hx-swap', 'innerHTML');
+            profileLink.setAttribute('hx-push-url', 'true');
+        }
+        if (nameEl) nameEl.textContent = authorName;
+        if (handleEl) handleEl.textContent = `@${authorUsername}`;
+        if (timeEl) timeEl.textContent = timeAgo || 'recently';
+        if (unitEl) {
+            unitEl.innerHTML = unitCode ?
+                `<span class="badge bg-primary bg-opacity-10 text-primary border-0 ms-1 px-1.5 py-0.5" style="font-size: 10px;">${unitCode}</span>` : '';
+        }
+
+        // Wire Rail Header Close Button
+        if (closeBtn && !closeBtn.dataset.bound) {
+            closeBtn.dataset.bound = 'true';
+            closeBtn.onclick = function(e) {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                toggleDesktopCommentRail(false);
+            };
+        }
+
+        // Wire Rail Comments Refresh Button
+        if (refreshBtn && !refreshBtn.dataset.bound) {
+            refreshBtn.dataset.bound = 'true';
+            refreshBtn.onclick = function(e) {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                refreshDesktopSideRailComments();
+            };
+        }
+
+        // Caption
+        if (captionEl) {
+            const rawCaptionHtml = activeItem.querySelector('.reel-caption-text')?.innerHTML ||
+                                   activeItem.querySelector('.post-content-text')?.innerHTML ||
+                                   activeItem.dataset.caption ||
+                                   '';
+            const plainText = (activeItem.dataset.caption || activeItem.querySelector('.reel-caption-text')?.textContent || '').trim();
+
+            if (plainText.length > 110 || (plainText.match(/\n/g) || []).length >= 2) {
+                captionEl.innerHTML = `
+                    <div class="reel-rail-caption-clamp" id="fsRailCaptionInner">${rawCaptionHtml}</div>
+                    <button type="button" class="btn btn-link btn-sm p-0 text-muted text-decoration-none mt-1 fw-semibold fs-rail-caption-toggle" style="font-size: 12px;">
+                        ... See more
+                    </button>
+                `;
+                const toggleBtn = captionEl.querySelector('.fs-rail-caption-toggle');
+                const clampEl = captionEl.querySelector('#fsRailCaptionInner');
+                if (toggleBtn && clampEl) {
+                    toggleBtn.onclick = function() {
+                        const isExp = clampEl.classList.toggle('is-expanded');
+                        toggleBtn.textContent = isExp ? 'See less' : '... See more';
+                    };
+                }
+            } else {
+                captionEl.innerHTML = rawCaptionHtml;
+            }
+        }
+
+        if (soundTextEl) {
+            soundTextEl.textContent = `Original Audio - ${authorUsername}`;
+        }
+
+        if (optionsBtn) {
+            optionsBtn.dataset.postId = postId;
+            optionsBtn.dataset.author = authorName;
+            optionsBtn.onclick = function() {
+                openReelQuickTools(postId, optionsBtn);
+            };
+        }
+
+        // Process HTMX on side rail header links
+        const railHeader = document.querySelector('.reel-rail-header');
+        if (railHeader && window.htmx) {
+            htmx.process(railHeader);
+        }
+
+        // 3. Update Comments Stream in Side Rail
+        const railCommentCount = document.getElementById('fsRailCommentCount');
+        if (railCommentCount) railCommentCount.textContent = commentCount;
+
+        if (currentDesktopRailPostId === postId) {
+            initSideRailWebSocket(postId);
+            return;
+        }
+        currentDesktopRailPostId = postId;
+        initSideRailWebSocket(postId);
+
+        const commentsList = document.getElementById('fsRailCommentsList');
+        const commentsLoading = document.getElementById('fsRailCommentsLoading');
+        const parentInput = document.getElementById('fsRailParentId');
+        const replyBanner = document.getElementById('fsRailReplyBanner');
+        const commentInput = document.getElementById('fsRailCommentInput');
+
+        if (parentInput) parentInput.value = '';
+        if (replyBanner) replyBanner.classList.add('d-none');
+        if (commentInput) {
+            commentInput.value = '';
+            commentInput.placeholder = 'Add a comment...';
+        }
+
+        if (commentsLoading) commentsLoading.style.display = 'block';
+        if (commentsList) {
+            commentsList.innerHTML = '';
+            delete commentsList.dataset.eventsBound;
+        }
+
+        fetch(`/post/${postId}/?show_all=1`, {
+            headers: { 'HX-Request': 'true' }
+        })
+        .then(res => res.text())
+        .then(html => {
+            if (commentsLoading) commentsLoading.style.display = 'none';
+            if (commentsList) {
+                commentsList.innerHTML = html;
+                if (window.htmx) {
+                    htmx.process(commentsList);
+                }
+                initSheetCommentsInteractions(commentsList, postId);
+                initSideRailWebSocket(postId);
+            }
+        })
+        .catch(err => {
+            console.warn('[DesktopSideRail] Failed to load comments:', err);
+            if (commentsLoading) commentsLoading.style.display = 'none';
+            if (commentsList) commentsList.innerHTML = '<div class="text-center py-4 text-muted small">Could not load comments.</div>';
+        });
+
+        // Bind desktop side rail comment form submission
+        const formEl = document.getElementById('fsRailCommentForm');
+        if (formEl && !formEl.dataset.bound) {
+            formEl.dataset.bound = 'true';
+            formEl.onsubmit = function(e) {
+                e.preventDefault();
+                if (formEl.dataset.submitting === 'true') return;
+
+                const curPostId = currentDesktopRailPostId;
+                if (!curPostId) return;
+
+                const content = commentInput?.value?.trim();
+                if (!content) return;
+
+                formEl.dataset.submitting = 'true';
+                const sendBtn = formEl.querySelector('button[type="submit"]');
+                if (sendBtn) sendBtn.disabled = true;
+
+                const targetParentId = (parentInput && parentInput.value) ? parentInput.value : '';
+
+                const formData = new FormData();
+                formData.append('content', content);
+                formData.append('csrfmiddlewaretoken', getCsrfToken());
+                if (targetParentId) {
+                    formData.append('parent_id', targetParentId);
+                }
+
+                fetch(`/post/${curPostId}/comment/`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'HX-Request': 'true' }
+                })
+                .then(res => res.text())
+                .then(html => {
+                    delete formEl.dataset.submitting;
+                    if (sendBtn) sendBtn.disabled = false;
+                    if (commentInput) commentInput.value = '';
+                    if (parentInput) parentInput.value = '';
+                    if (replyBanner) replyBanner.classList.add('d-none');
+
+                    if (commentsList) {
+                        delete commentsList.dataset.eventsBound;
+                        commentsList.innerHTML = html;
+                        if (window.htmx) {
+                            htmx.process(commentsList);
+                        }
+                        initSheetCommentsInteractions(commentsList, curPostId);
+                    }
+
+                    // Update all comment counters
+                    let curN = parseInt(railCommentCount?.textContent || '0', 10) || 0;
+                    let newN = curN + 1;
+                    if (railCommentCount) railCommentCount.textContent = newN;
+                    if (fsCommentCount) fsCommentCount.textContent = newN;
+
+                    const inlinePostCount = document.getElementById(`comment-count-${curPostId}`);
+                    const inlineReelCount = document.getElementById(`reel-comment-count-${curPostId}`);
+                    const fsReelCount = document.getElementById(`fs-reel-comment-count-${curPostId}`);
+                    if (inlinePostCount) inlinePostCount.textContent = newN;
+                    if (inlineReelCount) inlineReelCount.textContent = newN;
+                    if (fsReelCount) fsReelCount.textContent = newN;
+
+                    // Scroll to bottom
+                    const scrollContainer = document.getElementById('fsRailCommentsBody');
+                    if (scrollContainer) {
+                        scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+                    }
+                })
+                .catch(err => {
+                    delete formEl.dataset.submitting;
+                    if (sendBtn) sendBtn.disabled = false;
+                    console.error('[DesktopSideRail] Comment post error:', err);
+                });
+            };
+        }
+
+        // Cancel reply in side rail
+        const cancelReplyBtn = document.getElementById('fsRailCancelReply');
+        if (cancelReplyBtn && !cancelReplyBtn.dataset.bound) {
+            cancelReplyBtn.dataset.bound = 'true';
+            cancelReplyBtn.onclick = function() {
+                if (parentInput) parentInput.value = '';
+                if (replyBanner) replyBanner.classList.add('d-none');
+                if (commentInput && /^@\w+\s*$/.test(commentInput.value)) {
+                    commentInput.value = '';
+                    commentInput.placeholder = 'Add a comment...';
+                }
+            };
+        }
     }
 
     function openFullscreenReels(targetPostId) {
@@ -755,6 +1565,9 @@
         if (!overlay || !viewport) return;
 
         targetPostId = targetPostId ? String(targetPostId).trim() : null;
+        if (targetPostId === 'null' || targetPostId === 'undefined' || targetPostId === '') {
+            targetPostId = null;
+        }
 
         // Pause feed playback and save scroll offset
         state.previousScrollY = window.scrollY;
@@ -784,8 +1597,8 @@
             const vid = card.querySelector('video') || (card.tagName === 'VIDEO' ? card : null);
             if (!vid || card.classList.contains('reels-carousel-shelf')) return;
 
-            const cardPostId = String(extractPostId(card) || vid.dataset.postId || '').trim();
-            if (!cardPostId || seenPostIds.has(cardPostId)) return;
+            const cardPostId = String(extractPostId(card) || vid.dataset.postId || card.dataset.postId || '').trim();
+            if (!cardPostId || cardPostId === 'null' || cardPostId === 'undefined' || seenPostIds.has(cardPostId)) return;
 
             seenPostIds.add(cardPostId);
             allVideoCards.push(card);
@@ -820,6 +1633,9 @@
             }
         });
 
+        // Initialize nav button visibility immediately
+        updateFullscreenNavButtons(targetSnapItem || viewport.firstElementChild);
+
         // Request animation frame ensures DOM reflow is complete before scrolling/playing
         requestAnimationFrame(() => {
             const activeItem = targetSnapItem || viewport.firstElementChild;
@@ -838,6 +1654,10 @@
                     const vinyl = activeItem.querySelector('.reel-vinyl-disc');
                     if (vinyl) vinyl.classList.add('is-playing');
                 }
+                updateDesktopSideRail(activeItem);
+                updateFullscreenNavButtons(activeItem);
+            } else {
+                updateFullscreenNavButtons();
             }
         });
 
@@ -848,6 +1668,9 @@
         const overlay = document.getElementById('fullscreenReelsOverlay');
         const viewport = document.getElementById('reelsSnapViewport');
         if (!overlay) return;
+
+        closeSideRailWebSocket();
+        currentDesktopRailPostId = null;
 
         // Pause active fullscreen video
         pauseAllVideos();
@@ -886,6 +1709,9 @@
     }
 
     function openReelQuickTools(postId, targetEl) {
+        postId = postId ? String(postId).trim() : '';
+        if (!postId || postId === 'null' || postId === 'undefined') return;
+
         const modalEl = document.getElementById('reelQuickToolsModal');
         if (!modalEl || typeof bootstrap === 'undefined') return;
 
@@ -893,25 +1719,36 @@
         if (!card) return;
 
         const optionsBtn = card.querySelector('.reel-options-btn');
-        const authorName = optionsBtn?.dataset.author || card.querySelector('a[href*="profile"]')?.textContent?.trim() || 'Author';
+        const authorUsername = card.dataset.authorUsername ||
+                               optionsBtn?.dataset.authorUsername ||
+                               card.querySelector('.fb-author-username')?.textContent?.replace(/^@/, '')?.trim() ||
+                               (optionsBtn?.dataset.author || '').replace(/^@/, '') ||
+                               'Author';
         const isAuthor = optionsBtn?.dataset.isAuthor === 'true';
-        const shareUrl = optionsBtn?.dataset.shareUrl || (window.location.origin + `/posts/${postId}/`);
+        const shareUrl = optionsBtn?.dataset.shareUrl || (window.location.origin + `/post/${postId}/`);
         const videoUrl = optionsBtn?.dataset.videoUrl || '';
         const posterUrl = optionsBtn?.dataset.poster || '';
+        const caption = card.dataset.caption || card.querySelector('.reel-caption-text')?.textContent?.trim() || '';
 
         // Update Modal Header
         const authorEl = document.getElementById('quickToolsAuthor');
-        if (authorEl) authorEl.textContent = `@${authorName}`;
+        if (authorEl) authorEl.textContent = `@${authorUsername}`;
 
         // 1. Bookmark / Save Button
         const bookmarkBtn = document.getElementById('quickToolsBookmarkBtn');
         if (bookmarkBtn) {
+            const isBookmarked = window.pwaniSavedPosts ? window.pwaniSavedPosts.isPostSaved(postId) : bookmarkBtn.classList.contains('active');
+            bookmarkBtn.classList.toggle('active', isBookmarked);
+            const icon = bookmarkBtn.querySelector('i');
+            const label = bookmarkBtn.querySelector('.fw-semibold');
+            if (icon) icon.className = isBookmarked ? 'bi bi-bookmark-fill text-warning' : 'bi bi-bookmark';
+            if (label) label.textContent = isBookmarked ? 'Saved to Library' : 'Save to Library';
+
             bookmarkBtn.onclick = function() {
-                const isBookmarked = bookmarkBtn.classList.toggle('active');
-                const icon = bookmarkBtn.querySelector('i');
-                const label = bookmarkBtn.querySelector('.fw-semibold');
-                if (icon) icon.className = isBookmarked ? 'bi bi-bookmark-fill text-warning' : 'bi bi-bookmark';
-                if (label) label.textContent = isBookmarked ? 'Saved to Library' : 'Save to Library';
+                const nowSaved = window.pwaniSavedPosts ? window.pwaniSavedPosts.togglePostSaved(postId) : bookmarkBtn.classList.toggle('active');
+                bookmarkBtn.classList.toggle('active', nowSaved);
+                if (icon) icon.className = nowSaved ? 'bi bi-bookmark-fill text-warning' : 'bi bi-bookmark';
+                if (label) label.textContent = nowSaved ? 'Saved to Library' : 'Save to Library';
                 bootstrap.Modal.getInstance(modalEl)?.hide();
             };
         }
@@ -939,7 +1776,18 @@
                 bootstrap.Modal.getInstance(modalEl)?.hide();
                 const shareModalEl = document.getElementById('globalShareModal');
                 if (shareModalEl) {
-                    new bootstrap.Modal(shareModalEl).show();
+                    shareModalEl.setAttribute('data-post-id', postId);
+                    shareModalEl.setAttribute('data-post-url', `/post/${postId}/`);
+                    shareModalEl.setAttribute('data-video-url', videoUrl || '');
+                    shareModalEl.setAttribute('data-poster-url', posterUrl || '');
+                    shareModalEl.setAttribute('data-post-content', caption || '');
+                    const hiddenPostId = document.getElementById('globalSharePostId');
+                    if (hiddenPostId) hiddenPostId.value = postId;
+                    const inst = bootstrap.Modal.getInstance(shareModalEl) || new bootstrap.Modal(shareModalEl);
+                    inst.show();
+                    if (window.pwaniPrepareShareModal) {
+                        window.pwaniPrepareShareModal(postId, shareModalEl);
+                    }
                 }
             };
         }
@@ -1083,8 +1931,38 @@
         });
     }
 
+    function truncateLongComments(container) {
+        if (!container) return;
+        const bodies = container.querySelectorAll('.comment-body');
+        bodies.forEach(body => {
+            if (body.dataset.clampHandled === 'true') return;
+            body.dataset.clampHandled = 'true';
+
+            const text = body.textContent.trim();
+            if (text.length > 130 || (text.match(/\n/g) || []).length >= 3) {
+                body.classList.add('comment-body-clamped');
+                const toggleBtn = document.createElement('button');
+                toggleBtn.type = 'button';
+                toggleBtn.className = 'btn btn-link btn-sm p-0 text-muted text-decoration-none fw-semibold comment-see-more-btn';
+                toggleBtn.style.fontSize = '12px';
+                toggleBtn.style.display = 'inline-block';
+                toggleBtn.style.marginTop = '2px';
+                toggleBtn.textContent = '... See more';
+                toggleBtn.onclick = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const isExp = body.classList.toggle('is-expanded');
+                    body.classList.toggle('comment-body-clamped', !isExp);
+                    toggleBtn.textContent = isExp ? 'See less' : '... See more';
+                };
+                body.after(toggleBtn);
+            }
+        });
+    }
+
     function initSheetCommentsInteractions(listEl, postId) {
         if (!listEl) return;
+        truncateLongComments(listEl);
         if (listEl.dataset.eventsBound === 'true') return;
         listEl.dataset.eventsBound = 'true';
 
@@ -1147,21 +2025,26 @@
                 // Enforce 1-level maximum nesting: if replying to a reply, anchor to its root parent comment
                 const rootParentId = commentItem?.dataset?.parentId || commentItem?.dataset?.parentCommentId || commentId;
                 const authorLink = commentItem?.querySelector('.comment-author-link');
-                const authorName = authorLink ? authorLink.textContent.trim() : '';
+                const authorUsername = commentItem?.dataset?.authorUsername ||
+                                       authorLink?.dataset?.username ||
+                                       (authorLink?.getAttribute('href') || '').match(/\/users\/(?:user\/)?([^\/]+)/)?.[1] ||
+                                       authorLink?.textContent?.trim() || '';
 
-                const parentInput = document.getElementById('commentsModalParentId');
-                const replyBanner = document.getElementById('commentsModalReplyBanner');
-                const replyUserSpan = document.getElementById('commentsModalReplyUser');
-                const inputEl = document.getElementById('reelCommentInput');
+                const isRail = (listEl && listEl.id === 'fsRailCommentsList') || (listEl && listEl.closest('#fsRailCommentsBody, .reel-desktop-side-rail')) || Boolean(document.getElementById('fsRailCommentInput')?.offsetParent);
+
+                const parentInput = isRail ? document.getElementById('fsRailParentId') : document.getElementById('commentsModalParentId');
+                const replyBanner = isRail ? document.getElementById('fsRailReplyBanner') : document.getElementById('commentsModalReplyBanner');
+                const replyUserSpan = isRail ? document.getElementById('fsRailReplyUser') : document.getElementById('commentsModalReplyUser');
+                const inputEl = isRail ? document.getElementById('fsRailCommentInput') : document.getElementById('reelCommentInput');
 
                 if (parentInput) parentInput.value = rootParentId;
                 if (replyBanner && replyUserSpan) {
-                    replyUserSpan.textContent = authorName ? `@${authorName}` : 'comment';
+                    replyUserSpan.textContent = authorUsername ? `@${authorUsername}` : 'comment';
                     replyBanner.classList.remove('d-none');
                 }
                 if (inputEl) {
-                    if (authorName && !inputEl.value.includes(`@${authorName}`)) {
-                        inputEl.value = `@${authorName} `;
+                    if (authorUsername && !inputEl.value.includes(`@${authorUsername}`)) {
+                        inputEl.value = `@${authorUsername} `;
                     }
                     inputEl.focus();
                 }
@@ -1173,11 +2056,12 @@
             if (toggleBtn) {
                 e.preventDefault();
                 e.stopPropagation();
+                if (toggleBtn.dataset.loading === 'true') return;
                 const commentId = toggleBtn.dataset.commentId;
-                const parentComment = document.getElementById(`comment-${commentId}`);
+                const parentComment = listEl.querySelector(`#comment-${commentId}`) || document.getElementById(`comment-${commentId}`);
                 if (!parentComment) return;
 
-                let repliesContainer = document.getElementById(`replies-${commentId}`);
+                let repliesContainer = parentComment.querySelector('.replies-container') || parentComment.querySelector(`#replies-${commentId}`) || document.getElementById(`replies-${commentId}`);
                 const isExpanded = toggleBtn.classList.contains('expanded');
 
                 if (isExpanded) {
@@ -1194,7 +2078,7 @@
                         icon.classList.add('bi-chevron-down');
                     }
                     const span = toggleBtn.querySelector('span');
-                    if (span) span.textContent = `View ${toggleBtn.dataset.replyCount} replies`;
+                    if (span) span.textContent = `View ${toggleBtn.dataset.replyCount || ''} replies`;
                 } else {
                     // Expand
                     if (repliesContainer && repliesContainer.children.length > 0) {
@@ -1203,6 +2087,7 @@
                         repliesContainer.style.display = 'block';
                     } else {
                         // Fetch replies from API
+                        toggleBtn.dataset.loading = 'true';
                         try {
                             const res = await fetch(`/api/comments/${commentId}/replies/?page=1&page_size=20`);
                             if (res.ok) {
@@ -1216,20 +2101,34 @@
                                 }
                                 repliesContainer.innerHTML = '';
                                 const results = data.results || (Array.isArray(data) ? data : []);
+                                const seenIds = new Set();
                                 results.forEach(reply => {
+                                    if (seenIds.has(reply.id)) return;
+                                    seenIds.add(reply.id);
                                     const replyAvatar = reply.author?.profile_pic || '/static/images/default-avatar.png';
                                     const replyAuthor = reply.author?.full_name || reply.author?.username || 'User';
                                     const replyUsername = reply.author?.username || '';
                                     const replyLiked = reply.is_liked ? 'liked text-danger' : '';
+                                    const profilePath = `/users/user/${replyUsername}/`;
                                     const replyHtml = `
-                                        <div class="comment-item reply-item py-2 border-bottom border-light" id="comment-${reply.id}" data-comment-id="${reply.id}" data-parent-id="${commentId}" data-author-id="${reply.author?.id || ''}">
+                                        <div class="comment-item reply-item py-2 border-bottom border-light" id="comment-${reply.id}" data-comment-id="${reply.id}" data-parent-id="${commentId}" data-author-id="${reply.author?.id || ''}" data-author-username="${replyUsername}">
                                             <div class="d-flex align-items-start gap-2">
-                                                <a href="/users/${replyUsername}/" class="text-decoration-none comment-avatar-link">
+                                                <a href="${profilePath}"
+                                                   hx-get="${profilePath}"
+                                                   hx-target="#page-content-target"
+                                                   hx-swap="innerHTML"
+                                                   hx-push-url="true"
+                                                   class="text-decoration-none comment-avatar-link">
                                                     <img src="${replyAvatar}" class="rounded-circle border" style="width: 28px; height: 28px; object-fit: cover;" alt="${replyAuthor}">
                                                 </a>
                                                 <div class="flex-grow-1 min-w-0">
                                                     <div class="d-flex align-items-center justify-content-between">
-                                                        <a href="/users/${replyUsername}/" class="fw-bold text-dark text-decoration-none small comment-author-link">${replyAuthor}</a>
+                                                        <a href="${profilePath}"
+                                                           hx-get="${profilePath}"
+                                                           hx-target="#page-content-target"
+                                                           hx-swap="innerHTML"
+                                                           hx-push-url="true"
+                                                           class="fw-bold text-dark text-decoration-none small comment-author-link" data-username="${replyUsername}">${replyAuthor}</a>
                                                         <span class="text-muted" style="font-size: 11px;">${reply.created_at ? new Date(reply.created_at).toLocaleDateString() : ''}</span>
                                                     </div>
                                                     <div class="small text-break mt-0.5 comment-body" id="comment-body-${reply.id}">${reply.content}</div>
@@ -1253,10 +2152,16 @@
                                     `;
                                     repliesContainer.insertAdjacentHTML('beforeend', replyHtml);
                                 });
+                                if (window.htmx) {
+                                    window.htmx.process(repliesContainer);
+                                }
+                                truncateLongComments(repliesContainer);
                                 repliesContainer.style.display = 'block';
                             }
                         } catch (err) {
                             console.warn('[CommentsSheet] Failed to load replies:', err);
+                        } finally {
+                            toggleBtn.dataset.loading = 'false';
                         }
                     }
                     toggleBtn.classList.add('expanded');
@@ -1292,7 +2197,10 @@
 
                 const authorId = commentEl.dataset.authorId;
                 const authorLink = commentEl.querySelector('.comment-author-link');
-                const authorUsername = authorLink ? (authorLink.getAttribute('href') || '').replace(/^\/users\/|\/$/g, '') : '';
+                const authorUsername = commentEl.dataset.authorUsername ||
+                                       authorLink?.dataset?.username ||
+                                       (authorLink?.getAttribute('href') || '').match(/\/users\/(?:user\/)?([^\/]+)/)?.[1] ||
+                                       '';
 
                 const isOwner = (currentUserId && authorId && String(currentUserId) === String(authorId)) ||
                                 (currentUsername && authorUsername && currentUsername.toLowerCase() === authorUsername.toLowerCase());
@@ -1572,13 +2480,16 @@
     }
 
     function openCommentsSheet(postId) {
-        if (!postId) return;
-        postId = String(postId).trim();
+        postId = postId ? String(postId).trim() : '';
+        if (!postId || postId === 'null' || postId === 'undefined') {
+            console.warn('[CommentsSheet] Aborting openCommentsSheet on invalid postId:', postId);
+            return;
+        }
         activeCommentsPostId = postId;
 
         const modalEl = document.getElementById('commentsModal');
         if (!modalEl || typeof bootstrap === 'undefined') {
-            window.location.href = `/posts/${postId}/`;
+            console.warn('[CommentsSheet] Comments modal or bootstrap is unavailable.');
             return;
         }
 
@@ -1607,7 +2518,8 @@
         // Read current count from postcard or reelcard
         const curCount = document.getElementById(`comment-count-${postId}`)?.textContent ||
                          document.getElementById(`reel-comment-count-${postId}`)?.textContent ||
-                         document.getElementById(`fs-reel-comment-count-${postId}`)?.textContent || '0';
+                         document.getElementById(`fs-reel-comment-count-${postId}`)?.textContent ||
+                         document.getElementById('fsRailCommentCount')?.textContent || '0';
         if (countEl) countEl.textContent = curCount.trim();
 
         // Fetch comments dynamically without navigating away
@@ -1619,6 +2531,9 @@
             if (loadingEl) loadingEl.style.display = 'none';
             if (listEl) {
                 listEl.innerHTML = html;
+                if (window.htmx) {
+                    htmx.process(listEl);
+                }
                 initSheetCommentsInteractions(listEl, postId);
             }
         })
@@ -1670,6 +2585,9 @@
                     if (listEl) {
                         delete listEl.dataset.eventsBound;
                         listEl.innerHTML = html;
+                        if (window.htmx) {
+                            htmx.process(listEl);
+                        }
                         initSheetCommentsInteractions(listEl, curPostId);
                     }
 
@@ -1876,6 +2794,7 @@
                     const curIdx = Math.round(viewport.scrollTop / h);
                     const nextIdx = Math.min(viewport.children.length - 1, curIdx + 1);
                     viewport.scrollTo({ top: nextIdx * h, behavior: 'smooth' });
+                    updateFullscreenNavButtons(nextIdx);
                 }
                 return;
             }
@@ -1890,16 +2809,24 @@
                     const curIdx = Math.round(viewport.scrollTop / h);
                     const prevIdx = Math.max(0, curIdx - 1);
                     viewport.scrollTo({ top: prevIdx * h, behavior: 'smooth' });
+                    updateFullscreenNavButtons(prevIdx);
                 }
                 return;
             }
 
             // Comment trigger button (both reels and postcards)
-            const commentBtn = event.target.closest('.reel-comment-trigger, .postcard-comment-btn, [data-action="open-comments"]');
+            const commentBtn = event.target.closest('.reel-comment-trigger, .postcard-comment-btn, [data-action="open-comments"], #fsDesktopCommentBtn');
             if (commentBtn) {
                 event.preventDefault();
                 event.stopPropagation();
-                const postId = commentBtn.dataset.postId || extractPostId(commentBtn);
+                if (state.isFullScreenActive && window.innerWidth >= 992) {
+                    const sideInput = document.getElementById('fsRailCommentInput');
+                    if (sideInput) sideInput.focus();
+                    return;
+                }
+                const rawPostId = commentBtn.dataset.postId || extractPostId(commentBtn);
+                const postId = rawPostId ? String(rawPostId).trim() : '';
+                if (!postId || postId === 'null' || postId === 'undefined') return;
                 openCommentsSheet(postId);
                 return;
             }
@@ -1909,7 +2836,9 @@
             if (optionsBtn) {
                 event.preventDefault();
                 event.stopPropagation();
-                const postId = optionsBtn.dataset.postId || extractPostId(optionsBtn);
+                const rawPostId = optionsBtn.dataset.postId || extractPostId(optionsBtn);
+                const postId = rawPostId ? String(rawPostId).trim() : '';
+                if (!postId || postId === 'null' || postId === 'undefined') return;
                 openReelQuickTools(postId, optionsBtn);
                 return;
             }
@@ -1937,23 +2866,50 @@
             if (fsLikeBtn) {
                 event.preventDefault();
                 event.stopPropagation();
-                const postId = fsLikeBtn.dataset.postId;
-                const inlineLikeBtn = document.querySelector(`#reel-like-wrap-${postId} .like-button`);
+                const postId = fsLikeBtn.dataset.postId || currentDesktopRailPostId;
+                if (!postId) return;
+                const inlineLikeBtn = document.querySelector(`#reel-like-wrap-${postId} .like-button`) ||
+                                      document.querySelector(`.like-button[data-post-id="${postId}"]`);
                 if (inlineLikeBtn) {
                     inlineLikeBtn.click();
                 }
-                const icon = fsLikeBtn.querySelector('i');
                 const wasLiked = fsLikeBtn.classList.toggle('liked');
                 fsLikeBtn.classList.toggle('text-danger', wasLiked);
+                const icon = fsLikeBtn.querySelector('i');
                 if (icon) {
                     icon.className = wasLiked ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
                 }
+
+                // Sync desktop exterior like button
+                const desktopLikeBtn = document.getElementById('fsDesktopLikeBtn');
+                if (desktopLikeBtn && desktopLikeBtn !== fsLikeBtn) {
+                    desktopLikeBtn.classList.toggle('liked', wasLiked);
+                    const dIcon = desktopLikeBtn.querySelector('i');
+                    if (dIcon) dIcon.className = wasLiked ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+                }
+
+                // Sync in-video proxy like button
+                const inVideoLikeBtn = document.querySelector(`.reels-snap-item[data-post-id="${postId}"] .fs-like-proxy-btn`);
+                if (inVideoLikeBtn && inVideoLikeBtn !== fsLikeBtn) {
+                    inVideoLikeBtn.classList.toggle('liked', wasLiked);
+                    inVideoLikeBtn.classList.toggle('text-danger', wasLiked);
+                    const ivIcon = inVideoLikeBtn.querySelector('i');
+                    if (ivIcon) ivIcon.className = wasLiked ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+                }
+
                 const fsCountEl = document.getElementById(`fs-reel-like-count-${postId}`);
+                const desktopCountEl = document.getElementById('fsDesktopLikeCount');
                 const inlineCountEl = document.getElementById(`reel-like-count-${postId}`);
-                if (fsCountEl) {
-                    let cur = parseInt(fsCountEl.textContent, 10) || 0;
-                    fsCountEl.textContent = wasLiked ? cur + 1 : Math.max(0, cur - 1);
-                    if (inlineCountEl) inlineCountEl.textContent = fsCountEl.textContent;
+                let cur = parseInt(fsCountEl?.textContent || desktopCountEl?.textContent || inlineCountEl?.textContent || '0', 10) || 0;
+                let newCount = wasLiked ? cur + 1 : Math.max(0, cur - 1);
+                if (fsCountEl) fsCountEl.textContent = newCount;
+                if (desktopCountEl) desktopCountEl.textContent = newCount;
+                if (inlineCountEl) inlineCountEl.textContent = newCount;
+
+                const activeSnapItem = document.querySelector(`.reels-snap-item[data-post-id="${postId}"]`);
+                if (activeSnapItem) {
+                    activeSnapItem.dataset.isLiked = wasLiked ? 'true' : 'false';
+                    activeSnapItem.dataset.likes = newCount;
                 }
                 return;
             }
@@ -2079,13 +3035,21 @@
 
             if (event.key === 'ArrowDown' || event.key === 'PageDown' || event.key.toLowerCase() === 'j') {
                 event.preventDefault();
-                viewport.scrollBy({ top: viewport.clientHeight, behavior: 'smooth' });
+                const h = viewport.clientHeight || 1;
+                const curIdx = Math.round(viewport.scrollTop / h);
+                const nextIdx = Math.min(viewport.children.length - 1, curIdx + 1);
+                viewport.scrollTo({ top: nextIdx * h, behavior: 'smooth' });
+                updateFullscreenNavButtons(nextIdx);
                 return;
             }
 
             if (event.key === 'ArrowUp' || event.key === 'PageUp' || event.key.toLowerCase() === 'k') {
                 event.preventDefault();
-                viewport.scrollBy({ top: -viewport.clientHeight, behavior: 'smooth' });
+                const h = viewport.clientHeight || 1;
+                const curIdx = Math.round(viewport.scrollTop / h);
+                const prevIdx = Math.max(0, curIdx - 1);
+                viewport.scrollTo({ top: prevIdx * h, behavior: 'smooth' });
+                updateFullscreenNavButtons(prevIdx);
                 return;
             }
 
@@ -2160,6 +3124,46 @@
         document.addEventListener('visibilitychange', function() {
             if (document.hidden && state.currentPlayingVideo) {
                 pauseVideo(state.currentPlayingVideo);
+            }
+        });
+
+        // Passive scroll listener on snap viewport to synchronize Up/Down buttons
+        const snapViewportEl = document.getElementById('reelsSnapViewport');
+        if (snapViewportEl) {
+            let scrollNavTimer = null;
+            snapViewportEl.addEventListener('scroll', function() {
+                if (!state.isFullScreenActive) return;
+                clearTimeout(scrollNavTimer);
+                scrollNavTimer = setTimeout(() => {
+                    updateFullscreenNavButtons();
+                }, 40);
+            }, { passive: true });
+        }
+
+        window.addEventListener('resize', function() {
+            if (state.isFullScreenActive) {
+                const viewport = document.getElementById('reelsSnapViewport');
+                if (viewport) {
+                    const h = viewport.clientHeight || 1;
+                    const curIdx = Math.round(viewport.scrollTop / h);
+                    const activeSnap = viewport.children[curIdx] || viewport.firstElementChild;
+                    if (activeSnap) {
+                        const content = activeSnap.querySelector('.reel-fullscreen-content');
+                        if (window.innerWidth < 992) {
+                            if (content) {
+                                content.style.width = '';
+                                content.style.height = '';
+                                content.style.maxWidth = '';
+                                content.style.maxHeight = '';
+                                content.style.aspectRatio = '';
+                                content.classList.remove('is-portrait', 'is-landscape', 'is-square');
+                            }
+                        } else {
+                            adaptSnapItemOrientation(activeSnap);
+                            repositionDesktopActionsRail(content);
+                        }
+                    }
+                }
             }
         });
     }
@@ -2427,10 +3431,15 @@
 
     function initHTMXIntegration() {
         document.addEventListener('htmx:beforeSwap', function(event) {
-            if (state.isFullScreenActive) {
-                closeFullscreenReels();
+            const target = event.detail?.target;
+            if (state.isFullScreenActive && target) {
+                const isPageNavigation = target.id === 'page-content-target' ||
+                                         target.tagName === 'BODY' ||
+                                         target.tagName === 'MAIN';
+                if (isPageNavigation) {
+                    closeFullscreenReels();
+                }
             }
-            const target = event.detail.target;
             if (target && target.querySelectorAll) {
                 const oldVideos = target.querySelectorAll('video');
                 oldVideos.forEach(v => cleanupVideo(v));

@@ -544,7 +544,7 @@
         e.preventDefault();
         const imageId = this.getAttribute('data-image-id');
         const postId = this.getAttribute('data-post.share_id');
-        const commentsModal = document.getElementById('commentsModal');
+        const commentsModal = document.getElementById('imageCommentsModal');
         if (commentsModal && typeof bootstrap !== 'undefined') {
           const modal = new bootstrap.Modal(commentsModal);
           modal.show();
@@ -554,9 +554,9 @@
     }
 
     async function loadImageComments(postId, imageId) {
-      const commentsList = document.getElementById('commentsModalList');
+      const commentsList = document.getElementById('imageCommentsModalList');
       const emptyState = document.getElementById('commentsEmptyState');
-      const footer = document.getElementById('commentsModalFooter');
+      const footer = document.getElementById('imageCommentsModalFooter');
       const commentForm = document.getElementById('commentForm');
       const avatar = document.querySelector('.comment-input-avatar');
       if (!commentsList || !commentForm) return;
@@ -585,14 +585,28 @@
               commentEl.dataset.commentId = comment.id;
               commentEl.dataset.authorId = comment.author.id;
               const authorName = comment.author.full_name || comment.author.username;
+              const authorUsername = comment.author.username || '';
               const profilePic = comment.author.profile_pic || '/static/images/default-avatar.png';
+              const profilePath = `/users/user/${authorUsername}/`;
+              commentEl.dataset.authorUsername = authorUsername;
               commentEl.innerHTML = `
-                <a href="/user/${comment.author.username}/" class="comment-avatar-link">
+                <a href="${profilePath}"
+                   hx-get="${profilePath}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   class="comment-avatar-link">
                   <img src="${profilePic}" alt="${authorName}" class="comment-avatar" loading="lazy">
                 </a>
                 <div class="comment-content">
                   <div class="comment-header">
-                    <a href="/user/${comment.author.username}/" class="comment-author-link">${authorName}</a>
+                    <a href="${profilePath}"
+                       hx-get="${profilePath}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       class="comment-author-link"
+                       data-username="${authorUsername}">${authorName}</a>
                     <span class="comment-timestamp">${comment.created_at}</span>
                   </div>
                   <div class="comment-body" id="comment-body-${comment.id}">

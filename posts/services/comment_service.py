@@ -45,28 +45,34 @@ def add_comment_to_post(post, author, content, parent_comment=None):
     
     invalidate_home_feed_context(author.id)
     
-    # Broadcast new comment via WebSocket to post-specific channel
+    # Broadcast new comment via WebSocket to post-specific channels
     channel_layer = get_channel_layer()
+    event_payload = {
+        'type': 'new_comment',
+        'comment': {
+            'id': comment.id,
+            'author': {
+                'id': comment.author.id,
+                'username': comment.author.username,
+                'full_name': comment.author.get_full_name(),
+                'profile_pic': comment.author.profile_pic.url if comment.author.profile_pic else None
+            },
+            'content': comment.content,
+            'created_at': comment.created_at.isoformat(),
+            'likes_count': comment.likes.count(),
+            'parent_comment_id': comment.parent_comment.id if comment.parent_comment else None,
+            'reply_count': comment.reply_count
+        }
+    }
     async_to_sync(channel_layer.group_send)(
         f"post_comments_{post.id}",
-        {
-            'type': 'new_comment',
-            'comment': {
-                'id': comment.id,
-                'author': {
-                    'id': comment.author.id,
-                    'username': comment.author.username,
-                    'full_name': comment.author.get_full_name(),
-                    'profile_pic': comment.author.profile_pic.url if comment.author.profile_pic else None
-                },
-                'content': comment.content,
-                'created_at': comment.created_at.isoformat(),
-                'likes_count': comment.likes.count(),
-                'parent_comment_id': comment.parent_comment.id if comment.parent_comment else None,
-                'reply_count': comment.reply_count
-            }
-        }
+        event_payload
     )
+    if hasattr(post, 'share_id') and post.share_id:
+        async_to_sync(channel_layer.group_send)(
+            f"post_comments_{post.share_id}",
+            event_payload
+        )
     
     # Broadcast comment count update to global feed channel
     async_to_sync(channel_layer.group_send)(
@@ -103,14 +109,20 @@ def toggle_comment_like_for_user(comment, user):
     
     # Broadcast like update via WebSocket
     channel_layer = get_channel_layer()
+    like_payload = {
+        'type': 'comment_like_update',
+        'comment_id': comment.id,
+        'likes_count': comment.likes.count()
+    }
     async_to_sync(channel_layer.group_send)(
         f"post_comments_{comment.post.id}",
-        {
-            'type': 'comment_like_update',
-            'comment_id': comment.id,
-            'likes_count': comment.likes.count()
-        }
+        like_payload
     )
+    if hasattr(comment.post, 'share_id') and comment.post.share_id:
+        async_to_sync(channel_layer.group_send)(
+            f"post_comments_{comment.post.share_id}",
+            like_payload
+        )
     
     if comment.is_liked_by(user):
         return {

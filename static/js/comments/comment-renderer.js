@@ -19,15 +19,23 @@ const CommentRenderer = {
     const authorName = commentData.author.full_name || commentData.author.username;
     const timestamp = this.formatTimestamp(commentData.created_at);
     const replyCount = commentData.reply_count || 0;
+    const profileUrl = `/users/user/${encodeURIComponent(commentData.author.username)}/`;
 
     const commentHtml = `
       <div class="comment-item ${isReply ? 'reply-item' : ''} ${nestingLevel > 1 ? `reply-item--level-${nestingLevel}` : ''}" 
            id="comment-${commentData.id}"
            data-comment-id="${commentData.id}"
            data-parent-id="${commentData.parent_comment_id || ''}"
-           data-reply-count="${replyCount}">
+           data-reply-count="${replyCount}"
+           data-author-username="${commentData.author.username}"
+           data-author-id="${commentData.author.id}">
         
-        <a href="/users/${commentData.author.username}/" class="comment-avatar-link">
+        <a href="${profileUrl}"
+           hx-get="${profileUrl}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           class="comment-avatar-link">
           <img src="${avatarUrl}" 
                alt="${authorName}" 
                class="comment-avatar"
@@ -36,7 +44,13 @@ const CommentRenderer = {
         
         <div class="comment-content">
           <div class="comment-header">
-            <a href="/users/${commentData.author.username}/" class="comment-author-link">
+            <a href="${profileUrl}"
+               hx-get="${profileUrl}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               class="comment-author-link"
+               data-username="${commentData.author.username}">
               ${authorName}
             </a>
             <span class="comment-timestamp">${timestamp}</span>

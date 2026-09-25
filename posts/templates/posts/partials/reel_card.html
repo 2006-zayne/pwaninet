@@ -3,9 +3,14 @@
 {% load post_filters %}
 {% load user_extras %}
 
+{% with header_author=post.repost_of.author|default:post.author %}
 <div id="reel-card-{{ post.share_id }}"
      class="post-card fb-post-card reel-post-card mb-3 bg-white rounded-3 overflow-hidden border position-relative"
      data-post-id="{{ post.share_id }}"
+     data-author="{{ header_author.get_full_name|default:header_author.username }}"
+     data-author-username="{{ header_author.username }}"
+     data-author-avatar="{{ header_author.profile_pic.url|default:'/static/images/default-avatar.png' }}"
+     data-author-profile="{% url 'users:profile' header_author.username %}"
      data-reel="true">
 
     {% if post.repost_of %}
@@ -29,66 +34,68 @@
 
     <!-- Standard Facebook-Style Post Header -->
     <div class="post-card-header d-flex align-items-center px-3 py-2">
-        <div class="fb-avatar-container position-relative flex-shrink-0 me-2" style="width: 40px; height: 40px;">
+        <!-- Facebook Style Post Header Avatar -->
+        <div class="fb-avatar-container position-relative flex-shrink-0 me-2" style="width: 44px; height: 44px;">
             {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
-                <a href="{% url 'groups:groups_detail' post.group.id %}"
-                   hx-get="{% url 'groups:groups_detail' post.group.id %}"
-                   hx-target="#page-content-target"
-                   hx-swap="innerHTML"
-                   hx-push-url="true"
-                   hx-history="true"
-                   class="d-block w-100 h-100">
-                    <img src="{{ post.group.get_photo_url }}" class="rounded-circle border" style="width: 40px; height: 40px; object-fit: cover;" alt="{{ post.group.name }}">
-                </a>
-                {% with author_pic=post.repost_of.author.profile_pic.url|default:post.author.profile_pic.url %}
-                <a href="{% url 'users:profile' post.author.username %}"
-                   hx-get="{% url 'users:profile' post.author.username %}"
-                   hx-target="#page-content-target"
-                   hx-swap="innerHTML"
-                   hx-push-url="true"
-                   hx-history="true">
-                    <img src="{{ author_pic }}" class="rounded-circle position-absolute bottom-0 end-0 border border-2" style="width: 22px; height: 22px; object-fit: cover; border-color: var(--card-bg, #fff) !important; transform: translate(15%, 15%);" alt="{{ post.author.username }}">
-                </a>
-                {% endwith %}
+            <!-- Group Post: Group avatar is the huge one, author avatar is the smaller overlapping one -->
+            <a href="{% url 'groups:groups_detail' post.group.id %}"
+               hx-get="{% url 'groups:groups_detail' post.group.id %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
+               class="d-block w-100 h-100"
+               title="{{ post.group.name }}">
+                <img src="{{ post.group.get_photo_url }}"
+                     class="rounded-circle border fb-group-avatar-img"
+                     style="width: 44px; height: 44px; object-fit: cover;"
+                     alt="{{ post.group.name }}"
+                     onerror="this.src='/static/images/default_group.jpg'">
+            </a>
+            <a href="{% url 'users:profile' header_author.username %}"
+               hx-get="{% url 'users:profile' header_author.username %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
+               title="{{ header_author.username }}">
+                <img src="{{ header_author.profile_pic.url|default:'/static/images/default-avatar.png' }}"
+                     class="rounded-circle position-absolute bottom-0 end-0 border border-2 shadow-sm fb-author-avatar-img"
+                     style="width: 22px; height: 22px; object-fit: cover; border-color: var(--card-bg, #fff) !important; transform: translate(15%, 15%);"
+                     alt="{{ header_author.username }}"
+                     onerror="this.src='/static/images/default-avatar.png'">
+            </a>
             {% else %}
-                {% with header_author=post.repost_of.author|default:post.author %}
+            <!-- Normal Post: Author profile avatar -->
+            <a href="{% url 'users:profile' header_author.username %}"
+               hx-get="{% url 'users:profile' header_author.username %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-history="true"
+               class="d-block w-100 h-100"
+               title="{{ header_author.username }}">
+                <img src="{{ header_author.profile_pic.url|default:'/static/images/default-avatar.png' }}"
+                     class="rounded-circle border fb-author-avatar-img"
+                     style="width: 44px; height: 44px; object-fit: cover;"
+                     alt="{{ header_author.username }}"
+                     onerror="this.src='/static/images/default-avatar.png'">
+            </a>
+            {% endif %}
+        </div>
+
+        <div class="fb-header-meta flex-grow-1 min-w-0" style="min-width: 0;">
+            <div class="fb-author-row text-truncate" style="line-height: 1.25;">
                 <a href="{% url 'users:profile' header_author.username %}"
                    hx-get="{% url 'users:profile' header_author.username %}"
                    hx-target="#page-content-target"
                    hx-swap="innerHTML"
                    hx-push-url="true"
                    hx-history="true"
-                   class="d-block w-100 h-100">
-                    <img src="{{ header_author.profile_pic.url|default:'/static/images/default-avatar.png' }}" class="rounded-circle border" style="width: 40px; height: 40px; object-fit: cover;" alt="{{ header_author.username }}">
+                   class="fb-author-name fw-semibold text-dark text-decoration-none">
+                    {{ header_author.get_full_name|default:header_author.username }}
                 </a>
-                {% endwith %}
-            {% endif %}
-        </div>
-
-        <div class="fb-header-meta flex-grow-1 min-w-0" style="min-width: 0;">
-            <div class="fb-author-row d-flex align-items-center flex-wrap gap-1 text-truncate" style="line-height: 1.25;">
-                {% if post.repost_of %}
-                    <a href="{% url 'users:profile' post.repost_of.author.username %}"
-                       hx-get="{% url 'users:profile' post.repost_of.author.username %}"
-                       hx-target="#page-content-target"
-                       hx-swap="innerHTML"
-                       hx-push-url="true"
-                       hx-history="true"
-                       class="fb-author-name fw-semibold text-dark text-decoration-none">
-                        {{ post.repost_of.author.get_full_name|default:post.repost_of.author.username }}
-                    </a>
-                {% else %}
-                    <a href="{% url 'users:profile' post.author.username %}"
-                       hx-get="{% url 'users:profile' post.author.username %}"
-                       hx-target="#page-content-target"
-                       hx-swap="innerHTML"
-                       hx-push-url="true"
-                       hx-history="true"
-                       class="fb-author-name fw-semibold text-dark text-decoration-none">
-                        {{ post.author.get_full_name|default:post.author.username }}
-                    </a>
-                {% endif %}
-
+                <span class="text-muted small ms-1 fb-author-username" style="font-size: 11px;">@{{ header_author.username }}</span>
                 {% if post.group and request.resolver_match.url_name != 'groups_detail' %}
                     <span class="fb-context-arrow mx-1 text-muted" style="font-size: 11px;">&blacktriangleright;</span>
                     <a href="{% url 'groups:groups_detail' post.group.id %}"
@@ -313,7 +320,6 @@
                 style="flex: 1 1 0px; min-width: 0;"
                 data-post-id="{{ post.share_id }}"
                 data-action="open-comments"
-                onclick="window.openCommentsSheet ? window.openCommentsSheet('{{ post.share_id }}') : null"
                 aria-label="{% trans 'Comment' %}">
             <i class="bi bi-chat-dots fs-5"></i>
             <span id="comment-count-{{ post.share_id }}" class="fw-bold">{{ post.comments.count }}</span>
@@ -342,3 +348,4 @@
     </div>
     {% endif %}
 </div>
+{% endwith %}

@@ -2095,130 +2095,119 @@
             </div>
         </div>
 
-        <!-- Global Share Modal -->
-        <div class="modal fade" id="globalShareModal" tabindex="-1" aria-labelledby="globalShareModalTitle" aria-hidden="true">
+        <!-- Global Share Bottom Sheet (TikTok Style) -->
+        <div class="modal fade comments-bottom-sheet share-bottom-sheet" id="globalShareModal" tabindex="-1" aria-labelledby="globalShareModalTitle" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="globalShareModalTitle">{% trans "Share Post" %}</h5>
+                <div class="modal-content shadow-lg border-0">
+                    <div class="comments-modal-handle d-sm-none" aria-hidden="true"></div>
+                    <div class="modal-header border-0 pb-1 pt-3 px-3 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-2">
+                            <h6 class="modal-title fw-bold mb-0" id="globalShareModalTitle">{% trans "Share to" %}</h6>
+                            <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2 py-0.5 small d-none" id="globalShareSelectionCount">0</span>
+                        </div>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
                     </div>
-                    <div class="modal-body" id="globalShareModalBody">
+                    <div class="modal-body p-3 pt-2" id="globalShareModalBody">
                         <input type="hidden" name="post_id" id="globalSharePostId" value="">
 
-                        <div class="mb-3 d-grid">
-                            <button type="button" class="btn btn-outline-primary" id="globalCopyLinkBtn">
-                                <i class="bi bi-link-45deg"></i> {% trans "Copy Link to Clipboard" %}
-                            </button>
+                        <!-- Live Search Friends & Groups -->
+                        <div class="position-relative mb-3">
+                            <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted" style="font-size: 13px;"></i>
+                            <input type="text"
+                                   id="globalShareSearchInput"
+                                   class="form-control rounded-pill ps-5 bg-light border-0"
+                                   placeholder="{% trans 'Search friends or groups...' %}"
+                                   style="font-size: 13px; height: 38px;">
                         </div>
 
-                        <!-- External / Native Share -->
-                        <div class="mb-3" id="globalExternalShareContainer">
-                            <button type="button"
-                                    class="btn btn-outline-secondary w-100 mb-2 d-none"
-                                    id="globalNativeShareBtn">
-                                <i class="bi bi-share-fill me-1"></i> {% trans "Share to Other Apps" %}
-                            </button>
-                            <div id="globalPlatformShareLinks" class="d-flex gap-2 flex-wrap justify-content-center d-none">
-                                <a href="#" target="_blank" rel="noopener noreferrer"
-                                   class="btn btn-sm btn-outline-success platform-share-btn"
-                                   data-platform="whatsapp">
-                                    <i class="bi bi-whatsapp me-1"></i>WhatsApp
-                                </a>
-                                <a href="#" target="_blank" rel="noopener noreferrer"
-                                   class="btn btn-sm btn-outline-primary platform-share-btn"
-                                   data-platform="telegram">
-                                    <i class="bi bi-telegram me-1"></i>Telegram
-                                </a>
-                                <a href="#" target="_blank" rel="noopener noreferrer"
-                                   class="btn btn-sm btn-outline-dark platform-share-btn"
-                                   data-platform="twitter">
-                                    <i class="bi bi-twitter-x me-1"></i>X
-                                </a>
+                        <!-- Top Section: In-Site Friends & Groups Horizontal Tray (TikTok Style) -->
+                        <div class="share-tray-section mb-3">
+                            <div class="d-flex align-items-center justify-content-between px-1 mb-2">
+                                <span class="small fw-semibold text-muted text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">{% trans "Send on PwaniNet" %}</span>
+                                <span id="globalShareTargetStatus" class="small text-primary fw-medium" style="font-size: 11px;"></span>
+                            </div>
+                            <div class="share-users-tray d-flex gap-3 overflow-x-auto pb-2 px-1" id="globalShareTargetsTray" style="scrollbar-width: none; -webkit-overflow-scrolling: touch;">
+                                <div class="text-center py-3 text-muted small w-100" id="globalShareTrayLoading">
+                                    <div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>
+                                    <span>{% trans "Loading friends & groups..." %}</span>
+                                </div>
                             </div>
                         </div>
 
-                        <hr>
-                        <ul class="nav nav-tabs mb-3" id="globalShareTabs" role="tablist">
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link active" id="global-user-tab" data-bs-toggle="tab" data-bs-target="#global-user-share" type="button" role="tab">{% trans "Share to Users" %}</button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="global-group-tab" data-bs-toggle="tab" data-bs-target="#global-group-share" type="button" role="tab">{% trans "Share to Groups" %}</button>
-                            </li>
-                        </ul>
-                        <div class="tab-content" id="globalShareTabContent">
-                            <!-- Share to Users Tab -->
-                            <div class="tab-pane fade show active" id="global-user-share" role="tabpanel">
-                                <form id="global-share-user-form" method="POST" hx-post="" hx-target="#global-share-user-result" hx-swap="innerHTML">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="share_type" value="user">
-                                    <div class="mb-3">
-                                        <input type="text"
-                                               class="form-control"
-                                               placeholder="{% trans 'Search users you follow...' %}"
-                                               name="user_search"
-                                               hx-get="{% url 'posts:search_following_users' %}"
-                                               hx-target="#global-user-results"
-                                               hx-trigger="keyup changed delay:300ms">
+                        <hr class="my-2 border-secondary border-opacity-10">
+
+                        <!-- Bottom Section: External Platform Share & Actions (TikTok Style Row) -->
+                        <div class="share-actions-section pt-1">
+                            <div class="small fw-semibold text-muted text-uppercase px-1 mb-2" style="font-size: 11px; letter-spacing: 0.5px;">{% trans "Share via" %}</div>
+                            <div class="d-flex gap-3 overflow-x-auto pb-2 px-1" id="globalShareActionChips" style="scrollbar-width: none; -webkit-overflow-scrolling: touch;">
+                                <!-- 1. Bookmark / Save -->
+                                <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0" id="globalShareBookmarkBtn" title="{% trans 'Save to Library' %}" aria-label="{% trans 'Save to Library' %}">
+                                    <div class="share-action-icon rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-1">
+                                        <i class="bi bi-bookmark fs-5 text-dark"></i>
                                     </div>
-                                    <div id="global-user-results" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
-                                        <div class="p-3 text-center text-muted">
-                                            <small>{% trans "Start typing to search users you follow" %}</small>
-                                        </div>
+                                    <span class="share-action-label small text-muted">{% trans "Save" %}</span>
+                                </button>
+
+                                <!-- 2. Download Reel -->
+                                <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0" id="globalShareDownloadBtn" title="{% trans 'Download Video' %}" aria-label="{% trans 'Download Video' %}">
+                                    <div class="share-action-icon rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-1">
+                                        <i class="bi bi-download fs-5 text-dark"></i>
                                     </div>
-                                    <div id="global-selected-users" class="mb-3">
-                                        <small class="text-muted">{% trans "Selected users will appear here" %}</small>
+                                    <span class="share-action-label small text-muted">{% trans "Download" %}</span>
+                                </button>
+
+                                <!-- 3. Copy Link -->
+                                <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0" id="globalCopyLinkBtn" title="{% trans 'Copy Link' %}" aria-label="{% trans 'Copy Link' %}">
+                                    <div class="share-action-icon rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-1">
+                                        <i class="bi bi-link-45deg fs-4 text-dark"></i>
                                     </div>
-                                    <input type="hidden" name="shared_to_usernames" id="global-shared-to-usernames">
-                                    <div class="mb-3">
-                                        <label class="form-label">{% trans "Add a message (optional)" %}</label>
-                                        <textarea name="message" class="form-control" rows="3" placeholder="{% trans 'Check this out!' %}"></textarea>
+                                    <span class="share-action-label small text-muted">{% trans "Copy Link" %}</span>
+                                </button>
+
+                                <!-- 4. WhatsApp -->
+                                <a href="#" target="_blank" rel="noopener noreferrer" class="share-action-chip text-decoration-none text-center p-0 flex-shrink-0 platform-share-btn" data-platform="whatsapp" title="WhatsApp" aria-label="WhatsApp">
+                                    <div class="share-action-icon rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-1">
+                                        <i class="bi bi-whatsapp fs-5 text-success"></i>
                                     </div>
-                                    <button type="submit"
-                                            class="btn btn-primary w-100"
-                                            hx-on::after-request="if(this.closest('form').querySelector('.alert-success')) { const m = bootstrap.Modal.getInstance(document.getElementById('globalShareModal')); if(m) m.hide(); this.closest('form').querySelector('.alert-success').remove(); }">
-                                        {% trans "Share to Selected Users" %}
-                                    </button>
-                                    <div id="global-share-user-result"></div>
-                                </form>
-                            </div>
-                            <!-- Share to Groups Tab -->
-                            <div class="tab-pane fade" id="global-group-share" role="tabpanel">
-                                <form id="global-share-group-form" method="POST" hx-post="" hx-target="#global-share-group-result" hx-swap="innerHTML">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="share_type" value="group">
-                                    <div class="mb-3">
-                                        <input type="text"
-                                               class="form-control"
-                                               placeholder="{% trans 'Search your groups...' %}"
-                                               name="group_search"
-                                               hx-get="{% url 'posts:search_user_groups' %}"
-                                               hx-target="#global-group-results"
-                                               hx-trigger="keyup changed delay:300ms">
+                                    <span class="share-action-label small text-muted">WhatsApp</span>
+                                </a>
+
+                                <!-- 5. Facebook -->
+                                <a href="#" target="_blank" rel="noopener noreferrer" class="share-action-chip text-decoration-none text-center p-0 flex-shrink-0 platform-share-btn" data-platform="facebook" title="Facebook" aria-label="Facebook">
+                                    <div class="share-action-icon rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-1">
+                                        <i class="bi bi-facebook fs-5 text-primary"></i>
                                     </div>
-                                    <div id="global-group-results" class="border rounded mb-3" style="max-height: 200px; overflow-y: auto;">
-                                        <div class="p-3 text-center text-muted">
-                                            <small>{% trans "Start typing to search your groups" %}</small>
-                                        </div>
+                                    <span class="share-action-label small text-muted">Facebook</span>
+                                </a>
+
+                                <!-- 6. X (Twitter) -->
+                                <a href="#" target="_blank" rel="noopener noreferrer" class="share-action-chip text-decoration-none text-center p-0 flex-shrink-0 platform-share-btn" data-platform="twitter" title="X" aria-label="X">
+                                    <div class="share-action-icon rounded-circle bg-dark bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-1">
+                                        <i class="bi bi-twitter-x fs-5 text-dark"></i>
                                     </div>
-                                    <div id="global-selected-groups" class="mb-3">
-                                        <small class="text-muted">{% trans "Selected groups will appear here" %}</small>
+                                    <span class="share-action-label small text-muted">X</span>
+                                </a>
+
+                                <!-- 7. Telegram -->
+                                <a href="#" target="_blank" rel="noopener noreferrer" class="share-action-chip text-decoration-none text-center p-0 flex-shrink-0 platform-share-btn" data-platform="telegram" title="Telegram" aria-label="Telegram">
+                                    <div class="share-action-icon rounded-circle bg-info bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-1">
+                                        <i class="bi bi-telegram fs-5 text-info"></i>
                                     </div>
-                                    <input type="hidden" name="shared_to_group_ids" id="global-shared-to-group-ids">
-                                    <div class="mb-3">
-                                        <label class="form-label">{% trans "Add a message (optional)" %}</label>
-                                        <textarea name="message" class="form-control" rows="3" placeholder="{% trans 'Check this out!' %}"></textarea>
+                                    <span class="share-action-label small text-muted">Telegram</span>
+                                </a>
+
+                                <!-- 8. Native System Share -->
+                                <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0 d-none" id="globalNativeShareBtn" title="{% trans 'More' %}" aria-label="{% trans 'More options' %}">
+                                    <div class="share-action-icon rounded-circle bg-secondary bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-1">
+                                        <i class="bi bi-share-fill fs-5 text-secondary"></i>
                                     </div>
-                                    <button type="submit"
-                                            class="btn btn-primary w-100"
-                                            hx-on::after-request="if(this.closest('form').querySelector('.alert-success')) { const m = bootstrap.Modal.getInstance(document.getElementById('globalShareModal')); if(m) m.hide(); this.closest('form').querySelector('.alert-success').remove(); }">
-                                        {% trans "Share to Selected Groups" %}
-                                    </button>
-                                    <div id="global-share-group-result"></div>
-                                </form>
+                                    <span class="share-action-label small text-muted">{% trans "More" %}</span>
+                                </button>
                             </div>
                         </div>
+
+                        <!-- Feedback banner -->
+                        <div id="globalShareFeedback" class="mt-2 text-center small"></div>
                     </div>
                 </div>
             </div>
@@ -2361,23 +2350,157 @@
             </div>
         </div>
 
-        <!-- Dedicated Full-Screen Reels Continuous Player -->
+        <!-- Dedicated Full-Screen Reels Continuous Player (TikTok Style) -->
         <div id="fullscreenReelsOverlay" class="fullscreen-reels-modal d-none" aria-hidden="true" role="dialog" aria-label="{% trans 'Reels viewer' %}">
             <!-- Close Button (Top Left) -->
             <button type="button" class="close-fs-reels-btn" id="closeReelsOverlay" title="{% trans 'Back to feed' %}" aria-label="{% trans 'Close Reels' %}">
-                <i class="bi bi-arrow-left"></i>
+                <i class="bi bi-x-lg"></i>
             </button>
 
-            <!-- Desktop Up/Down Navigation Floating Buttons -->
-            <button type="button" class="reel-nav-btn reel-nav-prev d-none d-md-flex" id="reelsNavPrev" title="{% trans 'Previous Reel' %}" aria-label="{% trans 'Previous Reel' %}">
-                <i class="bi bi-chevron-up"></i>
-            </button>
-            <button type="button" class="reel-nav-btn reel-nav-next d-none d-md-flex" id="reelsNavNext" title="{% trans 'Next Reel' %}" aria-label="{% trans 'Next Reel' %}">
-                <i class="bi bi-chevron-down"></i>
-            </button>
+            <!-- Main Flex Layout Container -->
+            <div class="reel-player-layout">
+                <!-- Center Video Stage -->
+                <div class="reel-desktop-stage">
+                    <div class="reels-snap-viewport" id="reelsSnapViewport">
+                        <!-- Dynamically populated continuous snap items -->
+                    </div>
 
-            <div class="reels-snap-viewport" id="reelsSnapViewport">
-                <!-- Dynamically populated continuous snap items -->
+                    <!-- Desktop Exterior Engagement Rail (Outside Video Container on the right) -->
+                    <div class="reel-desktop-actions-rail d-none d-lg-flex" id="reelDesktopActionsRail">
+                        <div class="reel-desktop-action-unit text-center">
+                            <button type="button" class="reel-desktop-action-btn fs-like-proxy-btn" id="fsDesktopLikeBtn" title="{% trans 'Like' %}" aria-label="{% trans 'Like' %}">
+                                <i class="bi bi-heart"></i>
+                            </button>
+                            <span class="reel-desktop-action-label" id="fsDesktopLikeCount">0</span>
+                        </div>
+
+                        <div class="reel-desktop-action-unit text-center">
+                            <button type="button" class="reel-desktop-action-btn" id="fsDesktopCommentBtn" title="{% trans 'Comments' %}" aria-label="{% trans 'Comments' %}">
+                                <i class="bi bi-chat-dots-fill"></i>
+                            </button>
+                            <span class="reel-desktop-action-label" id="fsDesktopCommentCount">0</span>
+                        </div>
+
+                        <div class="reel-desktop-action-unit text-center">
+                            <button type="button" class="reel-desktop-action-btn" id="fsDesktopBookmarkBtn" title="{% trans 'Save to Library' %}" aria-label="{% trans 'Save to Library' %}">
+                                <i class="bi bi-bookmark"></i>
+                            </button>
+                            <span class="reel-desktop-action-label" id="fsDesktopBookmarkLabel">{% trans "Save" %}</span>
+                        </div>
+
+                        <div class="reel-desktop-action-unit text-center">
+                            <button type="button" class="reel-desktop-action-btn" id="fsDesktopShareBtn" data-bs-toggle="modal" data-bs-target="#globalShareModal" title="{% trans 'Share' %}" aria-label="{% trans 'Share' %}">
+                                <i class="bi bi-share-fill"></i>
+                            </button>
+                            <span class="reel-desktop-action-label">{% trans "Share" %}</span>
+                        </div>
+
+                        <div class="reel-desktop-action-unit text-center">
+                            <button type="button" class="reel-desktop-action-btn reel-mute-btn" data-action="mute-toggle" title="{% trans 'Mute / Unmute' %}" aria-label="{% trans 'Toggle Mute' %}">
+                                <i class="bi bi-volume-up-fill"></i>
+                            </button>
+                            <span class="reel-desktop-action-label reel-mute-label">{% trans "Sound" %}</span>
+                        </div>
+                    </div>
+
+                    <!-- Desktop Up/Down Navigation Floating Buttons (Docked near the comment rail) -->
+                    <div class="reel-desktop-nav-group d-none d-lg-flex">
+                        <button type="button" class="reel-nav-btn reel-nav-prev" id="reelsNavPrev" title="{% trans 'Previous Reel' %}" aria-label="{% trans 'Previous Reel' %}">
+                            <i class="bi bi-chevron-up"></i>
+                        </button>
+                        <button type="button" class="reel-nav-btn reel-nav-next" id="reelsNavNext" title="{% trans 'Next Reel' %}" aria-label="{% trans 'Next Reel' %}">
+                            <i class="bi bi-chevron-down"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right Side Rail for Desktop (TikTok Style Persistent Comments & Info) -->
+                <aside class="reel-desktop-side-rail d-none d-lg-flex" id="reelDesktopSideRail" aria-label="{% trans 'Reel details and comments' %}">
+                    <!-- Rail Header: Creator Profile & Options -->
+                    <div class="reel-rail-header border-bottom">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="d-flex align-items-center gap-2 min-w-0">
+                                <a href="#" id="fsRailAuthorProfileLink" class="text-decoration-none flex-shrink-0">
+                                    <img src="/static/images/default_avatar.png" id="fsRailAuthorAvatar" class="rounded-circle border" style="width: 44px; height: 44px; object-fit: cover;" alt="">
+                                </a>
+                                <div class="min-w-0">
+                                    <div class="d-flex align-items-center gap-1">
+                                        <a href="#" id="fsRailAuthorNameLink" class="fw-bold text-decoration-none text-truncate d-inline-block mw-100 fs-rail-author-name" style="font-size: 0.95rem;">
+                                            <span id="fsRailAuthorName">Author</span>
+                                        </a>
+                                        <span id="fsRailUnitBadge"></span>
+                                    </div>
+                                    <div class="small text-muted text-truncate d-flex align-items-center gap-1" style="font-size: 12px;">
+                                        <span id="fsRailAuthorHandle">@author</span>
+                                        <span>&middot;</span>
+                                        <span id="fsRailTime">just now</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-1 flex-shrink-0">
+                                <span id="fsRailFollowWrap"></span>
+                                <button type="button" class="btn btn-ghost btn-sm rounded-circle p-1 text-muted reel-options-btn" id="fsRailOptionsBtn" title="{% trans 'Options' %}" aria-label="{% trans 'Options' %}">
+                                    <i class="bi bi-three-dots fs-5"></i>
+                                </button>
+                                <button type="button" class="btn btn-ghost btn-sm rounded-circle p-1 text-muted" id="fsRailCloseBtn" title="{% trans 'Close comments rail' %}" aria-label="{% trans 'Close comments rail' %}">
+                                    <i class="bi bi-x-lg" style="font-size: 0.95rem;"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Caption & Sound -->
+                        <div class="reel-rail-caption-wrap mt-2">
+                            <div class="reel-rail-caption-text" id="fsRailCaption"></div>
+                            <div class="mt-2" id="fsRailSoundWrap">
+                                <span class="badge bg-light text-dark rounded-pill px-2.5 py-1 small d-inline-flex align-items-center gap-1.5 border" style="font-size: 11px;">
+                                    <i class="bi bi-music-note-beamed text-primary"></i>
+                                    <span class="text-truncate" style="max-width: 280px;" id="fsRailSoundText">{% trans "Original Audio" %}</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rail Comments Header -->
+                    <div class="reel-rail-comments-header px-3 py-2 border-bottom d-flex align-items-center justify-content-between">
+                        <span class="fw-bold" style="font-size: 0.9rem;">
+                            {% trans "Comments" %} (<span id="fsRailCommentCount">0</span>)
+                        </span>
+                        <button type="button" class="btn btn-ghost btn-sm p-1 text-muted rounded-circle fs-rail-refresh-btn" id="fsRailRefreshBtn" title="{% trans 'Refresh comments' %}" aria-label="{% trans 'Refresh comments' %}">
+                            <i class="bi bi-arrow-clockwise fs-6"></i>
+                        </button>
+                    </div>
+
+                    <!-- Rail Comments Scrollable Stream -->
+                    <div class="reel-rail-comments-body flex-grow-1" id="fsRailCommentsBody">
+                        <div class="text-center py-4 text-muted" id="fsRailCommentsLoading">
+                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                            <span>{% trans "Loading comments..." %}</span>
+                        </div>
+                        <div id="fsRailCommentsList" class="p-3"></div>
+                    </div>
+
+                    <!-- Rail Comment Input Footer -->
+                    <div class="reel-rail-footer border-top p-2 bg-light">
+                        <div id="fsRailReplyBanner" class="d-none w-100 px-3 py-1 mb-1 d-flex align-items-center justify-content-between rounded bg-white border" style="font-size: 12px;">
+                            <span class="text-muted text-truncate me-2">{% trans "Replying to" %} <b id="fsRailReplyUser" class="text-primary">@user</b></span>
+                            <button type="button" class="btn-close" id="fsRailCancelReply" aria-label="{% trans 'Cancel reply' %}" style="font-size: 9px;"></button>
+                        </div>
+                        <form id="fsRailCommentForm" class="d-flex align-items-center gap-2 w-100">
+                            {% csrf_token %}
+                            <input type="hidden" name="parent_id" id="fsRailParentId" value="">
+                            <input type="text"
+                                   id="fsRailCommentInput"
+                                   name="content"
+                                   class="form-control border-0 rounded-pill px-3"
+                                   placeholder="{% trans 'Add a comment...' %}"
+                                   style="font-size: 13px; height: 38px;"
+                                   required>
+                            <button type="submit" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px;" aria-label="{% trans 'Send' %}">
+                                <i class="bi bi-send-fill" style="font-size: 13px;"></i>
+                            </button>
+                        </form>
+                    </div>
+                </aside>
             </div>
         </div>
     {% endblock %}
@@ -3600,11 +3723,44 @@ window.addEventListener('beforeinstallprompt', (e) => {
             }
         });
 
+        // Close modal and fullscreen reels immediately when clicking internal navigation links inside any modal
+        document.addEventListener('click', function(e) {
+            const link = e.target.closest('a[href]');
+            if (!link) return;
+            const modalEl = link.closest('.modal, #fullscreenReelsOverlay');
+            if (!modalEl) return;
+            const href = link.getAttribute('href') || '';
+            if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+            if (link.dataset.bsToggle || link.hasAttribute('data-bs-toggle')) return;
+
+            const bsModal = link.closest('.modal');
+            if (bsModal && typeof bootstrap !== 'undefined') {
+                try {
+                    const inst = bootstrap.Modal.getInstance(bsModal);
+                    if (inst) inst.hide();
+                } catch (_) {}
+            }
+            if (typeof window.videoManager?.closeFullscreenReels === 'function') {
+                try {
+                    window.videoManager.closeFullscreenReels();
+                } catch (_) {}
+            }
+        }, true);
+
         // Clean up modal backdrops, reels mode, and media when swapping page-content-target
         document.body.addEventListener('htmx:beforeSwap', function(evt) {
             if (evt.detail.target && evt.detail.target.id === 'page-content-target') {
                 if (typeof window.cleanupOfflineMediaHub === 'function') {
                     try { window.cleanupOfflineMediaHub(); } catch (_) {}
+                }
+                document.querySelectorAll('.modal.show').forEach(function(modalEl) {
+                    try {
+                        const inst = bootstrap.Modal.getInstance(modalEl);
+                        if (inst) inst.hide();
+                    } catch (_) {}
+                });
+                if (typeof window.videoManager?.closeFullscreenReels === 'function') {
+                    try { window.videoManager.closeFullscreenReels(); } catch (_) {}
                 }
                 document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
                 document.body.classList.remove('modal-open', 'in-reels-mode');
@@ -4152,187 +4308,470 @@ window.addEventListener('beforeinstallprompt', (e) => {
     })();
     </script>
 
-    <!-- Global Modal Hydration & Share Controller -->
+    <!-- Global Modal Hydration & TikTok Share Controller -->
     <script>
     (function () {
         'use strict';
 
-        var selectedUsers = new Set();
-        var selectedGroups = new Set();
+        // ── Bookmark / Save State Management ──
+        window.pwaniSavedPosts = {
+            getSavedPosts: function () {
+                try {
+                    return JSON.parse(localStorage.getItem('pwaninet_saved_posts') || '[]');
+                } catch (_) {
+                    return [];
+                }
+            },
+            isPostSaved: function (postId) {
+                if (!postId) return false;
+                return this.getSavedPosts().includes(String(postId));
+            },
+            togglePostSaved: function (postId) {
+                if (!postId) return false;
+                var saved = this.getSavedPosts();
+                var strId = String(postId);
+                var idx = saved.indexOf(strId);
+                var nowSaved = false;
+                if (idx > -1) {
+                    saved.splice(idx, 1);
+                    nowSaved = false;
+                } else {
+                    saved.push(strId);
+                    nowSaved = true;
+                }
+                try {
+                    localStorage.setItem('pwaninet_saved_posts', JSON.stringify(saved));
+                } catch (_) {}
+                return nowSaved;
+            }
+        };
 
-        function updateSelectedUsers() {
-            var container = document.getElementById('global-selected-users');
-            var input = document.getElementById('global-shared-to-usernames');
-            if (!container || !input) return;
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
 
-            if (selectedUsers.size === 0) {
-                container.innerHTML = '<small class="text-muted">Selected users will appear here</small>';
-                input.value = '';
-            } else {
-                container.innerHTML = Array.from(selectedUsers).map(function (u) {
-                    return '<span class="badge bg-primary me-1 mb-1">' + u +
-                        ' <button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.5rem" ' +
-                        'onclick="window.removeGlobalShareUser(\'' + u + '\')">&times;</button></span>';
-                }).join('');
-                input.value = Array.from(selectedUsers).join(',');
+        function getCsrfToken() {
+            return (document.querySelector('[name=csrfmiddlewaretoken]') && document.querySelector('[name=csrfmiddlewaretoken]').value) ||
+                   ((document.cookie.match(/csrftoken=([^;]+)/) || [])[1]) || '';
+        }
+
+        var feedbackTimeout = null;
+        function showFeedback(message, type) {
+            var el = document.getElementById('globalShareFeedback');
+            if (!el) return;
+            var textClass = type === 'success' ? 'text-success' : (type === 'danger' ? 'text-danger' : 'text-primary');
+            el.innerHTML = '<span class="fw-semibold ' + textClass + '">' + escapeHtml(message) + '</span>';
+            clearTimeout(feedbackTimeout);
+            feedbackTimeout = setTimeout(function () {
+                if (el) el.innerHTML = '';
+            }, 3200);
+        }
+
+        function updateBookmarkVisual(isSaved) {
+            var btn = document.getElementById('globalShareBookmarkBtn');
+            if (btn) {
+                var icon = btn.querySelector('i');
+                var label = btn.querySelector('.share-action-label');
+                if (isSaved) {
+                    if (icon) icon.className = 'bi bi-bookmark-fill fs-5 text-warning';
+                    if (label) {
+                        label.textContent = 'Saved';
+                        label.classList.add('text-warning', 'fw-semibold');
+                        label.classList.remove('text-muted');
+                    }
+                } else {
+                    if (icon) icon.className = 'bi bi-bookmark fs-5 text-dark';
+                    if (label) {
+                        label.textContent = 'Save';
+                        label.classList.remove('text-warning', 'fw-semibold');
+                        label.classList.add('text-muted');
+                    }
+                }
+            }
+            var fsBookmarkBtn = document.getElementById('fsDesktopBookmarkBtn');
+            if (fsBookmarkBtn) {
+                fsBookmarkBtn.classList.toggle('active', isSaved);
+                var fsIcon = fsBookmarkBtn.querySelector('i');
+                var fsLabel = document.getElementById('fsDesktopBookmarkLabel');
+                if (fsIcon) fsIcon.className = isSaved ? 'bi bi-bookmark-fill text-warning' : 'bi bi-bookmark';
+                if (fsLabel) fsLabel.textContent = isSaved ? 'Saved' : 'Save';
             }
         }
 
-        function updateSelectedGroups() {
-            var container = document.getElementById('global-selected-groups');
-            var input = document.getElementById('global-shared-to-group-ids');
-            if (!container || !input) return;
+        // ── Share Sheet State ──
+        var cachedTargets = null;
+        var isFetchingTargets = false;
+        var activePostId = null;
+        var activePostUrl = '';
+        var activePostContent = '';
+        var activeVideoUrl = '';
+        var activePosterUrl = '';
+        var sentTargets = new Set();
+        var searchDebounceTimer = null;
 
-            if (selectedGroups.size === 0) {
-                container.innerHTML = '<small class="text-muted">Selected groups will appear here</small>';
-                input.value = '';
-            } else {
-                container.innerHTML = Array.from(selectedGroups).map(function (gid) {
-                    var label = document.querySelector('#group-' + gid);
-                    var bold = label ? label.querySelector('.fw-bold') : null;
-                    var name = bold ? bold.textContent : gid;
-                    return '<span class="badge bg-success me-1 mb-1">' + name +
-                        ' <button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.5rem" ' +
-                        'onclick="window.removeGlobalShareGroup(\'' + gid + '\')">&times;</button></span>';
-                }).join('');
-                input.value = Array.from(selectedGroups).join(',');
+        function renderShareTargets(query) {
+            var tray = document.getElementById('globalShareTargetsTray');
+            if (!tray) return;
+            if (!cachedTargets) return;
+
+            var q = (query || '').trim().toLowerCase();
+            var filteredUsers = cachedTargets.users.filter(function (u) {
+                return !q ||
+                    (u.name && u.name.toLowerCase().indexOf(q) !== -1) ||
+                    (u.username && u.username.toLowerCase().indexOf(q) !== -1);
+            });
+            var filteredGroups = cachedTargets.groups.filter(function (g) {
+                return !q || (g.name && g.name.toLowerCase().indexOf(q) !== -1);
+            });
+
+            var combined = filteredUsers.concat(filteredGroups);
+            if (combined.length === 0) {
+                tray.innerHTML = '<div class="text-center py-3 text-muted small w-100">' +
+                    (q ? 'No matching friends or groups found' : 'No friends or groups yet') +
+                    '</div>';
+                return;
             }
+
+            var html = combined.map(function (target) {
+                var isGroup = target.type === 'group';
+                var key = isGroup ? ('group:' + target.id) : ('user:' + target.username);
+                var isSent = sentTargets.has(key);
+                var badgeHtml = isGroup ?
+                    '<div class="share-target-type-badge bg-success" title="Group"><i class="bi bi-people-fill"></i></div>' : '';
+
+                return '<div class="share-target-item" data-key="' + key + '" data-type="' + target.type + '" data-id="' + (target.id || '') + '" data-username="' + (target.username || '') + '">' +
+                    '<div class="share-target-avatar-wrap">' +
+                        '<img src="' + escapeHtml(target.avatar || '/static/images/default_avatar.png') + '" alt="' + escapeHtml(target.name) + '" class="share-target-avatar" onerror="this.src=\'/static/images/default_avatar.png\'">' +
+                        badgeHtml +
+                    '</div>' +
+                    '<div class="share-target-name" title="' + escapeHtml(target.name) + '">' + escapeHtml(target.name) + '</div>' +
+                    '<button type="button" class="share-target-send-btn ' + (isSent ? 'sent' : '') + '" data-key="' + key + '" data-type="' + target.type + '" data-id="' + (target.id || '') + '" data-username="' + (target.username || '') + '" ' + (isSent ? 'disabled' : '') + '>' +
+                        (isSent ? '<i class="bi bi-check2"></i> Sent' : 'Send') +
+                    '</button>' +
+                '</div>';
+            }).join('');
+
+            tray.innerHTML = html;
         }
 
-        window.removeGlobalShareUser = function (username) {
-            selectedUsers.delete(username);
-            var cb = document.querySelector('#globalShareModal .user-checkbox[value="' + username + '"]');
-            if (cb) cb.checked = false;
-            updateSelectedUsers();
-        };
-
-        window.removeGlobalShareGroup = function (groupId) {
-            selectedGroups.delete(groupId);
-            var cb = document.querySelector('#globalShareModal .group-checkbox[value="' + groupId + '"]');
-            if (cb) cb.checked = false;
-            updateSelectedGroups();
-        };
-
-        document.addEventListener('change', function (e) {
-            if (!e.target.closest('#globalShareModal')) return;
-            if (e.target.classList.contains('user-checkbox')) {
-                e.target.checked ? selectedUsers.add(e.target.value) : selectedUsers.delete(e.target.value);
-                updateSelectedUsers();
+        function loadTargets() {
+            var tray = document.getElementById('globalShareTargetsTray');
+            if (cachedTargets) {
+                var searchInput = document.getElementById('globalShareSearchInput');
+                renderShareTargets(searchInput ? searchInput.value : '');
+                return;
             }
-            if (e.target.classList.contains('group-checkbox')) {
-                e.target.checked ? selectedGroups.add(e.target.value) : selectedGroups.delete(e.target.value);
-                updateSelectedGroups();
+            if (isFetchingTargets) return;
+            isFetchingTargets = true;
+
+            if (tray) {
+                tray.innerHTML = '<div class="text-center py-3 text-muted small w-100" id="globalShareTrayLoading">' +
+                    '<div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>' +
+                    '<span>Loading friends & groups...</span>' +
+                '</div>';
+            }
+
+            fetch('/share/targets/', {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                isFetchingTargets = false;
+                if (data && data.status === 'success') {
+                    cachedTargets = {
+                        users: Array.isArray(data.users) ? data.users : [],
+                        groups: Array.isArray(data.groups) ? data.groups : []
+                    };
+                    var searchInput = document.getElementById('globalShareSearchInput');
+                    renderShareTargets(searchInput ? searchInput.value : '');
+                } else if (tray) {
+                    tray.innerHTML = '<div class="text-center py-3 text-muted small w-100">Unable to load friends or groups</div>';
+                }
+            })
+            .catch(function (err) {
+                isFetchingTargets = false;
+                console.error('[Share Targets Fetch Error]', err);
+                if (tray) {
+                    tray.innerHTML = '<div class="text-center py-3 text-muted small w-100">Unable to load friends or groups</div>';
+                }
+            });
+        }
+
+        // ── 1-Tap Send on PwaniNet Handler ──
+        document.addEventListener('click', function (e) {
+            var tray = document.getElementById('globalShareTargetsTray');
+            if (!tray || !tray.contains(e.target)) return;
+
+            var sendBtn = e.target.closest('.share-target-send-btn');
+            if (!sendBtn) {
+                var item = e.target.closest('.share-target-item');
+                if (item) sendBtn = item.querySelector('.share-target-send-btn');
+            }
+            if (!sendBtn || sendBtn.disabled || sendBtn.classList.contains('sent')) return;
+
+            var key = sendBtn.getAttribute('data-key');
+            var type = sendBtn.getAttribute('data-type');
+            var id = sendBtn.getAttribute('data-id');
+            var username = sendBtn.getAttribute('data-username');
+
+            if (!activePostId) return;
+
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width: 10px; height: 10px;"></span>';
+
+            var csrfToken = getCsrfToken();
+            var params = new URLSearchParams();
+            params.append('share_type', type);
+            params.append('csrfmiddlewaretoken', csrfToken);
+            if (type === 'group') {
+                params.append('shared_to_group_ids', id);
+            } else {
+                params.append('shared_to_usernames', username);
+            }
+
+            fetch('/post/' + encodeURIComponent(activePostId) + '/share/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: params.toString()
+            })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (data && data.status === 'success') {
+                    sentTargets.add(key);
+                    sendBtn.classList.add('sent');
+                    sendBtn.innerHTML = '<i class="bi bi-check2"></i> Sent';
+                    sendBtn.disabled = true;
+                    showFeedback(data.message || 'Shared successfully!', 'success');
+                    if (window.Haptics && typeof window.Haptics.impactLight === 'function') {
+                        window.Haptics.impactLight();
+                    }
+                } else {
+                    sendBtn.disabled = false;
+                    sendBtn.innerHTML = 'Send';
+                    showFeedback((data && data.message) || 'Failed to share', 'danger');
+                }
+            })
+            .catch(function (err) {
+                console.error('[Share Post Error]', err);
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = 'Send';
+                showFeedback('Network error while sharing', 'danger');
+            });
+        });
+
+        // ── Live Search Filter ──
+        document.addEventListener('input', function (e) {
+            if (e.target && e.target.id === 'globalShareSearchInput') {
+                clearTimeout(searchDebounceTimer);
+                var val = e.target.value;
+                searchDebounceTimer = setTimeout(function () {
+                    renderShareTargets(val);
+                }, 120);
             }
         });
 
-        document.addEventListener('submit', function (e) {
-            if (e.target.id === 'global-share-user-form') updateSelectedUsers();
-            if (e.target.id === 'global-share-group-form') updateSelectedGroups();
-        }, true);
-
-        document.addEventListener('htmx:configRequest', function (e) {
-            var elt = e.detail && e.detail.elt;
-            if (!elt) return;
-            var fid = elt.id || (elt.closest && elt.closest('form') && elt.closest('form').id) || '';
-            if (fid === 'global-share-user-form') updateSelectedUsers();
-            if (fid === 'global-share-group-form') updateSelectedGroups();
-        });
-
-        window.pwaniPrepareShareModal = function (postId, button) {
+        // ── Prepare Share Modal (TikTok Style) ──
+        window.pwaniPrepareShareModal = function (postId, triggerSource) {
             var modal = document.getElementById('globalShareModal');
             if (!modal) return;
-            var postUrl = button.getAttribute('data-post-url') || (window.location.origin + '/posts/' + postId + '/');
-            var fullUrl = postUrl.startsWith('http') ? postUrl : (window.location.origin + postUrl);
-            var postContent = button.getAttribute('data-post-content') || '';
 
+            var button = (triggerSource instanceof Element) ? triggerSource : null;
+            activePostId = postId ||
+                           (button && (button.getAttribute('data-post-id') || button.getAttribute('data-share-id'))) ||
+                           (modal.getAttribute('data-post-id')) ||
+                           (document.getElementById('globalSharePostId') && document.getElementById('globalSharePostId').value);
+            if (!activePostId) return;
+
+            var hiddenInput = document.getElementById('globalSharePostId');
+            if (hiddenInput) hiddenInput.value = activePostId;
+
+            var postUrl = (button && button.getAttribute('data-post-url')) ||
+                          (modal && modal.getAttribute('data-post-url')) ||
+                          ('/post/' + activePostId + '/');
+            activePostUrl = postUrl.startsWith('http') ? postUrl : (window.location.origin + postUrl);
+            activePostContent = (button && button.getAttribute('data-post-content')) ||
+                                (modal && modal.getAttribute('data-post-content')) || '';
+
+            activeVideoUrl = (button && button.getAttribute('data-video-url')) ||
+                             (modal && modal.getAttribute('data-video-url')) || '';
+            activePosterUrl = (button && button.getAttribute('data-poster-url')) ||
+                              (modal && modal.getAttribute('data-poster-url')) || '';
+
+            if (!activeVideoUrl) {
+                var videoEl = document.querySelector(
+                    '#reelsSnapViewport .reels-snap-item[data-post-id="' + activePostId + '"] video, ' +
+                    '#reelsSnapViewport .reels-snap-item.active video, ' +
+                    '.post-card[data-post-id="' + activePostId + '"] video, ' +
+                    '.post-container[data-share-id="' + activePostId + '"] video'
+                );
+                if (videoEl) {
+                    activeVideoUrl = videoEl.currentSrc || videoEl.src || (videoEl.querySelector('source') && videoEl.querySelector('source').src) || '';
+                    activePosterUrl = videoEl.poster || '';
+                }
+            }
+
+            var feedbackEl = document.getElementById('globalShareFeedback');
+            if (feedbackEl) feedbackEl.innerHTML = '';
+            var searchInput = document.getElementById('globalShareSearchInput');
+            if (searchInput) searchInput.value = '';
+
+            sentTargets = new Set();
+            loadTargets();
+
+            // Setup Bookmark Action Chip
+            var isSaved = window.pwaniSavedPosts.isPostSaved(activePostId);
+            updateBookmarkVisual(isSaved);
+            var bookmarkBtn = document.getElementById('globalShareBookmarkBtn');
+            if (bookmarkBtn) {
+                bookmarkBtn.onclick = function () {
+                    var nowSaved = window.pwaniSavedPosts.togglePostSaved(activePostId);
+                    updateBookmarkVisual(nowSaved);
+                    showFeedback(nowSaved ? 'Post saved to Library' : 'Removed from Library', 'info');
+                };
+            }
+
+            // Setup Download Action Chip
+            var downloadBtn = document.getElementById('globalShareDownloadBtn');
+            if (downloadBtn) {
+                downloadBtn.onclick = function () {
+                    if (activeVideoUrl) {
+                        if (window.downloadManager && typeof window.downloadManager.download === 'function') {
+                            window.downloadManager.download({
+                                url: activeVideoUrl,
+                                postId: activePostId,
+                                mediaType: 'video',
+                                category: 'reels',
+                                filename: 'reel_' + activePostId + '.mp4',
+                                thumbnail: activePosterUrl
+                            });
+                            showFeedback('Download added to library!', 'success');
+                        } else {
+                            var a = document.createElement('a');
+                            a.href = activeVideoUrl;
+                            a.download = 'reel_' + activePostId + '.mp4';
+                            document.body.appendChild(a);
+                            a.click();
+                            setTimeout(function () { a.remove(); }, 1500);
+                            showFeedback('Downloading video...', 'success');
+                        }
+                    } else {
+                        showFeedback('No video file available for download', 'info');
+                    }
+                };
+            }
+
+            // Setup Copy Link Action Chip
             var copyBtn = document.getElementById('globalCopyLinkBtn');
             if (copyBtn) {
                 copyBtn.onclick = function () {
-                    if (typeof copyLinkToClipboard === 'function') {
-                        copyLinkToClipboard(fullUrl);
-                    } else if (navigator.clipboard) {
-                        navigator.clipboard.writeText(fullUrl);
+                    var label = copyBtn.querySelector('.share-action-label');
+                    var icon = copyBtn.querySelector('i');
+                    var finish = function () {
+                        if (label) label.textContent = 'Copied!';
+                        if (icon) icon.className = 'bi bi-check2 fs-4 text-success';
+                        showFeedback('Link copied to clipboard!', 'success');
+                        setTimeout(function () {
+                            if (label) label.textContent = 'Copy Link';
+                            if (icon) icon.className = 'bi bi-link-45deg fs-4 text-dark';
+                        }, 2000);
+                    };
+                    if (navigator.clipboard) {
+                        navigator.clipboard.writeText(activePostUrl).then(finish).catch(function () {
+                            if (typeof copyLinkToClipboard === 'function') copyLinkToClipboard(activePostUrl);
+                            finish();
+                        });
+                    } else if (typeof copyLinkToClipboard === 'function') {
+                        copyLinkToClipboard(activePostUrl);
+                        finish();
                     }
                 };
             }
 
+            // Setup Platform Links
+            var shareText = activePostContent || 'Check this out on PwaniNet!';
+            var encodedText = encodeURIComponent(shareText);
+            var encodedUrl = encodeURIComponent(activePostUrl);
+
+            var pLinks = modal.querySelectorAll('.platform-share-btn');
+            pLinks.forEach(function (btn) {
+                var platform = btn.getAttribute('data-platform');
+                if (platform === 'whatsapp') {
+                    btn.href = 'https://wa.me/?text=' + encodedText + '%20' + encodedUrl;
+                } else if (platform === 'facebook') {
+                    btn.href = 'https://www.facebook.com/sharer/sharer.php?u=' + encodedUrl;
+                } else if (platform === 'twitter') {
+                    btn.href = 'https://twitter.com/intent/tweet?text=' + encodedText + '&url=' + encodedUrl;
+                } else if (platform === 'telegram') {
+                    btn.href = 'https://t.me/share/url?url=' + encodedUrl + '&text=' + encodedText;
+                }
+            });
+
+            // Setup Native Share Action Chip
             var nativeBtn = document.getElementById('globalNativeShareBtn');
             if (nativeBtn) {
-                nativeBtn.onclick = function () {
-                    if (typeof window.pwaniShare === 'function') {
-                        window.pwaniShare(postUrl, postContent);
-                    }
-                };
+                if (navigator.share || (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share)) {
+                    nativeBtn.classList.remove('d-none');
+                    nativeBtn.onclick = function () {
+                        if (typeof window.pwaniShare === 'function') {
+                            window.pwaniShare(activePostUrl, shareText);
+                        } else if (navigator.share) {
+                            navigator.share({
+                                title: 'PwaniNet',
+                                text: shareText,
+                                url: activePostUrl
+                            }).catch(function () {});
+                        }
+                    };
+                } else {
+                    nativeBtn.classList.add('d-none');
+                }
             }
-
-            var platformLinks = modal.querySelectorAll('.platform-share-btn');
-            platformLinks.forEach(function (link) {
-                link.setAttribute('data-share-url', fullUrl);
-            });
-            if (typeof window.pwaniShareInit === 'function') {
-                window.pwaniShareInit();
-            }
-
-            var shareEndpoint = '/posts/' + postId + '/share/';
-            var userForm = document.getElementById('global-share-user-form');
-            if (userForm) {
-                userForm.setAttribute('hx-post', shareEndpoint);
-                if (window.htmx) htmx.process(userForm);
-            }
-            var groupForm = document.getElementById('global-share-group-form');
-            if (groupForm) {
-                groupForm.setAttribute('hx-post', shareEndpoint);
-                if (window.htmx) htmx.process(groupForm);
-            }
-
-            selectedUsers.clear();
-            selectedGroups.clear();
-            updateSelectedUsers();
-            updateSelectedGroups();
-            var userResults = document.getElementById('global-user-results');
-            if (userResults) userResults.innerHTML = '<div class="p-3 text-center text-muted"><small>Start typing to search users you follow</small></div>';
-            var groupResults = document.getElementById('global-group-results');
-            if (groupResults) groupResults.innerHTML = '<div class="p-3 text-center text-muted"><small>Start typing to search your groups</small></div>';
-            var userSearchInput = modal.querySelector('input[name="user_search"]');
-            if (userSearchInput) userSearchInput.value = '';
-            var groupSearchInput = modal.querySelector('input[name="group_search"]');
-            if (groupSearchInput) groupSearchInput.value = '';
-            var userResultContainer = document.getElementById('global-share-user-result');
-            if (userResultContainer) userResultContainer.innerHTML = '';
-            var groupResultContainer = document.getElementById('global-share-group-result');
-            if (groupResultContainer) groupResultContainer.innerHTML = '';
         };
 
-        // Bootstrap modal hydration listener
+        // ── Bootstrap Modal Hydration Listener ──
         document.addEventListener('show.bs.modal', function (event) {
-            const button = event.relatedTarget;
-            if (!button) return;
-            const postId = button.getAttribute('data-post-id') || button.getAttribute('data-share-id');
-            const modal = event.target;
+            var modal = event.target;
+            if (!modal) return;
+            var button = event.relatedTarget;
+            var postId = (button && (button.getAttribute('data-post-id') || button.getAttribute('data-share-id'))) ||
+                         (modal.querySelector && modal.querySelector('[name="post_id"]') && modal.querySelector('[name="post_id"]').value);
 
-            if (postId && modal.querySelector('[name="post_id"]')) {
+            if (postId && modal.querySelector && modal.querySelector('[name="post_id"]')) {
                 modal.querySelector('[name="post_id"]').value = postId;
             }
 
             if (modal.id === 'globalRepostModal' && postId) {
-                const form = modal.querySelector('#globalRepostForm');
+                var form = modal.querySelector('#globalRepostForm');
                 if (form) {
                     form.setAttribute('hx-post', '/api/posts/' + postId + '/repost/');
                     form.setAttribute('hx-target', '#post-card-' + postId);
                     if (window.htmx) htmx.process(form);
-                    const textarea = form.querySelector('textarea[name="content"]');
+                    var textarea = form.querySelector('textarea[name="content"]');
                     if (textarea) textarea.value = '';
                 }
             }
 
             if (modal.id === 'globalReportModal' && postId) {
-                const form = modal.querySelector('#globalReportForm');
-                if (form) {
-                    const postInput = form.querySelector('[name="post"]');
+                var rForm = modal.querySelector('#globalReportForm');
+                if (rForm) {
+                    var postInput = rForm.querySelector('[name="post"]');
                     if (postInput) postInput.value = postId;
-                    form.setAttribute('hx-target', '#post-card-' + postId);
-                    if (window.htmx) htmx.process(form);
-                    form.reset();
+                    rForm.setAttribute('hx-target', '#post-card-' + postId);
+                    if (window.htmx) htmx.process(rForm);
+                    rForm.reset();
                     if (postInput) postInput.value = postId;
                 }
             }
