@@ -194,6 +194,8 @@ def mark_user_notifications_as_read(user):
 
 
 def get_unread_count(user):
+    if not user or not getattr(user, 'is_authenticated', False):
+        return 0
     # Count all notifications that are not yet read
     # This includes CREATED, QUEUED, DELIVERED, and SEEN statuses
     count = NotificationObject.objects.filter(

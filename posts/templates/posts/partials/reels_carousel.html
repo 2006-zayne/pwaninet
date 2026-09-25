@@ -75,6 +75,7 @@
                 {% endwith %}
 
                 <!-- Preview Video element (used for carousel stick autoplay & fullscreen extraction) -->
+                {% with hls_url=reel.get_hls_url feed_video=reel.get_video_for_feed %}
                 <video class="reels-carousel-video position-absolute top-0 start-0 w-100 h-100 object-fit-cover"
                        preload="none"
                        muted
@@ -82,11 +83,15 @@
                        playsinline
                        poster="{{ reel.get_video_poster|default:reel.thumbnail_url|default:'' }}"
                        data-post-id="{{ reel.share_id }}"
-                       data-video-url="{{ reel.get_video_for_feed.url }}"
-                       {% if reel.hls_playlist %}data-hls-url="{{ reel.get_hls_url }}"{% endif %}
+                       {% if feed_video %}data-video-url="{{ feed_video.url }}"{% endif %}
+                       {% if hls_url %}data-hls-url="{{ hls_url }}"{% endif %}
+                       {% if not hls_url and feed_video %}src="{{ feed_video.url }}"{% endif %}
                        style="opacity: 0; pointer-events: none; transition: opacity 0.25s ease;">
-                    <source src="{{ reel.get_video_for_feed.url }}" type="video/mp4">
+                    {% if not hls_url and feed_video %}
+                    <source src="{{ feed_video.url }}" type="video/mp4">
+                    {% endif %}
                 </video>
+                {% endwith %}
 
 
 

@@ -957,9 +957,10 @@ def extract_opengraph_metadata(html, url):
     return metadata
 
 
-@login_required
 def unread_message_count(request):
     """Return HTML for unread message count badge (similar to notifications)."""
+    if not request.user or not request.user.is_authenticated:
+        return HttpResponse('<i class="bi bi-chat-dots-fill"></i>')
     # Calculate total unread messages across all conversations
     total_unread = 0
     conversations = Conversation.objects.filter(members__user=request.user).prefetch_related('members', 'messages')

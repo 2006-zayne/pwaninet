@@ -233,21 +233,25 @@
             {% endwith %}
         </div>
 
-        <!-- Video Element (Centered 9:16 surface) -->
+        <!-- Video Element (Centered 9:16 surface, HLS adaptive or direct MP4 fallback) -->
+        {% with hls_url=post.get_hls_url feed_video=post.get_video_for_feed %}
         <video class="reel-video-element feed-video"
                id="video-{{ post.share_id }}"
-               src="{{ post.get_video_for_feed.url }}"
+               {% if not hls_url and feed_video %}src="{{ feed_video.url }}"{% endif %}
                playsinline
                muted
                loop
                preload="metadata"
                poster="{{ post.get_video_poster|default:post.thumbnail_url|default:'' }}"
-               {% if post.hls_playlist %}data-hls-url="{{ post.get_hls_url }}"{% endif %}
-               data-video-url="{{ post.get_video_for_feed.url }}"
+               {% if hls_url %}data-hls-url="{{ hls_url }}"{% endif %}
+               {% if feed_video %}data-video-url="{{ feed_video.url }}"{% endif %}
                data-post-id="{{ post.share_id }}"
                data-autoplay="true">
-            <source src="{{ post.get_video_for_feed.url }}" type="video/mp4">
+            {% if not hls_url and feed_video %}
+            <source src="{{ feed_video.url }}" type="video/mp4">
+            {% endif %}
         </video>
+        {% endwith %}
 
         <!-- Central Interactive Hitbox (Single tap play/pause, Double tap heart like) -->
         <button type="button"
@@ -260,6 +264,14 @@
         <!-- Transient Play/Pause HUD Indicator -->
         <div id="reel-play-hud-{{ post.share_id }}" class="reel-play-hud" aria-hidden="true">
             <i class="bi bi-play-fill"></i>
+        </div>
+
+        <!-- Central Buffering / Audio-Wait Spinner -->
+        <div id="reel-buffer-spinner-{{ post.share_id }}" class="reel-buffering-indicator d-none" aria-hidden="true">
+            <div class="spinner-border spinner-border-sm text-white" role="status">
+                <span class="visually-hidden">{% trans "Buffering…" %}</span>
+            </div>
+            <span class="reel-buffer-text small text-white ms-1.5 fw-medium">{% trans "Loading…" %}</span>
         </div>
 
         <!-- Heart Burst Animation Target -->

@@ -168,38 +168,44 @@ class Post(models.Model):
 
     @property
     def get_video_for_feed(self):
-        """Get video preview for feed, fallback to original"""
+        """Get video preview for feed, fallback to original or parent repost."""
         if self.video_preview:
             return self.video_preview
         if self.video:
             return self.video
+        if self.repost_of_id and self.repost_of:
+            return self.repost_of.get_video_for_feed
         return None
     
     @property
     def get_video_poster(self):
-        """Get video poster image"""
+        """Get video poster image, delegating to parent repost if needed."""
         if self.video_poster:
             try:
                 return self.video_poster.url
             except ValueError:
                 pass
-        # Generate poster from first frame if video exists
         if self.video:
             try:
                 return self.video.url + '#poster'
             except ValueError:
                 pass
+        if self.repost_of_id and self.repost_of:
+            return self.repost_of.get_video_poster
         return None
 
     @property
     def get_hls_url(self):
-        """Get full CDN or media URL for HLS master playlist"""
-        if not self.hls_playlist:
+        """Get full CDN or media URL for HLS master playlist, delegating to parent repost if needed."""
+        playlist = self.hls_playlist
+        if not playlist and self.repost_of_id and self.repost_of:
+            playlist = self.repost_of.hls_playlist
+        if not playlist:
             return None
-        if self.hls_playlist.startswith('http://') or self.hls_playlist.startswith('https://'):
-            return self.hls_playlist
+        if playlist.startswith('http://') or playlist.startswith('https://'):
+            return playlist
         media_url = getattr(settings, 'MEDIA_URL', '/media/')
-        return f"{media_url.rstrip('/')}/{self.hls_playlist.lstrip('/')}"
+        return f"{media_url.rstrip('/')}/{playlist.lstrip('/')}"
 
     @property
     def is_reel(self):
@@ -231,6 +237,9 @@ class Post(models.Model):
         except Exception:
             pass
 
+        if self.repost_of_id and self.repost_of:
+            return self.repost_of.is_reel
+
         return False
 
     @property
@@ -245,6 +254,8 @@ class Post(models.Model):
                 return any(ext in url for ext in ['.mp4', '.mov', '.webm', '.m4v'])
         except Exception:
             pass
+        if self.repost_of_id and self.repost_of:
+            return self.repost_of.get_intel_file_is_video
         return False
 
     @property

@@ -9,6 +9,11 @@
       padding-bottom: 0 !important;
     }
   }
+  /* Always hide the mobile bottom navigation bar (Home & Groups links) on post detail page */
+  body:has(.post-detail-container) .mobile-bottom-nav,
+  body.post-detail-active .mobile-bottom-nav {
+    display: none !important;
+  }
   .post-detail-container .dropdown-menu {
     z-index: 10010 !important;
   }
@@ -24,20 +29,79 @@
   .post-detail-container .comment-menu-dropdown {
     z-index: 10010 !important;
   }
-  /* Hide sticky composer when any modal is open so it cannot overlap */
+  /* Hide sticky composer / guest CTA when any modal is open so it cannot overlap */
   body.modal-open .fixed-bottom,
   body.modal-open .post-detail-composer-bar,
+  body.modal-open .post-detail-guest-bar,
   body.modal-open .main-composer {
     display: none !important;
     pointer-events: none !important;
   }
+
+  /* Post Detail Guest Sticky Bar (Light & Dark Mode Responsive) */
+  .post-detail-guest-bar {
+    z-index: 1000;
+    background-color: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border, #e2e8f0);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.08);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  }
+  .post-detail-guest-bar .guest-bar-title {
+    color: var(--text-dark, #0f172a);
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+  .post-detail-guest-bar .guest-bar-subtitle {
+    color: var(--text-muted, #64748b);
+    font-size: 0.8rem;
+    line-height: 1.35;
+  }
+  [data-theme="dark"] .post-detail-guest-bar {
+    background-color: rgba(36, 37, 38, 0.96) !important;
+    border-top-color: var(--border, #3a3b3c) !important;
+    box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.45) !important;
+  }
+  [data-theme="dark"] .post-detail-guest-bar .guest-bar-title {
+    color: #f3f4f6 !important;
+  }
+  [data-theme="dark"] .post-detail-guest-bar .guest-bar-subtitle {
+    color: #9ca3af !important;
+  }
+  [data-theme="dark"] .post-detail-guest-bar .btn-outline-primary {
+    color: #818cf8 !important;
+    border-color: #6366f1 !important;
+  }
+  [data-theme="dark"] .post-detail-guest-bar .btn-outline-primary:hover {
+    background-color: #6366f1 !important;
+    color: #ffffff !important;
+  }
+  @media (max-width: 575.98px) {
+    .post-detail-guest-bar .guest-bar-inner {
+      flex-direction: column;
+      align-items: stretch !important;
+      text-align: center;
+      gap: 0.6rem !important;
+    }
+    .post-detail-guest-bar .guest-bar-actions {
+      width: 100%;
+      justify-content: center;
+    }
+    .post-detail-guest-bar .guest-bar-actions .btn {
+      flex: 1;
+    }
+  }
 </style>
 
 <div class="post-detail-container" data-post-id="{{ post.share_id }}">
-  <div class="container mt-3" style="padding-bottom: 80px;">
+  <div class="container mt-3" style="padding-bottom: 100px;">
     <!-- Back Button Row -->
     <div class="row justify-content-center">
         <div class="col-12 col-lg-8">
+            {% if request.user.is_authenticated %}
             <a href="{% if is_new_post or 'service-worker' in previous_page or '.js' in previous_page %}{% url 'posts:home' %}{% else %}{{ previous_page }}{% endif %}"
                hx-get="{% if is_new_post or 'service-worker' in previous_page or '.js' in previous_page %}{% url 'posts:home' %}{% else %}{{ previous_page }}{% endif %}"
                hx-target="#page-content-target"
@@ -48,6 +112,13 @@
                onclick="if (document.referrer && document.referrer.startsWith(window.location.origin) && window.history.length > 1) { window.history.back(); return false; }">
                 <i class="bi bi-arrow-left me-1"></i> {% trans "Back" %}
             </a>
+            {% else %}
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary rounded-pill fw-bold text-uppercase mb-3 px-3"
+                    onclick="if (window.showGuestAuthPrompt) { window.showGuestAuthPrompt({ title: '{% trans "Sign in to explore PwaniNet" %}', subtitle: '{% trans "Join PwaniNet to browse the campus feed, groups, and academic materials." %}' }); }">
+                <i class="bi bi-arrow-left me-1"></i> {% trans "Back" %}
+            </button>
+            {% endif %}
         </div>
     </div>
 
@@ -63,7 +134,7 @@
     </div>
   </div>
 
-  <!-- Sticky Comment Input at Bottom -->
+  <!-- Sticky Comment Input / Guest CTA at Bottom -->
   {% if request.user.is_authenticated %}
   <div class="fixed-bottom post-detail-composer-bar" style="z-index: 1000; background-color: transparent; border-top: none;">
     <div class="container py-3" style="background-color: transparent;">
@@ -92,6 +163,27 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="fixed-bottom post-detail-guest-bar">
+    <div class="container py-2.5">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-8 d-flex align-items-center justify-content-between gap-3 guest-bar-inner">
+                <div>
+                    <div class="guest-bar-title">{% trans "Join PwaniNet to participate" %}</div>
+                    <div class="guest-bar-subtitle">{% trans "Sign in to like, comment, and connect with students." %}</div>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-shrink-0 guest-bar-actions">
+                    <a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}" class="btn btn-primary btn-sm rounded-pill px-3 fw-semibold">
+                        {% trans "Sign In" %}
+                    </a>
+                    <a href="{% url 'users:register' %}?next={{ request.get_full_path|urlencode }}" class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-semibold">
+                        {% trans "Create Account" %}
+                    </a>
+                </div>
             </div>
         </div>
     </div>

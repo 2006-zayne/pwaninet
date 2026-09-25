@@ -222,8 +222,11 @@ def notifications_list(request):
     return render(request, 'notifications/notifications.html', context)
 
 
-@login_required
 def unread_notification_count(request):
+    if not request.user.is_authenticated:
+        if request.GET.get('format') == 'json' or 'application/json' in request.headers.get('Accept', ''):
+            return JsonResponse({'unread_count': 0, 'count': 0})
+        return HttpResponse('')
     count = get_cached_unread_count(request.user)
     if request.GET.get('format') == 'json' or 'application/json' in request.headers.get('Accept', ''):
         return JsonResponse({'unread_count': count, 'count': count})

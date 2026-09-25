@@ -23,10 +23,20 @@
     const username = window.PwaniNetUsername || '';
     const storageKey = username ? `pwaninet_audio_preference_${username}` : 'pwaninet_audio_preference';
     let isGlobalMuted = (localStorage.getItem(storageKey) || window.PwaniNetUserAudioPreference || 'muted') === 'muted';
+    let isProgrammaticAudioSync = false;
 
     // Auto-scroll preference (persisted per user)
     const autoScrollKey = username ? `pwaninet_autoscroll_${username}` : 'pwaninet_autoscroll';
     let isAutoScrollEnabled = localStorage.getItem(autoScrollKey) === 'true';
+
+    // Auto-scroll prompt nudge — tracks when to show, snooze, and when to give up
+    const promptTsKey    = username ? `pwaninet_autoscroll_prompt_ts_${username}`    : 'pwaninet_autoscroll_prompt_ts';
+    const promptCountKey = username ? `pwaninet_autoscroll_prompt_count_${username}` : 'pwaninet_autoscroll_prompt_count';
+    const PROMPT_SNOOZE_MS    = 7 * 24 * 60 * 60 * 1000; // 7 days
+    const PROMPT_MAX_DISMISSALS = 3;                       // stop asking after 3 dismissals
+    const PROMPT_TRIGGER_REELS  = 3;                       // show after watching N reels in the session
+    let   _promptSessionReelCount = 0;                     // how many reels played this session
+    let   _promptShownThisSession = false;                  // show at most once per session
 
     const state = {
         videos: new Map(), // video element -> video metadata
@@ -657,18 +667,25 @@
         isGlobalMuted = !!muted;
         try {
             localStorage.setItem(storageKey, isGlobalMuted ? 'muted' : 'unmuted');
+            localStorage.setItem('pwaninet_audio_preference', isGlobalMuted ? 'muted' : 'unmuted');
         } catch (e) {
             console.warn('[VideoManager] LocalStorage unavailable for audio preference', e);
         }
 
-        // Sync all video elements across feed and overlays (excluding carousel preview videos)
-        document.querySelectorAll('video').forEach(vid => {
-            if (vid.classList.contains('reels-carousel-video') || vid.closest('.reels-carousel-shelf')) {
-                vid.muted = true;
-                return;
-            }
-            vid.muted = isGlobalMuted;
-        });
+        isProgrammaticAudioSync = true;
+        try {
+            // Sync all video elements across feed and overlays (excluding carousel preview videos)
+            document.querySelectorAll('video').forEach(vid => {
+                if (vid.classList.contains('reels-carousel-video') || vid.closest('.reels-carousel-shelf')) {
+                    vid.muted = true;
+                    return;
+                }
+                delete vid._isAutoplayMutedFallback;
+                vid.muted = isGlobalMuted;
+            });
+        } finally {
+            setTimeout(() => { isProgrammaticAudioSync = false; }, 80);
+        }
 
         syncMuteButtons();
         console.log('[VideoManager] Global mute toggled to:', isGlobalMuted);
@@ -739,64 +756,389 @@
     }
 
     // ============================================================================
+    // AUTO-SCROLL PROMPT NUDGE
+    // ============================================================================
+
+    function _isPromptEligible() {
+        if (isAutoScrollEnabled) return false;           // already on — never prompt
+        if (_promptShownThisSession) return false;       // once per session max
+
+        const dismissCount = parseInt(localStorage.getItem(promptCountKey) || '0', 10);
+        if (dismissCount >= PROMPT_MAX_DISMISSALS) return false; // gave up after N dismissals
+
+        const lastTs = parseInt(localStorage.getItem(promptTsKey) || '0', 10);
+        if (lastTs && (Date.now() - lastTs) < PROMPT_SNOOZE_MS) return false; // in snooze window
+
+        return true;
+    }
+
+    function _buildAutoScrollPrompt() {
+        const el = document.createElement('div');
+        el.id = 'autoScrollPromptBanner';
+        el.setAttribute('role', 'dialog');
+        el.setAttribute('aria-label', 'Auto-scroll suggestion');
+        el.innerHTML = `
+            <div class="as-prompt-icon">
+                <i class="bi bi-collection-play-fill"></i>
+            </div>
+            <div class="as-prompt-body">
+                <div class="as-prompt-title">Auto-scroll reels?</div>
+                <div class="as-prompt-desc">Automatically advance to the next reel when one ends — no swiping needed.</div>
+                <div class="as-prompt-actions">
+                    <button type="button" class="as-prompt-btn-primary" id="asPromptAccept">
+                        <i class="bi bi-check2"></i> Turn On
+                    </button>
+                    <button type="button" class="as-prompt-btn-ghost" id="asPromptDismiss">
+                        Not now
+                    </button>
+                </div>
+            </div>
+            <button type="button" class="as-prompt-close" id="asPromptClose" aria-label="Dismiss">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        `;
+        return el;
+    }
+
+    function _hideAutoScrollPrompt(animate = true) {
+        const banner = document.getElementById('autoScrollPromptBanner');
+        if (!banner) return;
+        if (animate) {
+            banner.classList.remove('as-prompt-visible');
+            setTimeout(() => banner.remove(), 350);
+        } else {
+            banner.remove();
+        }
+    }
+
+    function _showAutoScrollPrompt() {
+        if (!state.isFullScreenActive) return;
+        if (document.getElementById('autoScrollPromptBanner')) return; // already showing
+
+        const stage = document.querySelector('.reel-desktop-stage');
+        if (!stage) return;
+
+        _promptShownThisSession = true;
+
+        const banner = _buildAutoScrollPrompt();
+        stage.appendChild(banner);
+
+        // Trigger enter animation on next frame
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => banner.classList.add('as-prompt-visible'));
+        });
+
+        // Auto-hide after 12 seconds if user ignores it (counts as a soft dismiss)
+        const autoHideTimer = setTimeout(() => {
+            _dismissAutoScrollPrompt(false); // silent snooze, no count increment
+        }, 12000);
+        banner._autoHideTimer = autoHideTimer;
+
+        // Wire buttons
+        document.getElementById('asPromptAccept')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearTimeout(banner._autoHideTimer);
+            _acceptAutoScrollPrompt();
+        });
+
+        document.getElementById('asPromptDismiss')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearTimeout(banner._autoHideTimer);
+            _dismissAutoScrollPrompt(true);
+        });
+
+        document.getElementById('asPromptClose')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearTimeout(banner._autoHideTimer);
+            _dismissAutoScrollPrompt(true);
+        });
+    }
+
+    function _acceptAutoScrollPrompt() {
+        _hideAutoScrollPrompt(true);
+        setAutoScroll(true);
+        // Clear any snooze state — they've accepted, we're done
+        try {
+            localStorage.removeItem(promptTsKey);
+            localStorage.removeItem(promptCountKey);
+        } catch (e) {}
+
+        // Brief confirmation toast
+        let toast = document.getElementById('autoScrollToast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'autoScrollToast';
+            toast.className = 'position-fixed bottom-0 start-50 translate-middle-x mb-5 px-3 py-2 rounded-pill shadow text-white text-center';
+            toast.style.cssText = 'z-index:10999;font-size:13px;pointer-events:none;transition:opacity 0.2s ease,transform 0.2s ease;';
+            document.body.appendChild(toast);
+        }
+        toast.style.background = '#0d6efd';
+        toast.textContent = '▶ Auto-scroll On';
+        toast.style.opacity = '1';
+        toast.style.transform = 'translate(-50%, 0)';
+        clearTimeout(toast._t);
+        toast._t = setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translate(-50%, 10px)';
+        }, 2200);
+    }
+
+    function _dismissAutoScrollPrompt(incrementCount = true) {
+        _hideAutoScrollPrompt(true);
+        try {
+            localStorage.setItem(promptTsKey, String(Date.now()));
+            if (incrementCount) {
+                const prev = parseInt(localStorage.getItem(promptCountKey) || '0', 10);
+                localStorage.setItem(promptCountKey, String(prev + 1));
+            }
+        } catch (e) {}
+    }
+
+    function _tickPromptSessionCounter() {
+        if (!state.isFullScreenActive) return;
+        if (isAutoScrollEnabled) return;
+        _promptSessionReelCount++;
+        if (_promptSessionReelCount >= PROMPT_TRIGGER_REELS && _isPromptEligible()) {
+            // Small delay so the reel is fully visible before the banner slides in
+            setTimeout(_showAutoScrollPrompt, 1800);
+        }
+    }
+
+    // ============================================================================
     // PLAYBACK CONTROLLER
     // ============================================================================
 
+    function wireVideoBufferingListeners(video, container, spinnerEl, progressBarContainer, vinylEl) {
+        if (!video || video._bufferingListenersAttached) return;
+        video._bufferingListenersAttached = true;
+
+        let bufferTimer = null;
+
+        const setBuffering = (isBuffering) => {
+            if (isBuffering) {
+                // Only trigger buffering if actively playing and genuinely waiting for media data
+                if (video.paused || video.ended || video.readyState >= 3) {
+                    if (bufferTimer) {
+                        clearTimeout(bufferTimer);
+                        bufferTimer = null;
+                    }
+                    if (spinnerEl) spinnerEl.classList.add('d-none');
+                    if (progressBarContainer) progressBarContainer.classList.remove('is-buffering');
+                    return;
+                }
+                if (!bufferTimer) {
+                    // Generous 750ms threshold: healthy connections never flash a spinner during brief fragment loads
+                    bufferTimer = setTimeout(() => {
+                        if (!video.paused && !video.ended && video.readyState < 3) {
+                            if (spinnerEl) spinnerEl.classList.remove('d-none');
+                            if (progressBarContainer) progressBarContainer.classList.add('is-buffering');
+                            if (vinylEl) vinylEl.classList.remove('is-playing');
+                        }
+                    }, 750);
+                }
+            } else {
+                if (bufferTimer) {
+                    clearTimeout(bufferTimer);
+                    bufferTimer = null;
+                }
+                if (spinnerEl) spinnerEl.classList.add('d-none');
+                if (progressBarContainer) progressBarContainer.classList.remove('is-buffering');
+                if (vinylEl && !video.paused && !video.ended) {
+                    vinylEl.classList.add('is-playing');
+                }
+            }
+        };
+
+        // ONLY listen to waiting when actively trying to play (NEVER stalled, which is a normal socket idle event)
+        video.addEventListener('waiting', () => {
+            if (!video.paused && !video.ended && video.readyState < 3) {
+                setBuffering(true);
+            }
+        });
+        video.addEventListener('seeking', () => {
+            if (!video.paused) {
+                setBuffering(true);
+            }
+        });
+        video.addEventListener('seeked', () => {
+            setBuffering(false);
+        });
+        video.addEventListener('playing', () => {
+            setBuffering(false);
+            video.classList.add('is-playing');
+            if (container) container.classList.add('is-video-playing');
+            triggerPlayHud(video, true);
+        });
+        video.addEventListener('play', () => {
+            video.classList.add('is-playing');
+            if (container) container.classList.add('is-video-playing');
+            triggerPlayHud(video, true);
+        });
+        video.addEventListener('canplay', () => setBuffering(false));
+        video.addEventListener('canplaythrough', () => setBuffering(false));
+        video.addEventListener('pause', () => {
+            setBuffering(false);
+            video.classList.remove('is-playing');
+            if (container) container.classList.remove('is-video-playing');
+            if (!video.seeking && !video.ended && video.dataset.wantsAutoplay !== 'true') {
+                triggerPlayHud(video, false);
+            }
+        });
+        video.addEventListener('ended', () => {
+            setBuffering(false);
+            video.classList.remove('is-playing');
+            if (container) container.classList.remove('is-video-playing');
+            triggerPlayHud(video, false);
+        });
+        video.addEventListener('timeupdate', () => {
+            if (video._lastTimeUpdate !== video.currentTime) {
+                video._lastTimeUpdate = video.currentTime;
+                setBuffering(false);
+            }
+        });
+    }
 
     function playVideo(video, isAutoplay = false) {
         if (!video) return;
 
-        // Enforce single active video playback
-        if (state.currentPlayingVideo && state.currentPlayingVideo !== video) {
-            pauseVideo(state.currentPlayingVideo);
+        video.dataset.wantsAutoplay = 'true';
+
+        // STRICT: Pause ALL other video elements across feed, fullscreen, and modals
+        document.querySelectorAll('video').forEach(otherVid => {
+            if (otherVid !== video && !otherVid.paused) {
+                try {
+                    otherVid.pause();
+                    delete otherVid.dataset.wantsAutoplay;
+                    otherVid.classList.remove('is-playing');
+                    triggerPlayHud(otherVid, false);
+                    const otherContainer = otherVid.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reel-fullscreen-content, .reels-snap-item, .media-video-container, .landscape-video-container, .landscape-video-wrapper, .post-card, .post-media-wrapper');
+                    if (otherContainer) {
+                        otherContainer.classList.remove('is-video-playing');
+                        triggerPlayHud(otherContainer, false);
+                        const otherVinyl = otherContainer.querySelector('.reel-vinyl-disc');
+                        if (otherVinyl) otherVinyl.classList.remove('is-playing');
+                    }
+                } catch (_) {}
+            }
+        });
+
+        // Ensure HLS is attached before calling play() so attachMedia doesn't abort play()
+        if (video.dataset.hlsUrl && !video.dataset.hlsReady && typeof window.initHLSForElement === 'function') {
+            window.initHLSForElement(video);
         }
 
         // Apply global mute (carousel previews are always strictly muted)
+        isProgrammaticAudioSync = true;
         if (video.classList.contains('reels-carousel-video') || video.closest('.reels-carousel-shelf')) {
             video.muted = true;
             video.volume = 0;
         } else {
             video.muted = isGlobalMuted;
         }
+        setTimeout(() => { isProgrammaticAudioSync = false; }, 80);
 
         // Resume HLS buffer loading if active
         if (video._hlsInstance && typeof video._hlsInstance.startLoad === 'function') {
             video._hlsInstance.startLoad();
         }
 
-        const container = video.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reel-fullscreen-content, .reels-snap-item');
-        if (container) {
-            const hud = container.querySelector('.reel-play-hud');
-            if (hud) {
-                if (hud._hideTimer) {
-                    clearTimeout(hud._hideTimer);
-                    hud._hideTimer = null;
-                }
-                hud.classList.remove('show', 'is-paused');
+        const container = video.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reel-fullscreen-content, .reels-snap-item, .media-video-container, .landscape-video-container, .landscape-video-wrapper, .post-card, .post-media-wrapper');
+        const vinyl = container ? container.querySelector('.reel-vinyl-disc') : null;
+
+        const onPlaySuccess = () => {
+            state.currentPlayingVideo = video;
+            video.classList.add('is-playing');
+            if (container) {
+                container.classList.add('is-video-playing');
+                triggerPlayHud(container, true);
             }
+            triggerPlayHud(video, true);
+            if (vinyl) {
+                vinyl.classList.add('is-playing');
+            }
+            // If fullscreen is active, ensure orientation and desktop rail are updated for this playing video!
+            if (state.isFullScreenActive) {
+                const snapItem = video.closest('.reels-snap-item');
+                if (snapItem) {
+                    adaptSnapItemOrientation(snapItem);
+                }
+            }
+        };
+
+        const onPlayPausedOrBlocked = () => {
+            if (video.paused) {
+                video.classList.remove('is-playing');
+                if (container) {
+                    container.classList.remove('is-video-playing');
+                    triggerPlayHud(container, false);
+                }
+                triggerPlayHud(video, false);
+            }
+            if (video.paused && vinyl) {
+                vinyl.classList.remove('is-playing');
+            }
+        };
+
+        // If media hasn't buffered enough frames yet, schedule autoplay as soon as canplay fires
+        if (video.readyState < 2 && !video._canplayAutoplayBound) {
+            video._canplayAutoplayBound = true;
+            const retryOnReady = () => {
+                video._canplayAutoplayBound = false;
+                if (video.dataset.wantsAutoplay === 'true' && video.paused) {
+                    playVideo(video, isAutoplay);
+                }
+            };
+            video.addEventListener('canplay', retryOnReady, { once: true });
         }
 
         const playPromise = video.play();
         if (playPromise !== undefined) {
             playPromise.then(() => {
-                state.currentPlayingVideo = video;
+                onPlaySuccess();
             }).catch(err => {
                 console.warn('[VideoManager] Play rejected:', err);
+                if (err && err.name === 'AbortError') {
+                    // Interrupted by media source load/HLS attachment; retry once ready
+                    video.addEventListener('canplay', function retryAfterAbort() {
+                        if (video.dataset.wantsAutoplay === 'true' && video.paused) {
+                            playVideo(video, isAutoplay);
+                        }
+                    }, { once: true });
+                    setTimeout(onPlayPausedOrBlocked, 280);
+                    return;
+                }
+
                 if (isAutoplay && !video.muted) {
-                    // Browser prevented unmuted autoplay: force muted and retry silently
+                    // Browser prevented unmuted autoplay: fallback to muted for this specific playback attempt only,
+                    // without destroying the user's global audio preference!
+                    isProgrammaticAudioSync = true;
+                    video._isAutoplayMutedFallback = true;
                     video.muted = true;
                     video.play().then(() => {
-                        state.currentPlayingVideo = video;
+                        onPlaySuccess();
                     }).catch(silentErr => {
                         console.log('[VideoManager] Muted retry also rejected:', silentErr);
+                        onPlayPausedOrBlocked();
+                    }).finally(() => {
+                        setTimeout(() => { isProgrammaticAudioSync = false; }, 80);
                     });
+                } else {
+                    onPlayPausedOrBlocked();
                 }
             });
+        } else {
+            if (!video.paused) {
+                onPlaySuccess();
+            } else {
+                onPlayPausedOrBlocked();
+            }
         }
     }
 
     function pauseVideo(video) {
         if (!video) return;
+
+        delete video.dataset.wantsAutoplay;
 
         if (video._hlsInstance && typeof video._hlsInstance.stopLoad === 'function') {
             video._hlsInstance.stopLoad();
@@ -806,6 +1148,16 @@
             video.pause();
         } catch (e) {
             // Ignore pause errors
+        }
+
+        video.classList.remove('is-playing');
+        const container = video.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reel-fullscreen-content, .reels-snap-item, .media-video-container, .landscape-video-container, .landscape-video-wrapper, .post-card, .post-media-wrapper');
+        triggerPlayHud(video, false);
+        if (container) {
+            container.classList.remove('is-video-playing');
+            triggerPlayHud(container, false);
+            const vinyl = container.querySelector('.reel-vinyl-disc');
+            if (vinyl) vinyl.classList.remove('is-playing');
         }
 
         if (state.currentPlayingVideo === video) {
@@ -871,17 +1223,60 @@
 
         entries.forEach(entry => {
             const video = entry.target;
-            const isReel = isReelElement(video);
 
             if (entry.isIntersecting && entry.intersectionRatio >= 0.65) {
-                // Autoplay reels when >= 65% visible
-                if (isReel && video.dataset.autoplay !== 'false') {
+                // Autoplay both reels and postcards when >= 65% visible
+                if (video.dataset.autoplay !== 'false') {
                     playVideo(video, true);
                 }
             } else if (!entry.isIntersecting || entry.intersectionRatio < 0.65) {
-                // Pause when visibility drops below 65%
-                if (video === state.currentPlayingVideo) {
-                    pauseVideo(video);
+                // Unconditionally pause when visibility drops below 65%
+                pauseVideo(video);
+            }
+        });
+    }
+
+    function preloadNextReelAndEvictDistant(currentSnapItem) {
+        if (!currentSnapItem || !currentSnapItem.parentElement) return;
+        const allItems = Array.from(currentSnapItem.parentElement.children);
+        const currentIndex = allItems.indexOf(currentSnapItem);
+        if (currentIndex === -1) return;
+
+        // 1. Preload Next Reel (N+1) buffer for instantaneous swipe playback (strictly kept paused)
+        const nextItem = allItems[currentIndex + 1];
+        if (nextItem) {
+            const nextVideo = nextItem.querySelector('video');
+            if (nextVideo) {
+                delete nextVideo.dataset.wantsAutoplay;
+                try { nextVideo.pause(); } catch (_) {}
+                if (nextVideo.dataset.hlsUrl) {
+                    if (!nextVideo.dataset.hlsReady && typeof window.initHLSForElement === 'function') {
+                        window.initHLSForElement(nextVideo);
+                    } else if (nextVideo._hlsInstance && typeof nextVideo._hlsInstance.startLoad === 'function') {
+                        nextVideo._hlsInstance.startLoad(0);
+                    }
+                } else {
+                    nextVideo.preload = 'auto';
+                }
+            }
+        }
+
+        // 2. Decoder & Bandwidth Optimization: stopLoad & pause distant items (|distance| >= 2)
+        // and full decoder eviction for distant items (|distance| >= 4)
+        allItems.forEach((item, idx) => {
+            const distance = Math.abs(idx - currentIndex);
+            const itemVideo = item.querySelector('video');
+            if (!itemVideo) return;
+
+            if (distance >= 4) {
+                pauseVideo(itemVideo);
+                if (typeof window.destroyHLSForElement === 'function') {
+                    window.destroyHLSForElement(itemVideo);
+                }
+            } else if (distance >= 2) {
+                pauseVideo(itemVideo);
+                if (itemVideo._hlsInstance && typeof itemVideo._hlsInstance.stopLoad === 'function') {
+                    itemVideo._hlsInstance.stopLoad();
                 }
             }
         });
@@ -896,9 +1291,15 @@
             if (!video) return;
 
             if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+                // Adapt orientation immediately for the active item
+                adaptSnapItemOrientation(snapItem);
+
                 playVideo(video, true);
                 const vinyl = snapItem.querySelector('.reel-vinyl-disc');
                 if (vinyl) vinyl.classList.add('is-playing');
+
+                // Preload Next Reel (N+1) buffer and evict distant video decoders (|distance| >= 2)
+                preloadNextReelAndEvictDistant(snapItem);
 
                 // Near end of queue: append more videos dynamically
                 checkAndAppendMoreFullscreenVideos(snapItem);
@@ -906,10 +1307,13 @@
                 // Update TikTok desktop rail and exterior engagement buttons
                 updateDesktopSideRail(snapItem);
                 updateFullscreenNavButtons(snapItem);
+
+                // Tick prompt counter — may trigger the auto-scroll nudge after N reels
+                _tickPromptSessionCounter();
+
             } else if (!entry.isIntersecting || entry.intersectionRatio < 0.5) {
-                if (video === state.currentPlayingVideo) {
-                    pauseVideo(video);
-                }
+                // Strictly pause when leaving viewport
+                pauseVideo(video);
                 const vinyl = snapItem.querySelector('.reel-vinyl-disc');
                 if (vinyl) vinyl.classList.remove('is-playing');
             }
@@ -974,6 +1378,10 @@
         });
 
         updateFullscreenNavButtons();
+        const activeSnap = getActiveSnapItem();
+        if (activeSnap) {
+            adaptSnapItemOrientation(activeSnap);
+        }
     }
 
     function checkAndAppendMoreFullscreenVideos(currentSnapItem) {
@@ -1013,30 +1421,51 @@
         }, 650);
     }
 
-    function triggerPlayHud(container, isPlaying) {
-        if (!container) return;
-        const hud = container.querySelector('.reel-play-hud');
-        if (!hud) return;
-
-        if (hud._hideTimer) {
-            clearTimeout(hud._hideTimer);
-            hud._hideTimer = null;
+    function triggerPlayHud(target, isPlaying) {
+        if (!target) return;
+        const huds = new Set();
+        if (target.classList && target.classList.contains('reel-play-hud')) {
+            huds.add(target);
+        }
+        const postId = target.dataset ? (target.dataset.postId || extractPostId(target)) : null;
+        if (postId) {
+            const byId1 = document.getElementById(`video-play-hud-${postId}`);
+            const byId2 = document.getElementById(`reel-play-hud-${postId}`);
+            if (byId1) huds.add(byId1);
+            if (byId2) huds.add(byId2);
+        }
+        if (target.parentElement) {
+            target.parentElement.querySelectorAll('.reel-play-hud').forEach(h => huds.add(h));
+        }
+        if (target.querySelectorAll) {
+            target.querySelectorAll('.reel-play-hud').forEach(h => huds.add(h));
+        }
+        const c = target.closest ? target.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reel-fullscreen-content, .reels-snap-item, .media-video-container, .landscape-video-container, .landscape-video-wrapper, .post-card, .post-media-wrapper') : null;
+        if (c) {
+            c.querySelectorAll('.reel-play-hud').forEach(h => huds.add(h));
         }
 
-        const icon = hud.querySelector('i');
-        if (icon) {
-            icon.className = 'bi bi-play-fill';
-        }
+        huds.forEach(hud => {
+            if (hud._hideTimer) {
+                clearTimeout(hud._hideTimer);
+                hud._hideTimer = null;
+            }
 
-        if (!isPlaying) {
-            // Persistently show Play button indicator while reel is paused
-            hud.classList.remove('show');
-            void hud.offsetWidth;
-            hud.classList.add('show', 'is-paused');
-        } else {
-            // Hide Play button indicator when reel resumes playing
-            hud.classList.remove('is-paused', 'show');
-        }
+            const icon = hud.querySelector('i');
+            if (icon) {
+                icon.className = 'bi bi-play-fill';
+            }
+
+            if (!isPlaying) {
+                // Persistently show Play button indicator while video is paused
+                hud.classList.remove('show');
+                void hud.offsetWidth;
+                hud.classList.add('show', 'is-paused');
+            } else {
+                // Hide Play button indicator when video is playing
+                hud.classList.remove('is-paused', 'show');
+            }
+        });
     }
 
     function handleHitboxTap(hitbox, event) {
@@ -1045,7 +1474,7 @@
             return;
         }
 
-        const container = hitbox.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reel-fullscreen-content, .reels-snap-item');
+        const container = hitbox.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reel-fullscreen-content, .reels-snap-item, .media-video-container, .landscape-video-container, .landscape-video-wrapper, .post-card, .post-media-wrapper');
         if (!container) return;
 
         const video = container.querySelector('video');
@@ -1057,6 +1486,17 @@
         if (state.tapTimers.has(hitbox)) {
             clearTimeout(state.tapTimers.get(hitbox));
             state.tapTimers.delete(hitbox);
+
+            if (!window.isAuthenticated) {
+                if (typeof window.showGuestAuthPrompt === 'function') {
+                    window.showGuestAuthPrompt({
+                        title: 'Sign in to like',
+                        subtitle: 'Create an account or sign in to like this reel and support the creator.',
+                        icon: 'bi-heart-fill'
+                    });
+                }
+                return;
+            }
 
             triggerHeartBurst(container, event.clientX, event.clientY);
 
@@ -1346,6 +1786,16 @@
         snapItem.dataset.isReposted = isReposted ? 'true' : 'false';
         snapItem.dataset.videoUrl = videoSrc;
         snapItem.dataset.poster = poster;
+        if (video.videoWidth && video.videoHeight) {
+            snapItem.dataset.videoWidth = video.videoWidth;
+            snapItem.dataset.videoHeight = video.videoHeight;
+        } else if (card.dataset.videoWidth && card.dataset.videoHeight) {
+            snapItem.dataset.videoWidth = card.dataset.videoWidth;
+            snapItem.dataset.videoHeight = card.dataset.videoHeight;
+        }
+        if (card.classList.contains('landscape-video-container') || card.closest('.landscape-video-container') || card.querySelector('.landscape-video-container') || card.dataset.mediaOrientation === 'landscape') {
+            snapItem.dataset.mediaOrientation = 'landscape';
+        }
         const rawCaptionText = (card.dataset.caption || card.querySelector('.reel-caption-text')?.textContent || card.querySelector('.post-content-text')?.textContent || card.querySelector('.post-text-body')?.textContent || '').trim();
         snapItem.dataset.caption = rawCaptionText;
 
@@ -1359,13 +1809,13 @@
                 <!-- Video Element with direct src for instant media engine decoding -->
                 <video class="fullscreen-reel-video w-100 h-100"
                        id="fs-video-${postId}"
-                       src="${videoSrc}"
+                       ${hlsUrl ? '' : `src="${videoSrc}"`}
                        playsinline loop preload="auto"
                        poster="${poster}"
                        data-post-id="${postId}"
                        ${hlsUrl ? `data-hls-url="${hlsUrl}"` : ''}
                        data-video-url="${videoSrc}">
-                    <source src="${videoSrc}" type="video/mp4">
+                    ${hlsUrl ? '' : `<source src="${videoSrc}" type="video/mp4">`}
                 </video>
 
                 <!-- Tap Hitbox for play/pause HUD and heart burst -->
@@ -1378,6 +1828,14 @@
                 <!-- Transient Play/Pause HUD Indicator -->
                 <div class="reel-play-hud" aria-hidden="true">
                     <i class="bi bi-play-fill"></i>
+                </div>
+
+                <!-- Central Buffering / Audio-Wait Spinner -->
+                <div id="fs-reel-buffer-spinner-${postId}" class="reel-buffering-indicator d-none" aria-hidden="true">
+                    <div class="spinner-border spinner-border-sm text-white" role="status">
+                        <span class="visually-hidden">Loading…</span>
+                    </div>
+                    <span class="reel-buffer-text small text-white ms-1.5 fw-medium">Loading…</span>
                 </div>
 
                 <!-- Heart Burst Animation Target -->
@@ -1465,6 +1923,25 @@
                 </div>
             </div>
         `;
+
+        const fsVideoEl = snapItem.querySelector('video');
+        if (fsVideoEl) {
+            const fsSpinner = snapItem.querySelector('.reel-buffering-indicator');
+            const fsProgress = snapItem.querySelector('.reel-progress-container');
+            const fsVinyl = snapItem.querySelector('.reel-vinyl-disc');
+            wireVideoBufferingListeners(fsVideoEl, snapItem, fsSpinner, fsProgress, fsVinyl);
+
+            fsVideoEl.addEventListener('playing', () => {
+                triggerPlayHud(snapItem, true);
+                if (fsVinyl) fsVinyl.classList.add('is-playing');
+            });
+            fsVideoEl.addEventListener('pause', () => {
+                if (!fsVideoEl.seeking && !fsVideoEl.ended) {
+                    triggerPlayHud(snapItem, false);
+                    if (fsVinyl) fsVinyl.classList.remove('is-playing');
+                }
+            });
+        }
 
         adaptSnapItemOrientation(snapItem, card);
         return snapItem;
@@ -1673,26 +2150,29 @@
         const isCurrentlyCollapsed = rail.classList.contains('rail-collapsed');
         const shouldOpen = (typeof forceOpen === 'boolean') ? forceOpen : isCurrentlyCollapsed;
 
+        const layout = document.querySelector('.reel-player-layout');
+        const toggleWrapper = document.getElementById('reelCommentRailToggleWrapper');
+
         if (shouldOpen) {
             rail.classList.remove('rail-collapsed');
+            if (layout) layout.classList.remove('rail-collapsed');
+            if (toggleWrapper) toggleWrapper.classList.remove('is-visible');
             const input = document.getElementById('fsRailCommentInput');
             if (input) {
                 setTimeout(() => input.focus(), 120);
             }
         } else {
             rail.classList.add('rail-collapsed');
+            if (layout) layout.classList.add('rail-collapsed');
+            if (toggleWrapper) toggleWrapper.classList.add('is-visible');
         }
 
         // Smoothly adjust exterior action buttons positioning
         const repositionActive = () => {
-            const viewport = document.getElementById('reelsSnapViewport');
-            if (viewport) {
-                const h = viewport.clientHeight || 1;
-                const curIdx = Math.round(viewport.scrollTop / h);
-                const activeSnap = viewport.children[curIdx] || viewport.firstElementChild;
-                if (activeSnap) {
-                    repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
-                }
+            const activeSnap = getActiveSnapItem();
+            if (activeSnap) {
+                adaptSnapItemOrientation(activeSnap);
+                repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
             }
         };
 
@@ -1764,27 +2244,48 @@
         }
     }
 
+    function isSnapItemActive(item) {
+        if (!state.isFullScreenActive || !item) return false;
+        const viewport = document.getElementById('reelsSnapViewport');
+        if (!viewport || viewport.children.length === 0) return false;
+        const h = viewport.clientHeight || 1;
+        const curIdx = Math.round(viewport.scrollTop / h);
+        return viewport.children[curIdx] === item;
+    }
+
+    function getActiveSnapItem() {
+        if (!state.isFullScreenActive) return null;
+        const viewport = document.getElementById('reelsSnapViewport');
+        if (!viewport || viewport.children.length === 0) return null;
+        const h = viewport.clientHeight || 1;
+        const curIdx = Math.round(viewport.scrollTop / h);
+        return viewport.children[curIdx] || viewport.firstElementChild;
+    }
+
     function repositionDesktopActionsRail(content) {
         if (window.innerWidth < 992) return;
         const rail = document.getElementById('reelDesktopActionsRail');
         const stage = document.querySelector('.reel-desktop-stage');
         if (!rail || !stage) return;
 
-        const activeContent = content || document.querySelector('.reels-snap-item .reel-fullscreen-content');
+        const activeSnap = getActiveSnapItem();
+        const activeContent = (activeSnap ? activeSnap.querySelector('.reel-fullscreen-content') : null) ||
+                              content ||
+                              document.querySelector('.reels-snap-item .reel-fullscreen-content');
         if (!activeContent) return;
 
         const contentRect = activeContent.getBoundingClientRect();
         const stageRect = stage.getBoundingClientRect();
-        if (stageRect.width === 0) return;
+        if (stageRect.width === 0 || contentRect.width === 0) return;
 
-        // Position rail 20px to the right of the active card
-        const desiredLeft = contentRect.right - stageRect.left + 20;
-
-        // Ensure it doesn't overlap the up/down nav group (docked at right: 28px)
-        const maxLeft = stageRect.width - 85;
-        const finalLeft = Math.max(16, Math.min(desiredLeft, maxLeft));
+        // Position rail cleanly 16px to the right of the active card
+        const desiredLeft = contentRect.right - stageRect.left + 16;
+        // Nav buttons sit at stage right: 28px + 44px = 72px from stage right edge
+        const maxLeft = stageRect.width - 76;
+        const finalLeft = Math.min(desiredLeft, maxLeft);
 
         rail.style.left = `${Math.round(finalLeft)}px`;
+        rail.classList.add('is-positioned');
     }
 
     function adaptSnapItemOrientation(snapItem, initialCard) {
@@ -1804,17 +2305,6 @@
             return;
         }
 
-        const isInitialLandscape = initialCard && (
-            initialCard.classList.contains('landscape-video-container') ||
-            initialCard.querySelector('.landscape-video-container') ||
-            initialCard.querySelector('.landscape-video-wrapper')
-        );
-
-        if (isInitialLandscape) {
-            content.classList.remove('is-portrait', 'is-square');
-            content.classList.add('is-landscape');
-        }
-
         function checkMetadata() {
             if (window.innerWidth < 992) {
                 content.style.width = '';
@@ -1826,38 +2316,69 @@
                 return;
             }
 
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
-            if (!vw || !vh) return;
+            const vw = video.videoWidth || (initialCard && initialCard.dataset.videoWidth ? parseInt(initialCard.dataset.videoWidth, 10) : 0) || (snapItem.dataset.videoWidth ? parseInt(snapItem.dataset.videoWidth, 10) : 0);
+            const vh = video.videoHeight || (initialCard && initialCard.dataset.videoHeight ? parseInt(initialCard.dataset.videoHeight, 10) : 0) || (snapItem.dataset.videoHeight ? parseInt(snapItem.dataset.videoHeight, 10) : 0);
+            if (!vw || !vh) {
+                const isCardLandscape = (initialCard && (initialCard.classList.contains('landscape-video-container') || initialCard.closest('.landscape-video-container') || initialCard.dataset.mediaOrientation === 'landscape')) ||
+                                        (snapItem && (snapItem.dataset.mediaOrientation === 'landscape' || snapItem.classList.contains('is-landscape')));
+                if (isCardLandscape) {
+                    content.classList.remove('is-portrait', 'is-square');
+                    content.classList.add('is-landscape');
+                    content.style.aspectRatio = '16 / 9';
+                }
+                repositionDesktopActionsRail(content);
+                return;
+            }
 
             const ratio = vw / vh;
             content.classList.remove('is-portrait', 'is-landscape', 'is-square');
+
+            const stage = document.querySelector('.reel-desktop-stage');
+            const stageWidth = stage ? stage.clientWidth : window.innerWidth;
+            const stageHeight = stage ? stage.clientHeight : window.innerHeight;
+
+            // Reserve 300px (150px on each side of the centered card) for exterior desktop engagement rail & nav buttons
+            const availableWidth = Math.max(260, stageWidth - 300);
+            const availableHeight = Math.max(300, stageHeight - 40);
+
             if (ratio >= 1.15) {
+                // True landscape video
                 content.classList.add('is-landscape');
                 content.style.aspectRatio = `${vw} / ${vh}`;
-                content.style.width = 'min(calc(100% - 150px), 920px)';
-                content.style.height = 'auto';
+                const maxWFromHeight = availableHeight * ratio;
+                const finalW = Math.min(availableWidth, maxWFromHeight, 860);
+                content.style.width = `${Math.round(finalW)}px`;
+                content.style.maxWidth = `${Math.round(availableWidth)}px`;
+                content.style.height = `${Math.round(finalW / ratio)}px`;
+                content.style.maxHeight = `${Math.round(availableHeight)}px`;
             } else if (ratio >= 0.88 && ratio < 1.15) {
+                // Square video
                 content.classList.add('is-square');
                 content.style.aspectRatio = '1 / 1';
-                const sz = 'min(calc(100vh - 40px), calc(100% - 150px), 720px)';
-                content.style.width = sz;
-                content.style.height = sz;
+                const sz = Math.min(availableWidth, availableHeight, 660);
+                content.style.width = `${Math.round(sz)}px`;
+                content.style.height = `${Math.round(sz)}px`;
+                content.style.maxWidth = `${Math.round(availableWidth)}px`;
+                content.style.maxHeight = `${Math.round(availableHeight)}px`;
             } else {
+                // Portrait 9:16 video
                 content.classList.add('is-portrait');
                 content.style.aspectRatio = `${vw} / ${vh}`;
-                content.style.height = 'min(calc(100vh - 40px), 940px)';
-                content.style.width = `calc(min(calc(100vh - 40px), 940px) * ${vw} / ${vh})`;
-                content.style.maxWidth = 'min(calc(100% - 150px), 940px)';
+                const finalH = Math.min(availableHeight, 920);
+                const finalW = Math.min(availableWidth, finalH * ratio, 520);
+                content.style.height = `${Math.round(finalH)}px`;
+                content.style.width = `${Math.round(finalW)}px`;
+                content.style.maxWidth = `${Math.round(availableWidth)}px`;
             }
 
             repositionDesktopActionsRail(content);
         }
 
-        if (video.videoWidth && video.videoHeight) {
-            checkMetadata();
-        } else {
+        checkMetadata();
+
+        if (!video.videoWidth || !video.videoHeight) {
             video.addEventListener('loadedmetadata', checkMetadata, { once: true });
+            video.addEventListener('canplay', checkMetadata, { once: true });
         }
     }
 
@@ -1869,7 +2390,7 @@
 
         const items = Array.from(viewport.children);
         const total = items.length;
-        if (total <= 1) {
+        if (total <= 1 || !window.isAuthenticated) {
             navPrev.classList.add('d-none');
             navNext.classList.add('d-none');
             return;
@@ -1960,11 +2481,24 @@
                     e.preventDefault();
                     e.stopPropagation();
                 }
-                toggleDesktopCommentRail();
+                toggleDesktopCommentRail(true);
             };
         }
         if (fsCommentCount) {
             fsCommentCount.textContent = commentCount;
+        }
+
+        // Wire Reopen Comment Rail Toggle Button (Desktop Stage)
+        const railToggleBtn = document.getElementById('reelCommentRailToggleBtn');
+        if (railToggleBtn && !railToggleBtn.dataset.bound) {
+            railToggleBtn.dataset.bound = 'true';
+            railToggleBtn.onclick = function(e) {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                toggleDesktopCommentRail(true);
+            };
         }
 
         const fsRepostBtn = document.getElementById('fsDesktopRepostBtn');
@@ -2330,6 +2864,18 @@
         createFullscreenObserver();
 
         let targetSnapItem = null;
+        let originCurrentTime = 0;
+        if (targetPostId) {
+            const originCard = allVideoCards.find(c => {
+                const pid = extractPostId(c) || c.querySelector('video')?.dataset.postId || c.dataset.postId;
+                return pid && String(pid).trim() === targetPostId;
+            });
+            const originVid = originCard ? originCard.querySelector('video') : null;
+            if (originVid && originVid.currentTime > 0) {
+                originCurrentTime = originVid.currentTime;
+            }
+        }
+
         allVideoCards.forEach(card => {
             const snapItem = buildSnapItemFromReelCard(card);
             if (snapItem) {
@@ -2368,12 +2914,24 @@
 
                 const activeVideo = activeItem.querySelector('video');
                 if (activeVideo) {
+                    if (originCurrentTime > 0) {
+                        try {
+                            activeVideo.currentTime = originCurrentTime;
+                        } catch (_) {}
+                    }
                     playVideo(activeVideo, true);
                     const vinyl = activeItem.querySelector('.reel-vinyl-disc');
                     if (vinyl) vinyl.classList.add('is-playing');
                 }
+                adaptSnapItemOrientation(activeItem);
+                repositionDesktopActionsRail(activeItem.querySelector('.reel-fullscreen-content'));
                 updateDesktopSideRail(activeItem);
                 updateFullscreenNavButtons(activeItem);
+
+                setTimeout(() => {
+                    adaptSnapItemOrientation(activeItem);
+                    repositionDesktopActionsRail(activeItem.querySelector('.reel-fullscreen-content'));
+                }, 60);
             } else {
                 updateFullscreenNavButtons();
             }
@@ -2421,6 +2979,19 @@
             noteEl.style.opacity = '0';
         }
 
+        // Dismiss prompt (no count increment) and reset session counter
+        _hideAutoScrollPrompt(false);
+        _promptSessionReelCount = 0;
+        _promptShownThisSession = false;
+
+        // Reset comment rail state
+        const sideRail = document.getElementById('reelDesktopSideRail');
+        const playerLayout = document.querySelector('.reel-player-layout');
+        const railToggleWrapper = document.getElementById('reelCommentRailToggleWrapper');
+        if (sideRail) sideRail.classList.remove('rail-collapsed');
+        if (playerLayout) playerLayout.classList.remove('rail-collapsed');
+        if (railToggleWrapper) railToggleWrapper.classList.remove('is-visible');
+
         // Restore exact previous scroll position
         window.scrollTo({
             top: state.previousScrollY,
@@ -2440,6 +3011,17 @@
     }
 
     function openReelQuickTools(postId, targetEl) {
+        if (!window.isAuthenticated) {
+            if (typeof window.showGuestAuthPrompt === 'function') {
+                window.showGuestAuthPrompt({
+                    title: 'Sign in for more options',
+                    subtitle: 'Sign in to PwaniNet to save reels, repost, customize your feed, or report content.',
+                    icon: 'bi-sliders'
+                });
+            }
+            return;
+        }
+
         postId = postId ? String(postId).trim() : '';
         if (!postId || postId === 'null' || postId === 'undefined') return;
 
@@ -2661,6 +3243,49 @@
                 toastEl._t = setTimeout(() => {
                     toastEl.style.opacity = '0';
                     toastEl.style.transform = 'translate(-50%, 10px)';
+                }, 1800);
+            };
+        }
+
+        // 10. Video Quality Selector (Adaptive Bitrate Control)
+        const qualitySelect = document.getElementById('quickToolsQualitySelect');
+        const qualitySub = document.getElementById('quickToolsQualitySub');
+        if (qualitySelect && window.PwaniVideoQualityManager) {
+            const currentPref = window.PwaniVideoQualityManager.getPreferredQuality();
+            qualitySelect.value = currentPref;
+
+            const updateQualitySubLabel = () => {
+                if (!qualitySub) return;
+                const vid = card.querySelector('video') || document.querySelector(`.reels-snap-item[data-post-id="${postId}"] video`);
+                const liveLabel = vid?.dataset?.currentQualityLabel;
+                if (qualitySelect.value === 'auto') {
+                    qualitySub.textContent = liveLabel ? `Auto (${liveLabel} streaming)` : 'Adaptive bitrate (Auto)';
+                } else {
+                    qualitySub.textContent = `Locked at ${qualitySelect.value}p`;
+                }
+            };
+            updateQualitySubLabel();
+
+            qualitySelect.onchange = function() {
+                const newQual = qualitySelect.value;
+                window.PwaniVideoQualityManager.setPreferredQuality(newQual);
+                updateQualitySubLabel();
+
+                let qToast = document.getElementById('reelQualityToast');
+                if (!qToast) {
+                    qToast = document.createElement('div');
+                    qToast.id = 'reelQualityToast';
+                    qToast.className = 'position-fixed bottom-0 start-50 translate-middle-x mb-5 px-3 py-2 rounded-pill shadow text-white text-center';
+                    qToast.style.cssText = 'z-index:10999;font-size:13px;pointer-events:none;transition:opacity 0.2s ease,transform 0.2s ease;background:#0d6efd;';
+                    document.body.appendChild(qToast);
+                }
+                qToast.textContent = newQual === 'auto' ? '⚡ Video Quality: Auto (Adaptive)' : `📺 Video Quality: ${newQual}p`;
+                qToast.style.opacity = '1';
+                qToast.style.transform = 'translate(-50%, 0)';
+                clearTimeout(qToast._t);
+                qToast._t = setTimeout(() => {
+                    qToast.style.opacity = '0';
+                    qToast.style.transform = 'translate(-50%, 10px)';
                 }, 1800);
             };
         }
@@ -3013,6 +3638,16 @@
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
+                if (!window.isAuthenticated) {
+                    if (typeof window.showGuestAuthPrompt === 'function') {
+                        window.showGuestAuthPrompt({
+                            title: 'Sign in for comment options',
+                            subtitle: 'Sign in to PwaniNet to interact with comments, view profiles, and join the discussion.',
+                            icon: 'bi-chat-dots-fill'
+                        });
+                    }
+                    return;
+                }
                 const commentId = menuBtn.dataset.commentId;
                 if (!commentId) return;
 
@@ -3611,6 +4246,23 @@
                 return;
             }
 
+            // Play HUD tap (direct tap on central play button overlay when paused)
+            const playHud = event.target.closest('.reel-play-hud');
+            if (playHud && (playHud.classList.contains('show') || playHud.classList.contains('is-paused'))) {
+                event.preventDefault();
+                event.stopPropagation();
+                const container = playHud.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reel-fullscreen-content, .reels-snap-item, .media-video-container, .landscape-video-container, .landscape-video-wrapper, .post-card, .post-media-wrapper');
+                const video = container ? container.querySelector('video') : null;
+                if (video) {
+                    if (video.paused) {
+                        playVideo(video, false);
+                    } else {
+                        pauseVideo(video);
+                    }
+                }
+                return;
+            }
+
             // Mute toggle button
             const muteBtn = event.target.closest('.reel-mute-btn, .video-mute-toggle, [data-action="mute-toggle"]');
             if (muteBtn) {
@@ -3657,6 +4309,16 @@
             if (navNext) {
                 event.preventDefault();
                 event.stopPropagation();
+                if (!window.isAuthenticated) {
+                    if (typeof window.showGuestAuthPrompt === 'function') {
+                        window.showGuestAuthPrompt({
+                            title: 'Watch more reels on PwaniNet',
+                            subtitle: 'Sign in to watch endless campus reels, trending videos, and discover creators.',
+                            icon: 'bi-play-circle-fill'
+                        });
+                    }
+                    return;
+                }
                 const viewport = document.getElementById('reelsSnapViewport');
                 if (viewport && viewport.children.length > 0) {
                     const h = viewport.clientHeight;
@@ -3684,11 +4346,12 @@
             }
 
             // Comment trigger button (both reels and postcards)
-            const commentBtn = event.target.closest('.reel-comment-trigger, .postcard-comment-btn, [data-action="open-comments"], #fsDesktopCommentBtn');
+            const commentBtn = event.target.closest('.reel-comment-trigger, .postcard-comment-btn, [data-action="open-comments"], #fsDesktopCommentBtn, #reelCommentRailToggleBtn');
             if (commentBtn) {
                 event.preventDefault();
                 event.stopPropagation();
                 if (state.isFullScreenActive && window.innerWidth >= 992) {
+                    toggleDesktopCommentRail(true);
                     const sideInput = document.getElementById('fsRailCommentInput');
                     if (sideInput) sideInput.focus();
                     return;
@@ -3898,6 +4561,16 @@
 
             if (event.key === 'ArrowDown' || event.key === 'PageDown' || event.key.toLowerCase() === 'j') {
                 event.preventDefault();
+                if (!window.isAuthenticated) {
+                    if (typeof window.showGuestAuthPrompt === 'function') {
+                        window.showGuestAuthPrompt({
+                            title: 'Watch more reels on PwaniNet',
+                            subtitle: 'Sign in to watch endless campus reels, trending videos, and discover creators.',
+                            icon: 'bi-play-circle-fill'
+                        });
+                    }
+                    return;
+                }
                 const h = viewport.clientHeight || 1;
                 const curIdx = Math.round(viewport.scrollTop / h);
                 const nextIdx = Math.min(viewport.children.length - 1, curIdx + 1);
@@ -4036,7 +4709,54 @@
                 clearTimeout(scrollNavTimer);
                 scrollNavTimer = setTimeout(() => {
                     updateFullscreenNavButtons();
+                    const activeSnap = getActiveSnapItem();
+                    if (activeSnap) {
+                        adaptSnapItemOrientation(activeSnap);
+                        repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
+                    }
                 }, 40);
+            }, { passive: true });
+
+            // Guest reels limiter: trigger auth prompt when guest tries to scroll/swipe past the shared reel
+            let guestWheelThrottle = false;
+            snapViewportEl.addEventListener('wheel', function(e) {
+                if (!window.isAuthenticated && e.deltaY > 15) {
+                    if (!guestWheelThrottle && typeof window.showGuestAuthPrompt === 'function') {
+                        guestWheelThrottle = true;
+                        setTimeout(() => { guestWheelThrottle = false; }, 1200);
+                        window.showGuestAuthPrompt({
+                            title: 'Watch more reels on PwaniNet',
+                            subtitle: 'Sign in to watch endless campus reels, trending videos, and discover creators.',
+                            icon: 'bi-play-circle-fill'
+                        });
+                    }
+                }
+            }, { passive: true });
+
+            let guestTouchStartY = 0;
+            snapViewportEl.addEventListener('touchstart', function(e) {
+                if (!window.isAuthenticated && e.touches.length > 0) {
+                    guestTouchStartY = e.touches[0].clientY;
+                }
+            }, { passive: true });
+
+            let guestTouchThrottle = false;
+            snapViewportEl.addEventListener('touchend', function(e) {
+                if (!window.isAuthenticated && guestTouchStartY > 0 && e.changedTouches.length > 0) {
+                    const delta = guestTouchStartY - e.changedTouches[0].clientY;
+                    if (delta > 35 && !guestTouchThrottle) {
+                        guestTouchThrottle = true;
+                        setTimeout(() => { guestTouchThrottle = false; }, 1200);
+                        if (typeof window.showGuestAuthPrompt === 'function') {
+                            window.showGuestAuthPrompt({
+                                title: 'Watch more reels on PwaniNet',
+                                subtitle: 'Sign in to watch endless campus reels, trending videos, and discover creators.',
+                                icon: 'bi-play-circle-fill'
+                            });
+                        }
+                    }
+                    guestTouchStartY = 0;
+                }
             }, { passive: true });
         }
 
@@ -4087,6 +4807,7 @@
             const vid = activeCarouselCard.querySelector('video.reels-carousel-video');
             if (vid) {
                 try {
+                    delete vid.dataset.wantsAutoplay;
                     vid.pause();
                     vid.currentTime = 0;
                     vid.style.opacity = '0';
@@ -4100,28 +4821,51 @@
 
     function playCarouselCard(card) {
         if (!card || state.isFullScreenActive) return;
-        if (activeCarouselCard === card) {
-            const vid = card.querySelector('video.reels-carousel-video');
-            if (vid && !vid.paused) return; // already playing
+        const video = card.querySelector('video.reels-carousel-video');
+        if (!video) return;
+
+        if (activeCarouselCard === card && !video.paused) {
+            return; // already playing
         }
 
         stopCarouselAutoplay(false);
 
-        const video = card.querySelector('video.reels-carousel-video');
-        if (!video) return;
-
         activeCarouselCard = card;
         video.muted = true;
         video.volume = 0;
-        video.style.opacity = '1';
+        video.dataset.wantsAutoplay = 'true';
 
-        const playPromise = video.play();
-        if (playPromise !== undefined) {
-            playPromise.catch(() => {
-                video.muted = true;
-                video.volume = 0;
-                video.play().catch(() => {});
-            });
+        // Ensure HLS or source is attached
+        if (video.dataset.hlsUrl && !video.dataset.hlsReady && typeof window.initHLSForElement === 'function') {
+            window.initHLSForElement(video);
+        } else if (!video.src && video.dataset.videoUrl) {
+            video.src = video.dataset.videoUrl;
+            video.load();
+        }
+
+        const startPlaying = () => {
+            if (activeCarouselCard !== card) return;
+            video.muted = true;
+            video.volume = 0;
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    video.style.opacity = '1';
+                }).catch(() => {
+                    video.muted = true;
+                    video.play().then(() => {
+                        video.style.opacity = '1';
+                    }).catch(() => {});
+                });
+            }
+        };
+
+        if (video.readyState >= 2) {
+            startPlaying();
+        } else {
+            video.addEventListener('canplay', startPlaying, { once: true });
+            video.addEventListener('loadeddata', startPlaying, { once: true });
+            startPlaying();
         }
     }
 
@@ -4151,7 +4895,7 @@
         return closestCard || cards[0];
     }
 
-    function scheduleCarouselStickCheck(shelf, delayMs = 1200) {
+    function scheduleCarouselStickCheck(shelf, delayMs = 400) {
         if (state.isFullScreenActive) return;
         if (carouselStickDebounceTimer) {
             clearTimeout(carouselStickDebounceTimer);
@@ -4164,7 +4908,7 @@
             const rect = shelf.getBoundingClientRect();
             const vh = window.innerHeight || document.documentElement.clientHeight;
             const visibleHeight = Math.min(rect.bottom, vh) - Math.max(rect.top, 0);
-            if (visibleHeight <= 0 || visibleHeight / rect.height < 0.4) {
+            if (visibleHeight <= 0 || visibleHeight / rect.height < 0.3) {
                 stopCarouselAutoplay();
                 return;
             }
@@ -4186,10 +4930,10 @@
                 if (state.isFullScreenActive) return;
                 entries.forEach(entry => {
                     const shelf = entry.target;
-                    if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+                    if (entry.isIntersecting && entry.intersectionRatio >= 0.35) {
                         shelf.dataset.inView = 'true';
-                        scheduleCarouselStickCheck(shelf, 1200);
-                    } else if (!entry.isIntersecting || entry.intersectionRatio < 0.35) {
+                        scheduleCarouselStickCheck(shelf, 300);
+                    } else if (!entry.isIntersecting || entry.intersectionRatio < 0.25) {
                         shelf.dataset.inView = 'false';
                         if (activeCarouselCard && activeCarouselCard.closest('.reels-carousel-shelf') === shelf) {
                             stopCarouselAutoplay();
@@ -4198,7 +4942,7 @@
                 });
             }, {
                 root: null,
-                threshold: [0.1, 0.35, 0.5, 0.7]
+                threshold: [0.1, 0.25, 0.35, 0.5, 0.7]
             });
         }
 
@@ -4218,7 +4962,7 @@
                         stopCarouselAutoplay(false);
                     }
                     if (shelf.dataset.inView === 'true') {
-                        scheduleCarouselStickCheck(shelf, 1000);
+                        scheduleCarouselStickCheck(shelf, 400);
                     }
                 }, { passive: true });
             }
@@ -4230,7 +4974,7 @@
                     if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
                     hoverTimer = setTimeout(() => {
                         playCarouselCard(card);
-                    }, 350);
+                    }, 100);
                 });
 
                 card.addEventListener('mouseleave', () => {
@@ -4241,7 +4985,7 @@
                     if (activeCarouselCard === card) {
                         stopCarouselAutoplay();
                         if (shelf.dataset.inView === 'true') {
-                            scheduleCarouselStickCheck(shelf, 800);
+                            scheduleCarouselStickCheck(shelf, 400);
                         }
                     }
                 });
@@ -4264,7 +5008,7 @@
         }
         const visibleShelf = document.querySelector('.reels-carousel-shelf[data-in-view="true"]');
         if (visibleShelf) {
-            scheduleCarouselStickCheck(visibleShelf, 1200);
+            scheduleCarouselStickCheck(visibleShelf, 400);
         }
     }, { passive: true });
 
@@ -4282,9 +5026,48 @@
         }
 
         videos.forEach(video => {
+            // Attach buffering indicator and micro-scrubber listeners across feed & fullscreen
+            const cardContainer = video.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reels-snap-item, .media-video-container, .landscape-video-container, .landscape-video-wrapper, .post-card, .post-media-wrapper');
+            const postId = extractPostId(video) || (cardContainer ? extractPostId(cardContainer) : null);
+            const spinner = cardContainer ? (cardContainer.querySelector('.reel-buffering-indicator, .video-buffering-indicator') || (postId ? document.getElementById(`reel-buffer-spinner-${postId}`) || document.getElementById(`video-buffer-spinner-${postId}`) : null)) : null;
+            const progressBar = cardContainer ? cardContainer.querySelector('.reel-progress-container') : null;
+            const vinyl = cardContainer ? cardContainer.querySelector('.reel-vinyl-disc') : null;
+            wireVideoBufferingListeners(video, cardContainer, spinner, progressBar, vinyl);
+
             if (!video.dataset.pwaniObserved) {
                 video.dataset.pwaniObserved = 'true';
+                isProgrammaticAudioSync = true;
                 video.muted = isGlobalMuted;
+                setTimeout(() => { isProgrammaticAudioSync = false; }, 80);
+
+                // Sync global mute if user changes volume / unmuted on native controls
+                video.addEventListener('volumechange', () => {
+                    if (isProgrammaticAudioSync) return;
+                    if (video._isAutoplayMutedFallback) return;
+                    if (video.classList.contains('reels-carousel-video') || video.closest('.reels-carousel-shelf')) return;
+                    if (video.muted !== isGlobalMuted) {
+                        setGlobalMute(video.muted);
+                    }
+                });
+
+                // When paused, ensure play HUD is shown
+                video.addEventListener('pause', () => {
+                    video.classList.remove('is-playing');
+                    if (cardContainer) cardContainer.classList.remove('is-video-playing');
+                    if (!video.seeking && !video.ended) {
+                        triggerPlayHud(video, false);
+                    }
+                });
+                video.addEventListener('playing', () => {
+                    video.classList.add('is-playing');
+                    if (cardContainer) cardContainer.classList.add('is-video-playing');
+                    triggerPlayHud(video, true);
+                });
+                video.addEventListener('play', () => {
+                    video.classList.add('is-playing');
+                    if (cardContainer) cardContainer.classList.add('is-video-playing');
+                    triggerPlayHud(video, true);
+                });
 
                 // Carousel videos are controlled exclusively by the carousel stick-autoplay engine
                 if (video.classList.contains('reels-carousel-video') || video.closest('.reels-carousel-shelf')) {
@@ -4292,18 +5075,32 @@
                     return;
                 }
 
-                const isReel = isReelElement(video);
-                if (isReel) {
-                    // Feed observer tracks reels for 65% visibility autoplay
-                    state.feedObserver.observe(video);
+                // For videos that strictly do not autoplay (manual play only), show Play HUD when paused
+                if (video.dataset.autoplay === 'false') {
+                    if (video.paused) {
+                        video.classList.remove('is-playing');
+                        if (cardContainer) cardContainer.classList.remove('is-video-playing');
+                        triggerPlayHud(video, false);
+                    } else {
+                        video.classList.add('is-playing');
+                        if (cardContainer) cardContainer.classList.add('is-video-playing');
+                        triggerPlayHud(video, true);
+                    }
                 } else {
-                    // Landscape videos: strictly require manual play
-                    video.dataset.autoplay = 'false';
-                    video.controls = true;
-                    // Check if vertical video trapped in landscape container
-                    checkAndPromoteLegacyVideo(video);
+                    // Autoplay videos: keep Play HUD hidden so it never flashes while loading/scrolling into view
+                    triggerPlayHud(video, true);
+                    if (!video.paused) {
+                        video.classList.add('is-playing');
+                        if (cardContainer) cardContainer.classList.add('is-video-playing');
+                    }
                 }
-            } else if (isReelElement(video) && state.feedObserver) {
+
+                // Feed observer tracks all videos (reels and postcards) for 65% visibility autoplay
+                if (state.feedObserver) {
+                    state.feedObserver.observe(video);
+                }
+                checkAndPromoteLegacyVideo(video);
+            } else if (state.feedObserver && !video.classList.contains('reels-carousel-video') && !video.closest('.reels-carousel-shelf')) {
                 try {
                     state.feedObserver.observe(video);
                 } catch (_) {}
@@ -4396,6 +5193,11 @@
                 }
                 if (state.isFullScreenActive) {
                     appendNewVideosToFullscreenViewport();
+                    const activeSnap = getActiveSnapItem();
+                    if (activeSnap) {
+                        adaptSnapItemOrientation(activeSnap);
+                        repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
+                    }
                 }
             }
         });
@@ -4406,6 +5208,11 @@
                 initializeVideos(elt);
                 if (state.isFullScreenActive) {
                     appendNewVideosToFullscreenViewport();
+                    const activeSnap = getActiveSnapItem();
+                    if (activeSnap) {
+                        adaptSnapItemOrientation(activeSnap);
+                        repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
+                    }
                 }
             }
             checkAutoLaunchReel();

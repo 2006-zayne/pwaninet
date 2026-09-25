@@ -26,6 +26,8 @@ def _unread_count_cache_key(user_id):
 
 
 def get_cached_unread_count(user):
+    if not user or not getattr(user, 'is_authenticated', False):
+        return 0
     cache_key = _unread_count_cache_key(user.id)
     cached_value = cache.get(cache_key)
     if cached_value is not None:

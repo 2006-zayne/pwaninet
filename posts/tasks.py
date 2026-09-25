@@ -285,15 +285,18 @@ def process_large_video(self, post_id):
         os.makedirs(hls_abs_dir, exist_ok=True)
 
         # ------------------------------------------------------------------
-        # Transcode renditions
+        # Transcode renditions (scale along minor axis: width for portrait 9:16, height for landscape)
         # ------------------------------------------------------------------
-        produced = []   # list of (label, target_h, bandwidth_bps, playlist_rel_path)
-        eligible  = [(lbl, h, vk, ak) for lbl, h, vk, ak in RENDITIONS if src_height == 0 or h <= src_height]
+        is_portrait = bool(src_height and src_width and src_height > src_width)
+        minor_dim = min(src_width, src_height) if (src_width and src_height) else src_height
+
+        produced = []   # list of (label, target_w, target_h, bandwidth_bps, playlist_rel_path)
+        eligible  = [(lbl, res, vk, ak) for lbl, res, vk, ak in RENDITIONS if minor_dim == 0 or res <= minor_dim]
         if not eligible:
             eligible = [RENDITIONS[0]]  # always produce at least 240p
 
         total_steps = len(eligible)
-        for step, (label, target_h, video_kbps, audio_kbps) in enumerate(eligible, start=1):
+        for step, (label, target_res, video_kbps, audio_kbps) in enumerate(eligible, start=1):
             start_pct = int((step - 1) / total_steps * 80) + 10
             _emit(user_id, {
                 'post_id':  post_id,
@@ -308,8 +311,20 @@ def process_large_video(self, post_id):
             playlist_abs = os.path.join(out_dir, 'index.m3u8')
             segment_tmpl = os.path.join(out_dir, 'seg%05d.ts')
 
-            # Scale: keep aspect ratio, height = target_h, force even dims
-            vf_scale = f'scale=-2:{target_h}'
+            # Scale along minor axis: portrait 9:16 uses width=target_res (e.g. 720x1280),
+            # landscape 16:9 uses height=target_res (e.g. 1280x720), forcing even dimensions.
+            if is_portrait:
+                vf_scale = f'scale={target_res}:-2'
+                target_w = target_res if target_res % 2 == 0 else target_res + 1
+                target_h = int(round(src_height * (target_w / src_width))) if src_width else int(round(target_w * 16 / 9))
+                if target_h % 2 != 0:
+                    target_h += 1
+            else:
+                vf_scale = f'scale=-2:{target_res}'
+                target_h = target_res if target_res % 2 == 0 else target_res + 1
+                target_w = int(round(src_width * (target_h / src_height))) if (src_height and src_width) else int(round(target_h * 16 / 9))
+                if target_w % 2 != 0:
+                    target_w += 1
 
             cmd = [
                 FFMPEG, '-y',
@@ -331,9 +346,9 @@ def process_large_video(self, post_id):
                 '-ac', '2',
                 '-af', 'aresample=async=1:first_pts=0',
                 '-profile:a', 'aac_low',
-                # HLS muxer options (4s segments optimize TTFF on poor networks)
+                # HLS muxer options (2s segments match 2s IDR keyframes for fast 2s ABR quality ramp-up)
                 '-f', 'hls',
-                '-hls_time', '4',
+                '-hls_time', '2',
                 '-hls_list_size', '0',
                 '-hls_segment_filename', segment_tmpl,
                 '-hls_flags', 'independent_segments',
@@ -349,8 +364,8 @@ def process_large_video(self, post_id):
                 raise RuntimeError(f'FFmpeg failed for {label}: {stderr_text[-500:]}')
 
             playlist_rel = os.path.join(hls_rel_dir, label, 'index.m3u8')
-            produced.append((label, target_h, (video_kbps + audio_kbps) * 1000, playlist_rel))
-            logger.info('[HLS] Post %s: %s done', post_id, label)
+            produced.append((label, target_w, target_h, (video_kbps + audio_kbps) * 1000, playlist_rel))
+            logger.info('[HLS] Post %s: %s (%dx%d) done', post_id, label, target_w, target_h)
 
             done_pct = int(step / total_steps * 80) + 10
             _emit(user_id, {
@@ -370,14 +385,7 @@ def process_large_video(self, post_id):
         with open(master_abs, 'w') as f:
             f.write('#EXTM3U\n')
             f.write('#EXT-X-VERSION:3\n')
-            for label, target_h, bandwidth, playlist_rel in produced:
-                # Compute width preserving aspect ratio, ensuring even dimension
-                if src_height and src_width:
-                    target_w = int(round(src_width * (target_h / src_height)))
-                else:
-                    target_w = int(round(target_h * 16 / 9))
-                if target_w % 2 != 0:
-                    target_w += 1
+            for label, target_w, target_h, bandwidth, playlist_rel in produced:
                 avg_bandwidth = int(bandwidth * 0.9)
                 playlist_name = os.path.join(label, 'index.m3u8')
                 f.write(

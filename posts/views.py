@@ -845,8 +845,23 @@ class SharedPostViewSet(viewsets.ReadOnlyModelViewSet):
 # DJANGO WEB VIEWS
 # ============================================================================
 
-@login_required
 def home_view(request):
+    # If unauthenticated user arrives with a shared reel link, redirect seamlessly to guest reel viewer
+    if not request.user.is_authenticated:
+        target_reel_id = request.GET.get('reel')
+        if target_reel_id:
+            try:
+                import uuid
+                valid_uuid = str(uuid.UUID(str(target_reel_id).strip()))
+                redirect_url = reverse('posts:post_details', args=[valid_uuid]) + "?reel=1"
+                shared_by = request.GET.get('shared_by', '')
+                if shared_by:
+                    redirect_url += f"&shared_by={shared_by}"
+                return redirect(redirect_url)
+            except (ValueError, AttributeError):
+                pass
+        return redirect(f"{settings.LOGIN_URL}?next={request.get_full_path()}")
+
     # Enforce onboarding before landing on feed
     if not getattr(request.user, 'has_completed_onboarding', True):
         if request.headers.get('HX-Request'):
@@ -1023,37 +1038,43 @@ def post_detail_view(request, share_id):
                 return htmx_location_response(target_url)
             return redirect(target_url)
 
+    is_guest = not request.user.is_authenticated
     context = build_comments_context(post, request.user, show_all_comments=show_all)
-    context['is_liked'] = post.is_liked_by(request.user)
-    context['unread_notifications_count'] = get_cached_unread_count(request.user)
+    context['is_guest'] = is_guest
+    context['is_liked'] = post.is_liked_by(request.user) if not is_guest else False
+    context['unread_notifications_count'] = get_cached_unread_count(request.user) if not is_guest else 0
     if is_reel_requested:
         context['auto_launch_reel_id'] = str(post.share_id)
         context['shared_by'] = shared_by
 
     # Track previous page for back button logic
-    is_new_post = request.session.pop('is_new_post', False)
-    new_share_id = request.session.pop('new_share_id', None)
+    if is_guest:
+        context['is_new_post'] = False
+        context['previous_page'] = '#'
+    else:
+        is_new_post = request.session.pop('is_new_post', False)
+        new_share_id = request.session.pop('new_share_id', None)
 
-    request_host = request.get_host()
-    default_home = reverse('posts:home')
+        request_host = request.get_host()
+        default_home = reverse('posts:home')
 
-    # If not a new post, save the referring URL for back button IF safe
-    if not is_new_post and request.META.get('HTTP_REFERER'):
-        referer = request.META.get('HTTP_REFERER')
-        if _is_safe_previous_page(referer, request_host, share_id):
-            request.session['previous_page'] = referer
-        else:
+        # If not a new post, save the referring URL for back button IF safe
+        if not is_new_post and request.META.get('HTTP_REFERER'):
+            referer = request.META.get('HTTP_REFERER')
+            if _is_safe_previous_page(referer, request_host, share_id):
+                request.session['previous_page'] = referer
+            else:
+                request.session['previous_page'] = default_home
+
+        context['is_new_post'] = is_new_post
+
+        # Ensure previous_page is safe (clears any legacy corrupted session values)
+        candidate_prev = request.session.get('previous_page', default_home)
+        if not _is_safe_previous_page(candidate_prev, request_host, share_id):
+            candidate_prev = default_home
             request.session['previous_page'] = default_home
 
-    context['is_new_post'] = is_new_post
-
-    # Ensure previous_page is safe (clears any legacy corrupted session values)
-    candidate_prev = request.session.get('previous_page', default_home)
-    if not _is_safe_previous_page(candidate_prev, request_host, share_id):
-        candidate_prev = default_home
-        request.session['previous_page'] = default_home
-
-    context['previous_page'] = candidate_prev
+        context['previous_page'] = candidate_prev
 
     # Return comments section whenever show_all=1 is requested
     if show_all:

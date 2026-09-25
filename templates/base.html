@@ -2339,6 +2339,24 @@
                                 </div>
                                 <span id="quickToolsAutoScrollStatus" class="badge rounded-pill bg-secondary bg-opacity-25 text-muted ms-auto auto-scroll-status-badge">{% trans "Off" %}</span>
                             </button>
+
+                            <!-- 10. Video Quality Selector (Adaptive Bitrate Control) -->
+                            <div class="reel-tool-btn d-flex align-items-center justify-content-between" id="quickToolsQualityRow" style="cursor: default;">
+                                <div class="d-flex align-items-center gap-2 min-w-0">
+                                    <i class="bi bi-badge-hd fs-5 text-primary"></i>
+                                    <div class="min-w-0 text-start">
+                                        <div class="fw-semibold">{% trans "Video Quality" %}</div>
+                                        <div class="small text-muted text-truncate" id="quickToolsQualitySub">{% trans "Adaptive bitrate" %}</div>
+                                    </div>
+                                </div>
+                                <select class="form-select form-select-sm w-auto rounded-pill border-0 bg-light fw-medium px-2.5 py-1 ms-2" id="quickToolsQualitySelect" aria-label="{% trans 'Video Quality' %}" style="font-size: 12px;">
+                                    <option value="auto">Auto (Adaptive)</option>
+                                    <option value="720">720p HD</option>
+                                    <option value="480">480p Balanced</option>
+                                    <option value="360">360p Standard</option>
+                                    <option value="240">240p Data Saver</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2388,6 +2406,76 @@
                 </div>
             </div>
         </div>
+
+        <!-- Guest Auth Prompt Modal (Centered on Desktop, Smooth Bottom Sheet on Mobile) -->
+        <style>
+            [data-theme="dark"] #guestAuthModal .modal-content {
+                background-color: #242526 !important;
+                border: 1px solid #3a3b3c !important;
+                color: #f3f4f6 !important;
+            }
+            [data-theme="dark"] #guestAuthModal .btn-close {
+                filter: invert(1) grayscale(100%) brightness(200%);
+            }
+            [data-theme="dark"] #guestAuthModal #guestAuthModalTitle {
+                color: #f3f4f6 !important;
+            }
+            [data-theme="dark"] #guestAuthModal #guestAuthModalSubtitle {
+                color: #9ca3af !important;
+            }
+            [data-theme="dark"] #guestAuthModal .auth-icon-circle {
+                background: rgba(99, 102, 241, 0.18) !important;
+                color: #818cf8 !important;
+            }
+            [data-theme="dark"] #guestAuthModal #guestAuthSignUpBtn {
+                color: #818cf8 !important;
+                border-color: #6366f1 !important;
+            }
+            [data-theme="dark"] #guestAuthModal #guestAuthSignUpBtn:hover {
+                background-color: #6366f1 !important;
+                color: #ffffff !important;
+            }
+        </style>
+        <div class="modal fade comments-bottom-sheet guest-auth-sheet" id="guestAuthModal" tabindex="-1" aria-labelledby="guestAuthModalTitle" aria-hidden="true" style="z-index: 10900 !important;">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content shadow-lg border-0" style="border-radius: 20px;">
+                    <div class="comments-modal-handle d-sm-none" aria-hidden="true"></div>
+                    <div class="modal-header border-0 pb-0 pt-3 px-4 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="fw-bold fs-5 tracking-tight text-primary">PWANI<span class="text-dark">NET</span></span>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+                    </div>
+                    <div class="modal-body p-4 pt-2 text-center">
+                        <div class="my-2">
+                            <div class="auth-icon-circle mx-auto mb-3 d-flex align-items-center justify-content-center shadow-sm" 
+                                 style="width: 60px; height: 60px; border-radius: 50%; background: rgba(37, 99, 235, 0.1); color: var(--primary, #2563eb);">
+                                <i class="bi bi-stars fs-2" id="guestAuthIcon"></i>
+                            </div>
+                            <h5 class="fw-bold mb-2 text-dark" id="guestAuthModalTitle">{% trans "Sign in to explore more" %}</h5>
+                            <p class="text-muted small mb-0 px-2" id="guestAuthModalSubtitle">
+                                {% trans "Join the PwaniNet campus network to like, comment, and connect with fellow students." %}
+                            </p>
+                        </div>
+
+                        <div class="d-grid gap-2 pt-3">
+                            <a href="{% url 'login' %}" id="guestAuthSignInBtn" class="btn btn-primary fw-semibold py-2 rounded-pill shadow-sm">
+                                <i class="bi bi-box-arrow-in-right me-1"></i> {% trans "Sign In" %}
+                            </a>
+                            <a href="{% url 'users:register' %}" id="guestAuthSignUpBtn" class="btn btn-outline-primary fw-semibold py-2 rounded-pill">
+                                <i class="bi bi-person-plus me-1"></i> {% trans "Create an Account" %}
+                            </a>
+                        </div>
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-link btn-sm text-muted text-decoration-none" data-bs-dismiss="modal">
+                                {% trans "Maybe later" %}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {% if auto_launch_reel_id %}
         <div id="pwaniAutoLaunchReel" data-reel-id="{{ auto_launch_reel_id }}" data-shared-by="{{ shared_by|default:'' }}" style="display:none;"></div>
         {% endif %}
@@ -2407,6 +2495,18 @@
                     <div id="fsReelSharedNote" class="reel-shared-note-pill d-none position-absolute top-0 start-50 translate-middle-x mt-3 z-3 px-3 py-1.5 rounded-pill shadow-sm d-flex align-items-center gap-1.5" style="background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.15); pointer-events: none; transition: opacity 0.3s ease;">
                         <i class="bi bi-send-fill text-primary" style="font-size: 12px;"></i>
                         <span id="fsReelSharedNoteText" class="text-white small fw-medium" style="font-size: 12px; letter-spacing: 0.2px;"></span>
+                    </div>
+
+                    <!-- Comments Rail Reopen Toggle (Desktop only, >= 992px, styled matching Pwanimate context rail) -->
+                    <div class="reel-comment-rail-toggle-wrapper d-none d-lg-flex" id="reelCommentRailToggleWrapper">
+                        <button type="button"
+                                class="reel-collapse-toggle-btn shadow-sm"
+                                id="reelCommentRailToggleBtn"
+                                title="{% trans 'Open Comments' %}"
+                                aria-label="{% trans 'Open Comments' %}">
+                            <i class="bi bi-layout-sidebar-reverse"></i>
+                            <span class="small ms-1">{% trans "Comments" %}</span>
+                        </button>
                     </div>
 
                     <div class="reels-snap-viewport" id="reelsSnapViewport">
@@ -2562,6 +2662,7 @@
 
 
     {% block mobile_bottom_nav %}
+        {% if request.user.is_authenticated and request.resolver_match.url_name != 'post_details' %}
         <div class="mobile-bottom-nav d-md-none" role="navigation" aria-label="Mobile navigation">
             <a href="{% url 'posts:home' %}"
                class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
@@ -2653,6 +2754,7 @@
                 </a>
             {% endif %}
         </div>
+        {% endif %}
     {% endblock %}
 
     <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
@@ -4732,8 +4834,21 @@ window.addEventListener('beforeinstallprompt', (e) => {
             var searchInput = document.getElementById('globalShareSearchInput');
             if (searchInput) searchInput.value = '';
 
-            sentTargets = new Set();
-            loadTargets();
+            var searchWrap = searchInput ? searchInput.parentElement : null;
+            var traySection = modal.querySelector('.share-tray-section');
+            var trayDivider = modal.querySelector('#globalShareModalBody > hr');
+
+            if (!window.isAuthenticated) {
+                if (searchWrap) searchWrap.classList.add('d-none');
+                if (traySection) traySection.classList.add('d-none');
+                if (trayDivider) trayDivider.classList.add('d-none');
+            } else {
+                if (searchWrap) searchWrap.classList.remove('d-none');
+                if (traySection) traySection.classList.remove('d-none');
+                if (trayDivider) trayDivider.classList.remove('d-none');
+                sentTargets = new Set();
+                loadTargets();
+            }
 
             // Setup Repost Action Chip
             var cardEl = document.querySelector('[data-post-id="' + activePostId + '"]');
@@ -4758,6 +4873,20 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
             if (repostBtn) {
                 repostBtn.onclick = function () {
+                    if (!window.isAuthenticated) {
+                        if (window.bootstrap && window.bootstrap.Modal) {
+                            var inst = bootstrap.Modal.getInstance(modal);
+                            if (inst) inst.hide();
+                        }
+                        if (typeof window.showGuestAuthPrompt === 'function') {
+                            window.showGuestAuthPrompt({
+                                title: '{% trans "Sign in to repost" %}',
+                                subtitle: '{% trans "Sign in to repost this to your followers and campus profile." %}',
+                                icon: 'bi-repeat'
+                            });
+                        }
+                        return;
+                    }
                     var csrfToken = (document.querySelector('[name=csrfmiddlewaretoken]') && document.querySelector('[name=csrfmiddlewaretoken]').value) || '';
                     fetch('/api/posts/' + activePostId + '/repost/', {
                         method: 'POST',
@@ -4800,11 +4929,25 @@ window.addEventListener('beforeinstallprompt', (e) => {
             }
 
             // Setup Bookmark Action Chip
-            var isSaved = window.pwaniSavedPosts.isPostSaved(activePostId);
+            var isSaved = window.isAuthenticated ? window.pwaniSavedPosts.isPostSaved(activePostId) : false;
             updateBookmarkVisual(isSaved);
             var bookmarkBtn = document.getElementById('globalShareBookmarkBtn');
             if (bookmarkBtn) {
                 bookmarkBtn.onclick = function () {
+                    if (!window.isAuthenticated) {
+                        if (window.bootstrap && window.bootstrap.Modal) {
+                            var inst = bootstrap.Modal.getInstance(modal);
+                            if (inst) inst.hide();
+                        }
+                        if (typeof window.showGuestAuthPrompt === 'function') {
+                            window.showGuestAuthPrompt({
+                                title: '{% trans "Sign in to save" %}',
+                                subtitle: '{% trans "Save your favorite posts and reels to your personal library." %}',
+                                icon: 'bi-bookmark-fill'
+                            });
+                        }
+                        return;
+                    }
                     var nowSaved = window.pwaniSavedPosts.togglePostSaved(activePostId);
                     updateBookmarkVisual(nowSaved);
                     showFeedback(nowSaved ? 'Post saved to Library' : 'Removed from Library', 'info');
@@ -4815,6 +4958,20 @@ window.addEventListener('beforeinstallprompt', (e) => {
             var downloadBtn = document.getElementById('globalShareDownloadBtn');
             if (downloadBtn) {
                 downloadBtn.onclick = function () {
+                    if (!window.isAuthenticated) {
+                        if (window.bootstrap && window.bootstrap.Modal) {
+                            var inst = bootstrap.Modal.getInstance(modal);
+                            if (inst) inst.hide();
+                        }
+                        if (typeof window.showGuestAuthPrompt === 'function') {
+                            window.showGuestAuthPrompt({
+                                title: '{% trans "Sign in to download" %}',
+                                subtitle: '{% trans "Sign in to save videos and academic materials for offline viewing." %}',
+                                icon: 'bi-download'
+                            });
+                        }
+                        return;
+                    }
                     if (activeVideoUrl) {
                         if (window.downloadManager && typeof window.downloadManager.download === 'function') {
                             window.downloadManager.download({
@@ -4981,6 +5138,158 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 window.pwaniPrepareShareModal(postId, button);
             }
         });
+    })();
+    </script>
+
+    <!-- Guest Auth Prompt Modal Controller & Interaction Interceptor -->
+    <script>
+    (function() {
+        window.showGuestAuthPrompt = function(options) {
+            options = options || {};
+            var title = options.title || '{% trans "Sign in to explore more" %}';
+            var subtitle = options.subtitle || '{% trans "Join the PwaniNet campus community to like, comment, and connect with students." %}';
+            var iconClass = options.icon || 'bi-stars';
+            var returnUrl = options.next || (window.location.pathname + window.location.search);
+
+            var titleEl = document.getElementById('guestAuthModalTitle');
+            var subEl = document.getElementById('guestAuthModalSubtitle');
+            var iconEl = document.getElementById('guestAuthIcon');
+            var signInBtn = document.getElementById('guestAuthSignInBtn');
+            var signUpBtn = document.getElementById('guestAuthSignUpBtn');
+
+            if (titleEl) titleEl.textContent = title;
+            if (subEl) subEl.textContent = subtitle;
+            if (iconEl) iconEl.className = 'bi ' + iconClass + ' fs-2';
+
+            var loginBase = '{% url "login" %}';
+            var registerBase = '{% url "users:register" %}';
+
+            if (signInBtn) signInBtn.href = loginBase + '?next=' + encodeURIComponent(returnUrl);
+            if (signUpBtn) signUpBtn.href = registerBase + '?next=' + encodeURIComponent(returnUrl);
+
+            var modalEl = document.getElementById('guestAuthModal');
+            if (modalEl && window.bootstrap && window.bootstrap.Modal) {
+                var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+            } else {
+                window.location.href = loginBase + '?next=' + encodeURIComponent(returnUrl);
+            }
+        };
+
+        // Capture phase click interceptor for unauthenticated visitors
+        document.addEventListener('click', function(e) {
+            if (window.isAuthenticated) return;
+
+            var target = e.target.closest('a, button');
+            if (!target) return;
+
+            // Allow elements inside guest auth modal, login/register navigation, navbar theme dropdown, video playback controls
+            if (target.closest('#guestAuthModal') ||
+                target.closest('[data-bs-dismiss="modal"]') ||
+                (target.getAttribute('href') && (target.getAttribute('href').indexOf('/accounts/login') !== -1 || target.getAttribute('href').indexOf('/login') !== -1 || target.getAttribute('href').indexOf('/register') !== -1)) ||
+                target.closest('#navbarGuestSettingsDropdown') ||
+                (target.closest('.dropdown-menu') && target.closest('.navbar-tactical')) ||
+                target.closest('.reel-mute-btn') ||
+                target.closest('.video-mute-toggle') ||
+                target.closest('[data-action="mute-toggle"]') ||
+                target.closest('.reel-progress-container')) {
+                return;
+            }
+
+            // Check if action requires auth
+            var isLike = target.closest('.like-button, .fs-like-proxy-btn, [data-action="like"], [hx-post*="/like/"]');
+            var isComment = target.closest('.comment-action:not([data-action="menu"]), .postcard-comment-btn, #fsDesktopCommentBtn, .reel-comment-trigger, [data-action="open-comments"], [data-action="reply"]');
+            var isRepost = target.closest('.repost-button, .fs-repost-proxy-btn, #globalShareRepostBtn, [data-action="repost"]');
+            var isBookmark = target.closest('.bookmark-button, #fsDesktopBookmarkBtn, #globalShareBookmarkBtn');
+            var isDownload = target.closest('#globalShareDownloadBtn, .media-download-btn, [data-action="download-media"]');
+            var isMoreMenu = target.closest('.comment-menu-btn, [data-action="menu"], .reel-options-btn, #fsRailOptionsBtn, .fb-more-btn, .post-card-header [data-bs-toggle="dropdown"]');
+            var isProfile = target.closest('.comment-avatar-link, .comment-author-link, .fb-author-link, .fb-author-name, #fsRailAuthorProfileLink, #fsRailAuthorNameLink, .reel-follow-chip, a[href*="/users/user/"], a[href*="/users/profile/"]');
+            var isNav = target.closest('.nav-brand-tactical, a[href="/"], a[href*="posts:home"], a[href*="/groups/"], a[href*="/search/"], a[href*="/notifications/"], a[href*="/pwanimate/"]');
+            var isCloseReels = target.closest('.close-fs-reels-btn, #closeReelsOverlay');
+
+            if (isLike || isComment || isRepost || isBookmark || isDownload || isMoreMenu || isProfile || isNav || isCloseReels) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof e.stopImmediatePropagation === 'function') {
+                    e.stopImmediatePropagation();
+                }
+
+                // If triggered from inside the Share Sheet, close the Share Sheet first so modals do not stack
+                var shareModalEl = document.getElementById('globalShareModal');
+                if (shareModalEl && shareModalEl.classList.contains('show') && window.bootstrap && window.bootstrap.Modal) {
+                    var shareInst = bootstrap.Modal.getInstance(shareModalEl);
+                    if (shareInst) shareInst.hide();
+                }
+
+                var contextOptions = {};
+                if (isLike) {
+                    contextOptions = {
+                        title: '{% trans "Sign in to like" %}',
+                        subtitle: '{% trans "Create an account or sign in to like this post and support the author." %}',
+                        icon: 'bi-heart-fill'
+                    };
+                } else if (isComment) {
+                    contextOptions = {
+                        title: '{% trans "Sign in to comment" %}',
+                        subtitle: '{% trans "Sign in to post comments, reply to students, and share your perspective." %}',
+                        icon: 'bi-chat-dots-fill'
+                    };
+                } else if (isRepost) {
+                    contextOptions = {
+                        title: '{% trans "Sign in to repost" %}',
+                        subtitle: '{% trans "Sign in to repost this to your followers and campus profile." %}',
+                        icon: 'bi-repeat'
+                    };
+                } else if (isBookmark) {
+                    contextOptions = {
+                        title: '{% trans "Sign in to save" %}',
+                        subtitle: '{% trans "Save your favorite posts and reels to your personal library." %}',
+                        icon: 'bi-bookmark-fill'
+                    };
+                } else if (isDownload) {
+                    contextOptions = {
+                        title: '{% trans "Sign in to download" %}',
+                        subtitle: '{% trans "Sign in to save videos and academic materials for offline viewing." %}',
+                        icon: 'bi-download'
+                    };
+                } else if (isMoreMenu) {
+                    contextOptions = {
+                        title: '{% trans "Sign in for more options" %}',
+                        subtitle: '{% trans "Sign in to PwaniNet to save posts, repost, customize your feed, or report content." %}',
+                        icon: 'bi-sliders'
+                    };
+                } else if (isProfile) {
+                    contextOptions = {
+                        title: '{% trans "Sign in to view profiles" %}',
+                        subtitle: '{% trans "Sign in to connect with students, see courses, and view their campus activity." %}',
+                        icon: 'bi-person-circle'
+                    };
+                } else if (isCloseReels) {
+                    // Close fullscreen reel and display guest auth prompt on post detail
+                    if (window.videoManager && typeof window.videoManager.closeFullscreenReels === 'function') {
+                        window.videoManager.closeFullscreenReels();
+                    } else {
+                        var overlay = document.getElementById('fullscreenReelsOverlay');
+                        if (overlay) overlay.classList.add('d-none');
+                        document.body.classList.remove('reels-active');
+                    }
+                    contextOptions = {
+                        title: '{% trans "Sign in to explore PwaniNet" %}',
+                        subtitle: '{% trans "Explore the main feed, courses, and campus discussions by signing in." %}',
+                        icon: 'bi-compass-fill'
+                    };
+                } else {
+                    contextOptions = {
+                        title: '{% trans "Sign in to explore PwaniNet" %}',
+                        subtitle: '{% trans "Join PwaniNet to explore campus groups, discover trending posts, and access past papers." %}',
+                        icon: 'bi-compass-fill'
+                    };
+                }
+
+                window.showGuestAuthPrompt(contextOptions);
+                return false;
+            }
+        }, true);
     })();
     </script>
 </body>
