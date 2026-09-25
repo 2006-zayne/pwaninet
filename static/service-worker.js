@@ -6,7 +6,7 @@
 
 'use strict';
 let CACHE_VERSION = '1.6.2';
-let CACHE_BUILD = '100';
+let CACHE_BUILD = '101';
 let CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}`;
 let OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}`;
 
@@ -17,7 +17,7 @@ const SW_VERSION = {
     buildDate: new Date().toISOString(),
     cacheName: CACHE_NAME,
     environment: 'production',
-    description: 'Global styles for search header, avatar, and groups to explore on HTMX navigation'
+    description: 'See more post content button enhancement and fix'
 };
 
 // Set version from message (called during registration)

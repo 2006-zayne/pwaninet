@@ -9,7 +9,7 @@
         data-share-id="{{ post.share_id }}"
         data-post-id="{{ post.id }}"
         aria-label="{% if user_has_liked %}{% trans 'Unlike post' %}{% else %}{% trans 'Like post' %}{% endif %}">
-    <i class="bi {% if user_has_liked %}bi-heart-fill{% else %}bi-heart{% endif %} fs-4"></i>
+    <i class="bi {% if user_has_liked %}bi-heart-fill{% else %}bi-heart{% endif %}"></i>
 </button>
 {% else %}
 <button class="like-button btn {% if user_has_liked %}text-danger{% else %}text-muted{% endif %} btn-sm border-0 d-flex align-items-center justify-content-center w-100 engagement-button"

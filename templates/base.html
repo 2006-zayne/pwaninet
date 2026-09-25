@@ -418,6 +418,51 @@
             }
         }
 
+        /* ── Post Text Clamping & See More Button ── */
+        .post-text-clamp {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 4;
+            overflow: hidden;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+        .post-text-clamp.is-expanded {
+            display: block;
+            -webkit-line-clamp: unset;
+            overflow: visible;
+        }
+        .see-more-btn {
+            background: none !important;
+            border: none !important;
+            padding: 0 !important;
+            margin-top: 4px !important;
+            color: var(--text-secondary, #65676b) !important;
+            font-size: 0.875rem !important;
+            font-weight: 600 !important;
+            cursor: pointer !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 2px !important;
+            text-decoration: none !important;
+            line-height: 1.4 !important;
+            user-select: none !important;
+            transition: color 0.15s ease, opacity 0.15s ease !important;
+        }
+        .see-more-btn:hover {
+            color: var(--text-primary, #050505) !important;
+            text-decoration: underline !important;
+        }
+        .see-more-btn:active {
+            opacity: 0.7;
+        }
+        [data-theme="dark"] .see-more-btn {
+            color: var(--text-muted, #b0b3b8) !important;
+        }
+        [data-theme="dark"] .see-more-btn:hover {
+            color: #ffffff !important;
+        }
+
         /* ── Critical Search Header & Avatar Styles ── */
         .search-header {
             position: relative !important;
@@ -767,12 +812,16 @@
         // Set authentication status for What's New modal
         window.isAuthenticated = {{ request.user.is_authenticated|lower }};
 
-        // Set user-specific data for audio manager
+        // Set user-specific data for audio manager and comment management
         {% if request.user.is_authenticated %}
+        window.PwaniNetUserId = {{ request.user.id }};
         window.PwaniNetUsername = '{{ request.user.username }}';
+        window.PwaniNetUserRole = '{{ request.user.global_role|default:"" }}';
         window.PwaniNetUserAudioPreference = '{{ request.user.audio_preference|default:"muted" }}';
         {% else %}
+        window.PwaniNetUserId = null;
         window.PwaniNetUsername = '';
+        window.PwaniNetUserRole = '';
         window.PwaniNetUserAudioPreference = null;
         {% endif %}
     </script>
@@ -2175,11 +2224,158 @@
             </div>
         </div>
 
+        <!-- Reel Quick Tools Sheet (Mobile Bottom Sheet & Desktop Modal) -->
+        <div class="modal fade reel-quick-tools-sheet" id="reelQuickToolsModal" tabindex="-1" aria-labelledby="reelQuickToolsModalTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content shadow-lg border-0">
+                    <div class="comments-modal-handle d-sm-none" aria-hidden="true"></div>
+                    <div class="modal-header border-0 pb-1 pt-2 px-3 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-2 min-w-0">
+                            <span class="badge bg-primary bg-opacity-10 text-primary fw-semibold rounded-pill px-2.5 py-1" style="font-size: 11px;">
+                                <i class="bi bi-play-circle-fill me-1"></i>{% trans "Reel Options" %}
+                            </span>
+                            <span id="quickToolsAuthor" class="small text-muted text-truncate fw-medium" style="max-width: 180px;"></span>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+                    </div>
+                    <div class="modal-body p-2">
+                        <div class="d-flex flex-column gap-1">
+                            <!-- 1. Bookmark / Save to Library -->
+                            <button type="button" class="reel-tool-btn" id="quickToolsBookmarkBtn">
+                                <i class="bi bi-bookmark"></i>
+                                <div>
+                                    <div class="fw-semibold">{% trans "Save to Library" %}</div>
+                                    <div class="small text-muted">{% trans "Bookmark this reel to revisit later" %}</div>
+                                </div>
+                            </button>
+
+                            <!-- 2. Repost Reel -->
+                            <button type="button" class="reel-tool-btn" id="quickToolsRepostBtn">
+                                <i class="bi bi-repeat"></i>
+                                <div>
+                                    <div class="fw-semibold">{% trans "Repost Reel" %}</div>
+                                    <div class="small text-muted">{% trans "Share this with your followers" %}</div>
+                                </div>
+                            </button>
+
+                            <!-- 3. Share Reel -->
+                            <button type="button" class="reel-tool-btn" id="quickToolsShareBtn">
+                                <i class="bi bi-share"></i>
+                                <div>
+                                    <div class="fw-semibold">{% trans "Share to Groups / WhatsApp" %}</div>
+                                    <div class="small text-muted">{% trans "Send to campus groups or friends" %}</div>
+                                </div>
+                            </button>
+
+                            <!-- 4. Copy Link -->
+                            <button type="button" class="reel-tool-btn" id="quickToolsCopyLinkBtn">
+                                <i class="bi bi-link-45deg"></i>
+                                <div>
+                                    <div class="fw-semibold">{% trans "Copy Link" %}</div>
+                                    <div class="small text-muted">{% trans "Copy reel link to clipboard" %}</div>
+                                </div>
+                            </button>
+
+                            <!-- 5. Download for Offline -->
+                            <button type="button" class="reel-tool-btn" id="quickToolsDownloadBtn">
+                                <i class="bi bi-download"></i>
+                                <div>
+                                    <div class="fw-semibold">{% trans "Save for Offline" %}</div>
+                                    <div class="small text-muted">{% trans "Watch without using cellular data" %}</div>
+                                </div>
+                            </button>
+
+                            <!-- 6. See Less / Hide -->
+                            <button type="button" class="reel-tool-btn" id="quickToolsHideBtn">
+                                <i class="bi bi-eye-slash"></i>
+                                <div>
+                                    <div class="fw-semibold">{% trans "Not Interested" %}</div>
+                                    <div class="small text-muted">{% trans "Hide this reel from your feed" %}</div>
+                                </div>
+                            </button>
+
+                            <!-- 7. Report Reel -->
+                            <button type="button" class="reel-tool-btn" id="quickToolsReportBtn">
+                                <i class="bi bi-flag"></i>
+                                <div>
+                                    <div class="fw-semibold">{% trans "Report Reel" %}</div>
+                                    <div class="small text-muted">{% trans "Flag inappropriate content" %}</div>
+                                </div>
+                            </button>
+
+                            <!-- 8. Delete Reel (Author Only) -->
+                            <button type="button" class="reel-tool-btn text-danger d-none" id="quickToolsDeleteBtn">
+                                <i class="bi bi-trash"></i>
+                                <div>
+                                    <div class="fw-semibold text-danger">{% trans "Delete Reel" %}</div>
+                                    <div class="small text-muted">{% trans "Permanently remove your reel" %}</div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Reel Comments Sheet / Modal -->
+        <div class="modal fade comments-bottom-sheet" id="commentsModal" tabindex="-1" aria-labelledby="commentsModalTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content shadow-lg border-0">
+                    <div class="comments-modal-handle d-sm-none" aria-hidden="true"></div>
+                    <div class="modal-header border-0 pb-2 pt-3 px-3 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-2">
+                            <h6 class="modal-title fw-bold mb-0" id="commentsModalTitle">{% trans "Comments" %}</h6>
+                            <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2" id="commentsModalCount">0</span>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+                    </div>
+                    <div class="modal-body p-3 pt-1" id="commentsModalBody" style="min-height: 220px; max-height: 60vh; overflow-y: auto;">
+                        <div class="text-center py-4 text-muted" id="commentsModalLoading">
+                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                            <span>{% trans "Loading comments..." %}</span>
+                        </div>
+                        <div id="commentsModalList"></div>
+                    </div>
+                    <div class="modal-footer border-top p-2 bg-light d-flex flex-column align-items-stretch">
+                        <!-- Reply Indicator Banner -->
+                        <div id="commentsModalReplyBanner" class="d-none w-100 px-3 py-1 mb-1 d-flex align-items-center justify-content-between rounded bg-white border" style="font-size: 12px;">
+                            <span class="text-muted text-truncate me-2">{% trans "Replying to" %} <b id="commentsModalReplyUser" class="text-primary">@user</b></span>
+                            <button type="button" class="btn-close" id="commentsModalCancelReply" aria-label="{% trans 'Cancel reply' %}" style="font-size: 9px;"></button>
+                        </div>
+                        <form id="reelCommentForm" class="d-flex align-items-center gap-2 w-100">
+                            {% csrf_token %}
+                            <input type="hidden" name="parent_id" id="commentsModalParentId" value="">
+                            <input type="text"
+                                   id="reelCommentInput"
+                                   name="content"
+                                   class="form-control border-0 rounded-pill"
+                                   placeholder="{% trans 'Add a comment...' %}"
+                                   style="font-size: 13px; background-color: var(--search-bg, #ffffff); height: 38px;"
+                                   required>
+                            <button type="submit" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; flex-shrink: 0;" aria-label="{% trans 'Send' %}">
+                                <i class="bi bi-send-fill" style="font-size: 14px;"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Dedicated Full-Screen Reels Continuous Player -->
         <div id="fullscreenReelsOverlay" class="fullscreen-reels-modal d-none" aria-hidden="true" role="dialog" aria-label="{% trans 'Reels viewer' %}">
-            <button type="button" class="reel-glass-btn close-fs-reels-btn position-absolute" id="closeReelsOverlay" style="z-index: 2015;" title="{% trans 'Back to feed' %}" aria-label="{% trans 'Close Reels' %}">
+            <!-- Close Button (Top Left) -->
+            <button type="button" class="close-fs-reels-btn" id="closeReelsOverlay" title="{% trans 'Back to feed' %}" aria-label="{% trans 'Close Reels' %}">
                 <i class="bi bi-arrow-left"></i>
             </button>
+
+            <!-- Desktop Up/Down Navigation Floating Buttons -->
+            <button type="button" class="reel-nav-btn reel-nav-prev d-none d-md-flex" id="reelsNavPrev" title="{% trans 'Previous Reel' %}" aria-label="{% trans 'Previous Reel' %}">
+                <i class="bi bi-chevron-up"></i>
+            </button>
+            <button type="button" class="reel-nav-btn reel-nav-next d-none d-md-flex" id="reelsNavNext" title="{% trans 'Next Reel' %}" aria-label="{% trans 'Next Reel' %}">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+
             <div class="reels-snap-viewport" id="reelsSnapViewport">
                 <!-- Dynamically populated continuous snap items -->
             </div>

@@ -414,9 +414,11 @@
             {% include "posts/partials/like_button.html" with post=post %}
         </div>
         <button type="button"
-                class="btn btn-sm border-0 text-muted d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1"
+                class="btn btn-sm border-0 text-muted d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1 postcard-comment-btn"
                 style="flex: 1 1 0px; min-width: 0;"
-                onclick="(function(){ var input = document.getElementById('comment-input-{{ post.share_id }}'); if(input){ input.focus(); } else { window.location.href = '{% url 'posts:post_details' post.share_id %}'; } })();"
+                data-post-id="{{ post.share_id }}"
+                data-action="open-comments"
+                onclick="window.openCommentsSheet ? window.openCommentsSheet('{{ post.share_id }}') : null"
                 aria-label="{% trans 'Comment' %}">
             <i class="bi bi-chat-dots fs-5"></i>
             <span id="comment-count-{{ post.share_id }}" class="fw-bold">{{ post.comments.count }}</span>

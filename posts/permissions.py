@@ -72,3 +72,49 @@ class IsPostAuthorOrReadOnly(permissions.BasePermission):
         
         # Write permissions - only author
         return obj.author == request.user
+
+
+class CanDeleteComment(permissions.BasePermission):
+    """
+    Author OR admin OR moderator OR global admin can delete comment.
+    """
+    def has_object_permission(self, request, view, obj):
+        if not request.user.is_authenticated:
+            return False
+
+        # Author can delete their own comment
+        if obj.author == request.user:
+            return True
+
+        # Global admins can delete any comment
+        from users.models import GlobalRole
+        if getattr(request.user, 'global_role', None) in [GlobalRole.PRESIDENT, GlobalRole.DELEGATE]:
+            return True
+
+        # Group admin/moderator can delete comments in their group
+        if obj.post and obj.post.group:
+            from groups.models import Membership, MembershipRole, MembershipStatus
+            try:
+                membership = Membership.objects.get(
+                    user=request.user,
+                    group=obj.post.group,
+                    role__in=[MembershipRole.ADMIN, MembershipRole.MODERATOR],
+                    status=MembershipStatus.APPROVED
+                )
+                return True
+            except Membership.DoesNotExist:
+                return False
+
+        return False
+
+
+class CanEditComment(permissions.BasePermission):
+    """
+    Only author can edit their comment.
+    """
+    def has_object_permission(self, request, view, obj):
+        if not request.user.is_authenticated:
+            return False
+
+        return obj.author == request.user
+

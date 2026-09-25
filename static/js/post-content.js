@@ -21,20 +21,81 @@
         e.preventDefault();
         e.stopPropagation();
         
+        const targetId = seeMoreBtn.dataset.targetId;
         const wrapper = seeMoreBtn.closest('.post-content-wrapper');
-        if (!wrapper) return;
+        const target = (targetId && document.getElementById(targetId)) ||
+                       (wrapper && wrapper.querySelector('.post-text-clamp')) ||
+                       (wrapper && wrapper.querySelector('.post-text-body'));
+        if (!target) return;
         
-        const textBody = wrapper.querySelector('.post-text-body');
-        if (!textBody) return;
+        const isExpanded = target.classList.toggle('is-expanded');
+        seeMoreBtn.setAttribute('aria-expanded', String(isExpanded));
         
-        const isExpanded = textBody.classList.toggle('is-expanded');
-        seeMoreBtn.textContent = isExpanded ? 'See less' : 'See more';
-        seeMoreBtn.setAttribute('aria-expanded', isExpanded);
+        const moreText = seeMoreBtn.dataset.moreText || 'See more';
+        const lessText = seeMoreBtn.dataset.lessText || 'See less';
+        seeMoreBtn.textContent = isExpanded ? lessText : moreText;
+        
+        if (!isExpanded) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    });
+
+    // Dynamic detection to ensure visually overflowing posts always have a See More button
+    function checkPostClamping(root) {
+        const textElements = (root || document).querySelectorAll('.post-text-clamp');
+        textElements.forEach(function(el) {
+            if (el.classList.contains('is-expanded')) return;
+            const wrapper = el.closest('.post-content-wrapper');
+            if (!wrapper) return;
+            
+            let btn = wrapper.querySelector('.see-more-btn');
+            // Detect if element's content exceeds its clamped height
+            const isOverflowing = el.scrollHeight > (el.clientHeight + 4);
+            
+            if (isOverflowing) {
+                if (!btn) {
+                    btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'see-more-btn';
+                    btn.dataset.targetId = el.id;
+                    btn.dataset.moreText = 'See more';
+                    btn.dataset.lessText = 'See less';
+                    btn.setAttribute('aria-expanded', 'false');
+                    btn.setAttribute('aria-controls', el.id);
+                    btn.textContent = 'See more';
+                    el.insertAdjacentElement('afterend', btn);
+                } else {
+                    btn.style.display = 'inline-flex';
+                }
+            }
+        });
+    }
+
+    // Run on DOM ready, HTMX swaps, history restoration, and window resize
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { checkPostClamping(); });
+    } else {
+        checkPostClamping();
+    }
+
+    document.addEventListener('htmx:afterSwap', function(evt) {
+        checkPostClamping(evt.detail.target || document);
+    });
+
+    document.addEventListener('htmx:historyRestore', function() {
+        checkPostClamping(document);
+    });
+
+    let resizeTimer = null;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() { checkPostClamping(document); }, 200);
     });
 
     // Public API
     window.PwaniNetPostContent = {
-        init: function() {}
+        init: function() { checkPostClamping(document); },
+        checkClamping: checkPostClamping
     };
 
 })();

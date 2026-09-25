@@ -22,6 +22,18 @@ def add_comment_to_post(post, author, content, parent_comment=None):
     content = (content or '').strip()
     if not content:
         return None
+
+    # Enforce maximum nesting depth: cap replies to 1 level below the root comment.
+    # If the target comment is already a reply, resolve up to the root top-level comment
+    # and auto-prefix @username mention if not present.
+    if parent_comment:
+        target_author = parent_comment.author
+        if parent_comment.parent_comment:
+            while parent_comment.parent_comment:
+                parent_comment = parent_comment.parent_comment
+            if target_author != author and not content.startswith(f"@{target_author.username}"):
+                content = f"@{target_author.username} {content}"
+
     comment = Comment.objects.create(post = post, author = author, content = content, parent_comment=parent_comment)
     
     # Increment parent comment's reply_count if this is a reply
@@ -62,7 +74,7 @@ def add_comment_to_post(post, author, content, parent_comment=None):
         {
             'type': 'post_comment_update',
             'post_id': post.id,
-            'comment_count': post.comments.filter(parent_comment__isnull=True).count()
+            'comment_count': post.comments.count()
         }
     )
     
@@ -70,7 +82,11 @@ def add_comment_to_post(post, author, content, parent_comment=None):
 
 
 def handle_add_comment_request(request, post):
-    comment = add_comment_to_post(post, request.user, request.POST.get('content'))
+    parent_comment = None
+    parent_id = request.POST.get('parent_id') or request.POST.get('parent_comment_id')
+    if parent_id:
+        parent_comment = Comment.objects.filter(id=parent_id, post=post).first()
+    comment = add_comment_to_post(post, request.user, request.POST.get('content'), parent_comment=parent_comment)
     if comment:
         messages.success(request, 'Comment added successfully.')
     else:

@@ -33,6 +33,7 @@
         isFullScreenActive: false,
         previousScrollY: 0,
         tapTimers: new Map(), // element -> timer id
+        hasLongPressed: false,
         isInitialized: false
     };
 
@@ -43,8 +44,12 @@
     function extractPostId(element) {
         if (!element) return null;
         if (element.dataset && element.dataset.postId) return element.dataset.postId;
-        if (element.id && element.id.startsWith('video-')) return element.id.replace('video-', '');
-        if (element.id && element.id.startsWith('fs-video-')) return element.id.replace('fs-video-', '');
+        if (element.id) {
+            if (element.id.startsWith('video-')) return element.id.replace('video-', '');
+            if (element.id.startsWith('fs-video-')) return element.id.replace('fs-video-', '');
+            if (element.id.startsWith('reel-card-')) return element.id.replace('reel-card-', '');
+            if (element.id.startsWith('reel-hitbox-')) return element.id.replace('reel-hitbox-', '');
+        }
         const parent = element.closest('[data-post-id]');
         return parent ? parent.dataset.postId : null;
     }
@@ -243,12 +248,16 @@
             const video = snapItem.querySelector('video');
             if (!video) return;
 
-            if (entry.isIntersecting && entry.intersectionRatio >= 0.65) {
+            if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
                 playVideo(video, true);
-            } else if (!entry.isIntersecting || entry.intersectionRatio < 0.65) {
+                const vinyl = snapItem.querySelector('.reel-vinyl-disc');
+                if (vinyl) vinyl.classList.add('is-playing');
+            } else if (!entry.isIntersecting || entry.intersectionRatio < 0.5) {
                 if (video === state.currentPlayingVideo) {
                     pauseVideo(video);
                 }
+                const vinyl = snapItem.querySelector('.reel-vinyl-disc');
+                if (vinyl) vinyl.classList.remove('is-playing');
             }
         });
     }
@@ -271,7 +280,7 @@
         state.fullscreenObserver = new IntersectionObserver(handleFullscreenIntersection, {
             root: document.getElementById('reelsSnapViewport') || null,
             rootMargin: '0px',
-            threshold: 0.65
+            threshold: 0.5
         });
     }
 
@@ -314,18 +323,12 @@
     }
 
     function handleHitboxTap(hitbox, event) {
-        const isInlineReel = hitbox.closest('.reel-card-container') && !hitbox.closest('.reel-fullscreen-content') && !hitbox.closest('.reels-snap-item');
-        if (isInlineReel) {
-            // Clicking an inline feed ReelCard opens the Fullscreen Reels Player
-            const container = hitbox.closest('.reel-card-container');
-            const postId = extractPostId(container);
-            if (postId) {
-                openFullscreenReels(postId);
-            }
+        if (state.hasLongPressed) {
+            state.hasLongPressed = false;
             return;
         }
 
-        const container = hitbox.closest('.reel-fullscreen-content') || hitbox.closest('.reels-snap-item');
+        const container = hitbox.closest('.reel-card-container, .reel-fullscreen-content, .reels-snap-item');
         if (!container) return;
 
         const video = container.querySelector('video');
@@ -333,15 +336,13 @@
 
         const postId = extractPostId(container);
 
-        // Check if pending single tap timer exists -> this is a double tap
+        // Double tap: heart burst animation + like (works in both feed and fullscreen)
         if (state.tapTimers.has(hitbox)) {
             clearTimeout(state.tapTimers.get(hitbox));
             state.tapTimers.delete(hitbox);
 
-            // Double tap: heart burst animation
             triggerHeartBurst(container, event.clientX, event.clientY);
 
-            // Trigger like button inside this card or sync with inline card
             const likeBtn = container.querySelector('.like-button') ||
                            (postId ? document.querySelector(`#reel-like-wrap-${postId} .like-button`) : null);
             if (likeBtn) {
@@ -350,7 +351,7 @@
             return;
         }
 
-        // Single tap: start 220ms delay before toggling play/pause
+        // Single tap: toggle play / pause (in both feed and fullscreen)
         const timer = setTimeout(() => {
             state.tapTimers.delete(hitbox);
 
@@ -406,27 +407,49 @@
         const video = card.querySelector('video');
         if (!video) return null;
 
-        const videoSrc = video.getAttribute('src') || (video.querySelector('source') ? video.querySelector('source').getAttribute('src') : '') || video.dataset.videoUrl || '';
-        const poster = video.getAttribute('poster') || '';
+        const videoSrc = video.dataset.videoUrl || (video.querySelector('source') ? video.querySelector('source').getAttribute('src') : '') || video.currentSrc || video.getAttribute('src') || '';
+        const poster = video.getAttribute('poster') || card.querySelector('.reel-ambient-img')?.getAttribute('src') || '';
         const hlsUrl = video.dataset.hlsUrl || '';
 
-        // Extract author info
-        const authorLink = card.querySelector('.reel-scrim-top a[href*="profile"]') || card.querySelector('a[href*="profile"]');
-        const authorAvatar = authorLink?.querySelector('img')?.getAttribute('src') || '/static/images/default-avatar.png';
-        const authorName = authorLink?.textContent?.trim() || 'Author';
-        const authorHref = authorLink?.getAttribute('href') || '#';
+        // Extract author avatar & details
+        const authorImg = card.querySelector('.reel-creator-row img') || card.querySelector('.reel-scrim-bottom img') || card.querySelector('.reel-vinyl-art');
+        const authorAvatar = authorImg?.getAttribute('src') || '/static/images/default-avatar.png';
+        const authorLink = card.querySelector('.reel-creator-row a') || card.querySelector('.reel-scrim-bottom a[href*="profile"]');
+        const authorName = authorLink?.textContent?.trim() || card.querySelector('.reel-options-btn')?.dataset.author || 'Author';
+
+        // Extract campus unit badge and time if present
+        const unitBadge = card.querySelector('.reel-unit-badge');
+        const unitHtml = unitBadge ? unitBadge.outerHTML : '';
+        const timeEl = card.querySelector('.reel-scrim-top .text-white-50');
+        const timeHtml = timeEl ? timeEl.outerHTML : '';
+
+        // Extract creator row (avatar, name, handle, follow chip)
+        const creatorRow = card.querySelector('.reel-creator-row');
+        const creatorRowHtml = creatorRow ? creatorRow.outerHTML : '';
 
         // Extract caption
-        const captionEl = card.querySelector('.post-text-clamp-2') || card.querySelector('.post-content-text');
-        const captionHtml = captionEl ? captionEl.innerHTML : '';
+        const captionWrap = card.querySelector('.reel-caption-wrap');
+        let captionHtml = '';
+        if (captionWrap) {
+            captionHtml = captionWrap.outerHTML;
+        } else {
+            const rawCaption = card.querySelector('.reel-caption-text') || card.querySelector('.post-text-clamp-2') || card.querySelector('.post-content-text');
+            if (rawCaption && rawCaption.textContent.trim()) {
+                captionHtml = `<div class="reel-caption-wrap mb-2"><div class="reel-caption-text post-text-clamp-2">${rawCaption.innerHTML}</div></div>`;
+            }
+        }
+
+        // Extract audio pill
+        const audioWrap = card.querySelector('.reel-audio-wrap') || card.querySelector('.reel-audio-pill')?.parentElement;
+        const audioWrapHtml = audioWrap ? audioWrap.outerHTML : '';
 
         // Extract like count & state
         const likeBtn = card.querySelector('.like-button');
-        const likeCount = card.querySelector('.reel-action-item .reel-action-label')?.textContent?.trim() || '0';
-        const isLiked = likeBtn?.classList?.contains('liked') || false;
+        const likeCount = card.querySelector(`[id^="reel-like-count-"]`)?.textContent?.trim() || card.querySelector('.reel-action-label')?.textContent?.trim() || '0';
+        const isLiked = likeBtn?.classList?.contains('liked') || likeBtn?.classList?.contains('text-danger') || false;
 
         // Extract comment count
-        const commentCount = card.querySelectorAll('.reel-action-item .reel-action-label')[1]?.textContent?.trim() || '0';
+        const commentCount = card.querySelector(`[id^="reel-comment-count-"]`)?.textContent?.trim() || card.querySelectorAll('.reel-action-unit .reel-action-label')[1]?.textContent?.trim() || '0';
 
         const snapItem = document.createElement('div');
         snapItem.className = 'reels-snap-item';
@@ -434,9 +457,16 @@
 
         snapItem.innerHTML = `
             <div class="reel-fullscreen-content">
+                <!-- Ambient Backdrop -->
+                <div class="reel-ambient-backdrop" aria-hidden="true">
+                    ${poster ? `<img src="${poster}" class="reel-ambient-img" alt="">` : '<div class="w-100 h-100 bg-black"></div>'}
+                </div>
+
+                <!-- Video Element with direct src for instant media engine decoding -->
                 <video class="fullscreen-reel-video w-100 h-100"
                        id="fs-video-${postId}"
-                       playsinline loop preload="metadata"
+                       src="${videoSrc}"
+                       playsinline loop preload="auto"
                        poster="${poster}"
                        data-post-id="${postId}"
                        ${hlsUrl ? `data-hls-url="${hlsUrl}"` : ''}
@@ -444,75 +474,89 @@
                     <source src="${videoSrc}" type="video/mp4">
                 </video>
 
+                <!-- Tap Hitbox for play/pause HUD and heart burst -->
                 <button type="button"
                         class="reel-center-hitbox reel-tap-hitbox"
                         data-post-id="${postId}"
                         aria-label="Play or pause reel">
                 </button>
 
+                <!-- Transient Play/Pause HUD Indicator -->
                 <div class="reel-play-hud" aria-hidden="true">
                     <i class="bi bi-play-fill"></i>
                 </div>
 
-                <div class="reel-heart-burst">
+                <!-- Heart Burst Animation Target -->
+                <div class="reel-heart-burst" aria-hidden="true">
                     <i class="bi bi-heart-fill"></i>
                 </div>
 
                 <!-- Top Scrim -->
-                <div class="reel-scrim-top position-absolute top-0 start-0 w-100 d-flex align-items-center justify-content-between p-3" style="z-index: 4;">
+                <div class="reel-scrim-top position-absolute top-0 start-0 w-100 d-flex align-items-center justify-content-between" style="z-index: 4;">
                     <div class="d-flex align-items-center gap-2 min-w-0">
-                        <a href="${authorHref}" class="flex-shrink-0 text-decoration-none">
-                            <img src="${authorAvatar}" class="rounded-circle border border-2 border-white shadow-sm" style="width: 38px; height: 38px; object-fit: cover;" alt="${authorName}">
-                        </a>
-                        <div class="min-w-0">
-                            <a href="${authorHref}" class="text-white fw-bold text-decoration-none small text-truncate d-inline-block mw-100" style="text-shadow: 0 1px 3px rgba(0,0,0,0.85);">
-                                ${authorName}
-                            </a>
-                        </div>
+                        ${unitHtml}
                     </div>
-                    <button type="button" class="btn btn-icon-hitbox text-white fs-4 close-fs-reels-btn" title="Close" aria-label="Close">
-                        <i class="bi bi-x-lg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));"></i>
-                    </button>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button"
+                                class="reel-top-action-btn reel-options-btn text-white p-1 border-0 bg-transparent"
+                                data-post-id="${postId}"
+                                data-author="${authorName}"
+                                title="Options"
+                                aria-label="Options">
+                            <i class="bi bi-three-dots-vertical fs-5"></i>
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Floating Right Engagement Stack -->
+                <!-- Floating Right Engagement Rail (Pure floating icons, no backdrop bubbles) -->
                 <div class="reel-actions-stack">
-                    <div class="reel-action-item">
+                    <div class="reel-action-unit text-center">
                         <button type="button" class="reel-action-btn fs-like-proxy-btn text-white ${isLiked ? 'liked text-danger' : ''}" data-post-id="${postId}">
                             <i class="bi ${isLiked ? 'bi-heart-fill text-danger' : 'bi-heart'}"></i>
                         </button>
-                        <span class="reel-action-label">${likeCount}</span>
+                        <span class="reel-action-label" id="fs-reel-like-count-${postId}">${likeCount}</span>
                     </div>
 
-                    <div class="reel-action-item">
-                        <a href="/posts/${postId}/" class="reel-action-btn text-white text-decoration-none">
+                    <div class="reel-action-unit text-center">
+                        <button type="button" class="reel-action-btn text-white reel-comment-trigger" data-post-id="${postId}">
                             <i class="bi bi-chat-dots-fill"></i>
-                        </a>
-                        <span class="reel-action-label">${commentCount}</span>
+                        </button>
+                        <span class="reel-action-label" id="fs-reel-comment-count-${postId}">${commentCount}</span>
                     </div>
 
-                    <div class="reel-action-item">
+                    <div class="reel-action-unit text-center">
                         <button type="button" class="reel-action-btn text-white" data-bs-toggle="modal" data-bs-target="#globalShareModal" data-post-id="${postId}">
                             <i class="bi bi-share-fill"></i>
                         </button>
                         <span class="reel-action-label">Share</span>
                     </div>
 
-                    <div class="reel-action-item">
+                    <div class="reel-action-unit text-center">
                         <button type="button" class="reel-action-btn reel-mute-btn text-white" data-action="mute-toggle">
                             <i class="bi ${isGlobalMuted ? 'bi-volume-mute-fill' : 'bi-volume-up-fill'}"></i>
                         </button>
                         <span class="reel-action-label reel-mute-label">${isGlobalMuted ? 'Mute' : 'Sound'}</span>
                     </div>
-                </div>
 
-                <!-- Bottom Scrim & Caption -->
-                <div class="reel-scrim-bottom position-absolute bottom-0 start-0 w-100 p-3 d-flex flex-column justify-content-end" style="pointer-events: none; z-index: 4;">
-                    <div style="pointer-events: auto; max-width: calc(100% - 64px);">
-                        <div class="post-text-clamp-2 fs-6 mb-2" onclick="this.classList.toggle('is-expanded');">
-                            ${captionHtml}
+                    <div class="reel-action-unit reel-vinyl-unit text-center mt-1">
+                        <div class="reel-vinyl-disc" data-post-id="${postId}">
+                            <img src="${authorAvatar}" class="reel-vinyl-art" alt="${authorName}">
                         </div>
                     </div>
+                </div>
+
+                <!-- Bottom Scrim: Creator Identity, Caption, and Audio Pill (Option C) -->
+                <div class="reel-scrim-bottom position-absolute bottom-0 start-0 w-100 d-flex flex-column justify-content-end" style="pointer-events: none; z-index: 4;">
+                    <div class="reel-scrim-content">
+                        ${creatorRowHtml}
+                        ${captionHtml}
+                        ${audioWrapHtml}
+                    </div>
+                </div>
+
+                <!-- Bottom Edge Micro-Scrubber -->
+                <div class="reel-progress-container position-absolute bottom-0 start-0 w-100" data-post-id="${postId}">
+                    <div class="reel-progress-bar" id="fs-reel-progress-${postId}"></div>
                 </div>
             </div>
         `;
@@ -524,6 +568,8 @@
         const overlay = document.getElementById('fullscreenReelsOverlay');
         const viewport = document.getElementById('reelsSnapViewport');
         if (!overlay || !viewport) return;
+
+        targetPostId = targetPostId ? String(targetPostId).trim() : null;
 
         // Pause feed playback and save scroll offset
         state.previousScrollY = window.scrollY;
@@ -556,27 +602,38 @@
                 const video = snapItem.querySelector('video');
                 if (video) {
                     video.muted = isGlobalMuted;
+                    // Trigger immediate media load
+                    if (!video.currentSrc && video.getAttribute('src')) {
+                        video.load();
+                    }
                 }
 
-                if (snapItem.dataset.postId === String(targetPostId)) {
+                if (targetPostId && String(snapItem.dataset.postId).trim() === targetPostId) {
                     targetSnapItem = snapItem;
                 }
             }
         });
 
-        // Scroll to target reel and start playback
-        if (targetSnapItem) {
-            setTimeout(() => {
-                targetSnapItem.scrollIntoView({ behavior: 'instant', block: 'start' });
-                const targetVideo = targetSnapItem.querySelector('video');
-                if (targetVideo) {
-                    playVideo(targetVideo, true);
+        // Request animation frame ensures DOM reflow is complete before scrolling/playing
+        requestAnimationFrame(() => {
+            const activeItem = targetSnapItem || viewport.firstElementChild;
+            if (activeItem) {
+                const items = Array.from(viewport.children);
+                const targetIndex = items.indexOf(activeItem);
+                if (targetIndex > 0) {
+                    viewport.scrollTop = targetIndex * viewport.clientHeight;
+                } else {
+                    viewport.scrollTop = 0;
                 }
-            }, 50);
-        } else if (viewport.firstElementChild) {
-            const firstVideo = viewport.firstElementChild.querySelector('video');
-            if (firstVideo) playVideo(firstVideo, true);
-        }
+
+                const activeVideo = activeItem.querySelector('video');
+                if (activeVideo) {
+                    playVideo(activeVideo, true);
+                    const vinyl = activeItem.querySelector('.reel-vinyl-disc');
+                    if (vinyl) vinyl.classList.add('is-playing');
+                }
+            }
+        });
 
         console.log('[VideoManager] Fullscreen reels overlay opened at post:', targetPostId);
     }
@@ -614,13 +671,945 @@
     }
 
     // ============================================================================
+    // REEL QUICK TOOLS & COMMENT HELPERS
+    // ============================================================================
+
+    function getCsrfToken() {
+        const match = document.cookie.match(/csrftoken=([^;]+)/);
+        return match ? match[1] : (document.querySelector('[name=csrfmiddlewaretoken]')?.value || '');
+    }
+
+    function openReelQuickTools(postId, targetEl) {
+        const modalEl = document.getElementById('reelQuickToolsModal');
+        if (!modalEl || typeof bootstrap === 'undefined') return;
+
+        const card = targetEl ? targetEl.closest('.reel-card-container, .reels-snap-item') : document.getElementById(`reel-card-${postId}`);
+        if (!card) return;
+
+        const optionsBtn = card.querySelector('.reel-options-btn');
+        const authorName = optionsBtn?.dataset.author || card.querySelector('a[href*="profile"]')?.textContent?.trim() || 'Author';
+        const isAuthor = optionsBtn?.dataset.isAuthor === 'true';
+        const shareUrl = optionsBtn?.dataset.shareUrl || (window.location.origin + `/posts/${postId}/`);
+        const videoUrl = optionsBtn?.dataset.videoUrl || '';
+        const posterUrl = optionsBtn?.dataset.poster || '';
+
+        // Update Modal Header
+        const authorEl = document.getElementById('quickToolsAuthor');
+        if (authorEl) authorEl.textContent = `@${authorName}`;
+
+        // 1. Bookmark / Save Button
+        const bookmarkBtn = document.getElementById('quickToolsBookmarkBtn');
+        if (bookmarkBtn) {
+            bookmarkBtn.onclick = function() {
+                const isBookmarked = bookmarkBtn.classList.toggle('active');
+                const icon = bookmarkBtn.querySelector('i');
+                const label = bookmarkBtn.querySelector('.fw-semibold');
+                if (icon) icon.className = isBookmarked ? 'bi bi-bookmark-fill text-warning' : 'bi bi-bookmark';
+                if (label) label.textContent = isBookmarked ? 'Saved to Library' : 'Save to Library';
+                bootstrap.Modal.getInstance(modalEl)?.hide();
+            };
+        }
+
+        // 2. Repost Button
+        const repostBtn = document.getElementById('quickToolsRepostBtn');
+        if (repostBtn) {
+            repostBtn.onclick = function() {
+                bootstrap.Modal.getInstance(modalEl)?.hide();
+                const repostModalEl = document.getElementById('globalRepostModal');
+                if (repostModalEl) {
+                    const hiddenInput = repostModalEl.querySelector('input[name="post_id"]');
+                    if (hiddenInput) hiddenInput.value = postId;
+                    const form = document.getElementById('globalRepostForm');
+                    if (form) form.setAttribute('hx-post', `/api/posts/${postId}/repost/`);
+                    new bootstrap.Modal(repostModalEl).show();
+                }
+            };
+        }
+
+        // 3. Share Button
+        const shareBtn = document.getElementById('quickToolsShareBtn');
+        if (shareBtn) {
+            shareBtn.onclick = function() {
+                bootstrap.Modal.getInstance(modalEl)?.hide();
+                const shareModalEl = document.getElementById('globalShareModal');
+                if (shareModalEl) {
+                    new bootstrap.Modal(shareModalEl).show();
+                }
+            };
+        }
+
+        // 4. Copy Link Button
+        const copyBtn = document.getElementById('quickToolsCopyLinkBtn');
+        if (copyBtn) {
+            copyBtn.onclick = function() {
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(shareUrl).then(() => {
+                        const label = copyBtn.querySelector('.fw-semibold');
+                        if (label) label.textContent = 'Link Copied!';
+                        setTimeout(() => {
+                            if (label) label.textContent = 'Copy Link';
+                            bootstrap.Modal.getInstance(modalEl)?.hide();
+                        }, 800);
+                    });
+                }
+            };
+        }
+
+        // 5. Download for Offline Button
+        const downloadBtn = document.getElementById('quickToolsDownloadBtn');
+        if (downloadBtn) {
+            downloadBtn.onclick = function() {
+                bootstrap.Modal.getInstance(modalEl)?.hide();
+                if (window.downloadManager && videoUrl) {
+                    window.downloadManager.startDownload({
+                        id: postId,
+                        url: videoUrl,
+                        title: `Reel by ${authorName}`,
+                        mediaType: 'video',
+                        thumbnail: posterUrl
+                    });
+                } else if (videoUrl) {
+                    const a = document.createElement('a');
+                    a.href = videoUrl;
+                    a.download = `reel_${postId}.mp4`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }
+            };
+        }
+
+        // 6. Hide Button
+        const hideBtn = document.getElementById('quickToolsHideBtn');
+        if (hideBtn) {
+            hideBtn.onclick = function() {
+                bootstrap.Modal.getInstance(modalEl)?.hide();
+                if (card) {
+                    card.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.95)';
+                    setTimeout(() => card.remove(), 250);
+                }
+            };
+        }
+
+        // 7. Report Button
+        const reportBtn = document.getElementById('quickToolsReportBtn');
+        if (reportBtn) {
+            reportBtn.onclick = function() {
+                bootstrap.Modal.getInstance(modalEl)?.hide();
+                const reportModalEl = document.getElementById('globalReportModal');
+                if (reportModalEl) {
+                    const hiddenInput = reportModalEl.querySelector('input[name="post"]');
+                    if (hiddenInput) hiddenInput.value = postId;
+                    new bootstrap.Modal(reportModalEl).show();
+                }
+            };
+        }
+
+        // 8. Delete Button (Author only)
+        const deleteBtn = document.getElementById('quickToolsDeleteBtn');
+        if (deleteBtn) {
+            if (isAuthor) {
+                deleteBtn.classList.remove('d-none');
+                deleteBtn.onclick = function() {
+                    if (confirm('Are you sure you want to delete this reel?')) {
+                        bootstrap.Modal.getInstance(modalEl)?.hide();
+                        fetch(`/api/posts/${postId}/`, {
+                            method: 'DELETE',
+                            headers: {
+                                'X-CSRFToken': getCsrfToken()
+                            }
+                        }).then(() => {
+                            card.remove();
+                        });
+                    }
+                };
+            } else {
+                deleteBtn.classList.add('d-none');
+            }
+        }
+
+        new bootstrap.Modal(modalEl).show();
+    }
+
+    let activeCommentsPostId = null;
+
+    function closeAllSheetCommentMenus() {
+        document.querySelectorAll('.comment-menu-dropdown').forEach(m => m.remove());
+        document.querySelectorAll('.comment-item.menu-open').forEach(el => el.classList.remove('menu-open'));
+        document.querySelectorAll('[data-action="menu"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+    }
+
+    function showCommentsToast(message) {
+        let toast = document.getElementById('pwaninetCommentsToast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'pwaninetCommentsToast';
+            toast.className = 'position-fixed bottom-0 start-50 translate-middle-x mb-4 px-3 py-2 rounded-pill shadow bg-dark text-white text-center';
+            toast.style.zIndex = '10060';
+            toast.style.fontSize = '13px';
+            toast.style.pointerEvents = 'none';
+            toast.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = message;
+        toast.style.opacity = '1';
+        toast.style.transform = 'translate(-50%, 0)';
+        clearTimeout(toast._timeout);
+        toast._timeout = setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translate(-50%, 10px)';
+        }, 2200);
+    }
+
+    if (!window._commentMenuListenersBound) {
+        window._commentMenuListenersBound = true;
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.comment-menu-dropdown') && !e.target.closest('[data-action="menu"]')) {
+                closeAllSheetCommentMenus();
+            }
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeAllSheetCommentMenus();
+            }
+        });
+    }
+
+    function initSheetCommentsInteractions(listEl, postId) {
+        if (!listEl) return;
+        if (listEl.dataset.eventsBound === 'true') return;
+        listEl.dataset.eventsBound = 'true';
+
+        listEl.addEventListener('click', async function(e) {
+            // A. Comment Like
+            const likeBtn = e.target.closest('[data-action="like"]');
+            if (likeBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const commentId = likeBtn.dataset.commentId;
+                if (!commentId) return;
+
+                const icon = likeBtn.querySelector('i');
+                const countSpan = likeBtn.querySelector('span');
+                const wasLiked = likeBtn.classList.contains('liked');
+                const curCount = parseInt(countSpan?.textContent || '0', 10);
+
+                // Optimistic UI toggle
+                likeBtn.classList.toggle('liked', !wasLiked);
+                if (icon) {
+                    icon.className = wasLiked ? 'bi bi-heart' : 'bi bi-heart-fill text-danger';
+                }
+                if (countSpan) {
+                    countSpan.textContent = wasLiked ? Math.max(0, curCount - 1) : curCount + 1;
+                }
+
+                try {
+                    const res = await fetch(`/api/comments/${commentId}/like/`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCsrfToken(),
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (!res.ok) {
+                        await fetch(`/comment/${commentId}/like/`, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': getCsrfToken(),
+                                'HX-Request': 'true'
+                            }
+                        });
+                    }
+                } catch (err) {
+                    console.warn('[CommentsSheet] Like toggle error:', err);
+                    likeBtn.classList.toggle('liked', wasLiked);
+                    if (icon) icon.className = wasLiked ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+                    if (countSpan) countSpan.textContent = curCount;
+                }
+                return;
+            }
+
+            // B. Comment Reply
+            const replyBtn = e.target.closest('[data-action="reply"]');
+            if (replyBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const commentId = replyBtn.dataset.commentId;
+                const commentItem = replyBtn.closest('.comment-item');
+                // Enforce 1-level maximum nesting: if replying to a reply, anchor to its root parent comment
+                const rootParentId = commentItem?.dataset?.parentId || commentItem?.dataset?.parentCommentId || commentId;
+                const authorLink = commentItem?.querySelector('.comment-author-link');
+                const authorName = authorLink ? authorLink.textContent.trim() : '';
+
+                const parentInput = document.getElementById('commentsModalParentId');
+                const replyBanner = document.getElementById('commentsModalReplyBanner');
+                const replyUserSpan = document.getElementById('commentsModalReplyUser');
+                const inputEl = document.getElementById('reelCommentInput');
+
+                if (parentInput) parentInput.value = rootParentId;
+                if (replyBanner && replyUserSpan) {
+                    replyUserSpan.textContent = authorName ? `@${authorName}` : 'comment';
+                    replyBanner.classList.remove('d-none');
+                }
+                if (inputEl) {
+                    if (authorName && !inputEl.value.includes(`@${authorName}`)) {
+                        inputEl.value = `@${authorName} `;
+                    }
+                    inputEl.focus();
+                }
+                return;
+            }
+
+            // C. Toggle Replies
+            const toggleBtn = e.target.closest('[data-action="toggle-replies"]');
+            if (toggleBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const commentId = toggleBtn.dataset.commentId;
+                const parentComment = document.getElementById(`comment-${commentId}`);
+                if (!parentComment) return;
+
+                let repliesContainer = document.getElementById(`replies-${commentId}`);
+                const isExpanded = toggleBtn.classList.contains('expanded');
+
+                if (isExpanded) {
+                    // Collapse
+                    if (repliesContainer) {
+                        repliesContainer.classList.remove('expanded');
+                        repliesContainer.classList.add('collapsed');
+                        repliesContainer.style.display = 'none';
+                    }
+                    toggleBtn.classList.remove('expanded');
+                    const icon = toggleBtn.querySelector('i');
+                    if (icon) {
+                        icon.classList.remove('bi-chevron-up');
+                        icon.classList.add('bi-chevron-down');
+                    }
+                    const span = toggleBtn.querySelector('span');
+                    if (span) span.textContent = `View ${toggleBtn.dataset.replyCount} replies`;
+                } else {
+                    // Expand
+                    if (repliesContainer && repliesContainer.children.length > 0) {
+                        repliesContainer.classList.remove('collapsed');
+                        repliesContainer.classList.add('expanded');
+                        repliesContainer.style.display = 'block';
+                    } else {
+                        // Fetch replies from API
+                        try {
+                            const res = await fetch(`/api/comments/${commentId}/replies/?page=1&page_size=20`);
+                            if (res.ok) {
+                                const data = await res.json();
+                                if (!repliesContainer) {
+                                    repliesContainer = document.createElement('div');
+                                    repliesContainer.id = `replies-${commentId}`;
+                                    repliesContainer.className = 'replies-container expanded ms-4 mt-2 ps-2 border-start';
+                                    const contentDiv = parentComment.querySelector('.comment-content') || parentComment;
+                                    contentDiv.appendChild(repliesContainer);
+                                }
+                                repliesContainer.innerHTML = '';
+                                const results = data.results || (Array.isArray(data) ? data : []);
+                                results.forEach(reply => {
+                                    const replyAvatar = reply.author?.profile_pic || '/static/images/default-avatar.png';
+                                    const replyAuthor = reply.author?.full_name || reply.author?.username || 'User';
+                                    const replyUsername = reply.author?.username || '';
+                                    const replyLiked = reply.is_liked ? 'liked text-danger' : '';
+                                    const replyHtml = `
+                                        <div class="comment-item reply-item py-2 border-bottom border-light" id="comment-${reply.id}" data-comment-id="${reply.id}" data-parent-id="${commentId}" data-author-id="${reply.author?.id || ''}">
+                                            <div class="d-flex align-items-start gap-2">
+                                                <a href="/users/${replyUsername}/" class="text-decoration-none comment-avatar-link">
+                                                    <img src="${replyAvatar}" class="rounded-circle border" style="width: 28px; height: 28px; object-fit: cover;" alt="${replyAuthor}">
+                                                </a>
+                                                <div class="flex-grow-1 min-w-0">
+                                                    <div class="d-flex align-items-center justify-content-between">
+                                                        <a href="/users/${replyUsername}/" class="fw-bold text-dark text-decoration-none small comment-author-link">${replyAuthor}</a>
+                                                        <span class="text-muted" style="font-size: 11px;">${reply.created_at ? new Date(reply.created_at).toLocaleDateString() : ''}</span>
+                                                    </div>
+                                                    <div class="small text-break mt-0.5 comment-body" id="comment-body-${reply.id}">${reply.content}</div>
+                                                    <div class="comment-actions d-flex align-items-center gap-3 mt-1" style="font-size: 11px;">
+                                                        <button type="button" class="btn btn-link p-0 text-muted text-decoration-none comment-action ${replyLiked}" data-action="like" data-comment-id="${reply.id}">
+                                                            <i class="bi ${reply.is_liked ? 'bi-heart-fill text-danger' : 'bi-heart'}"></i>
+                                                            <span class="ms-0.5">${reply.like_count || 0}</span>
+                                                        </button>
+                                                        <button type="button" class="btn btn-link p-0 text-muted text-decoration-none comment-action" data-action="reply" data-comment-id="${reply.id}">
+                                                            <i class="bi bi-chat-dots"></i> Reply
+                                                        </button>
+                                                        <div class="comment-menu-wrapper position-relative d-inline-flex">
+                                                            <button type="button" class="btn btn-link p-0 text-muted comment-menu-btn" data-action="menu" data-comment-id="${reply.id}" aria-label="More options" aria-expanded="false">
+                                                                <i class="bi bi-three-dots"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                    repliesContainer.insertAdjacentHTML('beforeend', replyHtml);
+                                });
+                                repliesContainer.style.display = 'block';
+                            }
+                        } catch (err) {
+                            console.warn('[CommentsSheet] Failed to load replies:', err);
+                        }
+                    }
+                    toggleBtn.classList.add('expanded');
+                    const icon = toggleBtn.querySelector('i');
+                    if (icon) {
+                        icon.classList.remove('bi-chevron-down');
+                        icon.classList.add('bi-chevron-up');
+                    }
+                    const span = toggleBtn.querySelector('span');
+                    if (span) span.textContent = 'Hide replies';
+                }
+                return;
+            }
+
+            // D. Comment Context Menu (Three Dots)
+            const menuBtn = e.target.closest('[data-action="menu"]');
+            if (menuBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const commentId = menuBtn.dataset.commentId;
+                if (!commentId) return;
+
+                const existingMenu = document.getElementById(`menu-${commentId}`);
+                closeAllSheetCommentMenus();
+                if (existingMenu) return;
+
+                const commentEl = document.getElementById(`comment-${commentId}`);
+                if (!commentEl) return;
+
+                const currentUserId = window.PwaniNetUserId;
+                const currentUsername = window.PwaniNetUsername;
+                const currentUserRole = window.PwaniNetUserRole;
+
+                const authorId = commentEl.dataset.authorId;
+                const authorLink = commentEl.querySelector('.comment-author-link');
+                const authorUsername = authorLink ? (authorLink.getAttribute('href') || '').replace(/^\/users\/|\/$/g, '') : '';
+
+                const isOwner = (currentUserId && authorId && String(currentUserId) === String(authorId)) ||
+                                (currentUsername && authorUsername && currentUsername.toLowerCase() === authorUsername.toLowerCase());
+                const isModerator = ['admin', 'moderator', 'president', 'delegate'].includes((currentUserRole || '').toLowerCase());
+
+                let menuHtml = '';
+                if (typeof CommentRenderer !== 'undefined' && CommentRenderer.renderMenu) {
+                    menuHtml = CommentRenderer.renderMenu(commentId, isOwner, isModerator);
+                } else {
+                    let items = '';
+                    if (isOwner) {
+                        items += `
+                            <button type="button" class="comment-menu-item" data-action="edit" data-comment-id="${commentId}">
+                                <i class="bi bi-pencil"></i> Edit
+                            </button>
+                            <button type="button" class="comment-menu-item danger" data-action="delete" data-comment-id="${commentId}">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                            <div class="comment-menu-divider"></div>
+                        `;
+                    } else if (isModerator) {
+                        items += `
+                            <button type="button" class="comment-menu-item danger" data-action="delete" data-comment-id="${commentId}">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                            <div class="comment-menu-divider"></div>
+                        `;
+                    }
+                    items += `
+                        <button type="button" class="comment-menu-item" data-action="copy-text" data-comment-id="${commentId}">
+                            <i class="bi bi-copy"></i> Copy text
+                        </button>
+                        <button type="button" class="comment-menu-item" data-action="copy-link" data-comment-id="${commentId}">
+                            <i class="bi bi-link-45deg"></i> Copy link
+                        </button>
+                        <button type="button" class="comment-menu-item" data-action="view-profile" data-comment-id="${commentId}">
+                            <i class="bi bi-person"></i> View profile
+                        </button>
+                    `;
+                    menuHtml = `<div class="comment-menu-dropdown" id="menu-${commentId}" role="menu">${items}</div>`;
+                }
+
+                const wrapper = menuBtn.closest('.comment-menu-wrapper') || menuBtn.parentElement;
+                commentEl.classList.add('menu-open');
+                wrapper.insertAdjacentHTML('beforeend', menuHtml);
+                menuBtn.setAttribute('aria-expanded', 'true');
+
+                const menuEl = document.getElementById(`menu-${commentId}`);
+                if (menuEl) {
+                    const rect = menuEl.getBoundingClientRect();
+                    const modalBody = document.getElementById('commentsModalBody') || window;
+                    const bottomEdge = modalBody.getBoundingClientRect ? modalBody.getBoundingClientRect().bottom : window.innerHeight;
+                    if (rect.bottom > bottomEdge - 20) {
+                        menuEl.classList.add('menu-dropup');
+                    }
+                }
+                return;
+            }
+
+            // E. Copy Comment Text
+            const copyTextBtn = e.target.closest('[data-action="copy-text"]');
+            if (copyTextBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const commentId = copyTextBtn.dataset.commentId;
+                closeAllSheetCommentMenus();
+                const bodyEl = document.getElementById(`comment-body-${commentId}`) ||
+                               document.querySelector(`#comment-${commentId} .comment-body`);
+                const text = bodyEl ? bodyEl.textContent.trim() : '';
+                if (navigator.clipboard && text) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        showCommentsToast('Comment text copied to clipboard');
+                    }).catch(() => {
+                        showCommentsToast('Failed to copy text');
+                    });
+                }
+                return;
+            }
+
+            // F. Copy Comment Link
+            const copyLinkBtn = e.target.closest('[data-action="copy-link"]');
+            if (copyLinkBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const commentId = copyLinkBtn.dataset.commentId;
+                closeAllSheetCommentMenus();
+                const curPostId = activeCommentsPostId || postId;
+                const url = `${window.location.origin}/posts/${curPostId}/#comment-${commentId}`;
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(url).then(() => {
+                        showCommentsToast('Comment link copied to clipboard');
+                    }).catch(() => {
+                        showCommentsToast('Failed to copy link');
+                    });
+                }
+                return;
+            }
+
+            // G. View Profile
+            const viewProfileBtn = e.target.closest('[data-action="view-profile"]');
+            if (viewProfileBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const commentId = viewProfileBtn.dataset.commentId;
+                closeAllSheetCommentMenus();
+                const commentEl = document.getElementById(`comment-${commentId}`);
+                const profileLink = commentEl?.querySelector('.comment-author-link') || commentEl?.querySelector('.comment-avatar-link') || commentEl?.querySelector('a');
+                if (profileLink && profileLink.href) {
+                    window.location.href = profileLink.href;
+                }
+                return;
+            }
+
+            // H. Edit Comment Mode
+            const editBtn = e.target.closest('[data-action="edit"]');
+            if (editBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const commentId = editBtn.dataset.commentId;
+                closeAllSheetCommentMenus();
+                const bodyEl = document.getElementById(`comment-body-${commentId}`) ||
+                               document.querySelector(`#comment-${commentId} .comment-body`);
+                if (!bodyEl) return;
+                if (document.getElementById(`edit-mode-${commentId}`)) return;
+
+                const curText = bodyEl.textContent.trim();
+                bodyEl.dataset.originalText = curText;
+                bodyEl.style.display = 'none';
+
+                const editHtml = `
+                    <div class="comment-edit-mode mt-1" id="edit-mode-${commentId}">
+                        <textarea class="form-control form-control-sm mb-1 edit-textarea" id="edit-input-${commentId}" rows="2" style="font-size: 13px;">${curText}</textarea>
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-sm btn-light border py-0 px-2" data-action="cancel-edit" data-comment-id="${commentId}" style="font-size: 12px;">Cancel</button>
+                            <button type="button" class="btn btn-sm btn-primary py-0 px-2" data-action="save-edit" data-comment-id="${commentId}" style="font-size: 12px;">Save</button>
+                        </div>
+                    </div>
+                `;
+                bodyEl.insertAdjacentHTML('afterend', editHtml);
+                const textarea = document.getElementById(`edit-input-${commentId}`);
+                if (textarea) textarea.focus();
+                return;
+            }
+
+            // I. Cancel Edit Mode
+            const cancelEditBtn = e.target.closest('[data-action="cancel-edit"]');
+            if (cancelEditBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const commentId = cancelEditBtn.dataset.commentId;
+                const editMode = document.getElementById(`edit-mode-${commentId}`);
+                const bodyEl = document.getElementById(`comment-body-${commentId}`) ||
+                               document.querySelector(`#comment-${commentId} .comment-body`);
+                if (bodyEl) bodyEl.style.display = '';
+                if (editMode) editMode.remove();
+                return;
+            }
+
+            // J. Save Edit
+            const saveEditBtn = e.target.closest('[data-action="save-edit"]');
+            if (saveEditBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const commentId = saveEditBtn.dataset.commentId;
+                const textarea = document.getElementById(`edit-input-${commentId}`);
+                const newText = textarea ? textarea.value.trim() : '';
+                if (!newText) return;
+
+                saveEditBtn.disabled = true;
+                saveEditBtn.textContent = 'Saving...';
+
+                try {
+                    const res = await fetch(`/api/comments/${commentId}/`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCsrfToken()
+                        },
+                        body: JSON.stringify({ content: newText })
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        const bodyEl = document.getElementById(`comment-body-${commentId}`) ||
+                                       document.querySelector(`#comment-${commentId} .comment-body`);
+                        if (bodyEl) {
+                            bodyEl.textContent = data.content || newText;
+                            bodyEl.style.display = '';
+                        }
+                        const editMode = document.getElementById(`edit-mode-${commentId}`);
+                        if (editMode) editMode.remove();
+                        showCommentsToast('Comment updated');
+                    } else {
+                        saveEditBtn.disabled = false;
+                        saveEditBtn.textContent = 'Save';
+                        showCommentsToast('Failed to update comment');
+                    }
+                } catch (err) {
+                    console.error('[CommentsSheet] Save edit error:', err);
+                    saveEditBtn.disabled = false;
+                    saveEditBtn.textContent = 'Save';
+                    showCommentsToast('Failed to update comment');
+                }
+                return;
+            }
+
+            // K. Delete Comment
+            const deleteBtn = e.target.closest('[data-action="delete"]');
+            if (deleteBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const commentId = deleteBtn.dataset.commentId;
+                closeAllSheetCommentMenus();
+
+                if (!confirm('Are you sure you want to delete this comment?')) {
+                    return;
+                }
+
+                try {
+                    const res = await fetch(`/api/comments/${commentId}/`, {
+                        method: 'DELETE',
+                        headers: {
+                            'X-CSRFToken': getCsrfToken()
+                        }
+                    });
+                    if (res.ok) {
+                        const commentEl = document.getElementById(`comment-${commentId}`);
+                        if (commentEl) {
+                            const parentId = commentEl.dataset.parentId;
+
+                            commentEl.style.transition = 'all 0.25s ease';
+                            commentEl.style.opacity = '0';
+                            commentEl.style.transform = 'translateX(20px)';
+                            setTimeout(() => {
+                                commentEl.remove();
+
+                                // If reply, decrement parent reply count
+                                if (parentId) {
+                                    const parentComment = document.getElementById(`comment-${parentId}`);
+                                    const toggle = parentComment?.querySelector('[data-action="toggle-replies"]');
+                                    if (toggle) {
+                                        let rCount = Math.max(0, (parseInt(toggle.dataset.replyCount, 10) || 1) - 1);
+                                        toggle.dataset.replyCount = rCount;
+                                        const span = toggle.querySelector('span');
+                                        if (rCount === 0) {
+                                            toggle.style.display = 'none';
+                                        } else if (span) {
+                                            span.textContent = `View ${rCount} ${rCount === 1 ? 'reply' : 'replies'}`;
+                                        }
+                                    }
+                                }
+
+                                // Decrement total comment counter
+                                const countEl = document.getElementById('commentsModalCount');
+                                let curN = Math.max(0, (parseInt(countEl?.textContent || '1', 10) || 1) - 1);
+                                if (countEl) countEl.textContent = curN;
+
+                                const curPostId = activeCommentsPostId || postId;
+                                const inlinePostCount = document.getElementById(`comment-count-${curPostId}`);
+                                const inlineReelCount = document.getElementById(`reel-comment-count-${curPostId}`);
+                                const fsReelCount = document.getElementById(`fs-reel-comment-count-${curPostId}`);
+                                if (inlinePostCount) inlinePostCount.textContent = curN;
+                                if (inlineReelCount) inlineReelCount.textContent = curN;
+                                if (fsReelCount) fsReelCount.textContent = curN;
+                            }, 250);
+                        }
+                        showCommentsToast('Comment deleted');
+                    } else {
+                        showCommentsToast('Could not delete comment');
+                    }
+                } catch (err) {
+                    console.error('[CommentsSheet] Delete error:', err);
+                    showCommentsToast('Could not delete comment');
+                }
+                return;
+            }
+        });
+    }
+
+    function openCommentsSheet(postId) {
+        if (!postId) return;
+        postId = String(postId).trim();
+        activeCommentsPostId = postId;
+
+        const modalEl = document.getElementById('commentsModal');
+        if (!modalEl || typeof bootstrap === 'undefined') {
+            window.location.href = `/posts/${postId}/`;
+            return;
+        }
+
+        const countEl = document.getElementById('commentsModalCount');
+        const loadingEl = document.getElementById('commentsModalLoading');
+        const listEl = document.getElementById('commentsModalList');
+        const formEl = document.getElementById('reelCommentForm');
+        const inputEl = document.getElementById('reelCommentInput');
+        const parentInput = document.getElementById('commentsModalParentId');
+        const replyBanner = document.getElementById('commentsModalReplyBanner');
+
+        // Reset reply state
+        if (parentInput) parentInput.value = '';
+        if (replyBanner) replyBanner.classList.add('d-none');
+        if (inputEl) {
+            inputEl.value = '';
+            inputEl.placeholder = 'Add a comment...';
+        }
+
+        if (loadingEl) loadingEl.style.display = 'block';
+        if (listEl) {
+            listEl.innerHTML = '';
+            delete listEl.dataset.eventsBound;
+        }
+
+        // Read current count from postcard or reelcard
+        const curCount = document.getElementById(`comment-count-${postId}`)?.textContent ||
+                         document.getElementById(`reel-comment-count-${postId}`)?.textContent ||
+                         document.getElementById(`fs-reel-comment-count-${postId}`)?.textContent || '0';
+        if (countEl) countEl.textContent = curCount.trim();
+
+        // Fetch comments dynamically without navigating away
+        fetch(`/post/${postId}/?show_all=1`, {
+            headers: { 'HX-Request': 'true' }
+        })
+        .then(res => res.text())
+        .then(html => {
+            if (loadingEl) loadingEl.style.display = 'none';
+            if (listEl) {
+                listEl.innerHTML = html;
+                initSheetCommentsInteractions(listEl, postId);
+            }
+        })
+        .catch(err => {
+            console.warn('[CommentsSheet] Error loading comments:', err);
+            if (loadingEl) loadingEl.style.display = 'none';
+            if (listEl) listEl.innerHTML = '<div class="text-center py-4 text-muted small">Could not load comments.</div>';
+        });
+
+        // Bind comment submission with double-submission protection
+        if (formEl && !formEl.dataset.bound) {
+            formEl.dataset.bound = 'true';
+            formEl.onsubmit = function(e) {
+                e.preventDefault();
+                if (formEl.dataset.submitting === 'true') return;
+
+                const curPostId = activeCommentsPostId;
+                if (!curPostId) return;
+
+                const content = inputEl?.value?.trim();
+                if (!content) return;
+
+                formEl.dataset.submitting = 'true';
+                const sendBtn = formEl.querySelector('button[type="submit"]');
+                if (sendBtn) sendBtn.disabled = true;
+
+                const targetParentId = (parentInput && parentInput.value) ? parentInput.value : '';
+
+                const formData = new FormData();
+                formData.append('content', content);
+                formData.append('csrfmiddlewaretoken', getCsrfToken());
+                if (targetParentId) {
+                    formData.append('parent_id', targetParentId);
+                }
+
+                fetch(`/post/${curPostId}/comment/`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'HX-Request': 'true' }
+                })
+                .then(res => res.text())
+                .then(html => {
+                    delete formEl.dataset.submitting;
+                    if (sendBtn) sendBtn.disabled = false;
+                    if (inputEl) inputEl.value = '';
+                    if (parentInput) parentInput.value = '';
+                    if (replyBanner) replyBanner.classList.add('d-none');
+
+                    if (listEl) {
+                        delete listEl.dataset.eventsBound;
+                        listEl.innerHTML = html;
+                        initSheetCommentsInteractions(listEl, curPostId);
+                    }
+
+                    // Update all counters
+                    let curN = parseInt(countEl?.textContent || '0', 10) || 0;
+                    let newN = curN + 1;
+                    if (countEl) countEl.textContent = newN;
+
+                    const inlinePostCount = document.getElementById(`comment-count-${curPostId}`);
+                    const inlineReelCount = document.getElementById(`reel-comment-count-${curPostId}`);
+                    const fsReelCount = document.getElementById(`fs-reel-comment-count-${curPostId}`);
+                    if (inlinePostCount) inlinePostCount.textContent = newN;
+                    if (inlineReelCount) inlineReelCount.textContent = newN;
+                    if (fsReelCount) fsReelCount.textContent = newN;
+
+                    // If it was a reply, auto-expand that parent comment's replies thread
+                    if (targetParentId) {
+                        const parentEl = document.getElementById(`comment-${targetParentId}`);
+                        const toggleBtn = parentEl?.querySelector('[data-action="toggle-replies"]');
+                        if (toggleBtn) {
+                            toggleBtn.click();
+                            setTimeout(() => {
+                                parentEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            }, 250);
+                        }
+                    } else {
+                        // Scroll to bottom of comments list to view new comment
+                        const modalBody = document.getElementById('commentsModalBody');
+                        if (modalBody) {
+                            modalBody.scrollTo({ top: modalBody.scrollHeight, behavior: 'smooth' });
+                        }
+                    }
+                })
+                .catch(err => {
+                    delete formEl.dataset.submitting;
+                    if (sendBtn) sendBtn.disabled = false;
+                    console.error('[CommentsSheet] Comment post error:', err);
+                });
+            };
+        }
+
+        // Cancel reply button
+        const cancelReplyBtn = document.getElementById('commentsModalCancelReply');
+        if (cancelReplyBtn && !cancelReplyBtn.dataset.bound) {
+            cancelReplyBtn.dataset.bound = 'true';
+            cancelReplyBtn.onclick = function() {
+                if (parentInput) parentInput.value = '';
+                if (replyBanner) replyBanner.classList.add('d-none');
+                if (inputEl && /^@\w+\s*$/.test(inputEl.value)) {
+                    inputEl.value = '';
+                    inputEl.placeholder = 'Add a comment...';
+                }
+            };
+        }
+
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    const openReelComments = openCommentsSheet;
+
+    // ============================================================================
+    // SCRUBBER DRAG & JUMP CONTROLLER
+    // ============================================================================
+
+    const scrubberState = {
+        isDragging: false,
+        activeContainer: null,
+        activeVideo: null,
+        wasPlaying: false
+    };
+
+    function updateScrubPosition(clientX) {
+        if (!scrubberState.isDragging || !scrubberState.activeContainer) return;
+
+        const rect = scrubberState.activeContainer.getBoundingClientRect();
+        if (rect.width === 0) return;
+
+        const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+
+        const bar = scrubberState.activeContainer.querySelector('.reel-progress-bar');
+        if (bar) {
+            bar.style.width = `${ratio * 100}%`;
+        }
+
+        if (scrubberState.activeVideo && scrubberState.activeVideo.duration) {
+            scrubberState.activeVideo.currentTime = ratio * scrubberState.activeVideo.duration;
+        }
+    }
+
+    function startScrubbing(container, clientX) {
+        const card = container.closest('.reel-card-container, .reels-snap-item');
+        const video = card?.querySelector('video');
+        if (!video) return;
+
+        scrubberState.isDragging = true;
+        scrubberState.activeContainer = container;
+        scrubberState.activeVideo = video;
+        scrubberState.wasPlaying = !video.paused;
+
+        if (scrubberState.wasPlaying) {
+            pauseVideo(video);
+        }
+
+        container.classList.add('is-dragging');
+        updateScrubPosition(clientX);
+    }
+
+    function stopScrubbing() {
+        if (!scrubberState.isDragging) return;
+
+        if (scrubberState.activeContainer) {
+            scrubberState.activeContainer.classList.remove('is-dragging');
+        }
+
+        if (scrubberState.activeVideo && scrubberState.wasPlaying) {
+            playVideo(scrubberState.activeVideo, false);
+        }
+
+        scrubberState.isDragging = false;
+        scrubberState.activeContainer = null;
+        scrubberState.activeVideo = null;
+        scrubberState.wasPlaying = false;
+    }
+
+    function handleScrubberClick(container, event) {
+        const rect = container.getBoundingClientRect();
+        if (rect.width === 0) return;
+        const clickX = event.clientX - rect.left;
+        const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+        const card = container.closest('.reel-card-container, .reels-snap-item');
+        const video = card?.querySelector('video');
+        if (video && video.duration) {
+            video.currentTime = ratio * video.duration;
+            const bar = container.querySelector('.reel-progress-bar');
+            if (bar) bar.style.width = `${ratio * 100}%`;
+        }
+    }
+
+    // ============================================================================
     // INITIALIZATION & EVENT DELEGATION
     // ============================================================================
 
     function setupDelegatedListeners() {
         // Tap and Hitbox handling
         document.addEventListener('click', function(event) {
-            // Hitbox single vs. double tap
+            // Hitbox single vs. double tap (pauses/plays or likes)
             const hitbox = event.target.closest('.reel-center-hitbox, .reel-tap-hitbox');
             if (hitbox) {
                 event.preventDefault();
@@ -638,7 +1627,7 @@
                 return;
             }
 
-            // Expand to Fullscreen Reel
+            // Expand to Fullscreen Reel (Only clicking this button opens fullscreen mode)
             const expandBtn = event.target.closest('.reel-expand-btn, [data-action="fullscreen"]');
             if (expandBtn) {
                 event.preventDefault();
@@ -648,19 +1637,62 @@
                 return;
             }
 
-            // Feed Reel Card Click -> open fullscreen reels (if clicked outside interactive buttons/links)
-            const inlineReelCard = event.target.closest('.reel-card-container');
-            if (inlineReelCard && !inlineReelCard.closest('#fullscreenReelsOverlay') && !inlineReelCard.closest('.reels-snap-item')) {
-                const isInteractive = event.target.closest('a, button, [data-bs-toggle], [data-action], input, textarea, .like-button');
-                if (!isInteractive) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const postId = extractPostId(inlineReelCard);
-                    if (postId) {
-                        openFullscreenReels(postId);
-                    }
-                    return;
+            // Desktop Next / Previous Reel buttons
+            const navNext = event.target.closest('#reelsNavNext');
+            if (navNext) {
+                event.preventDefault();
+                event.stopPropagation();
+                const viewport = document.getElementById('reelsSnapViewport');
+                if (viewport && viewport.children.length > 0) {
+                    const h = viewport.clientHeight;
+                    const curIdx = Math.round(viewport.scrollTop / h);
+                    const nextIdx = Math.min(viewport.children.length - 1, curIdx + 1);
+                    viewport.scrollTo({ top: nextIdx * h, behavior: 'smooth' });
                 }
+                return;
+            }
+
+            const navPrev = event.target.closest('#reelsNavPrev');
+            if (navPrev) {
+                event.preventDefault();
+                event.stopPropagation();
+                const viewport = document.getElementById('reelsSnapViewport');
+                if (viewport && viewport.children.length > 0) {
+                    const h = viewport.clientHeight;
+                    const curIdx = Math.round(viewport.scrollTop / h);
+                    const prevIdx = Math.max(0, curIdx - 1);
+                    viewport.scrollTo({ top: prevIdx * h, behavior: 'smooth' });
+                }
+                return;
+            }
+
+            // Comment trigger button (both reels and postcards)
+            const commentBtn = event.target.closest('.reel-comment-trigger, .postcard-comment-btn, [data-action="open-comments"]');
+            if (commentBtn) {
+                event.preventDefault();
+                event.stopPropagation();
+                const postId = commentBtn.dataset.postId || extractPostId(commentBtn);
+                openCommentsSheet(postId);
+                return;
+            }
+
+            // Options trigger button
+            const optionsBtn = event.target.closest('.reel-options-btn');
+            if (optionsBtn) {
+                event.preventDefault();
+                event.stopPropagation();
+                const postId = optionsBtn.dataset.postId || extractPostId(optionsBtn);
+                openReelQuickTools(postId, optionsBtn);
+                return;
+            }
+
+            // Micro-scrubber click (instant jump if not dragged)
+            const scrubber = event.target.closest('.reel-progress-container');
+            if (scrubber) {
+                event.preventDefault();
+                event.stopPropagation();
+                handleScrubberClick(scrubber, event);
+                return;
             }
 
             // Close Fullscreen Reel
@@ -672,7 +1704,7 @@
                 return;
             }
 
-            // Proxy like button in fullscreen modal -> triggers inline like button
+            // Proxy like button in fullscreen modal -> triggers inline like button & updates counter
             const fsLikeBtn = event.target.closest('.fs-like-proxy-btn');
             if (fsLikeBtn) {
                 event.preventDefault();
@@ -688,18 +1720,186 @@
                 if (icon) {
                     icon.className = wasLiked ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
                 }
+                const fsCountEl = document.getElementById(`fs-reel-like-count-${postId}`);
+                const inlineCountEl = document.getElementById(`reel-like-count-${postId}`);
+                if (fsCountEl) {
+                    let cur = parseInt(fsCountEl.textContent, 10) || 0;
+                    fsCountEl.textContent = wasLiked ? cur + 1 : Math.max(0, cur - 1);
+                    if (inlineCountEl) inlineCountEl.textContent = fsCountEl.textContent;
+                }
                 return;
             }
         });
 
-        // Close fullscreen on ESC key
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape' && state.isFullScreenActive) {
-                closeFullscreenReels();
+        // Scrubber Dragging Listeners (Desktop Mouse Drag & Mobile Touch Scrubbing)
+        document.addEventListener('mousedown', function(event) {
+            const scrubber = event.target.closest('.reel-progress-container');
+            if (scrubber) {
+                event.preventDefault();
+                event.stopPropagation();
+                startScrubbing(scrubber, event.clientX);
             }
         });
 
-        // Manual play on landscape video -> pause any active reel
+        document.addEventListener('touchstart', function(event) {
+            const scrubber = event.target.closest('.reel-progress-container');
+            if (scrubber && event.touches.length > 0) {
+                event.stopPropagation();
+                startScrubbing(scrubber, event.touches[0].clientX);
+            }
+        }, { passive: false });
+
+        document.addEventListener('mousemove', function(event) {
+            if (scrubberState.isDragging) {
+                event.preventDefault();
+                updateScrubPosition(event.clientX);
+            }
+        });
+
+        document.addEventListener('touchmove', function(event) {
+            if (scrubberState.isDragging && event.touches.length > 0) {
+                event.preventDefault();
+                updateScrubPosition(event.touches[0].clientX);
+            }
+        }, { passive: false });
+
+        document.addEventListener('mouseup', function() {
+            if (scrubberState.isDragging) {
+                stopScrubbing();
+            }
+        });
+
+        document.addEventListener('touchend', function() {
+            if (scrubberState.isDragging) {
+                stopScrubbing();
+            }
+        });
+
+        document.addEventListener('touchcancel', function() {
+            if (scrubberState.isDragging) {
+                stopScrubbing();
+            }
+        });
+
+        // Long-press detection on reel cards and hitboxes
+        let longPressTimer = null;
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        document.addEventListener('touchstart', function(event) {
+            const hitbox = event.target.closest('.reel-center-hitbox, .reel-tap-hitbox, .reel-card-container');
+            if (!hitbox) return;
+
+            const touch = event.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            state.hasLongPressed = false;
+
+            longPressTimer = setTimeout(() => {
+                state.hasLongPressed = true;
+                if (navigator.vibrate) navigator.vibrate(35);
+                const postId = extractPostId(hitbox);
+                if (postId) {
+                    openReelQuickTools(postId, hitbox);
+                }
+            }, 480);
+        }, { passive: true });
+
+        document.addEventListener('touchmove', function(event) {
+            if (!longPressTimer) return;
+            const touch = event.touches[0];
+            if (Math.abs(touch.clientX - touchStartX) > 12 || Math.abs(touch.clientY - touchStartY) > 12) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchend', function() {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        }, { passive: true });
+
+        // Right click context menu on desktop -> opens quick tools
+        document.addEventListener('contextmenu', function(event) {
+            const card = event.target.closest('.reel-card-container');
+            if (card) {
+                event.preventDefault();
+                const postId = extractPostId(card);
+                if (postId) openReelQuickTools(postId, card);
+            }
+        });
+
+        // Fullscreen keyboard navigation (Escape, Up/Down arrows, Page Up/Down, Space play/pause, M mute)
+        document.addEventListener('keydown', function(event) {
+            if (!state.isFullScreenActive) return;
+
+            // Don't intercept typing in inputs/textareas
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.isContentEditable) {
+                return;
+            }
+
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeFullscreenReels();
+                return;
+            }
+
+            const viewport = document.getElementById('reelsSnapViewport');
+            if (!viewport) return;
+
+            if (event.key === 'ArrowDown' || event.key === 'PageDown' || event.key.toLowerCase() === 'j') {
+                event.preventDefault();
+                viewport.scrollBy({ top: viewport.clientHeight, behavior: 'smooth' });
+                return;
+            }
+
+            if (event.key === 'ArrowUp' || event.key === 'PageUp' || event.key.toLowerCase() === 'k') {
+                event.preventDefault();
+                viewport.scrollBy({ top: -viewport.clientHeight, behavior: 'smooth' });
+                return;
+            }
+
+            if (event.key === ' ' || event.code === 'Space') {
+                event.preventDefault();
+                if (state.currentPlayingVideo) {
+                    const snapItem = state.currentPlayingVideo.closest('.reels-snap-item');
+                    if (state.currentPlayingVideo.paused) {
+                        playVideo(state.currentPlayingVideo, false);
+                        if (snapItem) triggerPlayHud(snapItem, true);
+                    } else {
+                        pauseVideo(state.currentPlayingVideo);
+                        if (snapItem) triggerPlayHud(snapItem, false);
+                    }
+                }
+                return;
+            }
+
+            if (event.key.toLowerCase() === 'm') {
+                event.preventDefault();
+                toggleGlobalMute();
+                return;
+            }
+        });
+
+        // Timeupdate to sync micro-scrubber progress bars
+        document.addEventListener('timeupdate', function(event) {
+            const video = event.target;
+            if (video.tagName !== 'VIDEO') return;
+            if (!video.duration) return;
+
+            const pct = (video.currentTime / video.duration) * 100;
+            const card = video.closest('.reel-card-container, .reels-snap-item');
+            if (card) {
+                const bar = card.querySelector('.reel-progress-bar');
+                if (bar) {
+                    bar.style.width = `${pct}%`;
+                }
+            }
+        }, true);
+
+        // Sync vinyl disc animation on play
         document.addEventListener('play', function(event) {
             const video = event.target;
             if (video.tagName !== 'VIDEO') return;
@@ -708,6 +1908,24 @@
                 pauseVideo(state.currentPlayingVideo);
             }
             state.currentPlayingVideo = video;
+
+            const card = video.closest('.reel-card-container, .reels-snap-item');
+            if (card) {
+                const vinyl = card.querySelector('.reel-vinyl-disc');
+                if (vinyl) vinyl.classList.add('is-playing');
+            }
+        }, true);
+
+        // Sync vinyl disc animation on pause
+        document.addEventListener('pause', function(event) {
+            const video = event.target;
+            if (video.tagName !== 'VIDEO') return;
+
+            const card = video.closest('.reel-card-container, .reels-snap-item');
+            if (card) {
+                const vinyl = card.querySelector('.reel-vinyl-disc');
+                if (vinyl) vinyl.classList.remove('is-playing');
+            }
         }, true);
 
         // Pause on visibility change
@@ -826,6 +2044,9 @@
     // PUBLIC API
     // ============================================================================
 
+    window.openCommentsSheet = openCommentsSheet;
+    window.openReelComments = openCommentsSheet;
+
     window.PwaniNetVideoManager = {
         init,
         playVideo,
@@ -837,6 +2058,8 @@
         checkAndPromoteLegacyVideo,
         openFullscreenReels,
         closeFullscreenReels,
+        openCommentsSheet,
+        openReelComments,
         get isGlobalMuted() { return isGlobalMuted; },
         get state() { return state; }
     };

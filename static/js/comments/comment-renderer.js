@@ -81,13 +81,15 @@ const CommentRenderer = {
           Reply
         </button>
         
-        <button class="comment-menu-btn" 
-                data-action="menu"
-                data-comment-id="${commentData.id}"
-                aria-label="More options"
-                aria-expanded="false">
-          <i class="bi bi-three-dots"></i>
-        </button>
+        <div class="comment-menu-wrapper position-relative d-inline-flex">
+          <button class="comment-menu-btn" 
+                  data-action="menu"
+                  data-comment-id="${commentData.id}"
+                  aria-label="More options"
+                  aria-expanded="false">
+            <i class="bi bi-three-dots"></i>
+          </button>
+        </div>
       </div>
     `;
   },
@@ -182,7 +184,14 @@ const CommentRenderer = {
         <button class="comment-menu-item" data-action="edit" data-comment-id="${commentId}">
           <i class="bi bi-pencil"></i> Edit
         </button>
-        <button class="comment-menu-item" data-action="delete" data-comment-id="${commentId}">
+        <button class="comment-menu-item danger" data-action="delete" data-comment-id="${commentId}">
+          <i class="bi bi-trash"></i> Delete
+        </button>
+        <div class="comment-menu-divider"></div>
+      `;
+    } else if (isModerator) {
+      menuItems += `
+        <button class="comment-menu-item danger" data-action="delete" data-comment-id="${commentId}">
           <i class="bi bi-trash"></i> Delete
         </button>
         <div class="comment-menu-divider"></div>

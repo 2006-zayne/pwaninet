@@ -55,13 +55,15 @@
                     Reply
                 </button>
                 
-                <button class="comment-menu-btn" 
-                        data-action="menu"
-                        data-comment-id="{{ comment.id }}"
-                        aria-label="More options"
-                        aria-expanded="false">
-                    <i class="bi bi-three-dots"></i>
-                </button>
+                <div class="comment-menu-wrapper position-relative d-inline-flex">
+                    <button class="comment-menu-btn" 
+                            data-action="menu"
+                            data-comment-id="{{ comment.id }}"
+                            aria-label="More options"
+                            aria-expanded="false">
+                        <i class="bi bi-three-dots"></i>
+                    </button>
+                </div>
             </div>
             
             {% if comment.reply_count > 0 %}

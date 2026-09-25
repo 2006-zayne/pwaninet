@@ -23,6 +23,8 @@ const CommentManager = {
    * Bind global events
    */
   bindEvents() {
+    if (this._eventsBound) return;
+    this._eventsBound = true;
     document.addEventListener('click', (e) => this.handleClick(e));
     document.addEventListener('keydown', (e) => this.handleKeydown(e));
     document.addEventListener('input', (e) => this.handleInput(e));
@@ -32,6 +34,11 @@ const CommentManager = {
    * Handle click events
    */
   handleClick(e) {
+    // Close menu when clicking outside of any comment menu dropdown or menu trigger
+    if (!e.target.closest('.comment-menu-dropdown') && !e.target.closest('[data-action="menu"]')) {
+      this.closeAllMenus();
+    }
+
     const target = e.target.closest('[data-action]');
     if (!target) return;
 
@@ -91,11 +98,6 @@ const CommentManager = {
         e.preventDefault();
         this.viewProfile(commentId);
         break;
-    }
-
-    // Close menu when clicking outside
-    if (!target.closest('.comment-menu-dropdown') && !target.closest('[data-action="menu"]')) {
-      this.closeAllMenus();
     }
   },
 
@@ -286,14 +288,20 @@ const CommentManager = {
    * Send reply
    */
   async sendReply(commentId) {
+    this.submittingReplies = this.submittingReplies || new Set();
+    if (this.submittingReplies.has(commentId)) return;
+
     const input = document.getElementById(`composer-input-${commentId}`);
-    const content = input.value.trim();
+    const content = input ? input.value.trim() : '';
     
     if (!content) return;
     
     const sendBtn = document.querySelector(`[data-action="send-reply"][data-comment-id="${commentId}"]`);
-    sendBtn.disabled = true;
-    sendBtn.textContent = 'Sending...';
+    if (sendBtn) {
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Sending...';
+    }
+    this.submittingReplies.add(commentId);
     
     try {
       const reply = await CommentApi.createComment(this.postId, content, commentId);
@@ -304,17 +312,21 @@ const CommentManager = {
       // Close composer
       this.closeComposer(commentId, false);
       
-      // Add reply to DOM
-      this.addReplyToDom(commentId, reply);
-      
-      // Update reply count
-      this.updateReplyCount(commentId, 1);
+      // Add reply to DOM only if not already rendered by live WebSocket broadcast
+      if (reply && reply.id && !document.getElementById(`comment-${reply.id}`)) {
+        this.addReplyToDom(commentId, reply);
+        this.updateReplyCount(commentId, 1);
+      }
       
     } catch (error) {
       console.error('Failed to send reply:', error);
-      sendBtn.disabled = false;
-      sendBtn.textContent = 'Send';
+      if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send';
+      }
       alert('Failed to send reply. Please try again.');
+    } finally {
+      this.submittingReplies.delete(commentId);
     }
   },
 
@@ -322,6 +334,12 @@ const CommentManager = {
    * Add reply to DOM
    */
   addReplyToDom(parentCommentId, replyData) {
+    if (!replyData || !replyData.id) return;
+    // CRITICAL: Prevent duplicate rendering in DOM
+    if (document.getElementById(`comment-${replyData.id}`)) {
+      return;
+    }
+
     const parentComment = document.getElementById(`comment-${parentCommentId}`);
     if (!parentComment) return;
     
@@ -504,21 +522,32 @@ const CommentManager = {
     }
     
     const commentEl = document.getElementById(`comment-${commentId}`);
-    const isOwner = this.currentUser && commentEl.dataset.authorId == this.currentUser.id;
-    const isModerator = this.currentUser && ['admin', 'moderator'].includes(this.currentUser.role);
+    if (!commentEl) return;
+
+    const currentUserId = (this.currentUser && this.currentUser.id) || window.PwaniNetUserId;
+    const currentUserRole = (this.currentUser && this.currentUser.role) || window.PwaniNetUserRole;
+    const currentUsername = (this.currentUser && this.currentUser.username) || window.PwaniNetUsername;
+
+    const authorId = commentEl.dataset.authorId;
+    const authorLink = commentEl.querySelector('.comment-author-link');
+    const authorUsername = authorLink ? (authorLink.getAttribute('href') || '').replace(/^\/users\/|\/$/g, '') : '';
+
+    const isOwner = (currentUserId && authorId && String(currentUserId) === String(authorId)) ||
+                    (currentUsername && authorUsername && currentUsername.toLowerCase() === authorUsername.toLowerCase());
+    const isModerator = ['admin', 'moderator', 'president', 'delegate'].includes((currentUserRole || '').toLowerCase());
     
     const menuHtml = CommentRenderer.renderMenu(commentId, isOwner, isModerator);
-    const contentDiv = commentEl.querySelector('.comment-content');
+    const wrapper = button.closest('.comment-menu-wrapper') || button.parentElement;
     if (commentEl) {
       commentEl.classList.add('menu-open');
     }
-    contentDiv.insertAdjacentHTML('beforeend', menuHtml);
+    wrapper.insertAdjacentHTML('beforeend', menuHtml);
     
-    // Smart dropup detection: if menu extends near or below bottom composer, open upward
+    // Smart dropup detection: if menu extends near or below bottom boundary, open upward
     const menuEl = document.getElementById(`menu-${commentId}`);
     if (menuEl) {
       const rect = menuEl.getBoundingClientRect();
-      const composer = document.querySelector('.post-detail-container .fixed-bottom') || document.querySelector('.fixed-bottom');
+      const composer = document.querySelector('.post-detail-container .fixed-bottom') || document.querySelector('.fixed-bottom') || button.closest('.modal-body');
       const bottomLimit = composer ? composer.getBoundingClientRect().top : (window.innerHeight - 70);
       if (rect.bottom > bottomLimit) {
         menuEl.classList.add('menu-dropup');
@@ -714,6 +743,8 @@ const CommentManager = {
    * Handle new comment via WebSocket
    */
   handleNewComment(commentData) {
+    if (!commentData || !commentData.id) return;
+
     // Check if comment already exists
     if (document.getElementById(`comment-${commentData.id}`)) {
       return;
@@ -721,8 +752,10 @@ const CommentManager = {
     
     // If this is a reply, add it to the parent's replies container
     if (commentData.parent_comment_id) {
-      this.addReplyToDom(commentData.parent_comment_id, commentData);
-      this.updateReplyCount(commentData.parent_comment_id, 1);
+      if (!document.getElementById(`comment-${commentData.id}`)) {
+        this.addReplyToDom(commentData.parent_comment_id, commentData);
+        this.updateReplyCount(commentData.parent_comment_id, 1);
+      }
       return;
     }
     

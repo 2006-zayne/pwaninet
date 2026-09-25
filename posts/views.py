@@ -564,6 +564,34 @@ class CommentViewSet(viewsets.ModelViewSet):
             return CommentCreateSerializer
         return CommentSerializer
 
+    def get_permissions(self):
+        from posts.permissions import CanDeleteComment, CanEditComment
+        if self.action in ['destroy']:
+            return [IsAuthenticated(), CanDeleteComment()]
+        elif self.action in ['update', 'partial_update']:
+            return [IsAuthenticated(), CanEditComment()]
+        return super().get_permissions()
+
+    def perform_destroy(self, instance):
+        post = instance.post
+        parent = instance.parent_comment
+        instance.delete()
+        if parent:
+            parent.reply_count = parent.replies.count()
+            parent.save(update_fields=['reply_count'])
+
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            "feed_updates",
+            {
+                'type': 'post_comment_update',
+                'post_id': post.id,
+                'comment_count': post.comments.count()
+            }
+        )
+
     def perform_create(self, serializer):
         comment = serializer.save(author=self.request.user)
 
