@@ -1267,7 +1267,6 @@ function initCreatePostComposer() {
     const attachCameraBtn = document.getElementById('attachCamera');
     if (attachCameraBtn) {
         attachCameraBtn.addEventListener('click', async () => {
-            attachmentModal.classList.remove('show');
             if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Camera) {
                 try {
                     if (window.PwaninetPermissions && typeof window.PwaninetPermissions.requestCamera === 'function') {
@@ -1277,34 +1276,92 @@ function initCreatePostComposer() {
                             return;
                         }
                     }
-                    const { Camera, CameraResultType, CameraSource } = window.Capacitor.Plugins;
+                    const { Camera } = window.Capacitor.Plugins;
                     const image = await Camera.getPhoto({
                         quality: 90,
                         allowEditing: false,
-                        resultType: CameraResultType.Uri,
-                        source: CameraSource.Camera
+                        resultType: 'uri',
+                        source: 'CAMERA'
                     });
 
-                    const response = await fetch(image.webPath);
-                    const blob = await response.blob();
-                    const file = new File([blob], `captured_image_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                    attachmentModal.classList.remove('show');
 
-                    addFiles([file]);
+                    let blob;
+                    if (image.webPath) {
+                        try {
+                            const response = await fetch(image.webPath);
+                            blob = await response.blob();
+                        } catch (fetchErr) {
+                            console.warn('[CreatePost] Failed to fetch webPath:', fetchErr);
+                        }
+                    }
+                    if (!blob && image.dataUrl) {
+                        const response = await fetch(image.dataUrl);
+                        blob = await response.blob();
+                    }
+
+                    if (blob) {
+                        const file = new File([blob], `captured_image_${Date.now()}.${image.format || 'jpg'}`, { type: `image/${image.format || 'jpeg'}` });
+                        addFiles([file]);
+                    }
                 } catch (error) {
                     if (error && error.message !== 'User cancelled photos app') {
                         console.error('[NativeApp] Camera capture failed:', error);
                     }
                 }
             } else if (cameraInput) {
+                attachmentModal.classList.remove('show');
                 cameraInput.click();
             }
         });
     }
 
-    document.getElementById('attachImages').addEventListener('click', () => {
-        imageInput.click();
-        attachmentModal.classList.remove('show');
-    });
+    const attachImagesBtn = document.getElementById('attachImages');
+    if (attachImagesBtn) {
+        attachImagesBtn.addEventListener('click', async () => {
+            attachmentModal.classList.remove('show');
+            if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Camera && typeof window.Capacitor.Plugins.Camera.pickImages === 'function') {
+                try {
+                    const { Camera } = window.Capacitor.Plugins;
+                    const result = await Camera.pickImages({
+                        quality: 90,
+                        limit: 10
+                    });
+
+                    if (result && result.photos && result.photos.length > 0) {
+                        const files = [];
+                        for (let i = 0; i < result.photos.length; i++) {
+                            const p = result.photos[i];
+                            let blob = null;
+                            if (p.webPath) {
+                                try {
+                                    const res = await fetch(p.webPath);
+                                    blob = await res.blob();
+                                } catch (fetchErr) {
+                                    console.warn('[CreatePost] Failed to fetch photo webPath:', fetchErr);
+                                }
+                            }
+                            if (blob) {
+                                const ext = p.format || 'jpg';
+                                const file = new File([blob], `gallery_${Date.now()}_${i}.${ext}`, { type: `image/${ext === 'jpg' ? 'jpeg' : ext}` });
+                                files.push(file);
+                            }
+                        }
+                        if (files.length > 0) {
+                            addFiles(files);
+                        }
+                    }
+                } catch (e) {
+                    if (e && e.message !== 'User cancelled photos app') {
+                        console.error('[CreatePost] Native gallery pick failed, falling back to file input:', e);
+                        imageInput.click();
+                    }
+                }
+            } else {
+                imageInput.click();
+            }
+        });
+    }
 
     document.getElementById('attachVideo').addEventListener('click', () => {
         videoInput.click();

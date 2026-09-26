@@ -102,6 +102,7 @@ class ProfileDrivenRenderer:
                             'url': action.url,
                             'method': action.method,
                             'payload': action.payload,
+                            'icon': getattr(action, 'icon', None) or (action.payload.get('icon') if hasattr(action, 'payload') and isinstance(action.payload, dict) else None),
                         })
             else:
                 actions = action_resolver.resolve(profile, payload)

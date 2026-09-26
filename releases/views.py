@@ -310,6 +310,8 @@ class VersionAPIView(APIView):
     This is the single source of truth for version information.
     Endpoint: GET /api/version/
     """
+    permission_classes = [permissions.AllowAny]
+
     def get(self, request):
         """Return current version metadata from Release model"""
         from .services import ReleaseService

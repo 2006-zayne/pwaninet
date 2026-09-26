@@ -1,5 +1,6 @@
 import datetime
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, logout
 from django.http import JsonResponse, HttpResponse
@@ -688,6 +689,12 @@ def profile_view(request, username):
     # Determine if viewing own profile
     is_own_profile = request.user == profile_user
 
+    # Determine requested active tab
+    active_tab = request.GET.get('tab', 'posts')
+    if is_own_profile and active_tab == 'shared' and unseen_shared_count > 0:
+        shared_posts.filter(is_viewed=False).update(is_viewed=True)
+        unseen_shared_count = 0
+
     # Get profile completion percentage for owner
     profile_completion = profile_user.profile_completion_percentage if is_own_profile else None
 
@@ -711,6 +718,7 @@ def profile_view(request, username):
             'liked_post_ids': liked_post_ids,
             'reposted_posts': reposted_posts,
             'repost_count': repost_count,
+            'active_tab': active_tab,
         }
         return render(request, 'users/partials/profile_navigation_partial.html', context)
 
@@ -720,7 +728,6 @@ def profile_view(request, username):
             'posts': posts_page,
             'has_more_posts': posts_page.has_next(),
             'profile_user': profile_user,
-            'posts': posts_page,
             'liked_post_ids': liked_post_ids,
         })
 
@@ -741,6 +748,7 @@ def profile_view(request, username):
         'liked_post_ids': liked_post_ids,
         'reposted_posts': reposted_posts,
         'repost_count': repost_count,
+        'active_tab': active_tab,
     })
 
 
@@ -1039,14 +1047,31 @@ def encrypted_invite_landing(request, token):
     if invite:
         resolved_type = invite.invite_type
         request.session['invite_token'] = token
-        request.session['inviter_id'] = invite.inviter_id
-        request.session['inviter_username'] = invite.inviter.username
+        inv_id = getattr(invite, 'inviter_id', getattr(invite, 'user_id', None))
+        inviter = getattr(invite, 'inviter', None)
+        if not inviter and inv_id:
+            from users.models import User
+            try:
+                inviter = User.objects.get(id=inv_id)
+            except Exception:
+                inviter = None
+        if inv_id:
+            request.session['inviter_id'] = inv_id
+        if inviter:
+            request.session['inviter_username'] = inviter.username
     else:
         decrypted = decrypt_invite_token(token)
         if decrypted:
             u_id, resolved_type = decrypted
             request.session['invite_token'] = token
-            request.session['inviter_id'] = u_id
+            if u_id:
+                request.session['inviter_id'] = u_id
+                from users.models import User
+                try:
+                    inviter = User.objects.get(id=u_id)
+                    request.session['inviter_username'] = inviter.username
+                except Exception:
+                    pass
 
     if resolved_type == InviteType.APP_DOWNLOAD:
         download_url = reverse('downloads')
@@ -1070,8 +1095,12 @@ def app_invite_landing(request, token):
     invite = track_invite_click(token)
     if invite:
         request.session['invite_token'] = token
-        request.session['inviter_id'] = invite.inviter_id
-        request.session['inviter_username'] = invite.inviter.username
+        inv_id = getattr(invite, 'inviter_id', getattr(invite, 'user_id', None))
+        if inv_id:
+            request.session['inviter_id'] = inv_id
+        inviter = getattr(invite, 'inviter', None)
+        if inviter:
+            request.session['inviter_username'] = inviter.username
 
     download_url = reverse('downloads')
     return redirect(f"{download_url}?ref={token}")
@@ -1086,8 +1115,12 @@ def platform_invite_landing(request, token):
     invite = track_invite_click(token)
     if invite:
         request.session['invite_token'] = token
-        request.session['inviter_id'] = invite.inviter_id
-        request.session['inviter_username'] = invite.inviter.username
+        inv_id = getattr(invite, 'inviter_id', getattr(invite, 'user_id', None))
+        if inv_id:
+            request.session['inviter_id'] = inv_id
+        inviter = getattr(invite, 'inviter', None)
+        if inviter:
+            request.session['inviter_username'] = inviter.username
 
     if request.user.is_authenticated:
         messages.info(request, "You are already a member of PwaniNet!")
@@ -1097,14 +1130,16 @@ def platform_invite_landing(request, token):
     return redirect(f"{register_url}?ref={token}")
 
 
-@login_required
 def get_invite_share_data(request):
     """
     API endpoint returning encrypted invite links, texts, and telemetry stats for the user.
     """
+    if not request.user.is_authenticated:
+        return JsonResponse({'status': 'error', 'message': 'Authentication required'}, status=401)
     from users.services.invite_service import get_invite_data
     data = get_invite_data(request.user, request)
     return JsonResponse({'status': 'success', 'data': data})
+
 
 
 @login_required

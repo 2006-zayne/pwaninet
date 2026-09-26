@@ -94,23 +94,23 @@
 
         // 3. Platform-specific subscription & permission checks
         if (isNativeApp()) {
-            const hasToken = !!localStorage.getItem('pwaninet_fcm_token');
             const isSubscribed = localStorage.getItem(STORAGE_KEY_SUBSCRIBED) === 'true';
-
-            // Already fully registered and subscribed on native
-            if (hasToken && isSubscribed) {
-                return false;
-            }
 
             try {
                 const PushNotifications = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications;
                 if (!PushNotifications) return false;
                 const status = await PushNotifications.checkPermissions();
+
+                // If already granted at OS level or marked subscribed, never prompt again
+                if (status.receive === 'granted' || isSubscribed) {
+                    localStorage.setItem(STORAGE_KEY_SUBSCRIBED, 'true');
+                    return false;
+                }
                 if (status.receive === 'denied') {
                     return false;
                 }
-                // Eligible: prompt, prompt-with-rationale, or granted without completed subscription
-                return true;
+                // Eligible only if user has not yet decided (prompt or prompt-with-rationale)
+                return status.receive === 'prompt' || status.receive === 'prompt-with-rationale';
             } catch (e) {
                 return false;
             }
@@ -195,10 +195,10 @@
                 }
 
                 if (permStatus.receive === 'granted') {
+                    localStorage.setItem(STORAGE_KEY_SUBSCRIBED, 'true');
                     if (typeof window.initNativePush === 'function') {
                         await window.initNativePush(true);
                     }
-                    localStorage.setItem(STORAGE_KEY_SUBSCRIBED, 'true');
                     console.log('[PUSH-SHEET] Native push permission granted and subscribed');
                     showToast('Notifications enabled successfully!');
                     hideSheet(false);

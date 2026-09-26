@@ -1,3 +1,4 @@
+import logging
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -10,6 +11,9 @@ from django.core.exceptions import ValidationError
 from django.urls import reverse
 from django.conf import settings
 from celery.result import AsyncResult
+
+logger = logging.getLogger(__name__)
+
 
 from .models import Post, Comment, Report, Like, Repost, HiddenPost, AuthorPreference, SharedPost, PostImage, PostImageLike, PostImageComment
 from .serializers import (
@@ -1433,7 +1437,7 @@ def share_app_to_users_view(request):
             ).first()
 
             if not existing:
-                SharedPost.objects.create(
+                shared_post = SharedPost.objects.create(
                     sharer=request.user,
                     shared_to=recipient,
                     share_type='app_link',
@@ -1465,6 +1469,8 @@ def share_app_to_users_view(request):
                             'resource_type': 'APP',
                             'post_content': 'Download the official PwaniNet Android app',
                             'actor_username': request.user.username,
+                            'download_url': '/download/app/latest/',
+                            'shared_post_id': shared_post.share_id,
                         }
                     )
                 except Exception as notify_err:
@@ -1472,6 +1478,9 @@ def share_app_to_users_view(request):
             else:
                 shared_count += 1
         except User.DoesNotExist:
+            continue
+        except Exception as share_err:
+            logger.error(f"Error sharing app link to user '{username}': {share_err}")
             continue
 
     if shared_count > 0:

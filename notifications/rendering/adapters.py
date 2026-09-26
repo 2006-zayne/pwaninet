@@ -476,6 +476,26 @@ class NotificationObjectAdapter(PayloadAdapter):
             except Exception:
                 pass
         
+        # Check if this is an app download share
+        is_app_share = (
+            target_type in ['APPDOWNLOAD', 'APP']
+            or context_type == 'APP'
+            or (metadata.get('resource_type') or '').upper() == 'APP'
+            or metadata.get('share_type') in ['app_link', 'app_download', 'APP']
+            or 'download_url' in metadata
+        )
+        if is_app_share:
+            recipient_username = getattr(notification.recipient, 'username', '') or metadata.get('recipient_username', '')
+            anchor = f"#shared-post-card-{metadata['shared_post_id']}" if metadata.get('shared_post_id') else "#shared-content"
+            tab_url = f"/users/user/{recipient_username}/?tab=shared{anchor}" if recipient_username else "/downloads/"
+            return NotificationResource(
+                type=ResourceType.SYSTEM,
+                id=target_id or 0,
+                url=tab_url,
+                title=metadata.get('post_content') or 'PwaniNet Mobile App',
+                image_url=_clean_media_url(thumbnail_url) or '/static/images/pwaninet-app-icon.png'
+            )
+
         post = None
         if target_type in ['POST', 'POSTS'] and target_id:
             post = _get_post_safely(target_id)
@@ -483,8 +503,8 @@ class NotificationObjectAdapter(PayloadAdapter):
             post = _get_post_safely(context_id)
         if not post and notification.notification_type in [
             'LIKE', 'POST_LIKE', 'POST_COMMENT', 'COMMENT', 'COMMENT_REPLY',
-            'COMMENT_LIKE', 'SHARE', 'POST_SHARE', 'POST_SHARED', 'POST_REPOSTED',
-            'POST_CREATED', 'DOCUMENT_SHARED', 'POST_DOCUMENT_SHARED'
+            'COMMENT_LIKE', 'SHARE', 'POST_SHARE', 'POST_SHARED', 'POST_SHARED_TO_GROUP',
+            'POST_REPOSTED', 'POST_CREATED', 'DOCUMENT_SHARED', 'POST_DOCUMENT_SHARED'
         ]:
             post = _get_post_safely(target_id) or _get_post_safely(context_id)
         
@@ -546,6 +566,21 @@ class NotificationObjectAdapter(PayloadAdapter):
                     image_url=image_url or _clean_media_url(thumbnail_url),
                     content=comment_content
                 )
+            elif notification.notification_type in ['POST_SHARED_TO_GROUP'] or (notification.notification_type in ['SHARE', 'POST_SHARE', 'POST_SHARED'] and (getattr(post, 'group', None) or metadata.get('group_id'))):
+                # Group shared post: link directly into the group on this exact post
+                group_obj = getattr(post, 'group', None)
+                group_id = getattr(group_obj, 'id', None) or metadata.get('group_id')
+                repost_sid = metadata.get('repost_share_id') or post.share_id
+                if group_id:
+                    url = f'/groups/{group_id}/#post-card-{repost_sid}'
+                else:
+                    url = f'/post/{post.share_id}/'
+            elif notification.notification_type in ['SHARE', 'POST_SHARE', 'POST_SHARED']:
+                # Direct post share: thumbnail lands in recipient's profile 'Shared with me' tab
+                recipient_username = getattr(notification.recipient, 'username', '') or metadata.get('recipient_username', '')
+                shared_post_id = metadata.get('shared_post_id')
+                anchor = f'#shared-post-card-{shared_post_id}' if shared_post_id else '#shared-content'
+                url = f'/users/user/{recipient_username}/?tab=shared{anchor}' if recipient_username else f'/post/{post.share_id}/'
             else:
                 url = f'/post/{post.share_id}/'
             
@@ -588,11 +623,26 @@ class NotificationObjectAdapter(PayloadAdapter):
             except (Document.DoesNotExist, ValueError):
                 pass
 
-        # Fallback 2: If post lookup failed or post was deleted, BUT thumbnail_url exists, STILL return NotificationResource
-        if thumbnail_url:
+        # Fallback 2: If post lookup failed or post was deleted, return NotificationResource if share notification or thumbnail exists
+        notif_type = str(getattr(notification, 'notification_type', '') or '').upper()
+        is_share_notif = notif_type in ['POST_SHARED_TO_GROUP', 'SHARE', 'POST_SHARE', 'POST_SHARED'] or bool(metadata.get('group_id')) or bool(metadata.get('shared_post_id'))
+        if thumbnail_url or is_share_notif:
             target_url = '#'
             res_id = 0
-            if target_id:
+            if is_app_share:
+                recipient_username = getattr(notification.recipient, 'username', '') or metadata.get('recipient_username', '')
+                anchor = f"#shared-post-card-{metadata['shared_post_id']}" if metadata.get('shared_post_id') else "#shared-content"
+                target_url = f"/users/user/{recipient_username}/?tab=shared{anchor}" if recipient_username else "/downloads/"
+            elif notification.notification_type in ['POST_SHARED_TO_GROUP'] or metadata.get('group_id'):
+                gid = metadata.get('group_id')
+                repost_id = metadata.get('repost_share_id') or target_id
+                target_url = f'/groups/{gid}/#post-card-{repost_id}' if gid else '#'
+            elif notification.notification_type in ['SHARE', 'POST_SHARE', 'POST_SHARED']:
+                recipient_username = getattr(notification.recipient, 'username', '') or metadata.get('recipient_username', '')
+                shared_post_id = metadata.get('shared_post_id')
+                anchor = f'#shared-post-card-{shared_post_id}' if shared_post_id else '#shared-content'
+                target_url = f"/users/user/{recipient_username}/?tab=shared{anchor}" if recipient_username else '#'
+            elif target_id:
                 sid = _post_share_id(target_id) or target_id
                 target_url = f'/post/{sid}/'
                 if str(target_id).isdigit():
@@ -604,7 +654,7 @@ class NotificationObjectAdapter(PayloadAdapter):
                     res_id = int(context_id)
             
             return NotificationResource(
-                type=ResourceType.POST,
+                type=ResourceType.SYSTEM if is_app_share else ResourceType.POST,
                 id=res_id,
                 url=target_url,
                 title=metadata.get('post_content', 'Post') or 'Post',
@@ -685,40 +735,56 @@ class NotificationObjectAdapter(PayloadAdapter):
         actions = []
         
         # First, check if there are actions in the NotificationAction model
-        from notifications.models import NotificationAction as ModelNotificationAction
-        notification_actions = ModelNotificationAction.objects.filter(notification=notification)
+        try:
+            from notifications.models import NotificationAction as ModelNotificationAction
+            notification_actions = ModelNotificationAction.objects.filter(notification=notification)
+            if notification_actions.exists():
+                # Deduplicate actions by label to prevent duplicates from multiple actors
+                seen_labels = set()
+                for idx, action in enumerate(notification_actions):
+                    if action.label not in seen_labels:
+                        # Fix old URL format for VIEW_POST actions
+                        url = action.url
+                        if action.action_type == 'VIEW_POST' and url and url.startswith('/posts/'):
+                            url = url.replace('/posts/', '/post/')
+                        
+                        # Fix old integer-ID post URLs → UUID share_id
+                        if url:
+                            import re
+                            m = re.match(r'^/post/(\d+)(/.*)?$', url)
+                            if m:
+                                share_id = _post_share_id(int(m.group(1)))
+                                if share_id:
+                                    url = f'/post/{share_id}/{m.group(2) or ""}'.replace('//', '/')
+                        
+                        actions.append(PayloadNotificationAction(
+                            id=action.action_type,  # Use action_type instead of database ID
+                            label=action.label,
+                            style='primary' if action.is_primary else 'secondary',
+                            enabled=True,
+                            url=url,
+                            method=action.method or 'GET',
+                            payload={}
+                        ))
+                        seen_labels.add(action.label)
+                return actions
+        except Exception:
+            pass
         
-        if notification_actions.exists():
-            # Deduplicate actions by label to prevent duplicates from multiple actors
-            seen_labels = set()
-            for idx, action in enumerate(notification_actions):
-                if action.label not in seen_labels:
-                    # Fix old URL format for VIEW_POST actions
-                    url = action.url
-                    if action.action_type == 'VIEW_POST' and url and url.startswith('/posts/'):
-                        url = url.replace('/posts/', '/post/')
-                    
-                    # Fix old integer-ID post URLs → UUID share_id
-                    if url:
-                        import re
-                        m = re.match(r'^/post/(\d+)(/.*)?$', url)
-                        if m:
-                            share_id = _post_share_id(int(m.group(1)))
-                            if share_id:
-                                url = f'/post/{share_id}/{m.group(2) or ""}'.replace('//', '/')
-                    
-                    actions.append(PayloadNotificationAction(
-                        id=action.action_type,  # Use action_type instead of database ID
-                        label=action.label,
-                        style='primary' if action.is_primary else 'secondary',
-                        enabled=True,
-                        url=url,
-                        method=action.method or 'GET',
-                        payload={}
-                    ))
-                    seen_labels.add(action.label)
-            return actions
-        
+        # Check for app share
+        meta = notification.metadata or {}
+        is_app_share = (
+            getattr(notification, 'target_type', '') in ['AppDownload', 'APPDOWNLOAD', 'APP']
+            or getattr(notification, 'context_type', '') == 'APP'
+            or (meta.get('resource_type') or '').upper() == 'APP'
+            or meta.get('share_type') in ['app_link', 'app_download', 'APP']
+            or 'download_url' in meta
+        )
+        notif_type = str(getattr(notification, 'notification_type', '') or '').upper()
+        if notif_type in ['POST_SHARED', 'POST_SHARE', 'SHARE'] and is_app_share:
+            action = self._build_action_from_id('DOWNLOAD_APK', notification)
+            return [action] if action else []
+
         # Use profile registry to determine available actions
         from .profile_registry import profile_registry
         profile = profile_registry.get_profile(notification.notification_type)
@@ -769,6 +835,13 @@ class NotificationObjectAdapter(PayloadAdapter):
         """Build a single action from action ID using notification context."""
         # Map action IDs to their configurations
         action_configs = {
+            'DOWNLOAD_APK': {
+                'label': 'Download APK',
+                'style': 'success',
+                'icon': 'download',
+                'url_builder': lambda n: (n.metadata or {}).get('download_url') or '/download/app/latest/',
+                'method': 'GET'
+            },
             'ACCEPT': {
                 'label': 'Accept',
                 'style': 'primary',
@@ -794,9 +867,10 @@ class NotificationObjectAdapter(PayloadAdapter):
                 'method': 'POST'
             },
             'VIEW_POST': {
-                'label': 'View Post',
+                'label': 'View in Group' if (notification.notification_type == 'POST_SHARED_TO_GROUP' or (notification.metadata or {}).get('group_id')) else 'View Post',
                 'style': 'primary',
-                'url_builder': lambda n: f'/post/{_post_share_id(n.context_id)}/' if n.context_type == 'POST' and n.context_id and _post_share_id(n.context_id) else None,
+                'icon': 'arrow-right',
+                'url_builder': lambda n: self._build_post_view_url(n),
                 'method': 'GET'
             },
             'VIEW_COMMENT': {
@@ -891,9 +965,26 @@ class NotificationObjectAdapter(PayloadAdapter):
             enabled=enabled,
             url=url,
             method=config['method'],
-            payload={}
+            payload={},
+            icon=config.get('icon')
         )
     
+    def _build_post_view_url(self, n) -> Optional[str]:
+        """Build URL to view post, handling group shares and standard post details."""
+        meta = n.metadata or {}
+        group_id = meta.get('group_id')
+        if n.notification_type in ['POST_SHARED_TO_GROUP'] or group_id:
+            repost_sid = meta.get('repost_share_id') or _post_share_id(n.target_id) or _post_share_id(n.context_id)
+            if group_id and repost_sid:
+                return f'/groups/{group_id}/#post-card-{repost_sid}'
+            elif group_id:
+                return f'/groups/{group_id}/'
+        
+        sid = _post_share_id(n.context_id) or _post_share_id(n.target_id)
+        if sid:
+            return f'/post/{sid}/'
+        return None
+
     def _build_document_view_url(self, n) -> Optional[str]:
         """Build URL to view document for document notifications."""
         meta = n.metadata or {}
@@ -1011,13 +1102,17 @@ class NotificationObjectAdapter(PayloadAdapter):
         has_preview_image = bool(resource and (resource.image_url or getattr(resource, 'thumbnail_url', None)))
         preview_visible = (visibility_config.preview if visibility_config else False) or has_preview_image
         
+        # Check if actions exist for this notification
+        actions = self._resolve_actions(notification)
+        action_bar_visible = (visibility_config.action_bar if visibility_config else False) or bool(actions)
+        
         return NotificationComponents(
             context_header=visibility_config.context_header if visibility_config else False,
             actor_stack=visibility_config.actor_stack if visibility_config else True,
             content=visibility_config.content if visibility_config else True,
             preview=preview_visible,
             metadata=visibility_config.metadata if visibility_config else True,
-            action_bar=visibility_config.action_bar if visibility_config else False,
+            action_bar=action_bar_visible,
             status=visibility_config.status if visibility_config else False
         )
     

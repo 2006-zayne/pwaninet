@@ -24,7 +24,11 @@ from django.http import HttpResponse, HttpResponseRedirect, FileResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from notifications import views as notification_views
-from users.views import toggle_profile_photo_like, PwaniLoginView, login_2fa_challenge_view, app_invite_landing, platform_invite_landing, encrypted_invite_landing
+from users.views import (
+    toggle_profile_photo_like, PwaniLoginView, login_2fa_challenge_view,
+    app_invite_landing, platform_invite_landing, encrypted_invite_landing,
+    get_invite_share_data
+)
 
 # PWA Manifest - served as static file to bypass auth middleware
 @require_http_methods(["GET", "HEAD"])
@@ -153,8 +157,28 @@ def downloads_page_view(request):
       * PWA install guidelines for iOS Safari & Android Chrome
     """
     github_url = getattr(settings, 'APK_DOWNLOAD_URL', 'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk')
+    
+    # Resolve encrypted referral link for sharing from this page
+    app_invite_token = ''
+    try:
+        from users.services.invite_service import get_or_create_invite, encrypt_invite_token, InviteType
+        if request.user.is_authenticated:
+            invite = get_or_create_invite(request.user, InviteType.APP_DOWNLOAD)
+            app_invite_token = invite.token
+        else:
+            app_invite_token = encrypt_invite_token(0, InviteType.APP_DOWNLOAD)
+    except Exception:
+        pass
+
+    try:
+        app_invite_url = request.build_absolute_uri(f"/i/{app_invite_token}/") if app_invite_token else request.build_absolute_uri("/downloads/")
+    except Exception:
+        app_invite_url = f"https://pwaninet.app/i/{app_invite_token}/" if app_invite_token else "https://pwaninet.app/downloads/"
+
     context = {
         'github_apk_url': github_url,
+        'app_invite_token': app_invite_token,
+        'app_invite_url': app_invite_url,
     }
     template = 'downloads/partials/download_page_content.html' if request.headers.get('HX-Request') else 'downloads/download_page.html'
     return render(request, template, context)
@@ -162,10 +186,10 @@ def downloads_page_view(request):
 
 import functools
 
-@functools.lru_cache(maxsize=1)
-def _generate_apk_qr_svg_bytes():
+@functools.lru_cache(maxsize=128)
+def _generate_qr_svg_bytes(target_url):
     """
-    Generate a pixel-perfect, scannable QR code SVG for https://pwaninet.app/apk/
+    Generate a pixel-perfect, scannable QR code SVG for target_url.
     Results are cached in-process so subsequent requests cost nothing.
     """
     import qrcode
@@ -177,7 +201,7 @@ def _generate_apk_qr_svg_bytes():
         box_size=10,
         border=4,  # 4-module quiet zone required by QR spec
     )
-    qr.add_data('https://pwaninet.app/apk/')
+    qr.add_data(target_url)
     qr.make(fit=True)
     img = qr.make_image(image_factory=qrcode.image.svg.SvgPathImage)
     buf = _io.BytesIO()
@@ -189,16 +213,46 @@ def _generate_apk_qr_svg_bytes():
 @csrf_exempt
 def qr_code_svg(request):
     """
-    Serve a clean, scannable SVG QR code pointing to https://pwaninet.app/apk/.
-    Cached in-process; sets a long Cache-Control header for edge caching.
+    Serve a clean, scannable SVG QR code pointing to an encrypted URL (e.g. /i/<token>/).
+    Supports ?token=<encrypted_token> or auto-resolves for the authenticated user / guest.
     """
+    token = request.GET.get('token', '').strip()
+    if not token:
+        user = getattr(request, 'user', None)
+        if user and user.is_authenticated:
+            try:
+                from users.services.invite_service import get_or_create_invite, InviteType
+                invite = get_or_create_invite(user, InviteType.APP_DOWNLOAD)
+                token = invite.token
+            except Exception:
+                pass
+
+    if not token:
+        try:
+            from users.services.invite_service import encrypt_invite_token, InviteType
+            token = encrypt_invite_token(0, InviteType.APP_DOWNLOAD)
+        except Exception:
+            token = ''
+
+    if token:
+        try:
+            target_url = request.build_absolute_uri(f"/i/{token}/")
+        except Exception:
+            target_url = f"https://pwaninet.app/i/{token}/"
+    else:
+        try:
+            target_url = request.build_absolute_uri("/downloads/")
+        except Exception:
+            target_url = "https://pwaninet.app/downloads/"
+
     try:
-        svg_bytes = _generate_apk_qr_svg_bytes()
+        svg_bytes = _generate_qr_svg_bytes(target_url)
     except Exception:
         return HttpResponse('QR generation failed', status=500)
 
     response = HttpResponse(svg_bytes, content_type='image/svg+xml')
     response['Cache-Control'] = 'public, max-age=86400'  # 24h browser/CDN cache
+
     response['X-Content-Type-Options'] = 'nosniff'
     return response
 
@@ -225,6 +279,7 @@ urlpatterns = [
     path('i/<str:token>/', encrypted_invite_landing, name='encrypted_invite_landing'),
     path('app/<str:token>/', app_invite_landing, name='app_invite_landing'),
     path('invite/<str:token>/', platform_invite_landing, name='platform_invite_landing'),
+    path('api/share/invite-data/', get_invite_share_data, name='api_invite_share_data'),
     path('download/app/latest/', download_android_apk, name='download_android_apk'),
     path('download/android/', download_android_apk, name='download_android_apk_alt'),
     path('apk/', download_android_apk, name='download_apk_short'),

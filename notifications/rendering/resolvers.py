@@ -39,13 +39,20 @@ class ComponentVisibilityResolver:
         elif payload and hasattr(payload, 'resource') and payload.resource:
             has_resource_image = bool(payload.resource.image_url or getattr(payload.resource, 'thumbnail_url', None))
         
+        # Check if payload has actions
+        has_actions = False
+        if isinstance(payload, dict):
+            has_actions = bool(payload.get('actions'))
+        elif payload and hasattr(payload, 'actions'):
+            has_actions = bool(payload.actions)
+        
         return {
             'context_header': visibility.context_header if visibility else False,
             'actor_stack': visibility.actor_stack if visibility else True,
             'content': visibility.content if visibility else True,
             'preview': (visibility.preview if visibility else False) or has_resource_image,
             'metadata': visibility.metadata if visibility else True,
-            'action_bar': visibility.action_bar if visibility else False,
+            'action_bar': (visibility.action_bar if visibility else False) or has_actions,
             'status': visibility.status if visibility else False,
         }
 
@@ -183,6 +190,7 @@ class ActionResolver:
                         'url': payload_action.get('url'),
                         'method': payload_action.get('method', 'GET'),
                         'payload': payload_action.get('payload', {}),
+                        'icon': payload_action.get('icon'),
                         'is_primary': action_id in strategy.primary_actions,
                         'is_secondary': action_id in strategy.secondary_actions,
                         'is_disabled': action_id in strategy.disabled_actions,
@@ -196,6 +204,7 @@ class ActionResolver:
                         'url': payload_action.url,
                         'method': payload_action.method,
                         'payload': payload_action.payload,
+                        'icon': getattr(payload_action, 'icon', None),
                         'is_primary': action_id in strategy.primary_actions,
                         'is_secondary': action_id in strategy.secondary_actions,
                         'is_disabled': action_id in strategy.disabled_actions,

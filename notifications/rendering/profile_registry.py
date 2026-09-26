@@ -144,8 +144,9 @@ class RenderingProfileRegistry:
         self._profiles["SHARE"] = RenderingProfile(
             id="SHARE", category=ProfileCategory.SOCIAL, intent=ProfileIntent.ACTIVITY,
             message_strategy=MessageStrategy(template="SHARE", supported_states=["SINGLE", "DUAL", "FEW", "MANY"]),
-            component_visibility=ComponentVisibilityConfig(actor_stack=True, preview=True),
+            component_visibility=ComponentVisibilityConfig(actor_stack=True, preview=True, action_bar=True),
             preview_strategy=PreviewStrategy(enabled=True, preview_type="POST"),
+            action_strategy=ActionStrategy(available_actions=["VIEW_POST"], primary_actions=["VIEW_POST"]),
             navigation_strategy=NavigationStrategy(
                 primary=NavigationConfig(target="POST_DETAIL", resource_id_field="resource.id")
             ),
@@ -224,10 +225,22 @@ class RenderingProfileRegistry:
         self._profiles["POST_SHARE"] = RenderingProfile(
             id="POST_SHARE", category=ProfileCategory.SOCIAL, intent=ProfileIntent.ACTIVITY,
             message_strategy=MessageStrategy(template="POST_SHARE", supported_states=["SINGLE", "DUAL", "FEW", "MANY"]),
-            component_visibility=ComponentVisibilityConfig(actor_stack=True, preview=True),
+            component_visibility=ComponentVisibilityConfig(actor_stack=True, preview=True, action_bar=True),
             preview_strategy=PreviewStrategy(enabled=True, preview_type="POST"),
+            action_strategy=ActionStrategy(available_actions=["VIEW_POST"], primary_actions=["VIEW_POST"]),
             navigation_strategy=NavigationStrategy(
                 primary=NavigationConfig(target="POST_DETAIL", resource_id_field="resource.id")
+            )
+        )
+        self._profiles["POST_SHARED"] = self._profiles["POST_SHARE"]
+        self._profiles["POST_SHARED_TO_GROUP"] = RenderingProfile(
+            id="POST_SHARED_TO_GROUP", category=ProfileCategory.GROUP, intent=ProfileIntent.ACTIVITY,
+            message_strategy=MessageStrategy(template="POST_SHARE", supported_states=["SINGLE", "DUAL", "FEW", "MANY"]),
+            component_visibility=ComponentVisibilityConfig(actor_stack=True, preview=True, action_bar=True),
+            preview_strategy=PreviewStrategy(enabled=True, preview_type="POST"),
+            action_strategy=ActionStrategy(available_actions=["VIEW_POST"], primary_actions=["VIEW_POST"]),
+            navigation_strategy=NavigationStrategy(
+                primary=NavigationConfig(target="GROUP_DETAIL", resource_id_field="resource.id")
             )
         )
         

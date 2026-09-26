@@ -67,24 +67,44 @@ def decrypt_invite_token(token):
         return None
 
 
+class StatelessInvite:
+    """
+    Stateless fallback object when database table is not yet migrated or during temporary database downtime.
+    Provides identical properties (.token, .clicks_count, .conversions_count, .id) using AES-256-GCM.
+    """
+    def __init__(self, user_id, invite_type):
+        self.id = 0
+        self.user_id = user_id
+        self.invite_type = invite_type
+        self.token = encrypt_invite_token(user_id, invite_type)
+        self.clicks_count = 0
+        self.conversions_count = 0
+        self.last_clicked_at = None
+
+
 def get_or_create_invite(user, invite_type):
     """
     Ensure an invite record exists for a user and invite type with an encrypted AES-256-GCM token.
+    Falls back gracefully to stateless AES-256-GCM encrypted token if database table is not yet migrated.
     """
-    invite = PlatformInvite.objects.filter(inviter=user, invite_type=invite_type).first()
-    if not invite:
-        token = encrypt_invite_token(user.id, invite_type)
-        invite = PlatformInvite.objects.create(
-            inviter=user,
-            invite_type=invite_type,
-            token=token
-        )
-    elif not decrypt_invite_token(invite.token):
-        # Refresh legacy/unencrypted token with AES-256-GCM encrypted token
-        invite.token = encrypt_invite_token(user.id, invite_type)
-        invite.save(update_fields=['token'])
+    try:
+        invite = PlatformInvite.objects.filter(inviter=user, invite_type=invite_type).first()
+        if not invite:
+            token = encrypt_invite_token(user.id, invite_type)
+            invite = PlatformInvite.objects.create(
+                inviter=user,
+                invite_type=invite_type,
+                token=token
+            )
+        elif not decrypt_invite_token(invite.token):
+            # Refresh legacy/unencrypted token with AES-256-GCM encrypted token
+            invite.token = encrypt_invite_token(user.id, invite_type)
+            invite.save(update_fields=['token'])
+        return invite
+    except Exception as e:
+        logger.warning(f"Database error for PlatformInvite in get_or_create_invite: {e}")
+        return StatelessInvite(user.id, invite_type)
 
-    return invite
 
 
 def get_invite_data(user, request=None):
@@ -132,28 +152,36 @@ def track_invite_click(token):
     if not token:
         return None
 
-    invite = PlatformInvite.objects.select_related('inviter').filter(token=token).first()
-    if not invite:
+    try:
+        invite = PlatformInvite.objects.select_related('inviter').filter(token=token).first()
+        if not invite:
+            decrypted = decrypt_invite_token(token)
+            if decrypted:
+                user_id, invite_type = decrypted
+                from users.models import User
+                try:
+                    inviter = User.objects.get(id=user_id)
+                    invite, _ = PlatformInvite.objects.get_or_create(
+                        inviter=inviter,
+                        invite_type=invite_type,
+                        defaults={'token': token}
+                    )
+                except User.DoesNotExist:
+                    return None
+
+        if invite:
+            invite.clicks_count += 1
+            invite.last_clicked_at = timezone.now()
+            invite.save(update_fields=['clicks_count', 'last_clicked_at'])
+
+        return invite
+    except Exception as e:
+        logger.warning(f"Database error in track_invite_click: {e}")
         decrypted = decrypt_invite_token(token)
         if decrypted:
             user_id, invite_type = decrypted
-            from users.models import User
-            try:
-                inviter = User.objects.get(id=user_id)
-                invite, _ = PlatformInvite.objects.get_or_create(
-                    inviter=inviter,
-                    invite_type=invite_type,
-                    defaults={'token': token}
-                )
-            except User.DoesNotExist:
-                return None
-
-    if invite:
-        invite.clicks_count += 1
-        invite.last_clicked_at = timezone.now()
-        invite.save(update_fields=['clicks_count', 'last_clicked_at'])
-
-    return invite
+            return StatelessInvite(user_id, invite_type)
+        return None
 
 
 def process_invite_conversion(token, new_user):
@@ -163,55 +191,59 @@ def process_invite_conversion(token, new_user):
     if not token or not new_user:
         return None
 
-    invite = PlatformInvite.objects.select_related('inviter').filter(token=token).first()
-    if not invite:
-        decrypted = decrypt_invite_token(token)
-        if decrypted:
-            user_id, invite_type = decrypted
-            from users.models import User
+    try:
+        invite = PlatformInvite.objects.select_related('inviter').filter(token=token).first()
+        if not invite:
+            decrypted = decrypt_invite_token(token)
+            if decrypted:
+                user_id, invite_type = decrypted
+                from users.models import User
+                try:
+                    inviter = User.objects.get(id=user_id)
+                    invite, _ = PlatformInvite.objects.get_or_create(
+                        inviter=inviter,
+                        invite_type=invite_type,
+                        defaults={'token': token}
+                    )
+                except User.DoesNotExist:
+                    return None
+
+        if not invite:
+            return None
+
+        invite.conversions_count += 1
+        invite.save(update_fields=['conversions_count'])
+
+        inviter = invite.inviter
+        if inviter and inviter != new_user:
             try:
-                inviter = User.objects.get(id=user_id)
-                invite, _ = PlatformInvite.objects.get_or_create(
-                    inviter=inviter,
-                    invite_type=invite_type,
-                    defaults={'token': token}
+                from users.models import Follow
+                Follow.objects.get_or_create(follower=new_user, following=inviter)
+            except Exception as e:
+                logger.warning(f"Could not establish follow relationship on invite conversion: {e}")
+
+            try:
+                from notifications.events import publish_event, EventTypes, EventSources, EventActions
+                publish_event(
+                    event_type=EventTypes.FOLLOW.value,
+                    source=EventSources.USERS.value,
+                    action=EventActions.FOLLOWED.value,
+                    actor=new_user,
+                    target_type='User',
+                    target_id=str(inviter.id),
+                    context_type='USER',
+                    context_id=str(inviter.id),
+                    audience=str(inviter.id),
+                    metadata={
+                        'actor_username': new_user.username,
+                        'recipient_username': inviter.username,
+                        'message': f"@{new_user.username} joined PwaniNet using your invite link!",
+                    }
                 )
-            except User.DoesNotExist:
-                return None
+            except Exception as e:
+                logger.warning(f"Could not publish notification for invite conversion: {e}")
 
-    if not invite:
+        return invite
+    except Exception as e:
+        logger.warning(f"Database error in process_invite_conversion: {e}")
         return None
-
-    invite.conversions_count += 1
-    invite.save(update_fields=['conversions_count'])
-
-    inviter = invite.inviter
-    if inviter and inviter != new_user:
-        try:
-            from users.models import Follow
-            Follow.objects.get_or_create(follower=new_user, following=inviter)
-        except Exception as e:
-            logger.warning(f"Could not establish follow relationship on invite conversion: {e}")
-
-        try:
-            from notifications.events import publish_event, EventTypes, EventSources, EventActions
-            publish_event(
-                event_type=EventTypes.FOLLOW.value,
-                source=EventSources.USERS.value,
-                action=EventActions.FOLLOWED.value,
-                actor=new_user,
-                target_type='User',
-                target_id=str(inviter.id),
-                context_type='USER',
-                context_id=str(inviter.id),
-                audience=str(inviter.id),
-                metadata={
-                    'actor_username': new_user.username,
-                    'recipient_username': inviter.username,
-                    'message': f"@{new_user.username} joined PwaniNet using your invite link!",
-                }
-            )
-        except Exception as e:
-            logger.warning(f"Could not publish notification for invite conversion: {e}")
-
-    return invite

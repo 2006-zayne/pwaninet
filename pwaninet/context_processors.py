@@ -108,4 +108,26 @@ def release_metadata(request):
         'app_release_channel': current_release.get_release_channel_display() if current_release else None,
         'app_mandatory_update': current_release.mandatory_update if current_release else False,
     }
+
+    # Universal encrypted invite tokens & URLs (never expose readable links)
+    try:
+        from users.services.invite_service import get_or_create_invite, encrypt_invite_token, InviteType
+        user = getattr(request, 'user', None)
+        if user and user.is_authenticated:
+            app_inv = get_or_create_invite(user, InviteType.APP_DOWNLOAD)
+            plat_inv = get_or_create_invite(user, InviteType.PLATFORM_INVITE)
+            app_token = app_inv.token
+            plat_token = plat_inv.token
+        else:
+            app_token = encrypt_invite_token(0, InviteType.APP_DOWNLOAD)
+            plat_token = encrypt_invite_token(0, InviteType.PLATFORM_INVITE)
+
+        base_context['global_app_invite_token'] = app_token
+        base_context['global_platform_invite_token'] = plat_token
+        base_context['global_app_invite_url'] = f"/i/{app_token}/"
+        base_context['global_platform_invite_url'] = f"/i/{plat_token}/"
+    except Exception:
+        pass
+
     return base_context
+

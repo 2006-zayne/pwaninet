@@ -281,7 +281,41 @@ def resolve_notification_target_url(notification):
     meta = notification.metadata if isinstance(notification.metadata, dict) else {}
     ctx_type = str(notification.context_type or '').upper()
     ctx_id = notification.context_id
-    ntype = str(notification.notification_type or '').upper()
+    # App Download shares
+    is_app_share = (
+        ctx_type == 'APP'
+        or str(getattr(notification, 'target_type', '') or '').upper() in ('APPDOWNLOAD', 'APP')
+        or meta.get('resource_type') == 'APP'
+    )
+    if is_app_share:
+        recipient = getattr(notification, 'recipient', None)
+        username = getattr(recipient, 'username', '') if recipient else meta.get('recipient_username', '')
+        if username:
+            return f'/users/user/{username}/?tab=shared#shared-content'
+        return '/downloads/'
+
+    # Shared to group
+    if ntype in ('POST_SHARED_TO_GROUP', 'SHARE_GROUP') or meta.get('group_id'):
+        gid = meta.get('group_id')
+        repost_id = meta.get('repost_share_id') or ctx_id or meta.get('target_id')
+        if gid:
+            if repost_id:
+                try:
+                    from notifications.rendering.adapters import _post_share_id
+                    repost_sid = _post_share_id(repost_id) or repost_id
+                except Exception:
+                    repost_sid = repost_id
+                return f'/groups/{gid}/#post-card-{repost_sid}'
+            return f'/groups/{gid}/'
+
+    # Direct post share
+    if ntype in ('POST_SHARED', 'POST_SHARE', 'SHARE') and not meta.get('group_id'):
+        recipient = getattr(notification, 'recipient', None)
+        username = getattr(recipient, 'username', '') if recipient else meta.get('recipient_username', '')
+        shared_post_id = meta.get('shared_post_id')
+        if username:
+            anchor = f'#shared-post-card-{shared_post_id}' if shared_post_id else '#shared-content'
+            return f'/users/user/{username}/?tab=shared{anchor}'
 
     # Posts
     if ctx_type in ('POST', 'POSTS') and ctx_id:

@@ -400,20 +400,20 @@ function initCaching() {
  */
 async function requestNativeCameraPermissions() {
     if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.Camera) {
-        return { camera: 'granted', photos: 'granted' };
+        return { camera: 'granted' };
     }
     try {
         const { Camera } = window.Capacitor.Plugins;
         let status = await Camera.checkPermissions();
         console.log('[NativeApp] Camera permissions check:', status);
-        if (status.camera !== 'granted' || status.photos !== 'granted') {
-            status = await Camera.requestPermissions();
+        if (status.camera !== 'granted') {
+            status = await Camera.requestPermissions({ permissions: ['camera'] });
             console.log('[NativeApp] Camera permissions requested:', status);
         }
         return status;
     } catch (err) {
         console.warn('[NativeApp] Error requesting camera permissions:', err);
-        return { camera: 'denied', photos: 'denied' };
+        return { camera: 'denied' };
     }
 }
 
@@ -464,24 +464,37 @@ function initNativeMedia() {
                     return;
                 }
 
-                const { Camera, CameraResultType, CameraSource } = window.Capacitor.Plugins;
+                const { Camera } = window.Capacitor.Plugins;
                 const image = await Camera.getPhoto({
                     quality: 90,
                     allowEditing: false,
-                    resultType: CameraResultType.Uri,
-                    source: CameraSource.Camera
+                    resultType: 'uri',
+                    source: 'CAMERA'
                 });
 
-                const response = await fetch(image.webPath);
-                const blob = await response.blob();
-                const file = new File([blob], 'captured_image_' + Date.now() + '.jpg', { type: 'image/jpeg' });
+                let blob;
+                if (image.webPath) {
+                    try {
+                        const response = await fetch(image.webPath);
+                        blob = await response.blob();
+                    } catch (fetchErr) {
+                        console.warn('[NativeApp] Failed to fetch webPath:', fetchErr);
+                    }
+                }
+                if (!blob && image.dataUrl) {
+                    const response = await fetch(image.dataUrl);
+                    blob = await response.blob();
+                }
 
-                const dataTransfer = new DataTransfer();
-                dataTransfer.items.add(file);
-                target.files = dataTransfer.files;
-                target.dispatchEvent(new Event('change', { bubbles: true }));
+                if (blob) {
+                    const file = new File([blob], 'captured_image_' + Date.now() + '.' + (image.format || 'jpg'), { type: 'image/' + (image.format || 'jpeg') });
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    target.files = dataTransfer.files;
+                    target.dispatchEvent(new Event('change', { bubbles: true }));
+                }
             } catch (error) {
-                if (error.message !== 'User cancelled photos app') {
+                if (error && error.message !== 'User cancelled photos app') {
                     console.error('[NativeApp] Camera capture failed:', error);
                 }
             }
@@ -1427,6 +1440,7 @@ async function initNativePush(requestIfPrompt = false) {
             try {
                 const response = await fetch('/api/push/subscribe/', {
                     method: 'POST',
+                    credentials: 'same-origin',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': getNativeCsrfToken()

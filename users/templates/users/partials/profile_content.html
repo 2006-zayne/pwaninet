@@ -419,12 +419,12 @@
             </style>
             <ul class="nav nav-tabs mb-3 px-2" id="profileTabs" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="posts-tab" data-bs-toggle="tab" data-bs-target="#posts-content" type="button" role="tab">
+                    <button class="nav-link {% if not active_tab or active_tab == 'posts' %}active{% endif %}" id="posts-tab" data-bs-toggle="tab" data-bs-target="#posts-content" type="button" role="tab">
                         {% trans "Posts" %}
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="reposts-tab" data-bs-toggle="tab" data-bs-target="#reposts-content" type="button" role="tab">
+                    <button class="nav-link {% if active_tab == 'reposts' %}active{% endif %}" id="reposts-tab" data-bs-toggle="tab" data-bs-target="#reposts-content" type="button" role="tab">
                         <i class="bi bi-repeat me-1"></i>{% trans "Reposts" %}
                         {% if repost_count > 0 %}
                         <span class="badge bg-primary rounded-pill ms-1">{{ repost_count }}</span>
@@ -433,7 +433,7 @@
                 </li>
                 {% if is_own_profile %}
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="shared-tab" data-bs-toggle="tab" data-bs-target="#shared-content" type="button" role="tab"
+                    <button class="nav-link {% if active_tab == 'shared' %}active{% endif %}" id="shared-tab" data-bs-toggle="tab" data-bs-target="#shared-content" type="button" role="tab"
                             hx-post="{% url 'users:mark_shared_viewed' profile_user.username %}"
                             hx-target="#shared-tab"
                             hx-swap="outerHTML">
@@ -448,7 +448,7 @@
 
             <div class="tab-content" id="profileTabContent">
                 <!-- Posts Tab -->
-                <div class="tab-pane fade show active" id="posts-content" role="tabpanel" data-skeleton="profile">
+                <div class="tab-pane fade {% if not active_tab or active_tab == 'posts' %}show active{% endif %}" id="posts-content" role="tabpanel" data-skeleton="profile">
                     <div class="intel-stream" id="posts-container">
                         {% for post in posts %}
                             {% include 'posts/partials/post_card.html' %}
@@ -469,7 +469,7 @@
                 </div>
 
                 <!-- Reposts Tab -->
-                <div class="tab-pane fade" id="reposts-content" role="tabpanel" data-skeleton="profile">
+                <div class="tab-pane fade {% if active_tab == 'reposts' %}show active{% endif %}" id="reposts-content" role="tabpanel" data-skeleton="profile">
                     <div class="intel-stream" id="reposts-container">
                         {% for repost in reposted_posts %}
                             {% with post=repost.original_post %}
@@ -499,7 +499,7 @@
                             </div>
                             {% endwith %}
                         {% empty %}
-                            <div class="text-center py-5 bg-white rounded-4 shadow-sm border-0">
+                        <div class="text-center py-5 bg-white rounded-4 shadow-sm border-0">
                                 <i class="bi bi-repeat text-muted display-4"></i>
                                 <p class="text-muted mt-3">
                                     {% if is_own_profile %}
@@ -515,7 +515,7 @@
 
                 {% if is_own_profile %}
                 <!-- Shared Posts Tab (private — profile owner only) -->
-                <div class="tab-pane fade" id="shared-content" role="tabpanel" data-skeleton="profile">
+                <div class="tab-pane fade {% if active_tab == 'shared' %}show active{% endif %}" id="shared-content" role="tabpanel" data-skeleton="profile">
                     <div class="intel-stream">
                         {% for shared_post in shared_posts %}
                             {% include 'posts/partials/shared_post_card.html' %}
@@ -533,3 +533,70 @@
 
     </div>
 </div>
+
+<style>
+@keyframes postHighlightPulse {
+  0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.45); }
+  50% { box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.15); }
+  100% { box-shadow: none; }
+}
+.highlight-target-post {
+  animation: postHighlightPulse 2s ease-out;
+  border: 1px solid var(--bs-primary, #2563eb) !important;
+  border-radius: 0.5rem;
+}
+</style>
+
+<script>
+(function() {
+    function initProfileTabsAndScroll() {
+        const hash = window.location.hash;
+        const searchParams = new URLSearchParams(window.location.search);
+        const tabParam = searchParams.get('tab');
+
+        let targetTabBtn = null;
+        if (tabParam === 'shared' || (hash && hash.startsWith('#shared-'))) {
+            targetTabBtn = document.getElementById('shared-tab');
+        } else if (tabParam === 'reposts' || hash === '#reposts-content') {
+            targetTabBtn = document.getElementById('reposts-tab');
+        } else if (tabParam === 'posts' || hash === '#posts-content') {
+            targetTabBtn = document.getElementById('posts-tab');
+        }
+
+        if (targetTabBtn && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+            try {
+                const tabInstance = bootstrap.Tab.getOrCreateInstance(targetTabBtn);
+                tabInstance.show();
+            } catch (e) {
+                console.debug('Tab activation error:', e);
+            }
+        }
+
+        if (hash && (hash.startsWith('#shared-post-card-') || hash.startsWith('#post-card-'))) {
+            setTimeout(function() {
+                try {
+                    const targetCard = document.querySelector(hash);
+                    if (targetCard) {
+                        targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        targetCard.classList.add('highlight-target-post');
+                        setTimeout(function() {
+                            targetCard.classList.remove('highlight-target-post');
+                        }, 2500);
+                    }
+                } catch (err) {}
+            }, 200);
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initProfileTabsAndScroll);
+    } else {
+        initProfileTabsAndScroll();
+    }
+    document.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail && (evt.detail.target.id === 'page-content-target' || evt.detail.target.closest('#page-content-target'))) {
+            initProfileTabsAndScroll();
+        }
+    });
+})();
+</script>

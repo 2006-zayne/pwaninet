@@ -289,17 +289,43 @@ class PostSharedRenderer(NotificationRenderer):
     
     def get_context(self, notification: Any) -> Dict[str, Any]:
         """Build context for post shared notifications."""
+        meta = getattr(notification, 'metadata', {}) or {}
+        is_app = (
+            getattr(notification, 'target_type', '') in ['AppDownload', 'APPDOWNLOAD', 'APP']
+            or meta.get('resource_type') == 'APP'
+            or meta.get('share_type') in ['app_link', 'app_download', 'APP']
+            or 'download_url' in meta
+        )
         return {
-            'icon': 'share',
-            'icon_color': 'info',
-            'action_verb': 'shared a post with you'
+            'icon': 'download' if is_app else 'share',
+            'icon_color': 'success' if is_app else 'info',
+            'action_verb': 'shared the mobile app with you' if is_app else 'shared a post with you'
         }
     
     def get_actions(self, notification: Any) -> list:
         """Get actions for post shared notifications."""
         actions = []
-        if notification.resource and notification.resource.get('url'):
+        meta = getattr(notification, 'metadata', {}) or {}
+        is_app = (
+            getattr(notification, 'target_type', '') in ['AppDownload', 'APPDOWNLOAD', 'APP']
+            or meta.get('resource_type') == 'APP'
+            or meta.get('share_type') in ['app_link', 'app_download', 'APP']
+            or 'download_url' in meta
+        )
+        
+        if is_app:
+            download_url = meta.get('download_url') or '/download/app/latest/'
             actions.append({
+                'id': 'DOWNLOAD_APK',
+                'label': 'Download APK',
+                'icon': 'download',
+                'url': download_url,
+                'type': 'link',
+                'style': 'success'
+            })
+        elif notification.resource and notification.resource.get('url'):
+            actions.append({
+                'id': 'VIEW_POST',
                 'label': 'View Post',
                 'icon': 'arrow-right',
                 'url': notification.resource['url'],
@@ -329,7 +355,8 @@ class PostSharedToGroupRenderer(NotificationRenderer):
         actions = []
         if notification.resource and notification.resource.get('url'):
             actions.append({
-                'label': 'View Post',
+                'id': 'VIEW_POST',
+                'label': 'View in Group',
                 'icon': 'arrow-right',
                 'url': notification.resource['url'],
                 'type': 'link',

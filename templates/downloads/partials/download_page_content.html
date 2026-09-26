@@ -287,7 +287,7 @@
                     {% trans "Point your phone camera at the code to open this download page or download the APK directly on mobile." %}
                 </p>
                 <div class="input-group input-group-sm max-w-sm mx-auto mx-md-0" style="max-width: 340px;">
-                    <input type="text" id="downloads-share-input" class="form-control" value="https://pwaninet.app/downloads/" readonly style="font-size: 0.8rem;">
+                    <input type="text" id="downloads-share-input" class="form-control" value="{{ app_invite_url|default:global_app_invite_url }}" readonly style="font-size: 0.8rem;">
                     <button class="btn btn-outline-primary" type="button" id="downloads-copy-btn">
                         <i class="bi bi-clipboard me-1"></i>{% trans "Copy" %}
                     </button>
@@ -295,7 +295,7 @@
             </div>
             <div class="col-12 col-md-4 text-center">
                 <div class="d-inline-flex p-2 rounded-3 shadow-sm" style="background: #ffffff !important; border: 1px solid #e2e8f0;">
-                    <img src="{% url 'qr_code_svg' %}"
+                    <img src="{% url 'qr_code_svg' %}?token={{ app_invite_token|default:global_app_invite_token }}"
                          alt="{% trans 'PwaniNet QR Code' %}"
                          width="110"
                          height="110"

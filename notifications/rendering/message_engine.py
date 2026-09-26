@@ -220,6 +220,23 @@ class NotificationMessageEngine:
                 "FEW": "{actors} shared posts with you.",
                 "MANY": "{actors} shared posts with you.",
                 "HISTORICAL": "{actors} shared posts with you.",
+                "SUMMARY": "New post shared with you",
+            },
+            "APP_SHARE": {
+                "SINGLE": "{actor} shared the PwaniNet mobile app with you.",
+                "DUAL": "{actor1} and {actor2} shared the PwaniNet mobile app with you.",
+                "FEW": "{actors} shared the PwaniNet mobile app with you.",
+                "MANY": "{actors} shared the PwaniNet mobile app with you.",
+                "HISTORICAL": "{actors} shared the PwaniNet mobile app with you.",
+                "SUMMARY": "Mobile app shared with you",
+            },
+            "POST_SHARED_TO_GROUP": {
+                "SINGLE": "{actor} shared a post to {group}.",
+                "DUAL": "{actor1} and {actor2} shared posts to {group}.",
+                "FEW": "{actors} shared posts to {group}.",
+                "MANY": "{actors} shared posts to {group}.",
+                "HISTORICAL": "{actors} shared posts to {group}.",
+                "SUMMARY": "New post shared to group",
             },
             "POST_CREATED": {
                 "SINGLE": "{actor} posted a new update.",
@@ -361,6 +378,20 @@ class NotificationMessageEngine:
             actor_count = len(actors)
             state = self.determine_state(actor_count)
             
+            # Detect specialized share types
+            if template_name in ['SHARE', 'POST_SHARE', 'POST_SHARED']:
+                raw_meta = payload.get('raw_data', {}) or {}
+                meta = payload.get('metadata', {}) or {}
+                is_app = (
+                    raw_meta.get('resource_type') == 'APP'
+                    or meta.get('resource_type') == 'APP'
+                    or payload.get('target_type') == 'AppDownload'
+                )
+                if is_app:
+                    template_name = 'APP_SHARE'
+                elif raw_meta.get('group_id') or meta.get('group_id') or (context_data and context_data.get('type') == 'GROUP'):
+                    template_name = 'POST_SHARED_TO_GROUP'
+
             # Get the template for this type and state
             template = self._get_template(template_name, state)
             
@@ -428,6 +459,26 @@ class NotificationMessageEngine:
         variables = payload.message.variables or {}
         actors = payload.actors
         
+        # Detect specialized share types
+        if template_name in ['SHARE', 'POST_SHARE', 'POST_SHARED']:
+            raw_meta = getattr(payload, 'raw_data', {}) or {}
+            meta = getattr(payload, 'metadata', {})
+            if isinstance(meta, dict):
+                meta_dict = meta
+            elif hasattr(meta, 'to_dict'):
+                meta_dict = meta.to_dict()
+            else:
+                meta_dict = {}
+            is_app = (
+                raw_meta.get('resource_type') == 'APP'
+                or meta_dict.get('resource_type') == 'APP'
+                or getattr(payload, 'target_type', None) == 'AppDownload'
+            )
+            if is_app:
+                template_name = 'APP_SHARE'
+            elif raw_meta.get('group_id') or meta_dict.get('group_id') or (getattr(payload, 'context', None) and getattr(payload.context, 'type', None) == 'GROUP'):
+                template_name = 'POST_SHARED_TO_GROUP'
+
         # Get the template for this type and state
         template = self._get_template(template_name, state)
         

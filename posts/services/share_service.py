@@ -97,6 +97,8 @@ def share_post(user, post, shared_to_user=None, shared_to_group=None, message=No
                 'resource_type': 'POST',
                 'post_content': post.content[:100] if post.content else '',
                 'actor_username': user.username,  # Add for title template compatibility
+                'shared_post_id': shared_post.share_id,
+                'post_share_id': post.share_id,
             }
         )
         
@@ -182,6 +184,8 @@ def share_post(user, post, shared_to_user=None, shared_to_group=None, message=No
                 'post_content': post.content[:100] if post.content else '',
                 'group_id': str(shared_to_group.id),
                 'actor_username': user.username,  # Add for title template compatibility
+                'repost_share_id': repost.share_id,
+                'shared_post_id': shared_post.share_id,
             }
         )
 

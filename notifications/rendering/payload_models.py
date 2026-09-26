@@ -174,6 +174,7 @@ class NotificationAction:
     url: Optional[str] = None
     method: str = "GET"
     payload: Dict[str, Any] = field(default_factory=dict)
+    icon: Optional[str] = None
 
 
 @dataclass
@@ -372,6 +373,7 @@ class NotificationPayload:
                     'url': action.url,
                     'method': action.method,
                     'payload': action.payload,
+                    'icon': getattr(action, 'icon', None) or (action.payload.get('icon') if isinstance(action.payload, dict) else None),
                 }
                 for action in self.actions
             ],

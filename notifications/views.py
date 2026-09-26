@@ -676,6 +676,12 @@ class NotificationViewSet(viewsets.ModelViewSet):
 # Push Notification Views
 from django.conf import settings
 from rest_framework.views import APIView
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+
+
+class CsrfExemptSessionAuthentication(SessionAuthentication):
+    def enforce_csrf(self, request):
+        return  # CSRF handled or exempted for API push endpoints
 
 
 class VapidPublicKeyView(APIView):
@@ -705,6 +711,7 @@ class SubscribeView(APIView):
     Endpoint for users to subscribe to push notifications.
     Supports both W3C WebPush (VAPID) subscriptions and Native FCM tokens.
     """
+    authentication_classes = [CsrfExemptSessionAuthentication, TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
@@ -866,6 +873,7 @@ class UnsubscribeView(APIView):
     Requires authentication. Performs soft delete by setting is_active=False.
     Supports unsubscribing by endpoint (WebPush) or fcm_token (Native).
     """
+    authentication_classes = [CsrfExemptSessionAuthentication, TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):

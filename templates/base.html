@@ -1935,7 +1935,7 @@
                 <!-- QR Code — pure white card so dark-mode never inverts the modules -->
                 <div class="d-inline-flex flex-column align-items-center justify-content-center p-3 my-2 rounded-3 shadow-sm"
                      style="background: #ffffff !important; border: 1px solid #e2e8f0; width: 200px; height: 200px; margin: 0 auto;">
-                  <img src="{% url 'qr_code_svg' %}"
+                  <img src="{% url 'qr_code_svg' %}{% if global_app_invite_token %}?token={{ global_app_invite_token }}{% endif %}"
                        alt="{% trans 'PwaniNet APK QR Code' %}"
                        width="176"
                        height="176"
@@ -1967,7 +1967,7 @@
                   <span class="input-group-text bg-transparent border-end-0 text-muted">
                     <i class="bi bi-link-45deg"></i>
                   </span>
-                  <input type="text" id="qr-modal-link-input" class="form-control border-start-0 border-end-0 small" value="https://pwaninet.app/apk/" readonly style="font-size: 0.85rem; background: transparent;">
+                  <input type="text" id="qr-modal-link-input" class="form-control border-start-0 border-end-0 small" value="https://pwaninet.app{{ global_app_invite_url }}" readonly style="font-size: 0.85rem; background: transparent;">
                   <button class="btn btn-outline-primary btn-sm px-3" type="button" id="qr-modal-copy-btn" onclick="if (typeof copyApkLink === 'function') copyApkLink(this);">
                     <i class="bi bi-clipboard me-1"></i>{% trans "Copy" %}
                   </button>
@@ -4969,11 +4969,13 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
                 var shareUrl = (button && button.getAttribute('data-share-url')) || '';
                 var shareTxt = (button && button.getAttribute('data-share-text')) || '';
+                var defaultAppUrl = window.location.origin + '{{ global_app_invite_url }}';
+                var defaultPlatformUrl = window.location.origin + '{{ global_platform_invite_url }}';
 
                 if (shareMode === 'app_download') {
                     if (titleEl) titleEl.textContent = '{% trans "Share Mobile App" %}';
-                    activePostUrl = shareUrl || (window.location.origin + '/downloads/');
-                    activePostContent = shareTxt || '{% trans "📱 Download the official PwaniNet Android app for campus updates, course groups, and offline access:" %}';
+                    activePostUrl = shareUrl || defaultAppUrl;
+                    activePostContent = shareTxt || ('{% trans "📱 Download the official PwaniNet Android app for campus updates, course groups, and offline access:" %} ' + activePostUrl);
 
                     // App download can be sent directly to friends on PwaniNet
                     if (window.isAuthenticated) {
@@ -4990,8 +4992,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 } else {
                     // platform_invite: For friends who are NOT on PwaniNet
                     if (titleEl) titleEl.textContent = '{% trans "Invite to PwaniNet" %}';
-                    activePostUrl = shareUrl || (window.location.origin + '/users/register/');
-                    activePostContent = shareTxt || '{% trans "🎓 Join me on PwaniNet! Connect with classmates, access course groups, and collaborate:" %}';
+                    activePostUrl = shareUrl || defaultPlatformUrl;
+                    activePostContent = shareTxt || ('{% trans "🎓 Join me on PwaniNet! Connect with classmates, access course groups, and collaborate:" %} ' + activePostUrl);
 
                     // Hide in-app users tray since invite is for non-members
                     if (searchWrap) searchWrap.classList.add('d-none');
@@ -5002,22 +5004,20 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 applyPlatformLinks(activePostContent, activePostUrl);
                 setupCopyButton();
 
-                // If dynamic data wasn't pre-rendered on button, load from API
-                if (!shareUrl) {
-                    fetch('/api/share/invite-data/')
-                        .then(function(res) { return res.json(); })
-                        .then(function(resData) {
-                            if (resData && resData.status === 'success' && resData.data) {
-                                var payload = shareMode === 'app_download' ? resData.data.app_download : resData.data.platform_invite;
-                                if (payload && payload.url) {
-                                    activePostUrl = payload.url;
-                                    activePostContent = payload.text || activePostContent;
-                                    applyPlatformLinks(activePostContent, activePostUrl);
-                                }
+                // Refresh latest dynamic invite data from API
+                fetch('/api/share/invite-data/')
+                    .then(function(res) { return res.json(); })
+                    .then(function(resData) {
+                        if (resData && resData.status === 'success' && resData.data) {
+                            var payload = shareMode === 'app_download' ? resData.data.app_download : resData.data.platform_invite;
+                            if (payload && payload.url) {
+                                activePostUrl = payload.url;
+                                activePostContent = payload.text || (payload.copy_text ? (payload.copy_text + ' ' + activePostUrl) : activePostContent);
+                                applyPlatformLinks(activePostContent, activePostUrl);
                             }
-                        })
-                        .catch(function(e) { console.warn('Could not fetch invite data', e); });
-                }
+                        }
+                    })
+                    .catch(function(e) { console.debug('Could not refresh invite data', e); });
 
                 setupTrayNavigation('globalShareTargetsTray', 'shareTrayPrevBtn', 'shareTrayNextBtn');
                 setupTrayNavigation('globalShareActionChips', 'shareToolsPrevBtn', 'shareToolsNextBtn');

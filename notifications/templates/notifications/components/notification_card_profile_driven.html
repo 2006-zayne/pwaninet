@@ -314,16 +314,19 @@
                   </button>
                 {% else %}
                   <a href="{{ action.url }}"
-                     {% if action.id != 'SEE_WHATS_NEW' %}
+                     {% if action.id != 'SEE_WHATS_NEW' and action.id != 'DOWNLOAD_APK' %}
                      hx-get="{{ action.url }}"
                      hx-target="#page-content-target"
                      hx-swap="innerHTML"
                      hx-push-url="true"
                      hx-history="true"
                      {% endif %}
-                     class="btn btn-sm"
-                     style="background-color: {% if action.style == 'primary' %}var(--brand){% elif action.style == 'danger' %}var(--danger){% elif action.style == 'success' %}var(--success){% else %}var(--bg-secondary){% endif %}; color: {% if action.style in 'primary danger success' %}white{% else %}var(--text-primary){% endif %}; text-decoration: none; border-radius: 20px;"
-                     onclick="{% if action.id == 'SEE_WHATS_NEW' %}event.preventDefault(); event.stopPropagation(); if (typeof window.openWhatsNewModal === 'function') { window.openWhatsNewModal('{{ payload.raw_data.target_id }}', event); }{% else %}event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this);{% endif %}"
+                     {% if action.id == 'DOWNLOAD_APK' %}
+                     data-apk-download="true"
+                     {% endif %}
+                     class="btn btn-sm d-inline-flex align-items-center gap-1"
+                     style="background-color: {% if action.style == 'primary' %}var(--brand){% elif action.style == 'danger' %}var(--danger){% elif action.style == 'success' %}var(--success, #198754){% else %}var(--bg-secondary){% endif %}; color: {% if action.style in 'primary danger success' %}white{% else %}var(--text-primary){% endif %}; text-decoration: none; border-radius: 20px; font-weight: 600;"
+                     onclick="{% if action.id == 'SEE_WHATS_NEW' %}event.preventDefault(); event.stopPropagation(); if (typeof window.openWhatsNewModal === 'function') { window.openWhatsNewModal('{{ payload.raw_data.target_id }}', event); }{% elif action.id == 'DOWNLOAD_APK' %}event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this); if (typeof window.triggerPwaninetDownload === 'function') { event.preventDefault(); window.triggerPwaninetDownload('{{ action.url }}'); }{% else %}event.stopPropagation(); markAsRead('{{ payload.identity.notification_id }}', this);{% endif %}"
                      {% if not action.enabled %}style="opacity: 0.5; pointer-events: none;"{% endif %}>
                     {% if action.icon %}<i class="bi bi-{{ action.icon }}"></i>{% endif %}
                     {{ action.label }}
