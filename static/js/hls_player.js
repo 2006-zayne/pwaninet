@@ -272,14 +272,20 @@
     let hlsIntersectionObserver = null;
 
     function destroyHLSForElement(videoEl) {
-        if (!videoEl || !videoEl._hlsInstance) return;
-        try {
-            videoEl._hlsInstance.destroy();
-        } catch (_) {}
-        delete videoEl._hlsInstance;
+        if (!videoEl) return;
+        if (videoEl._hlsInstance) {
+            try {
+                videoEl._hlsInstance.destroy();
+            } catch (_) {}
+            delete videoEl._hlsInstance;
+        }
         videoEl.dataset.hlsReady = '';
         try {
             videoEl.removeAttribute('src');
+            try { videoEl.src = ''; } catch (_) {}
+            while (videoEl.firstChild) {
+                videoEl.removeChild(videoEl.firstChild);
+            }
             videoEl.load();
         } catch (_) {}
     }

@@ -26,7 +26,7 @@
                preload="metadata"
                class="w-100 h-100 {% if not disable_autoplay and not in_search %}feed-video{% endif %}"
                style="width: 100%; height: 100%; object-fit: contain; background-color: #000000;"
-               muted loop playsinline controls
+               muted loop playsinline
                data-post-id="{{ post.share_id }}"
                data-autoplay="{% if disable_autoplay or in_search %}false{% else %}true{% endif %}"
                poster="{{ post.get_video_poster|default:'' }}"
@@ -39,13 +39,21 @@
         </video>
         {% endwith %}
 
+        <!-- Central Interactive Hitbox (Single tap play/pause, Double tap heart like) -->
+        <button type="button"
+                class="reel-center-hitbox reel-tap-hitbox"
+                id="video-hitbox-{{ post.share_id }}"
+                data-post-id="{{ post.share_id }}"
+                aria-label="{% trans 'Play or pause video' %}">
+        </button>
+
         <!-- Play / Pause HUD Overlay -->
         <div id="video-play-hud-{{ post.share_id }}" class="reel-play-hud" aria-hidden="true">
             <i class="bi bi-play-fill"></i>
         </div>
 
         <!-- Central Buffering / Audio-Wait Spinner -->
-        <div id="video-buffer-spinner-{{ post.share_id }}" class="video-buffering-indicator d-none position-absolute top-50 start-50 translate-middle pointer-events-none" style="z-index: 4;" aria-hidden="true">
+        <div id="video-buffer-spinner-{{ post.share_id }}" class="video-buffering-indicator reel-buffering-indicator d-none position-absolute top-50 start-50 translate-middle pointer-events-none" style="z-index: 4;" aria-hidden="true">
             <div class="d-flex align-items-center gap-2 px-3 py-1.5 rounded-pill bg-dark bg-opacity-75 text-white shadow-sm" style="backdrop-filter: blur(8px);">
                 <div class="spinner-border spinner-border-sm text-primary" role="status">
                     <span class="visually-hidden">{% trans "Buffering…" %}</span>
@@ -53,6 +61,27 @@
                 <span class="small fw-medium" style="font-size: 12px;">{% trans "Buffering…" %}</span>
             </div>
         </div>
+
+        <!-- Bottom Right Overlay: Mute toggle button -->
+        <div class="position-absolute bottom-0 end-0 m-2" style="z-index: 4;">
+            <button type="button"
+                    class="reel-stage-overlay-btn reel-mute-btn text-white"
+                    id="video-mute-btn-{{ post.share_id }}"
+                    data-post-id="{{ post.share_id }}"
+                    data-action="mute-toggle"
+                    title="{% trans 'Toggle mute' %}"
+                    aria-label="{% trans 'Toggle mute' %}">
+                <i class="bi bi-volume-mute-fill"></i>
+            </button>
+        </div>
+
+        <!-- Bottom Edge Micro-Scrubber -->
+        <div class="reel-progress-container position-absolute bottom-0 start-0 w-100"
+             data-post-id="{{ post.share_id }}"
+             title="{% trans 'Seek' %}">
+            <div class="reel-progress-bar" id="video-progress-{{ post.share_id }}"></div>
+        </div>
+
         {% if post.video and post.video_status != 'ready' %}
         <div class="position-absolute bottom-0 start-0 m-2" style="z-index: 3;">
             <span class="badge bg-dark bg-opacity-75 text-white small">

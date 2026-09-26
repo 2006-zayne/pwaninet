@@ -51,6 +51,17 @@
         isInitialized: false
     };
 
+    // Virtualized Three-Slot Playback Engine State (Phase 1)
+    const reelSlotEngine = {
+        activeIndex: -1,
+        previousIndex: -1,
+        nextIndex: -1,
+        suspendedFeedVideos: []
+    };
+
+    // Global Gesture Discrimination State (Phase 2: Prevents Swipes Turning into Clicks)
+    let isGestureDrag = false;
+
     // ============================================================================
     // UTILITY HELPERS
     // ============================================================================
@@ -1236,50 +1247,224 @@
         });
     }
 
-    function preloadNextReelAndEvictDistant(currentSnapItem) {
-        if (!currentSnapItem || !currentSnapItem.parentElement) return;
-        const allItems = Array.from(currentSnapItem.parentElement.children);
-        const currentIndex = allItems.indexOf(currentSnapItem);
-        if (currentIndex === -1) return;
+    // ============================================================================
+    // VIRTUALIZED THREE-SLOT PLAYBACK ENGINE & LIFECYCLE (PHASE 1)
+    // ============================================================================
 
-        // 1. Preload Next Reel (N+1) buffer for instantaneous swipe playback (strictly kept paused)
-        const nextItem = allItems[currentIndex + 1];
-        if (nextItem) {
-            const nextVideo = nextItem.querySelector('video');
-            if (nextVideo) {
-                delete nextVideo.dataset.wantsAutoplay;
-                try { nextVideo.pause(); } catch (_) {}
-                if (nextVideo.dataset.hlsUrl) {
-                    if (!nextVideo.dataset.hlsReady && typeof window.initHLSForElement === 'function') {
-                        window.initHLSForElement(nextVideo);
-                    } else if (nextVideo._hlsInstance && typeof nextVideo._hlsInstance.startLoad === 'function') {
-                        nextVideo._hlsInstance.startLoad(0);
-                    }
-                } else {
-                    nextVideo.preload = 'auto';
+    /**
+     * Generic, robust media eviction for a snap item.
+     * Guaranteed to release both HLS instances and native HTML5 / MP4 MediaCodec decoders.
+     */
+    function evictSnapItemMedia(snapItem) {
+        if (!snapItem) return;
+        const video = snapItem.querySelector('video');
+        if (!video) return;
+
+        const hasActiveMedia = video._hlsInstance || video.currentSrc || video.getAttribute('src') || video.querySelector('source') || video.dataset.isWarmed === 'true';
+        if (!hasActiveMedia) return;
+
+        // 1. Pause and reset playback intent
+        try { video.pause(); } catch (_) {}
+        delete video.dataset.wantsAutoplay;
+        delete video.dataset.isWarmed;
+        video.classList.remove('is-playing');
+
+        // 2. Destroy HLS instance & clear references
+        if (video._hlsInstance && typeof video._hlsInstance.destroy === 'function') {
+            try { video._hlsInstance.destroy(); } catch (_) {}
+            video._hlsInstance = null;
+        }
+        video.dataset.hlsReady = '';
+
+        // 3. For MP4 / HTML5 direct media: remove src and all source elements, then call load()
+        // Calling load() after removing src is the W3C-specified method to force Chromium / WebKit
+        // and Android MediaCodec to terminate the hardware decoding context.
+        try {
+            video.removeAttribute('src');
+            try { video.src = ''; } catch (_) {}
+            while (video.firstChild) {
+                video.removeChild(video.firstChild);
+            }
+            video.load();
+        } catch (_) {}
+
+        // 4. Reset indicators
+        const spinner = snapItem.querySelector('.reel-buffering-indicator');
+        if (spinner) spinner.classList.add('d-none');
+        const progress = snapItem.querySelector('.reel-progress-container');
+        if (progress) progress.classList.remove('is-buffering');
+        const vinyl = snapItem.querySelector('.reel-vinyl-disc');
+        if (vinyl) vinyl.classList.remove('is-playing');
+    }
+
+    /**
+     * Warm media pipeline for a slot in [N-1, N+1].
+     * Network-aware: avoids speculative buffering on slow/save-data connections to protect active video N.
+     */
+    function warmSnapItemMedia(snapItem, isNext = false) {
+        if (!snapItem) return;
+        const video = snapItem.querySelector('video');
+        if (!video) return;
+
+        if (video.dataset.isWarmed === 'true') {
+            return; // Already warmed
+        }
+
+        const conn = typeof navigator !== 'undefined' ? (navigator.connection || navigator.mozConnection || navigator.webkitConnection) : null;
+        const isSaveData = Boolean(conn && (conn.saveData || conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g'));
+
+        // On slow connections or save-data mode, avoid speculative pre-buffering to prioritize active video N
+        if (isSaveData && isNext) {
+            video.preload = 'none';
+            return;
+        }
+
+        video.dataset.isWarmed = 'true';
+        video.preload = 'auto';
+
+        const hlsUrl = video.dataset.hlsUrl;
+        const videoUrl = video.dataset.videoUrl;
+
+        if (hlsUrl) {
+            if (typeof window.initHLSForElement === 'function') {
+                delete video.dataset.wantsAutoplay;
+                window.initHLSForElement(video);
+            }
+        } else if (videoUrl) {
+            if (!video.src && !video.querySelector('source')) {
+                video.src = videoUrl;
+                const srcEl = document.createElement('source');
+                srcEl.src = videoUrl;
+                srcEl.type = 'video/mp4';
+                video.appendChild(srcEl);
+                video.load();
+            }
+        }
+    }
+
+    /**
+     * Authoritative three-slot window updater.
+     * Manages [N-1, N, N+1] and evicts all items with |index - activeIndex| >= 2.
+     * Guarantees only the active reel plays.
+     */
+    function updateThreeSlotWindow(newActiveIndex, originCurrentTime = 0) {
+        if (!state.isFullScreenActive) return;
+        const viewport = document.getElementById('reelsSnapViewport');
+        if (!viewport) return;
+        const items = Array.from(viewport.children);
+        if (items.length === 0) return;
+
+        newActiveIndex = Math.max(0, Math.min(items.length - 1, newActiveIndex));
+        reelSlotEngine.activeIndex = newActiveIndex;
+        reelSlotEngine.previousIndex = newActiveIndex > 0 ? newActiveIndex - 1 : -1;
+        reelSlotEngine.nextIndex = newActiveIndex < items.length - 1 ? newActiveIndex + 1 : -1;
+
+        // 1. Evict any snap item with |distance| >= 2 (frees decoders and RAM)
+        items.forEach((item, idx) => {
+            const distance = Math.abs(idx - newActiveIndex);
+            if (distance >= 2) {
+                evictSnapItemMedia(item);
+                item.classList.remove('is-active-reel', 'is-warmed-reel');
+            }
+        });
+
+        // 2. Warm N-1 (previous) if exists - kept strictly paused
+        if (reelSlotEngine.previousIndex !== -1) {
+            const prevItem = items[reelSlotEngine.previousIndex];
+            warmSnapItemMedia(prevItem, false);
+            prevItem.classList.remove('is-active-reel');
+            prevItem.classList.add('is-warmed-reel');
+            const prevVid = prevItem.querySelector('video');
+            if (prevVid) {
+                delete prevVid.dataset.wantsAutoplay;
+                if (!prevVid.paused) {
+                    try { prevVid.pause(); } catch (_) {}
                 }
             }
         }
 
-        // 2. Decoder & Bandwidth Optimization: stopLoad & pause distant items (|distance| >= 2)
-        // and full decoder eviction for distant items (|distance| >= 4)
-        allItems.forEach((item, idx) => {
-            const distance = Math.abs(idx - currentIndex);
-            const itemVideo = item.querySelector('video');
-            if (!itemVideo) return;
-
-            if (distance >= 4) {
-                pauseVideo(itemVideo);
-                if (typeof window.destroyHLSForElement === 'function') {
-                    window.destroyHLSForElement(itemVideo);
-                }
-            } else if (distance >= 2) {
-                pauseVideo(itemVideo);
-                if (itemVideo._hlsInstance && typeof itemVideo._hlsInstance.stopLoad === 'function') {
-                    itemVideo._hlsInstance.stopLoad();
+        // 3. Warm N+1 (next) if exists - kept strictly paused
+        if (reelSlotEngine.nextIndex !== -1) {
+            const nextItem = items[reelSlotEngine.nextIndex];
+            warmSnapItemMedia(nextItem, true);
+            nextItem.classList.remove('is-active-reel');
+            nextItem.classList.add('is-warmed-reel');
+            const nextVid = nextItem.querySelector('video');
+            if (nextVid) {
+                delete nextVid.dataset.wantsAutoplay;
+                if (!nextVid.paused) {
+                    try { nextVid.pause(); } catch (_) {}
                 }
             }
+        }
+
+        // 4. Ensure N (active) is warmed and played
+        const activeItem = items[newActiveIndex];
+        if (activeItem) {
+            activeItem.classList.remove('is-warmed-reel');
+            activeItem.classList.add('is-active-reel');
+            warmSnapItemMedia(activeItem, false);
+
+            const activeVid = activeItem.querySelector('video');
+            if (activeVid) {
+                if (originCurrentTime > 0) {
+                    try { activeVid.currentTime = originCurrentTime; } catch (_) {}
+                }
+                playVideo(activeVid, true);
+                const vinyl = activeItem.querySelector('.reel-vinyl-disc');
+                if (vinyl) vinyl.classList.add('is-playing');
+            }
+            adaptSnapItemOrientation(activeItem);
+            repositionDesktopActionsRail(activeItem.querySelector('.reel-fullscreen-content'));
+            updateDesktopSideRail(activeItem);
+            updateFullscreenNavButtons(newActiveIndex);
+        }
+
+        // Check if approaching end of queue to load more cards
+        if (activeItem) {
+            checkAndAppendMoreFullscreenVideos(activeItem);
+        }
+    }
+
+    /**
+     * Suspend background feed videos when fullscreen reels is opened.
+     * Prevents feed decoders and HLS workers from competing with fullscreen playback.
+     */
+    function suspendFeedVideos() {
+        reelSlotEngine.suspendedFeedVideos = [];
+        if (state.feedObserver) {
+            try { state.feedObserver.disconnect(); } catch (_) {}
+        }
+        document.querySelectorAll('video').forEach(vid => {
+            if (vid.closest('#fullscreenReelsOverlay') || vid.closest('#reelsSnapViewport')) {
+                return;
+            }
+            try { vid.pause(); } catch (_) {}
+            delete vid.dataset.wantsAutoplay;
+            vid.classList.remove('is-playing');
+            if (vid._hlsInstance && typeof vid._hlsInstance.stopLoad === 'function') {
+                try { vid._hlsInstance.stopLoad(); } catch (_) {}
+            }
+            reelSlotEngine.suspendedFeedVideos.push(vid);
         });
+    }
+
+    /**
+     * Restore background feed videos when fullscreen reels is closed.
+     */
+    function restoreFeedVideos() {
+        reelSlotEngine.suspendedFeedVideos = [];
+        if (!state.isFullScreenActive) {
+            createFeedObserver();
+            document.querySelectorAll('video').forEach(vid => {
+                if (vid.closest('#fullscreenReelsOverlay') || vid.closest('#reelsSnapViewport')) {
+                    return;
+                }
+                if (state.feedObserver && !vid.classList.contains('reels-carousel-video') && !vid.closest('.reels-carousel-shelf')) {
+                    try { state.feedObserver.observe(vid); } catch (_) {}
+                }
+            });
+        }
     }
 
     function handleFullscreenIntersection(entries) {
@@ -1290,32 +1475,28 @@
             const video = snapItem.querySelector('video');
             if (!video) return;
 
-            if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
-                // Adapt orientation immediately for the active item
-                adaptSnapItemOrientation(snapItem);
-
-                playVideo(video, true);
-                const vinyl = snapItem.querySelector('.reel-vinyl-disc');
-                if (vinyl) vinyl.classList.add('is-playing');
-
-                // Preload Next Reel (N+1) buffer and evict distant video decoders (|distance| >= 2)
-                preloadNextReelAndEvictDistant(snapItem);
-
-                // Near end of queue: append more videos dynamically
-                checkAndAppendMoreFullscreenVideos(snapItem);
-
-                // Update TikTok desktop rail and exterior engagement buttons
-                updateDesktopSideRail(snapItem);
-                updateFullscreenNavButtons(snapItem);
-
-                // Tick prompt counter — may trigger the auto-scroll nudge after N reels
-                _tickPromptSessionCounter();
-
-            } else if (!entry.isIntersecting || entry.intersectionRatio < 0.5) {
-                // Strictly pause when leaving viewport
-                pauseVideo(video);
-                const vinyl = snapItem.querySelector('.reel-vinyl-disc');
-                if (vinyl) vinyl.classList.remove('is-playing');
+            if (entry.isIntersecting && entry.intersectionRatio >= 0.65) {
+                const viewport = document.getElementById('reelsSnapViewport');
+                if (viewport) {
+                    const items = Array.from(viewport.children);
+                    const snapIdx = items.indexOf(snapItem);
+                    if (snapIdx !== -1 && snapIdx !== reelSlotEngine.activeIndex) {
+                        updateThreeSlotWindow(snapIdx);
+                        _tickPromptSessionCounter();
+                    }
+                }
+            } else if (!entry.isIntersecting || entry.intersectionRatio < 0.2) {
+                // If snap item leaves viewport and is >= 2 positions away from active, evict it
+                const viewport = document.getElementById('reelsSnapViewport');
+                if (viewport) {
+                    const items = Array.from(viewport.children);
+                    const snapIdx = items.indexOf(snapItem);
+                    if (snapIdx !== -1 && reelSlotEngine.activeIndex !== -1) {
+                        if (Math.abs(snapIdx - reelSlotEngine.activeIndex) >= 2) {
+                            evictSnapItemMedia(snapItem);
+                        }
+                    }
+                }
             }
         });
     }
@@ -1338,7 +1519,7 @@
         state.fullscreenObserver = new IntersectionObserver(handleFullscreenIntersection, {
             root: document.getElementById('reelsSnapViewport') || null,
             rootMargin: '0px',
-            threshold: 0.5
+            threshold: 0.65
         });
     }
 
@@ -1471,6 +1652,11 @@
     function handleHitboxTap(hitbox, event) {
         if (state.hasLongPressed) {
             state.hasLongPressed = false;
+            return;
+        }
+
+        // Swipes and drags must never trigger play/pause or double-tap likes
+        if (isGestureDrag || (event && event.defaultPrevented)) {
             return;
         }
 
@@ -1806,16 +1992,14 @@
                     ${poster ? `<img src="${poster}" class="reel-ambient-img" alt="">` : '<div class="w-100 h-100 bg-black"></div>'}
                 </div>
 
-                <!-- Video Element with direct src for instant media engine decoding -->
+                <!-- Video Element with on-demand media engine slot initialization -->
                 <video class="fullscreen-reel-video w-100 h-100"
                        id="fs-video-${postId}"
-                       ${hlsUrl ? '' : `src="${videoSrc}"`}
-                       playsinline loop preload="auto"
+                       playsinline loop preload="none"
                        poster="${poster}"
                        data-post-id="${postId}"
                        ${hlsUrl ? `data-hls-url="${hlsUrl}"` : ''}
                        data-video-url="${videoSrc}">
-                    ${hlsUrl ? '' : `<source src="${videoSrc}" type="video/mp4">`}
                 </video>
 
                 <!-- Tap Hitbox for play/pause HUD and heart burst -->
@@ -2809,14 +2993,27 @@
             targetPostId = null;
         }
 
-        // Pause feed playback and save scroll offset
+        // Pause feed playback, suspend feed decoders, and save scroll offset
         state.previousScrollY = window.scrollY;
         pauseAllVideos();
+        suspendFeedVideos();
 
         state.isFullScreenActive = true;
         document.body.classList.add('reels-active');
         overlay.classList.remove('d-none');
         overlay.setAttribute('aria-hidden', 'false');
+
+        // Force white icons in status bar for fullscreen reels mode
+        try {
+            if (typeof window.updateStatusBarForTheme === 'function') {
+                window.updateStatusBarForTheme('dark');
+            } else {
+                const bridge = window.AndroidBridge || window.PwaninetBridge;
+                if (bridge && typeof bridge.setSystemBarTheme === 'function') {
+                    bridge.setSystemBarTheme('dark');
+                }
+            }
+        } catch (_) {}
 
         // Check and display subtle shared-by note if arriving via shared reel link
         if (!sharedBy) {
@@ -2885,10 +3082,6 @@
                 const video = snapItem.querySelector('video');
                 if (video) {
                     video.muted = isGlobalMuted;
-                    // Trigger immediate media load
-                    if (!video.currentSrc && video.getAttribute('src')) {
-                        video.load();
-                    }
                 }
 
                 if (targetPostId && String(snapItem.dataset.postId).trim() === targetPostId) {
@@ -2906,27 +3099,15 @@
             if (activeItem) {
                 const items = Array.from(viewport.children);
                 const targetIndex = items.indexOf(activeItem);
-                if (targetIndex > 0) {
-                    viewport.scrollTop = targetIndex * viewport.clientHeight;
+                const validIndex = targetIndex > 0 ? targetIndex : 0;
+                if (validIndex > 0) {
+                    viewport.scrollTop = validIndex * viewport.clientHeight;
                 } else {
                     viewport.scrollTop = 0;
                 }
 
-                const activeVideo = activeItem.querySelector('video');
-                if (activeVideo) {
-                    if (originCurrentTime > 0) {
-                        try {
-                            activeVideo.currentTime = originCurrentTime;
-                        } catch (_) {}
-                    }
-                    playVideo(activeVideo, true);
-                    const vinyl = activeItem.querySelector('.reel-vinyl-disc');
-                    if (vinyl) vinyl.classList.add('is-playing');
-                }
-                adaptSnapItemOrientation(activeItem);
-                repositionDesktopActionsRail(activeItem.querySelector('.reel-fullscreen-content'));
-                updateDesktopSideRail(activeItem);
-                updateFullscreenNavButtons(activeItem);
+                // Activate 3-slot window: N plays, N-1 and N+1 warmed, rest evicted
+                updateThreeSlotWindow(validIndex, originCurrentTime);
 
                 setTimeout(() => {
                     adaptSnapItemOrientation(activeItem);
@@ -2963,15 +3144,35 @@
         }
 
         if (viewport) {
-            const fsVideos = viewport.querySelectorAll('video');
-            fsVideos.forEach(v => cleanupVideo(v));
+            const snapItems = Array.from(viewport.children);
+            snapItems.forEach(item => evictSnapItemMedia(item));
             viewport.innerHTML = '';
         }
+
+        reelSlotEngine.activeIndex = -1;
+        reelSlotEngine.previousIndex = -1;
+        reelSlotEngine.nextIndex = -1;
+
+        // Restore feed videos and feed observer
+        restoreFeedVideos();
 
         overlay.classList.add('d-none');
         overlay.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('reels-active');
         state.isFullScreenActive = false;
+
+        // Restore status bar theme to user's active theme
+        try {
+            const curTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            if (typeof window.updateStatusBarForTheme === 'function') {
+                window.updateStatusBarForTheme(curTheme);
+            } else {
+                const bridge = window.AndroidBridge || window.PwaninetBridge;
+                if (bridge && typeof bridge.setSystemBarTheme === 'function') {
+                    bridge.setSystemBarTheme(curTheme);
+                }
+            }
+        } catch (_) {}
 
         const noteEl = document.getElementById('fsReelSharedNote');
         if (noteEl) {
@@ -4235,11 +4436,86 @@
     // ============================================================================
 
     function setupDelegatedListeners() {
+        // --------------------------------------------------------------------
+        // Global Gesture Discrimination: Swipe vs. Tap (Phase 2)
+        // Strictly prevents swipe/drag gestures from generating accidental clicks
+        // --------------------------------------------------------------------
+        let gestureStartX = 0;
+        let gestureStartY = 0;
+        let dragResetTimer = null;
+        const DRAG_THRESHOLD_PX = 8;
+
+        document.addEventListener('touchstart', function(e) {
+            if (e.touches && e.touches.length === 1) {
+                gestureStartX = e.touches[0].clientX;
+                gestureStartY = e.touches[0].clientY;
+                isGestureDrag = false;
+                if (dragResetTimer) {
+                    clearTimeout(dragResetTimer);
+                    dragResetTimer = null;
+                }
+            }
+        }, { passive: true, capture: true });
+
+        document.addEventListener('touchmove', function(e) {
+            if (!isGestureDrag && e.touches && e.touches.length === 1) {
+                const dx = Math.abs(e.touches[0].clientX - gestureStartX);
+                const dy = Math.abs(e.touches[0].clientY - gestureStartY);
+                if (dx > DRAG_THRESHOLD_PX || dy > DRAG_THRESHOLD_PX) {
+                    isGestureDrag = true;
+                }
+            }
+        }, { passive: true, capture: true });
+
+        document.addEventListener('touchend', function() {
+            if (isGestureDrag) {
+                clearTimeout(dragResetTimer);
+                dragResetTimer = setTimeout(() => {
+                    isGestureDrag = false;
+                    dragResetTimer = null;
+                }, 120);
+            }
+        }, { passive: true, capture: true });
+
+        document.addEventListener('touchcancel', function() {
+            isGestureDrag = false;
+            if (dragResetTimer) {
+                clearTimeout(dragResetTimer);
+                dragResetTimer = null;
+            }
+        }, { passive: true, capture: true });
+
+        // Capturing click filter: discard synthetic clicks caused by finger swipes/drags
+        document.addEventListener('click', function(event) {
+            if (isGestureDrag) {
+                const target = event.target;
+                const isSwipeableTarget = target && target.closest && (
+                    target.closest('.reels-carousel-card') ||
+                    target.closest('.reels-carousel-shelf') ||
+                    target.closest('.reel-center-hitbox') ||
+                    target.closest('.reel-tap-hitbox') ||
+                    target.closest('.reels-snap-item') ||
+                    target.closest('#reelsSnapViewport') ||
+                    target.closest('.reel-card-container') ||
+                    target.closest('.reel-post-card') ||
+                    target.closest('.post-card') ||
+                    target.closest('.cursor-pointer')
+                );
+                if (isSwipeableTarget) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    event.stopImmediatePropagation();
+                    return;
+                }
+            }
+        }, true);
+
         // Tap and Hitbox handling
         document.addEventListener('click', function(event) {
             // Hitbox single vs. double tap (pauses/plays or likes)
             const hitbox = event.target.closest('.reel-center-hitbox, .reel-tap-hitbox');
             if (hitbox) {
+                if (isGestureDrag || event.defaultPrevented) return;
                 event.preventDefault();
                 event.stopPropagation();
                 handleHitboxTap(hitbox, event);
@@ -4249,6 +4525,7 @@
             // Play HUD tap (direct tap on central play button overlay when paused)
             const playHud = event.target.closest('.reel-play-hud');
             if (playHud && (playHud.classList.contains('show') || playHud.classList.contains('is-paused'))) {
+                if (isGestureDrag || event.defaultPrevented) return;
                 event.preventDefault();
                 event.stopPropagation();
                 const container = playHud.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reel-fullscreen-content, .reels-snap-item, .media-video-container, .landscape-video-container, .landscape-video-wrapper, .post-card, .post-media-wrapper');
@@ -4275,6 +4552,7 @@
             // Carousel Card Click -> Open Fullscreen Reel
             const carouselCard = event.target.closest('.reels-carousel-card');
             if (carouselCard) {
+                if (isGestureDrag || event.defaultPrevented) return;
                 event.preventDefault();
                 event.stopPropagation();
                 const postId = carouselCard.dataset.postId || extractPostId(carouselCard);
@@ -4700,13 +4978,36 @@
             }
         });
 
-        // Passive scroll listener on snap viewport to synchronize Up/Down buttons
+        // Passive scroll and snap-settlement listener on snap viewport (Phase 2)
         const snapViewportEl = document.getElementById('reelsSnapViewport');
         if (snapViewportEl) {
             let scrollNavTimer = null;
+            let snapSettleTimer = null;
+
+            const handleSnapSettled = () => {
+                if (!state.isFullScreenActive) return;
+                const h = snapViewportEl.clientHeight || 1;
+                const curIdx = Math.round(snapViewportEl.scrollTop / h);
+                const items = Array.from(snapViewportEl.children);
+                if (curIdx >= 0 && curIdx < items.length) {
+                    if (curIdx !== reelSlotEngine.activeIndex) {
+                        updateThreeSlotWindow(curIdx);
+                        _tickPromptSessionCounter();
+                    }
+                    const activeSnap = items[curIdx];
+                    if (activeSnap) {
+                        adaptSnapItemOrientation(activeSnap);
+                        repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
+                    }
+                    updateFullscreenNavButtons(activeSnap);
+                }
+            };
+
             snapViewportEl.addEventListener('scroll', function() {
                 if (!state.isFullScreenActive) return;
                 clearTimeout(scrollNavTimer);
+                clearTimeout(snapSettleTimer);
+
                 scrollNavTimer = setTimeout(() => {
                     updateFullscreenNavButtons();
                     const activeSnap = getActiveSnapItem();
@@ -4715,6 +5016,15 @@
                         repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
                     }
                 }, 40);
+
+                // Debounced snap settlement (fallback for older browser engines)
+                snapSettleTimer = setTimeout(handleSnapSettled, 60);
+            }, { passive: true });
+
+            snapViewportEl.addEventListener('scrollend', function() {
+                if (!state.isFullScreenActive) return;
+                clearTimeout(snapSettleTimer);
+                handleSnapSettled();
             }, { passive: true });
 
             // Guest reels limiter: trigger auth prompt when guest tries to scroll/swipe past the shared reel
@@ -4833,6 +5143,7 @@
         activeCarouselCard = card;
         video.muted = true;
         video.volume = 0;
+        video.loop = false; // Sequential autoplay: do not loop single card
         video.dataset.wantsAutoplay = 'true';
 
         // Ensure HLS or source is attached
@@ -4841,6 +5152,27 @@
         } else if (!video.src && video.dataset.videoUrl) {
             video.src = video.dataset.videoUrl;
             video.load();
+        }
+
+        // Sequential autoplay: advance to next card when current card finishes
+        if (!video._carouselEndedBound) {
+            video._carouselEndedBound = true;
+            video.addEventListener('ended', function handleCarouselCardEnded() {
+                if (activeCarouselCard !== card || state.isFullScreenActive) return;
+                const shelf = card.closest('.reels-carousel-shelf');
+                if (!shelf) return;
+                const track = shelf.querySelector('.reels-carousel-track');
+                if (!track) return;
+
+                const cards = Array.from(track.querySelectorAll('.reels-carousel-card'));
+                const curIdx = cards.indexOf(card);
+                const nextIdx = (curIdx !== -1 && curIdx + 1 < cards.length) ? curIdx + 1 : 0;
+                const nextCard = cards[nextIdx];
+                if (nextCard && nextCard !== card) {
+                    nextCard.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                    playCarouselCard(nextCard);
+                }
+            });
         }
 
         const startPlaying = () => {
@@ -4895,7 +5227,7 @@
         return closestCard || cards[0];
     }
 
-    function scheduleCarouselStickCheck(shelf, delayMs = 400) {
+    function scheduleCarouselStickCheck(shelf, delayMs = 80) {
         if (state.isFullScreenActive) return;
         if (carouselStickDebounceTimer) {
             clearTimeout(carouselStickDebounceTimer);
@@ -5127,6 +5459,13 @@
             mutations.forEach(mutation => {
                 mutation.addedNodes.forEach(node => {
                     if (node.nodeType === Node.ELEMENT_NODE) {
+                        // Ignore mutations occurring inside fullscreen reels viewport or overlay to avoid document-wide re-scans
+                        if (node.closest && (node.closest('#reelsSnapViewport') || node.closest('#fullscreenReelsOverlay'))) {
+                            return;
+                        }
+                        if (node.id === 'reelsSnapViewport' || node.id === 'fullscreenReelsOverlay') {
+                            return;
+                        }
                         if (node.tagName === 'VIDEO' || (node.querySelector && node.querySelector('video'))) {
                             hasNewVideos = true;
                         }
@@ -5278,7 +5617,11 @@
         showSharedByNote,
         get isGlobalMuted() { return isGlobalMuted; },
         get isAutoScrollEnabled() { return isAutoScrollEnabled; },
-        get state() { return state; }
+        get state() { return state; },
+        get reelSlotEngine() { return reelSlotEngine; },
+        updateThreeSlotWindow,
+        evictSnapItemMedia,
+        warmSnapItemMedia
     };
 
     window.videoManager = window.PwaniNetVideoManager;

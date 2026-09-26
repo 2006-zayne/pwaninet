@@ -244,6 +244,15 @@ public class MainActivity extends BridgeActivity {
                 String js =
                     "(function() {" +
                     "  function syncTheme() {" +
+                    "    if (document.body && document.body.classList.contains('reels-active')) {" +
+                    "      var bridge = window.AndroidBridge || window.PwaninetBridge;" +
+                    "      if (bridge && bridge.setSystemBarTheme) {" +
+                    "        bridge.setSystemBarTheme('dark');" +
+                    "      } else if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.NavigationBar) {" +
+                    "        window.Capacitor.Plugins.NavigationBar.setStyle({ style: 'DARK' });" +
+                    "      }" +
+                    "      return;" +
+                    "    }" +
                     "    var root = document.documentElement;" +
                     "    var theme = root.getAttribute('data-theme');" +
                     "    if (!theme || theme === 'system') {" +
@@ -284,6 +293,9 @@ public class MainActivity extends BridgeActivity {
             if (getBridge() != null && getBridge().getWebView() != null) {
                 getBridge().getWebView().evaluateJavascript(
                     "(function() {" +
+                    "  if (document.body && document.body.classList.contains('reels-active')) {" +
+                    "    return 'dark';" +
+                    "  }" +
                     "  var theme = document.documentElement.getAttribute('data-theme');" +
                     "  if (!theme || theme === 'system') {" +
                     "    var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;" +
@@ -895,6 +907,7 @@ public class MainActivity extends BridgeActivity {
             try {
                 String cleanStyle = style != null ? style.trim().toLowerCase(Locale.US) : "light";
                 Vibrator vibrator = getVibratorService();
+                boolean vibratorHandled = false;
                 if (vibrator != null && vibrator.hasVibrator()) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         int effectId = VibrationEffect.EFFECT_CLICK;
@@ -905,29 +918,34 @@ public class MainActivity extends BridgeActivity {
                         }
                         try {
                             vibrator.vibrate(VibrationEffect.createPredefined(effectId));
+                            vibratorHandled = true;
                         } catch (Exception e) {
-                            int amp = "light".equals(cleanStyle) ? 120 : ("heavy".equals(cleanStyle) ? 255 : 180);
-                            int dur = "light".equals(cleanStyle) ? 18 : ("heavy".equals(cleanStyle) ? 45 : 28);
+                            int amp = "light".equals(cleanStyle) ? 60 : ("heavy".equals(cleanStyle) ? 220 : 130);
+                            int dur = "light".equals(cleanStyle) ? 12 : ("heavy".equals(cleanStyle) ? 35 : 20);
                             vibrator.vibrate(VibrationEffect.createOneShot(dur, amp));
+                            vibratorHandled = true;
                         }
                     } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        int amplitude = "light".equals(cleanStyle) ? 120 : ("heavy".equals(cleanStyle) ? 255 : 180);
-                        int duration = "light".equals(cleanStyle) ? 18 : ("heavy".equals(cleanStyle) ? 45 : 28);
+                        int amplitude = "light".equals(cleanStyle) ? 60 : ("heavy".equals(cleanStyle) ? 220 : 130);
+                        int duration = "light".equals(cleanStyle) ? 12 : ("heavy".equals(cleanStyle) ? 35 : 20);
                         vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude));
+                        vibratorHandled = true;
                     }
                 }
 
-                View view = getBridge() != null && getBridge().getWebView() != null 
-                    ? getBridge().getWebView() 
-                    : getWindow().getDecorView();
-                if (view != null) {
-                    int feedbackConstant = HapticFeedbackConstants.VIRTUAL_KEY;
-                    if ("light".equals(cleanStyle)) {
-                        feedbackConstant = HapticFeedbackConstants.KEYBOARD_TAP;
-                    } else if ("heavy".equals(cleanStyle)) {
-                        feedbackConstant = HapticFeedbackConstants.LONG_PRESS;
+                if (!vibratorHandled) {
+                    View view = getBridge() != null && getBridge().getWebView() != null 
+                        ? getBridge().getWebView() 
+                        : getWindow().getDecorView();
+                    if (view != null) {
+                        int feedbackConstant = HapticFeedbackConstants.VIRTUAL_KEY;
+                        if ("light".equals(cleanStyle)) {
+                            feedbackConstant = HapticFeedbackConstants.KEYBOARD_TAP;
+                        } else if ("heavy".equals(cleanStyle)) {
+                            feedbackConstant = HapticFeedbackConstants.LONG_PRESS;
+                        }
+                        view.performHapticFeedback(feedbackConstant, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
                     }
-                    view.performHapticFeedback(feedbackConstant, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
                 }
             } catch (Exception ignored) {}
         });

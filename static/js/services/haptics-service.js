@@ -287,8 +287,40 @@
      * Declarative event delegation for haptic attributes and mobile nav
      */
     function attachGlobalHapticListeners() {
+        let touchStartTarget = null;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchStartTime = 0;
+        let touchMoved = false;
+
         document.addEventListener('touchstart', function(e) {
-            const hapticEl = e.target.closest('[data-haptic]');
+            if (!e.touches || e.touches.length !== 1) return;
+            touchStartTarget = e.target;
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            touchStartTime = Date.now();
+            touchMoved = false;
+        }, { passive: true });
+
+        document.addEventListener('touchmove', function(e) {
+            if (touchStartTarget && e.touches && e.touches.length === 1) {
+                const dx = Math.abs(e.touches[0].clientX - touchStartX);
+                const dy = Math.abs(e.touches[0].clientY - touchStartY);
+                if (dx > 8 || dy > 8) {
+                    touchMoved = true;
+                }
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchend', function() {
+            if (!touchStartTarget) return;
+            const target = touchStartTarget;
+            touchStartTarget = null;
+
+            // Only fire haptics on genuine tap release (never during swipes or drags)
+            if (touchMoved || (Date.now() - touchStartTime) > 400) return;
+
+            const hapticEl = target.closest ? target.closest('[data-haptic]') : null;
             if (hapticEl) {
                 const type = hapticEl.getAttribute('data-haptic');
                 if (type === 'medium') instance.impactMedium();
@@ -301,18 +333,22 @@
             }
 
             // Bottom Navigation Chips
-            const navChip = e.target.closest('.mobile-bottom-nav .nav-chip');
+            const navChip = target.closest ? target.closest('.mobile-bottom-nav .nav-chip') : null;
             if (navChip) {
                 instance.impactLight();
                 return;
             }
 
             // Interactive Switches & Checkboxes
-            const toggleEl = e.target.closest('.form-check-input, .switch, [role="switch"]');
+            const toggleEl = target.closest ? target.closest('.form-check-input, .switch, [role="switch"]') : null;
             if (toggleEl) {
                 instance.selection();
                 return;
             }
+        }, { passive: true });
+
+        document.addEventListener('touchcancel', function() {
+            touchStartTarget = null;
         }, { passive: true });
     }
 

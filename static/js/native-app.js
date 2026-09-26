@@ -227,26 +227,53 @@ function initInstantTouchStates() {
         '.cursor-pointer',
         '[data-clickable="true"]'
     ];
-    
+
+    let touchTarget = null;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchStartTime = 0;
+    let touchMoved = false;
+
     document.addEventListener('touchstart', function(e) {
-        const target = e.target.closest(clickableSelectors.join(','));
-        if (target) {
-            target.classList.add('activated');
-            // Trigger instant light haptic if element doesn't have an explicit haptic attribute
-            if (!target.hasAttribute('data-haptic') && window.Haptics && typeof window.Haptics.impactLight === 'function') {
-                window.Haptics.impactLight();
+        if (!e.touches || e.touches.length !== 1) return;
+        touchTarget = e.target.closest(clickableSelectors.join(','));
+        if (touchTarget) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            touchStartTime = Date.now();
+            touchMoved = false;
+            touchTarget.classList.add('activated');
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function(e) {
+        if (touchTarget && e.touches && e.touches.length === 1) {
+            const dx = Math.abs(e.touches[0].clientX - touchStartX);
+            const dy = Math.abs(e.touches[0].clientY - touchStartY);
+            if (dx > 8 || dy > 8) {
+                touchMoved = true;
+                touchTarget.classList.remove('activated');
             }
         }
     }, { passive: true });
 
-    document.addEventListener('touchend', function(e) {
-        const target = e.target.closest(clickableSelectors.join(','));
-        if (target) target.classList.remove('activated');
+    document.addEventListener('touchend', function() {
+        if (touchTarget) {
+            touchTarget.classList.remove('activated');
+            const duration = Date.now() - touchStartTime;
+            // Only fire light haptic on a genuine tap release (not during a swipe or long hold)
+            if (!touchMoved && duration < 400 && !touchTarget.hasAttribute('data-haptic') && window.Haptics && typeof window.Haptics.impactLight === 'function') {
+                window.Haptics.impactLight();
+            }
+            touchTarget = null;
+        }
     }, { passive: true });
 
-    document.addEventListener('touchcancel', function(e) {
-        const target = e.target.closest(clickableSelectors.join(','));
-        if (target) target.classList.remove('activated');
+    document.addEventListener('touchcancel', function() {
+        if (touchTarget) {
+            touchTarget.classList.remove('activated');
+            touchTarget = null;
+        }
     }, { passive: true });
 }
 
@@ -281,6 +308,9 @@ function initThemeSync() {
  */
 async function updateStatusBarForTheme(theme) {
     try {
+        if (document.body && document.body.classList.contains('reels-active')) {
+            theme = 'dark';
+        }
         let isLight = theme === 'light';
         if (theme !== 'dark' && theme !== 'light' && window.matchMedia) {
             isLight = !window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -309,6 +339,9 @@ async function updateStatusBarForTheme(theme) {
  */
 async function updateNavigationBarForTheme(theme) {
     try {
+        if (document.body && document.body.classList.contains('reels-active')) {
+            theme = 'dark';
+        }
         let isLight = true;
         if (theme === 'dark') {
             isLight = false;
@@ -641,8 +674,8 @@ function initPullToRefresh() {
         startY = 0;
 
         if (window.scrollY <= 2 && e.touches.length === 1) {
-            // Don't activate PTR when the touch is inside a scrollable child container.
-            if (touchStartsInScrollableChild(e.target)) {
+            // Don't activate PTR when in fullscreen reels or inside a scrollable child container.
+            if (document.body.classList.contains('reels-active') || touchStartsInScrollableChild(e.target)) {
                 isPulling = false;
                 return;
             }

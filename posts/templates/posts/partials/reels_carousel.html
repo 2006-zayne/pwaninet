@@ -60,7 +60,6 @@
                  data-is-self="{% if reel.author == request.user %}true{% else %}false{% endif %}"
                  role="button"
                  tabindex="0"
-                 onclick="const vm = window.videoManager || window.PwaniNetVideoManager; if(vm) vm.openFullscreenReels('{{ reel.share_id }}');"
                  onkeydown="if(event.key==='Enter'||event.key===' '){ const vm = window.videoManager || window.PwaniNetVideoManager; if(vm) vm.openFullscreenReels('{{ reel.share_id }}'); event.preventDefault(); }">
                 
                 <!-- Poster Thumbnail Image -->
@@ -77,9 +76,8 @@
                 <!-- Preview Video element (used for carousel stick autoplay & fullscreen extraction) -->
                 {% with hls_url=reel.get_hls_url feed_video=reel.get_video_for_feed %}
                 <video class="reels-carousel-video position-absolute top-0 start-0 w-100 h-100 object-fit-cover"
-                       preload="none"
+                       preload="metadata"
                        muted
-                       loop
                        playsinline
                        poster="{{ reel.get_video_poster|default:reel.thumbnail_url|default:'' }}"
                        data-post-id="{{ reel.share_id }}"
