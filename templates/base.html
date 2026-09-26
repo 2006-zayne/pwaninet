@@ -2032,6 +2032,10 @@
                   <a href="{% url 'download_android_apk' %}" target="pwaninet-download-target" data-apk-download="true" class="text-primary text-decoration-none fw-semibold" hx-boost="false">
                     {% trans "Download directly on your computer" %}
                   </a>
+                  <span class="mx-1 text-secondary">•</span>
+                  <a href="{% url 'downloads' %}" class="text-primary text-decoration-none fw-semibold" data-bs-dismiss="modal">
+                    {% trans "View Downloads Page" %}
+                  </a>
                 </span>
               </div>
             </div>
@@ -4142,9 +4146,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
             if (targetUrl.origin !== window.location.origin) return;
 
             const pathname = targetUrl.pathname;
-            // Exclude static assets, media files, admin portal, downloads, auth session boundary URLs, and Pwanimate app
+            // Exclude static assets, media files, admin portal, binary downloads, auth session boundary URLs, and Pwanimate app
             if (pathname.startsWith('/admin/') || pathname.startsWith('/static/') ||
-                pathname.startsWith('/media/') || pathname.startsWith('/download/') ||
+                pathname.startsWith('/media/') || pathname.startsWith('/download/app/') || pathname.startsWith('/download/android/') ||
                 pathname.startsWith('/accounts/') || pathname.startsWith('/users/login') ||
                 pathname.startsWith('/users/logout') || pathname.startsWith('/users/register') ||
                 pathname.startsWith('/register') || pathname.startsWith('/login') ||
@@ -5205,9 +5209,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
             var isMoreMenu = target.closest('.comment-menu-btn, [data-action="menu"], .reel-options-btn, #fsRailOptionsBtn, .fb-more-btn, .post-card-header [data-bs-toggle="dropdown"]');
             var isProfile = target.closest('.comment-avatar-link, .comment-author-link, .fb-author-link, .fb-author-name, #fsRailAuthorProfileLink, #fsRailAuthorNameLink, .reel-follow-chip, a[href*="/users/user/"], a[href*="/users/profile/"]');
             var isNav = target.closest('.nav-brand-tactical, a[href="/"], a[href*="posts:home"], a[href*="/groups/"], a[href*="/search/"], a[href*="/notifications/"], a[href*="/pwanimate/"]');
-            var isCloseReels = target.closest('.close-fs-reels-btn, #closeReelsOverlay');
 
-            if (isLike || isComment || isRepost || isBookmark || isDownload || isMoreMenu || isProfile || isNav || isCloseReels) {
+            if (isLike || isComment || isRepost || isBookmark || isDownload || isMoreMenu || isProfile || isNav) {
                 e.preventDefault();
                 e.stopPropagation();
                 if (typeof e.stopImmediatePropagation === 'function') {
@@ -5263,20 +5266,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         title: '{% trans "Sign in to view profiles" %}',
                         subtitle: '{% trans "Sign in to connect with students, see courses, and view their campus activity." %}',
                         icon: 'bi-person-circle'
-                    };
-                } else if (isCloseReels) {
-                    // Close fullscreen reel and display guest auth prompt on post detail
-                    if (window.videoManager && typeof window.videoManager.closeFullscreenReels === 'function') {
-                        window.videoManager.closeFullscreenReels();
-                    } else {
-                        var overlay = document.getElementById('fullscreenReelsOverlay');
-                        if (overlay) overlay.classList.add('d-none');
-                        document.body.classList.remove('reels-active');
-                    }
-                    contextOptions = {
-                        title: '{% trans "Sign in to explore PwaniNet" %}',
-                        subtitle: '{% trans "Explore the main feed, courses, and campus discussions by signing in." %}',
-                        icon: 'bi-compass-fill'
                     };
                 } else {
                     contextOptions = {

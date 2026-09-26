@@ -46,7 +46,11 @@
         <span>{% trans "Direct APK Download" %}</span>
       </div>
     </div>
-    <div class="settings-app-download-action">
+    <div class="settings-app-download-action d-flex flex-wrap gap-2">
+      <!-- Dedicated Downloads Page -->
+      <a href="{% url 'downloads' %}" class="btn btn-outline-primary btn-sm d-inline-flex align-items-center" hx-get="{% url 'downloads' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true">
+        <i class="bi bi-grid-fill me-1"></i> {% trans "All Options" %}
+      </a>
       <!-- Mobile: Direct APK Download Link (targets hidden iframe for zero page reload) -->
       <a href="{% url 'download_android_apk' %}" target="pwaninet-download-target" data-apk-download="true" class="btn btn-primary btn-sm d-inline-flex d-md-none align-items-center" download="pwaninet.apk" hx-boost="false">
         <i class="bi bi-download me-1"></i> {% trans "Download APK" %}

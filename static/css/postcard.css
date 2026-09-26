@@ -1936,6 +1936,24 @@ video.is-playing ~ .reel-play-hud,
   transform: scale(1.05);
 }
 
+.reels-carousel-card video.reels-carousel-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  z-index: 1;
+}
+
+.reels-carousel-card:hover video.reels-carousel-video,
+.reels-carousel-card.is-active video.reels-carousel-video,
+video.reels-carousel-video.is-playing {
+  opacity: 1 !important;
+}
+
 .reels-card-scrim-bottom {
   background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.3) 50%, transparent 100%);
   pointer-events: none;

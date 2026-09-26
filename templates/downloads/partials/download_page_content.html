@@ -1,0 +1,582 @@
+{% load i18n %}
+{% load static %}
+
+<!-- Page Title for HTMX navigation history updates -->
+<title>{% trans "Download PwaniNet — Web App (PWA) & Mobile APK" %}</title>
+
+<div class="downloads-continuous-wrapper">
+    <!-- 1. HERO HEADER (Seamlessly sits directly on background) -->
+    <header class="downloads-hero-header text-center py-4 mb-4">
+        <div class="d-inline-flex position-relative mb-3">
+            <img src="{% static 'images/pwaninet-app-icon.png' %}" 
+                 alt="PwaniNet" 
+                 width="88" 
+                 height="88" 
+                 class="rounded-4 shadow-sm downloads-brand-logo" />
+            <span class="position-absolute bottom-0 start-50 translate-middle-x badge rounded-pill bg-primary border border-2 border-white px-2 py-1 small" style="font-size: 0.65rem;">
+                Official
+            </span>
+        </div>
+        <h1 class="h2 fw-bold text-dark-emphasis mb-2">{% trans "Download PwaniNet" %}</h1>
+        <p class="text-secondary mx-auto mb-3" style="max-width: 600px; font-size: 0.95rem; line-height: 1.5;">
+            {% trans "Please read the short installation guide below first to avoid browser security blocks, then select your download option at the bottom." %}
+        </p>
+        <div class="d-flex flex-wrap justify-content-center gap-2">
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1">
+                <i class="bi bi-tag-fill me-1"></i>v{{ latest_apk_version|default:app_version|default:"1.0.0" }}
+            </span>
+            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">
+                <i class="bi bi-shield-check me-1"></i>{% trans "Verified Safe & Open Source" %}
+            </span>
+        </div>
+    </header>
+
+    <!-- NOTIFICATION ALERT (Appears when download/install is clicked) -->
+    <div id="downloads-action-alert" class="alert d-none align-items-center gap-2 rounded-3 shadow-sm mb-4" role="alert">
+        <i id="downloads-action-icon" class="bi bi-info-circle-fill fs-5"></i>
+        <div id="downloads-action-text" class="small fw-semibold"></div>
+    </div>
+
+    <!-- 2. INSTRUCTIONS SECTION (Clear & Direct to the Point) -->
+    <section class="downloads-instructions-section mb-5">
+        <!-- PART A: ANDROID APK INSTALLATION & WARNINGS -->
+        <div class="instruction-block mb-4 p-4 rounded-4">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <span class="step-circle bg-success text-white fw-bold">1</span>
+                <div>
+                    <h2 class="h5 fw-bold mb-0 text-dark-emphasis">
+                        {% trans "Android APK Installation & Safety Warnings" %}
+                    </h2>
+                    <span class="small text-muted">{% trans "Direct to the point — what Android shows and how to proceed" %}</span>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <!-- Warning 1: File might be harmful -->
+                <div class="col-12 col-md-6">
+                    <div class="instruction-card h-100 p-3 rounded-3 border">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="badge bg-warning text-dark fw-bold">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i>{% trans "Warning 1" %}
+                            </span>
+                            <h3 class="h6 fw-bold mb-0 text-dark-emphasis">
+                                {% trans "'File might be harmful'" %}
+                            </h3>
+                        </div>
+                        <p class="small text-secondary mb-2">
+                            {% trans "When downloading, Chrome will pop up:" %}
+                        </p>
+                        <div class="instruction-quote p-2 rounded-2 small mb-2 fst-italic">
+                            "{% trans "File might be harmful. Do you want to download pwaninet.apk anyway?" %}"
+                        </div>
+                        <div class="instruction-action alert alert-light border small py-2 px-3 mb-0">
+                            <strong>{% trans "Action:" %}</strong> {% trans "Tap " %}<span class="badge bg-primary text-white">{% trans "Download anyway" %}</span>.
+                            <div class="text-muted mt-1" style="font-size: 0.78rem;">
+                                {% trans "Chrome shows this standard warning for all APKs outside Google Play. PwaniNet is 100% verified & safe." %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Warning 2: Google Play Protect -->
+                <div class="col-12 col-md-6">
+                    <div class="instruction-card h-100 p-3 rounded-3 border">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="badge bg-danger text-white fw-bold">
+                                <i class="bi bi-shield-x me-1"></i>{% trans "Warning 2" %}
+                            </span>
+                            <h3 class="h6 fw-bold mb-0 text-dark-emphasis">
+                                {% trans "'Blocked by Play Protect'" %}
+                            </h3>
+                        </div>
+                        <p class="small text-secondary mb-2">
+                            {% trans "When opening the APK, Google Play Protect may prompt:" %}
+                        </p>
+                        <div class="instruction-quote p-2 rounded-2 small mb-2 fst-italic">
+                            "{% trans "Blocked by Play Protect — Unknown developer" %}"
+                        </div>
+                        <div class="instruction-action alert alert-light border small py-2 px-3 mb-0">
+                            <strong>{% trans "Action:" %}</strong>
+                            <ol class="ps-3 mb-0 mt-1" style="font-size: 0.82rem;">
+                                <li>{% trans "Do " %}<strong>{% trans "NOT" %}</strong>{% trans " tap 'OK' (it cancels install)." %}</li>
+                                <li>{% trans "Tap " %}<strong>"{% trans "More details" %}"</strong> <span class="text-muted">({% trans "small text at bottom" %})</span>.</li>
+                                <li>{% trans "Tap " %}<span class="badge bg-danger text-white">{% trans "Install anyway" %}</span>.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Unknown Sources -->
+                <div class="col-12">
+                    <div class="instruction-card p-3 rounded-3 border">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="badge bg-secondary-subtle text-secondary fw-bold">
+                                <i class="bi bi-gear-fill me-1"></i>{% trans "Step 3" %}
+                            </span>
+                            <h3 class="h6 fw-bold mb-0 text-dark-emphasis">
+                                {% trans "Allow 'Install Unknown Apps' Permission" %}
+                            </h3>
+                        </div>
+                        <p class="small text-secondary mb-2">
+                            {% trans "Open " %}<code>pwaninet.apk</code>{% trans " from your notifications or phone Downloads folder. If your device says:" %}
+                        </p>
+                        <div class="instruction-quote p-2 rounded-2 small mb-2 fst-italic">
+                            "{% trans "For your security, your phone is not allowed to install unknown apps from this source" %}"
+                        </div>
+                        <p class="small text-secondary mb-0">
+                            <strong>{% trans "Action:" %}</strong> {% trans "Tap " %}<strong>{% trans "Settings" %}</strong> ➔ {% trans "toggle ON " %}<strong>"{% trans "Allow from this source" %}"</strong> ➔ {% trans "tap Back and press " %}<strong>"{% trans "Install" %}"</strong>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PART B: PWA (WEB APP) INSTRUCTIONS -->
+        <div class="instruction-block mb-4 p-4 rounded-4">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <span class="step-circle bg-primary text-white fw-bold">2</span>
+                <div>
+                    <h2 class="h5 fw-bold mb-0 text-dark-emphasis">
+                        {% trans "Web App (PWA) Guidelines" %}
+                    </h2>
+                    <span class="small text-muted">{% trans "No file downloads needed • Runs straight through your browser" %}</span>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <!-- iOS Safari -->
+                <div class="col-12 col-md-4">
+                    <div class="instruction-card h-100 p-3 rounded-3 border">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="bi bi-apple fs-5 text-dark-emphasis"></i>
+                            <h3 class="h6 fw-bold mb-0">{% trans "iPhone & iPad (Safari)" %}</h3>
+                        </div>
+                        <ol class="small text-secondary ps-3 mb-0" style="line-height: 1.5;">
+                            <li>{% trans "Open this site in Safari." %}</li>
+                            <li>{% trans "Tap the " %}<strong>{% trans "Share button" %}</strong> <i class="bi bi-box-arrow-up text-primary"></i>.</li>
+                            <li>{% trans "Scroll down & tap " %}<strong>"{% trans "Add to Home Screen" %}"</strong> <i class="bi bi-plus-square text-primary"></i>.</li>
+                            <li>{% trans "Tap " %}<strong>"{% trans "Add" %}"</strong> {% trans "in top-right corner." %}</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <!-- Android Chrome -->
+                <div class="col-12 col-md-4">
+                    <div class="instruction-card h-100 p-3 rounded-3 border">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="bi bi-google fs-5 text-primary"></i>
+                            <h3 class="h6 fw-bold mb-0">{% trans "Android (Chrome)" %}</h3>
+                        </div>
+                        <ol class="small text-secondary ps-3 mb-0" style="line-height: 1.5;">
+                            <li>{% trans "Click " %}<strong>"{% trans "Install Web App (PWA)" %}"</strong> {% trans "below." %}</li>
+                            <li>{% trans "Confirm " %}<strong>"{% trans "Install" %}"</strong> {% trans "on browser popup." %}</li>
+                            <li>{% trans "Or tap Chrome Menu (⋮) ➔ " %}<strong>"{% trans "Install app" %}"</strong>.</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <!-- Desktop -->
+                <div class="col-12 col-md-4">
+                    <div class="instruction-card h-100 p-3 rounded-3 border">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="bi bi-display fs-5 text-secondary"></i>
+                            <h3 class="h6 fw-bold mb-0">{% trans "Desktop (PC & Mac)" %}</h3>
+                        </div>
+                        <ol class="small text-secondary ps-3 mb-0" style="line-height: 1.5;">
+                            <li>{% trans "Click the Install icon (⬇) in the browser URL bar." %}</li>
+                            <li>{% trans "Or click " %}<strong>"{% trans "Install Web App" %}"</strong> {% trans "below." %}</li>
+                            <li>{% trans "PwaniNet launches in its own clean window." %}</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. DOWNLOAD BUTTONS SECTION (NOW COMES AFTER ALL INSTRUCTIONS ARE READ!) -->
+    <section class="downloads-actions-section mb-5">
+        <div class="text-center mb-4">
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1 mb-2">
+                <i class="bi bi-check2-all me-1"></i>{% trans "Instructions Read" %}
+            </span>
+            <h2 class="h3 fw-bold text-dark-emphasis mb-1">
+                {% trans "Choose Your Download Option" %}
+            </h2>
+            <p class="text-secondary small mb-0">
+                {% trans "Select between the standalone Android APK or the instant browser Web App (PWA)." %}
+            </p>
+        </div>
+
+        <div class="row g-4 justify-content-center">
+            <!-- OPTION 1: MOBILE APK BUTTON -->
+            <div class="col-12 col-md-6">
+                <div class="download-action-card p-4 rounded-4 border h-100 d-flex flex-column text-center">
+                    <div class="mb-3">
+                        <div class="d-inline-flex p-3 rounded-circle bg-success-subtle text-success mb-2">
+                            <i class="bi bi-android2 fs-2"></i>
+                        </div>
+                        <h3 class="h5 fw-bold text-dark-emphasis mb-1">
+                            {% trans "Android APK" %}
+                        </h3>
+                        <span class="badge bg-success-subtle text-success rounded-pill px-3 py-1 small">
+                            {% trans "Recommended for Android" %}
+                        </span>
+                    </div>
+                    <p class="small text-secondary mb-4 flex-grow-1">
+                        {% trans "Standalone APK compiled directly from GitHub releases. Enables background push alerts and native 60fps speed." %}
+                    </p>
+                    <div>
+                        <button type="button" 
+                                id="apk-download-trigger-btn" 
+                                class="btn btn-success btn-lg w-100 fw-bold py-3 shadow-sm d-flex align-items-center justify-content-center gap-2"
+                                data-download-url="{{ github_apk_url|default:'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk' }}">
+                            <i class="bi bi-download fs-5"></i>
+                            <span id="apk-btn-text">{% trans "Download Mobile APK" %}</span>
+                        </button>
+                        <div id="apk-status-feedback" class="mt-2 small text-muted">
+                            <i class="bi bi-arrow-down-circle me-1"></i>{% trans "Direct file download • No redirect" %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OPTION 2: PWA WEB APP BUTTON -->
+            <div class="col-12 col-md-6">
+                <div class="download-action-card p-4 rounded-4 border h-100 d-flex flex-column text-center">
+                    <div class="mb-3">
+                        <div class="d-inline-flex p-3 rounded-circle bg-primary-subtle text-primary mb-2">
+                            <i class="bi bi-window-fullscreen fs-2"></i>
+                        </div>
+                        <h3 class="h5 fw-bold text-dark-emphasis mb-1">
+                            {% trans "Web App (PWA)" %}
+                        </h3>
+                        <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 small">
+                            {% trans "Universal • Zero Download" %}
+                        </span>
+                    </div>
+                    <p class="small text-secondary mb-4 flex-grow-1">
+                        {% trans "Installs directly to your home screen or desktop via your browser. Zero storage overhead and automatic background updates." %}
+                    </p>
+                    <div>
+                        <button type="button" 
+                                id="pwa-install-trigger-btn" 
+                                class="btn btn-primary btn-lg w-100 fw-bold py-3 shadow-sm d-flex align-items-center justify-content-center gap-2">
+                            <i class="bi bi-phone-fill fs-5"></i>
+                            <span id="pwa-btn-text">{% trans "Install Web App (PWA)" %}</span>
+                        </button>
+                        <div id="pwa-status-feedback" class="mt-2 small text-muted">
+                            <i class="bi bi-lightning-charge me-1"></i>{% trans "Triggers browser install prompt" %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. DESKTOP QR MOBILE HANDOFF (FOOTNOTE) -->
+    <footer class="downloads-qr-footer p-4 rounded-4 border mb-4 text-center text-md-start">
+        <div class="row align-items-center g-3">
+            <div class="col-12 col-md-8">
+                <div class="d-flex align-items-center justify-content-center justify-content-md-start gap-2 mb-1">
+                    <i class="bi bi-qr-code-scan text-primary fs-5"></i>
+                    <h3 class="h6 fw-bold mb-0 text-dark-emphasis">
+                        {% trans "Viewing on a computer? Scan with your phone" %}
+                    </h3>
+                </div>
+                <p class="small text-secondary mb-2">
+                    {% trans "Point your phone camera at the code to open this download page or download the APK directly on mobile." %}
+                </p>
+                <div class="input-group input-group-sm max-w-sm mx-auto mx-md-0" style="max-width: 340px;">
+                    <input type="text" id="downloads-share-input" class="form-control" value="https://pwaninet.app/downloads/" readonly style="font-size: 0.8rem;">
+                    <button class="btn btn-outline-primary" type="button" id="downloads-copy-btn">
+                        <i class="bi bi-clipboard me-1"></i>{% trans "Copy" %}
+                    </button>
+                </div>
+            </div>
+            <div class="col-12 col-md-4 text-center">
+                <div class="d-inline-flex p-2 rounded-3 shadow-sm" style="background: #ffffff !important; border: 1px solid #e2e8f0;">
+                    <img src="{% url 'qr_code_svg' %}"
+                         alt="{% trans 'PwaniNet QR Code' %}"
+                         width="110"
+                         height="110"
+                         style="display: block; image-rendering: pixelated; background: #ffffff;"
+                         loading="lazy">
+                </div>
+            </div>
+        </div>
+    </footer>
+</div>
+
+<style>
+/* Continuous Downloads Page Styles */
+.downloads-continuous-wrapper {
+    max-width: 820px;
+    margin: 0 auto;
+    background: transparent;
+}
+
+.downloads-brand-logo {
+    box-shadow: 0 4px 20px rgba(37, 99, 235, 0.15);
+}
+
+.instruction-block {
+    background: var(--card-bg, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+}
+
+.step-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+.instruction-card {
+    background: var(--background, #f8fafc);
+    border-color: var(--border, #e2e8f0) !important;
+}
+
+.instruction-quote {
+    background: rgba(0, 0, 0, 0.04);
+    border-left: 3px solid var(--primary, #2563eb);
+    color: var(--text-dark, #0f172a);
+}
+
+.instruction-action {
+    background: rgba(var(--card-bg-rgb, 255, 255, 255), 0.9);
+}
+
+.download-action-card {
+    background: var(--card-bg, #ffffff);
+    border-color: var(--border, #e2e8f0) !important;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.download-action-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.09) !important;
+}
+
+.downloads-qr-footer {
+    background: var(--card-bg, #ffffff);
+    border-color: var(--border, #e2e8f0) !important;
+}
+
+.pwaninet-pulse {
+    animation: downloadPulse 1.8s ease-in-out;
+}
+
+@keyframes downloadPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+/* Dark Theme Adaptations */
+[data-theme="dark"] .instruction-block,
+[data-theme="dark"] .download-action-card,
+[data-theme="dark"] .downloads-qr-footer {
+    background: var(--card-bg, #242526);
+    border-color: var(--border, #3a3b3c) !important;
+}
+
+[data-theme="dark"] .instruction-card {
+    background: rgba(24, 25, 31, 0.6) !important;
+    border-color: var(--border, #3a3b3c) !important;
+}
+
+[data-theme="dark"] .instruction-quote {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-dark, #e4e6eb);
+}
+
+[data-theme="dark"] .instruction-action {
+    background: rgba(36, 37, 38, 0.8) !important;
+    color: var(--text-dark, #e4e6eb) !important;
+    border-color: var(--border, #3a3b3c) !important;
+}
+
+[data-theme="dark"] .text-dark-emphasis {
+    color: var(--text-dark, #e4e6eb) !important;
+}
+</style>
+
+<script>
+(function() {
+    function initContinuousDownloads() {
+        const pwaBtn = document.getElementById('pwa-install-trigger-btn');
+        const pwaBtnText = document.getElementById('pwa-btn-text');
+        const pwaFeedback = document.getElementById('pwa-status-feedback');
+        const apkBtn = document.getElementById('apk-download-trigger-btn');
+        const apkBtnText = document.getElementById('apk-btn-text');
+        const alertBox = document.getElementById('downloads-action-alert');
+        const alertIcon = document.getElementById('downloads-action-icon');
+        const alertText = document.getElementById('downloads-action-text');
+
+        function showAlert(message, type, iconClass) {
+            if (!alertBox || !alertText) return;
+            alertBox.className = 'alert d-flex align-items-center gap-2 rounded-3 shadow-sm mb-4 alert-' + (type || 'info');
+            alertIcon.className = 'bi ' + (iconClass || 'bi-info-circle-fill') + ' fs-5';
+            alertText.innerHTML = message;
+            alertBox.classList.remove('d-none');
+            alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // Check if already running in standalone PWA or native container
+        if (typeof window.isStandalonePWA === 'function' && window.isStandalonePWA()) {
+            if (pwaBtnText) pwaBtnText.innerHTML = '<i class="bi bi-check2-circle me-1"></i>PWA Installed ✓';
+            if (pwaBtn) {
+                pwaBtn.classList.remove('btn-primary');
+                pwaBtn.classList.add('btn-success');
+            }
+            if (pwaFeedback) pwaFeedback.textContent = 'PwaniNet PWA is running on this device.';
+        }
+
+        if (typeof window.isNativeAppContainer === 'function' && window.isNativeAppContainer()) {
+            if (apkBtnText) apkBtnText.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Native APK Running ✓';
+            if (apkBtn) {
+                apkBtn.classList.remove('btn-success');
+                apkBtn.classList.add('btn-outline-success');
+            }
+        }
+
+        // 1. PWA INSTALL TRIGGER BUTTON
+        if (pwaBtn) {
+            pwaBtn.onclick = function(e) {
+                e.preventDefault();
+
+                if (typeof window.isNativeAppContainer === 'function' && window.isNativeAppContainer()) {
+                    showAlert('You are already running the native Android app!', 'info', 'bi-info-circle-fill');
+                    return;
+                }
+
+                if (typeof window.isStandalonePWA === 'function' && window.isStandalonePWA()) {
+                    showAlert('PwaniNet PWA is already installed on your device ✓', 'success', 'bi-check2-circle');
+                    return;
+                }
+
+                if (window.nativePWAInstallManager && window.nativePWAInstallManager.deferredPrompt) {
+                    window.nativePWAInstallManager.showNativeInstallPrompt()
+                        .then(function(choice) {
+                            if (choice && choice.outcome === 'accepted') {
+                                if (pwaBtnText) pwaBtnText.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Installed ✓';
+                                pwaBtn.classList.remove('btn-primary');
+                                pwaBtn.classList.add('btn-success');
+                                showAlert('PwaniNet has been installed successfully to your device!', 'success', 'bi-check2-circle');
+                            }
+                        });
+                    return;
+                }
+
+                // Check iOS Safari
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                if (isIOS) {
+                    showAlert('On iOS Safari: Tap <strong>Share</strong> <i class="bi bi-box-arrow-up"></i> at the bottom ➔ tap <strong>"Add to Home Screen"</strong> <i class="bi bi-plus-square"></i> ➔ tap <strong>"Add"</strong>.', 'primary', 'bi-apple');
+                    return;
+                }
+
+                // Other browsers
+                showAlert('To install, open your browser menu (⋮) and select <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong>.', 'info', 'bi-info-circle-fill');
+            };
+        }
+
+        // 2. APK DOWNLOAD TRIGGER BUTTON (SILENT DOWNLOAD - NO REDIRECT)
+        if (apkBtn) {
+            apkBtn.onclick = function(e) {
+                e.preventDefault();
+                const downloadUrl = apkBtn.getAttribute('data-download-url') || 'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk';
+
+                const originalHtml = apkBtnText ? apkBtnText.innerHTML : 'Download Mobile APK';
+                if (apkBtnText) {
+                    apkBtnText.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Starting download...';
+                }
+                apkBtn.disabled = true;
+
+                // Trigger file download silently via hidden iframe without page navigation
+                if (typeof window.triggerPwaninetDownload === 'function') {
+                    window.triggerPwaninetDownload(downloadUrl);
+                } else {
+                    let iframe = document.getElementById('pwaninet-download-target');
+                    if (!iframe) {
+                        iframe = document.createElement('iframe');
+                        iframe.id = 'pwaninet-download-target';
+                        iframe.name = 'pwaninet-download-target';
+                        iframe.style.display = 'none';
+                        iframe.style.width = '0';
+                        iframe.style.height = '0';
+                        iframe.style.border = 'none';
+                        document.body.appendChild(iframe);
+                    }
+                    iframe.src = downloadUrl;
+                }
+
+                setTimeout(function() {
+                    if (apkBtnText) {
+                        apkBtnText.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Download Started!';
+                    }
+                    apkBtn.disabled = false;
+                    setTimeout(function() {
+                        if (apkBtnText) apkBtnText.innerHTML = originalHtml;
+                    }, 4000);
+                }, 1200);
+
+                showAlert(
+                    '<strong>Download started!</strong> If Android warns <em>"File might be harmful"</em>, tap <strong>"Download anyway"</strong>. If Play Protect blocks it, tap <strong>"More details" ➔ "Install anyway"</strong>.',
+                    'warning',
+                    'bi-exclamation-triangle-fill'
+                );
+            };
+        }
+
+        // Listen for native appinstalled event
+        window.addEventListener('appinstalled', function() {
+            if (pwaBtnText) pwaBtnText.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Installed ✓';
+            if (pwaBtn) {
+                pwaBtn.classList.remove('btn-primary');
+                pwaBtn.classList.add('btn-success');
+            }
+            showAlert('PwaniNet PWA successfully installed to your device!', 'success', 'bi-check2-circle');
+        });
+
+        // Copy Share Link handler
+        const copyBtn = document.getElementById('downloads-copy-btn');
+        const shareInput = document.getElementById('downloads-share-input');
+        if (copyBtn && shareInput) {
+            copyBtn.onclick = function() {
+                shareInput.select();
+                shareInput.setSelectionRange(0, 99999);
+                navigator.clipboard.writeText(shareInput.value).then(function() {
+                    const orig = copyBtn.innerHTML;
+                    copyBtn.innerHTML = '<i class="bi bi-check2 me-1"></i>Copied!';
+                    copyBtn.classList.remove('btn-outline-primary');
+                    copyBtn.classList.add('btn-success');
+                    setTimeout(function() {
+                        copyBtn.innerHTML = orig;
+                        copyBtn.classList.remove('btn-success');
+                        copyBtn.classList.add('btn-outline-primary');
+                    }, 2000);
+                }).catch(function() {
+                    document.execCommand('copy');
+                });
+            };
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initContinuousDownloads);
+    } else {
+        initContinuousDownloads();
+    }
+    document.addEventListener('htmx:afterSwap', function() {
+        if (document.querySelector('.downloads-continuous-wrapper')) {
+            initContinuousDownloads();
+        }
+    });
+})();
+</script>

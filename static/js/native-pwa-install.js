@@ -58,8 +58,8 @@ class NativePWAInstallManager {
     }
 
     init() {
-        // Tier 1 & 2: Check APK download/upgrade banner for Android users outside the native container
-        this.checkApkDownloadBanner();
+        // Unified check: show single install banner (PWA + APK entry point)
+        this.checkUnifiedInstallBanner();
 
         // Desktop QR Install Modal handler
         this.initDesktopQrModal();
@@ -67,8 +67,8 @@ class NativePWAInstallManager {
         // Silent download handler (prevents page reload on 302 downloads)
         this.initSilentDownload();
 
-        // Tier 2 & 3: Check PWA install prompt (suppressed in native container AND standalone PWA)
-        if (this.isInstalled()) {
+        // Tier 2 & 3: Check PWA install prompt (suppressed in native container)
+        if (isNativeAppContainer()) {
             this.disableInstallPrompts();
             return;
         }
@@ -84,9 +84,8 @@ class NativePWAInstallManager {
             this.deferredPrompt = e;
             console.log('[PWA] Native install prompt captured');
 
-            // Immediately show visible CTA banner and attach a one-time user gesture to prompt
-            this.showInstallBanner();
-            this.attachAutoPromptOnFirstGesture();
+            // Trigger the unified banner if not already dismissed/snoozed
+            this.checkUnifiedInstallBanner();
         });
 
         window.addEventListener('appinstalled', () => {
@@ -95,10 +94,29 @@ class NativePWAInstallManager {
             this.installPromptShown = true;
             this.disableInstallPrompts();
             this.showInstallSuccess();
+
+            // Also update any open downloads page button
+            const pwaBtn = document.getElementById('pwa-install-trigger-btn');
+            const pwaBtnText = document.getElementById('pwa-btn-text');
+            if (pwaBtn && pwaBtnText) {
+                pwaBtnText.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Installed ✓';
+                pwaBtn.classList.remove('btn-primary');
+                pwaBtn.classList.add('btn-success');
+            }
         });
 
         this.trackUserEngagement();
         this.checkInstallPrompt();
+
+        // Automatically clean up banner on HTMX navigation to the downloads page
+        document.addEventListener('htmx:afterSwap', () => {
+            if (window.location.pathname.startsWith('/downloads') || window.location.pathname.startsWith('/download/')) {
+                const b = document.getElementById('pwaninet-install-banner') ||
+                          document.getElementById('pwaninet-apk-banner') ||
+                          document.getElementById('pwa-install-banner');
+                if (b) b.remove();
+            }
+        });
     }
 
     isInstalled() {
@@ -111,12 +129,12 @@ class NativePWAInstallManager {
         this.deferredPrompt = null;
         localStorage.setItem('pwaInstalled', 'true');
 
-        const pwaBanner = document.getElementById('pwa-install-banner');
-        if (pwaBanner) pwaBanner.remove();
+        const banners = document.querySelectorAll('#pwaninet-install-banner, #pwaninet-apk-banner, #pwa-install-banner');
+        banners.forEach(b => b.remove());
 
-        const genericBanners = document.querySelectorAll('[id*="install"]:not(#pwaninet-apk-banner), [class*="install"]:not([class*="apk"])');
+        const genericBanners = document.querySelectorAll('[id*="install"]:not(#pwaninet-install-banner):not(#pwa-install-trigger-btn), [class*="install"]:not([class*="apk"]):not(#pwa-install-trigger-btn)');
         genericBanners.forEach(b => {
-            if (b.id !== 'pwaninet-apk-banner' && !b.closest('#pwaninet-apk-banner')) {
+            if (b.id !== 'pwaninet-install-banner' && !b.closest('#pwaninet-install-banner') && b.id !== 'pwa-install-trigger-btn') {
                 b.remove();
             }
         });
@@ -127,29 +145,23 @@ class NativePWAInstallManager {
             clearTimeout(this._dismissTimer);
             this._dismissTimer = null;
         }
-
-        // Tier 3: If running in native app container, ensure APK banner is also removed
-        if (isNativeAppContainer()) {
-            const apkBanner = document.getElementById('pwaninet-apk-banner');
-            if (apkBanner) apkBanner.remove();
-        }
     }
 
-    checkApkDownloadBanner() {
-        // Tier 3: Suppress completely if running in native app container
+    checkUnifiedInstallBanner() {
+        // Suppress completely if running in native app container
         if (isNativeAppContainer()) {
-            const existingApkBanner = document.getElementById('pwaninet-apk-banner');
-            if (existingApkBanner) existingApkBanner.remove();
+            this.disableInstallPrompts();
             return;
         }
 
-        // Only show to Android users
-        if (!isAndroidUser()) {
+        // Suppress on the dedicated downloads page
+        if (window.location.pathname.startsWith('/downloads') || window.location.pathname.startsWith('/download/')) {
             return;
         }
 
-        // 1. Check if user permanently opted out ("Never")
-        if (localStorage.getItem('pwaninet_apk_banner_never') === 'true') {
+        // Check if user permanently opted out ("Never")
+        if (localStorage.getItem('pwaninet_unified_install_never') === 'true' ||
+            localStorage.getItem('pwaninet_apk_banner_never') === 'true') {
             return;
         }
 
@@ -158,40 +170,57 @@ class NativePWAInstallManager {
             return;
         }
 
-        // 2. Check if currently snoozed ("Not now")
-        const snoozedUntil = parseInt(localStorage.getItem('pwaninet_apk_banner_snoozed_until') || '0', 10);
+        // Check if currently snoozed ("Not now")
+        const snoozedUntil = parseInt(localStorage.getItem('pwaninet_unified_install_snoozed_until') ||
+                                      localStorage.getItem('pwaninet_apk_banner_snoozed_until') || '0', 10);
         if (snoozedUntil && Date.now() < snoozedUntil) {
+            return;
+        }
+
+        // If user is already running standalone PWA and is NOT on Android, suppress
+        if (isStandalonePWA() && !isAndroidUser()) {
             return;
         }
 
         // Delay slightly after load for a smoother UX
         setTimeout(() => {
             if (isNativeAppContainer()) return;
-            if (localStorage.getItem('pwaninet_apk_banner_never') === 'true') return;
+            if (window.location.pathname.startsWith('/downloads') || window.location.pathname.startsWith('/download/')) return;
+            if (localStorage.getItem('pwaninet_unified_install_never') === 'true' ||
+                localStorage.getItem('pwaninet_apk_banner_never') === 'true') return;
             if (localStorage.getItem('pwaninet_apk_banner_dismissed') === 'true') return;
 
-            const currentSnooze = parseInt(localStorage.getItem('pwaninet_apk_banner_snoozed_until') || '0', 10);
+            const currentSnooze = parseInt(localStorage.getItem('pwaninet_unified_install_snoozed_until') ||
+                                           localStorage.getItem('pwaninet_apk_banner_snoozed_until') || '0', 10);
             if (currentSnooze && Date.now() < currentSnooze) return;
 
-            this.showApkDownloadBanner();
+            this.showUnifiedInstallBanner();
         }, 1500);
     }
 
-    showApkDownloadBanner() {
+    showUnifiedInstallBanner() {
         if (isNativeAppContainer()) return;
-        if (localStorage.getItem('pwaninet_apk_banner_never') === 'true') return;
+        if (window.location.pathname.startsWith('/downloads') || window.location.pathname.startsWith('/download/')) return;
+        if (localStorage.getItem('pwaninet_unified_install_never') === 'true' ||
+            localStorage.getItem('pwaninet_apk_banner_never') === 'true') return;
         if (localStorage.getItem('pwaninet_apk_banner_dismissed') === 'true') return;
 
-        const snoozedUntil = parseInt(localStorage.getItem('pwaninet_apk_banner_snoozed_until') || '0', 10);
+        const snoozedUntil = parseInt(localStorage.getItem('pwaninet_unified_install_snoozed_until') ||
+                                      localStorage.getItem('pwaninet_apk_banner_snoozed_until') || '0', 10);
         if (snoozedUntil && Date.now() < snoozedUntil) return;
 
-        if (document.getElementById('pwaninet-apk-banner')) return;
+        // Ensure ONLY ONE banner exists in the DOM
+        if (document.getElementById('pwaninet-install-banner') ||
+            document.getElementById('pwaninet-apk-banner') ||
+            document.getElementById('pwa-install-banner')) {
+            return;
+        }
 
         this.injectBannerStyles();
 
         const isStandalone = isStandalonePWA();
         const banner = document.createElement('div');
-        banner.id = 'pwaninet-apk-banner';
+        banner.id = 'pwaninet-install-banner';
         banner.className = 'pwaninet-banner-toast';
         banner.innerHTML = `
             <div class="pwaninet-apk-banner-inner">
@@ -200,23 +229,23 @@ class NativePWAInstallManager {
                 </div>
                 <div class="pwaninet-apk-banner-content">
                     <div class="pwaninet-apk-banner-title">
-                        <span>PwaniNet for Android</span>
-                        <span class="pwaninet-apk-badge">APK</span>
+                        <span>PwaniNet App</span>
+                        <span class="pwaninet-apk-badge">Install</span>
                     </div>
                     <div class="pwaninet-apk-banner-sub">
-                        ${isStandalone ? 'Upgrade to native app for faster speed & background push.' : 'Download the official Android APK for native speed & alerts.'}
+                        ${isStandalone ? 'Get the native Android APK for faster speed & background push.' : 'Install the Web App (PWA) or download the Android APK.'}
                     </div>
                 </div>
                 <div class="pwaninet-apk-banner-actions">
-                    <a id="pwaninet-apk-download-btn" href="/download/android/" class="btn btn-primary btn-sm" download>
+                    <a id="pwaninet-unified-download-btn" href="/downloads/" class="btn btn-primary btn-sm">
                         <i class="bi bi-download me-1"></i>Download
                     </a>
                     <div class="pwaninet-apk-banner-secondary-actions">
-                        <button id="pwaninet-apk-snooze-btn" class="pwaninet-btn-text" type="button" title="Remind me in 7 days">
+                        <button id="pwaninet-unified-snooze-btn" class="pwaninet-btn-text" type="button" title="Remind me in 7 days">
                             Not now
                         </button>
                         <span class="pwaninet-action-divider">•</span>
-                        <button id="pwaninet-apk-never-btn" class="pwaninet-btn-text" type="button" title="Don't show again">
+                        <button id="pwaninet-unified-never-btn" class="pwaninet-btn-text" type="button" title="Don't show again">
                             Never
                         </button>
                     </div>
@@ -226,93 +255,42 @@ class NativePWAInstallManager {
 
         document.body.appendChild(banner);
 
-        const downloadBtn = document.getElementById('pwaninet-apk-download-btn');
-        const snoozeBtn = document.getElementById('pwaninet-apk-snooze-btn');
-        const neverBtn = document.getElementById('pwaninet-apk-never-btn');
+        const downloadBtn = document.getElementById('pwaninet-unified-download-btn');
+        const snoozeBtn = document.getElementById('pwaninet-unified-snooze-btn');
+        const neverBtn = document.getElementById('pwaninet-unified-never-btn');
 
         // "Not now" -> snooze for 7 days
         if (snoozeBtn) {
             snoozeBtn.addEventListener('click', () => {
                 banner.remove();
                 const sevenDaysLater = Date.now() + (7 * 24 * 60 * 60 * 1000);
+                localStorage.setItem('pwaninet_unified_install_snoozed_until', sevenDaysLater.toString());
                 localStorage.setItem('pwaninet_apk_banner_snoozed_until', sevenDaysLater.toString());
-                console.log('[PWA] APK banner snoozed for 7 days');
+                console.log('[PWA] Unified banner snoozed for 7 days');
             });
         }
 
-        // "Never" -> snooze forever
+        // "Never" -> dismiss permanently
         if (neverBtn) {
             neverBtn.addEventListener('click', () => {
                 banner.remove();
+                localStorage.setItem('pwaninet_unified_install_never', 'true');
                 localStorage.setItem('pwaninet_apk_banner_never', 'true');
-                console.log('[PWA] APK banner dismissed permanently');
+                console.log('[PWA] Unified banner dismissed permanently');
             });
         }
 
-        // "Download" -> starts download and snoozes for 14 days
+        // "Download" -> navigates to /downloads/ and snoozes for 14 days
         if (downloadBtn) {
             downloadBtn.addEventListener('click', () => {
                 const fourteenDaysLater = Date.now() + (14 * 24 * 60 * 60 * 1000);
+                localStorage.setItem('pwaninet_unified_install_snoozed_until', fourteenDaysLater.toString());
                 localStorage.setItem('pwaninet_apk_banner_snoozed_until', fourteenDaysLater.toString());
                 setTimeout(() => {
                     if (banner.parentNode) banner.parentNode.removeChild(banner);
-                }, 2000);
+                }, 300);
             });
         }
-    }
-
-    showInstallBanner() {
-        if (this.isInstalled()) return;
-        const existing = document.getElementById('pwa-install-banner');
-        if (existing) return;
-
-        this.injectBannerStyles();
-
-        const banner = document.createElement('div');
-        banner.id = 'pwa-install-banner';
-        banner.innerHTML = `
-            <div class="pwa-install-inner">
-                <div class="pwa-install-left">
-                    <img src="/static/images/web-app-manifest-192x192.png" alt="PwaniNet" width="42" height="42" style="border-radius:10px;"/>
-                </div>
-                <div class="pwa-install-body">
-                    <div class="pwa-install-title">Install PwaniNet</div>
-                    <div class="pwa-install-sub">Get quicker access and offline support</div>
-                </div>
-                <div class="pwa-install-actions">
-                    <button id="pwa-install-accept" class="btn btn-primary" type="button">Install</button>
-                    <button id="pwa-install-dismiss" class="btn btn-outline-secondary" type="button">Dismiss</button>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(banner);
-
-        const accept = document.getElementById('pwa-install-accept');
-        const dismiss = document.getElementById('pwa-install-dismiss');
-
-        if (accept) {
-            accept.addEventListener('click', (ev) => {
-                ev.preventDefault();
-                this.showNativeInstallPrompt();
-            });
-        }
-
-        if (dismiss) {
-            dismiss.addEventListener('click', () => {
-                banner.remove();
-                this.detachAutoPrompt();
-
-                this._dismissTimer = setTimeout(() => {
-                    if (!this.isInstalled()) {
-                        this.showInstallReminder();
-                    }
-                }, 1800000); // 30 minutes
-            });
-        }
-
-        // Auto-hide after 30s if not interacted
-        setTimeout(() => { if (banner.parentNode) banner.parentNode.removeChild(banner); }, 30000);
     }
 
     injectBannerStyles() {
@@ -321,7 +299,7 @@ class NativePWAInstallManager {
         const style = document.createElement('style');
         style.id = 'pwaninet-banner-styles';
         style.textContent = `
-            #pwaninet-apk-banner, #pwa-install-banner {
+            #pwaninet-install-banner, #pwaninet-apk-banner, #pwa-install-banner {
                 position: fixed;
                 right: 16px;
                 left: 16px;
@@ -341,23 +319,11 @@ class NativePWAInstallManager {
             }
 
             @media (min-width: 768px) {
-                #pwaninet-apk-banner, #pwa-install-banner {
+                #pwaninet-install-banner, #pwaninet-apk-banner, #pwa-install-banner {
                     left: auto;
                     right: 24px;
                     bottom: 24px;
                     width: 380px;
-                }
-            }
-
-            /* When both banners coexist on standard browser, stack APK banner above PWA banner */
-            #pwa-install-banner ~ #pwaninet-apk-banner,
-            #pwaninet-apk-banner ~ #pwa-install-banner {
-                bottom: calc(180px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
-            }
-            @media (min-width: 768px) {
-                #pwa-install-banner ~ #pwaninet-apk-banner,
-                #pwaninet-apk-banner ~ #pwa-install-banner {
-                    bottom: 120px;
                 }
             }
 
@@ -542,24 +508,31 @@ class NativePWAInstallManager {
     }
 
     showNativeInstallPrompt() {
-        if (this.isInstalled()) { this.disableInstallPrompts(); return; }
-        if (this.installPromptShown) return;
-        if (!this.deferredPrompt) return;
+        if (this.isInstalled()) {
+            this.disableInstallPrompts();
+            return Promise.resolve({ outcome: 'already_installed' });
+        }
+        if (!this.deferredPrompt) {
+            this.showInstallInstructions();
+            return Promise.resolve({ outcome: 'no_prompt' });
+        }
 
-        this.installPromptShown = true;
         const dp = this.deferredPrompt;
         dp.prompt();
-        dp.userChoice.then(choice => {
+        return dp.userChoice.then(choice => {
             if (choice.outcome === 'accepted') {
                 this.showInstallSuccess();
                 localStorage.setItem('pwaInstalled', 'true');
+                this.installPromptShown = true;
             } else {
                 this.showInstallReminder();
             }
             this.deferredPrompt = null;
+            return choice;
         }).catch(err => {
             console.warn('[PWA] Install prompt failed:', err);
             this.deferredPrompt = null;
+            return { outcome: 'error', error: err };
         });
     }
 
@@ -636,8 +609,9 @@ class NativePWAInstallManager {
                 iframe.style.border = 'none';
                 document.body.appendChild(iframe);
             }
-            iframe.src = url || '/download/android/';
-            console.log('[PWA] Triggered silent APK download via iframe:', iframe.src);
+            const targetUrl = url || 'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk';
+            iframe.src = targetUrl;
+            console.log('[PWA] Triggered silent APK download via iframe:', targetUrl);
         };
 
         // Expose globally
@@ -645,11 +619,16 @@ class NativePWAInstallManager {
 
         // Global click interceptor: prevents top-level page navigation & reloads on downloads
         document.addEventListener('click', (e) => {
-            const link = e.target.closest('a[href*="/download/android/"], a[href*="/apk/"], [data-apk-download]');
+            const link = e.target.closest('a[href*="/download/android/"], a[href*="/download/app/latest/"], a[href*="/apk/"], [data-apk-download]');
             if (link) {
+                const href = link.getAttribute('href') || '';
+                // Do not intercept if it points to the downloads HTML page or QR endpoint
+                if (href.startsWith('/downloads') || href.startsWith('/download/page') || href === '/downloads/' || href === '/downloads' || href.includes('/apk/qr/')) {
+                    return;
+                }
                 e.preventDefault();
                 e.stopPropagation();
-                triggerSilentDownload(link.href || '/download/android/');
+                triggerSilentDownload(link.href || 'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk');
             }
         });
     }

@@ -1059,6 +1059,9 @@
         const onPlaySuccess = () => {
             state.currentPlayingVideo = video;
             video.classList.add('is-playing');
+            if (video.classList.contains('reels-carousel-video')) {
+                video.style.opacity = '1';
+            }
             if (container) {
                 container.classList.add('is-video-playing');
                 triggerPlayHud(container, true);
@@ -1232,19 +1235,61 @@
     function handleFeedIntersection(entries) {
         if (state.isFullScreenActive) return; // Fullscreen overlay has priority
 
+        // 1. Update intersection ratio cache on observed videos
         entries.forEach(entry => {
             const video = entry.target;
-
-            if (entry.isIntersecting && entry.intersectionRatio >= 0.65) {
-                // Autoplay both reels and postcards when >= 65% visible
-                if (video.dataset.autoplay !== 'false') {
-                    playVideo(video, true);
-                }
-            } else if (!entry.isIntersecting || entry.intersectionRatio < 0.65) {
-                // Unconditionally pause when visibility drops below 65%
-                pauseVideo(video);
+            video._feedIntersectionRatio = entry.isIntersecting ? entry.intersectionRatio : 0;
+            // When video leaves the viewport substantially, reset manual pause intent
+            if (!entry.isIntersecting || entry.intersectionRatio < 0.2) {
+                delete video.dataset.userPaused;
             }
         });
+
+        // 2. Evaluate currently playing video
+        const currentActive = state.currentPlayingVideo;
+        const currentActiveRatio = (currentActive && currentActive._feedIntersectionRatio !== undefined)
+            ? currentActive._feedIntersectionRatio
+            : 0;
+
+        // If currently playing video has dropped below 35% visible, pause it
+        if (currentActive && currentActiveRatio < 0.35) {
+            pauseVideo(currentActive);
+        }
+
+        // 3. Find candidate video with highest visibility across the feed
+        let bestCandidate = null;
+        let bestRatio = 0;
+
+        document.querySelectorAll('video').forEach(video => {
+            if (video.classList.contains('reels-carousel-video') ||
+                video.closest('.reels-carousel-shelf') ||
+                video.closest('#fullscreenReelsOverlay') ||
+                video.closest('#reelsSnapViewport')) {
+                return;
+            }
+            if (video.dataset.autoplay === 'false' || video.dataset.userPaused === 'true') {
+                return;
+            }
+
+            const ratio = video._feedIntersectionRatio || 0;
+            if (ratio > bestRatio) {
+                bestRatio = ratio;
+                bestCandidate = video;
+            }
+        });
+
+        // 4. Hysteresis decision:
+        // If current video is still healthy (>= 35% visible), only switch if the incoming video is dominant (>= 55% and higher than current)
+        // If no video is currently playing, start the best candidate if it reaches >= 45% visibility
+        if (state.currentPlayingVideo && !state.currentPlayingVideo.paused && state.currentPlayingVideo.dataset.userPaused !== 'true') {
+            if (bestCandidate && bestCandidate !== state.currentPlayingVideo && bestRatio >= 0.55 && bestRatio > currentActiveRatio + 0.15) {
+                playVideo(bestCandidate, true);
+            }
+        } else {
+            if (bestCandidate && bestRatio >= 0.45) {
+                playVideo(bestCandidate, true);
+            }
+        }
     }
 
     // ============================================================================
@@ -1408,7 +1453,14 @@
             const activeVid = activeItem.querySelector('video');
             if (activeVid) {
                 if (originCurrentTime > 0) {
-                    try { activeVid.currentTime = originCurrentTime; } catch (_) {}
+                    const applyOriginTime = () => {
+                        try { activeVid.currentTime = originCurrentTime; } catch (_) {}
+                    };
+                    if (activeVid.readyState >= 1) {
+                        applyOriginTime();
+                    } else {
+                        activeVid.addEventListener('loadedmetadata', applyOriginTime, { once: true });
+                    }
                 }
                 playVideo(activeVid, true);
                 const vinyl = activeItem.querySelector('.reel-vinyl-disc');
@@ -1453,6 +1505,13 @@
      * Restore background feed videos when fullscreen reels is closed.
      */
     function restoreFeedVideos() {
+        if (Array.isArray(reelSlotEngine.suspendedFeedVideos)) {
+            reelSlotEngine.suspendedFeedVideos.forEach(vid => {
+                if (vid && vid._hlsInstance && typeof vid._hlsInstance.startLoad === 'function') {
+                    try { vid._hlsInstance.startLoad(); } catch (_) {}
+                }
+            });
+        }
         reelSlotEngine.suspendedFeedVideos = [];
         if (!state.isFullScreenActive) {
             createFeedObserver();
@@ -1508,7 +1567,7 @@
         state.feedObserver = new IntersectionObserver(handleFeedIntersection, {
             root: null,
             rootMargin: '0px',
-            threshold: 0.65
+            threshold: [0.15, 0.35, 0.5, 0.65, 0.8]
         });
     }
 
@@ -1656,14 +1715,14 @@
         }
 
         // Swipes and drags must never trigger play/pause or double-tap likes
-        if (isGestureDrag || (event && event.defaultPrevented)) {
+        if (isGestureDrag) {
             return;
         }
 
-        const container = hitbox.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reel-fullscreen-content, .reels-snap-item, .media-video-container, .landscape-video-container, .landscape-video-wrapper, .post-card, .post-media-wrapper');
+        const container = (hitbox.closest && hitbox.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reel-fullscreen-content, .reels-snap-item, .media-video-container, .landscape-video-container, .landscape-video-wrapper, .post-card, .post-media-wrapper')) || hitbox;
         if (!container) return;
 
-        const video = container.querySelector('video');
+        const video = container.querySelector ? container.querySelector('video') : (container.tagName === 'VIDEO' ? container : null);
         if (!video) return;
 
         const postId = extractPostId(container);
@@ -1684,12 +1743,14 @@
                 return;
             }
 
-            triggerHeartBurst(container, event.clientX, event.clientY);
+            const clickX = event?.clientX || (event?.touches && event.touches[0]?.clientX);
+            const clickY = event?.clientY || (event?.touches && event.touches[0]?.clientY);
+            triggerHeartBurst(container, clickX, clickY);
 
             if (postId) {
-                const snapItem = container.closest('.reels-snap-item');
+                const snapItem = container.closest ? container.closest('.reels-snap-item') : null;
                 const isCurrentlyLiked = snapItem ? (snapItem.dataset.isLiked === 'true') :
-                    Boolean(container.querySelector('.fs-like-proxy-btn.liked') || container.querySelector('.like-button.liked') || container.querySelector('.like-button.text-danger'));
+                    Boolean(container.querySelector && (container.querySelector('.fs-like-proxy-btn.liked') || container.querySelector('.like-button.liked') || container.querySelector('.like-button.text-danger')));
                 if (!isCurrentlyLiked) {
                     toggleReelLike(postId);
                 }
@@ -1702,13 +1763,15 @@
             state.tapTimers.delete(hitbox);
 
             if (video.paused) {
+                delete video.dataset.userPaused;
                 playVideo(video, false);
                 triggerPlayHud(container, true);
             } else {
+                video.dataset.userPaused = 'true';
                 pauseVideo(video);
                 triggerPlayHud(container, false);
             }
-        }, 220);
+        }, 180);
 
         state.tapTimers.set(hitbox, timer);
     }
@@ -1989,7 +2052,7 @@
             <div class="reel-fullscreen-content">
                 <!-- Ambient Backdrop -->
                 <div class="reel-ambient-backdrop" aria-hidden="true">
-                    ${poster ? `<img src="${poster}" class="reel-ambient-img" alt="">` : '<div class="w-100 h-100 bg-black"></div>'}
+                    ${poster ? `<img src="${poster}" class="reel-ambient-img" loading="lazy" decoding="async" alt="">` : '<div class="w-100 h-100 bg-black"></div>'}
                 </div>
 
                 <!-- Video Element with on-demand media engine slot initialization -->
@@ -2994,7 +3057,7 @@
         }
 
         // Pause feed playback, suspend feed decoders, and save scroll offset
-        state.previousScrollY = window.scrollY;
+        state.previousScrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
         pauseAllVideos();
         suspendFeedVideos();
 
@@ -3145,7 +3208,13 @@
 
         if (viewport) {
             const snapItems = Array.from(viewport.children);
-            snapItems.forEach(item => evictSnapItemMedia(item));
+            const activeIdx = reelSlotEngine.activeIndex;
+            // Cleanly evict media decoders only for active slot and its immediate warmed neighbors
+            snapItems.forEach((item, idx) => {
+                if (Math.abs(idx - activeIdx) <= 1) {
+                    evictSnapItemMedia(item);
+                }
+            });
             viewport.innerHTML = '';
         }
 
@@ -3153,13 +3222,22 @@
         reelSlotEngine.previousIndex = -1;
         reelSlotEngine.nextIndex = -1;
 
-        // Restore feed videos and feed observer
-        restoreFeedVideos();
-
         overlay.classList.add('d-none');
         overlay.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('reels-active');
         state.isFullScreenActive = false;
+
+        // Restore home feed scroll position immediately
+        if (typeof state.previousScrollY === 'number') {
+            try {
+                window.scrollTo({ top: state.previousScrollY, behavior: 'instant' });
+            } catch (_) {
+                window.scrollTo(0, state.previousScrollY);
+            }
+        }
+
+        // Restore feed videos and feed observer now that isFullScreenActive is false
+        restoreFeedVideos();
 
         // Restore status bar theme to user's active theme
         try {
@@ -4443,7 +4521,7 @@
         let gestureStartX = 0;
         let gestureStartY = 0;
         let dragResetTimer = null;
-        const DRAG_THRESHOLD_PX = 8;
+        const DRAG_THRESHOLD_PX = 18;
 
         document.addEventListener('touchstart', function(e) {
             if (e.touches && e.touches.length === 1) {
@@ -4515,25 +4593,40 @@
             // Hitbox single vs. double tap (pauses/plays or likes)
             const hitbox = event.target.closest('.reel-center-hitbox, .reel-tap-hitbox');
             if (hitbox) {
-                if (isGestureDrag || event.defaultPrevented) return;
+                if (isGestureDrag) return;
                 event.preventDefault();
                 event.stopPropagation();
                 handleHitboxTap(hitbox, event);
                 return;
             }
 
+            // Direct tap fallback on video element, stage container, or ambient backdrop
+            const videoElem = event.target.closest('video');
+            const stageContainer = event.target.closest('.reel-stage-container, .landscape-video-container, .landscape-video-wrapper, .reel-fullscreen-content');
+            if ((videoElem || stageContainer) && !event.target.closest('.reels-carousel-shelf, .reel-actions-stack, .reel-desktop-actions-rail, .reel-top-action-btn, .dropdown, .modal, button, a')) {
+                if (isGestureDrag) return;
+                const container = (videoElem || stageContainer).closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reel-fullscreen-content, .reels-snap-item, .media-video-container, .landscape-video-container, .landscape-video-wrapper, .post-card, .post-media-wrapper');
+                const targetHitbox = container ? container.querySelector('.reel-center-hitbox, .reel-tap-hitbox') : null;
+                event.preventDefault();
+                event.stopPropagation();
+                handleHitboxTap(targetHitbox || container || videoElem, event);
+                return;
+            }
+
             // Play HUD tap (direct tap on central play button overlay when paused)
             const playHud = event.target.closest('.reel-play-hud');
             if (playHud && (playHud.classList.contains('show') || playHud.classList.contains('is-paused'))) {
-                if (isGestureDrag || event.defaultPrevented) return;
+                if (isGestureDrag) return;
                 event.preventDefault();
                 event.stopPropagation();
                 const container = playHud.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reel-fullscreen-content, .reels-snap-item, .media-video-container, .landscape-video-container, .landscape-video-wrapper, .post-card, .post-media-wrapper');
                 const video = container ? container.querySelector('video') : null;
                 if (video) {
                     if (video.paused) {
+                        delete video.dataset.userPaused;
                         playVideo(video, false);
                     } else {
+                        video.dataset.userPaused = 'true';
                         pauseVideo(video);
                     }
                 }
@@ -5097,6 +5190,7 @@
                 }
             }
         });
+
     }
 
     // ============================================================================
@@ -5121,6 +5215,7 @@
                     vid.pause();
                     vid.currentTime = 0;
                     vid.style.opacity = '0';
+                    vid.classList.remove('is-playing');
                 } catch (e) {}
             }
             if (resetActive) {
@@ -5135,6 +5230,8 @@
         if (!video) return;
 
         if (activeCarouselCard === card && !video.paused) {
+            video.style.opacity = '1';
+            video.classList.add('is-playing');
             return; // already playing
         }
 
@@ -5145,6 +5242,11 @@
         video.volume = 0;
         video.loop = false; // Sequential autoplay: do not loop single card
         video.dataset.wantsAutoplay = 'true';
+
+        // Resume HLS buffer loading if already initialized
+        if (video._hlsInstance && typeof video._hlsInstance.startLoad === 'function') {
+            try { video._hlsInstance.startLoad(); } catch (_) {}
+        }
 
         // Ensure HLS or source is attached
         if (video.dataset.hlsUrl && !video.dataset.hlsReady && typeof window.initHLSForElement === 'function') {
@@ -5183,14 +5285,23 @@
             if (playPromise !== undefined) {
                 playPromise.then(() => {
                     video.style.opacity = '1';
+                    video.classList.add('is-playing');
                 }).catch(() => {
                     video.muted = true;
                     video.play().then(() => {
                         video.style.opacity = '1';
+                        video.classList.add('is-playing');
                     }).catch(() => {});
                 });
             }
         };
+
+        video.addEventListener('playing', () => {
+            if (activeCarouselCard === card) {
+                video.style.opacity = '1';
+                video.classList.add('is-playing');
+            }
+        });
 
         if (video.readyState >= 2) {
             startPlaying();
@@ -5302,14 +5413,14 @@
             const cards = shelf.querySelectorAll('.reels-carousel-card');
             cards.forEach(card => {
                 let hoverTimer = null;
-                card.addEventListener('mouseenter', () => {
-                    if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
+                const onEnter = () => {
+                    if (hoverTimer) clearTimeout(hoverTimer);
                     hoverTimer = setTimeout(() => {
                         playCarouselCard(card);
-                    }, 100);
-                });
+                    }, 50);
+                };
 
-                card.addEventListener('mouseleave', () => {
+                const onLeave = () => {
                     if (hoverTimer) {
                         clearTimeout(hoverTimer);
                         hoverTimer = null;
@@ -5320,7 +5431,10 @@
                             scheduleCarouselStickCheck(shelf, 400);
                         }
                     }
-                });
+                };
+
+                card.addEventListener('mouseenter', onEnter);
+                card.addEventListener('mouseleave', onLeave);
             });
         });
     }
@@ -5486,7 +5600,7 @@
                 });
             }
 
-            if (hasNewVideos) {
+            if (hasNewVideos && !state.isFullScreenActive) {
                 initializeVideos(document.body);
             }
         });

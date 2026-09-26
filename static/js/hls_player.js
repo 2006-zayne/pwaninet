@@ -163,16 +163,21 @@
         // On modern connections (>= 1.2 Mbps), startLevel: -1 selects optimal HD rendition immediately without blur.
         const startLevel = (preferredQuality === 'auto' && estimatedBps >= 1200000) ? -1 : 0;
 
+        const isReel = videoEl.classList.contains('fullscreen-reel-video') ||
+                       !!videoEl.closest('#reelsSnapViewport') ||
+                       !!videoEl.closest('.reel-video-container');
+
         const hls = new Hls({
             startLevel: startLevel,
             abrEwmaDefaultEstimate: estimatedBps,
             // Never cap to unmeasured or small player sizes
             capLevelToPlayerSize: false,
-            // Robust buffer: 30s forward, 60s max to prevent premature buffering on healthy connections
-            maxBufferLength: 30,
-            maxMaxBufferLength: 60,
-            backBufferLength: 10,
-            maxBufferSize: 64 * 1024 * 1024, // 64 MB MSE buffer
+            // Short-form reels use compact buffers (12s/16MB) to keep mobile RAM and GPU decoders lean.
+            // Long-form feed videos use 30s/64MB.
+            maxBufferLength: isReel ? 12 : 30,
+            maxMaxBufferLength: isReel ? 20 : 60,
+            backBufferLength: isReel ? 6 : 10,
+            maxBufferSize: (isReel ? 16 : 64) * 1024 * 1024,
             // Fast segment recovery on cellular fluctuations
             fragLoadingTimeOut: 20000,
             fragLoadingMaxRetry: 5,
@@ -350,6 +355,12 @@
         for (const mutation of mutations) {
             for (const node of mutation.addedNodes) {
                 if (node.nodeType === Node.ELEMENT_NODE) {
+                    // Fullscreen reels and snap viewport manage their own media engines;
+                    // skip subtree traversal inside them to eliminate main-thread stutter during streaming.
+                    if (node.id === 'reelsSnapViewport' || node.id === 'fullscreenReelsOverlay' ||
+                        (typeof node.closest === 'function' && node.closest('#reelsSnapViewport, #fullscreenReelsOverlay'))) {
+                        continue;
+                    }
                     if (node.matches && node.matches('video[data-hls-url]')) {
                         if (!node.classList.contains('fullscreen-reel-video') && !node.closest('#reelsSnapViewport')) {
                             initHLSInSubtree(node.parentElement || node);

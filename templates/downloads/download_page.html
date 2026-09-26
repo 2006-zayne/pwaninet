@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block title %}{% trans "Download PwaniNet — Web App (PWA) & Mobile APK" %}{% endblock %}
+
+{% block content %}
+<div class="container max-w-4xl py-3 py-md-4">
+    {% include 'downloads/partials/download_page_content.html' %}
+</div>
+{% endblock %}

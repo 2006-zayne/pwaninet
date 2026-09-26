@@ -106,6 +106,17 @@
             <span class="left-rail-label">{% trans "Settings" %}</span>
         </a>
 
+        <a href="{% url 'downloads' %}"
+           class="left-rail-link nav-chip {% if request.resolver_match.url_name == 'downloads' %}active{% endif %}"
+           hx-get="{% url 'downloads' %}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-history="true">
+            <i class="bi bi-cloud-arrow-down-fill left-rail-icon"></i>
+            <span class="left-rail-label">{% trans "Download App" %}</span>
+        </a>
+
         {% if request.user.is_staff %}
         <a href="{% url 'admin_dashboard:dashboard_home' %}"
            class="left-rail-link nav-chip {% if request.resolver_match.app_name == 'admin_dashboard' %}active{% endif %}"

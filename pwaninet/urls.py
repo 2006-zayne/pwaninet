@@ -138,6 +138,28 @@ def download_android_apk(request):
     return HttpResponseRedirect(github_url)
 
 
+from django.shortcuts import render
+
+@require_http_methods(["GET", "HEAD"])
+def downloads_page_view(request):
+    """
+    Dedicated full page for PwaniNet downloads:
+    - PWA installation option with browser prompt trigger
+    - Mobile APK direct download option (via silent trigger without page redirect)
+    - Detailed safety guidance:
+      * 'File might be harmful' Android/Chrome warning explanations
+      * Google Play Protect blocking/scanning explanations & bypass instructions
+      * Unknown sources / APK sideloading walkthrough
+      * PWA install guidelines for iOS Safari & Android Chrome
+    """
+    github_url = getattr(settings, 'APK_DOWNLOAD_URL', 'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk')
+    context = {
+        'github_apk_url': github_url,
+    }
+    template = 'downloads/partials/download_page_content.html' if request.headers.get('HX-Request') else 'downloads/download_page.html'
+    return render(request, template, context)
+
+
 import functools
 
 @functools.lru_cache(maxsize=1)
@@ -196,8 +218,12 @@ urlpatterns = [
     # PWA Manifest and Service Worker - served without auth middleware
     path('manifest.webmanifest', serve_manifest, name='manifest'),
     path('service-worker.js', serve_service_worker, name='service_worker'),
+    # Dedicated Downloads Page
+    path('downloads/', downloads_page_view, name='downloads'),
+    path('download/', downloads_page_view, name='download_alias'),
     # Direct Android APK download routes (permanent endpoints for social sharing & settings)
     path('download/app/latest/', download_android_apk, name='download_android_apk'),
+    path('download/android/', download_android_apk, name='download_android_apk_alt'),
     path('apk/', download_android_apk, name='download_apk_short'),
     path('apk/qr/', qr_code_svg, name='qr_code_svg'),
     # PWA Test Pages
