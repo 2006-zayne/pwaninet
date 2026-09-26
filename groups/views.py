@@ -1025,8 +1025,9 @@ def groups_detail_view(request, group_id):
     mark_group_notifications_as_read_and_invalidate(request.user, group_id, exclude_types=['GROUP_ANNOUNCEMENT'])
     group = get_object_or_404(Group.objects.annotate(member_count=Count('memberships', filter=Q(memberships__status=MembershipStatus.APPROVED))), id=group_id)
     query = request.GET.get('search_user', '')
+    post_query = request.GET.get('post_query') or request.GET.get('q_post') or request.GET.get('q') or ''
     page = int(request.GET.get('page', 1))
-    context = build_group_detail_context(request.user, group, query, page)
+    context = build_group_detail_context(request.user, group, query, page, post_query=post_query)
     liked_post_ids = set()
     if request.user.is_authenticated and context.get('posts'):
         for pid, sid in Like.objects.filter(user=request.user, post__in=context['posts']).values_list('post_id', 'post__share_id'):
@@ -1038,7 +1039,7 @@ def groups_detail_view(request, group_id):
 
     # Check if HTMX request
     if request.headers.get('HX-Request'):
-        # If pagination request for infinite scroll of group posts
+        # If pagination request for infinite scroll or search query targeting posts container
         if request.headers.get('HX-Target') == 'posts-container' or (request.GET.get('page') and page > 1):
             return render(request, 'groups/partials/group_post_cards_list.html', {
                 'group': group,
@@ -1047,6 +1048,7 @@ def groups_detail_view(request, group_id):
                 'next_page': context.get('next_page'),
                 'liked_post_ids': liked_post_ids,
                 'is_member': context.get('is_member'),
+                'post_query': post_query,
             })
         response = render(request, 'groups/partials/groups_detail_navigation_partial.html', context)
         response['HX-Trigger'] = 'updateGroupActivity'

@@ -3677,5 +3677,251 @@ body.pwanimate-active .pwanimate-settings-mobile,
     display: flex !important;
 }
 
+/* 5. Pwanimate Attachment Button & WhatsApp-Style Bottom Sheet */
+.pwanimate-attach-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 1.05rem;
+    color: var(--pwanimate-muted, #94a3b8);
+    border: 1px solid transparent;
+    background: transparent;
+    transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+    cursor: pointer;
+    user-select: none;
+}
+
+.pwanimate-attach-btn:hover {
+    color: var(--pwanimate-asst-text, #0f172a);
+    background-color: var(--pwanimate-hover-bg, rgba(0,0,0,0.05));
+    transform: scale(1.05);
+}
+
+.pwanimate-attach-btn:active {
+    transform: scale(0.95);
+}
+
+.pwanimate-attachment-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10500;
+}
+
+.pwanimate-attachment-modal.show {
+    display: flex;
+}
+
+.pwanimate-attachment-modal-content {
+    background: var(--card-bg, #ffffff);
+    border-radius: 20px;
+    padding: 1.75rem;
+    max-width: 440px;
+    width: 90%;
+    border: 1px solid var(--border, #e2e8f0);
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.2);
+    position: relative;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: scale(0.95);
+}
+
+[data-theme="dark"] .pwanimate-attachment-modal-content,
+[data-bs-theme="dark"] .pwanimate-attachment-modal-content {
+    background: #1e1f29;
+    border-color: #2e303e;
+}
+
+.pwanimate-attachment-modal.show .pwanimate-attachment-modal-content {
+    transform: scale(1);
+}
+
+.pwanimate-attachment-sheet-handle {
+    display: none;
+    width: 36px;
+    height: 4px;
+    background: var(--border-hover, #cbd5e1);
+    border-radius: 999px;
+    margin: 0 auto 1.25rem auto;
+}
+
+.pwanimate-attachment-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+
+.pwanimate-attachment-modal-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--text-primary, #0f172a);
+    margin: 0;
+    letter-spacing: -0.3px;
+}
+
+[data-theme="dark"] .pwanimate-attachment-modal-title,
+[data-bs-theme="dark"] .pwanimate-attachment-modal-title {
+    color: #f1f5f9;
+}
+
+.pwanimate-attachment-modal-close {
+    background: var(--page-bg, #f8fafc);
+    border: 1px solid var(--border, #e2e8f0);
+    color: var(--text-muted, #94a3b8);
+    font-size: 1.1rem;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.pwanimate-attachment-modal-close:hover {
+    color: var(--text-primary, #0f172a);
+    transform: scale(1.05);
+}
+
+.pwanimate-attachment-options {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 0.75rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.pwanimate-attachment-option {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.45rem !important;
+    cursor: pointer !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 0.35rem 0.15rem !important;
+    transition: transform 0.18s ease !important;
+    text-decoration: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+
+.pwanimate-attachment-option:hover {
+    transform: translateY(-2px) !important;
+}
+
+.pwanimate-attachment-option:active {
+    transform: scale(0.95) !important;
+}
+
+.pwanimate-attachment-icon-circle {
+    width: 54px !important;
+    height: 54px !important;
+    border-radius: 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background-color: var(--engagement-bg, #f0f2f5) !important;
+    color: var(--text-primary, #050505) !important;
+    border: 1px solid var(--border, #e4e6eb) !important;
+    font-size: 1.45rem !important;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="dark"] .pwanimate-attachment-icon-circle,
+[data-bs-theme="dark"] .pwanimate-attachment-icon-circle {
+    background-color: var(--engagement-bg, #3a3b3c) !important;
+    color: var(--text-primary, #e4e6eb) !important;
+    border-color: var(--card-border-subtle, #393a3b) !important;
+}
+
+.pwanimate-attachment-option:hover .pwanimate-attachment-icon-circle {
+    background-color: var(--engagement-hover, #e4e6eb) !important;
+    color: var(--text-primary, #050505) !important;
+    transform: scale(1.06) !important;
+}
+
+[data-theme="dark"] .pwanimate-attachment-option:hover .pwanimate-attachment-icon-circle,
+[data-bs-theme="dark"] .pwanimate-attachment-option:hover .pwanimate-attachment-icon-circle {
+    background-color: var(--engagement-hover, #4e4f50) !important;
+    color: #ffffff !important;
+}
+
+.pwanimate-attachment-option span {
+    font-size: 0.76rem !important;
+    font-weight: 600 !important;
+    color: var(--text-primary, #0f172a) !important;
+    text-align: center !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+[data-theme="dark"] .pwanimate-attachment-option span,
+[data-bs-theme="dark"] .pwanimate-attachment-option span {
+    color: #e2e8f0 !important;
+}
+
+@media (max-width: 768px) {
+    .pwanimate-attachment-modal {
+        align-items: flex-end !important;
+    }
+    .pwanimate-attachment-modal-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        border-radius: 24px 24px 0 0 !important;
+        border-left: none !important;
+        border-right: none !important;
+        border-bottom: none !important;
+        padding: 0.85rem 1rem calc(1.5rem + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) 1rem !important;
+        box-shadow: 0 -8px 36px rgba(0, 0, 0, 0.25) !important;
+        animation: sheetSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+        box-sizing: border-box !important;
+    }
+    .pwanimate-attachment-sheet-handle {
+        display: block !important;
+        margin: 0 auto 1rem auto !important;
+    }
+    .pwanimate-attachment-options {
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        gap: 0.35rem !important;
+        padding: 0.4rem 0 0.6rem 0 !important;
+        width: 100% !important;
+    }
+    .pwanimate-attachment-icon-circle {
+        width: 50px !important;
+        height: 50px !important;
+        border-radius: 15px !important;
+        font-size: 1.35rem !important;
+        margin-bottom: 0.25rem !important;
+    }
+    .pwanimate-attachment-option {
+        padding: 0.25rem 0.1rem !important;
+    }
+    .pwanimate-attachment-option span {
+        font-size: 0.72rem !important;
+    }
+}
+
 
 

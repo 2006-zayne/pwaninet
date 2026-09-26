@@ -515,14 +515,16 @@
   /* ── Hidden gradient input ── */
   #id_gradient_class { display: none; }
 
-  /* ── Attachment Modal ── */
+  /* ── Attachment Modal & WhatsApp-Style Bottom Sheet ── */
   .attachment-modal {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     display: none;
     align-items: center;
     justify-content: center;
@@ -536,67 +538,211 @@
   .attachment-modal-content {
     background: var(--card-bg);
     border-radius: var(--radius-lg);
-    padding: 2rem;
-    max-width: 400px;
+    padding: 1.75rem;
+    max-width: 440px;
     width: 90%;
     border: 1px solid var(--border);
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.2);
+    position: relative;
+    animation: modalPopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes modalPopIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .attachment-sheet-handle {
+    display: none;
+    width: 36px;
+    height: 4px;
+    background: var(--border-hover, #cbd5e1);
+    border-radius: 999px;
+    margin: 0 auto 1.25rem auto;
+  }
+
+  .attachment-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
   }
 
   .attachment-modal-title {
-    font-size: 1.2rem;
-    font-weight: 700;
-    margin-bottom: 1.5rem;
+    font-size: 1.15rem;
+    font-weight: 800;
     color: var(--text-primary);
-  }
-
-  .attachment-options {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-  }
-
-  .attachment-option {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 1.5rem;
-    background: var(--brand-light);
-    border: 2px solid var(--border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all 0.2s var(--ease);
-  }
-
-  .attachment-option:hover {
-    border-color: var(--brand);
-    transform: translateY(-2px);
-  }
-
-  .attachment-option i {
-    font-size: 2rem;
-    color: var(--brand);
-  }
-
-  .attachment-option span {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--text-primary);
+    margin: 0;
+    letter-spacing: -0.3px;
   }
 
   .attachment-modal-close {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    background: transparent;
-    border: none;
+    background: var(--page-bg);
+    border: 1px solid var(--border);
     color: var(--text-muted);
-    font-size: 1.5rem;
+    font-size: 1.1rem;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
+    transition: all 0.18s var(--ease);
   }
 
   .attachment-modal-close:hover {
     color: var(--text-primary);
+    border-color: var(--border-hover);
+    transform: scale(1.05);
+  }
+
+  .attachment-options {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 0.75rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .attachment-option {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.45rem !important;
+    cursor: pointer !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 0.35rem 0.15rem !important;
+    transition: transform 0.18s var(--ease) !important;
+    text-decoration: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .attachment-option:hover {
+    transform: translateY(-2px) !important;
+  }
+
+  .attachment-option:active {
+    transform: scale(0.95) !important;
+  }
+
+  /* ── Attachment Badges (Matching Postcard Engagement Buttons) ── */
+  .attachment-icon-circle {
+    width: 54px !important;
+    height: 54px !important;
+    border-radius: 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background-color: var(--engagement-bg, #f0f2f5) !important;
+    color: var(--text-primary, #050505) !important;
+    border: 1px solid var(--border, #e4e6eb) !important;
+    font-size: 1.45rem !important;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  }
+
+  [data-theme="dark"] .attachment-icon-circle,
+  [data-bs-theme="dark"] .attachment-icon-circle {
+    background-color: var(--engagement-bg, #3a3b3c) !important;
+    color: var(--text-primary, #e4e6eb) !important;
+    border-color: var(--card-border-subtle, #393a3b) !important;
+  }
+
+  .attachment-option:hover .attachment-icon-circle {
+    background-color: var(--engagement-hover, #e4e6eb) !important;
+    color: var(--text-primary, #050505) !important;
+    transform: scale(1.06) !important;
+  }
+
+  [data-theme="dark"] .attachment-option:hover .attachment-icon-circle,
+  [data-bs-theme="dark"] .attachment-option:hover .attachment-icon-circle {
+    background-color: var(--engagement-hover, #4e4f50) !important;
+    color: #ffffff !important;
+  }
+
+  .attachment-option span {
+    font-size: 0.76rem !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    text-align: center !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* ── Mobile WhatsApp / ChatGPT Bottom Sheet ── */
+  @media (max-width: 768px) {
+    .attachment-modal {
+      align-items: flex-end !important;
+    }
+
+    .attachment-modal-content {
+      width: 100% !important;
+      max-width: 100% !important;
+      border-radius: 24px 24px 0 0 !important;
+      border-left: none !important;
+      border-right: none !important;
+      border-bottom: none !important;
+      padding: 0.85rem 1rem calc(1.5rem + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) 1rem !important;
+      box-shadow: 0 -8px 36px rgba(0, 0, 0, 0.25) !important;
+      animation: sheetSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+      box-sizing: border-box !important;
+    }
+
+    @keyframes sheetSlideUp {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+
+    .attachment-sheet-handle {
+      display: block !important;
+      margin: 0 auto 1rem auto !important;
+    }
+
+    .attachment-options {
+      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+      gap: 0.35rem !important;
+      padding: 0.4rem 0 0.6rem 0 !important;
+      width: 100% !important;
+    }
+
+    .attachment-icon-circle {
+      width: 50px !important;
+      height: 50px !important;
+      border-radius: 15px !important;
+      font-size: 1.35rem !important;
+      margin-bottom: 0.25rem !important;
+    }
+
+    .attachment-option {
+      padding: 0.25rem 0.1rem !important;
+    }
+
+    .attachment-option span {
+      font-size: 0.72rem !important;
+    }
+  }
+
+  .posting-target-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: var(--brand-light);
+    color: var(--brand);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.65rem;
+    border-radius: var(--radius-pill);
+    margin-top: 0.25rem;
   }
 
   /* ── Storage Link ── */
@@ -793,12 +939,21 @@
         <input type="file" name="images" id="{{ form.images.id_for_label }}" class="form-control-file" multiple accept="image/*" style="display: none;">
         <input type="file" name="video" id="{{ form.video.id_for_label }}" class="form-control-file" accept="video/*" style="display: none;">
         <input type="file" name="docs" id="{{ form.docs.id_for_label }}" class="form-control-file" accept=".pdf" style="display: none;">
+        <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
 
         <div class="compose-body">
           <div class="compose-header">
             <img src="{{ request.user.profile_pic.url }}" class="compose-avatar" alt="You">
-            <div class="compose-author">
-              {{ request.user.get_full_name|default:request.user.username }}
+            <div class="d-flex flex-column">
+              <div class="compose-author">
+                {{ request.user.get_full_name|default:request.user.username }}
+              </div>
+              {% if selected_group %}
+              <div class="posting-target-badge">
+                <i class="bi bi-people-fill"></i>
+                <span>{% trans "Posting in" %} <strong>{{ selected_group.name }}</strong></span>
+              </div>
+              {% endif %}
             </div>
           </div>
           <div class="compose-right">
@@ -843,10 +998,10 @@
               <select name="group_select" class="sector-select form-select" id="group_select">
                 <option value="">No Group</option>
                 {% for group in user_groups %}
-                  <option value="{{ group.id }}">{{ group.name }}</option>
+                  <option value="{{ group.id }}" {% if selected_group_id and selected_group_id == group.id|stringformat:"s" %}selected{% endif %}>{{ group.name }}</option>
                 {% endfor %}
               </select>
-              <input type="hidden" name="group" id="id_group" value="">
+              <input type="hidden" name="group" id="id_group" value="{{ selected_group_id|default:'' }}">
               <div class="sector-hint">Select a group to post in that group's feed, or leave as "No Group" for global feed.</div>
             </div>
 
@@ -938,29 +1093,40 @@
     </div>
   </div>
 
-  <!-- Attachment Modal -->
+  <!-- Attachment Modal & WhatsApp-Style Bottom Sheet -->
   <div class="attachment-modal" id="attachmentModal">
     <div class="attachment-modal-content">
-      <button class="attachment-modal-close" id="closeAttachmentModal">
-        <i class="bi bi-x"></i>
-      </button>
-      <h3 class="attachment-modal-title">{% trans "Add Attachment" %}</h3>
+      <div class="attachment-sheet-handle"></div>
+      <div class="attachment-modal-header">
+        <h3 class="attachment-modal-title">{% trans "Add attachment" %}</h3>
+        <button class="attachment-modal-close" id="closeAttachmentModal" type="button" aria-label="Close">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
       <div class="attachment-options">
-        <div class="attachment-option" id="attachImages">
-          <i class="bi bi-images"></i>
-          <span>{% trans "Images" %}</span>
-        </div>
-        <div class="attachment-option d-none" id="attachCameraNative">
-          <i class="bi bi-camera-fill"></i>
+        <div class="attachment-option" id="attachCamera">
+          <div class="attachment-icon-circle">
+            <i class="bi bi-camera-fill"></i>
+          </div>
           <span>{% trans "Camera" %}</span>
         </div>
+        <div class="attachment-option" id="attachImages">
+          <div class="attachment-icon-circle">
+            <i class="bi bi-image-fill"></i>
+          </div>
+          <span>{% trans "Photos" %}</span>
+        </div>
         <div class="attachment-option" id="attachVideo">
-          <i class="bi bi-play-btn"></i>
+          <div class="attachment-icon-circle">
+            <i class="bi bi-play-btn-fill"></i>
+          </div>
           <span>{% trans "Video" %}</span>
         </div>
         <div class="attachment-option" id="attachDocs">
-          <i class="bi bi-file-earmark-pdf"></i>
-          <span>{% trans "PDF" %}</span>
+          <div class="attachment-icon-circle">
+            <i class="bi bi-file-earmark-text-fill"></i>
+          </div>
+          <span>{% trans "Docs" %}</span>
         </div>
       </div>
     </div>
@@ -1055,6 +1221,9 @@ function initCreatePostComposer() {
     const groupSelect = document.getElementById('group_select');
     const groupHidden = document.getElementById('id_group');
     if (groupSelect && groupHidden) {
+        if (groupSelect.value) {
+            groupHidden.value = groupSelect.value;
+        }
         groupSelect.addEventListener('change', function() {
             groupHidden.value = this.value;
         });
@@ -1089,34 +1258,48 @@ function initCreatePostComposer() {
         }
     });
 
-    // Attachment options
-    const attachCameraNative = document.getElementById('attachCameraNative');
-    if (window.hasOwnProperty('Capacitor')) {
-        attachCameraNative.classList.remove('d-none');
+    // Camera input handling
+    const cameraInput = document.getElementById('cameraInput');
+    if (cameraInput) {
+        cameraInput.addEventListener('change', () => addFiles(Array.from(cameraInput.files || [])));
     }
 
-    attachCameraNative.addEventListener('click', async () => {
-        attachmentModal.classList.remove('show');
-        if (window.Capacitor && window.Capacitor.Plugins.Camera) {
-            try {
-                const { Camera, CameraResultType, CameraSource } = window.Capacitor.Plugins;
-                const image = await Camera.getPhoto({
-                    quality: 90,
-                    allowEditing: false,
-                    resultType: CameraResultType.Uri,
-                    source: CameraSource.Camera
-                });
+    const attachCameraBtn = document.getElementById('attachCamera');
+    if (attachCameraBtn) {
+        attachCameraBtn.addEventListener('click', async () => {
+            attachmentModal.classList.remove('show');
+            if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Camera) {
+                try {
+                    if (window.PwaninetPermissions && typeof window.PwaninetPermissions.requestCamera === 'function') {
+                        const status = await window.PwaninetPermissions.requestCamera();
+                        if (status && status.camera === 'denied') {
+                            console.warn('[CreatePost] Camera permission was denied');
+                            return;
+                        }
+                    }
+                    const { Camera, CameraResultType, CameraSource } = window.Capacitor.Plugins;
+                    const image = await Camera.getPhoto({
+                        quality: 90,
+                        allowEditing: false,
+                        resultType: CameraResultType.Uri,
+                        source: CameraSource.Camera
+                    });
 
-                const response = await fetch(image.webPath);
-                const blob = await response.blob();
-                const file = new File([blob], `captured_image_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                    const response = await fetch(image.webPath);
+                    const blob = await response.blob();
+                    const file = new File([blob], `captured_image_${Date.now()}.jpg`, { type: 'image/jpeg' });
 
-                addFiles([file]);
-            } catch (error) {
-                console.error('[NativeApp] Camera capture failed:', error);
+                    addFiles([file]);
+                } catch (error) {
+                    if (error && error.message !== 'User cancelled photos app') {
+                        console.error('[NativeApp] Camera capture failed:', error);
+                    }
+                }
+            } else if (cameraInput) {
+                cameraInput.click();
             }
-        }
-    });
+        });
+    }
 
     document.getElementById('attachImages').addEventListener('click', () => {
         imageInput.click();

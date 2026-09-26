@@ -707,10 +707,18 @@ class AuthorPreference(models.Model):
 
 
 class SharedPost(models.Model):
-    original_post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='shares')
+    original_post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='shares', null=True, blank=True)
     sharer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='shared_posts')
     shared_to = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='received_shares', null=True, blank=True)
     shared_to_group = models.ForeignKey('groups.Group', on_delete=models.CASCADE, related_name='received_shares', null=True, blank=True)
+    share_type = models.CharField(max_length=32, default='post', choices=[
+        ('post', 'Post'),
+        ('app_link', 'Mobile App Link'),
+        ('link', 'Custom Link'),
+    ])
+    shared_link = models.URLField(max_length=500, blank=True, null=True)
+    shared_link_title = models.CharField(max_length=255, blank=True, null=True)
+    shared_link_description = models.TextField(blank=True, null=True)
     message = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     is_viewed = models.BooleanField(default=False)
@@ -719,24 +727,28 @@ class SharedPost(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=['original_post', 'sharer', 'shared_to'],
-                condition=models.Q(shared_to__isnull=False),
+                condition=models.Q(shared_to__isnull=False, original_post__isnull=False),
                 name='unique_user_share'
             ),
             models.UniqueConstraint(
                 fields=['original_post', 'sharer', 'shared_to_group'],
-                condition=models.Q(shared_to_group__isnull=False),
+                condition=models.Q(shared_to_group__isnull=False, original_post__isnull=False),
                 name='unique_group_share'
             ),
             models.CheckConstraint(
                 condition=models.Q(shared_to__isnull=False) | models.Q(shared_to_group__isnull=False),
                 name='share_to_user_or_group'
+            ),
+            models.CheckConstraint(
+                condition=models.Q(original_post__isnull=False) | models.Q(shared_link__isnull=False),
+                name='share_post_or_link'
             )
         ]
         ordering = ['-created_at']
 
     def __str__(self):
-        if self.shared_to:
-            return f"{self.sharer.username} shared post {self.original_post.id} to {self.shared_to.username}"
-        elif self.shared_to_group:
-            return f"{self.sharer.username} shared post {self.original_post.id} to group {self.shared_to_group.name}"
-        return f"{self.sharer.username} shared post {self.original_post.id}"
+        target = self.shared_to.username if self.shared_to else (self.shared_to_group.name if self.shared_to_group else 'unknown')
+        if self.original_post:
+            return f"{self.sharer.username} shared post {self.original_post.id} to {target}"
+        return f"{self.sharer.username} shared link ({self.shared_link_title or self.shared_link}) to {target}"
+

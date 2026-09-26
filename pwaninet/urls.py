@@ -24,7 +24,7 @@ from django.http import HttpResponse, HttpResponseRedirect, FileResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from notifications import views as notification_views
-from users.views import toggle_profile_photo_like, PwaniLoginView, login_2fa_challenge_view
+from users.views import toggle_profile_photo_like, PwaniLoginView, login_2fa_challenge_view, app_invite_landing, platform_invite_landing, encrypted_invite_landing
 
 # PWA Manifest - served as static file to bypass auth middleware
 @require_http_methods(["GET", "HEAD"])
@@ -222,6 +222,9 @@ urlpatterns = [
     path('downloads/', downloads_page_view, name='downloads'),
     path('download/', downloads_page_view, name='download_alias'),
     # Direct Android APK download routes (permanent endpoints for social sharing & settings)
+    path('i/<str:token>/', encrypted_invite_landing, name='encrypted_invite_landing'),
+    path('app/<str:token>/', app_invite_landing, name='app_invite_landing'),
+    path('invite/<str:token>/', platform_invite_landing, name='platform_invite_landing'),
     path('download/app/latest/', download_android_apk, name='download_android_apk'),
     path('download/android/', download_android_apk, name='download_android_apk_alt'),
     path('apk/', download_android_apk, name='download_apk_short'),

@@ -248,55 +248,79 @@
             margin-right: 0;
         }
         @media (min-width: 992px) {
+            .app-shell-layout {
+                display: grid !important;
+                grid-template-columns: minmax(220px, 1fr) minmax(0, 800px) minmax(220px, 1fr) !important;
+                align-items: start !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding-top: 16px !important;
+                padding-bottom: 40px !important;
+                gap: 0 !important;
+            }
             .desktop-left-rail {
-                width: 240px;
-                flex: 0 0 240px;
+                grid-column: 1 !important;
+                grid-row: 1 !important;
+                justify-self: start !important;
+                width: 100% !important;
+                max-width: 240px !important;
+                min-width: 0 !important;
+                position: sticky !important;
+                top: calc(var(--navbar-height, 60px) + 16px) !important;
+                max-height: calc(100vh - var(--navbar-height, 60px) - 32px) !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                padding-left: 20px !important;
+                padding-right: 12px !important;
+                box-sizing: border-box !important;
+                z-index: 100 !important;
             }
             .desktop-center-panel {
-                width: 100%;
-                max-width: 800px;
-                min-width: 0;
+                grid-column: 2 !important;
+                grid-row: 1 !important;
+                width: 100% !important;
+                max-width: 800px !important;
+                min-width: 0 !important;
+                justify-self: center !important;
+                box-sizing: border-box !important;
+            }
+            .desktop-context-rail {
+                grid-column: 3 !important;
+                grid-row: 1 !important;
+                justify-self: end !important;
+                width: 100% !important;
+                max-width: 340px !important;
+                min-width: 0 !important;
+                position: sticky !important;
+                top: calc(var(--navbar-height, 60px) + 16px) !important;
+                max-height: calc(100vh - var(--navbar-height, 60px) - 32px) !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                padding-left: 16px !important;
+                padding-right: 20px !important;
+                box-sizing: border-box !important;
+                z-index: 100 !important;
             }
         }
         @media (min-width: 1200px) {
             .app-shell-layout {
-                display: grid;
-                grid-template-columns: minmax(240px, 1fr) minmax(0, 800px) minmax(240px, 1fr);
-                align-items: start;
-                width: 100%;
-                max-width: 100%;
-                margin: 0;
-                padding: 20px 0 0 0;
-                gap: 0;
+                grid-template-columns: minmax(240px, 1fr) minmax(0, 800px) minmax(240px, 1fr) !important;
+                padding-top: 20px !important;
             }
             .desktop-left-rail {
-                grid-column: 1;
-                justify-self: start;
-                width: 240px;
-                position: sticky;
-                top: calc(var(--navbar-height, 60px) + 20px);
-                max-height: calc(100vh - var(--navbar-height, 60px) - 32px);
-                padding-left: 24px;
-                padding-right: 16px;
-                box-sizing: border-box;
-            }
-            .desktop-center-panel {
-                grid-column: 2;
-                width: 100%;
-                max-width: 800px;
-                justify-self: center;
+                max-width: 240px !important;
+                top: calc(var(--navbar-height, 60px) + 20px) !important;
+                padding-left: 24px !important;
+                padding-right: 16px !important;
             }
             .desktop-context-rail {
-                grid-column: 3;
-                justify-self: end;
-                width: 340px;
-                position: sticky;
-                top: calc(var(--navbar-height, 60px) + 20px);
-                max-height: calc(100vh - var(--navbar-height, 60px) - 32px);
-                padding-left: 16px;
-                padding-right: 24px;
-                box-sizing: border-box;
+                max-width: 340px !important;
+                top: calc(var(--navbar-height, 60px) + 20px) !important;
+                padding-left: 16px !important;
+                padding-right: 24px !important;
             }
+        }
         /* ── Critical Postcard & Engagement Button Pills (Ensures styles always apply on hard reload / first paint) ── */
         .post-card {
             background-color: var(--card-bg, #ffffff) !important;
@@ -1853,9 +1877,9 @@
             {% block content %}{% endblock %}
         </main>
 
-        <!-- 3. RIGHT RAIL: Contextual Surface (Desktop only: >= 1200px) -->
+        <!-- 3. RIGHT RAIL: Contextual Surface (Desktop only: >= 992px) -->
         <aside id="context-rail-target"
-               class="desktop-context-rail d-none d-xl-block"
+               class="desktop-context-rail d-none d-lg-block"
                aria-label="{% trans 'Contextual Information' %}">
             <div class="context-rail-inner" id="context-rail-inner">
                 {% block context_rail %}
@@ -4602,6 +4626,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
         var activePosterUrl = '';
         var sentTargets = new Set();
         var searchDebounceTimer = null;
+        var activeShareMode = 'post';
 
         function renderShareTargets(query) {
             var tray = document.getElementById('globalShareTargetsTray');
@@ -4711,6 +4736,50 @@ window.addEventListener('beforeinstallprompt', (e) => {
             var id = sendBtn.getAttribute('data-id');
             var username = sendBtn.getAttribute('data-username');
 
+            // Handle App Download Share Mode (sends clickable app download card to friend's profile)
+            if (activeShareMode === 'app_download') {
+                sendBtn.disabled = true;
+                sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width: 10px; height: 10px;"></span>';
+                var csrfToken = getCsrfToken();
+                var params = new URLSearchParams();
+                params.append('shared_to_usernames', username);
+                params.append('csrfmiddlewaretoken', csrfToken);
+
+                fetch('/share/app-to-users/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: params.toString()
+                })
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    if (data && data.status === 'success') {
+                        sentTargets.add(key);
+                        sendBtn.classList.add('sent');
+                        sendBtn.innerHTML = '<i class="bi bi-check2"></i> Sent';
+                        sendBtn.disabled = true;
+                        showFeedback(data.message || '{% trans "App shared successfully!" %}', 'success');
+                        if (window.Haptics && typeof window.Haptics.impactLight === 'function') {
+                            window.Haptics.impactLight();
+                        }
+                    } else {
+                        sendBtn.disabled = false;
+                        sendBtn.innerHTML = 'Send';
+                        showFeedback((data && data.message) || '{% trans "Failed to share" %}', 'danger');
+                    }
+                })
+                .catch(function (err) {
+                    console.error('[Share App Error]', err);
+                    sendBtn.disabled = false;
+                    sendBtn.innerHTML = 'Send';
+                    showFeedback('{% trans "Network error while sharing" %}', 'danger');
+                });
+                return;
+            }
+
             if (!activePostId) return;
 
             sendBtn.disabled = true;
@@ -4777,6 +4846,190 @@ window.addEventListener('beforeinstallprompt', (e) => {
             if (!modal) return;
 
             var button = (triggerSource instanceof Element) ? triggerSource : null;
+            var shareMode = (button && button.getAttribute('data-share-mode')) ||
+                            (modal && modal.getAttribute('data-share-mode')) ||
+                            'post';
+            activeShareMode = shareMode;
+            modal.setAttribute('data-share-mode', shareMode);
+
+            var titleEl = document.getElementById('globalShareModalTitle');
+            var repostBtn = document.getElementById('globalShareRepostBtn');
+            var bookmarkBtn = document.getElementById('globalShareBookmarkBtn');
+            var downloadBtn = document.getElementById('globalShareDownloadBtn');
+            var copyBtn = document.getElementById('globalCopyLinkBtn');
+            var feedbackEl = document.getElementById('globalShareFeedback');
+            if (feedbackEl) feedbackEl.innerHTML = '';
+            var searchInput = document.getElementById('globalShareSearchInput');
+            if (searchInput) searchInput.value = '';
+            var searchWrap = searchInput ? searchInput.parentElement : null;
+            var traySection = modal.querySelector('.share-tray-section');
+            var trayDivider = modal.querySelector('#globalShareModalBody > hr');
+
+            function applyPlatformLinks(text, url) {
+                var encodedText = encodeURIComponent(text);
+                var encodedUrl = encodeURIComponent(url);
+                var pLinks = modal.querySelectorAll('.platform-share-btn');
+                pLinks.forEach(function (btn) {
+                    var platform = btn.getAttribute('data-platform');
+                    if (platform === 'whatsapp') {
+                        btn.href = 'https://wa.me/?text=' + encodedText + '%20' + encodedUrl;
+                    } else if (platform === 'facebook') {
+                        btn.href = 'https://www.facebook.com/sharer/sharer.php?u=' + encodedUrl;
+                    } else if (platform === 'twitter') {
+                        btn.href = 'https://twitter.com/intent/tweet?text=' + encodedText + '&url=' + encodedUrl;
+                    } else if (platform === 'telegram') {
+                        btn.href = 'https://t.me/share/url?url=' + encodedUrl + '&text=' + encodedText;
+                    }
+                });
+
+                var nativeBtn = document.getElementById('globalNativeShareBtn');
+                if (nativeBtn) {
+                    if (navigator.share || (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share)) {
+                        nativeBtn.classList.remove('d-none');
+                        nativeBtn.onclick = function () {
+                            if (typeof window.pwaniShare === 'function') {
+                                window.pwaniShare(url, text);
+                            } else if (navigator.share) {
+                                navigator.share({
+                                    title: 'PwaniNet',
+                                    text: text,
+                                    url: url
+                                }).catch(function () {});
+                            }
+                        };
+                    } else {
+                        nativeBtn.classList.add('d-none');
+                    }
+                }
+            }
+
+            function setupCopyButton() {
+                if (copyBtn) {
+                    copyBtn.onclick = function () {
+                        var label = copyBtn.querySelector('.share-action-label');
+                        var icon = copyBtn.querySelector('i');
+                        var finish = function () {
+                            if (label) label.textContent = '{% trans "Copied!" %}';
+                            if (icon) icon.className = 'bi bi-check2 fs-4 text-success';
+                            showFeedback('{% trans "Link copied to clipboard!" %}', 'success');
+                            setTimeout(function () {
+                                if (label) label.textContent = '{% trans "Copy Link" %}';
+                                if (icon) icon.className = 'bi bi-link-45deg fs-4 text-dark';
+                            }, 2000);
+                        };
+                        if (navigator.clipboard) {
+                            navigator.clipboard.writeText(activePostUrl).then(finish).catch(function () {
+                                if (typeof copyLinkToClipboard === 'function') copyLinkToClipboard(activePostUrl);
+                                finish();
+                            });
+                        } else if (typeof copyLinkToClipboard === 'function') {
+                            copyLinkToClipboard(activePostUrl);
+                            finish();
+                        }
+                    };
+                }
+            }
+
+            function setupTrayNavigation(containerId, prevBtnId, nextBtnId) {
+                var container = document.getElementById(containerId);
+                var prevBtn = document.getElementById(prevBtnId);
+                var nextBtn = document.getElementById(nextBtnId);
+                if (!container || !prevBtn || !nextBtn) return;
+
+                function updateArrows() {
+                    var sl = container.scrollLeft;
+                    var maxScroll = container.scrollWidth - container.clientWidth;
+                    prevBtn.style.opacity = sl > 8 ? '1' : '0';
+                    prevBtn.style.pointerEvents = sl > 8 ? 'auto' : 'none';
+                    nextBtn.style.opacity = (sl < maxScroll - 8) ? '1' : '0';
+                    nextBtn.style.pointerEvents = (sl < maxScroll - 8) ? 'auto' : 'none';
+                }
+
+                prevBtn.onclick = function(e) {
+                    e.preventDefault();
+                    container.scrollBy({ left: -220, behavior: 'smooth' });
+                };
+                nextBtn.onclick = function(e) {
+                    e.preventDefault();
+                    container.scrollBy({ left: 220, behavior: 'smooth' });
+                };
+
+                container.onscroll = updateArrows;
+                setTimeout(updateArrows, 200);
+            }
+
+            if (shareMode === 'app_download' || shareMode === 'platform_invite') {
+                activePostId = null;
+                var hiddenInputEl = document.getElementById('globalSharePostId');
+                if (hiddenInputEl) hiddenInputEl.value = '';
+
+                if (repostBtn) repostBtn.classList.add('d-none');
+                if (bookmarkBtn) bookmarkBtn.classList.add('d-none');
+                if (downloadBtn) downloadBtn.classList.add('d-none');
+
+                var shareUrl = (button && button.getAttribute('data-share-url')) || '';
+                var shareTxt = (button && button.getAttribute('data-share-text')) || '';
+
+                if (shareMode === 'app_download') {
+                    if (titleEl) titleEl.textContent = '{% trans "Share Mobile App" %}';
+                    activePostUrl = shareUrl || (window.location.origin + '/downloads/');
+                    activePostContent = shareTxt || '{% trans "📱 Download the official PwaniNet Android app for campus updates, course groups, and offline access:" %}';
+
+                    // App download can be sent directly to friends on PwaniNet
+                    if (window.isAuthenticated) {
+                        if (searchWrap) searchWrap.classList.remove('d-none');
+                        if (traySection) traySection.classList.remove('d-none');
+                        if (trayDivider) trayDivider.classList.remove('d-none');
+                        sentTargets = new Set();
+                        loadTargets();
+                    } else {
+                        if (searchWrap) searchWrap.classList.add('d-none');
+                        if (traySection) traySection.classList.add('d-none');
+                        if (trayDivider) trayDivider.classList.add('d-none');
+                    }
+                } else {
+                    // platform_invite: For friends who are NOT on PwaniNet
+                    if (titleEl) titleEl.textContent = '{% trans "Invite to PwaniNet" %}';
+                    activePostUrl = shareUrl || (window.location.origin + '/users/register/');
+                    activePostContent = shareTxt || '{% trans "🎓 Join me on PwaniNet! Connect with classmates, access course groups, and collaborate:" %}';
+
+                    // Hide in-app users tray since invite is for non-members
+                    if (searchWrap) searchWrap.classList.add('d-none');
+                    if (traySection) traySection.classList.add('d-none');
+                    if (trayDivider) trayDivider.classList.add('d-none');
+                }
+
+                applyPlatformLinks(activePostContent, activePostUrl);
+                setupCopyButton();
+
+                // If dynamic data wasn't pre-rendered on button, load from API
+                if (!shareUrl) {
+                    fetch('/api/share/invite-data/')
+                        .then(function(res) { return res.json(); })
+                        .then(function(resData) {
+                            if (resData && resData.status === 'success' && resData.data) {
+                                var payload = shareMode === 'app_download' ? resData.data.app_download : resData.data.platform_invite;
+                                if (payload && payload.url) {
+                                    activePostUrl = payload.url;
+                                    activePostContent = payload.text || activePostContent;
+                                    applyPlatformLinks(activePostContent, activePostUrl);
+                                }
+                            }
+                        })
+                        .catch(function(e) { console.warn('Could not fetch invite data', e); });
+                }
+
+                setupTrayNavigation('globalShareTargetsTray', 'shareTrayPrevBtn', 'shareTrayNextBtn');
+                setupTrayNavigation('globalShareActionChips', 'shareToolsPrevBtn', 'shareToolsNextBtn');
+                return;
+            }
+
+            // Restore elements for normal post/reel sharing
+            if (titleEl) titleEl.textContent = '{% trans "Share to" %}';
+            if (repostBtn) repostBtn.classList.remove('d-none');
+            if (bookmarkBtn) bookmarkBtn.classList.remove('d-none');
+            if (downloadBtn) downloadBtn.classList.remove('d-none');
+
             activePostId = postId ||
                            (button && (button.getAttribute('data-post-id') || button.getAttribute('data-share-id'))) ||
                            (modal.getAttribute('data-post-id')) ||

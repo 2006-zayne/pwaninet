@@ -988,3 +988,60 @@ class UnifiedSearchService:
     def _count_groups(self, query: str) -> int:
         _, count = self._search_groups(query, None, limit=1, offset=0)
         return count
+
+    def search_group_posts_queryset(self, group, query: str, user=None):
+        """
+        Reuse Unified Search Engine to filter posts within a specific group.
+        Applies PostgreSQL Full-Text Search with Trigram and text similarity fallbacks,
+        author select_related, and media prefetches.
+        """
+        from posts.models import Post, HiddenPost, AuthorPreference, PostImage
+        query = (query or "").strip()
+        base_filter = Q(group=group) & ~Q(video_status=Post.VIDEO_STATUS_FAILED)
+
+        if user and user.is_authenticated:
+            hidden_ids = HiddenPost.objects.filter(user=user).values_list('post_id', flat=True)
+            if hidden_ids:
+                base_filter &= ~Q(id__in=hidden_ids)
+            blocked_authors = AuthorPreference.objects.filter(user=user, preference='none').values_list('author_id', flat=True)
+            if blocked_authors:
+                base_filter &= ~Q(author_id__in=blocked_authors)
+
+        if not query:
+            qs = Post.objects.filter(base_filter).order_by('-created_at')
+        else:
+            search_query = SearchQuery(query, config='english')
+            fts_qs = Post.objects.filter(base_filter).annotate(
+                relevance_rank=SearchRank(F('search_vector'), search_query)
+            ).filter(search_vector=search_query)
+
+            if fts_qs.exists():
+                qs = fts_qs.order_by('-relevance_rank', '-id')
+            else:
+                trgm_sim = TrigramSimilarity('content', query)
+                trgm_qs = Post.objects.filter(base_filter).annotate(
+                    relevance_rank=trgm_sim
+                ).filter(relevance_rank__gte=0.15)
+                if trgm_qs.exists():
+                    qs = trgm_qs.order_by('-relevance_rank', '-id')
+                else:
+                    qs = Post.objects.filter(
+                        base_filter & (
+                            Q(content__icontains=query) |
+                            Q(author__username__icontains=query) |
+                            Q(author__first_name__icontains=query) |
+                            Q(author__last_name__icontains=query)
+                        )
+                    ).order_by('-created_at')
+
+        return qs.select_related(
+            'author', 'group', 'unit', 'repost_of', 'repost_of__author',
+            'shared_document', 'shared_document__analytics'
+        ).prefetch_related(
+            Prefetch('images', queryset=PostImage.objects.all()),
+            'comments', 'likes'
+        ).annotate(
+            like_count_annotated=Count('likes', distinct=True),
+            comment_count_annotated=Count('comments', distinct=True),
+            repost_count_annotated=Count('repost_children', distinct=True),
+        )

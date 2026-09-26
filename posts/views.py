@@ -930,6 +930,14 @@ def create_post_view(request):
         memberships__status=MembershipStatus.APPROVED
     ).distinct()
 
+    selected_group_id = request.GET.get('group') or ''
+    selected_group = None
+    if selected_group_id:
+        try:
+            selected_group = user_groups.filter(id=int(selected_group_id)).first()
+        except (ValueError, TypeError):
+            pass
+
     if request.method == 'POST':
         logger.info(f"POST request received. FILES keys: {list(request.FILES.keys())}")
         logger.info(f"POST data keys: {list(request.POST.keys())}")
@@ -942,7 +950,7 @@ def create_post_view(request):
         if form.is_valid():
             logger.info(f"Calling create_post_for_user with FILES: {request.FILES}")
             # Get group from POST data (hidden input)
-            group_id = request.POST.get('group')
+            group_id = request.POST.get('group') or selected_group_id
             post = create_post_for_user(form, request.user, request.FILES, group_id=group_id)
             logger.info(f"Post created with ID: {post.id}")
             logger.info(f"Post group: {post.group}")
@@ -961,7 +969,12 @@ def create_post_view(request):
         form = PostForm(user=request.user)
 
     template = 'posts/partials/create_post_navigation_partial.html' if is_htmx else 'posts/create_post.html'
-    return render(request, template, {'form': form, 'user_groups': user_groups})
+    return render(request, template, {
+        'form': form,
+        'user_groups': user_groups,
+        'selected_group': selected_group,
+        'selected_group_id': str(selected_group.id) if selected_group else selected_group_id,
+    })
 
 
 def storage_manager_view(request):
@@ -1375,6 +1388,98 @@ def share_post_view(request, share_id):
     if not request.headers.get('HX-Request'):
         return redirect('posts:post_details', share_share_id=share_id)
     return HttpResponse('')
+
+
+@login_required
+def share_app_to_users_view(request):
+    """
+    Handle sharing the mobile app referral link directly to friends on PwaniNet.
+    Creates SharedPost entries of type 'app_link' which display on the recipient's
+    profile under the 'Shared with me' tab as a clickable download card.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+
+    usernames_str = request.POST.get('shared_to_usernames', '')
+    usernames = [u.strip() for u in usernames_str.split(',') if u.strip()]
+    message = request.POST.get('message', '').strip()
+
+    if not usernames:
+        return JsonResponse({'status': 'error', 'message': 'No recipient users specified.'}, status=400)
+
+    try:
+        from users.services.invite_service import get_or_create_invite, InviteType
+        invite = get_or_create_invite(request.user, InviteType.APP_DOWNLOAD)
+        app_url = request.build_absolute_uri(reverse('encrypted_invite_landing', kwargs={'token': invite.token}))
+    except Exception as e:
+        logger.error(f"Error resolving invite link for app share: {e}")
+        app_url = request.build_absolute_uri(reverse('downloads'))
+
+    shared_count = 0
+    from users.models import User
+    from posts.models import SharedPost
+
+    for username in usernames:
+        try:
+            recipient = User.objects.get(username=username)
+            if recipient == request.user:
+                continue
+
+            existing = SharedPost.objects.filter(
+                sharer=request.user,
+                shared_to=recipient,
+                share_type='app_link',
+                shared_link=app_url
+            ).first()
+
+            if not existing:
+                SharedPost.objects.create(
+                    sharer=request.user,
+                    shared_to=recipient,
+                    share_type='app_link',
+                    shared_link=app_url,
+                    shared_link_title='PwaniNet Mobile App (Android APK)',
+                    shared_link_description='Download the official PwaniNet Android app for campus updates, course groups, and offline access.',
+                    message=message or 'Check out the PwaniNet Android app!'
+                )
+                shared_count += 1
+
+                try:
+                    from notifications.events import publish_event, EventTypes, EventSources, EventActions
+                    publish_event(
+                        event_type=EventTypes.POSTS_POST_SHARED.value,
+                        source=EventSources.POSTS.value,
+                        action=EventActions.SHARED.value,
+                        actor=request.user,
+                        target_type='AppDownload',
+                        target_id=str(invite.id) if 'invite' in locals() and invite else '0',
+                        context_type='APP',
+                        context_id=str(invite.id) if 'invite' in locals() and invite else '0',
+                        audience=str(recipient.id),
+                        metadata={
+                            'message': message[:100] if message else 'Shared the PwaniNet Mobile App with you',
+                            'sharer_username': request.user.username,
+                            'recipient_username': recipient.username,
+                            'recipient_id': str(recipient.id),
+                            'thumbnail_url': '/static/images/pwaninet-app-icon.png',
+                            'resource_type': 'APP',
+                            'post_content': 'Download the official PwaniNet Android app',
+                            'actor_username': request.user.username,
+                        }
+                    )
+                except Exception as notify_err:
+                    logger.warning(f"Could not emit notification for app share: {notify_err}")
+            else:
+                shared_count += 1
+        except User.DoesNotExist:
+            continue
+
+    if shared_count > 0:
+        return JsonResponse({
+            'status': 'success',
+            'message': f'Mobile app link shared to {shared_count} friend(s) successfully.'
+        })
+    return JsonResponse({'status': 'error', 'message': 'No valid users could be shared to.'}, status=400)
 
 
 @login_required

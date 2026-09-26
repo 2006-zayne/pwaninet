@@ -9,9 +9,17 @@
 <div id="profile-floating-actions" hx-swap-oob="true"></div>
 
 <!-- Context Rail Out-Of-Band update for Group Detail -->
-<aside id="context-rail-target" class="desktop-context-rail d-none d-xl-block" aria-label="{% trans 'Contextual Information' %}" hx-swap-oob="true">
+<aside id="context-rail-target" class="desktop-context-rail d-none d-lg-block" aria-label="{% trans 'Contextual Information' %}" hx-swap-oob="true">
     <div class="context-rail-inner" id="context-rail-inner">
         {% include 'groups/partials/groups_detail_context_rail.html' %}
     </div>
 </aside>
+
+<!-- Left Rail Out-Of-Band: restore PwaniNet left rail -->
+<aside id="left-nav-rail" class="desktop-left-rail d-none d-lg-block" aria-label="{% trans 'Global Navigation' %}" hx-swap-oob="true">
+    <div class="left-rail-inner">
+        {% include 'partials/desktop_left_rail.html' %}
+    </div>
+</aside>
+
 

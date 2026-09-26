@@ -798,8 +798,15 @@
   z-index: 10;
 }
 
+.landscape-video-wrapper .media-download-btn {
+  right: auto;
+  left: 10px;
+}
+
 .post-media:hover .media-download-btn,
-.post-media:focus-within .media-download-btn {
+.post-media:focus-within .media-download-btn,
+.landscape-video-wrapper:hover .media-download-btn,
+.landscape-video-wrapper:focus-within .media-download-btn {
   opacity: 1;
 }
 

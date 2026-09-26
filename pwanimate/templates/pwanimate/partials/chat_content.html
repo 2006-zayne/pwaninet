@@ -439,6 +439,14 @@
                 </div>
                 <div class="pwanimate-composer-action-row">
                     <div class="pwanimate-composer-actions-start d-flex align-items-center gap-1">
+                        <!-- Attachment Button (UI Prepared) -->
+                        <button type="button"
+                                class="pwanimate-attach-btn"
+                                id="pwanimateAttachBtn"
+                                title="{% trans 'Add attachment' %}"
+                                aria-label="{% trans 'Add attachment' %}">
+                            <i class="bi bi-paperclip"></i>
+                        </button>
                         <!-- Model Selection Dropdown -->
                         <div class="dropdown pwanimate-model-dropdown">
                             <button class="btn btn-sm pwanimate-model-btn dropdown-toggle d-flex align-items-center gap-1"
@@ -519,6 +527,48 @@
             </div>
         </div>
     </section>
+
+    <!-- Pwanimate Attachment Modal & Bottom Sheet (UI Prepared) -->
+    <div class="pwanimate-attachment-modal" id="pwanimateAttachmentModal">
+        <div class="pwanimate-attachment-modal-content">
+            <div class="pwanimate-attachment-sheet-handle"></div>
+            <div class="pwanimate-attachment-modal-header">
+                <h4 class="pwanimate-attachment-modal-title">{% trans "Add attachment" %}</h4>
+                <button class="pwanimate-attachment-modal-close" id="closePwanimateAttachmentModal" type="button" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="pwanimate-attachment-options">
+                <div class="pwanimate-attachment-option" id="pwanimateAttachCamera">
+                    <div class="pwanimate-attachment-icon-circle">
+                        <i class="bi bi-camera-fill"></i>
+                    </div>
+                    <span>{% trans "Camera" %}</span>
+                </div>
+                <div class="pwanimate-attachment-option" id="pwanimateAttachPhotos">
+                    <div class="pwanimate-attachment-icon-circle">
+                        <i class="bi bi-image-fill"></i>
+                    </div>
+                    <span>{% trans "Photos" %}</span>
+                </div>
+                <div class="pwanimate-attachment-option" id="pwanimateAttachDocs">
+                    <div class="pwanimate-attachment-icon-circle">
+                        <i class="bi bi-file-earmark-text-fill"></i>
+                    </div>
+                    <span>{% trans "Docs" %}</span>
+                </div>
+                <div class="pwanimate-attachment-option" id="pwanimateAttachFiles">
+                    <div class="pwanimate-attachment-icon-circle">
+                        <i class="bi bi-folder-fill"></i>
+                    </div>
+                    <span>{% trans "Files" %}</span>
+                </div>
+            </div>
+            <div class="text-center text-muted mt-3 small opacity-75">
+                {% trans "File attachments for Pwanimate analysis coming soon" %}
+            </div>
+        </div>
+    </div>
 
     <!-- AI Models & Quota Status Modal -->
     <div class="modal fade" id="pwanimateQuotaModal" tabindex="-1" aria-labelledby="pwanimateQuotaModalLabel" aria-hidden="true">
@@ -606,6 +656,49 @@
             window.initPwanimate();
         }
     })();
+
+    // Pwanimate Attachment UI Wiring
+    function initPwanimateAttachmentUI() {
+        const attachBtn = document.getElementById('pwanimateAttachBtn');
+        const modal = document.getElementById('pwanimateAttachmentModal');
+        const closeBtn = document.getElementById('closePwanimateAttachmentModal');
+        if (!attachBtn || !modal) return;
+
+        attachBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            modal.classList.add('show');
+        });
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                modal.classList.remove('show');
+            });
+        }
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('show');
+            }
+        });
+
+        modal.querySelectorAll('.pwanimate-attachment-option').forEach(opt => {
+            opt.addEventListener('click', () => {
+                modal.classList.remove('show');
+            });
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPwanimateAttachmentUI);
+    } else {
+        initPwanimateAttachmentUI();
+    }
+    document.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail && (evt.detail.target.id === 'page-content-target' || evt.detail.target.id === 'pwanimate-root')) {
+            initPwanimateAttachmentUI();
+        }
+    });
 </script>
 
 

@@ -396,14 +396,74 @@ function initCaching() {
 }
 
 /**
+ * Native Camera & Filesystem Permissions
+ */
+async function requestNativeCameraPermissions() {
+    if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.Camera) {
+        return { camera: 'granted', photos: 'granted' };
+    }
+    try {
+        const { Camera } = window.Capacitor.Plugins;
+        let status = await Camera.checkPermissions();
+        console.log('[NativeApp] Camera permissions check:', status);
+        if (status.camera !== 'granted' || status.photos !== 'granted') {
+            status = await Camera.requestPermissions();
+            console.log('[NativeApp] Camera permissions requested:', status);
+        }
+        return status;
+    } catch (err) {
+        console.warn('[NativeApp] Error requesting camera permissions:', err);
+        return { camera: 'denied', photos: 'denied' };
+    }
+}
+
+async function requestNativeFilesystemPermissions() {
+    if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.Filesystem) {
+        return { publicStorage: 'granted' };
+    }
+    try {
+        const { Filesystem } = window.Capacitor.Plugins;
+        let status = await Filesystem.checkPermissions();
+        console.log('[NativeApp] Filesystem permissions check:', status);
+        if (status.publicStorage !== 'granted') {
+            status = await Filesystem.requestPermissions();
+            console.log('[NativeApp] Filesystem permissions requested:', status);
+        }
+        return status;
+    } catch (err) {
+        console.warn('[NativeApp] Error requesting filesystem permissions:', err);
+        return { publicStorage: 'denied' };
+    }
+}
+
+async function ensureNativeMediaPermissions() {
+    const camPerm = await requestNativeCameraPermissions();
+    const fsPerm = await requestNativeFilesystemPermissions();
+    return { camera: camPerm, filesystem: fsPerm };
+}
+
+window.PwaninetPermissions = {
+    requestCamera: requestNativeCameraPermissions,
+    requestFilesystem: requestNativeFilesystemPermissions,
+    ensureMedia: ensureNativeMediaPermissions
+};
+
+/**
  * Native Media Handling (Camera/Gallery)
  */
 function initNativeMedia() {
     document.addEventListener('click', async (e) => {
         const target = e.target.closest('input[type="file"][capture]');
-        if (target && window.Capacitor.Plugins.Camera) {
+        if (target && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Camera) {
             e.preventDefault();
             try {
+                // Ensure permissions before capturing
+                const perms = await requestNativeCameraPermissions();
+                if (perms.camera === 'denied') {
+                    console.warn('[NativeApp] Camera permission was denied');
+                    return;
+                }
+
                 const { Camera, CameraResultType, CameraSource } = window.Capacitor.Plugins;
                 const image = await Camera.getPhoto({
                     quality: 90,

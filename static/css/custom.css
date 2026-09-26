@@ -1270,7 +1270,7 @@ body.modal-open .mobile-bottom-nav {
     box-sizing: border-box;
 }
 
-/* Tablet / Intermediate Desktop (992px–1199px): Left Rail + Centered Feed */
+/* Tablet / Intermediate Desktop (992px–1199px): Left Rail + Centered Feed + Right Rail */
 @media (min-width: 992px) {
     body {
         padding-bottom: 40px !important;
@@ -1292,8 +1292,11 @@ body.modal-open .mobile-bottom-nav {
 
     .desktop-left-rail {
         grid-column: 1;
+        grid-row: 1;
         justify-self: start;
-        width: 230px;
+        width: 100%;
+        max-width: 230px;
+        min-width: 0;
         position: sticky;
         top: calc(var(--navbar-height, 60px) + 16px);
         max-height: calc(100vh - var(--navbar-height, 60px) - 32px);
@@ -1318,10 +1321,32 @@ body.modal-open .mobile-bottom-nav {
 
     .desktop-center-panel {
         grid-column: 2;
+        grid-row: 1;
         width: 100%;
         max-width: 800px;
         justify-self: center;
         min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .desktop-context-rail {
+        grid-column: 3;
+        grid-row: 1;
+        justify-self: end;
+        width: 100%;
+        max-width: 340px;
+        min-width: 0;
+        position: sticky;
+        top: calc(var(--navbar-height, 60px) + 16px);
+        max-height: calc(100vh - var(--navbar-height, 60px) - 32px);
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-left: 16px;
+        padding-right: 20px;
+        box-sizing: border-box;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(100, 116, 139, 0.2) transparent;
+        z-index: 100;
     }
 }
 
@@ -1343,8 +1368,11 @@ body.modal-open .mobile-bottom-nav {
 
     .desktop-left-rail {
         grid-column: 1;
+        grid-row: 1;
         justify-self: start;
-        width: 240px;
+        width: 100%;
+        max-width: 240px;
+        min-width: 0;
         position: sticky;
         top: calc(var(--navbar-height, 60px) + 20px);
         max-height: calc(100vh - var(--navbar-height, 60px) - 32px);
@@ -1355,16 +1383,21 @@ body.modal-open .mobile-bottom-nav {
 
     .desktop-center-panel {
         grid-column: 2;
+        grid-row: 1;
         width: 100%;
         max-width: 800px;
         justify-self: center;
         min-width: 0;
+        box-sizing: border-box;
     }
 
     .desktop-context-rail {
         grid-column: 3;
+        grid-row: 1;
         justify-self: end;
-        width: 340px;
+        width: 100%;
+        max-width: 340px;
+        min-width: 0;
         position: sticky;
         top: calc(var(--navbar-height, 60px) + 20px);
         max-height: calc(100vh - var(--navbar-height, 60px) - 32px);
@@ -1412,6 +1445,51 @@ body.modal-open .mobile-bottom-nav {
 
 .desktop-context-rail .card {
     width: 100%;
+}
+
+/* Group Detail Context Rail Hero Card */
+.group-detail-context-rail .group-card {
+    position: relative;
+    overflow: visible;
+}
+
+.group-detail-context-rail .group-banner {
+    height: 140px;
+    position: relative;
+    border-radius: 16px 16px 0 0;
+}
+
+.group-detail-context-rail .cover-container {
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    border-radius: 16px 16px 0 0;
+    position: relative;
+}
+
+.group-detail-context-rail .group-avatar-wrap {
+    position: absolute;
+    bottom: -36px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+}
+
+.group-detail-context-rail .group-avatar {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--card-bg, #ffffff);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+    display: block;
+}
+
+.group-detail-context-rail .clickable-cover,
+.group-detail-context-rail .clickable-photo {
+    cursor: pointer;
 }
 
 /* Ensure post cards and feed containers match center panel width across Home, Profile, and Group Detail */

@@ -568,3 +568,44 @@ class RecoveryCode(models.Model):
         status = "consumed" if self.is_consumed else "active"
         return f"RecoveryCode(user={self.user.username}, id={self.id}, status={status})"
 
+
+class InviteType(models.TextChoices):
+    APP_DOWNLOAD = 'app_download', 'Mobile App Download'
+    PLATFORM_INVITE = 'platform_invite', 'Invite to PwaniNet'
+
+
+class PlatformInvite(models.Model):
+    """
+    Peer-to-peer invite and mobile app referral links with opaque tokens and telemetry.
+    """
+    token = models.CharField(max_length=128, unique=True, db_index=True)
+    inviter = models.ForeignKey(
+        'users.User',
+        on_delete=models.CASCADE,
+        related_name='platform_invites',
+        db_index=True
+    )
+    invite_type = models.CharField(
+        max_length=32,
+        choices=InviteType.choices,
+        default=InviteType.PLATFORM_INVITE,
+        db_index=True
+    )
+    clicks_count = models.PositiveIntegerField(default=0)
+    conversions_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_clicked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Platform Invite"
+        verbose_name_plural = "Platform Invites"
+        unique_together = ('inviter', 'invite_type')
+        indexes = [
+            models.Index(fields=['token']),
+            models.Index(fields=['inviter', 'invite_type']),
+        ]
+
+    def __str__(self):
+        return f"PlatformInvite({self.inviter.username}, type={self.invite_type}, token={self.token})"
+
+

@@ -1,11 +1,13 @@
 {% load i18n %}
 <div class="landscape-video-wrapper position-relative">
-    <button class="media-download-btn"
+    <button class="media-download-btn position-absolute top-0 start-0 m-2"
             data-post-id="{{ post.share_id }}"
             data-media-type="video"
             data-url="{{ post.get_video_for_feed.url }}"
             data-thumbnail="{{ post.get_video_poster|default:post.thumbnail_url|default:'' }}"
-            title="{% trans 'Download' %}">
+            title="{% trans 'Download' %}"
+            aria-label="{% trans 'Download' %}"
+            style="right: auto;">
         <i class="bi bi-download"></i>
     </button>
     <button type="button"

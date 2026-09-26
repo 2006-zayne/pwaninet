@@ -16,6 +16,12 @@ urlpatterns = [
     # Registration
     path('register/', views.register_view, name='register'),
     
+    # Invites & Mobile App Referral Landing Endpoints
+    path('i/<str:token>/', views.encrypted_invite_landing, name='encrypted_invite_landing'),
+    path('app/<str:token>/', views.app_invite_landing, name='app_invite_landing'),
+    path('invite/<str:token>/', views.platform_invite_landing, name='platform_invite_landing'),
+    path('api/share/invite-data/', views.get_invite_share_data, name='api_invite_share_data'),
+    
     # Onboarding Flow
     path('onboarding/', views.onboarding_wizard_view, name='onboarding'),
     path('onboarding/batch-follow/', views.batch_follow_view, name='onboarding_batch_follow'),

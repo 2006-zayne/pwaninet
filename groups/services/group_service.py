@@ -8,9 +8,11 @@ def build_groups_dashboard_context(user):
         'suggested_groups': get_suggested_groups_from_following(user, limit = 10) }
 
 
-def build_group_detail_context(user, group, query, page=1):
+def build_group_detail_context(user, group, query, page=1, post_query=''):
     from groups.models import Membership, MembershipRole, MembershipStatus, JoinPolicy
     from django.core.paginator import Paginator
+    from search.services.unified_search_service import UnifiedSearchService
+
     memberships = group.memberships.filter(status=MembershipStatus.APPROVED).select_related('user')
     user_membership = group.memberships.filter(user=user).first()
     is_admin = user_membership and user_membership.role == MembershipRole.ADMIN and user_membership.status == MembershipStatus.APPROVED
@@ -22,7 +24,11 @@ def build_group_detail_context(user, group, query, page=1):
     
     # Pagination for posts - only show posts to approved members
     if is_member:
-        posts_queryset = get_group_posts(group)
+        if post_query and post_query.strip():
+            search_service = UnifiedSearchService()
+            posts_queryset = search_service.search_group_posts_queryset(group, post_query.strip(), user=user)
+        else:
+            posts_queryset = get_group_posts(group)
     else:
         # Non-members see no posts
         posts_queryset = Post.objects.none()
@@ -43,6 +49,7 @@ def build_group_detail_context(user, group, query, page=1):
         'memberships': memberships,
         'search_results': search_invite_candidates(query, group, limit = 10),
         'query': query,
+        'post_query': post_query,
         'following_ids': following_ids,
         'page': page,
         'has_next': posts_page.has_next(),

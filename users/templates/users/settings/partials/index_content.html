@@ -59,6 +59,10 @@
       <button type="button" class="btn btn-primary btn-sm d-none d-md-inline-flex align-items-center" data-bs-toggle="modal" data-bs-target="#qrInstallModal" onclick="if (typeof window.renderDesktopQRCode === 'function') window.renderDesktopQRCode();">
         <i class="bi bi-qr-code-scan me-1"></i> {% trans "Install on your phone" %}
       </button>
+      <!-- Share App with Friends (Opens Bottom Sheet with encrypted download link) -->
+      <button type="button" class="btn btn-outline-primary btn-sm d-inline-flex align-items-center" data-bs-toggle="modal" data-bs-target="#globalShareModal" data-share-mode="app_download" data-share-url="{{ invite_data.app_download.url }}" data-share-text="{{ invite_data.app_download.text }}" title="{% trans 'Share App with Friends' %}">
+        <i class="bi bi-share me-1"></i> {% trans "Share App" %}
+      </button>
     </div>
   </div>
 </div>
@@ -83,16 +87,50 @@
         <span id="native-latest-version-meta"><i class="bi bi-cloud-arrow-down text-primary me-1"></i>{% trans "Latest" %} v{{ latest_app_version|default:app_version|default:"1.0.0" }}</span>
       </div>
     </div>
-    <div class="settings-app-download-action" id="native-app-update-action">
+    <div class="settings-app-download-action d-flex flex-wrap gap-2" id="native-app-update-action">
       <a href="{% url 'download_android_apk' %}" target="_blank" id="native-app-download-update-btn" class="btn btn-primary btn-sm d-none align-items-center" onclick="if (typeof window.triggerNativeApkDownload === 'function') { window.triggerNativeApkDownload(this.href); return false; }">
         <i class="bi bi-arrow-up-circle me-1"></i> {% trans "Download Update" %}
       </a>
       <button type="button" class="btn btn-outline-primary btn-sm d-inline-flex align-items-center" id="native-app-check-update-btn" onclick="if (typeof window.checkNativeAppUpdates === 'function') window.checkNativeAppUpdates(true);">
         <i class="bi bi-arrow-clockwise me-1"></i> {% trans "Check for Updates" %}
       </button>
+      <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center" data-bs-toggle="modal" data-bs-target="#globalShareModal" data-share-mode="app_download" data-share-url="{{ invite_data.app_download.url }}" data-share-text="{{ invite_data.app_download.text }}" title="{% trans 'Share App with Friends' %}">
+        <i class="bi bi-share me-1"></i> {% trans "Share App" %}
+      </button>
     </div>
   </div>
 </div>
+
+<!-- Invite Friends to PwaniNet Card (Hidden in Settings next to download APK section) -->
+<div class="settings-app-download-card apk-download-card mb-3" id="settings-invite-friends-card" style="border-left: 4px solid var(--primary, #2563eb);">
+  <div class="settings-app-download-inner">
+    <div class="settings-app-download-icon d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(37, 99, 235, 0.1); color: var(--primary, #2563eb);">
+      <i class="bi bi-person-plus-fill fs-4"></i>
+    </div>
+    <div class="settings-app-download-content">
+      <div class="settings-app-download-title">
+        <span>{% trans "Invite Friends to PwaniNet" %}</span>
+        <span class="settings-app-badge bg-success text-white">{% trans "Classmates" %}</span>
+      </div>
+      <p class="settings-app-download-desc">
+        {% trans "Know students or friends who aren't on PwaniNet yet? Send them a friendly invite link to join course groups, share notes, and collaborate." %}
+      </p>
+      {% if invite_data.platform_invite %}
+      <div class="settings-app-download-meta">
+        <span><i class="bi bi-cursor-fill text-primary me-1"></i>{{ invite_data.platform_invite.clicks|default:"0" }} {% trans "clicks" %}</span>
+        <span>•</span>
+        <span><i class="bi bi-people-fill text-success me-1"></i>{{ invite_data.platform_invite.conversions|default:"0" }} {% trans "joined" %}</span>
+      </div>
+      {% endif %}
+    </div>
+    <div class="settings-app-download-action">
+      <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center" data-bs-toggle="modal" data-bs-target="#globalShareModal" data-share-mode="platform_invite" data-share-url="{{ invite_data.platform_invite.url }}" data-share-text="{{ invite_data.platform_invite.text }}" title="{% trans 'Invite Friends to PwaniNet' %}">
+        <i class="bi bi-send-fill me-1"></i> {% trans "Invite Friends" %}
+      </button>
+    </div>
+  </div>
+</div>
+
 
 <script>
   (function() {

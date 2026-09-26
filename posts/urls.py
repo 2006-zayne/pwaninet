@@ -15,6 +15,7 @@ urlpatterns = [
     path('search/', views.search_view, name='search'),
     path('post/<uuid:share_id>/image/<int:image_index>/', views.view_image_fullscreen, name='view_image_fullscreen'),
     path('post/<uuid:share_id>/share/', views.share_post_view, name='share_post'),
+    path('share/app-to-users/', views.share_app_to_users_view, name='share_app_to_users'),
     path('shares/', views.shared_posts_view, name='shared_posts'),
     path('share/search-users/', views.search_following_users, name='search_following_users'),
     path('share/search-groups/', views.search_user_groups, name='search_user_groups'),

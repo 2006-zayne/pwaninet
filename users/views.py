@@ -53,6 +53,27 @@ def register_view(request):
     if request.user.is_authenticated:
         return redirect('posts:home')
 
+    ref_token = request.GET.get('ref') or request.session.get('invite_token')
+    inviter_username = request.session.get('inviter_username')
+    if ref_token and not inviter_username:
+        try:
+            from users.models import PlatformInvite, User
+            from users.services.invite_service import decrypt_invite_token
+            inv = PlatformInvite.objects.select_related('inviter').filter(token=ref_token).first()
+            if inv:
+                inviter_username = inv.inviter.username
+            else:
+                decrypted = decrypt_invite_token(ref_token)
+                if decrypted:
+                    u_id, _ = decrypted
+                    inviter_user = User.objects.get(id=u_id)
+                    inviter_username = inviter_user.username
+            if inviter_username:
+                request.session['invite_token'] = ref_token
+                request.session['inviter_username'] = inviter_username
+        except Exception:
+            pass
+
     if request.method == 'POST':
         ip = get_client_ip(request)
         submitted_username = request.POST.get('username', '').strip()
@@ -67,6 +88,18 @@ def register_view(request):
                 msg_success = f"[AUTH-REGISTER] SUCCESS: User created. id={user.id}, username='{user.username}', IP={ip}"
                 print(msg_success, flush=True)
                 logger.info(msg_success)
+
+                # Process invite conversion if user joined via invite
+                if ref_token:
+                    try:
+                        from users.services.invite_service import process_invite_conversion
+                        process_invite_conversion(ref_token, user)
+                        request.session.pop('invite_token', None)
+                        request.session.pop('inviter_username', None)
+                        request.session.pop('inviter_id', None)
+                    except Exception as e:
+                        logger.warning(f"Error processing invite conversion: {e}")
+
                 request.session['registered_username'] = user.username
                 messages.success(request, f"Welcome @{user.username}! Your account has been created successfully. Please log in.")
                 return redirect('login')
@@ -83,7 +116,11 @@ def register_view(request):
     else:
         form = PwaniSignupForm()
 
-    return render(request, 'users/register.html', {'form': form})
+    return render(request, 'users/register.html', {
+        'form': form,
+        'inviter_username': inviter_username,
+        'invite_token': ref_token,
+    })
 
 
 class PwaniLoginView(LoginView):
@@ -986,14 +1023,107 @@ def get_suggestions(request):
     return render(request, 'users/partials/suggestions.html', {'suggestions': suggestions})
 
 
+def encrypted_invite_landing(request, token):
+    """
+    Unified landing endpoint for cryptographically encrypted (AES-256-GCM) invite & app links (/i/<token>/).
+    Decodes the authenticated ciphertext, records click telemetry, and routes to:
+    - App download page if invite_type == 'app_download'
+    - Registration page if invite_type == 'platform_invite'
+    """
+    from users.services.invite_service import track_invite_click, decrypt_invite_token
+    from users.models import InviteType
+
+    invite = track_invite_click(token)
+    resolved_type = None
+
+    if invite:
+        resolved_type = invite.invite_type
+        request.session['invite_token'] = token
+        request.session['inviter_id'] = invite.inviter_id
+        request.session['inviter_username'] = invite.inviter.username
+    else:
+        decrypted = decrypt_invite_token(token)
+        if decrypted:
+            u_id, resolved_type = decrypted
+            request.session['invite_token'] = token
+            request.session['inviter_id'] = u_id
+
+    if resolved_type == InviteType.APP_DOWNLOAD:
+        download_url = reverse('downloads')
+        return redirect(f"{download_url}?ref={token}")
+
+    # Default to platform invite
+    if request.user.is_authenticated:
+        messages.info(request, "You are already a member of PwaniNet!")
+        return redirect('posts:home')
+
+    register_url = reverse('users:register')
+    return redirect(f"{register_url}?ref={token}")
+
+
+def app_invite_landing(request, token):
+    """
+    Landing endpoint for encrypted/opaque mobile app download referral links.
+    Logs telemetry click count and redirects user to the official downloads page.
+    """
+    from users.services.invite_service import track_invite_click
+    invite = track_invite_click(token)
+    if invite:
+        request.session['invite_token'] = token
+        request.session['inviter_id'] = invite.inviter_id
+        request.session['inviter_username'] = invite.inviter.username
+
+    download_url = reverse('downloads')
+    return redirect(f"{download_url}?ref={token}")
+
+
+def platform_invite_landing(request, token):
+    """
+    Landing endpoint for encrypted/opaque platform invite links.
+    Logs telemetry click count, records inviter session context, and redirects to register.
+    """
+    from users.services.invite_service import track_invite_click
+    invite = track_invite_click(token)
+    if invite:
+        request.session['invite_token'] = token
+        request.session['inviter_id'] = invite.inviter_id
+        request.session['inviter_username'] = invite.inviter.username
+
+    if request.user.is_authenticated:
+        messages.info(request, "You are already a member of PwaniNet!")
+        return redirect('posts:home')
+
+    register_url = reverse('users:register')
+    return redirect(f"{register_url}?ref={token}")
+
+
+@login_required
+def get_invite_share_data(request):
+    """
+    API endpoint returning encrypted invite links, texts, and telemetry stats for the user.
+    """
+    from users.services.invite_service import get_invite_data
+    data = get_invite_data(request.user, request)
+    return JsonResponse({'status': 'success', 'data': data})
+
+
 @login_required
 def settings_view(request):
     """Main settings landing page - navigation hub for all settings categories"""
+    from users.services.invite_service import get_invite_data
+    invite_data = {}
+    try:
+        invite_data = get_invite_data(request.user, request)
+    except Exception as e:
+        logger.warning(f"Failed to fetch invite data for settings: {e}")
+
+    context = {
+        'settings_content_partial': 'users/settings/partials/index_content.html',
+        'invite_data': invite_data,
+    }
     if request.headers.get('HX-Request'):
-        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
-            'settings_content_partial': 'users/settings/partials/index_content.html'
-        })
-    return render(request, 'users/settings/index.html')
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', context)
+    return render(request, 'users/settings/index.html', context)
 
 
 @login_required
