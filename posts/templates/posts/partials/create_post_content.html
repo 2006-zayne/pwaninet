@@ -1864,6 +1864,22 @@ function initCreatePostComposer() {
       deployBtn.disabled = true;
       deployBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Posting...';
 
+      // Extract video preview metadata if available
+      let videoWidth = null;
+      let videoHeight = null;
+      let videoDuration = null;
+      let videoPosterBlob = null;
+      if (window.uploadManager && draftPreviewId) {
+        const draftPreviews = window.uploadManager.previewManager?.getPreviews(draftPreviewId) || [];
+        const videoPreview = draftPreviews.find(p => p.type === 'video');
+        if (videoPreview?.metadata) {
+          videoWidth = videoPreview.metadata.width || null;
+          videoHeight = videoPreview.metadata.height || null;
+          videoDuration = videoPreview.metadata.duration ? Math.round(videoPreview.metadata.duration) : null;
+          videoPosterBlob = videoPreview.metadata.posterBlob || null;
+        }
+      }
+
       let createdUploadId = null;
       if (window.uploadManager) {
         createdUploadId = window.uploadManager.createUpload({
@@ -1878,6 +1894,10 @@ function initCreatePostComposer() {
             custom_gradient_color1: document.getElementById('customGradientColor1')?.value || null,
             custom_gradient_color2: document.getElementById('customGradientColor2')?.value || null,
             custom_gradient_text_color: document.getElementById('customGradientTextColor')?.value || null,
+            video_width: videoWidth,
+            video_height: videoHeight,
+            video_duration: videoDuration,
+            video_poster_blob: videoPosterBlob,
           },
         });
 

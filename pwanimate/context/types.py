@@ -163,6 +163,7 @@ class ContextPackage:
     truncated: bool = False
     source_counts: Dict[str, int] = field(default_factory=dict)
     user_context: Optional[Any] = None
+    attachment_context: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert package to JSON-serializable dictionary."""
@@ -176,6 +177,8 @@ class ContextPackage:
             "truncated": self.truncated,
             "source_counts": self.source_counts,
         }
+        if self.attachment_context:
+            data["attachment_context"] = self.attachment_context
         if self.user_context and hasattr(self.user_context, "to_dict"):
             data["user_context"] = self.user_context.to_dict()
         elif self.user_context is not None:
@@ -185,9 +188,12 @@ class ContextPackage:
     def format_context_text(self) -> str:
         """
         Format the entire context package as structured, machine-readable text.
-        Retrieved content is enclosed in unambiguous data boundaries.
+        Retrieved content and attachment data are enclosed in unambiguous data boundaries.
         """
         sections = []
+
+        if self.attachment_context:
+            sections.append(self.attachment_context)
 
         if self.user_context and hasattr(self.user_context, "format_context_block"):
             user_text = self.user_context.format_context_block()
@@ -204,5 +210,5 @@ class ContextPackage:
         return "\n\n".join(sections)
 
     def has_content(self) -> bool:
-        """Check if package contains either grounding items or user context."""
-        return bool(self.items or self.user_context)
+        """Check if package contains either grounding items, attachment context, or user context."""
+        return bool(self.items or self.attachment_context or self.user_context)

@@ -6,20 +6,26 @@ RAG interactions, conversation listings, and detail/deletion.
 """
 
 import logging
+import uuid
+from django.db import transaction
+from django.http import FileResponse, Http404
 from rest_framework import permissions, status
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from pwanimate.ai.exceptions import (
     AIGatewayError,
+    AIProviderConfigurationError,
     AIProviderRateLimitError,
     AIProviderTimeoutError,
 )
 from pwanimate.api.serializers import (
     ConversationDetailSerializer,
     ConversationListSerializer,
+    PwanimateAttachmentSerializer,
 )
-from pwanimate.models import PwanimateConversation
+from pwanimate.models import PwanimateConversation, PwanimateAttachment
 from pwanimate.orchestrator import (
     OrchestrationRequest,
     OrchestratorValidationError,
@@ -27,6 +33,7 @@ from pwanimate.orchestrator import (
 )
 from django.core.exceptions import ValidationError
 from pwanimate.services.conversation import ConversationService
+from pwanimate.services.attachment import AttachmentService
 from pwanimate.ai.gateway.quota_tracker import get_quota_tracker
 
 logger = logging.getLogger(__name__)
@@ -59,6 +66,8 @@ class PwanimateChatView(APIView):
             task (str): Optional task override ('rag', 'general').
             provider (str): Optional provider override ('gemini', 'groq', 'openrouter', 'mock').
             model (str): Optional model override.
+            attachments (list): Optional list of attachment UUIDs or objects.
+            context_resources (list): Optional list of Context Rail resource descriptors.
         """
         data = request.data or {}
         message = data.get("message") or data.get("query")
@@ -84,6 +93,29 @@ class PwanimateChatView(APIView):
         else:
             conversation = ConversationService.create_conversation(user=request.user)
 
+        # Validate attachments if provided
+        raw_attachment_ids = data.get("attachments") or data.get("attachment_ids") or []
+        attachment_objs = []
+        if isinstance(raw_attachment_ids, list) and raw_attachment_ids:
+            for item in raw_attachment_ids:
+                aid = item.get("id") if isinstance(item, dict) else item
+                if not aid:
+                    continue
+                att = AttachmentService.get_authorized_attachment(
+                    user=request.user,
+                    attachment_id=aid,
+                )
+                if not att:
+                    return Response(
+                        {"error": f"Attachment '{aid}' not found or unauthorized."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                attachment_objs.append(att)
+
+        context_resources = data.get("context_resources") or []
+        if not isinstance(context_resources, list):
+            context_resources = []
+
         # Load bounded history from server persistence
         server_history = ConversationService.load_history(conversation)
 
@@ -95,6 +127,24 @@ class PwanimateChatView(APIView):
         # Persist user message turn
         clean_query = message.strip()
         user_msg = ConversationService.persist_user_message(conversation, clean_query)
+
+        # Atomically link attachments to conversation and user message
+        if attachment_objs:
+            with transaction.atomic():
+                for att in attachment_objs:
+                    att.conversation = conversation
+                    att.message = user_msg
+                    att.save(update_fields=["conversation", "message"])
+
+        # Multi-turn attachment context preservation:
+        # Include current turn attachments plus active working materials attached earlier in this conversation
+        active_attachments = list(attachment_objs)
+        if conversation:
+            seen_ids = {a.id for a in active_attachments}
+            for conv_att in conversation.attachments.all().order_by("created_at"):
+                if conv_att.id not in seen_ids:
+                    active_attachments.append(conv_att)
+                    seen_ids.add(conv_att.id)
 
         sources = data.get("sources")
         task = data.get("task", "rag")
@@ -110,6 +160,8 @@ class PwanimateChatView(APIView):
                 sources=sources,
                 provider=provider,
                 model=model,
+                attachments=active_attachments,
+                context_resources=context_resources,
             )
             orchestrator = self.get_orchestrator()
             # External LLM generation occurs outside database transactions
@@ -131,6 +183,8 @@ class PwanimateChatView(APIView):
             res_data["conversation_id"] = str(conversation.id)
             res_data["message_id"] = asst_msg.id
             res_data["user_message_id"] = user_msg.id
+            if attachment_objs:
+                res_data["attachments"] = PwanimateAttachmentSerializer(attachment_objs, many=True).data
 
             # Include fallback info and quota status
             fallback_info = {
@@ -168,6 +222,12 @@ class PwanimateChatView(APIView):
         except OrchestratorValidationError as exc:
             return Response(
                 {"error": str(exc), "conversation_id": str(conversation.id)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except AIProviderConfigurationError as exc:
+            logger.warning("Pwanimate provider capability error: %s", exc)
+            return Response(
+                {"error": exc.message, "conversation_id": str(conversation.id)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except ValidationError as exc:
@@ -213,6 +273,122 @@ class PwanimateChatView(APIView):
                     "error": "An unexpected error occurred while processing your request.",
                     "conversation_id": str(conversation.id),
                 },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class PwanimateAttachmentUploadView(APIView):
+    """
+    Upload an attachment (image or document) for staging before sending in chat.
+    Accepts multipart/form-data with 'file' field and optional 'conversation_id'.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        file_obj = request.FILES.get("file")
+        if not file_obj:
+            return Response(
+                {"error": "No file uploaded. Expected 'file' multipart field."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        conversation_id = request.data.get("conversation_id") or None
+
+        try:
+            attachment = AttachmentService.create_attachment(
+                user=request.user,
+                uploaded_file=file_obj,
+                conversation_id=conversation_id,
+            )
+            serializer = PwanimateAttachmentSerializer(attachment)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except ValidationError as exc:
+            msg = exc.message if hasattr(exc, "message") else str(exc)
+            return Response({"error": msg}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            logger.error("Failed to upload attachment: %s", exc, exc_info=True)
+            return Response(
+                {"error": "Failed to process attachment upload."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class PwanimateAttachmentMediaView(APIView):
+    """
+    Authorized private media view endpoint.
+    Serves attachment content inline only to the owning user.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, attachment_id):
+        attachment = AttachmentService.get_authorized_attachment(
+            user=request.user,
+            attachment_id=attachment_id,
+        )
+        if not attachment:
+            return Response(
+                {"error": "Attachment not found or access denied."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not attachment.file:
+            return Response(
+                {"error": "Attachment file missing."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            file_handle = attachment.file.open("rb")
+            response = FileResponse(file_handle, content_type=attachment.mime_type)
+            response["Content-Disposition"] = f'inline; filename="{attachment.file_name}"'
+            response["X-Content-Type-Options"] = "nosniff"
+            return response
+        except Exception as exc:
+            logger.error("Error serving attachment %s: %s", attachment_id, exc)
+            return Response(
+                {"error": "Could not read attachment file."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class PwanimateAttachmentDownloadView(APIView):
+    """
+    Authorized private media download endpoint.
+    Serves attachment as forced download only to the owning user.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, attachment_id):
+        attachment = AttachmentService.get_authorized_attachment(
+            user=request.user,
+            attachment_id=attachment_id,
+        )
+        if not attachment:
+            return Response(
+                {"error": "Attachment not found or access denied."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not attachment.file:
+            return Response(
+                {"error": "Attachment file missing."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            file_handle = attachment.file.open("rb")
+            response = FileResponse(file_handle, content_type=attachment.mime_type)
+            response["Content-Disposition"] = f'attachment; filename="{attachment.file_name}"'
+            response["X-Content-Type-Options"] = "nosniff"
+            return response
+        except Exception as exc:
+            logger.error("Error downloading attachment %s: %s", attachment_id, exc)
+            return Response(
+                {"error": "Could not read attachment file."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

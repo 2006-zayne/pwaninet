@@ -6,6 +6,7 @@ generateContent REST API using direct HTTP requests.
 """
 
 from typing import Any, Dict, List, Optional
+import base64
 import logging
 import requests
 
@@ -129,7 +130,7 @@ class GeminiLLMProvider(BaseLLMProvider):
         contents: List[Dict[str, Any]] = []
 
         # Process messages
-        for msg in request.messages:
+        for idx, msg in enumerate(request.messages):
             if msg.role == "system":
                 # System message in turn list gets appended to system instructions
                 if system_instruction_text:
@@ -142,9 +143,41 @@ class GeminiLLMProvider(BaseLLMProvider):
                     "parts": [{"text": msg.content}],
                 })
             else:  # user
+                parts = [{"text": msg.content}]
+
+                # Check for attachments on this message or request level
+                msg_attachments = list(getattr(msg, "attachments", []) or [])
+                if idx == len(request.messages) - 1 and getattr(request, "attachments", None):
+                    seen_ids = {getattr(a, "id", None) for a in msg_attachments}
+                    for req_att in request.attachments:
+                        req_id = getattr(req_att, "id", None)
+                        if req_id is None or req_id not in seen_ids:
+                            msg_attachments.append(req_att)
+                            if req_id is not None:
+                                seen_ids.add(req_id)
+
+                for att in msg_attachments:
+                    att_type = getattr(att, "attachment_type", "document")
+                    att_bytes = getattr(att, "data_bytes", None)
+                    if not att_bytes and getattr(att, "file_path", None):
+                        try:
+                            with open(att.file_path, "rb") as f:
+                                att_bytes = f.read()
+                        except Exception as e:
+                            logger.warning("Could not read file_path for image attachment: %s", e)
+                    att_mime = getattr(att, "mime_type", "image/jpeg")
+                    if att_type == "image" and att_bytes:
+                        b64_data = base64.b64encode(att_bytes).decode("utf-8")
+                        parts.append({
+                            "inlineData": {
+                                "mimeType": att_mime,
+                                "data": b64_data,
+                            }
+                        })
+
                 contents.append({
                     "role": "user",
-                    "parts": [{"text": msg.content}],
+                    "parts": parts,
                 })
 
         # Inject context into contents if present

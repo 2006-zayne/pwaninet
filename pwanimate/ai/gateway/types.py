@@ -14,6 +14,50 @@ VALID_ROLES = {"system", "user", "assistant"}
 
 
 @dataclass
+class AttachmentData:
+    """
+    Provider-neutral representation of a message attachment.
+    """
+    id: str = ""
+    name: str = ""
+    mime_type: str = "application/octet-stream"
+    attachment_type: str = "document"  # 'image' or 'document'
+    data_bytes: Optional[bytes] = None
+    file_path: Optional[str] = None
+    url: str = ""
+
+    def __init__(
+        self,
+        id: str = "",
+        name: str = "",
+        mime_type: str = "application/octet-stream",
+        attachment_type: str = "document",
+        data_bytes: Optional[bytes] = None,
+        file_path: Optional[str] = None,
+        url: str = "",
+        attachment_id: Optional[str] = None,
+        file_name: Optional[str] = None,
+    ):
+        self.id = id or attachment_id or ""
+        self.name = name or file_name or ""
+        self.mime_type = mime_type
+        self.attachment_type = attachment_type
+        self.data_bytes = data_bytes
+        self.file_path = file_path
+        self.url = url
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "mime_type": self.mime_type,
+            "attachment_type": self.attachment_type,
+            "url": self.url,
+            "file_path": self.file_path,
+        }
+
+
+@dataclass
 class ChatMessage:
     """
     Individual conversational message.
@@ -21,18 +65,27 @@ class ChatMessage:
     Attributes:
         role: Sender role, must be one of 'system', 'user', 'assistant'.
         content: Message text.
+        attachments: Optional list of AttachmentData associated with this message turn.
     """
     role: str
     content: str
+    attachments: List[AttachmentData] = field(default_factory=list)
 
     def __post_init__(self):
         if self.role not in VALID_ROLES:
             raise ValueError(f"Invalid message role '{self.role}'. Supported roles: {VALID_ROLES}")
         if not isinstance(self.content, str):
             raise TypeError("Message content must be a string.")
+        if not isinstance(self.attachments, list):
+            self.attachments = list(self.attachments) if self.attachments else []
 
-    def to_dict(self) -> Dict[str, str]:
-        return {"role": self.role, "content": self.content}
+    def to_dict(self) -> Dict[str, Any]:
+        data: Dict[str, Any] = {"role": self.role, "content": self.content}
+        if self.attachments:
+            data["attachments"] = [
+                a.to_dict() if hasattr(a, "to_dict") else a for a in self.attachments
+            ]
+        return data
 
 
 @dataclass
@@ -50,6 +103,7 @@ class LLMRequest:
         temperature: Sampling temperature (default 0.2 for grounded generation).
         max_tokens: Maximum tokens in response.
         metadata: Provider-neutral metadata/options.
+        attachments: Optional active query attachments passed to the gateway.
     """
     task: str = "general"
     messages: List[ChatMessage] = field(default_factory=list)
@@ -60,6 +114,7 @@ class LLMRequest:
     temperature: float = 0.2
     max_tokens: int = 1024
     metadata: Dict[str, Any] = field(default_factory=dict)
+    attachments: List[AttachmentData] = field(default_factory=list)
 
     def __post_init__(self):
         if self.temperature < 0.0 or self.temperature > 2.0:

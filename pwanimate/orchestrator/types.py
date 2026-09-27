@@ -36,6 +36,8 @@ class OrchestrationRequest:
     temperature: float = 0.2
     max_tokens: Optional[int] = None
     user_context: Optional[Any] = None
+    attachments: List[Any] = field(default_factory=list)
+    context_resources: List[Dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self):
         if not isinstance(self.query, str) or not self.query.strip():
@@ -43,6 +45,12 @@ class OrchestrationRequest:
 
         if not isinstance(self.history, list):
             raise OrchestratorValidationError("History must be a list of ChatMessage instances.")
+
+        if not isinstance(self.attachments, list):
+            self.attachments = list(self.attachments) if self.attachments else []
+
+        if not isinstance(self.context_resources, list):
+            self.context_resources = list(self.context_resources) if self.context_resources else []
 
         # Normalize any raw dicts in history to ChatMessage
         normalized_history: List[ChatMessage] = []

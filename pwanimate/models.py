@@ -409,3 +409,116 @@ class PwanimatePreferences(models.Model):
         user_ident = getattr(self.user, "username", str(self.user_id)) if hasattr(self, "user") else str(self.pk)
         return f"PwanimatePreferences({user_ident}, tone={self.tone}, style={self.response_style})"
 
+
+def pwanimate_attachment_upload_path(instance, filename):
+    """
+    Generate a safe, collision-free, UUID-based storage path for Pwanimate attachments.
+    Never uses untrusted user filenames as filesystem identifiers.
+    Format: pwanimate/attachments/%Y/%m/<uuid>.<ext>
+    """
+    import os
+    from django.utils import timezone
+    now = timezone.now()
+    ext = os.path.splitext(filename)[1].lower()
+    return f"pwanimate/attachments/{now.year:04d}/{now.month:02d}/{instance.id}{ext}"
+
+
+class PwanimateAttachment(models.Model):
+    """
+    Dedicated model for user chat attachments in Pwanimate.
+
+    Supports images and documents attached to conversational turns,
+    strictly bounded to authenticated users and private storage paths.
+    """
+    ATTACHMENT_TYPE_CHOICES = [
+        ('image', 'Image'),
+        ('document', 'Document'),
+    ]
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="pwanimate_attachments",
+        db_index=True,
+    )
+    conversation = models.ForeignKey(
+        PwanimateConversation,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+        db_index=True,
+    )
+    message = models.ForeignKey(
+        PwanimateMessage,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="attachments",
+        db_index=True,
+    )
+    file = models.FileField(
+        upload_to=pwanimate_attachment_upload_path,
+        max_length=500,
+        help_text="Secure, UUID-addressed file path",
+    )
+    file_name = models.CharField(
+        max_length=255,
+        help_text="Sanitized original display filename",
+    )
+    file_size = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
+        help_text="File size in bytes",
+    )
+    mime_type = models.CharField(
+        max_length=100,
+        db_index=True,
+        help_text="Validated MIME type",
+    )
+    attachment_type = models.CharField(
+        max_length=20,
+        choices=ATTACHMENT_TYPE_CHOICES,
+        default='document',
+        db_index=True,
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "-created_at"]),
+            models.Index(fields=["conversation", "created_at"]),
+            models.Index(fields=["message"]),
+        ]
+
+    def __str__(self):
+        return f"{self.file_name} ({self.attachment_type}, {self.id})"
+
+    @property
+    def extension(self) -> str:
+        import os
+        return os.path.splitext(self.file_name)[1].lower()
+
+    @property
+    def url(self) -> str:
+        return f"/api/pwanimate/attachments/{self.id}/view/"
+
+    @property
+    def download_url(self) -> str:
+        return f"/api/pwanimate/attachments/{self.id}/download/"
+
+    def get_url(self) -> str:
+        return self.url
+
+    def get_download_url(self) -> str:
+        return self.download_url
+
+

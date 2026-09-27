@@ -608,6 +608,13 @@ PWANIMATE_LLM_FALLBACK_CHAIN = [
     {"provider": "openrouter", "model": "liquid/lfm-2.5-2.6b:free"},
 ]
 
+# Pwanimate Attachments Subsystem
+PWANIMATE_ATTACHMENTS_DIR = 'pwanimate/attachments'
+PWANIMATE_MAX_IMAGE_SIZE = int(os.environ.get('PWANIMATE_MAX_IMAGE_SIZE', 10 * 1024 * 1024))   # 10MB
+PWANIMATE_MAX_DOC_SIZE = int(os.environ.get('PWANIMATE_MAX_DOC_SIZE', 25 * 1024 * 1024))       # 25MB
+PWANIMATE_MAX_EXTRACT_CHARS = int(os.environ.get('PWANIMATE_MAX_EXTRACT_CHARS', 15000))        # 15,000 chars per attachment
+
+
 
 
 

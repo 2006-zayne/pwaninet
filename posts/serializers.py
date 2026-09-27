@@ -107,13 +107,17 @@ class PostCreateSerializer(serializers.ModelSerializer):
     custom_gradient_text = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=100)
     custom_gradient_color1 = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=7)
     custom_gradient_color2 = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=7)
+    video_width = serializers.IntegerField(required=False, allow_null=True)
+    video_height = serializers.IntegerField(required=False, allow_null=True)
+    video_duration = serializers.IntegerField(required=False, allow_null=True)
+    video_poster = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
         model = Post
         fields = [
             'id', 'post_id', 'share_id', 'author', 'group', 'course', 'unit', 'content',
             'images', 'video', 'docs', 'audio', 'gradient_class', 'has_signature',
-            'video_status',
+            'video_status', 'video_width', 'video_height', 'video_duration', 'video_poster',
             'custom_gradient_text', 'custom_gradient_color1', 'custom_gradient_color2', 'custom_gradient_text_color'
         ]
         read_only_fields = ['id', 'post_id', 'share_id', 'video_status', 'author']
@@ -414,10 +418,42 @@ class PostCreateSerializer(serializers.ModelSerializer):
         # master.m3u8 → video_status/hls_playlist/video_duration update →
         # real-time progress events over Channels (feed_{user_id} group).
         if post.video:
+            # Synchronously ensure video_width and video_height are populated before responding
+            # so the initial feed load immediately resolves post.is_reel correctly.
+            if not post.video_width or not post.video_height:
+                try:
+                    from posts.utils.video_probe import probe_video_metadata
+                    duration, src_width, src_height = probe_video_metadata(post.video)
+                    update_dims = {}
+                    if src_width and src_height:
+                        post.video_width = src_width
+                        post.video_height = src_height
+                        update_dims['video_width'] = src_width
+                        update_dims['video_height'] = src_height
+                    if duration and not post.video_duration:
+                        post.video_duration = int(duration)
+                        update_dims['video_duration'] = int(duration)
+                    if update_dims:
+                        post.save(update_fields=list(update_dims.keys()))
+                        logger.info('[PostCreateSerializer] Synchronously probed video for post %s: %dx%d', post.id, src_width, src_height)
+                except Exception as probe_err:
+                    logger.warning('[PostCreateSerializer] Synchronous video probe failed: %s', probe_err)
+
+            # Synchronously generate poster if missing so ambient blur in reelcard renders immediately
+            if not post.video_poster:
+                try:
+                    from posts.utils.video_probe import generate_fast_video_poster
+                    poster_name, poster_file = generate_fast_video_poster(post.video)
+                    if poster_name and poster_file:
+                        post.video_poster.save(poster_name, poster_file, save=True)
+                        logger.info('[PostCreateSerializer] Synchronously generated poster for post %s', post.id)
+                except Exception as poster_err:
+                    logger.warning('[PostCreateSerializer] Synchronous poster generation failed: %s', poster_err)
+
             logger.info('[PostCreateSerializer] Triggering HLS transcoding for post %s', post.id)
             process_large_video.delay(post.id)
-            # Also generate a quick poster from first frame while HLS encodes
-            generate_video_poster.delay(post.id)
+            if not post.video_poster:
+                generate_video_poster.delay(post.id)
 
                 
         return post

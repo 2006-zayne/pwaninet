@@ -746,9 +746,15 @@ class SharedPost(models.Model):
         ]
         ordering = ['-created_at']
 
+    @property
+    def share_id(self):
+        """Compatibility property for templates and notifications referencing share_id."""
+        return self.id
+
     def __str__(self):
         target = self.shared_to.username if self.shared_to else (self.shared_to_group.name if self.shared_to_group else 'unknown')
         if self.original_post:
             return f"{self.sharer.username} shared post {self.original_post.id} to {target}"
         return f"{self.sharer.username} shared link ({self.shared_link_title or self.shared_link}) to {target}"
+
 

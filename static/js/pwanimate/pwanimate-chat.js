@@ -133,6 +133,7 @@
             this.checkCollapsibleUserBubbles();
             requestAnimationFrame(() => this.checkCollapsibleUserBubbles());
             this.bindEvents();
+            this.initAttachmentHandlers();
             this.updateQuotaStatus({ models: this.getDefaultModels() });
             this.updateSelectedModelUI();
             this.updateSendButtonState();
@@ -2012,17 +2013,256 @@
 
             this.sendBtn.classList.remove('is-generating');
             const hasText = Boolean(this.input && this.input.value.trim().length > 0);
+            const hasAttachments = this.stagedAttachments && this.stagedAttachments.length > 0;
+            
+            // Check if any attachment is still uploading
+            const hasUploadingAttachments = this._composerAttachmentsEl && 
+                this._composerAttachmentsEl.querySelector('.pwanimate-staged-chip.is-uploading');
 
-            if (hasText) {
-                this.sendBtn.disabled = false;
-                this.sendBtn.classList.add('is-active');
-                this.sendBtn.setAttribute('aria-label', 'Send message');
-                this.sendBtn.setAttribute('title', 'Send message (Enter)');
+            if (hasText || hasAttachments) {
+                // Disable send button if any attachment is still uploading
+                if (hasUploadingAttachments) {
+                    this.sendBtn.disabled = true;
+                    this.sendBtn.classList.remove('is-active');
+                    this.sendBtn.setAttribute('aria-label', 'Wait for attachments to finish uploading');
+                    this.sendBtn.setAttribute('title', 'Wait for attachments to finish uploading');
+                } else {
+                    this.sendBtn.disabled = false;
+                    this.sendBtn.classList.add('is-active');
+                    this.sendBtn.setAttribute('aria-label', 'Send message');
+                    this.sendBtn.setAttribute('title', 'Send message (Enter)');
+                }
             } else {
                 this.sendBtn.disabled = true;
                 this.sendBtn.classList.remove('is-active');
                 this.sendBtn.setAttribute('aria-label', 'Send message');
                 this.sendBtn.setAttribute('title', 'Type a message to send');
+            }
+        }
+
+        // -----------------------------------------------------------------------
+        // Attachment Staging & Upload
+        // -----------------------------------------------------------------------
+
+        initAttachmentHandlers() {
+            this.stagedAttachments = [];
+            this._composerAttachmentsEl = this.composerForm && this.composerForm.querySelector('#pwanimate-composer-attachments');
+
+            const photoInput = this.composerForm && this.composerForm.querySelector('#pwanimatePhotoInput');
+            const docInput   = this.composerForm && this.composerForm.querySelector('#pwanimateDocInput');
+            const fileInput  = this.composerForm && this.composerForm.querySelector('#pwanimateFileInput');
+            const cameraInput = this.composerForm && this.composerForm.querySelector('#pwanimateCameraInput');
+
+            const modal = document.getElementById('pwanimateAttachmentModal');
+
+            const wireOption = (optionId, input, useCapacitorCamera) => {
+                const opt = document.getElementById(optionId);
+                if (!opt) return;
+                opt.addEventListener('click', async () => {
+                    if (modal) modal.classList.remove('show');
+
+                    // Capacitor camera path (native mobile)
+                    if (useCapacitorCamera &&
+                        typeof window.Capacitor !== 'undefined' &&
+                        window.Capacitor.Plugins &&
+                        window.Capacitor.Plugins.Camera) {
+                        try {
+                            const { Camera } = window.Capacitor.Plugins;
+                            const photo = await Camera.getPhoto({
+                                quality: 85,
+                                resultType: 'base64',
+                                source: 'CAMERA',
+                                saveToGallery: false,
+                            });
+                            if (photo && photo.base64String) {
+                                const mime = `image/${photo.format || 'jpeg'}`;
+                                const byteStr = atob(photo.base64String);
+                                const ab = new ArrayBuffer(byteStr.length);
+                                const ia = new Uint8Array(ab);
+                                for (let i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
+                                const blob = new Blob([ab], { type: mime });
+                                const fileName = `camera_${Date.now()}.${photo.format || 'jpg'}`;
+                                const file = new File([blob], fileName, { type: mime });
+                                this._stageFiles([file]);
+                            }
+                        } catch (err) {
+                            if (err && err.message && err.message.toLowerCase().includes('cancel')) return;
+                            console.warn('[Pwanimate] Capacitor camera error, falling back to file input:', err);
+                            if (cameraInput) cameraInput.click();
+                        }
+                        return;
+                    }
+
+                    if (input) input.click();
+                });
+            };
+
+            wireOption('pwanimateAttachCamera', cameraInput, true);
+            wireOption('pwanimateAttachPhotos', photoInput, false);
+            wireOption('pwanimateAttachDocs', docInput, false);
+            wireOption('pwanimateAttachFiles', fileInput, false);
+
+            const bindInput = (input) => {
+                if (!input) return;
+                input.addEventListener('change', (e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length > 0) this._stageFiles(files);
+                    input.value = '';
+                });
+            };
+            bindInput(photoInput);
+            bindInput(docInput);
+            bindInput(fileInput);
+            bindInput(cameraInput);
+        }
+
+        _stageFiles(files) {
+            files.forEach(file => {
+                const chipId = `staged-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                const chip = this._buildChip(chipId, file.name, file.type);
+                if (this._composerAttachmentsEl) {
+                    this._composerAttachmentsEl.classList.remove('d-none');
+                    this._composerAttachmentsEl.appendChild(chip);
+                }
+                this._uploadFile(file, chipId);
+            });
+            this.updateSendButtonState();
+        }
+
+        _buildChip(chipId, fileName, mimeType) {
+            const isImage = mimeType && mimeType.startsWith('image/');
+            const chip = document.createElement('div');
+            chip.className = 'pwanimate-staged-chip is-uploading';
+            chip.id = chipId;
+            chip.dataset.attachmentId = '';
+
+            // Create inner media container
+            const mediaContainer = document.createElement('div');
+            mediaContainer.className = 'pwanimate-staged-media';
+
+            if (isImage) {
+                const iconEl = document.createElement('i');
+                iconEl.className = 'pwanimate-staged-icon bi bi-image';
+                mediaContainer.appendChild(iconEl);
+            } else {
+                const iconEl = document.createElement('i');
+                iconEl.className = 'pwanimate-staged-icon bi bi-file-earmark-text';
+                mediaContainer.appendChild(iconEl);
+            }
+
+            // Add spinner inside the media container
+            const spinner = document.createElement('span');
+            spinner.className = 'pwanimate-staged-spinner spinner-border spinner-border-sm text-primary';
+            spinner.style.width = '16px';
+            spinner.style.height = '16px';
+            spinner.setAttribute('role', 'status');
+            mediaContainer.appendChild(spinner);
+
+            chip.appendChild(mediaContainer);
+
+            return chip;
+        }
+
+        async _uploadFile(file, chipId) {
+            const csrfToken = getCsrfToken();
+            const formData = new FormData();
+            formData.append('file', file);
+            if (this.conversationId) {
+                formData.append('conversation_id', this.conversationId);
+            }
+
+            let chip = document.getElementById(chipId);
+
+            try {
+                const response = await fetch('/api/pwanimate/attachments/upload/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    credentials: 'same-origin',
+                    body: formData,
+                });
+
+                const data = await response.json();
+                chip = document.getElementById(chipId);
+
+                if (!response.ok || !data.id) {
+                    const errMsg = data.error || 'Upload failed.';
+                    console.warn('[Pwanimate] Attachment upload failed:', errMsg);
+                    if (chip) {
+                        chip.classList.remove('is-uploading');
+                        chip.classList.add('is-error');
+                        const mediaContainer = chip.querySelector('.pwanimate-staged-media');
+                        const spinner = chip.querySelector('.pwanimate-staged-spinner');
+                        if (spinner && mediaContainer) spinner.remove();
+                        // Auto-remove error chips after 3s
+                        setTimeout(() => { if (chip && chip.parentNode) chip.parentNode.removeChild(chip); }, 3000);
+                    }
+                    return;
+                }
+
+                // Success
+                this.stagedAttachments.push({ id: data.id, file_name: data.file_name, attachment_type: data.attachment_type, url: data.url });
+                if (chip) {
+                    chip.classList.remove('is-uploading');
+                    chip.dataset.attachmentId = data.id;
+                    
+                    const mediaContainer = chip.querySelector('.pwanimate-staged-media');
+                    const spinner = chip.querySelector('.pwanimate-staged-spinner');
+                    if (spinner && mediaContainer) spinner.remove();
+
+                    // If image, show a tiny thumbnail inside the media container
+                    if (data.attachment_type === 'image' && data.url && mediaContainer) {
+                        const thumb = document.createElement('img');
+                        thumb.src = data.url;
+                        thumb.className = 'pwanimate-staged-thumb';
+                        thumb.alt = data.file_name;
+                        const existingIcon = chip.querySelector('.pwanimate-staged-icon');
+                        if (existingIcon) {
+                            mediaContainer.removeChild(existingIcon);
+                        }
+                        mediaContainer.appendChild(thumb);
+                    }
+
+                    // Remove button
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.className = 'pwanimate-staged-remove';
+                    removeBtn.setAttribute('aria-label', `Remove ${data.file_name}`);
+                    removeBtn.innerHTML = '<i class="bi bi-x-lg"></i>';
+                    removeBtn.addEventListener('click', () => {
+                        this.stagedAttachments = this.stagedAttachments.filter(a => a.id !== data.id);
+                        if (chip && chip.parentNode) chip.parentNode.removeChild(chip);
+                        if (this._composerAttachmentsEl && !this._composerAttachmentsEl.querySelector('.pwanimate-staged-chip')) {
+                            this._composerAttachmentsEl.classList.add('d-none');
+                        }
+                        this.updateSendButtonState();
+                    });
+                    chip.appendChild(removeBtn);
+                }
+
+                this.updateSendButtonState();
+
+            } catch (err) {
+                console.error('[Pwanimate] Attachment upload network error:', err);
+                chip = document.getElementById(chipId);
+                if (chip) {
+                    chip.classList.remove('is-uploading');
+                    chip.classList.add('is-error');
+                    const mediaContainer = chip.querySelector('.pwanimate-staged-media');
+                    const spinner = chip.querySelector('.pwanimate-staged-spinner');
+                    if (spinner && mediaContainer) spinner.remove();
+                    setTimeout(() => { if (chip && chip.parentNode) chip.parentNode.removeChild(chip); }, 3000);
+                }
+            }
+        }
+
+        _clearStagedAttachments() {
+            this.stagedAttachments = [];
+            if (this._composerAttachmentsEl) {
+                this._composerAttachmentsEl.innerHTML = '';
+                this._composerAttachmentsEl.classList.add('d-none');
             }
         }
 
@@ -2051,7 +2291,8 @@
         async handleSend() {
             if (this.isGenerating) return;
             const text = this.input ? this.input.value.trim() : '';
-            if (!text) return;
+            const hasStagedAttachments = this.stagedAttachments && this.stagedAttachments.length > 0;
+            if (!text && !hasStagedAttachments) return;
 
             // Setup AbortController for modern cancellation support
             this.abortController = new AbortController();
@@ -2061,14 +2302,18 @@
             this.resetTextareaHeight();
             this.updateSendButtonState();
 
+            // Snapshot staged attachments and clear the strip before sending
+            const snapshotAttachments = (this.stagedAttachments || []).slice();
+            this._clearStagedAttachments();
+
             // Remove empty state if present
             const emptyState = this.transcript.querySelector('#pwanimate-empty-state');
             if (emptyState) {
                 emptyState.remove();
             }
 
-            // Render optimistic user message
-            const userRow = this.appendUserMessage(text);
+            // Render optimistic user message (with attachment chips)
+            const userRow = this.appendUserMessage(text, null, snapshotAttachments);
             this.showTypingIndicator(text);
             this.setGenerating(true);
             this.scrollToBottom();
@@ -2077,7 +2322,7 @@
 
             try {
                 const payload = {
-                    message: text
+                    message: text || ' '
                 };
                 if (this.conversationId) {
                     payload.conversation_id = this.conversationId;
@@ -2087,6 +2332,12 @@
                 }
                 if (this.selectedModel) {
                     payload.model = this.selectedModel;
+                }
+                if (snapshotAttachments.length > 0) {
+                    payload.attachments = snapshotAttachments.map(a => a.id);
+                }
+                if (this.contextResources && this.contextResources.length > 0) {
+                    payload.context_resources = this.contextResources;
                 }
 
                 const response = await fetch('/api/pwanimate/chat/', {
@@ -2177,17 +2428,36 @@
             }
         }
 
-        appendUserMessage(text, messageId = null) {
+        appendUserMessage(text, messageId = null, attachments = []) {
             const row = document.createElement('div');
             row.className = 'pwanimate-message-row user';
             if (messageId) {
                 row.dataset.messageId = messageId;
             }
-            const escaped = escapeHtml(text);
+            const escaped = escapeHtml(text || '');
+
+            // Build attachment HTML for optimistic rendering
+            let attachmentHtml = '';
+            if (attachments && attachments.length > 0) {
+                const chips = attachments.map(att => {
+                    if (att.attachment_type === 'image' && att.url) {
+                        return `<a href="${escapeHtml(att.url)}" target="_blank" rel="noopener noreferrer" class="pwanimate-attachment-thumb-link" title="${escapeHtml(att.file_name || '')}">
+                            <img src="${escapeHtml(att.url)}" alt="${escapeHtml(att.file_name || '')}" class="pwanimate-attachment-thumb rounded" loading="lazy">
+                        </a>`;
+                    }
+                    return `<a href="/api/pwanimate/attachments/${escapeHtml(att.id)}/download/" class="pwanimate-attachment-doc-chip badge text-decoration-none d-inline-flex align-items-center gap-1 p-2" title="${escapeHtml(att.file_name || '')}">
+                        <i class="bi bi-file-earmark-text fs-6"></i>
+                        <span class="text-truncate" style="max-width: 140px;">${escapeHtml(att.file_name || 'File')}</span>
+                    </a>`;
+                }).join('');
+                attachmentHtml = `<div class="pwanimate-user-attachments mb-2 d-flex flex-wrap gap-2">${chips}</div>`;
+            }
+
             row.innerHTML = `
                 <div class="pwanimate-message-content">
                     <div class="pwanimate-user-bubble-wrapper">
-                        <div class="pwanimate-user-bubble" data-raw="${escaped}">${escaped}</div>
+                        ${attachmentHtml}
+                        ${escaped ? `<div class="pwanimate-user-bubble" data-raw="${escaped}">${escaped}</div>` : ''}
                     </div>
                     <div class="pwanimate-message-actions user-actions">
                         <button type="button" class="btn pwanimate-action-btn copy-btn" title="Copy message" aria-label="Copy message">
@@ -2200,8 +2470,10 @@
                 </div>
             `;
             this.transcript.appendChild(row);
-            this.checkCollapsibleUserBubbles(row);
-            requestAnimationFrame(() => this.checkCollapsibleUserBubbles(row));
+            if (escaped) {
+                this.checkCollapsibleUserBubbles(row);
+                requestAnimationFrame(() => this.checkCollapsibleUserBubbles(row));
+            }
             return row;
         }
 

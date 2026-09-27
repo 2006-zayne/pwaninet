@@ -7,9 +7,11 @@ and the AI Gateway.
 """
 
 import logging
+import os
 import re
 import time
-from typing import Any, Dict, List, Optional
+import uuid
+from typing import Any, Dict, List, Optional, Tuple
 
 from pwanimate.ai.gateway import (
     AIGateway,
@@ -18,6 +20,7 @@ from pwanimate.ai.gateway import (
     LLMResponse,
     get_task_policy,
 )
+from pwanimate.ai.gateway.types import AttachmentData
 from pwanimate.context import ContextEngine, ContextPackage, ContextRequest
 from pwanimate.orchestrator.prompts import (
     SYSTEM_INSTRUCTION_CONVERSATIONAL,
@@ -151,6 +154,59 @@ def sanitize_llm_response(text: str) -> str:
     return result.strip()
 
 
+def extract_attachment_text(attachment: Any, max_chars: int = 15000) -> str:
+    """
+    Extract bounded textual content from an uploaded document attachment.
+    Supports PDF, DOCX, PPTX, TXT, MD, CSV, etc. using Pwanimate extractors.
+    """
+    file_obj = getattr(attachment, "file", None)
+    file_name = getattr(attachment, "file_name", getattr(attachment, "name", "document"))
+
+    file_path = None
+    if file_obj:
+        try:
+            # Try to get the file path - this will fail for cloud storage backends
+            potential_path = file_obj.path
+            if os.path.exists(potential_path):
+                file_path = potential_path
+        except (NotImplementedError, AttributeError):
+            # Storage backend doesn't support absolute paths (e.g., S3)
+            # or path attribute doesn't exist - fall back to direct file reading
+            pass
+
+    extracted_text = ""
+    if file_path:
+        try:
+            from pwanimate.ingestion.extractors.factory import extract_document
+            extracted_doc = extract_document(file_path, filename=file_name)
+            if extracted_doc and extracted_doc.elements:
+                extracted_text = "\n\n".join(el.text for el in extracted_doc.elements if el.text)
+        except Exception as exc:
+            logger.warning("Structural extraction failed for attachment %s: %s", file_name, exc)
+
+    # Fallback to direct text reading if extraction is empty or file has no path
+    if not extracted_text and file_obj:
+        try:
+            file_obj.seek(0)
+            raw_bytes = file_obj.read(max_chars * 2)
+            file_obj.seek(0)
+            text_candidate = raw_bytes.decode("utf-8", errors="replace").replace("\x00", "")
+            if text_candidate.strip():
+                printable_ratio = sum(c.isprintable() or c in "\n\r\t" for c in text_candidate) / max(1, len(text_candidate))
+                if printable_ratio > 0.80:
+                    extracted_text = text_candidate
+        except Exception as exc:
+            logger.warning("Fallback raw read failed for attachment %s: %s", file_name, exc)
+
+    cleaned = (extracted_text or "").strip()
+    if not cleaned:
+        return f"[No extractable text could be found in '{file_name}']"
+
+    if len(cleaned) > max_chars:
+        cleaned = cleaned[:max_chars].rstrip() + "... [ATTACHMENT TRUNCATED]"
+    return cleaned
+
+
 class PwanimateOrchestrator:
     """
     Main orchestration engine for Pwanimate assistant interactions.
@@ -169,6 +225,137 @@ class PwanimateOrchestrator:
         self.gateway = gateway or AIGateway()
         self.tool_router = tool_router or ToolRouter()
         self.tool_registry = tool_registry or get_default_tool_registry()
+
+    def _process_attachments(
+        self, attachments: List[Any]
+    ) -> Tuple[List[AttachmentData], Optional[str]]:
+        """
+        Process user attachments:
+        - Image attachments become AttachmentData with raw bytes for multimodal models.
+        - Document attachments have text extracted and bounded into an XML context block.
+        """
+        if not attachments:
+            return [], None
+
+        from django.conf import settings
+
+        max_chars = getattr(settings, "PWANIMATE_MAX_EXTRACT_CHARS", 15000)
+        image_attachments: List[AttachmentData] = []
+        doc_blocks: List[str] = []
+
+        for att in attachments:
+            att_type = getattr(att, "attachment_type", None) or "document"
+            att_id = str(getattr(att, "id", uuid.uuid4()))
+            att_name = getattr(att, "file_name", getattr(att, "name", "attachment"))
+            att_mime = getattr(att, "mime_type", "application/octet-stream")
+
+            if att_type == "image":
+                data_bytes = getattr(att, "data_bytes", None)
+                if not data_bytes and hasattr(att, "file") and att.file:
+                    try:
+                        att.file.seek(0)
+                        data_bytes = att.file.read()
+                        att.file.seek(0)
+                    except Exception as e:
+                        logger.warning("Could not read bytes from image attachment %s: %s", att_id, e)
+
+                image_attachments.append(
+                    AttachmentData(
+                        id=att_id,
+                        name=att_name,
+                        mime_type=att_mime,
+                        attachment_type="image",
+                        data_bytes=data_bytes,
+                        url=getattr(att, "url", f"/api/pwanimate/attachments/{att_id}/view/"),
+                    )
+                )
+
+            elif att_type == "document":
+                extracted_text = extract_attachment_text(att, max_chars=max_chars)
+                block = [
+                    f'<attachment_context id="{att_id}" filename="{att_name}" type="{att_type}">',
+                    f'  <title>{att_name}</title>',
+                    '  <content>',
+                    f'    {extracted_text}',
+                    '  </content>',
+                    '</attachment_context>',
+                ]
+                doc_blocks.append("\n".join(block))
+
+        attachment_context_str = "\n\n".join(doc_blocks) if doc_blocks else None
+        return image_attachments, attachment_context_str
+
+    def _resolve_context_resources(
+        self, user: Any, context_resources: List[Dict[str, Any]]
+    ) -> Tuple[Optional[int], List[Any]]:
+        """
+        Authorize and resolve client context resources (documents and pages).
+        Returns: (filter_document_id, page_chunks)
+        """
+        if not context_resources or not isinstance(context_resources, list):
+            return None, []
+
+        from documents.models import Document
+        from pwanimate.retrieval.services.document_retrieval import DocumentSemanticRetrievalService
+
+        doc_retrieval = DocumentSemanticRetrievalService()
+        candidate_qs = doc_retrieval.build_candidate_queryset(user=user)
+
+        filter_doc_id = None
+        page_chunks: List[Any] = []
+
+        for res in context_resources:
+            if not isinstance(res, dict):
+                continue
+            res_type = str(res.get("type") or res.get("category") or "").lower()
+            if res_type in ("document", "doc"):
+                doc_id = res.get("id") or res.get("document_id")
+                share_id = res.get("share_id") or res.get("document_share_id")
+                page_raw = res.get("page") or res.get("page_number")
+
+                doc_obj = None
+                if doc_id:
+                    try:
+                        doc_obj = Document.objects.filter(id=int(doc_id)).first()
+                    except (ValueError, TypeError):
+                        pass
+                elif share_id:
+                    try:
+                        doc_obj = Document.objects.filter(share_id=share_id).first()
+                    except (ValueError, TypeError):
+                        pass
+
+                if not doc_obj:
+                    continue
+
+                # Verify authorized candidate queryset permits this document
+                is_authorized = candidate_qs.filter(document_id=doc_obj.id).exists()
+                if not is_authorized:
+                    logger.warning(
+                        "Context resource document %s not authorized for user %s",
+                        doc_obj.id,
+                        getattr(user, "id", None),
+                    )
+                    continue
+
+                filter_doc_id = doc_obj.id
+
+                # If page is specified, attempt page chunks retrieval
+                if page_raw is not None:
+                    try:
+                        page_num = int(page_raw)
+                        if page_num > 0 and doc_obj.share_id:
+                            chunks = doc_retrieval.get_page_chunks(
+                                user=user,
+                                document_share_id=doc_obj.share_id,
+                                page_number=page_num,
+                            )
+                            if chunks:
+                                page_chunks.extend(chunks)
+                    except (ValueError, TypeError):
+                        pass
+
+        return filter_doc_id, page_chunks
 
     def is_conversational_intent(self, query: str) -> bool:
         """
@@ -201,12 +388,12 @@ class PwanimateOrchestrator:
         """
         Execute an end-to-end orchestration turn.
 
-        1. Inspects query intent for conversational pleasantries.
+        1. Inspects query intent for conversational pleasantries (bypassed if attachments/context present).
         2. Evaluates high-confidence deterministic domain tool routes.
            If matched: executes authorized tool and grounds response via ContextPackage.
-        3. If broad academic/knowledge query:
-           a. Performs authorized multi-source retrieval (respecting request.user).
-           b. Binds and formats retrieved context into ContextPackage.
+        3. If broad academic/knowledge query or explicit attachment/context turn:
+           a. Performs authorized multi-source retrieval (respecting request.user and context filters).
+           b. Binds and formats retrieved context + attachment context into ContextPackage.
            c. Formulates LLMRequest with academic tutor system prompt.
            d. Generates normalized response via Gateway.
         4. Packages citations, sources, timing, and response.
@@ -222,17 +409,24 @@ class PwanimateOrchestrator:
             except Exception as exc:
                 logger.warning("Could not build UserContext for user %s: %s", getattr(request.user, "id", None), exc)
 
+        # If attachments or context resources are present, we bypass purely conversational shortcuts
+        has_attachments_or_context = bool(request.attachments or request.context_resources)
+
         # 1. Check conversational intent
-        is_conversational = request.task == "general" or self.is_conversational_intent(query)
+        is_conversational = not has_attachments_or_context and (
+            request.task == "general" or self.is_conversational_intent(query)
+        )
         if is_conversational:
             return self._run_conversational(request, query, t_start)
 
-        # 2. Check deterministic tool routing
-        tool_route = self.tool_router.route(query, user=request.user, user_context=request.user_context)
+        # 2. Check deterministic tool routing (only if no explicit attachments/context overriding intent)
+        tool_route = None if has_attachments_or_context else self.tool_router.route(
+            query, user=request.user, user_context=request.user_context
+        )
         if tool_route:
             return self._run_tool(request, query, tool_route, t_start)
 
-        # 3. Fallback to standard multi-source retrieval
+        # 3. Standard / Attachment / Context RAG
         return self._run_rag(request, query, t_start)
 
     def _run_conversational(
@@ -471,32 +665,55 @@ class PwanimateOrchestrator:
         t_start: float,
     ) -> OrchestrationResponse:
         """Handle knowledge/retrieval-augmented dialogue turns."""
-        # 1. Upstream Authorized Retrieval
-        t_ret = time.perf_counter()
-        sources = request.sources or [SourceType.DOCUMENT, SourceType.POST]
-        retrieval_req = RetrievalRequest(
-            query=query,
-            user=request.user,
-            sources=sources,
-            mode=RetrievalMode.HYBRID,
+        # 0. Process attachments (images for vision, docs for prompt context)
+        image_attachments, attachment_context = self._process_attachments(request.attachments)
+
+        # 1. Resolve authorized context resources (active document / page filtering)
+        filter_doc_id, page_chunks = self._resolve_context_resources(
+            request.user, request.context_resources
         )
 
-        retrieval_resp: RetrievalResponse = self.retrieval_service.retrieve(retrieval_req)
+        # 2. Upstream Authorized Retrieval
+        t_ret = time.perf_counter()
+        if page_chunks:
+            retrieval_resp = RetrievalResponse(
+                query=query,
+                results=page_chunks,
+                total_count=len(page_chunks),
+                execution_time_ms=0.0,
+            )
+        else:
+            sources = request.sources or [SourceType.DOCUMENT, SourceType.POST]
+            filters = {}
+            if filter_doc_id:
+                filters["document_id"] = filter_doc_id
+
+            retrieval_req = RetrievalRequest(
+                query=query,
+                user=request.user,
+                sources=sources,
+                mode=RetrievalMode.HYBRID,
+                filters=filters,
+            )
+            retrieval_resp = self.retrieval_service.retrieve(retrieval_req)
         ret_time_ms = round((time.perf_counter() - t_ret) * 1000.0, 2)
 
-        # 2. Context Engine Bounding
+        # 3. Context Engine Bounding
         context_req = ContextRequest(
             query=query,
             retrieval_response=retrieval_resp,
             user_context=request.user_context,
         )
         context_pkg: ContextPackage = self.context_engine.build_context(context_req)
+        if attachment_context:
+            context_pkg.attachment_context = attachment_context
 
         # Extract source summaries (deduplicated & enriched)
         sources_summary = self._build_sources_summary(context_pkg.items)
 
-        # 3. LLM Generation
-        messages = list(request.history) + [ChatMessage(role="user", content=query)]
+        # 4. LLM Generation
+        last_user_msg = ChatMessage(role="user", content=query, attachments=image_attachments)
+        messages = list(request.history) + [last_user_msg]
 
         effective_max_tokens = self._resolve_effective_budget(request, "rag")
 
@@ -509,6 +726,7 @@ class PwanimateOrchestrator:
             model=request.model,
             temperature=request.temperature,
             max_tokens=effective_max_tokens,
+            attachments=image_attachments,
         )
 
         t_gen = time.perf_counter()

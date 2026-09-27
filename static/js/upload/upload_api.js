@@ -123,6 +123,24 @@ class UploadAPI {
             console.log('[UploadAPI] Adding audio');
         }
 
+        // Add video metadata (dimensions and poster frame)
+        if (data.video_width) {
+            formData.append('video_width', data.video_width);
+            console.log('[UploadAPI] Adding video_width:', data.video_width);
+        }
+        if (data.video_height) {
+            formData.append('video_height', data.video_height);
+            console.log('[UploadAPI] Adding video_height:', data.video_height);
+        }
+        if (data.video_duration) {
+            formData.append('video_duration', data.video_duration);
+            console.log('[UploadAPI] Adding video_duration:', data.video_duration);
+        }
+        if (data.video_poster) {
+            formData.append('video_poster', data.video_poster, 'poster.jpg');
+            console.log('[UploadAPI] Adding video_poster');
+        }
+
         console.log('[UploadAPI] FormData created successfully');
         return formData;
     }
@@ -141,6 +159,10 @@ class UploadAPI {
             custom_gradient_text: session.metadata?.custom_gradient_text || null,
             custom_gradient_color1: session.metadata?.custom_gradient_color1 || null,
             custom_gradient_color2: session.metadata?.custom_gradient_color2 || null,
+            video_width: session.metadata?.video_width || null,
+            video_height: session.metadata?.video_height || null,
+            video_duration: session.metadata?.video_duration || null,
+            video_poster: session.metadata?.video_poster_blob || null,
         });
     }
 

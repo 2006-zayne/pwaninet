@@ -48,6 +48,10 @@ class UploadManager {
                     custom_gradient_color1: data.custom_gradient_color1 || data.metadata?.custom_gradient_color1 || null,
                     custom_gradient_color2: data.custom_gradient_color2 || data.metadata?.custom_gradient_color2 || null,
                     custom_gradient_text_color: data.custom_gradient_text_color || data.metadata?.custom_gradient_text_color || null,
+                    video_width: data.video_width || data.metadata?.video_width || null,
+                    video_height: data.video_height || data.metadata?.video_height || null,
+                    video_duration: data.video_duration || data.metadata?.video_duration || null,
+                    video_poster_blob: data.video_poster_blob || data.metadata?.video_poster_blob || null,
                 },
             });
 
@@ -149,6 +153,23 @@ class UploadManager {
 
         const previews = await previewManager.generatePreviews(session.files, uploadId);
         session.previewUrls = previews.map((preview) => preview.objectUrl).filter(Boolean);
+
+        // If session has video and dimensions are not yet recorded, populate them from preview metadata
+        const videoPreview = previews.find((p) => p.type === 'video');
+        if (videoPreview && videoPreview.metadata) {
+            if (!session.metadata.video_width && videoPreview.metadata.width) {
+                session.metadata.video_width = videoPreview.metadata.width;
+            }
+            if (!session.metadata.video_height && videoPreview.metadata.height) {
+                session.metadata.video_height = videoPreview.metadata.height;
+            }
+            if (!session.metadata.video_duration && videoPreview.metadata.duration) {
+                session.metadata.video_duration = Math.round(videoPreview.metadata.duration);
+            }
+            if (!session.metadata.video_poster_blob && videoPreview.metadata.posterBlob) {
+                session.metadata.video_poster_blob = videoPreview.metadata.posterBlob;
+            }
+        }
     }
 
     async compressImages(uploadId) {

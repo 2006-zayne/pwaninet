@@ -64,6 +64,22 @@ class GroqLLMProvider(BaseLLMProvider):
             )
 
         model = request.model or self.model_name
+
+        # Enforce explicit capability check: Groq text models do not support image attachments
+        has_images = any(
+            getattr(a, "attachment_type", "") == "image"
+            for a in (getattr(request, "attachments", []) or [])
+        ) or any(
+            any(getattr(a, "attachment_type", "") == "image" for a in (getattr(msg, "attachments", []) or []))
+            for msg in request.messages
+        )
+        if has_images:
+            raise AIProviderConfigurationError(
+                f"Selected AI model '{model}' on provider '{self.provider_name}' does not support image attachments. "
+                "Please select Google Gemini for multimodal image analysis.",
+                provider=self.provider_name,
+            )
+
         payload = self._build_payload(request, model)
         headers = {
             "Content-Type": "application/json",
@@ -121,6 +137,20 @@ class GroqLLMProvider(BaseLLMProvider):
 
     def _build_payload(self, request: LLMRequest, model: str) -> Dict[str, Any]:
         """Construct OpenAI-compatible chat completions payload."""
+        has_images = any(
+            getattr(a, "attachment_type", "") == "image"
+            for a in (getattr(request, "attachments", []) or [])
+        ) or any(
+            any(getattr(a, "attachment_type", "") == "image" for a in (getattr(msg, "attachments", []) or []))
+            for msg in request.messages
+        )
+        if has_images:
+            raise AIProviderConfigurationError(
+                f"Selected AI model '{model}' on provider '{self.provider_name}' does not support image attachments. "
+                "Please select Google Gemini for multimodal image analysis.",
+                provider=self.provider_name,
+            )
+
         messages: List[Dict[str, str]] = []
 
         if request.system_instruction:

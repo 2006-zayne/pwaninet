@@ -108,6 +108,7 @@ class PreviewManager {
             duration: metadata.duration,
             width: metadata.width,
             height: metadata.height,
+            posterBlob: metadata.posterBlob || null,
         });
 
         preview.objectUrl = url;
@@ -257,27 +258,70 @@ class PreviewManager {
     }
 
     /**
-     * Get video metadata
+     * Get video metadata including dimensions and optional poster frame blob
      * @param {File} file - Video file
-     * @returns {Promise<{duration: number, width: number, height: number}>}
+     * @returns {Promise<{duration: number, width: number, height: number, posterBlob: Blob|null}>}
      */
     getVideoMetadata(file) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             const video = document.createElement('video');
+            video.preload = 'auto';
+            video.muted = true;
+            video.playsInline = true;
             const url = this.createObjectUrl(file);
 
-            video.onloadedmetadata = () => {
+            let isResolved = false;
+            const finalize = (width, height, duration, posterBlob = null) => {
+                if (isResolved) return;
+                isResolved = true;
                 this.revokeObjectUrl(url);
                 resolve({
-                    duration: video.duration,
-                    width: video.videoWidth,
-                    height: video.videoHeight,
+                    duration: duration || 0,
+                    width: width || 0,
+                    height: height || 0,
+                    posterBlob,
                 });
             };
 
+            const capturePoster = () => {
+                const width = video.videoWidth || 0;
+                const height = video.videoHeight || 0;
+                const duration = video.duration || 0;
+                if (!width || !height) {
+                    finalize(width, height, duration, null);
+                    return;
+                }
+                try {
+                    const canvas = document.createElement('canvas');
+                    const targetWidth = Math.min(width, 720);
+                    const targetHeight = Math.round(targetWidth * (height / width));
+                    canvas.width = targetWidth;
+                    canvas.height = targetHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
+                    canvas.toBlob((blob) => {
+                        finalize(width, height, duration, blob);
+                    }, 'image/jpeg', 0.85);
+                } catch (e) {
+                    finalize(width, height, duration, null);
+                }
+            };
+
+            video.onloadedmetadata = () => {
+                // Seek slightly to grab a clear frame if possible
+                const seekTime = (video.duration && video.duration > 1) ? 0.2 : 0.0;
+                video.onseeked = () => capturePoster();
+                const fallbackTimeout = setTimeout(() => capturePoster(), 500);
+                try {
+                    video.currentTime = seekTime;
+                } catch (e) {
+                    clearTimeout(fallbackTimeout);
+                    capturePoster();
+                }
+            };
+
             video.onerror = () => {
-                this.revokeObjectUrl(url);
-                reject(new Error('Failed to load video'));
+                finalize(0, 0, 0, null);
             };
 
             video.src = url;

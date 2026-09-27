@@ -3,13 +3,36 @@ Pwanimate API Serializers.
 """
 
 from rest_framework import serializers
-from pwanimate.models import PwanimateConversation, PwanimateMessage
+from pwanimate.models import PwanimateConversation, PwanimateMessage, PwanimateAttachment
+
+
+class PwanimateAttachmentSerializer(serializers.ModelSerializer):
+    """Serializer for Pwanimate attachments with secure view/download URL."""
+
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PwanimateAttachment
+        fields = [
+            "id",
+            "file_name",
+            "file_size",
+            "mime_type",
+            "attachment_type",
+            "url",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_url(self, obj) -> str:
+        return f"/api/pwanimate/attachments/{obj.id}/view/"
 
 
 class MessageSerializer(serializers.ModelSerializer):
     """Serializer for individual conversation messages."""
 
     people = serializers.ReadOnlyField()
+    attachments = PwanimateAttachmentSerializer(many=True, read_only=True)
 
     class Meta:
         model = PwanimateMessage
@@ -20,6 +43,7 @@ class MessageSerializer(serializers.ModelSerializer):
             "citations",
             "sources",
             "people",
+            "attachments",
             "created_at",
         ]
         read_only_fields = fields

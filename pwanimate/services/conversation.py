@@ -11,7 +11,7 @@ import uuid
 
 from django.db import transaction
 
-from pwanimate.ai.gateway.types import ChatMessage
+from pwanimate.ai.gateway.types import ChatMessage, AttachmentData
 from pwanimate.context.types import estimate_tokens
 from pwanimate.models import PwanimateConversation, PwanimateMessage
 
@@ -129,9 +129,10 @@ class ConversationService:
         3. Enforces token budget: keeps the newest complete turns within budget.
         4. Converts to ChatMessage contracts.
         """
-        # Fetch newest messages first
+        # Fetch newest messages first with prefetched attachments
         recent_records = list(
             conversation.messages.filter(role__in=["user", "assistant"])
+            .prefetch_related("attachments")
             .order_by("-created_at")[:max_messages]
         )
 
@@ -146,10 +147,33 @@ class ConversationService:
             # Drop the oldest message in the window
             chronological_records.pop(0)
 
-        return [
-            ChatMessage(role=m.role, content=m.content)
-            for m in chronological_records
-        ]
+        chat_messages = []
+        for m in chronological_records:
+            att_data_list = []
+            for att in m.attachments.all():
+                att_bytes = None
+                if att.attachment_type == "image" and att.file:
+                    try:
+                        att.file.seek(0)
+                        att_bytes = att.file.read()
+                        att.file.seek(0)
+                    except Exception:
+                        pass
+                att_data_list.append(
+                    AttachmentData(
+                        id=str(att.id),
+                        name=att.file_name,
+                        mime_type=att.mime_type,
+                        attachment_type=att.attachment_type,
+                        data_bytes=att_bytes,
+                        url=att.url,
+                    )
+                )
+            chat_messages.append(
+                ChatMessage(role=m.role, content=m.content, attachments=att_data_list)
+            )
+
+        return chat_messages
 
     @staticmethod
     def persist_user_message(

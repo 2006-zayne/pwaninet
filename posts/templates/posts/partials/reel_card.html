@@ -225,7 +225,7 @@
         <!-- Ambient Blurred Video Backdrop (Fills sides seamlessly on wide viewports) -->
         <div class="reel-ambient-backdrop" aria-hidden="true">
             {% with poster=post.get_video_poster|default:post.thumbnail_url %}
-                {% if poster %}
+                {% if poster and not '.mp4' in poster and not '.mov' in poster and not '.webm' in poster and not '#poster' in poster %}
                     <img src="{{ poster }}" class="reel-ambient-img" alt="" loading="lazy">
                 {% else %}
                     <div class="w-100 h-100 bg-black"></div>

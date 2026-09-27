@@ -1470,7 +1470,7 @@ def share_app_to_users_view(request):
                             'post_content': 'Download the official PwaniNet Android app',
                             'actor_username': request.user.username,
                             'download_url': '/download/app/latest/',
-                            'shared_post_id': shared_post.share_id,
+                            'shared_post_id': shared_post.id,
                         }
                     )
                 except Exception as notify_err:

@@ -63,6 +63,10 @@ class MockLLMProvider(BaseLLMProvider):
                 f"[MockLLM] Processed task '{request.task}' with {msg_count} messages "
                 f"and {context_count} context items. Prompt: '{last_msg[:50]}'"
             )
+            if getattr(request, "attachments", None):
+                img_names = [getattr(a, "name", "image") for a in request.attachments if getattr(a, "attachment_type", "") == "image"]
+                if img_names:
+                    content += f" [Attached images: {', '.join(img_names)}]"
 
         # Approximate deterministic token counts
         prompt_len = sum(len(m.content) for m in request.messages)

@@ -89,11 +89,62 @@ def create_post_for_user(form, user, files, group_id=None):
                     post.video = video_file
                     post.save()
                     logger.info(f"Video saved successfully: {post.video}")
+
+                    # Check if dimensions were passed in form
+                    update_dims = {}
+                    if form and hasattr(form, 'data'):
+                        try:
+                            vw = int(form.data.get('video_width', 0) or 0)
+                            vh = int(form.data.get('video_height', 0) or 0)
+                            vd = int(form.data.get('video_duration', 0) or 0)
+                            if vw and vh:
+                                post.video_width = vw
+                                post.video_height = vh
+                                update_dims['video_width'] = vw
+                                update_dims['video_height'] = vh
+                            if vd:
+                                post.video_duration = vd
+                                update_dims['video_duration'] = vd
+                        except (ValueError, TypeError):
+                            pass
+
+                    # Fast fallback probe if dimensions are not present
+                    if not post.video_width or not post.video_height:
+                        try:
+                            from posts.utils.video_probe import probe_video_metadata
+                            duration, src_width, src_height = probe_video_metadata(post.video)
+                            if src_width and src_height:
+                                post.video_width = src_width
+                                post.video_height = src_height
+                                update_dims['video_width'] = src_width
+                                update_dims['video_height'] = src_height
+                            if duration and not post.video_duration:
+                                post.video_duration = int(duration)
+                                update_dims['video_duration'] = int(duration)
+                        except Exception as probe_err:
+                            logger.warning(f"Video probe failed in post_service: {probe_err}")
+
+                    if update_dims:
+                        post.save(update_fields=list(update_dims.keys()))
+                        logger.info(f"Video dimensions saved synchronously: {post.video_width}x{post.video_height}")
+
+                    # Generate fast poster if not present
+                    if not post.video_poster:
+                        try:
+                            from posts.utils.video_probe import generate_fast_video_poster
+                            poster_name, poster_file = generate_fast_video_poster(post.video)
+                            if poster_name and poster_file:
+                                post.video_poster.save(poster_name, poster_file, save=True)
+                                logger.info(f"Fast poster saved synchronously for post {post.id}")
+                        except Exception as poster_err:
+                            logger.warning(f"Fast poster generation failed in post_service: {poster_err}")
+
                     from posts.tasks import process_large_video, generate_video_poster
                     if post.video:
-                        logger.info(f"Triggering HLS transcoding and poster generation for post {post.id}")
+                        logger.info(f"Triggering HLS transcoding for post {post.id}")
                         process_large_video.delay(post.id)
-                        generate_video_poster.delay(post.id)
+                        if not post.video_poster:
+                            generate_video_poster.delay(post.id)
                 except Exception as e:
                     # Log error but don't fail the entire post creation
                     logger.error(f"Error saving video file: {e}")

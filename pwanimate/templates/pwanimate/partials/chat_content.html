@@ -301,6 +301,22 @@
                         <div class="pwanimate-message-row user" data-message-id="{{ msg.id }}">
                             <div class="pwanimate-message-content">
                                 <div class="pwanimate-user-bubble-wrapper">
+                                    {% if msg.attachments.all %}
+                                        <div class="pwanimate-user-attachments mb-2 d-flex flex-wrap gap-2">
+                                            {% for att in msg.attachments.all %}
+                                                {% if att.attachment_type == 'image' %}
+                                                    <a href="{{ att.url }}" target="_blank" rel="noopener noreferrer" class="pwanimate-attachment-thumb-link" title="{{ att.file_name }}">
+                                                        <img src="{{ att.url }}" alt="{{ att.file_name }}" class="pwanimate-attachment-thumb rounded" loading="lazy">
+                                                    </a>
+                                                {% else %}
+                                                    <a href="{{ att.download_url }}" class="pwanimate-attachment-doc-chip badge text-decoration-none d-inline-flex align-items-center gap-1 p-2" title="{{ att.file_name }}">
+                                                        <i class="bi bi-file-earmark-text fs-6"></i>
+                                                        <span class="text-truncate" style="max-width: 140px;">{{ att.file_name }}</span>
+                                                    </a>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
                                     <div class="pwanimate-user-bubble" data-raw="{{ msg.content }}">{{ msg.content }}</div>
                                 </div>
                                 <div class="pwanimate-message-actions user-actions">
@@ -429,6 +445,15 @@
         <!-- Composer Area -->
         <div class="pwanimate-composer-wrapper">
             <form id="pwanimate-composer-form" class="pwanimate-composer-box" onsubmit="return false;">
+                <!-- Staged Attachments Strip -->
+                <div class="pwanimate-composer-attachments d-none" id="pwanimate-composer-attachments"></div>
+
+                <!-- Hidden file inputs for attachment picking -->
+                <input type="file" id="pwanimatePhotoInput" accept="image/jpeg,image/png,image/gif,image/webp" multiple class="d-none" style="display: none;">
+                <input type="file" id="pwanimateDocInput" accept=".pdf,.doc,.docx,.txt,.csv,.md,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/csv,text/markdown" multiple class="d-none" style="display: none;">
+                <input type="file" id="pwanimateFileInput" accept="*/*" multiple class="d-none" style="display: none;">
+                <input type="file" id="pwanimateCameraInput" accept="image/*" capture="environment" class="d-none" style="display: none;">
+
                 <label for="pwanimate-input" class="visually-hidden">{% trans "Message Pwanimate" %}</label>
                 <div class="pwanimate-composer-input-row">
                     <textarea id="pwanimate-input"
@@ -565,7 +590,7 @@
                 </div>
             </div>
             <div class="text-center text-muted mt-3 small opacity-75">
-                {% trans "File attachments for Pwanimate analysis coming soon" %}
+                {% trans "Supported: Images (JPEG, PNG, GIF, WebP), PDFs, and Text Documents" %}
             </div>
         </div>
     </div>
