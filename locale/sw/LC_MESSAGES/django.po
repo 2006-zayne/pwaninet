@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PwaniNet\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-22 09:00+0300\n"
+"POT-Creation-Date: 2026-10-01 01:53+0300\n"
 "PO-Revision-Date: 2026-07-22 09:00+0300\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: Swahili\n"
@@ -15,476 +15,4156 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-msgid "Back to Settings"
-msgstr "Rudi kwenye Mipangilio"
+#: admin_dashboard/templates/admin_dashboard/partials/feedback_composer.html:9
+msgid "Share feedback"
+msgstr "Shiriki maoni"
 
-msgid "Appearance"
-msgstr "Mwonekano"
+#: admin_dashboard/templates/admin_dashboard/partials/feedback_composer.html:10
+msgid ""
+"Report a problem or suggest an improvement. The PwaniNet team will review "
+"your message."
+msgstr "Ripoti tatizo au pendekeza maboresho. Timu ya PwaniNet itapitia ujumbe wako."
 
-msgid "Customize how PwaniNet looks and feels"
-msgstr "Badilisha jinsi PwaniNet inavyonekana na kuhisi"
+#: admin_dashboard/templates/admin_dashboard/partials/feedback_composer.html:16
+msgid "Thanks—your feedback was sent to the admin team."
+msgstr "Asante—maoni yako yametumwa kwa timu ya wasimamizi."
 
-msgid "Theme"
-msgstr "Mandhari"
+#: admin_dashboard/templates/admin_dashboard/partials/feedback_composer.html:31
+msgid "Type"
+msgstr "Aina"
 
-msgid "Light, dark, system preference"
-msgstr "Nuru, giza, mapendeleo ya mfumo"
+#: admin_dashboard/templates/admin_dashboard/partials/feedback_composer.html:39
+msgid "Subject"
+msgstr "Mada"
 
-msgid "Light"
-msgstr "Nuru"
+#: admin_dashboard/templates/admin_dashboard/partials/feedback_composer.html:41
+msgid "A short summary"
+msgstr "Muhtasari mfupi"
 
-msgid "Always use the light theme."
-msgstr "Tumia daima mandhari ya nuru."
+#: admin_dashboard/templates/admin_dashboard/partials/feedback_composer.html:44
+msgid "Message"
+msgstr "Ujumbe"
 
-msgid "Dark"
-msgstr "Giza"
+#: admin_dashboard/templates/admin_dashboard/partials/feedback_composer.html:46
+msgid "Tell us what happened or what would make PwaniNet better…"
+msgstr "Tuambie kilichotokea au jinsi PwaniNet inavyoweza kuboreshwa…"
 
-msgid "Always use the dark theme."
-msgstr "Tumia daima mandhari ya giza."
+#: admin_dashboard/templates/admin_dashboard/partials/feedback_composer.html:50
+msgid "Send feedback"
+msgstr "Tuma maoni"
 
-msgid "System"
-msgstr "Mfumo"
+#: documents/templates/documents/partials/document_detail_context_rail.html:30
+msgid "Open in Pwanimate context"
+msgstr "Fungua katika muktadha wa Pwanimate"
 
-msgid "Automatically match your device."
-msgstr "Lingana kiotomatiki na kifaa chako."
+#: documents/templates/documents/partials/document_detail_context_rail.html:46
+#: posts/templates/posts/partials/media_video_player.html:8
+#: posts/templates/posts/partials/media_video_player.html:9
+#: templates/base.html:2244
+msgid "Download"
+msgstr "Pakua"
 
+#: documents/templates/documents/partials/document_detail_context_rail.html:57
+msgid "Manage"
+msgstr "Dhibiti"
+
+#: documents/templates/documents/partials/document_detail_context_rail.html:66
+msgid "Edit Details"
+msgstr "Hariri maelezo"
+
+#: documents/templates/documents/partials/document_detail_context_rail.html:74
+msgid "Upload New Version"
+msgstr "Pakia toleo jipya"
+
+#: documents/templates/documents/partials/document_detail_context_rail.html:83
+msgid "Delete Document"
+msgstr "Futa waraka"
+
+#: documents/templates/documents/partials/document_detail_context_rail.html:95
+#: users/templates/users/settings/partials/downloads_content.html:13
+msgid "Downloads"
+msgstr "Vipakuliwa"
+
+#: documents/templates/documents/partials/document_detail_context_rail.html:100
+msgid "Views"
+msgstr "Mionekano"
+
+#: documents/templates/documents/partials/document_detail_context_rail.html:105
+msgid "Bookmarks"
+msgstr "Vialamisho"
+
+#: documents/templates/documents/partials/document_detail_context_rail.html:112
+msgid "Category"
+msgstr "Kategoria"
+
+#: documents/templates/documents/partials/document_detail_context_rail.html:116
+msgid "File Type"
+msgstr "Aina ya faili"
+
+#: documents/templates/documents/partials/document_detail_context_rail.html:126
+msgid "Uploaded"
+msgstr "Imepakiwa"
+
+#: documents/templates/documents/partials/document_detail_context_rail.html:127
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:17
+#: users/templates/users/partials/profile_content.html:533
+msgid "ago"
+msgstr "iliyopita"
+
+#: documents/templates/documents/partials/document_detail_context_rail.html:130
+msgid "Size"
+msgstr "Ukubwa"
+
+#: documents/templates/documents/partials/document_detail_context_rail.html:140
+msgid "Pages"
+msgstr "Kurasa"
+
+#: documents/templates/documents/partials/document_detail_context_rail.html:150
+#: users/templates/users/settings/partials/appearance_content.html:64
 msgid "Language"
 msgstr "Lugha"
 
-msgid "Select your preferred language"
-msgstr "Chagua lugha unayopendelea"
+#: documents/templates/documents/partials/document_detail_context_rail.html:161
+msgid "Uploaded by"
+msgstr "Imepakiwa na"
 
-msgid "English"
-msgstr "Kiingereza"
+#: documents/templates/documents/partials/document_detail_context_rail.html:195
+#: templates/partials/desktop_left_rail.html:40
+#: users/templates/users/partials/profile_floating_actions.html:15
+msgid "Documents"
+msgstr "Nyaraka"
 
-msgid "Use English throughout the application."
-msgstr "Tumia Kiingereza katika programu nzima."
-
-msgid "Kiswahili"
-msgstr "Kiswahili"
-
-msgid "Tumia Kiswahili kwenye programu nzima."
-msgstr "Tumia Kiswahili kwenye programu nzima."
-
-msgid "Typography"
-msgstr "Uandishi"
-
-msgid "Font size and readability options"
-msgstr "Chaguo za ukubwa wa fonti na usomaji"
-
-msgid "Tiny"
-msgstr "Ndogo sana"
-
-msgid "Compact interface."
-msgstr "Kiolesura cha kawaida."
-
-msgid "Small"
-msgstr "Ndogo"
-
-msgid "Slightly smaller text."
-msgstr "Maandishi yanayofura kidogo."
-
-msgid "Medium"
-msgstr "Wastani"
-
-msgid "Recommended for most users."
-msgstr "Inapendekezwa kwa watumiaji wengi."
-
-msgid "Large"
-msgstr "Kubwa"
-
-msgid "Larger text for improved readability."
-msgstr "Maandishi makubwa kwa usomaji bora."
-
+#: documents/templates/documents/partials/document_detail_context_rail.html:197
+#: documents/templates/documents/partials/documents_context_rail.html:146
+#: groups/templates/groups/partials/groups_dashboard_context_rail.html:78
+#: groups/templates/groups/partials/groups_detail_context_rail.html:62
+#: groups/templates/groups/partials/groups_detail_context_rail.html:185
+#: groups/templates/groups/partials/groups_detail_context_rail.html:216
+#: posts/templates/posts/partials/home_context_rail.html:93
+#: pwanimate/templates/pwanimate/partials/chat_content.html:40
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:46
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:111
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:112
+#: pwanimate/templates/pwanimate/settings/partials/settings_mobile_page.html:16
+#: pwanimate/templates/pwanimate/settings/partials/settings_modal.html:17
+#: templates/downloads/partials/download_page_content.html:127
+#: templates/partials/default_context_rail.html:43
+#: templates/partials/desktop_left_rail.html:106
+#: users/templates/users/partials/profile_context_rail.html:428
+#: users/templates/users/partials/profile_context_rail.html:459
+#: users/templates/users/settings/partials/index_content.html:7
 msgid "Settings"
 msgstr "Mipangilio"
 
-msgid "Profile"
-msgstr "Wasifu"
-
-msgid "Manage your profile, username, bio..."
-msgstr "Dhibiti wasifu wako, jina la mtumiaji, wasifu..."
-
-msgid "Theme, dark mode, language..."
-msgstr "Mandhari, hali ya giza, lugha..."
-
-msgid "Notifications"
-msgstr "Arifa"
-
-msgid "Push notifications, mentions..."
-msgstr "Arifa za push, matumizi..."
-
-msgid "Privacy & Security"
-msgstr "Faragha na Usalama"
-
-msgid "Password, sessions, blocked users..."
-msgstr "Nenosiri, vikao, watumiaji waliozuiwa..."
-
-msgid "Storage"
-msgstr "Hifadhi"
-
-msgid "Cache, downloads, storage..."
-msgstr "Akiba, vipakuliwa, hifadhi..."
-
-msgid "About PwaniNet"
-msgstr "Kuhusu PwaniNet"
-
-msgid "Version, support, licenses..."
-msgstr "Toleo, msaada, leseni..."
-
-msgid "Manage your profile information and preferences"
-msgstr "Dhibiti maelezo ya wasifu wako na mapendeleo"
-
-msgid "Profile Information"
-msgstr "Maelezo ya Wasifu"
-
-msgid "Username, display name, bio, avatar"
-msgstr "Jina la mtumiaji, jina la kuonyesha, wasifu, picha"
-
-msgid "Profile settings coming soon..."
-msgstr "Mipangilio ya wasifu inakuja hivi karibuni..."
-
-msgid "Username, display name, bio, avatar, and more"
-msgstr "Jina la mtumiaji, jina la kuonyesha, wasifu, picha, na zaidi"
-
-msgid "Linked Accounts"
-msgstr "Akaunti Zilizounganishwa"
-
-msgid "Connected accounts and services"
-msgstr "Akaunti na huduma zilizounganishwa"
-
-msgid "Linked accounts coming soon..."
-msgstr "Akaunti zilizounganishwa zinakuja hivi karibuni..."
-
-msgid "Choose which notifications you want to receive"
-msgstr "Chagua arifa unazotaka kupokea"
-
-msgid "Notification Preferences"
-msgstr "Mapendeleo ya Arifa"
-
-msgid "Manage how and when you receive notifications"
-msgstr "Dhibiti jinsi na wakati unapopokea arifa"
-
-msgid "Updates"
-msgstr "Visasisho"
-
-msgid "Manage application updates and view release information"
-msgstr "Dhibiti visasisho vya programu na ona maelezo vya toleo"
-
-msgid "Protect your account and manage your privacy"
-msgstr "Linda akaunti yako na dhibiti faragha yako"
-
-msgid "Password"
-msgstr "Nenosiri"
-
-msgid "Change your password and security settings"
-msgstr "Badilisha nenosiri lako na mipangilio ya usalama"
-
-msgid "Password settings coming soon..."
-msgstr "Mipangilio ya nenosiri inakuja hivi karibuni..."
-
-msgid "Active Sessions"
-msgstr "Vikao Vya Kazi"
-
-msgid "Manage devices and sessions where you're logged in"
-msgstr "Dhibiti vifaa na vikao ambapo umesajiliwa"
-
-msgid "Session management coming soon..."
-msgstr "Usimamizi wa vikao unakuja hivi karibuni..."
-
-msgid "Manage your storage and cached data"
-msgstr "Dhibiti hifadhi yako na data iliyohifadhiwa"
-
-msgid "Storage Usage"
-msgstr "Matumizi ya Hifadhi"
-
-msgid "View your storage usage and manage space"
-msgstr "Ona matumizi yako ya hifadhi na dhibiti nafasi"
-
-msgid "Storage usage coming soon..."
-msgstr "Matumizi ya hifadhi yana kuja hivi karibuni..."
-
-msgid "Version information and support resources"
-msgstr "Maelezo ya toleo na rasilimali za msaada"
-
-msgid "App Information"
-msgstr "Maelezo ya Programu"
-
-msgid "Version and build information"
-msgstr "Maelezo ya toleo na kujenga"
-
-msgid "Current Version"
-msgstr "Toleo la Sasa"
-
-msgid "Build"
-msgstr "Jenga"
-
-msgid "Channel"
-msgstr "Njia"
-
-msgid "Environment"
-msgstr "Mazingira"
-
-msgid "Release Center"
-msgstr "Kituo cha Toleo"
-
-msgid "View release notes and update information"
-msgstr "Ona maelezo ya toleo na maelezo ya visasisho"
-
-msgid "Current Release Details"
-msgstr "Maelezo ya Toleo la Sasa"
-
-msgid "Home"
-msgstr "Nyumbani"
-
-msgid "Groups"
-msgstr "Vikundi"
-
-msgid "Post"
-msgstr "Chapisha"
-
-msgid "Login"
-msgstr "Ingia"
-
-msgid "Search friends &amp; groups…"
-msgstr "Tafuta marafiki na vikundi…"
-
-msgid "Search friends and groups"
-msgstr "Tafuta marafiki na vikundi"
-
-msgid "Clear search"
-msgstr "Futa utafutaji"
-
-msgid "What's on your mind?"
-msgstr "Unachofikiria?"
-
-msgid "New Post"
-msgstr "Chapisho Jipya"
-
-msgid "Create a Post"
-msgstr "Unda Chapisho"
-
-msgid "Discard"
-msgstr "Tupa"
-
-msgid "Add Attachment"
-msgstr "Ongeza Kiambatisho"
-
-msgid "Images"
-msgstr "Picha"
-
-msgid "Video"
-msgstr "Video"
-
-msgid "PDF"
-msgstr "PDF"
-
-msgid "Share to profile"
-msgstr "Shiriki kwenye wasifu"
-
-msgid "Report post"
-msgstr "Ripoti chapisho"
-
-msgid "Are you sure you want to delete this post?"
-msgstr "Una uhakika unataka kufuta chapisho hili?"
-
-msgid "Delete post"
-msgstr "Futa chapisho"
-
-msgid "Share"
-msgstr "Shiriki"
-
-msgid "Write a comment..."
-msgstr "Andika maoni..."
-
-msgid "Add a comment (optional)"
-msgstr "Ongeza maoni (hiari)"
-
-msgid "What do you think?"
-msgstr "Unafikiria nini?"
-
-msgid "Repost"
-msgstr "Chapisha tena"
-
-msgid "Share Post"
-msgstr "Shiriki Chapisho"
-
-msgid "Share to Users"
-msgstr "Shiriki kwa Watumiaji"
-
-msgid "Share to Groups"
-msgstr "Shiriki kwa Vikundi"
-
-msgid "Search users you follow..."
-msgstr "Tafuta watumiaji unaofuata..."
-
-msgid "Start typing to search users you follow"
-msgstr "Anza kuandika kutafuta watumiaji unaofuata"
-
-msgid "Selected users will appear here"
-msgstr "Watumiaji waliochaguliwa wataonekana hapa"
-
-msgid "Add a message (optional)"
-msgstr "Ongeza ujumbe (hiari)"
-
-msgid "Check this out!"
-msgstr "Angalia hili!"
-
-msgid "Share with selected users"
-msgstr "Shiriki na watumiaji waliochaguliwa"
-
-msgid "Search groups you're a member of..."
-msgstr "Tafuta vikundi ambavyo ni mwanza..."
-
-msgid "Start typing to search groups"
-msgstr "Anza kuandika kutafuta vikundi"
-
-msgid "Selected groups will appear here"
-msgstr "Vikundi vilivyochaguliwa vitaonekana hapa"
-
-msgid "Share with selected groups"
-msgstr "Shiriki na vikundi vilivyochaguliwa"
-
-msgid "Welcome Back, Comrade!"
-msgstr "Karibu Tena, Rafiki!"
-
-msgid "Identify yourself to access the PwaniNet feed."
-msgstr "Jitambulishe ili kupata PwaniNet feed."
-
-msgid "Forgot password?"
-msgstr "Umesahau nenosiri?"
-
-msgid "This field cannot be empty"
-msgstr "Uga huu hauwezi kuwa wazi"
-
-msgid "Authenticate & Enter"
-msgstr "Tambulisha na Ingia"
-
-msgid "New to the squad?"
-msgstr "Mpya kwenye kundi?"
-
-msgid "Create a New Account"
-msgstr "Unda Akaunti Mpya"
-
-msgid "← Back to Public View"
-msgstr "← Rudi kwenye Mtazamo wa Umma"
-
-msgid "Pwani University Student."
-msgstr "Mwanafunzi wa Chuo Kikuu cha Pwani."
-
-msgid "UPDATE PROFILE"
-msgstr "SASISHA WASILIFU"
-
-msgid "SETTINGS"
-msgstr "MIPANGILIO"
-
-msgid "SWITCH ACCOUNT"
-msgstr "BADILISHA AKAUNTI"
-
-msgid "LOGOUT"
-msgstr "ONDOKA"
-
-msgid "Followers"
-msgstr "Wafuataji"
-
-msgid "Following"
-msgstr "Unafuata"
-
-msgid "Likes"
-msgstr "Mapendeleo"
-
-msgid "Pinches Sent"
-msgstr "Pinches Zilizotumwa"
-
-msgid "Pinches Received"
-msgstr "Pinches Zilizopokelewa"
-
-msgid "Academic Details"
-msgstr "Maelezo ya Kielimu"
-
-msgid "School"
-msgstr "Shule"
-
-msgid "Course"
-msgstr "Kozi"
-
-msgid "Year"
-msgstr "Mwaka"
-
-msgid "Profile Completion"
-msgstr "Ukamilishi wa Wasifu"
-
-msgid "Hide"
-msgstr "Ficha"
-
-msgid "Completion"
-msgstr "Ukamilishi"
-
-msgid "Suggestions to improve your profile:"
-msgstr "Mapendekezo ya kuboresha wasifu wako:"
-
-msgid "Add a headline to introduce yourself better"
-msgstr "Ongeza kichwa cha habari kujitambulisha vizuri zaidi"
-
-msgid "Add skills so classmates can discover your strengths"
-msgstr "Ongeza ujuzi ili wanafunzi wenzako waweze kugundua nguvu zako"
-
-msgid "Add projects to showcase your work"
-msgstr "Ongeza miradi kuonyesha kazi yako"
-
-msgid "Add interests to find like-minded classmates"
-msgstr "Ongeza maslahi kupata wanafunzi wenye mawazo sawa"
-
+#: documents/templates/documents/partials/document_detail_context_rail.html:199
+#: documents/templates/documents/partials/documents_context_rail.html:148
+#: groups/templates/groups/partials/groups_dashboard_context_rail.html:80
+#: groups/templates/groups/partials/groups_detail_context_rail.html:218
+#: posts/templates/posts/partials/home_context_rail.html:95
+#: templates/partials/default_context_rail.html:45
+#: users/templates/users/partials/profile_context_rail.html:461
+msgid "Privacy"
+msgstr "Faragha"
+
+#: documents/templates/documents/partials/document_floating_actions.html:15
+#: documents/templates/documents/partials/documents_context_rail.html:35
+#: documents/templates/documents/partials/documents_context_rail.html:46
+#: documents/templates/documents/partials/home_content.html:37
+#: templates/partials/desktop_left_rail.html:52
+msgid "My Library"
+msgstr "Maktaba yangu"
+
+#: documents/templates/documents/partials/document_floating_actions.html:30
+msgid "Upload"
+msgstr "Pakia"
+
+#: documents/templates/documents/partials/documents_context_rail.html:10
+msgid "Academic Repository"
+msgstr "Hazina ya kitaaluma"
+
+#: documents/templates/documents/partials/documents_context_rail.html:13
+msgid ""
+"Share course notes, past papers, and revision materials or access your "
+"personal workspace."
+msgstr "Shiriki dondoo za kozi, mitihani ya zamani na nyenzo za marudio, au fungua nafasi yako binafsi."
+
+#: documents/templates/documents/partials/documents_context_rail.html:25
+#: documents/templates/documents/partials/documents_context_rail.html:41
+#: documents/templates/documents/partials/home_content.html:27
+msgid "Upload Document"
+msgstr "Pakia waraka"
+
+#: documents/templates/documents/partials/documents_context_rail.html:59
+msgid "Library Shortcuts"
+msgstr "Njia za mkato za maktaba"
+
+#: documents/templates/documents/partials/documents_context_rail.html:68
+msgid "Overview"
+msgstr "Muhtasari"
+
+#: documents/templates/documents/partials/documents_context_rail.html:82
+msgid "My Uploads"
+msgstr "Nilizopakia"
+
+#: documents/templates/documents/partials/documents_context_rail.html:95
+msgid "Saved Bookmarks"
+msgstr "Vialamisho vilivyohifadhiwa"
+
+#: documents/templates/documents/partials/documents_context_rail.html:108
+msgid "Downloaded Materials"
+msgstr "Nyenzo zilizopakuliwa"
+
+#: documents/templates/documents/partials/documents_context_rail.html:121
+msgid "Viewing History"
+msgstr "Historia ya kutazama"
+
+#: documents/templates/documents/partials/documents_context_rail.html:135
+msgid "Sharing Guidelines"
+msgstr "Mwongozo wa kushiriki"
+
+#: documents/templates/documents/partials/documents_context_rail.html:138
+msgid ""
+"Ensure uploaded papers, notes, and study guides are clear, properly "
+"categorized, and follow university academic integrity standards."
+msgstr "Hakikisha karatasi, dondoo na miongozo ya masomo iliyopakiwa iko wazi, imeainishwa vizuri na inafuata viwango vya uadilifu wa kitaaluma vya chuo kikuu."
+
+#: documents/templates/documents/partials/documents_context_rail.html:150
+#: groups/templates/groups/partials/groups_dashboard_context_rail.html:82
+#: groups/templates/groups/partials/groups_detail_context_rail.html:220
+#: posts/templates/posts/partials/home_context_rail.html:97
+#: pwanimate/templates/pwanimate/settings/partials/settings_mobile_page.html:49
+#: pwanimate/templates/pwanimate/settings/partials/settings_modal.html:59
+#: templates/partials/default_context_rail.html:47
+#: users/templates/users/partials/profile_content.html:306
+#: users/templates/users/partials/profile_context_rail.html:287
+#: users/templates/users/partials/profile_context_rail.html:463
+#: users/templates/users/partials/pwanimate_profile_card.html:43
 msgid "About"
 msgstr "Kuhusu"
 
-msgid "Open to Projects"
-msgstr "Wazi kwa Miradi"
+#: documents/templates/documents/partials/documents_navigation_partial.html:9
+#: groups/templates/groups/partials/groups_dashboard_navigation_partial.html:11
+#: groups/templates/groups/partials/groups_detail_navigation_partial.html:12
+#: posts/templates/posts/partials/home_navigation_partial.html:581
+#: templates/base.html:1917
+#: users/templates/users/partials/profile_navigation_partial.html:16
+msgid "Contextual Information"
+msgstr "Taarifa za muktadha"
 
-msgid "Open to Study Groups"
-msgstr "Wazi kwa Vikundi vya Masomo"
+#: documents/templates/documents/partials/documents_navigation_partial.html:20
+#: groups/templates/groups/partials/groups_dashboard_navigation_partial.html:18
+#: groups/templates/groups/partials/groups_detail_navigation_partial.html:19
+#: notifications/templates/notifications/partials/notifications_navigation_partial.html:17
+#: posts/templates/posts/partials/home_navigation_partial.html:588
+#: templates/base.html:1853
+#: users/templates/users/partials/profile_navigation_partial.html:23
+#: users/templates/users/settings/partials/settings_navigation_partial.html:19
+msgid "Global Navigation"
+msgstr "Urambazaji mkuu"
 
-msgid "Open to Networking"
-msgstr "Wazi kwa Mtandao"
+#: groups/templates/groups/partials/groups_dashboard_context_rail.html:11
+msgid "Your Groups"
+msgstr "Vikundi vyako"
 
-msgid "Not Looking"
-msgstr "Haatafuti"
+#: groups/templates/groups/partials/groups_dashboard_context_rail.html:55
+msgid "You haven't joined any groups yet."
+msgstr "Bado hujajiunga na kikundi chochote."
 
-msgid "Interests"
-msgstr "Maslahi"
+#: groups/templates/groups/partials/groups_dashboard_context_rail.html:67
+msgid "How groups work"
+msgstr "Jinsi vikundi vinavyofanya kazi"
 
-msgid "Skills"
-msgstr "Ujuzi"
+#: groups/templates/groups/partials/groups_dashboard_context_rail.html:70
+msgid ""
+"Join study groups to access shared class discussions, course materials, and "
+"connect with peers. Create your own group to collaborate on projects."
+msgstr "Jiunge na vikundi vya masomo ili kupata mijadala ya darasa na nyenzo za kozi zinazoshirikiwa, na kuwasiliana na wenzako. Unda kikundi chako ili mshirikiane kwenye miradi."
 
-msgid "Projects"
-msgstr "Miradi"
+#: groups/templates/groups/partials/groups_detail_context_rail.html:53
+#: groups/templates/groups/partials/groups_detail_context_rail.html:175
+msgid "Announcements"
+msgstr "Matangazo"
 
-msgid "View Project"
-msgstr "Angalia Mradi"
+#: groups/templates/groups/partials/groups_detail_context_rail.html:65
+msgid "Leave Group"
+msgstr "Ondoka kwenye kikundi"
 
-msgid "Links"
-msgstr "Viungo"
+#: groups/templates/groups/partials/groups_detail_context_rail.html:71
+msgid "Request Sent"
+msgstr "Ombi limetumwa"
 
-msgid "View More About"
-msgstr "Angalia Zaidi Kuhusu"
+#: groups/templates/groups/partials/groups_detail_context_rail.html:76
+msgid "Cancel Request"
+msgstr "Ghairi ombi"
 
-msgid "View Less About"
-msgstr "Angalia Punguzo Kuhusu"
+#: groups/templates/groups/partials/groups_detail_context_rail.html:85
+msgid "Request Again"
+msgstr "Omba tena"
 
+#: groups/templates/groups/partials/groups_detail_context_rail.html:93
+msgid "Invite Only"
+msgstr "Kwa mwaliko pekee"
+
+#: groups/templates/groups/partials/groups_detail_context_rail.html:95
+msgid "You have to be invited to join this group"
+msgstr "Unahitaji mwaliko ili kujiunga na kikundi hiki"
+
+#: groups/templates/groups/partials/groups_detail_context_rail.html:100
+msgid "Join Group"
+msgstr "Jiunge na kikundi"
+
+#: groups/templates/groups/partials/groups_detail_context_rail.html:110
+#: groups/templates/groups/partials/groups_detail_context_rail.html:144
+msgid "Members"
+msgstr "Wanachama"
+
+#: groups/templates/groups/partials/groups_detail_context_rail.html:115
+#: groups/templates/groups/partials/groups_detail_context_rail.html:148
+#: users/templates/users/partials/profile_content.html:465
 msgid "Posts"
 msgstr "Machapisho"
 
-msgid "Shared with"
-msgstr "Imeshirikiwa na"
+#: groups/templates/groups/partials/groups_detail_context_rail.html:126
+msgid "About Group"
+msgstr "Kuhusu kikundi"
 
+#: groups/templates/groups/partials/groups_detail_context_rail.html:138
+msgid "No description provided."
+msgstr "Hakuna maelezo yaliyotolewa."
+
+#: groups/templates/groups/partials/groups_detail_context_rail.html:152
+msgid "Status"
+msgstr "Hali"
+
+#: groups/templates/groups/partials/groups_detail_context_rail.html:153
+msgid "Active"
+msgstr "Inaendelea"
+
+#: groups/templates/groups/partials/groups_detail_context_rail.html:164
+#: users/templates/users/partials/profile_context_rail.html:407
+msgid "Shortcuts"
+msgstr "Njia za mkato"
+
+#: groups/templates/groups/partials/groups_detail_context_rail.html:196
+#: users/templates/users/partials/profile_context_rail.html:449
+msgid "All Groups"
+msgstr "Vikundi vyote"
+
+#: groups/templates/groups/partials/groups_detail_context_rail.html:206
+#: templates/partials/default_context_rail.html:23
+#: users/templates/users/partials/profile_context_rail.html:439
+msgid "Course Materials"
+msgstr "Nyenzo za kozi"
+
+#: posts/templates/posts/home.html:330
+#: posts/templates/posts/partials/home_navigation_partial.html:329
+#: search/templates/search/partials/search_navigation_partial.html:234
+msgid "Search friends, documents, posts…"
+msgstr "Tafuta marafiki, nyaraka, machapisho…"
+
+#: posts/templates/posts/home.html:338
+#: posts/templates/posts/partials/home_navigation_partial.html:337
+#: search/templates/search/partials/search_navigation_partial.html:236
+msgid "Search PwaniNet"
+msgstr "Tafuta kwenye PwaniNet"
+
+#: posts/templates/posts/offline_media_viewer.html:4
+msgid "Offline Media Library - PwaniNet"
+msgstr "Maktaba ya midia ya nje ya mtandao - PwaniNet"
+
+#: posts/templates/posts/partials/create_post_content.html:917
+msgid "New Post"
+msgstr "Chapisho Jipya"
+
+#: posts/templates/posts/partials/create_post_content.html:919
+msgid "Create a Post"
+msgstr "Unda Chapisho"
+
+#: posts/templates/posts/partials/create_post_content.html:927
+msgid "Discard"
+msgstr "Tupa"
+
+#: posts/templates/posts/partials/create_post_content.html:954
+msgid "Posting in"
+msgstr "Inachapisha katika"
+
+#: posts/templates/posts/partials/create_post_content.html:965
+msgid "What's on your mind?"
+msgstr "Unachofikiria?"
+
+#: posts/templates/posts/partials/create_post_content.html:1084
+#: templates/base.html:2776 templates/partials/desktop_left_rail.html:142
+#: templates/partials/top_nav.html:54
+msgid "Post"
+msgstr "Chapisha"
+
+#: posts/templates/posts/partials/create_post_content.html:1101
+#: pwanimate/templates/pwanimate/partials/chat_content.html:506
+#: pwanimate/templates/pwanimate/partials/chat_content.html:507
+#: pwanimate/templates/pwanimate/partials/chat_content.html:593
+msgid "Add attachment"
+msgstr "Ongeza kiambatisho"
+
+#: posts/templates/posts/partials/create_post_content.html:1111
+#: pwanimate/templates/pwanimate/partials/chat_content.html:603
+msgid "Camera"
+msgstr "Kamera"
+
+#: posts/templates/posts/partials/create_post_content.html:1117
+#: posts/templates/posts/partials/offline_media_viewer_content.html:49
+#: posts/templates/posts/partials/offline_media_viewer_content.html:83
+#: pwanimate/templates/pwanimate/partials/chat_content.html:609
+msgid "Photos"
+msgstr "Picha"
+
+#: posts/templates/posts/partials/create_post_content.html:1123
+msgid "Video"
+msgstr "Video"
+
+#: posts/templates/posts/partials/create_post_content.html:1129
+#: posts/templates/posts/partials/offline_media_viewer_content.html:61
+#: posts/templates/posts/partials/offline_media_viewer_content.html:93
+#: pwanimate/templates/pwanimate/partials/chat_content.html:615
+msgid "Docs"
+msgstr "Nyaraka"
+
+#: posts/templates/posts/partials/home_context_rail.html:11
+msgid "Groups to Explore"
+msgstr "Vikundi vya kuchunguza"
+
+#: posts/templates/posts/partials/home_context_rail.html:20
+msgid "See all"
+msgstr "Tazama vyote"
+
+#: posts/templates/posts/partials/home_context_rail.html:41
+msgid "members"
+msgstr "wanachama"
+
+#: posts/templates/posts/partials/home_context_rail.html:43
+msgid "Study Group"
+msgstr "Kikundi cha masomo"
+
+#: posts/templates/posts/partials/home_context_rail.html:60
+#: templates/partials/default_context_rail.html:10
+msgid "Campus Hub"
+msgstr "Kitovu cha chuo"
+
+#: posts/templates/posts/partials/home_context_rail.html:63
+msgid ""
+"Quick access to course notes, revision papers, and student study circles."
+msgstr "Ufikiaji wa haraka wa dondoo za kozi, karatasi za marudio na vikundi vya masomo vya wanafunzi."
+
+#: posts/templates/posts/partials/home_context_rail.html:73
+msgid "Documents & Past Papers"
+msgstr "Nyaraka na mitihani ya zamani"
+
+#: posts/templates/posts/partials/home_context_rail.html:83
+msgid "All Student Groups"
+msgstr "Vikundi vyote vya wanafunzi"
+
+#: posts/templates/posts/partials/like_button.html:11
+#: posts/templates/posts/partials/like_button.html:22
+msgid "Unlike post"
+msgstr "Ondoa kupenda chapisho"
+
+#: posts/templates/posts/partials/like_button.html:11
+#: posts/templates/posts/partials/like_button.html:22
+msgid "Like post"
+msgstr "Penda chapisho"
+
+#: posts/templates/posts/partials/media_video_player.html:17
+#: posts/templates/posts/partials/post_card.html:124
+#: posts/templates/posts/partials/reel_card.html:126
+msgid "Watch Fullscreen"
+msgstr "Tazama kwenye skrini nzima"
+
+#: posts/templates/posts/partials/media_video_player.html:18
+msgid "Expand to fullscreen"
+msgstr "Panua hadi skrini nzima"
+
+#: posts/templates/posts/partials/media_video_player.html:49
+msgid "Play or pause video"
+msgstr "Cheza au sitisha video"
+
+#: posts/templates/posts/partials/media_video_player.html:61
+#: posts/templates/posts/partials/media_video_player.html:63
+#: posts/templates/posts/partials/reel_card.html:273
+msgid "Buffering…"
+msgstr "Inapakia…"
+
+#: posts/templates/posts/partials/media_video_player.html:74
+#: posts/templates/posts/partials/media_video_player.html:75
+#: posts/templates/posts/partials/reel_card.html:309
+#: posts/templates/posts/partials/reel_card.html:310
+msgid "Toggle mute"
+msgstr "Washa au zima sauti"
+
+#: posts/templates/posts/partials/media_video_player.html:83
+#: posts/templates/posts/partials/reel_card.html:318
+msgid "Seek"
+msgstr "Tafuta"
+
+#: posts/templates/posts/partials/media_video_player.html:91
+msgid "HD processing…"
+msgstr "Inachakata HD…"
+
+#: posts/templates/posts/partials/media_video_player.html:93
+msgid "Processing failed"
+msgstr "Uchakataji umeshindwa"
+
+#: posts/templates/posts/partials/media_video_player.html:95
+msgid "Preparing…"
+msgstr "Inatayarisha…"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:11
+msgid "Offline Media Library"
+msgstr "Maktaba ya midia ya nje ya mtandao"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:12
+msgid "Stream videos, view photos, play audio, and read documents offline"
+msgstr "Tazama video, picha, sikiliza sauti na soma nyaraka bila intaneti"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:18
+msgid "Watch Reels"
+msgstr "Tazama video fupi"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:21
+msgid "Clear All"
+msgstr "Futa yote"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:30
+#: users/templates/users/settings/partials/storage_content.html:24
+msgid "Storage Usage"
+msgstr "Matumizi ya Hifadhi"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:43
+#: posts/templates/posts/partials/offline_media_viewer_content.html:78
+msgid "Videos"
+msgstr "Video"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:55
+msgid "Audios"
+msgstr "Sauti"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:73
+msgid "All"
+msgstr "Zote"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:88
+msgid "Audio"
+msgstr "Sauti"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:101
+msgid "Search downloads…"
+msgstr "Tafuta vipakuliwa…"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:104
+msgid "Newest"
+msgstr "Vipya zaidi"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:105
+msgid "Oldest"
+msgstr "Vya zamani zaidi"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:106
+msgid "Largest"
+msgstr "Kikubwa zaidi"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:107
+msgid "Smallest"
+msgstr "Kidogo zaidi"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:108
+msgid "A-Z"
+msgstr "A-Z"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:123
+msgid "No downloaded media yet"
+msgstr "Bado hakuna midia iliyopakuliwa"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:125
+msgid ""
+"Files you download while browsing PwaniNet will automatically be saved here "
+"for full offline streaming and viewing."
+msgstr "Faili unazopakua unapotumia PwaniNet zitahifadhiwa hapa kiotomatiki ili uzitazame bila intaneti."
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:128
+msgid "Browse Feed"
+msgstr "Vinjari mtiririko"
+
+#: posts/templates/posts/partials/offline_media_viewer_content.html:170
+msgid "Save to Phone"
+msgstr "Hifadhi kwenye simu"
+
+#: posts/templates/posts/partials/post_card.html:106
+#: posts/templates/posts/partials/reel_card.html:109
+msgid "Public"
+msgstr "Hadharani"
+
+#: posts/templates/posts/partials/post_card.html:114
+#: posts/templates/posts/partials/reel_card.html:118
+msgid "Post options"
+msgstr "Chaguo za chapisho"
+
+#: posts/templates/posts/partials/post_card.html:132
+#: posts/templates/posts/partials/post_card.html:450
+#: posts/templates/posts/partials/reel_card.html:132
+#: posts/templates/posts/partials/reel_card.html:344
+#: posts/templates/posts/partials/repost_scatter_cluster.html:18
+#: templates/base.html:2108 templates/base.html:2120 templates/base.html:2224
+#: templates/base.html:2228 templates/base.html:2598 templates/base.html:5159
+msgid "Repost"
+msgstr "Chapisha tena"
+
+#: posts/templates/posts/partials/post_card.html:140
+#: posts/templates/posts/partials/reel_card.html:140
+msgid "Hide post"
+msgstr "Ficha chapisho"
+
+#: posts/templates/posts/partials/post_card.html:150
+#: posts/templates/posts/partials/reel_card.html:150
+msgid "Hide posts from"
+msgstr "Ficha machapisho kutoka kwa"
+
+#: posts/templates/posts/partials/post_card.html:156
+#: posts/templates/posts/partials/reel_card.html:156
+msgid "Share to profile"
+msgstr "Shiriki kwenye wasifu"
+
+#: posts/templates/posts/partials/post_card.html:162
+#: posts/templates/posts/partials/reel_card.html:162 templates/base.html:2248
+#: templates/base.html:2252 templates/base.html:2355 templates/base.html:4950
+msgid "Copy Link"
+msgstr "Nakili kiungo"
+
+#: posts/templates/posts/partials/post_card.html:168
+#: posts/templates/posts/partials/reel_card.html:168 templates/base.html:2132
+msgid "Report post"
+msgstr "Ripoti chapisho"
+
+#: posts/templates/posts/partials/post_card.html:182
+msgid "Download Media"
+msgstr "Pakua midia"
+
+#: posts/templates/posts/partials/post_card.html:192
+#: posts/templates/posts/partials/reel_card.html:192
+msgid "Are you sure you want to delete this post?"
+msgstr "Una uhakika unataka kufuta chapisho hili?"
+
+#: posts/templates/posts/partials/post_card.html:195
+#: posts/templates/posts/partials/reel_card.html:195
+msgid "Delete post"
+msgstr "Futa chapisho"
+
+#: posts/templates/posts/partials/post_card.html:440
+#: posts/templates/posts/partials/reel_card.html:334
+msgid "Comment"
+msgstr "Toa maoni"
+
+#: posts/templates/posts/partials/post_card.html:461
+#: posts/templates/posts/partials/reel_card.html:355
+msgid "Share post"
+msgstr "Shiriki chapisho"
+
+#: posts/templates/posts/partials/post_card.html:463
+#: posts/templates/posts/partials/reel_card.html:357 templates/base.html:2612
+#: templates/base.html:2615
+msgid "Share"
+msgstr "Shiriki"
+
+#: posts/templates/posts/partials/post_card.html:494
+msgid "Write a comment..."
+msgstr "Andika maoni..."
+
+#: posts/templates/posts/partials/post_card.html:500
+msgid "Submit comment"
+msgstr "Wasilisha maoni"
+
+#: posts/templates/posts/partials/post_content.html:18
+#: posts/templates/posts/partials/post_content.html:22
+#: posts/templates/posts/partials/reel_card.html:216
+#: posts/templates/posts/partials/reel_card.html:218
+msgid "See more"
+msgstr "Tazama zaidi"
+
+#: posts/templates/posts/partials/post_content.html:19
+#: posts/templates/posts/partials/reel_card.html:216
+msgid "See less"
+msgstr "Tazama machache"
+
+#: posts/templates/posts/partials/post_detail_content.html:113
+#: posts/templates/posts/partials/post_detail_content.html:119
+msgid "Back"
+msgstr "Rudi"
+
+#: posts/templates/posts/partials/post_detail_content.html:118
+#: templates/base.html:5557
+msgid "Sign in to explore PwaniNet"
+msgstr "Ingia ili kuchunguza PwaniNet"
+
+#: posts/templates/posts/partials/post_detail_content.html:118
+msgid ""
+"Join PwaniNet to browse the campus feed, groups, and academic materials."
+msgstr "Jiunge na PwaniNet ili kuvinjari mtiririko wa chuo, vikundi na nyenzo za masomo."
+
+#: posts/templates/posts/partials/post_detail_content.html:156
+msgid "Add comment..."
+msgstr "Ongeza maoni..."
+
+#: posts/templates/posts/partials/post_detail_content.html:157
+msgid "Add a comment"
+msgstr "Ongeza maoni"
+
+#: posts/templates/posts/partials/post_detail_content.html:161
+msgid "Send comment"
+msgstr "Tuma maoni"
+
+#: posts/templates/posts/partials/post_detail_content.html:176
+msgid "Join PwaniNet to participate"
+msgstr "Jiunge na PwaniNet ili kushiriki"
+
+#: posts/templates/posts/partials/post_detail_content.html:177
+msgid "Sign in to like, comment, and connect with students."
+msgstr "Ingia ili kupenda, kutoa maoni na kuwasiliana na wanafunzi."
+
+#: posts/templates/posts/partials/post_detail_content.html:181
+#: templates/base.html:2528
+msgid "Sign In"
+msgstr "Ingia"
+
+#: posts/templates/posts/partials/post_detail_content.html:184
+msgid "Create Account"
+msgstr "Fungua akaunti"
+
+#: posts/templates/posts/partials/reel_card.html:182
+msgid "Download Reel"
+msgstr "Pakua video fupi"
+
+#: posts/templates/posts/partials/reel_card.html:262
+msgid "Play or pause reel"
+msgstr "Cheza au sitisha video fupi"
+
+#: posts/templates/posts/partials/reel_card.html:275
+msgid "Loading…"
+msgstr "Inapakia…"
+
+#: posts/templates/posts/partials/reel_card.html:289
+msgid "Full Screen"
+msgstr "Skrini nzima"
+
+#: posts/templates/posts/partials/reel_card.html:290
+msgid "Expand reel"
+msgstr "Panua video fupi"
+
+#: posts/templates/posts/partials/reels_carousel.html:11
+msgid "Campus Reels"
+msgstr "Video fupi za chuo"
+
+#: posts/templates/posts/partials/reels_carousel.html:17
+#: templates/base.html:2198 templates/base.html:2219
+msgid "Scroll left"
+msgstr "Sogeza kushoto"
+
+#: posts/templates/posts/partials/reels_carousel.html:20
+#: templates/base.html:2207 templates/base.html:2295
+msgid "Scroll right"
+msgstr "Sogeza kulia"
+
+#: posts/templates/posts/partials/reels_carousel.html:31
+msgid "View all"
+msgstr "Tazama yote"
+
+#: posts/templates/posts/partials/repost_header_banner.html:11
+msgid "You"
+msgstr "Wewe"
+
+#: posts/templates/posts/partials/repost_header_banner.html:11
+#: posts/templates/posts/partials/repost_header_banner.html:17
+#: posts/templates/posts/partials/repost_header_banner.html:25
+#: posts/templates/posts/partials/repost_header_banner.html:31
+msgid "and"
+msgstr "na"
+
+#: posts/templates/posts/partials/repost_header_banner.html:33
+#: users/templates/users/partials/profile_content.html:531
+msgid "reposted this"
+msgstr "ameshiriki tena chapisho hili"
+
+#: posts/templates/posts/partials/shared_post_card.html:30
+msgid "shared the mobile app with"
+msgstr "ameshiriki programu ya simu na"
+
+#: posts/templates/posts/partials/shared_post_card.html:32
+msgid "shared a post with"
+msgstr "ameshiriki chapisho na"
+
+#: posts/templates/posts/partials/shared_post_card.html:76
+msgid "Download Mobile App"
+msgstr "Pakua programu ya simu"
+
+#: posts/templates/posts/partials/shared_post_card.html:84
+msgid "This post is no longer available."
+msgstr "Chapisho hili halipatikani tena."
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:13
+#: pwanimate/templates/pwanimate/partials/chat_content.html:116
+#: pwanimate/templates/pwanimate/partials/chat_content.html:639
+#: pwanimate/templates/pwanimate/partials/chat_content.html:669
+#: pwanimate/templates/pwanimate/partials/chat_content.html:689
+#: pwanimate/templates/pwanimate/settings/partials/settings_modal.html:23
+#: templates/base.html:1966 templates/base.html:2109 templates/base.html:2133
+#: templates/base.html:2176 templates/base.html:2320 templates/base.html:2441
+#: templates/base.html:2512
+#: users/templates/users/settings/partials/active_devices_content.html:135
+#: users/templates/users/settings/partials/blocked_content.html:67
+#: users/templates/users/settings/partials/hidden_content.html:66
+#: users/templates/users/settings/partials/notification_preferences_content.html:20
+#: users/templates/users/settings/partials/password_content.html:102
+#: users/templates/users/settings/partials/post_privacy_content.html:76
+#: users/templates/users/settings/partials/profile_privacy_content.html:67
+msgid "Close"
+msgstr "Funga"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:61
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:69
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:90
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:91
+msgid "New Chat"
+msgstr "Mazungumzo mapya"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:66
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:71
+msgid "Chat History"
+msgstr "Historia ya mazungumzo"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:76
+msgid "Logout"
+msgstr "Toka"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:99
+#: pwanimate/templates/pwanimate/partials/chat_content.html:158
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:29
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:115
+msgid "Preview"
+msgstr "Hakiki"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:111
+#: pwanimate/templates/pwanimate/partials/chat_content.html:300
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:42
+msgid "Context"
+msgstr "Muktadha"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:132
+#: pwanimate/templates/pwanimate/partials/chat_content.html:226
+#: pwanimate/templates/pwanimate/partials/chat_content.html:365
+#: pwanimate/templates/pwanimate/partials/chat_content.html:389
+#: pwanimate/templates/pwanimate/partials/chat_content.html:391
+#: pwanimate/templates/pwanimate/partials/chat_content.html:396
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:84
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:193
+msgid "Document"
+msgstr "Waraka"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:140
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:93
+msgid "+ Add to Context"
+msgstr "+ Ongeza kwenye muktadha"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:167
+#: pwanimate/templates/pwanimate/partials/chat_content.html:254
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:124
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:225
+msgid "Thumbnail"
+msgstr "Picha ya kijipicha"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:181
+msgid "Resource Preview"
+msgstr "Hakiki nyenzo"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:188
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:145
+msgid "Open Document"
+msgstr "Fungua waraka"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:190
+#: pwanimate/templates/pwanimate/partials/chat_content.html:276
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:147
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:247
+msgid "Open in new tab"
+msgstr "Fungua kwenye kichupo kipya"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:203
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:163
+msgid "Working Context"
+msgstr "Muktadha wa kazi"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:205
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:164
+msgid ""
+"No working materials attached yet. Inspect citations in the Preview tab and "
+"click '+ Add to Context' to keep key references attached while you chat."
+msgstr "Bado hakuna nyenzo za kazi zilizoambatishwa. Kagua marejeo kwenye kichupo cha Hakikisho kisha ubofye '+ Ongeza kwenye muktadha' ili kuhifadhi marejeo muhimu unapozungumza."
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:207
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:169
+msgid "Add context item"
+msgstr "Ongeza kipengee cha muktadha"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:217
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:182
+msgid "Add a book"
+msgstr "Ongeza kitabu"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:232
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:199
+msgid "Remove from working context"
+msgstr "Ondoa kwenye muktadha wa kazi"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:234
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:201
+msgid "Remove"
+msgstr "Ondoa"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:249
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:219
+msgid "Context item"
+msgstr "Kipengee cha muktadha"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:274
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:245
+msgid "Open Original"
+msgstr "Fungua ya asili"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:289
+msgid "Pwanimate Chat"
+msgstr "Mazungumzo ya Pwanimate"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:297
+#: pwanimate/templates/pwanimate/partials/chat_content.html:298
+msgid "Open Context Rail"
+msgstr "Fungua paneli ya muktadha"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:331
+msgid "Copy message"
+msgstr "Nakili ujumbe"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:334
+msgid "Edit message"
+msgstr "Hariri ujumbe"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:358
+msgid "Sources referenced"
+msgstr "Vyanzo vilivyorejelewa"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:407
+msgid "Citations"
+msgstr "Marejeo"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:422
+msgid "Save response to My Resources"
+msgstr "Hifadhi jibu kwenye Nyenzo Zangu"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:426
+msgid "Download PDF"
+msgstr "Pakua PDF"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:427
+msgid "Download Word document"
+msgstr "Pakua waraka wa Word"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:430
+msgid "Copy answer"
+msgstr "Nakili jibu"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:457
+msgid "Pwanimate can make mistakes. Please verify important details."
+msgstr "Pwanimate inaweza kukosea. Tafadhali hakiki taarifa muhimu."
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:492
+#: pwanimate/templates/pwanimate/partials/chat_content.html:498
+msgid "Message Pwanimate"
+msgstr "Tuma ujumbe kwa Pwanimate"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:497
+msgid "Message Pwanimate..."
+msgstr "Tuma ujumbe kwa Pwanimate..."
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:517
+msgid "Select AI Model"
+msgstr "Chagua modeli ya AI"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:522
+msgid "AI Model Selection"
+msgstr "Uteuzi wa modeli ya AI"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:530
+msgid "Auto (Recommended)"
+msgstr "Kiotomatiki (Inapendekezwa)"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:531
+msgid "Automatic multi-tier failover"
+msgstr "Uhamishaji wa kiotomatiki kati ya viwango"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:547
+msgid "View Quotas & Models..."
+msgstr "Tazama viwango na modeli..."
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:557
+#: pwanimate/templates/pwanimate/partials/chat_content.html:558
+msgid "Dictate a message"
+msgstr "Tamka ujumbe"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:565
+#: pwanimate/templates/pwanimate/partials/chat_content.html:566
+msgid "Send message"
+msgstr "Tuma ujumbe"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:621
+msgid "Files"
+msgstr "Faili"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:625
+msgid "Supported: Images (JPEG, PNG, GIF, WebP), PDFs, and Text Documents"
+msgstr "Vinavyokubaliwa: Picha (JPEG, PNG, GIF, WebP), PDF na nyaraka za maandishi"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:636
+msgid "Add a book to context"
+msgstr "Ongeza kitabu kwenye muktadha"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:637
+msgid ""
+"Search the document repository and choose a book to open in your context "
+"rail."
+msgstr "Tafuta kwenye hazina ya nyaraka na uchague kitabu cha kufungua kwenye paneli ya muktadha."
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:642
+msgid "Search repository books"
+msgstr "Tafuta vitabu kwenye hazina"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:645
+msgid "Search books by title or topic…"
+msgstr "Tafuta vitabu kwa jina au mada…"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:648
+msgid "Type at least two characters to search the repository."
+msgstr "Andika angalau herufi mbili ili kutafuta kwenye hazina."
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:662
+msgid "AI Models & Quotas"
+msgstr "Modeli na viwango vya AI"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:665
+msgid "Refresh quota status"
+msgstr "Onyesha upya hali ya kiwango"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:667
+msgid "Refresh"
+msgstr "Onyesha upya"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:674
+msgid ""
+"Select an AI model to manually override default routing, or keep Auto for "
+"automatic zero-downtime failover between tiers."
+msgstr "Chagua modeli ya AI ili kubatilisha mwenyewe uelekezaji chaguomsingi, au acha Kiotomatiki ili mfumo ubadilishe viwango bila kukatika."
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:681
+msgid "Loading models..."
+msgstr "Inapakia modeli..."
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:687
+msgid "Multi-tier rate limit protection active"
+msgstr "Ulinzi wa kikomo cha matumizi wa viwango vingi unatumika"
+
+#: pwanimate/templates/pwanimate/partials/chat_navigation_partial.html:13
+msgid "Pwanimate Navigation"
+msgstr "Urambazaji wa Pwanimate"
+
+#: pwanimate/templates/pwanimate/partials/chat_navigation_partial.html:20
+msgid "Pwanimate Resources"
+msgstr "Nyenzo za Pwanimate"
+
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:14
+msgid "New Conversation"
+msgstr "Mazungumzo mapya"
+
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:23
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:24
+msgid "Delete conversation"
+msgstr "Futa mazungumzo"
+
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:32
+msgid "No conversations yet. Ask a question to start one!"
+msgstr "Bado hakuna mazungumzo. Uliza swali ili kuanza!"
+
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:42
+msgid "Loading more conversations…"
+msgstr "Inapakia mazungumzo zaidi…"
+
+#: pwanimate/templates/pwanimate/partials/people_section.html:6
+msgid "Discovered Students & Peers"
+msgstr "Wanafunzi na wenzao waliogunduliwa"
+
+#: pwanimate/templates/pwanimate/partials/person_card.html:67
+#: users/templates/users/partials/profile_content.html:322
+#: users/templates/users/partials/profile_context_rail.html:304
+msgid "Open to Projects"
+msgstr "Wazi kwa Miradi"
+
+#: pwanimate/templates/pwanimate/partials/person_card.html:71
+#: users/templates/users/partials/profile_content.html:324
+#: users/templates/users/partials/profile_context_rail.html:306
+msgid "Open to Study Groups"
+msgstr "Wazi kwa Vikundi vya Masomo"
+
+#: pwanimate/templates/pwanimate/partials/person_card.html:75
+#: users/templates/users/partials/profile_content.html:326
+#: users/templates/users/partials/profile_context_rail.html:308
+msgid "Open to Networking"
+msgstr "Wazi kwa Mtandao"
+
+#: pwanimate/templates/pwanimate/partials/person_card.html:79
+msgid "Open to Collaborate"
+msgstr "Tayari kushirikiana"
+
+#: pwanimate/templates/pwanimate/partials/person_card.html:103
+msgid "mutual"
+msgstr "wa pamoja"
+
+#: pwanimate/templates/pwanimate/partials/person_card.html:109
+msgid "groups"
+msgstr "vikundi"
+
+#: pwanimate/templates/pwanimate/partials/person_card.html:127
+msgid "Preview here"
+msgstr "Hakiki hapa"
+
+#: pwanimate/templates/pwanimate/partials/person_card.html:137
+msgid "View Profile"
+msgstr "Tazama wasifu"
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:9
+msgid "Resize context rail"
+msgstr "Badilisha ukubwa wa paneli ya muktadha"
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:14
+msgid "Drag to resize context rail"
+msgstr "Buruta ili kubadilisha ukubwa wa paneli ya muktadha"
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:51
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:52
+msgid "Close context rail"
+msgstr "Funga paneli ya muktadha"
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:70
+msgid "Reference Inspection"
+msgstr "Ukaguzi wa marejeo"
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:71
+msgid ""
+"Click any citation badge in the conversation to inspect documents, posts, or "
+"media here without modifying your working context."
+msgstr "Bofya alama yoyote ya rejeleo kwenye mazungumzo ili kukagua nyaraka, machapisho au midia hapa bila kubadilisha muktadha wako wa kazi."
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:73
+msgid ""
+"The open preview is included with your next question. Add it to Context to "
+"keep it attached while you chat."
+msgstr "Hakikisho lililo wazi litaambatishwa kwenye swali lako linalofuata. Liongeze kwenye Muktadha ili libaki limeambatishwa unapozungumza."
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:95
+msgid "Close preview"
+msgstr "Funga hakikisho"
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:166
+msgid "Attached resources remain pinned across tab switches and citations."
+msgstr "Nyenzo zilizoambatishwa hubaki zimebandikwa unapobadilisha vichupo na marejeo."
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:13
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:101
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:102
+msgid "Back to PwaniNet"
+msgstr "Rudi kwenye PwaniNet"
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:14
+msgid "PwaniNet"
+msgstr "PwaniNet"
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:20
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:21
+msgid "Collapse sidebar"
+msgstr "Kunja upau wa pembeni"
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:27
+msgid "Light Mode"
+msgstr "Hali angavu"
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:28
+msgid "Dark Mode"
+msgstr "Hali nyeusi"
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:29
+msgid "System Theme"
+msgstr "Mandhari ya mfumo"
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:83
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:84
+msgid "Expand sidebar"
+msgstr "Panua upau wa pembeni"
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_top_nav.html:18
+#: pwanimate/templates/pwanimate/partials/pwanimate_top_nav.html:19
+msgid "Open working context"
+msgstr "Fungua muktadha wa kazi"
+
+#: pwanimate/templates/pwanimate/settings/index.html:5
+msgid "Settings - Pwanimate"
+msgstr "Mipangilio - Pwanimate"
+
+#: pwanimate/templates/pwanimate/settings/partials/about_content.html:12
+msgid "The Official Intelligent Assistant for Pwani University Students"
+msgstr "Msaidizi rasmi mahiri wa wanafunzi wa Chuo Kikuu cha Pwani"
+
+#: pwanimate/templates/pwanimate/settings/partials/about_content.html:13
+#, python-format
+msgid "Version %(ver)s"
+msgstr "Toleo %(ver)s"
+
+#: pwanimate/templates/pwanimate/settings/partials/about_content.html:18
+msgid "What is Pwanimate?"
+msgstr "Pwanimate ni nini?"
+
+#: pwanimate/templates/pwanimate/settings/partials/about_content.html:20
+msgid ""
+"Pwanimate is an AI academic companion natively integrated into PwaniNet. "
+"Built specifically for Pwani University, Pwanimate bridges campus academic "
+"records, lecture materials, student collaboration, and course information to "
+"help you navigate your academic journey."
+msgstr "Pwanimate ni msaidizi wa masomo unaotumia AI na umejumuishwa moja kwa moja kwenye PwaniNet. Umetengenezwa mahsusi kwa Chuo Kikuu cha Pwani, ukiunganisha kumbukumbu za kitaaluma za chuo, nyenzo za mihadhara, ushirikiano wa wanafunzi na taarifa za kozi ili kukusaidia katika safari yako ya masomo."
+
+#: pwanimate/templates/pwanimate/settings/partials/about_content.html:26
+msgid "Key Capabilities"
+msgstr "Uwezo mkuu"
+
+#: pwanimate/templates/pwanimate/settings/partials/about_content.html:32
+msgid "Document Retrieval & Citations"
+msgstr "Utafutaji wa nyaraka na marejeo"
+
+#: pwanimate/templates/pwanimate/settings/partials/about_content.html:35
+msgid ""
+"Unified retrieval searches campus documents, course outlines, syllabus, and "
+"lecture notes via semantic and keyword search, providing citations with "
+"direct source links."
+msgstr "Utafutaji wa pamoja hutafuta nyaraka za chuo, mihutasari ya kozi, silabasi na dondoo za mihadhara kwa kutumia maana na maneno muhimu, kisha kutoa marejeo yenye viungo vya moja kwa moja vya vyanzo."
+
+#: pwanimate/templates/pwanimate/settings/partials/about_content.html:43
+msgid "Student Peer Discovery"
+msgstr "Ugunduzi wa wanafunzi wenzako"
+
+#: pwanimate/templates/pwanimate/settings/partials/about_content.html:46
+msgid ""
+"Discovers active peers based on shared skills, interests, and collaboration "
+"availability, strictly respecting user privacy settings and student profile "
+"visibility."
+msgstr "Hutambua wanafunzi wenza walio hai kwa kuzingatia ujuzi na maslahi yanayofanana pamoja na utayari wa kushirikiana, huku ukiheshimu kikamilifu mipangilio ya faragha na mwonekano wa wasifu."
+
+#: pwanimate/templates/pwanimate/settings/partials/about_content.html:54
+msgid "Campus & Group Awareness"
+msgstr "Ufahamu wa chuo na vikundi"
+
+#: pwanimate/templates/pwanimate/settings/partials/about_content.html:57
+msgid ""
+"Contextual summaries of course announcements, departmental notices, and "
+"enrolled group updates directly within your chat."
+msgstr "Muhtasari wenye muktadha wa matangazo ya kozi, taarifa za idara na masasisho ya vikundi ulivyojiunga navyo, moja kwa moja kwenye mazungumzo yako."
+
+#: pwanimate/templates/pwanimate/settings/partials/about_content.html:65
+msgid "Personalized Preferences"
+msgstr "Mapendeleo yaliyobinafsishwa"
+
+#: pwanimate/templates/pwanimate/settings/partials/about_content.html:68
+msgid ""
+"Customizes conversational tone, response style, and personal instructions "
+"tailored to your preferences while remaining subordinate to system safety "
+"and academic integrity guidelines."
+msgstr "Hubinafsisha mtindo wa mazungumzo, namna ya kujibu na maagizo yako kulingana na mapendeleo yako, huku ukifuata kanuni za usalama za mfumo na uadilifu wa kitaaluma."
+
+#: pwanimate/templates/pwanimate/settings/partials/about_content.html:77
+msgid "Academic Boundaries & Privacy"
+msgstr "Mipaka ya kitaaluma na faragha"
+
+#: pwanimate/templates/pwanimate/settings/partials/about_content.html:79
+msgid ""
+"Pwanimate only accesses campus documents and platform records you are "
+"authorized to view. Your personal instructions and preference settings are "
+"private to your account and never shared with peers or external services. "
+"Pwanimate is an advisory assistant and study tool designed to augment your "
+"learning, not replace faculty instruction or university grading systems."
+msgstr "Pwanimate hufikia tu nyaraka za chuo na kumbukumbu za jukwaa ambazo umeidhinishwa kuona. Maagizo na mapendeleo yako ni ya faragha kwenye akaunti yako na hayashirikiwi na wanafunzi wenzako au huduma za nje. Pwanimate ni msaidizi wa ushauri na zana ya kujifunzia inayosaidia masomo yako; haichukui nafasi ya mafundisho ya wahadhiri au mifumo ya upimaji ya chuo kikuu."
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:11
+#: pwanimate/templates/pwanimate/settings/partials/settings_mobile_page.html:29
+#: pwanimate/templates/pwanimate/settings/partials/settings_modal.html:39
+msgid "Personalization"
+msgstr "Ubinafsishaji"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:13
+msgid ""
+"Configure how Pwanimate interacts with you across conversations and academic "
+"inquiries."
+msgstr "Weka jinsi Pwanimate inavyowasiliana nawe kwenye mazungumzo na maswali ya kitaaluma."
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:21
+msgid "Saved!"
+msgstr "Imehifadhiwa!"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:21
+msgid "Your Pwanimate preferences have been updated."
+msgstr "Mapendeleo yako ya Pwanimate yamesasishwa."
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:30
+msgid "Please correct the following errors:"
+msgstr "Tafadhali sahihisha hitilafu zifuatazo:"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:45
+msgid "What should Pwanimate call you?"
+msgstr "Pwanimate ikuitaje?"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:48
+msgid ""
+"Optional. This only changes how Pwanimate addresses you in chat, and does "
+"not alter your PwaniNet account or display name."
+msgstr "Si lazima. Hii hubadilisha tu jinsi Pwanimate inavyokuita kwenye mazungumzo; haibadilishi akaunti au jina lako la kuonyesha la PwaniNet."
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:56
+msgid "e.g. Zayne"
+msgstr "kwa mfano Zayne"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:67
+msgid "Conversational Tone"
+msgstr "Mtindo wa mazungumzo"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:69
+msgid "Select the general manner in which Pwanimate frames its responses."
+msgstr "Chagua namna ya jumla ambayo Pwanimate itatumia kuunda majibu yake."
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:75
+msgid "Neutral"
+msgstr "Wastani"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:75
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:120
+#: users/templates/users/settings/partials/appearance_content.html:172
+msgid "Default"
+msgstr "Chaguomsingi"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:76
+msgid "Clear, objective, balanced, and straightforward responses."
+msgstr "Majibu yaliyo wazi, yasiyoegemea upande, yenye uwiano na ya moja kwa moja."
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:82
+msgid "Friendly"
+msgstr "Kirafiki"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:83
+msgid "Warm, conversational, relaxed, and encouraging."
+msgstr "Ya kirafiki, ya mazungumzo, tulivu na yenye kutia moyo."
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:89
+msgid "Professional"
+msgstr "Kitaalamu"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:90
+msgid "Polished, workplace-appropriate, and formally structured."
+msgstr "Yaliyopangiliwa vizuri, yanayofaa kazini na yenye muundo rasmi."
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:96
+msgid "Academic"
+msgstr "Kitaaluma"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:97
+msgid "Scholarly, intellectually rigorous, and conceptually precise."
+msgstr "Ya kitaaluma, yenye kina cha fikra na usahihi wa dhana."
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:105
+msgid "Response Style"
+msgstr "Mtindo wa majibu"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:107
+msgid "Choose the preferred depth and length of explanations."
+msgstr "Chagua kina na urefu unaopendelea wa maelezo."
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:113
+msgid "Concise"
+msgstr "Fupi"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:114
+msgid "Brief, direct, and focused to the point without extra fluff."
+msgstr "Mafupi, ya moja kwa moja na yanayolenga hoja bila maelezo ya ziada."
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:120
+msgid "Balanced"
+msgstr "Yenye uwiano"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:121
+msgid "Sufficient explanation and guidance without unnecessary length."
+msgstr "Maelezo na mwongozo wa kutosha bila urefu usiohitajika."
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:127
+msgid "Detailed"
+msgstr "Yenye maelezo"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:128
+msgid ""
+"Comprehensive, in-depth explanations with additional background context."
+msgstr "Maelezo ya kina na ya kina zaidi pamoja na muktadha wa ziada."
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:137
+msgid "Personal Instructions"
+msgstr "Maagizo binafsi"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:140
+msgid ""
+"Tell Pwanimate how you would like it to work with you. These instructions "
+"guide conversational style, but do not override university policies, safety "
+"rules, or privacy boundaries."
+msgstr "Eleza jinsi unavyotaka Pwanimate ishirikiane nawe. Maagizo haya huongoza mtindo wa mazungumzo, lakini hayabatilishi sera za chuo kikuu, kanuni za usalama au mipaka ya faragha."
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:147
+msgid ""
+"e.g. Keep technical explanations practical. Provide concrete code examples "
+"before abstract theory."
+msgstr "kwa mfano: Eleza mambo ya kiufundi kwa njia ya vitendo. Toa mifano halisi ya msimbo kabla ya nadharia ya jumla."
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:168
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:242
+msgid "Saved"
+msgstr "Imehifadhiwa"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:168
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:226
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:243
+msgid "Save Preferences"
+msgstr "Hifadhi mapendeleo"
+
+#: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:216
+msgid "Saving..."
+msgstr "Inahifadhi..."
+
+#: pwanimate/templates/pwanimate/settings/partials/settings_mobile_page.html:14
+msgid "Back to Chat"
+msgstr "Rudi kwenye mazungumzo"
+
+#: pwanimate/templates/pwanimate/settings/partials/settings_mobile_page.html:39
+#: pwanimate/templates/pwanimate/settings/partials/settings_modal.html:49
+msgid "Usage"
+msgstr "Matumizi"
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:4
+msgid "Usage & Activity"
+msgstr "Matumizi na shughuli"
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:6
+msgid ""
+"Overview of your Pwanimate activity, conversational threads, and platform "
+"capabilities."
+msgstr "Muhtasari wa shughuli zako za Pwanimate, mazungumzo na uwezo wa jukwaa."
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:25
+msgid "Pwanimate Active"
+msgstr "Pwanimate inatumika"
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:31
+msgid "Connected Account"
+msgstr "Akaunti iliyounganishwa"
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:35
+msgid "Conversational Threads"
+msgstr "Mazungumzo"
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:36
+msgid "thread"
+msgstr "mazungumzo"
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:36
+msgid "threads"
+msgstr "mazungumzo"
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:48
+msgid "Detailed Usage Metrics in Preparation"
+msgstr "Takwimu za kina za matumizi zinatayarishwa"
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:50
+msgid ""
+"Detailed personal activity summaries, query telemetry, and resource "
+"allocation meters are currently in development for a future update."
+msgstr "Muhtasari wa kina wa shughuli binafsi, takwimu za hoja na vipimo vya ugawaji wa rasilimali vinatengenezwa kwa sasisho lijalo."
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:53
+msgid ""
+"Pwanimate is currently available for your academic studies, peer discovery, "
+"and course inquiries under standard Pwani University acceptable academic use "
+"and fair use guidelines."
+msgstr "Kwa sasa Pwanimate inapatikana kwa masomo yako, kutafuta wanafunzi wenzako na maswali ya kozi, kwa kufuata mwongozo wa matumizi yanayokubalika na matumizi ya haki wa Chuo Kikuu cha Pwani."
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:61
+msgid "Included Capabilities"
+msgstr "Vipengele vilivyojumuishwa"
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:64
+msgid "Campus Documents & Lecture Retrieval"
+msgstr "Nyaraka za chuo na utafutaji wa mihadhara"
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:65
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:69
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:73
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:77
+msgid "Available"
+msgstr "Inapatikana"
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:68
+msgid "Student Peer Discovery & Academic Collaboration"
+msgstr "Ugunduzi wa wanafunzi wenza na ushirikiano wa kitaaluma"
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:72
+msgid "Group Announcements & Notification Summaries"
+msgstr "Matangazo ya vikundi na muhtasari wa arifa"
+
+#: pwanimate/templates/pwanimate/settings/partials/usage_content.html:76
+msgid "Course & Programme Curriculum Structure"
+msgstr "Muundo wa mtaala wa kozi na programu"
+
+#: search/templates/search/partials/search_navigation_partial.html:252
+msgid "Recent searches"
+msgstr "Utafutaji wa hivi karibuni"
+
+#: search/templates/search/partials/search_navigation_partial.html:261
+msgid "Clear"
+msgstr "Futa"
+
+#: templates/404.html:7
+msgid "Page Not Found (404)"
+msgstr "Ukurasa haujapatikana (404)"
+
+#: templates/404.html:180
+msgid "Error 404"
+msgstr "Hitilafu 404"
+
+#: templates/404.html:181
+msgid "Page not found"
+msgstr "Ukurasa haujapatikana"
+
+#: templates/404.html:183
+msgid ""
+"The page or resource you are looking for may have been removed, had its name "
+"changed, or is temporarily unavailable."
+msgstr "Ukurasa au nyenzo unayotafuta huenda imeondolewa, jina lake limebadilishwa au haipatikani kwa sasa."
+
+#: templates/404.html:188
+msgid "Return to Home"
+msgstr "Rudi mwanzo"
+
+#: templates/404.html:192
+msgid "Go Back"
+msgstr "Rudi nyuma"
+
+#: templates/base.html:1874
+#: users/templates/users/settings/partials/two_factor_content.html:300
+msgid "Protect Your Account with 2FA"
+msgstr "Linda akaunti yako kwa 2FA"
+
+#: templates/base.html:1875
+msgid "Add an extra layer of security to your student account."
+msgstr "Ongeza hatua nyingine ya usalama kwenye akaunti yako ya mwanafunzi."
+
+#: templates/base.html:1880
+msgid "Enable"
+msgstr "Washa"
+
+#: templates/base.html:1936 templates/base.html:1937
+msgid "Back to top"
+msgstr "Rudi juu"
+
+#: templates/base.html:1964
+msgid "Install PwaniNet on Android"
+msgstr "Sakinisha PwaniNet kwenye Android"
+
+#: templates/base.html:1973
+msgid "PwaniNet APK QR Code"
+msgstr "Msimbo wa QR wa APK ya PwaniNet"
+
+#: templates/base.html:1980
+msgid "Point your phone's camera or QR scanner at the code above."
+msgstr "Elekeza kamera ya simu au kichanganuzi cha QR kwenye msimbo ulio juu."
+
+#: templates/base.html:1987
+msgid "Scan the QR code and tap Download APK."
+msgstr "Changanua msimbo wa QR kisha uguse Pakua APK."
+
+#: templates/base.html:1991
+msgid "If prompted by Chrome, select Download anyway."
+msgstr "Chrome ikiuliza, chagua Pakua hata hivyo."
+
+#: templates/base.html:1995
+msgid "Open the downloaded file and tap Install."
+msgstr "Fungua faili lililopakuliwa kisha uguse Sakinisha."
+
+#: templates/base.html:2006
+#: templates/downloads/partials/download_page_content.html:292
+msgid "Copy"
+msgstr "Nakili"
+
+#: templates/base.html:2026 templates/base.html:4946
+msgid "Copied!"
+msgstr "Imenakiliwa!"
+
+#: templates/base.html:2089
+msgid "Downloading on this device?"
+msgstr "Unapakua kwenye kifaa hiki?"
+
+#: templates/base.html:2091
+msgid "Download directly on your computer"
+msgstr "Pakua moja kwa moja kwenye kompyuta yako"
+
+#: templates/base.html:2095
+msgid "View Downloads Page"
+msgstr "Tazama ukurasa wa vipakuliwa"
+
+#: templates/base.html:2117
+msgid "Add a comment (optional)"
+msgstr "Ongeza maoni (hiari)"
+
+#: templates/base.html:2118
+msgid "What do you think?"
+msgstr "Unafikiria nini?"
+
+#: templates/base.html:2142
+msgid "Reason for reporting"
+msgstr "Sababu ya kuripoti"
+
+#: templates/base.html:2144
+msgid "Select a reason"
+msgstr "Chagua sababu"
+
+#: templates/base.html:2145
+msgid "Spam"
+msgstr "Barua taka"
+
+#: templates/base.html:2146
+msgid "Inappropriate content"
+msgstr "Maudhui yasiyofaa"
+
+#: templates/base.html:2147
+msgid "Harassment"
+msgstr "Unyanyasaji"
+
+#: templates/base.html:2148
+msgid "False information"
+msgstr "Taarifa za uongo"
+
+#: templates/base.html:2149
+msgid "Copyright or ownership concern"
+msgstr "Wasiwasi kuhusu hakimiliki au umiliki"
+
+#: templates/base.html:2150
+msgid "Privacy concern"
+msgstr "Wasiwasi wa faragha"
+
+#: templates/base.html:2151
+msgid "Other"
+msgstr "Nyingine"
+
+#: templates/base.html:2155
+msgid "Additional details (optional)"
+msgstr "Maelezo ya ziada (si lazima)"
+
+#: templates/base.html:2156
+msgid "Please provide more details about why you are reporting this post..."
+msgstr "Tafadhali eleza zaidi kwa nini unaripoti chapisho hili..."
+
+#: templates/base.html:2159
+msgid "Submit Report"
+msgstr "Wasilisha ripoti"
+
+#: templates/base.html:2173 templates/base.html:5062
+msgid "Share to"
+msgstr "Shiriki kwa"
+
+#: templates/base.html:2187
+msgid "Search friends or groups..."
+msgstr "Tafuta marafiki au vikundi..."
+
+#: templates/base.html:2194
+msgid "Send on PwaniNet"
+msgstr "Tuma kwenye PwaniNet"
+
+#: templates/base.html:2204
+msgid "Loading friends & groups..."
+msgstr "Inapakia marafiki na vikundi..."
+
+#: templates/base.html:2217
+msgid "Share via"
+msgstr "Shiriki kupitia"
+
+#: templates/base.html:2232 templates/base.html:2328 templates/base.html:2605
+msgid "Save to Library"
+msgstr "Hifadhi kwenye maktaba"
+
+#: templates/base.html:2236 templates/base.html:2608
+msgid "Save"
+msgstr "Hifadhi"
+
+#: templates/base.html:2240
+msgid "Download Video"
+msgstr "Pakua video"
+
+#: templates/base.html:2288 templates/base.html:2292
+msgid "More"
+msgstr "Zaidi"
+
+#: templates/base.html:2288
+msgid "More options"
+msgstr "Chaguo zaidi"
+
+#: templates/base.html:2316
+msgid "Reel Options"
+msgstr "Chaguo za video fupi"
+
+#: templates/base.html:2329
+msgid "Bookmark this reel to revisit later"
+msgstr "Weka alama kwenye video hii fupi ili uitazame tena baadaye"
+
+#: templates/base.html:2337
+msgid "Repost Reel"
+msgstr "Shiriki tena video fupi"
+
+#: templates/base.html:2338
+msgid "Share this with your followers"
+msgstr "Shiriki hili na wafuasi wako"
+
+#: templates/base.html:2346
+msgid "Share to Groups / WhatsApp"
+msgstr "Shiriki kwa vikundi / WhatsApp"
+
+#: templates/base.html:2347
+msgid "Send to campus groups or friends"
+msgstr "Tuma kwa vikundi vya chuo au marafiki"
+
+#: templates/base.html:2356
+msgid "Copy reel link to clipboard"
+msgstr "Nakili kiungo cha video fupi"
+
+#: templates/base.html:2364
+msgid "Save for Offline"
+msgstr "Hifadhi kwa matumizi bila intaneti"
+
+#: templates/base.html:2365
+msgid "Watch without using cellular data"
+msgstr "Tazama bila kutumia data ya simu"
+
+#: templates/base.html:2373
+msgid "Not Interested"
+msgstr "Sipendezwi"
+
+#: templates/base.html:2374
+msgid "Hide this reel from your feed"
+msgstr "Ficha video hii fupi kwenye mtiririko wako"
+
+#: templates/base.html:2382
+msgid "Report Reel"
+msgstr "Ripoti video fupi"
+
+#: templates/base.html:2383
+msgid "Flag inappropriate content"
+msgstr "Ripoti maudhui yasiyofaa"
+
+#: templates/base.html:2391
+msgid "Delete Reel"
+msgstr "Futa video fupi"
+
+#: templates/base.html:2392
+msgid "Permanently remove your reel"
+msgstr "Ondoa video yako fupi kabisa"
+
+#: templates/base.html:2402
+msgid "Auto-scroll"
+msgstr "Kusogeza kiotomatiki"
+
+#: templates/base.html:2403
+msgid "Automatically advance to the next reel when it ends"
+msgstr "Nenda kiotomatiki kwenye video fupi inayofuata hii ikiisha"
+
+#: templates/base.html:2405
+msgid "Off"
+msgstr "Zima"
+
+#: templates/base.html:2413 templates/base.html:2417
+msgid "Video Quality"
+msgstr "Ubora wa video"
+
+#: templates/base.html:2414
+msgid "Adaptive bitrate"
+msgstr "Kiwango cha biti kinachobadilika"
+
+#: templates/base.html:2438 templates/base.html:2573 templates/base.html:2591
+#: templates/base.html:2686
+msgid "Comments"
+msgstr "Maoni"
+
+#: templates/base.html:2446 templates/base.html:2697
+msgid "Loading comments..."
+msgstr "Inapakia maoni..."
+
+#: templates/base.html:2453 templates/base.html:2705
+msgid "Replying to"
+msgstr "Unamjibu"
+
+#: templates/base.html:2454 templates/base.html:2706
+msgid "Cancel reply"
+msgstr "Ghairi jibu"
+
+#: templates/base.html:2463 templates/base.html:2715
+msgid "Add a comment..."
+msgstr "Ongeza maoni..."
+
+#: templates/base.html:2466 templates/base.html:2718
+msgid "Send"
+msgstr "Tuma"
+
+#: templates/base.html:2520 templates/base.html:5438
+msgid "Sign in to explore more"
+msgstr "Ingia ili kuchunguza zaidi"
+
+#: templates/base.html:2522
+msgid ""
+"Join the PwaniNet campus network to like, comment, and connect with fellow "
+"students."
+msgstr "Jiunge na mtandao wa chuo wa PwaniNet ili kupenda, kutoa maoni na kuwasiliana na wanafunzi wenzako."
+
+#: templates/base.html:2531
+msgid "Create an Account"
+msgstr "Fungua akaunti"
+
+#: templates/base.html:2536
+msgid "Maybe later"
+msgstr "Labda baadaye"
+
+#: templates/base.html:2549
+msgid "Reels viewer"
+msgstr "Kitazamaji cha video fupi"
+
+#: templates/base.html:2551
+msgid "Back to feed"
+msgstr "Rudi kwenye mtiririko"
+
+#: templates/base.html:2551
+msgid "Close Reels"
+msgstr "Funga video fupi"
+
+#: templates/base.html:2570 templates/base.html:2571
+msgid "Open Comments"
+msgstr "Fungua maoni"
+
+#: templates/base.html:2584
+msgid "Like"
+msgstr "Penda"
+
+#: templates/base.html:2619
+msgid "Mute / Unmute"
+msgstr "Zima / washa sauti"
+
+#: templates/base.html:2619
+msgid "Toggle Mute"
+msgstr "Washa au zima sauti"
+
+#: templates/base.html:2622
+msgid "Sound"
+msgstr "Sauti"
+
+#: templates/base.html:2628
+msgid "Previous Reel"
+msgstr "Video fupi iliyotangulia"
+
+#: templates/base.html:2631
+msgid "Next Reel"
+msgstr "Video fupi inayofuata"
+
+#: templates/base.html:2638
+msgid "Reel details and comments"
+msgstr "Maelezo na maoni ya video fupi"
+
+#: templates/base.html:2662
+msgid "Options"
+msgstr "Chaguo"
+
+#: templates/base.html:2665
+msgid "Close comments rail"
+msgstr "Funga paneli ya maoni"
+
+#: templates/base.html:2677
+msgid "Original Audio"
+msgstr "Sauti ya asili"
+
+#: templates/base.html:2688
+msgid "Refresh comments"
+msgstr "Onyesha upya maoni"
+
+#: templates/base.html:2742 templates/base.html:2744
+#: templates/partials/desktop_left_rail.html:15
+#: templates/partials/top_nav.html:24
+msgid "Home"
+msgstr "Nyumbani"
+
+#: templates/base.html:2756 templates/base.html:2761
+#: templates/partials/desktop_left_rail.html:29
+#: templates/partials/top_nav.html:38
+msgid "Groups"
+msgstr "Vikundi"
+
+#: templates/base.html:2774
+msgid "Create Post"
+msgstr "Unda chapisho"
+
+#: templates/base.html:2789 templates/base.html:2804
+#: templates/partials/desktop_left_rail.html:83
+#: users/templates/users/settings/partials/notification_preferences_content.html:8
+msgid "Notifications"
+msgstr "Arifa"
+
+#: templates/base.html:2816 templates/base.html:2818
+#: templates/partials/desktop_left_rail.html:95
+msgid "Profile"
+msgstr "Wasifu"
+
+#: templates/base.html:4798
+msgid "App shared successfully!"
+msgstr "Programu imeshirikiwa!"
+
+#: templates/base.html:4805
+msgid "Failed to share"
+msgstr "Imeshindwa kushiriki"
+
+#: templates/base.html:4812
+msgid "Network error while sharing"
+msgstr "Hitilafu ya mtandao wakati wa kushiriki"
+
+#: templates/base.html:4948
+msgid "Link copied to clipboard!"
+msgstr "Kiungo kimenakiliwa!"
+
+#: templates/base.html:5010
+msgid "Share Mobile App"
+msgstr "Shiriki programu ya simu"
+
+#: templates/base.html:5012 users/services/invite_service.py:124
+msgid ""
+"📱 Download the official PwaniNet Android app for campus updates, course "
+"groups, and offline access:"
+msgstr "📱 Pakua programu rasmi ya PwaniNet ya Android ili kupata masasisho ya chuo, vikundi vya kozi na ufikiaji bila intaneti:"
+
+#: templates/base.html:5028
+msgid "Invite to PwaniNet"
+msgstr "Alika kwenye PwaniNet"
+
+#: templates/base.html:5030 users/services/invite_service.py:125
+msgid ""
+"🎓 Join me on PwaniNet! Connect with classmates, access course groups, and "
+"collaborate:"
+msgstr "🎓 Jiunge nami kwenye PwaniNet! Wasiliana na wanafunzi wenzako, jiunge na vikundi vya kozi na mshirikiane:"
+
+#: templates/base.html:5159
+msgid "Reposted"
+msgstr "Imeshirikiwa tena"
+
+#: templates/base.html:5174 templates/base.html:5527
+msgid "Sign in to repost"
+msgstr "Ingia ili kushiriki tena"
+
+#: templates/base.html:5175 templates/base.html:5528
+msgid "Sign in to repost this to your followers and campus profile."
+msgstr "Ingia ili kushiriki hili tena na wafuasi wako na kwenye wasifu wako wa chuo."
+
+#: templates/base.html:5196
+msgid "Reposted to your profile!"
+msgstr "Imeshirikiwa tena kwenye wasifu wako!"
+
+#: templates/base.html:5196
+msgid "Repost removed"
+msgstr "Ushiriki tena umeondolewa"
+
+#: templates/base.html:5217
+msgid "Could not update repost"
+msgstr "Imeshindwa kusasisha ushiriki tena"
+
+#: templates/base.html:5235 templates/base.html:5533
+msgid "Sign in to save"
+msgstr "Ingia ili kuhifadhi"
+
+#: templates/base.html:5236 templates/base.html:5534
+msgid "Save your favorite posts and reels to your personal library."
+msgstr "Hifadhi machapisho na video fupi unazopenda kwenye maktaba yako binafsi."
+
+#: templates/base.html:5259 templates/base.html:5539
+msgid "Sign in to download"
+msgstr "Ingia ili kupakua"
+
+#: templates/base.html:5260 templates/base.html:5540
+msgid "Sign in to save videos and academic materials for offline viewing."
+msgstr "Ingia ili kuhifadhi video na nyenzo za masomo kwa kutazama bila intaneti."
+
+#: templates/base.html:5439
+msgid ""
+"Join the PwaniNet campus community to like, comment, and connect with "
+"students."
+msgstr "Jiunge na jumuiya ya chuo ya PwaniNet ili kupenda, kutoa maoni na kuwasiliana na wanafunzi."
+
+#: templates/base.html:5515
+msgid "Sign in to like"
+msgstr "Ingia ili kupenda"
+
+#: templates/base.html:5516
+msgid "Create an account or sign in to like this post and support the author."
+msgstr "Fungua akaunti au ingia ili kupenda chapisho hili na kumuunga mkono mwandishi."
+
+#: templates/base.html:5521
+msgid "Sign in to comment"
+msgstr "Ingia ili kutoa maoni"
+
+#: templates/base.html:5522
+msgid ""
+"Sign in to post comments, reply to students, and share your perspective."
+msgstr "Ingia ili kutoa maoni, kuwajibu wanafunzi na kushiriki mtazamo wako."
+
+#: templates/base.html:5545
+msgid "Sign in for more options"
+msgstr "Ingia kwa chaguo zaidi"
+
+#: templates/base.html:5546
+msgid ""
+"Sign in to PwaniNet to save posts, repost, customize your feed, or report "
+"content."
+msgstr "Ingia kwenye PwaniNet ili kuhifadhi machapisho, kuyashiriki tena, kubinafsisha mtiririko wako au kuripoti maudhui."
+
+#: templates/base.html:5551
+msgid "Sign in to view profiles"
+msgstr "Ingia ili kuona wasifu"
+
+#: templates/base.html:5552
+msgid ""
+"Sign in to connect with students, see courses, and view their campus "
+"activity."
+msgstr "Ingia ili kuwasiliana na wanafunzi, kuona kozi na shughuli zao chuoni."
+
+#: templates/base.html:5558
+msgid ""
+"Join PwaniNet to explore campus groups, discover trending posts, and access "
+"past papers."
+msgstr "Jiunge na PwaniNet ili kuchunguza vikundi vya chuo, kugundua machapisho yanayovuma na kupata mitihani ya zamani."
+
+#: templates/downloads/download_page.html:5
+#: templates/downloads/partials/download_page_content.html:5
+msgid "Download PwaniNet — Web App (PWA) & Mobile APK"
+msgstr "Pakua PwaniNet — programu ya wavuti (PWA) na APK ya simu"
+
+#: templates/downloads/partials/download_page_content.html:20
+msgid "Download PwaniNet"
+msgstr "Pakua PwaniNet"
+
+#: templates/downloads/partials/download_page_content.html:22
+msgid ""
+"Please read the short installation guide below first to avoid browser "
+"security blocks, then select your download option at the bottom."
+msgstr "Soma kwanza mwongozo mfupi wa usakinishaji hapa chini ili kuepuka vizuizi vya usalama vya kivinjari, kisha uchague njia ya kupakua chini."
+
+#: templates/downloads/partials/download_page_content.html:29
+msgid "Verified Safe & Open Source"
+msgstr "Imethibitishwa kuwa salama na chanzo huria"
+
+#: templates/downloads/partials/download_page_content.html:48
+msgid "Android APK Installation & Safety Warnings"
+msgstr "Usakinishaji wa APK ya Android na tahadhari za usalama"
+
+#: templates/downloads/partials/download_page_content.html:50
+msgid "Direct to the point — what Android shows and how to proceed"
+msgstr "Kwa ufupi — ujumbe unaoonyeshwa na Android na jinsi ya kuendelea"
+
+#: templates/downloads/partials/download_page_content.html:60
+msgid "Warning 1"
+msgstr "Tahadhari ya 1"
+
+#: templates/downloads/partials/download_page_content.html:63
+msgid "'File might be harmful'"
+msgstr "'Faili linaweza kuwa hatari'"
+
+#: templates/downloads/partials/download_page_content.html:67
+msgid "When downloading, Chrome will pop up:"
+msgstr "Unapopakua, Chrome itaonyesha ujumbe:"
+
+#: templates/downloads/partials/download_page_content.html:70
+msgid "File might be harmful. Do you want to download pwaninet.apk anyway?"
+msgstr "Faili linaweza kuwa hatari. Unataka kupakua pwaninet.apk hata hivyo?"
+
+#: templates/downloads/partials/download_page_content.html:73
+#: templates/downloads/partials/download_page_content.html:99
+#: templates/downloads/partials/download_page_content.html:127
+msgid "Action:"
+msgstr "Hatua:"
+
+#: templates/downloads/partials/download_page_content.html:73
+#: templates/downloads/partials/download_page_content.html:102
+#: templates/downloads/partials/download_page_content.html:103
+#: templates/downloads/partials/download_page_content.html:127
+#: templates/downloads/partials/download_page_content.html:158
+msgid "Tap "
+msgstr "Gusa "
+
+#: templates/downloads/partials/download_page_content.html:73
+msgid "Download anyway"
+msgstr "Pakua hata hivyo"
+
+#: templates/downloads/partials/download_page_content.html:75
+#, python-format
+msgid ""
+"Chrome shows this standard warning for all APKs outside Google Play. "
+"PwaniNet is 100%% verified & safe."
+msgstr "Chrome huonyesha tahadhari hii ya kawaida kwa APK zote zilizo nje ya Google Play. PwaniNet imethibitishwa kuwa salama kwa 100%%."
+
+#: templates/downloads/partials/download_page_content.html:86
+msgid "Warning 2"
+msgstr "Tahadhari ya 2"
+
+#: templates/downloads/partials/download_page_content.html:89
+msgid "'Blocked by Play Protect'"
+msgstr "'Imezuiwa na Play Protect'"
+
+#: templates/downloads/partials/download_page_content.html:93
+msgid "When opening the APK, Google Play Protect may prompt:"
+msgstr "Unapofungua APK, Google Play Protect inaweza kuonyesha ujumbe:"
+
+#: templates/downloads/partials/download_page_content.html:96
+msgid "Blocked by Play Protect — Unknown developer"
+msgstr "Imezuiwa na Play Protect — Msanidi programu hajulikani"
+
+#: templates/downloads/partials/download_page_content.html:101
+msgid "Do "
+msgstr "Usi"
+
+#: templates/downloads/partials/download_page_content.html:101
+msgid "NOT"
+msgstr "USI"
+
+#: templates/downloads/partials/download_page_content.html:101
+msgid " tap 'OK' (it cancels install)."
+msgstr " uguse 'Sawa' (hii hughairi usakinishaji)."
+
+#: templates/downloads/partials/download_page_content.html:102
+msgid "More details"
+msgstr "Maelezo zaidi"
+
+#: templates/downloads/partials/download_page_content.html:102
+msgid "small text at bottom"
+msgstr "maandishi madogo chini"
+
+#: templates/downloads/partials/download_page_content.html:103
+msgid "Install anyway"
+msgstr "Sakinisha hata hivyo"
+
+#: templates/downloads/partials/download_page_content.html:114
+msgid "Step 3"
+msgstr "Hatua ya 3"
+
+#: templates/downloads/partials/download_page_content.html:117
+msgid "Allow 'Install Unknown Apps' Permission"
+msgstr "Ruhusu ruhusa ya 'Sakinisha programu zisizojulikana'"
+
+#: templates/downloads/partials/download_page_content.html:121
+msgid "Open "
+msgstr "Fungua "
+
+#: templates/downloads/partials/download_page_content.html:121
+msgid ""
+" from your notifications or phone Downloads folder. If your device says:"
+msgstr " kutoka kwenye arifa au folda ya Vipakuliwa ya simu. Kifaa kikisema:"
+
+#: templates/downloads/partials/download_page_content.html:124
+msgid ""
+"For your security, your phone is not allowed to install unknown apps from "
+"this source"
+msgstr "Kwa usalama wako, simu yako hairuhusiwi kusakinisha programu zisizojulikana kutoka chanzo hiki"
+
+#: templates/downloads/partials/download_page_content.html:127
+msgid "toggle ON "
+msgstr "washa "
+
+#: templates/downloads/partials/download_page_content.html:127
+msgid "Allow from this source"
+msgstr "Ruhusu kutoka chanzo hiki"
+
+#: templates/downloads/partials/download_page_content.html:127
+msgid "tap Back and press "
+msgstr "gusa Rudi kisha ubonyeze "
+
+#: templates/downloads/partials/download_page_content.html:127
+#: templates/downloads/partials/download_page_content.html:172
+msgid "Install"
+msgstr "Sakinisha"
+
+#: templates/downloads/partials/download_page_content.html:140
+msgid "Web App (PWA) Guidelines"
+msgstr "Mwongozo wa programu ya wavuti (PWA)"
+
+#: templates/downloads/partials/download_page_content.html:142
+msgid "No file downloads needed • Runs straight through your browser"
+msgstr "Hakuna faili la kupakua • Hutumika moja kwa moja kwenye kivinjari"
+
+#: templates/downloads/partials/download_page_content.html:152
+msgid "iPhone & iPad (Safari)"
+msgstr "iPhone na iPad (Safari)"
+
+#: templates/downloads/partials/download_page_content.html:155
+msgid "Open this site in Safari."
+msgstr "Fungua tovuti hii kwenye Safari."
+
+#: templates/downloads/partials/download_page_content.html:156
+msgid "Tap the "
+msgstr "Gusa "
+
+#: templates/downloads/partials/download_page_content.html:156
+msgid "Share button"
+msgstr "Kitufe cha kushiriki"
+
+#: templates/downloads/partials/download_page_content.html:157
+msgid "Scroll down & tap "
+msgstr "Sogeza chini kisha uguse "
+
+#: templates/downloads/partials/download_page_content.html:157
+msgid "Add to Home Screen"
+msgstr "Ongeza kwenye skrini ya mwanzo"
+
+#: templates/downloads/partials/download_page_content.html:158
+msgid "Add"
+msgstr "Ongeza"
+
+#: templates/downloads/partials/download_page_content.html:158
+msgid "in top-right corner."
+msgstr "kwenye kona ya juu kulia."
+
+#: templates/downloads/partials/download_page_content.html:168
+msgid "Android (Chrome)"
+msgstr "Android (Chrome)"
+
+#: templates/downloads/partials/download_page_content.html:171
+msgid "Click "
+msgstr "Bofya "
+
+#: templates/downloads/partials/download_page_content.html:171
+#: templates/downloads/partials/download_page_content.html:265
+msgid "Install Web App (PWA)"
+msgstr "Sakinisha programu ya wavuti (PWA)"
+
+#: templates/downloads/partials/download_page_content.html:171
+#: templates/downloads/partials/download_page_content.html:187
+msgid "below."
+msgstr "hapa chini."
+
+#: templates/downloads/partials/download_page_content.html:172
+msgid "Confirm "
+msgstr "Thibitisha "
+
+#: templates/downloads/partials/download_page_content.html:172
+msgid "on browser popup."
+msgstr "kwenye dirisha ibukizi la kivinjari."
+
+#: templates/downloads/partials/download_page_content.html:173
+msgid "Or tap Chrome Menu (⋮) ➔ "
+msgstr "Au gusa Menyu ya Chrome (⋮) ➔ "
+
+#: templates/downloads/partials/download_page_content.html:173
+msgid "Install app"
+msgstr "Sakinisha programu"
+
+#: templates/downloads/partials/download_page_content.html:183
+msgid "Desktop (PC & Mac)"
+msgstr "Kompyuta (PC na Mac)"
+
+#: templates/downloads/partials/download_page_content.html:186
+msgid "Click the Install icon (⬇) in the browser URL bar."
+msgstr "Bofya aikoni ya Sakinisha (⬇) kwenye upau wa anwani wa kivinjari."
+
+#: templates/downloads/partials/download_page_content.html:187
+msgid "Or click "
+msgstr "Au bofya "
+
+#: templates/downloads/partials/download_page_content.html:187
+msgid "Install Web App"
+msgstr "Sakinisha programu ya wavuti"
+
+#: templates/downloads/partials/download_page_content.html:188
+msgid "PwaniNet launches in its own clean window."
+msgstr "PwaniNet itafunguka kwenye dirisha lake tofauti."
+
+#: templates/downloads/partials/download_page_content.html:200
+msgid "Instructions Read"
+msgstr "Nimesoma maelekezo"
+
+#: templates/downloads/partials/download_page_content.html:203
+msgid "Choose Your Download Option"
+msgstr "Chagua njia ya kupakua"
+
+#: templates/downloads/partials/download_page_content.html:206
+msgid ""
+"Select between the standalone Android APK or the instant browser Web App "
+"(PWA)."
+msgstr "Chagua kati ya APK huru ya Android au programu ya wavuti (PWA) inayofunguka kwenye kivinjari."
+
+#: templates/downloads/partials/download_page_content.html:219
+msgid "Android APK"
+msgstr "APK ya Android"
+
+#: templates/downloads/partials/download_page_content.html:222
+msgid "Recommended for Android"
+msgstr "Inapendekezwa kwa Android"
+
+#: templates/downloads/partials/download_page_content.html:226
+msgid ""
+"Standalone APK compiled directly from GitHub releases. Enables background "
+"push alerts and native 60fps speed."
+msgstr "APK huru iliyotengenezwa moja kwa moja kutoka matoleo ya GitHub. Huwezesha arifa za chinichini na kasi asilia ya fremu 60 kwa sekunde."
+
+#: templates/downloads/partials/download_page_content.html:234
+msgid "Download Mobile APK"
+msgstr "Pakua APK ya simu"
+
+#: templates/downloads/partials/download_page_content.html:237
+msgid "Direct file download • No redirect"
+msgstr "Upakuaji wa faili moja kwa moja • Hakuna kuelekezwa kwingine"
+
+#: templates/downloads/partials/download_page_content.html:251
+msgid "Web App (PWA)"
+msgstr "Programu ya wavuti (PWA)"
+
+#: templates/downloads/partials/download_page_content.html:254
+msgid "Universal • Zero Download"
+msgstr "Kwa vifaa vyote • Hakuna upakuaji"
+
+#: templates/downloads/partials/download_page_content.html:258
+msgid ""
+"Installs directly to your home screen or desktop via your browser. Zero "
+"storage overhead and automatic background updates."
+msgstr "Sakinisha moja kwa moja kwenye skrini ya mwanzo au kompyuta kupitia kivinjari. Haitumii nafasi ya ziada na husasishwa kiotomatiki chinichini."
+
+#: templates/downloads/partials/download_page_content.html:268
+msgid "Triggers browser install prompt"
+msgstr "Hufungua ombi la usakinishaji la kivinjari"
+
+#: templates/downloads/partials/download_page_content.html:283
+msgid "Viewing on a computer? Scan with your phone"
+msgstr "Unatumia kompyuta? Changanua kwa simu yako"
+
+#: templates/downloads/partials/download_page_content.html:287
+msgid ""
+"Point your phone camera at the code to open this download page or download "
+"the APK directly on mobile."
+msgstr "Elekeza kamera ya simu kwenye msimbo ili kufungua ukurasa huu wa upakuaji au kupakua APK moja kwa moja kwenye simu."
+
+#: templates/downloads/partials/download_page_content.html:299
+msgid "PwaniNet QR Code"
+msgstr "Msimbo wa QR wa PwaniNet"
+
+#: templates/legal/about.html:6 templates/registration/login.html:217
+#: users/templates/users/settings/partials/about_content.html:7
+#: users/templates/users/settings/partials/about_content.html:98
+msgid "About PwaniNet"
+msgstr "Kuhusu PwaniNet"
+
+#: templates/legal/licenses.html:6
+#: users/templates/users/settings/partials/about_content.html:100
+msgid "Licences and attributions"
+msgstr "Leseni na shukrani"
+
+#: templates/legal/privacy.html:6
+msgid "PwaniNet Privacy Policy"
+msgstr "Sera ya faragha ya PwaniNet"
+
+#: templates/partials/default_context_rail.html:13
+msgid ""
+"Stay connected with class groups, course revisions, shared notes, and peer "
+"updates."
+msgstr "Endelea kuwasiliana kupitia vikundi vya darasa, marudio ya kozi, dondoo zinazoshirikiwa na masasisho kutoka kwa wanafunzi wenzako."
+
+#: templates/partials/default_context_rail.html:33
+msgid "Study Groups"
+msgstr "Vikundi vya masomo"
+
+#: templates/partials/desktop_left_rail.html:6
+msgid "Main Navigation"
+msgstr "Urambazaji mkuu"
+
+#: templates/partials/desktop_left_rail.html:27
+msgid "New group activity"
+msgstr "Shughuli mpya ya kikundi"
+
+#: templates/partials/desktop_left_rail.html:61
+msgid "Pwanimate"
+msgstr "Pwanimate"
+
+#: templates/partials/desktop_left_rail.html:117
+msgid "Download App"
+msgstr "Pakua programu"
+
+#: templates/partials/desktop_left_rail.html:148
+msgid "Log In"
+msgstr "Ingia"
+
+#: templates/partials/top_nav.html:133
+msgid "Login"
+msgstr "Ingia"
+
+#: templates/registration/login.html:127
+msgid "Welcome back"
+msgstr "Karibu tena"
+
+#: templates/registration/login.html:128
+msgid "Sign in to your PwaniNet account to continue."
+msgstr "Ingia kwenye akaunti yako ya PwaniNet ili kuendelea."
+
+#: templates/registration/login.html:154
+msgid "Authentication Failed"
+msgstr "Uthibitishaji umeshindwa"
+
+#: templates/registration/login.html:181
+msgid "Forgot password?"
+msgstr "Umesahau nenosiri?"
+
+#: templates/registration/login.html:191
+msgid "This field cannot be empty"
+msgstr "Uga huu hauwezi kuwa wazi"
+
+#: templates/registration/login.html:197
+msgid "Sign in"
+msgstr "Ingia"
+
+#: templates/registration/login.html:205
+msgid "New to PwaniNet?"
+msgstr "Mgeni kwenye PwaniNet?"
+
+#: templates/registration/login.html:206
+msgid "Create an account"
+msgstr "Fungua akaunti"
+
+#: templates/registration/login.html:213
+#: templates/registration/login_2fa.html:206
+#: templates/registration/password_recovery_identify.html:142
+#: templates/registration/password_recovery_set_new.html:150
+#: templates/registration/password_recovery_verify.html:204
+msgid "← Back to Public View"
+msgstr "← Rudi kwenye Mtazamo wa Umma"
+
+#: templates/registration/login.html:215
+#: users/templates/users/settings/partials/about_content.html:99
+msgid "Privacy Policy"
+msgstr "Sera ya faragha"
+
+#: templates/registration/login.html:219
+msgid "Licences"
+msgstr "Leseni"
+
+#: templates/registration/login.html:371
+msgid "Authenticate & Enter"
+msgstr "Tambulisha na Ingia"
+
+#: templates/registration/login_2fa.html:69
+msgid "Two-Factor Verification"
+msgstr "Uthibitishaji wa hatua mbili"
+
+#: templates/registration/login_2fa.html:71
+#, python-format
+msgid ""
+"\n"
+"                  Signed in as <strong>@%(uname)s</strong>. Enter the 6-"
+"digit code from your authenticator app.\n"
+"                "
+msgstr "\n                  Umeingia kama <strong>@%(uname)s</strong>. Weka msimbo wa tarakimu 6 kutoka kwenye programu yako ya uthibitishaji.\n                "
+
+#: templates/registration/login_2fa.html:99
+#: templates/registration/password_recovery_verify.html:99
+msgid "Verification Failed"
+msgstr "Uthibitishaji umeshindwa"
+
+#: templates/registration/login_2fa.html:104
+#, python-format
+msgid ""
+"\n"
+"                      %(n)s attempt(s) remaining before you are locked out.\n"
+"                    "
+msgstr "\n                      Umebakiza majaribio %(n)s kabla akaunti haijafungwa.\n                    "
+
+#: templates/registration/login_2fa.html:118
+msgid "Authenticator Code"
+msgstr "Msimbo wa uthibitishaji"
+
+#: templates/registration/login_2fa.html:134
+msgid ""
+"Open Google Authenticator (or any TOTP app) and enter the current 6-digit "
+"code."
+msgstr "Fungua Google Authenticator (au programu nyingine ya TOTP) na uweke msimbo wa sasa wa tarakimu 6."
+
+#: templates/registration/login_2fa.html:140
+msgid "Verify & Sign In"
+msgstr "Thibitisha na uingie"
+
+#: templates/registration/login_2fa.html:156
+msgid "Use a recovery code instead"
+msgstr "Tumia msimbo wa kurejesha badala yake"
+
+#: templates/registration/login_2fa.html:166
+msgid "Recovery Code"
+msgstr "Msimbo wa kurejesha"
+
+#: templates/registration/login_2fa.html:180
+msgid ""
+"Enter one of the single-use recovery codes you saved when you set up 2FA."
+msgstr "Weka mojawapo ya misimbo ya matumizi moja ya kurejesha akaunti uliyohifadhi ulipoweka 2FA."
+
+#: templates/registration/login_2fa.html:185
+msgid "Sign In with Recovery Code"
+msgstr "Ingia kwa msimbo wa kurejesha"
+
+#: templates/registration/login_2fa.html:190
+#: templates/registration/password_recovery_verify.html:188
+msgid "Each recovery code can only be used once."
+msgstr "Kila msimbo wa kurejesha unaweza kutumika mara moja tu."
+
+#: templates/registration/login_2fa.html:196
+msgid "Log in as different user"
+msgstr "Ingia kama mtumiaji mwingine"
+
+#: templates/registration/password_recovery_identify.html:63
+msgid "Account Recovery"
+msgstr "Urejeshaji wa akaunti"
+
+#: templates/registration/password_recovery_identify.html:65
+msgid ""
+"Enter your username to recover access using your Two-Factor Authentication "
+"or Recovery Code."
+msgstr "Weka jina lako la mtumiaji ili kurejesha ufikiaji kwa kutumia uthibitishaji wa hatua mbili au msimbo wa kurejesha."
+
+#: templates/registration/password_recovery_identify.html:91
+msgid "Unable to Recover Account"
+msgstr "Imeshindwa kurejesha akaunti"
+
+#: templates/registration/password_recovery_identify.html:101
+msgid "Username"
+msgstr "Jina la mtumiaji"
+
+#: templates/registration/password_recovery_identify.html:108
+msgid "Enter your username"
+msgstr "Weka jina lako la mtumiaji"
+
+#: templates/registration/password_recovery_identify.html:117
+msgid ""
+"No email required. You will verify your identity using your authenticator "
+"app or recovery code."
+msgstr "Barua pepe haihitajiki. Utathibitisha utambulisho wako kwa programu ya uthibitishaji au msimbo wa kurejesha."
+
+#: templates/registration/password_recovery_identify.html:123
+msgid "Continue to Verification"
+msgstr "Endelea na uthibitishaji"
+
+#: templates/registration/password_recovery_identify.html:132
+msgid "Back to Login"
+msgstr "Rudi kwenye ukurasa wa kuingia"
+
+#: templates/registration/password_recovery_identify.html:157
+msgid "Looking up account…"
+msgstr "Inatafuta akaunti…"
+
+#: templates/registration/password_recovery_set_new.html:63
+msgid "Set New Password"
+msgstr "Weka nenosiri jipya"
+
+#: templates/registration/password_recovery_set_new.html:65
+#, python-format
+msgid ""
+"\n"
+"                  Identity confirmed for <strong>@%(uname)s</strong>. Choose "
+"a strong new password for your account.\n"
+"                "
+msgstr "\n                  Utambulisho wa <strong>@%(uname)s</strong> umethibitishwa. Chagua nenosiri jipya thabiti la akaunti yako.\n                "
+
+#: templates/registration/password_recovery_set_new.html:75
+msgid "Password Requirements Not Met"
+msgstr "Masharti ya nenosiri hayajatimizwa"
+
+#: templates/registration/password_recovery_set_new.html:90
+#: users/templates/users/settings/partials/password_content.html:50
+#: users/templates/users/settings/partials/password_content.html:58
+msgid "New Password"
+msgstr "Nenosiri jipya"
+
+#: templates/registration/password_recovery_set_new.html:98
+msgid "Enter new password"
+msgstr "Weka nenosiri jipya"
+
+#: templates/registration/password_recovery_set_new.html:111
+#: users/templates/users/settings/partials/password_content.html:72
+#: users/templates/users/settings/partials/password_content.html:80
+msgid "Confirm New Password"
+msgstr "Thibitisha nenosiri jipya"
+
+#: templates/registration/password_recovery_set_new.html:119
+msgid "Confirm new password"
+msgstr "Thibitisha nenosiri jipya"
+
+#: templates/registration/password_recovery_set_new.html:131
+msgid "Save New Password & Sign In"
+msgstr "Hifadhi nenosiri jipya na uingie"
+
+#: templates/registration/password_recovery_set_new.html:140
+msgid "Cancel and Return to Login"
+msgstr "Ghairi na urudi kwenye ukurasa wa kuingia"
+
+#: templates/registration/password_recovery_set_new.html:182
+msgid "Saving new password…"
+msgstr "Inahifadhi nenosiri jipya…"
+
+#: templates/registration/password_recovery_verify.html:69
+msgid "Verify Your Identity"
+msgstr "Thibitisha utambulisho wako"
+
+#: templates/registration/password_recovery_verify.html:71
+#, python-format
+msgid ""
+"\n"
+"                  Recovering access for <strong>@%(uname)s</strong>. Enter "
+"your 6-digit authenticator code or single-use recovery code.\n"
+"                "
+msgstr "\n                  Unarejesha ufikiaji wa <strong>@%(uname)s</strong>. Weka msimbo wa uthibitishaji wa tarakimu 6 au msimbo wa kurejesha wa matumizi moja.\n                "
+
+#: templates/registration/password_recovery_verify.html:104
+#, python-format
+msgid ""
+"\n"
+"                      %(n)s attempt(s) remaining before recovery is locked "
+"out.\n"
+"                    "
+msgstr "\n                      Umebakiza majaribio %(n)s kabla urejeshaji haujafungwa.\n                    "
+
+#: templates/registration/password_recovery_verify.html:117
+msgid "6-Digit Authenticator Code"
+msgstr "Msimbo wa uthibitishaji wa tarakimu 6"
+
+#: templates/registration/password_recovery_verify.html:133
+msgid "Open Google Authenticator or your 2FA app to get the current code."
+msgstr "Fungua Google Authenticator au programu yako ya 2FA ili kupata msimbo wa sasa."
+
+#: templates/registration/password_recovery_verify.html:139
+msgid "Verify & Reset Password"
+msgstr "Thibitisha na uweke upya nenosiri"
+
+#: templates/registration/password_recovery_verify.html:155
+msgid "Lost your authenticator? Use a Recovery Code"
+msgstr "Umepoteza programu yako ya uthibitishaji? Tumia msimbo wa kurejesha"
+
+#: templates/registration/password_recovery_verify.html:164
+msgid "Single-Use Recovery Code"
+msgstr "Msimbo wa kurejesha wa matumizi moja"
+
+#: templates/registration/password_recovery_verify.html:178
+msgid "Enter one of the 8 single-use codes you saved when enabling 2FA."
+msgstr "Weka mojawapo ya misimbo 8 ya matumizi moja uliyohifadhi ulipowasha 2FA."
+
+#: templates/registration/password_recovery_verify.html:183
+msgid "Verify Recovery Code"
+msgstr "Thibitisha msimbo wa kurejesha"
+
+#: templates/registration/password_recovery_verify.html:194
+msgid "Try different username"
+msgstr "Jaribu jina lingine la mtumiaji"
+
+#: templates/registration/password_recovery_verify.html:233
+msgid "Verifying…"
+msgstr "Inathibitisha…"
+
+#: users/templates/users/partials/private_profile_content.html:7
+msgid "Profile picture"
+msgstr "Picha ya wasifu"
+
+#: users/templates/users/partials/private_profile_content.html:15
+msgid ""
+"This profile is visible to followers only. Follow this student to see their "
+"profile details and posts."
+msgstr "Wasifu huu unaonekana kwa wafuasi pekee. Mfuate mwanafunzi huyu ili kuona maelezo ya wasifu na machapisho yake."
+
+#: users/templates/users/partials/private_profile_content.html:17
+msgid "This student has chosen to keep their profile private."
+msgstr "Mwanafunzi huyu amechagua kuweka wasifu wake kuwa wa faragha."
+
+#: users/templates/users/partials/profile_actions_menu.html:9
+msgid "Profile options"
+msgstr "Chaguo za wasifu"
+
+#: users/templates/users/partials/profile_actions_menu.html:15
+msgid ""
+"Block this student? They will not be able to view your profile or posts."
+msgstr "Umzuie mwanafunzi huyu? Hataweza kuona wasifu au machapisho yako."
+
+#: users/templates/users/partials/profile_actions_menu.html:18
+msgid "Block student"
+msgstr "Mzuie mwanafunzi"
+
+#: users/templates/users/partials/profile_content.html:83
+#: users/templates/users/partials/profile_context_rail.html:79
+msgid "Bio hidden by profile privacy"
+msgstr "Wasifu mfupi umefichwa kwa sababu ya mipangilio ya faragha"
+
+#: users/templates/users/partials/profile_content.html:83
+#: users/templates/users/partials/profile_content.html:207
+#: users/templates/users/partials/profile_content.html:309
+#: users/templates/users/partials/profile_context_rail.html:79
+#: users/templates/users/partials/profile_context_rail.html:199
+#: users/templates/users/partials/profile_context_rail.html:291
+msgid "This information is hidden by the profile owner."
+msgstr "Taarifa hii imefichwa na mmiliki wa wasifu."
+
+#: users/templates/users/partials/profile_content.html:89
+#: users/templates/users/partials/profile_context_rail.html:85
+#: users/templates/users/partials/pwanimate_profile_card.html:19
+msgid "Pwani University Student."
+msgstr "Mwanafunzi wa Chuo Kikuu cha Pwani."
+
+#: users/templates/users/partials/profile_content.html:110
+#: users/templates/users/partials/profile_context_rail.html:106
+msgid "UPDATE PROFILE"
+msgstr "SASISHA WASILIFU"
+
+#: users/templates/users/partials/profile_content.html:113
+#: users/templates/users/partials/profile_context_rail.html:109
+msgid "SETTINGS"
+msgstr "MIPANGILIO"
+
+#: users/templates/users/partials/profile_content.html:116
+#: users/templates/users/partials/profile_context_rail.html:112
+msgid "SWITCH ACCOUNT"
+msgstr "BADILISHA AKAUNTI"
+
+#: users/templates/users/partials/profile_content.html:121
+#: users/templates/users/partials/profile_context_rail.html:117
+msgid "LOGOUT"
+msgstr "ONDOKA"
+
+#: users/templates/users/partials/profile_content.html:136
+#: users/templates/users/partials/profile_content.html:140
+#: users/templates/users/partials/profile_content.html:145
+#: users/templates/users/partials/profile_context_rail.html:131
+#: users/templates/users/partials/profile_context_rail.html:135
+#: users/templates/users/partials/profile_context_rail.html:137
+#: users/templates/users/partials/pwanimate_profile_card.html:23
+msgid "Followers"
+msgstr "Wafuataji"
+
+#: users/templates/users/partials/profile_content.html:155
+#: users/templates/users/partials/profile_content.html:159
+#: users/templates/users/partials/profile_content.html:164
+#: users/templates/users/partials/profile_context_rail.html:145
+#: users/templates/users/partials/profile_context_rail.html:149
+#: users/templates/users/partials/profile_context_rail.html:151
+#: users/templates/users/partials/pwanimate_profile_card.html:24
+msgid "Following"
+msgstr "Unafuata"
+
+#: users/templates/users/partials/profile_content.html:170
+#: users/templates/users/partials/profile_context_rail.html:156
+#: users/templates/users/partials/pwanimate_profile_card.html:25
+msgid "Likes"
+msgstr "Mapendeleo"
+
+#: users/templates/users/partials/profile_content.html:181
+#: users/templates/users/partials/profile_content.html:185
+#: users/templates/users/partials/profile_context_rail.html:167
+#: users/templates/users/partials/profile_context_rail.html:171
+msgid "Pinches Sent"
+msgstr "Pinches Zilizotumwa"
+
+#: users/templates/users/partials/profile_content.html:193
+#: users/templates/users/partials/profile_content.html:197
+#: users/templates/users/partials/profile_context_rail.html:179
+#: users/templates/users/partials/profile_context_rail.html:183
+msgid "Pinches Received"
+msgstr "Pinches Zilizopokelewa"
+
+#: users/templates/users/partials/profile_content.html:205
+msgid "Academic Details"
+msgstr "Maelezo ya Kielimu"
+
+#: users/templates/users/partials/profile_content.html:207
+#: users/templates/users/partials/profile_context_rail.html:199
+msgid "Academic details hidden by profile privacy"
+msgstr "Maelezo ya kitaaluma yamefichwa kwa sababu ya mipangilio ya faragha"
+
+#: users/templates/users/partials/profile_content.html:213
+#: users/templates/users/partials/profile_context_rail.html:206
+#: users/templates/users/partials/pwanimate_profile_card.html:33
+msgid "Programme"
+msgstr "Programu ya masomo"
+
+#: users/templates/users/partials/profile_content.html:218
+#: users/templates/users/partials/profile_context_rail.html:211
+#: users/templates/users/partials/pwanimate_profile_card.html:34
+msgid "Department"
+msgstr "Idara"
+
+#: users/templates/users/partials/profile_content.html:223
+#: users/templates/users/partials/profile_content.html:248
+msgid "School"
+msgstr "Shule"
+
+#: users/templates/users/partials/profile_content.html:230
+msgid "Academic Level"
+msgstr "Kiwango cha masomo"
+
+#: users/templates/users/partials/profile_content.html:236
+msgid "Academic Year"
+msgstr "Mwaka wa masomo"
+
+#: users/templates/users/partials/profile_content.html:242
+msgid "Semester"
+msgstr "Muhula"
+
+#: users/templates/users/partials/profile_content.html:252
+#: users/templates/users/partials/profile_context_rail.html:217
+#: users/templates/users/partials/pwanimate_profile_card.html:33
+msgid "Course"
+msgstr "Kozi"
+
+#: users/templates/users/partials/profile_content.html:256
+#: users/templates/users/partials/profile_context_rail.html:223
+#: users/templates/users/partials/pwanimate_profile_card.html:35
+msgid "Year"
+msgstr "Mwaka"
+
+#: users/templates/users/partials/profile_content.html:261
+msgid "No academic information available"
+msgstr "Hakuna taarifa za kitaaluma zinazopatikana"
+
+#: users/templates/users/partials/profile_content.html:270
+#: users/templates/users/partials/profile_context_rail.html:246
+msgid "Profile Completion"
+msgstr "Ukamilishi wa Wasifu"
+
+#: users/templates/users/partials/profile_content.html:271
+msgid "Hide"
+msgstr "Ficha"
+
+#: users/templates/users/partials/profile_content.html:282
+msgid "Completion"
+msgstr "Ukamilishi"
+
+#: users/templates/users/partials/profile_content.html:287
+msgid "Suggestions to improve your profile:"
+msgstr "Mapendekezo ya kuboresha wasifu wako:"
+
+#: users/templates/users/partials/profile_content.html:289
+msgid "Add a headline to introduce yourself better"
+msgstr "Ongeza kichwa cha habari kujitambulisha vizuri zaidi"
+
+#: users/templates/users/partials/profile_content.html:292
+msgid "Add skills so classmates can discover your strengths"
+msgstr "Ongeza ujuzi ili wanafunzi wenzako waweze kugundua nguvu zako"
+
+#: users/templates/users/partials/profile_content.html:295
+msgid "Add projects to showcase your work"
+msgstr "Ongeza miradi kuonyesha kazi yako"
+
+#: users/templates/users/partials/profile_content.html:298
+msgid "Add interests to find like-minded classmates"
+msgstr "Ongeza maslahi kupata wanafunzi wenye mawazo sawa"
+
+#: users/templates/users/partials/profile_content.html:309
+#: users/templates/users/partials/profile_context_rail.html:291
+msgid "Profile details hidden by profile privacy"
+msgstr "Maelezo ya wasifu yamefichwa kwa sababu ya mipangilio ya faragha"
+
+#: users/templates/users/partials/profile_content.html:328
+#: users/templates/users/partials/profile_context_rail.html:310
+msgid "Not Looking"
+msgstr "Haatafuti"
+
+#: users/templates/users/partials/profile_content.html:338
+#: users/templates/users/partials/profile_context_rail.html:318
+#: users/templates/users/partials/pwanimate_profile_card.html:45
+msgid "Interests"
+msgstr "Maslahi"
+
+#: users/templates/users/partials/profile_content.html:345
+#: users/templates/users/partials/profile_context_rail.html:325
+#: users/templates/users/partials/pwanimate_profile_card.html:46
+msgid "Skills"
+msgstr "Ujuzi"
+
+#: users/templates/users/partials/profile_content.html:356
+#: users/templates/users/partials/profile_context_rail.html:336
+#: users/templates/users/partials/pwanimate_profile_card.html:47
+msgid "Projects"
+msgstr "Miradi"
+
+#: users/templates/users/partials/profile_content.html:362
+#: users/templates/users/partials/profile_context_rail.html:343
+#: users/templates/users/partials/pwanimate_profile_card.html:47
+msgid "View Project"
+msgstr "Angalia Mradi"
+
+#: users/templates/users/partials/profile_content.html:371
+#: users/templates/users/partials/profile_context_rail.html:353
+#: users/templates/users/partials/pwanimate_profile_card.html:48
+msgid "Links"
+msgstr "Viungo"
+
+#: users/templates/users/partials/profile_content.html:402
+#: users/templates/users/partials/profile_content.html:405
+msgid "View More About"
+msgstr "Angalia Zaidi Kuhusu"
+
+#: users/templates/users/partials/profile_content.html:403
+msgid "View Less About"
+msgstr "Angalia Punguzo Kuhusu"
+
+#: users/templates/users/partials/profile_content.html:459
+msgid "This student chose to hide their profile and posts."
+msgstr "Mwanafunzi huyu amechagua kuficha wasifu na machapisho yake."
+
+#: users/templates/users/partials/profile_content.html:470
+msgid "Reposts"
+msgstr "Machapisho yaliyoshirikiwa tena"
+
+#: users/templates/users/partials/profile_content.html:482
+msgid "Shared with me"
+msgstr "Yameshirikiwa nami"
+
+#: users/templates/users/partials/profile_content.html:500
 msgid "hasn't posted anything yet."
 msgstr "hajachapisha kitu bado."
 
+#: users/templates/users/partials/profile_content.html:507
 msgid "Loading..."
 msgstr "Inapakia..."
 
-msgid "No posts have been shared with"
-msgstr "Hakuna machapisho yaliyoshirikiwa na"
+#: users/templates/users/partials/profile_content.html:548
+msgid "You haven't reposted anything yet."
+msgstr "Bado hujashiriki chapisho lolote tena."
 
-msgid "yet."
-msgstr "bado."
+#: users/templates/users/partials/profile_content.html:550
+msgid "hasn't reposted anything yet."
+msgstr "bado hajashiriki chapisho lolote tena."
+
+#: users/templates/users/partials/profile_content.html:567
+msgid "No posts have been shared with you yet."
+msgstr "Bado hakuna machapisho yaliyoshirikiwa nawe."
+
+#: users/templates/users/partials/profile_context_rail.html:196
+#: users/templates/users/partials/pwanimate_profile_card.html:31
+msgid "Academic Info"
+msgstr "Taarifa za kitaaluma"
+
+#: users/templates/users/partials/profile_context_rail.html:228
+#: users/templates/users/partials/pwanimate_profile_card.html:36
+msgid "Joined"
+msgstr "Alijiunga"
+
+#: users/templates/users/partials/profile_context_rail.html:260
+msgid "Suggestions to improve:"
+msgstr "Mapendekezo ya kuboresha:"
+
+#: users/templates/users/partials/profile_context_rail.html:262
+msgid "Add a headline"
+msgstr "Ongeza kichwa cha wasifu"
+
+#: users/templates/users/partials/profile_context_rail.html:265
+msgid "Add skills"
+msgstr "Ongeza ujuzi"
+
+#: users/templates/users/partials/profile_context_rail.html:268
+msgid "Add projects"
+msgstr "Ongeza miradi"
+
+#: users/templates/users/partials/profile_context_rail.html:271
+msgid "Add interests"
+msgstr "Ongeza mambo yanayokuvutia"
+
+#: users/templates/users/partials/profile_context_rail.html:386
+msgid "About You"
+msgstr "Kuhusu wewe"
+
+#: users/templates/users/partials/profile_context_rail.html:388
+msgid "Add your headline, skills, and projects to complete your profile."
+msgstr "Ongeza kichwa cha wasifu, ujuzi na miradi ili kukamilisha wasifu wako."
+
+#: users/templates/users/partials/profile_context_rail.html:396
+msgid "Add Profile Details"
+msgstr "Ongeza maelezo ya wasifu"
+
+#: users/templates/users/partials/profile_context_rail.html:418
+msgid "Edit Profile"
+msgstr "Hariri wasifu"
+
+#: users/templates/users/partials/pwanimate_profile_card.html:48
+msgid "Portfolio"
+msgstr "Kazi zilizokusanywa"
+
+#: users/templates/users/settings/partials/about_content.html:5
+#: users/templates/users/settings/partials/appearance_content.html:6
+#: users/templates/users/settings/partials/notification_preferences_content.html:6
+#: users/templates/users/settings/partials/privacy_content.html:5
+#: users/templates/users/settings/partials/profile_content.html:12
+#: users/templates/users/settings/partials/storage_content.html:12
+msgid "Back to Settings"
+msgstr "Rudi kwenye Mipangilio"
+
+#: users/templates/users/settings/partials/about_content.html:8
+msgid "Version information and support resources"
+msgstr "Maelezo ya toleo na rasilimali za msaada"
+
+#: users/templates/users/settings/partials/about_content.html:17
+msgid "App Information"
+msgstr "Maelezo ya Programu"
+
+#: users/templates/users/settings/partials/about_content.html:18
+msgid "Version and build information"
+msgstr "Maelezo ya toleo na kujenga"
+
+#: users/templates/users/settings/partials/about_content.html:25
+msgid "Current Version"
+msgstr "Toleo la Sasa"
+
+#: users/templates/users/settings/partials/about_content.html:29
+msgid "Build"
+msgstr "Jenga"
+
+#: users/templates/users/settings/partials/about_content.html:33
+msgid "Channel"
+msgstr "Njia"
+
+#: users/templates/users/settings/partials/about_content.html:37
+msgid "Environment"
+msgstr "Mazingira"
+
+#: users/templates/users/settings/partials/about_content.html:50
+#: users/templates/users/settings/partials/about_content.html:64
+msgid "Release Center"
+msgstr "Kituo cha Toleo"
+
+#: users/templates/users/settings/partials/about_content.html:51
+msgid "View release notes and update information"
+msgstr "Ona maelezo ya toleo na maelezo ya visasisho"
+
+#: users/templates/users/settings/partials/about_content.html:74
+msgid "Current Release Details"
+msgstr "Maelezo ya Toleo la Sasa"
+
+#: users/templates/users/settings/partials/active_devices_content.html:5
+#: users/templates/users/settings/partials/blocked_content.html:5
+#: users/templates/users/settings/partials/hidden_content.html:5
+#: users/templates/users/settings/partials/password_content.html:6
+#: users/templates/users/settings/partials/post_privacy_content.html:5
+#: users/templates/users/settings/partials/profile_privacy_content.html:5
+#: users/templates/users/settings/partials/two_factor_content.html:5
+msgid "Back to Privacy & Security"
+msgstr "Rudi kwenye Faragha na Usalama"
+
+#: users/templates/users/settings/partials/active_devices_content.html:7
+msgid "Active Devices"
+msgstr "Vifaa vinavyotumika"
+
+#: users/templates/users/settings/partials/active_devices_content.html:8
+msgid "Manage devices and sessions where you're logged in"
+msgstr "Dhibiti vifaa na vikao ambapo umesajiliwa"
+
+#: users/templates/users/settings/partials/active_devices_content.html:17
+msgid "Current Device"
+msgstr "Kifaa cha sasa"
+
+#: users/templates/users/settings/partials/active_devices_content.html:18
+msgid "This device is currently active"
+msgstr "Kifaa hiki kinatumika sasa"
+
+#: users/templates/users/settings/partials/active_devices_content.html:50
+msgid "Current Session"
+msgstr "Kipindi cha sasa"
+
+#: users/templates/users/settings/partials/active_devices_content.html:56
+msgid "No current session information available"
+msgstr "Hakuna taarifa ya kipindi hiki inayopatikana"
+
+#: users/templates/users/settings/partials/active_devices_content.html:69
+msgid "Other Active Devices"
+msgstr "Vifaa vingine vinavyotumika"
+
+#: users/templates/users/settings/partials/active_devices_content.html:70
+msgid "Manage your other logged-in devices"
+msgstr "Dhibiti vifaa vingine vilivyoingia kwenye akaunti yako"
+
+#: users/templates/users/settings/partials/active_devices_content.html:106
+msgid "Sign out this device"
+msgstr "Toka kwenye kifaa hiki"
+
+#: users/templates/users/settings/partials/active_devices_content.html:107
+msgid "Sign Out"
+msgstr "Toka"
+
+#: users/templates/users/settings/partials/active_devices_content.html:122
+msgid ""
+"This will sign you out of every other device currently logged into your "
+"account."
+msgstr "Hatua hii itakutoa kwenye vifaa vingine vyote vilivyoingia kwenye akaunti yako."
+
+#: users/templates/users/settings/partials/active_devices_content.html:125
+msgid "Sign Out All Other Devices"
+msgstr "Toka kwenye vifaa vingine vyote"
+
+#: users/templates/users/settings/partials/appearance_content.html:8
+msgid "Appearance"
+msgstr "Mwonekano"
+
+#: users/templates/users/settings/partials/appearance_content.html:9
+msgid "Customize how PwaniNet looks and feels"
+msgstr "Badilisha jinsi PwaniNet inavyonekana na kuhisi"
+
+#: users/templates/users/settings/partials/appearance_content.html:18
+msgid "Theme"
+msgstr "Mandhari"
+
+#: users/templates/users/settings/partials/appearance_content.html:19
+msgid "Light, dark, system preference"
+msgstr "Nuru, giza, mapendeleo ya mfumo"
+
+#: users/templates/users/settings/partials/appearance_content.html:34
+msgid "Light"
+msgstr "Nuru"
+
+#: users/templates/users/settings/partials/appearance_content.html:35
+msgid "Always use the light theme."
+msgstr "Tumia daima mandhari ya nuru."
+
+#: users/templates/users/settings/partials/appearance_content.html:42
+msgid "Dark"
+msgstr "Giza"
+
+#: users/templates/users/settings/partials/appearance_content.html:43
+msgid "Always use the dark theme."
+msgstr "Tumia daima mandhari ya giza."
+
+#: users/templates/users/settings/partials/appearance_content.html:50
+msgid "System"
+msgstr "Mfumo"
+
+#: users/templates/users/settings/partials/appearance_content.html:51
+msgid "Automatically match your device."
+msgstr "Lingana kiotomatiki na kifaa chako."
+
+#: users/templates/users/settings/partials/appearance_content.html:65
+msgid "Select your preferred language"
+msgstr "Chagua lugha unayopendelea"
+
+#: users/templates/users/settings/partials/appearance_content.html:80
+msgid "English"
+msgstr "Kiingereza"
+
+#: users/templates/users/settings/partials/appearance_content.html:81
+msgid "Use English throughout the application."
+msgstr "Tumia Kiingereza katika programu nzima."
+
+#: users/templates/users/settings/partials/appearance_content.html:88
+msgid "Kiswahili"
+msgstr "Kiswahili"
+
+#: users/templates/users/settings/partials/appearance_content.html:89
+msgid "Tumia Kiswahili kwenye programu nzima."
+msgstr "Tumia Kiswahili kwenye programu nzima."
+
+#: users/templates/users/settings/partials/appearance_content.html:102
+msgid "Typography"
+msgstr "Uandishi"
+
+#: users/templates/users/settings/partials/appearance_content.html:103
+msgid "Font size and readability options"
+msgstr "Chaguo za ukubwa wa fonti na usomaji"
+
+#: users/templates/users/settings/partials/appearance_content.html:118
+msgid "Tiny"
+msgstr "Ndogo sana"
+
+#: users/templates/users/settings/partials/appearance_content.html:119
+msgid "Compact interface."
+msgstr "Kiolesura cha kawaida."
+
+#: users/templates/users/settings/partials/appearance_content.html:126
+msgid "Small"
+msgstr "Ndogo"
+
+#: users/templates/users/settings/partials/appearance_content.html:127
+msgid "Slightly smaller text."
+msgstr "Maandishi yanayofura kidogo."
+
+#: users/templates/users/settings/partials/appearance_content.html:134
+msgid "Medium"
+msgstr "Wastani"
+
+#: users/templates/users/settings/partials/appearance_content.html:135
+msgid "Recommended for most users."
+msgstr "Inapendekezwa kwa watumiaji wengi."
+
+#: users/templates/users/settings/partials/appearance_content.html:142
+msgid "Large"
+msgstr "Kubwa"
+
+#: users/templates/users/settings/partials/appearance_content.html:143
+msgid "Larger text for improved readability."
+msgstr "Maandishi makubwa kwa usomaji bora."
+
+#: users/templates/users/settings/partials/appearance_content.html:156
+msgid "Font Family"
+msgstr "Familia ya fonti"
+
+#: users/templates/users/settings/partials/appearance_content.html:157
+msgid "Choose your preferred font style"
+msgstr "Chagua mtindo wa fonti unaopendelea"
+
+#: users/templates/users/settings/partials/appearance_content.html:173
+msgid "System default font"
+msgstr "Fonti chaguomsingi ya mfumo"
+
+#: users/templates/users/settings/partials/appearance_content.html:180
+msgid "Inter"
+msgstr "Inter"
+
+#: users/templates/users/settings/partials/appearance_content.html:181
+msgid "Clean UI font"
+msgstr "Fonti safi ya kiolesura"
+
+#: users/templates/users/settings/partials/appearance_content.html:188
+msgid "Roboto"
+msgstr "Roboto"
+
+#: users/templates/users/settings/partials/appearance_content.html:189
+msgid "Material Design font"
+msgstr "Fonti ya Material Design"
+
+#: users/templates/users/settings/partials/appearance_content.html:196
+msgid "IBM Plex Serif"
+msgstr "IBM Plex Serif"
+
+#: users/templates/users/settings/partials/appearance_content.html:197
+msgid "Elegant serif font"
+msgstr "Fonti ya serif maridadi"
+
+#: users/templates/users/settings/partials/appearance_content.html:204
+msgid "Manrope"
+msgstr "Manrope"
+
+#: users/templates/users/settings/partials/appearance_content.html:205
+msgid "Modern sans-serif font"
+msgstr "Fonti ya sans-serif ya kisasa"
+
+#: users/templates/users/settings/partials/appearance_content.html:212
+msgid "Playfair Display"
+msgstr "Playfair Display"
+
+#: users/templates/users/settings/partials/appearance_content.html:213
+msgid "Classic display serif font"
+msgstr "Fonti ya serif ya kawaida ya kuonyesha"
+
+#: users/templates/users/settings/partials/appearance_content.html:220
+msgid "Romanesco"
+msgstr "Romanesco"
+
+#: users/templates/users/settings/partials/appearance_content.html:221
+msgid "Decorative cursive font"
+msgstr "Fonti ya mwandiko wa mapambo"
+
+#: users/templates/users/settings/partials/appearance_content.html:228
+msgid "Story Script"
+msgstr "Story Script"
+
+#: users/templates/users/settings/partials/appearance_content.html:229
+msgid "Handwritten script font"
+msgstr "Fonti ya mwandiko wa mkono"
+
+#: users/templates/users/settings/partials/appearance_content.html:236
+msgid "Poppins"
+msgstr "Poppins"
+
+#: users/templates/users/settings/partials/appearance_content.html:237
+msgid "Modern geometric sans-serif"
+msgstr "Fonti ya kisasa ya sans-serif ya kijiometri"
+
+#: users/templates/users/settings/partials/appearance_content.html:244
+msgid "Lora"
+msgstr "Lora"
+
+#: users/templates/users/settings/partials/appearance_content.html:245
+msgid "Elegant serif for reading"
+msgstr "Fonti ya serif maridadi kwa usomaji"
+
+#: users/templates/users/settings/partials/appearance_content.html:252
+msgid "Merriweather"
+msgstr "Merriweather"
+
+#: users/templates/users/settings/partials/appearance_content.html:253
+msgid "Screen-optimized serif"
+msgstr "Fonti ya serif iliyoboreshwa kwa skrini"
+
+#: users/templates/users/settings/partials/appearance_content.html:260
+msgid "Dancing Script"
+msgstr "Dancing Script"
+
+#: users/templates/users/settings/partials/appearance_content.html:261
+msgid "Playful script font"
+msgstr "Fonti ya mwandiko wa kuchekesha"
+
+#: users/templates/users/settings/partials/appearance_content.html:268
+msgid "Great Vibes"
+msgstr "Great Vibes"
+
+#: users/templates/users/settings/partials/appearance_content.html:269
+msgid "Elegant calligraphy font"
+msgstr "Fonti maridadi ya kaligrafia"
+
+#: users/templates/users/settings/partials/appearance_content.html:276
+msgid "Parisienne"
+msgstr "Parisienne"
+
+#: users/templates/users/settings/partials/appearance_content.html:277
+msgid "French cursive font"
+msgstr "Fonti ya mwandiko wa Kifaransa"
+
+#: users/templates/users/settings/partials/appearance_content.html:284
+msgid "Satisfy"
+msgstr "Satisfy"
+
+#: users/templates/users/settings/partials/appearance_content.html:285
+msgid "Handwriting style font"
+msgstr "Fonti ya mtindo wa mwandiko wa mkono"
+
+#: users/templates/users/settings/partials/appearance_content.html:292
+msgid "Cookie"
+msgstr "Cookie"
+
+#: users/templates/users/settings/partials/appearance_content.html:293
+msgid "Playful handwritten font"
+msgstr "Fonti ya mwandiko wa mkono wa kuchekesha"
+
+#: users/templates/users/settings/partials/appearance_content.html:300
+msgid "Italianno"
+msgstr "Italianno"
+
+#: users/templates/users/settings/partials/appearance_content.html:301
+msgid "Elegant Italian script"
+msgstr "Mwandiko maridadi wa Kiitaliano"
+
+#: users/templates/users/settings/partials/appearance_content.html:308
+msgid "Tangerine"
+msgstr "Tangerine"
+
+#: users/templates/users/settings/partials/appearance_content.html:309
+msgid "Calligraphic font"
+msgstr "Fonti ya kaligrafia"
+
+#: users/templates/users/settings/partials/appearance_content.html:322
+msgid "Font Style"
+msgstr "Mtindo wa fonti"
+
+#: users/templates/users/settings/partials/appearance_content.html:323
+msgid "Normal or italic text style"
+msgstr "Mtindo wa maandishi ya kawaida au ya mwinamo"
+
+#: users/templates/users/settings/partials/appearance_content.html:338
+msgid "Normal"
+msgstr "Kawaida"
+
+#: users/templates/users/settings/partials/appearance_content.html:339
+msgid "Standard upright text"
+msgstr "Maandishi ya kawaida yaliyonyooka"
+
+#: users/templates/users/settings/partials/appearance_content.html:346
+msgid "Italic"
+msgstr "Mwinamo"
+
+#: users/templates/users/settings/partials/appearance_content.html:347
+msgid "Slanted italic text (when available)"
+msgstr "Maandishi ya mwinamo (yanapopatikana)"
+
+#: users/templates/users/settings/partials/appearance_content.html:361
+msgid "Mobile Navigation Position"
+msgstr "Mahali pa urambazaji wa simu"
+
+#: users/templates/users/settings/partials/appearance_content.html:362
+msgid "Bottom dock or full-width top bar"
+msgstr "Gati la chini au upau wa juu wa upana wote"
+
+#: users/templates/users/settings/partials/appearance_content.html:377
+msgid "Bottom (Default)"
+msgstr "Chini (chaguomsingi)"
+
+#: users/templates/users/settings/partials/appearance_content.html:378
+msgid "Floating navigation bar docked near the bottom of your screen."
+msgstr "Upau wa urambazaji unaoelea na kukaa karibu na sehemu ya chini ya skrini."
+
+#: users/templates/users/settings/partials/appearance_content.html:380
+msgid "Bottom navigation preview"
+msgstr "Hakikisho la urambazaji wa chini"
+
+#: users/templates/users/settings/partials/appearance_content.html:396
+msgid "Top (Full Width)"
+msgstr "Juu (upana wote)"
+
+#: users/templates/users/settings/partials/appearance_content.html:397
+msgid ""
+"Full-width navigation bar docked beneath the header with brand and profile "
+"maintained."
+msgstr "Upau wa urambazaji wa upana wote chini ya kichwa, huku chapa na wasifu vikionekana."
+
+#: users/templates/users/settings/partials/appearance_content.html:399
+msgid "Top navigation preview"
+msgstr "Hakikisho la urambazaji wa juu"
+
+#: users/templates/users/settings/partials/blocked_content.html:7
+#: users/templates/users/settings/partials/blocked_content.html:17
+msgid "Blocked Users"
+msgstr "Watumiaji waliozuiwa"
+
+#: users/templates/users/settings/partials/blocked_content.html:8
+msgid "Manage users you've blocked"
+msgstr "Dhibiti watumiaji uliowazuia"
+
+#: users/templates/users/settings/partials/blocked_content.html:18
+msgid "Users you've blocked from interacting with you"
+msgstr "Watumiaji uliowazuia wasiwasiliane nawe"
+
+#: users/templates/users/settings/partials/blocked_content.html:43
+msgid "Are you sure you want to unblock this user?"
+msgstr "Una uhakika unataka kumfungulia mtumiaji huyu?"
+
+#: users/templates/users/settings/partials/blocked_content.html:46
+#: users/templates/users/settings/partials/blocked_content.html:47
+msgid "Unblock"
+msgstr "Ondoa kizuizi"
+
+#: users/templates/users/settings/partials/blocked_content.html:56
+msgid "You haven't blocked anyone."
+msgstr "Hujamzuia mtu yeyote."
+
+#: users/templates/users/settings/partials/downloads_content.html:11
+msgid "Back to Storage"
+msgstr "Rudi kwenye hifadhi"
+
+#: users/templates/users/settings/partials/downloads_content.html:14
+msgid "Manage your downloaded files"
+msgstr "Dhibiti faili ulizopakua"
+
+#: users/templates/users/settings/partials/hidden_content.html:7
+#: users/templates/users/settings/partials/hidden_content.html:17
+msgid "Hidden Authors"
+msgstr "Waandishi waliofichwa"
+
+#: users/templates/users/settings/partials/hidden_content.html:8
+msgid "Manage authors whose posts are hidden from your feed"
+msgstr "Dhibiti waandishi ambao machapisho yao yamefichwa kwenye mtiririko wako"
+
+#: users/templates/users/settings/partials/hidden_content.html:18
+msgid "Authors you've hidden from your feed"
+msgstr "Waandishi ambao umeficha kwenye mtiririko wako"
+
+#: users/templates/users/settings/partials/hidden_content.html:45
+msgid "Show posts from"
+msgstr "Onyesha machapisho kutoka kwa"
+
+#: users/templates/users/settings/partials/hidden_content.html:46
+msgid "Show Posts"
+msgstr "Onyesha machapisho"
+
+#: users/templates/users/settings/partials/hidden_content.html:55
+msgid "You aren't hiding posts from anyone."
+msgstr "Humfichii mtu yeyote machapisho."
+
+#: users/templates/users/settings/partials/index_content.html:5
+msgid "Back to Profile"
+msgstr "Rudi kwenye wasifu"
+
+#: users/templates/users/settings/partials/index_content.html:8
+msgid "Manage your account preferences and application settings"
+msgstr "Dhibiti mapendeleo ya akaunti na mipangilio ya programu"
+
+#: users/templates/users/settings/partials/index_content.html:39
+msgid "Download PwaniNet Mobile App"
+msgstr "Pakua programu ya simu ya PwaniNet"
+
+#: users/templates/users/settings/partials/index_content.html:43
+msgid ""
+"Install the official native Android app for faster performance, smoother "
+"animations, and instant background push notifications."
+msgstr "Sakinisha programu rasmi asilia ya Android ili kupata utendaji wa haraka, miondoko laini na arifa za papo hapo za chinichini."
+
+#: users/templates/users/settings/partials/index_content.html:46
+#: users/templates/users/settings/partials/index_content.html:160
+msgid "Latest Version"
+msgstr "Toleo jipya zaidi"
+
+#: users/templates/users/settings/partials/index_content.html:48
+msgid "Direct APK Download"
+msgstr "Upakuaji wa APK moja kwa moja"
+
+#: users/templates/users/settings/partials/index_content.html:54
+msgid "All Options"
+msgstr "Chaguo zote"
+
+#: users/templates/users/settings/partials/index_content.html:58
+msgid "Download APK"
+msgstr "Pakua APK"
+
+#: users/templates/users/settings/partials/index_content.html:62
+msgid "Install on your phone"
+msgstr "Sakinisha kwenye simu yako"
+
+#: users/templates/users/settings/partials/index_content.html:65
+#: users/templates/users/settings/partials/index_content.html:99
+msgid "Share App with Friends"
+msgstr "Shiriki programu na marafiki"
+
+#: users/templates/users/settings/partials/index_content.html:66
+#: users/templates/users/settings/partials/index_content.html:100
+msgid "Share App"
+msgstr "Shiriki programu"
+
+#: users/templates/users/settings/partials/index_content.html:80
+msgid "PwaniNet for Android"
+msgstr "PwaniNet ya Android"
+
+#: users/templates/users/settings/partials/index_content.html:81
+#: users/templates/users/settings/partials/index_content.html:87
+msgid "Installed"
+msgstr "Imesakinishwa"
+
+#: users/templates/users/settings/partials/index_content.html:84
+msgid "Running the official native Android app."
+msgstr "Unatumia programu rasmi asilia ya Android."
+
+#: users/templates/users/settings/partials/index_content.html:89
+#: users/templates/users/settings/partials/index_content.html:164
+msgid "Latest"
+msgstr "Ya hivi karibuni"
+
+#: users/templates/users/settings/partials/index_content.html:94
+msgid "Download Update"
+msgstr "Pakua sasisho"
+
+#: users/templates/users/settings/partials/index_content.html:97
+msgid "Check for Updates"
+msgstr "Angalia masasisho"
+
+#: users/templates/users/settings/partials/index_content.html:114
+#: users/templates/users/settings/partials/index_content.html:129
+msgid "Invite Friends to PwaniNet"
+msgstr "Alika marafiki kwenye PwaniNet"
+
+#: users/templates/users/settings/partials/index_content.html:115
+msgid "Classmates"
+msgstr "Wanafunzi wenzako"
+
+#: users/templates/users/settings/partials/index_content.html:118
+msgid ""
+"Know students or friends who aren't on PwaniNet yet? Send them a friendly "
+"invite link to join course groups, share notes, and collaborate."
+msgstr "Unawajua wanafunzi au marafiki ambao bado hawapo PwaniNet? Watumie kiungo cha mwaliko wajiunge na vikundi vya kozi, washiriki dondoo na kushirikiana."
+
+#: users/templates/users/settings/partials/index_content.html:122
+msgid "clicks"
+msgstr "mibofyo"
+
+#: users/templates/users/settings/partials/index_content.html:124
+msgid "joined"
+msgstr "waliojiunga"
+
+#: users/templates/users/settings/partials/index_content.html:130
+msgid "Invite Friends"
+msgstr "Alika marafiki"
+
+#: users/templates/users/settings/partials/notification_preferences_content.html:9
+msgid "Choose which notifications you want to receive"
+msgstr "Chagua arifa unazotaka kupokea"
+
+#: users/templates/users/settings/partials/notification_preferences_content.html:32
+msgid "Notification Preferences"
+msgstr "Mapendeleo ya Arifa"
+
+#: users/templates/users/settings/partials/notification_preferences_content.html:33
+msgid "Manage how and when you receive notifications"
+msgstr "Dhibiti jinsi na wakati unapopokea arifa"
+
+#: users/templates/users/settings/partials/password_content.html:8
+msgid "Password Manager"
+msgstr "Kidhibiti cha nenosiri"
+
+#: users/templates/users/settings/partials/password_content.html:9
+msgid "Change your account password"
+msgstr "Badilisha nenosiri la akaunti yako"
+
+#: users/templates/users/settings/partials/password_content.html:18
+#: users/templates/users/settings/partials/password_content.html:90
+msgid "Change Password"
+msgstr "Badilisha nenosiri"
+
+#: users/templates/users/settings/partials/password_content.html:19
+msgid "Enter your current password and choose a new one"
+msgstr "Weka nenosiri lako la sasa kisha uchague jipya"
+
+#: users/templates/users/settings/partials/password_content.html:34
+#: users/templates/users/settings/partials/password_content.html:42
+msgid "Current Password"
+msgstr "Nenosiri la sasa"
+
+#: users/templates/users/settings/partials/password_content.html:43
+#: users/templates/users/settings/partials/password_content.html:59
+#: users/templates/users/settings/partials/password_content.html:81
+msgid "Show password"
+msgstr "Onyesha nenosiri"
+
+#: users/templates/users/settings/partials/password_content.html:67
+msgid "Password strength"
+msgstr "Uimara wa nenosiri"
+
+#: users/templates/users/settings/partials/post_privacy_content.html:7
+msgid "Post Privacy"
+msgstr "Faragha ya machapisho"
+
+#: users/templates/users/settings/partials/post_privacy_content.html:8
+msgid "Control the default audience for your posts"
+msgstr "Dhibiti hadhira chaguomsingi ya machapisho yako"
+
+#: users/templates/users/settings/partials/post_privacy_content.html:17
+msgid "Default Post Visibility"
+msgstr "Mwonekano chaguomsingi wa machapisho"
+
+#: users/templates/users/settings/partials/post_privacy_content.html:18
+msgid "Choose who can see your new posts by default"
+msgstr "Chagua ni nani anayeweza kuona machapisho yako mapya kwa chaguomsingi"
+
+#: users/templates/users/settings/partials/post_privacy_content.html:38
+msgid "Only PwaniNet users can see your new posts"
+msgstr "Watumiaji wa PwaniNet pekee wanaweza kuona machapisho yako mapya"
+
+#: users/templates/users/settings/partials/post_privacy_content.html:40
+msgid "Only your followers can see your new posts"
+msgstr "Wafuasi wako pekee wanaweza kuona machapisho yako mapya"
+
+#: users/templates/users/settings/partials/post_privacy_content.html:42
+msgid "Only you can see your new posts"
+msgstr "Wewe pekee unaweza kuona machapisho yako mapya"
+
+#: users/templates/users/settings/partials/post_privacy_content.html:55
+#: users/templates/users/settings/partials/profile_privacy_content.html:55
+msgid "Save Changes"
+msgstr "Hifadhi mabadiliko"
+
+#: users/templates/users/settings/partials/post_privacy_content.html:66
+msgid ""
+"This setting only affects new posts. Existing posts will keep their current "
+"visibility unless you change them individually."
+msgstr "Mpangilio huu huathiri machapisho mapya pekee. Machapisho yaliyopo yatabaki na mwonekano wake wa sasa isipokuwa uyabadilishe moja moja."
+
+#: users/templates/users/settings/partials/privacy_content.html:7
+msgid "Privacy & Security"
+msgstr "Faragha na Usalama"
+
+#: users/templates/users/settings/partials/privacy_content.html:8
+msgid "Protect your account and manage your privacy"
+msgstr "Linda akaunti yako na dhibiti faragha yako"
+
+#: users/templates/users/settings/partials/profile_content.html:14
+msgid "Profile Settings"
+msgstr "Mipangilio ya wasifu"
+
+#: users/templates/users/settings/partials/profile_content.html:15
+msgid "Manage your profile information and preferences"
+msgstr "Dhibiti maelezo ya wasifu wako na mapendeleo"
+
+#: users/templates/users/settings/partials/profile_content.html:24
+msgid "Profile Information"
+msgstr "Maelezo ya Wasifu"
+
+#: users/templates/users/settings/partials/profile_content.html:25
+msgid "Username, display name, bio, avatar"
+msgstr "Jina la mtumiaji, jina la kuonyesha, wasifu, picha"
+
+#: users/templates/users/settings/partials/profile_content.html:138
+msgid "Linked Accounts"
+msgstr "Akaunti Zilizounganishwa"
+
+#: users/templates/users/settings/partials/profile_content.html:139
+msgid "Connected accounts and services"
+msgstr "Akaunti na huduma zilizounganishwa"
+
+#: users/templates/users/settings/partials/profile_content.html:150
+msgid "Linked accounts coming soon..."
+msgstr "Akaunti zilizounganishwa zinakuja hivi karibuni..."
+
+#: users/templates/users/settings/partials/profile_content.html:159
+msgid "Delete account"
+msgstr "Futa akaunti"
+
+#: users/templates/users/settings/partials/profile_content.html:160
+msgid ""
+"Choose whether your posts and uploads should also be deleted or kept without "
+"your profile details."
+msgstr "Chagua kama machapisho na faili ulizopakia zifutwe pia au zibaki bila maelezo ya wasifu wako."
+
+#: users/templates/users/settings/partials/profile_content.html:166
+msgid "Delete my account and its posts, comments, and uploaded content"
+msgstr "Futa akaunti yangu pamoja na machapisho, maoni na maudhui niliyopakia"
+
+#: users/templates/users/settings/partials/profile_content.html:167
+msgid ""
+"Delete my profile and sign-in, but keep my posts, comments, and uploads "
+"under a generic deleted-account name"
+msgstr "Futa wasifu na uwezo wangu wa kuingia, lakini hifadhi machapisho, maoni na faili nilizopakia chini ya jina la jumla la akaunti iliyofutwa"
+
+#: users/templates/users/settings/partials/profile_content.html:169
+msgid "Enter your password to confirm"
+msgstr "Weka nenosiri lako ili kuthibitisha"
+
+#: users/templates/users/settings/partials/profile_content.html:172
+msgid "I understand this action cannot be undone"
+msgstr "Ninaelewa kuwa hatua hii haiwezi kutenduliwa"
+
+#: users/templates/users/settings/partials/profile_content.html:173
+msgid "Delete my account"
+msgstr "Futa akaunti yangu"
+
+#: users/templates/users/settings/partials/profile_privacy_content.html:7
+msgid "Profile Privacy"
+msgstr "Faragha ya wasifu"
+
+#: users/templates/users/settings/partials/profile_privacy_content.html:8
+msgid "Control who can view your profile information"
+msgstr "Dhibiti ni nani anayeweza kuona taarifa za wasifu wako"
+
+#: users/templates/users/settings/partials/profile_privacy_content.html:17
+msgid "Profile Visibility"
+msgstr "Mwonekano wa wasifu"
+
+#: users/templates/users/settings/partials/profile_privacy_content.html:18
+msgid "Choose who can see your profile information"
+msgstr "Chagua ni nani anayeweza kuona taarifa za wasifu wako"
+
+#: users/templates/users/settings/partials/profile_privacy_content.html:38
+msgid "Only PwaniNet users can view your profile"
+msgstr "Watumiaji wa PwaniNet pekee wanaweza kuona wasifu wako"
+
+#: users/templates/users/settings/partials/profile_privacy_content.html:40
+msgid "Only your followers can view your profile"
+msgstr "Wafuasi wako pekee wanaweza kuona wasifu wako"
+
+#: users/templates/users/settings/partials/profile_privacy_content.html:42
+msgid "Only you can view your profile"
+msgstr "Wewe pekee unaweza kuona wasifu wako"
+
+#: users/templates/users/settings/partials/storage_content.html:14
+msgid "Storage"
+msgstr "Hifadhi"
+
+#: users/templates/users/settings/partials/storage_content.html:15
+msgid "Manage your storage and cached data"
+msgstr "Dhibiti hifadhi yako na data iliyohifadhiwa"
+
+#: users/templates/users/settings/partials/storage_content.html:25
+msgid "View your storage usage and manage space"
+msgstr "Ona matumizi yako ya hifadhi na dhibiti nafasi"
+
+#: users/templates/users/settings/partials/two_factor_content.html:7
+msgid "Two-Factor Authentication"
+msgstr "Uthibitishaji wa hatua mbili"
+
+#: users/templates/users/settings/partials/two_factor_content.html:8
+msgid "Add an authenticator app for an additional layer of account protection."
+msgstr "Ongeza programu ya uthibitishaji ili kuongeza ulinzi wa akaunti."
+
+#: users/templates/users/settings/partials/two_factor_content.html:38
+msgid "New Recovery Codes Generated"
+msgstr "Misimbo mipya ya kurejesha imetengenezwa"
+
+#: users/templates/users/settings/partials/two_factor_content.html:39
+msgid "Your previous recovery codes have been permanently invalidated."
+msgstr "Misimbo yako ya awali ya kurejesha imebatilishwa kabisa."
+
+#: users/templates/users/settings/partials/two_factor_content.html:41
+msgid "Two-Factor Authentication Enabled!"
+msgstr "Uthibitishaji wa hatua mbili umewashwa!"
+
+#: users/templates/users/settings/partials/two_factor_content.html:42
+msgid "Your account is now protected with an authenticator app."
+msgstr "Akaunti yako sasa inalindwa na programu ya uthibitishaji."
+
+#: users/templates/users/settings/partials/two_factor_content.html:49
+msgid "Save these recovery codes immediately."
+msgstr "Hifadhi misimbo hii ya kurejesha sasa hivi."
+
+#: users/templates/users/settings/partials/two_factor_content.html:50
+msgid ""
+"These codes are displayed ONLY ONCE and cannot be recovered later. Each "
+"single-use code can recover your account if you lose access to your "
+"authenticator app."
+msgstr "Misimbo hii huonyeshwa MARA MOJA TU na haiwezi kupatikana tena baadaye. Kila msimbo wa matumizi moja unaweza kurejesha akaunti yako ukipoteza ufikiaji wa programu ya uthibitishaji."
+
+#: users/templates/users/settings/partials/two_factor_content.html:76
+msgid "Copy All Codes"
+msgstr "Nakili misimbo yote"
+
+#: users/templates/users/settings/partials/two_factor_content.html:79
+msgid "Download (.txt)"
+msgstr "Pakua (.txt)"
+
+#: users/templates/users/settings/partials/two_factor_content.html:87
+msgid "I Have Saved My Recovery Codes"
+msgstr "Nimehifadhi misimbo yangu ya kurejesha"
+
+#: users/templates/users/settings/partials/two_factor_content.html:100
+msgid "Step 1 of 2"
+msgstr "Hatua ya 1 kati ya 2"
+
+#: users/templates/users/settings/partials/two_factor_content.html:101
+msgid "Scan Authenticator QR Code"
+msgstr "Changanua msimbo wa QR wa uthibitishaji"
+
+#: users/templates/users/settings/partials/two_factor_content.html:103
+msgid ""
+"Use Google Authenticator, Microsoft Authenticator, or any compatible TOTP "
+"app."
+msgstr "Tumia Google Authenticator, Microsoft Authenticator au programu yoyote ya TOTP inayooana."
+
+#: users/templates/users/settings/partials/two_factor_content.html:115
+msgid "Point your phone camera or authenticator app at this code"
+msgstr "Elekeza kamera ya simu au programu ya uthibitishaji kwenye msimbo huu"
+
+#: users/templates/users/settings/partials/two_factor_content.html:124
+msgid "Can't scan? Use manual setup key:"
+msgstr "Imeshindikana kuchanganua? Tumia ufunguo wa kusanidi mwenyewe:"
+
+#: users/templates/users/settings/partials/two_factor_content.html:127
+msgid "Copy Key"
+msgstr "Nakili ufunguo"
+
+#: users/templates/users/settings/partials/two_factor_content.html:134
+msgid "Enter this key manually into your app (Time-based / 30 seconds)."
+msgstr "Weka ufunguo huu mwenyewe kwenye programu yako (unaotegemea muda / sekunde 30)."
+
+#: users/templates/users/settings/partials/two_factor_content.html:144
+msgid "Step 2 of 2"
+msgstr "Hatua ya 2 kati ya 2"
+
+#: users/templates/users/settings/partials/two_factor_content.html:145
+msgid "Enter the 6-Digit Code"
+msgstr "Weka msimbo wa tarakimu 6"
+
+#: users/templates/users/settings/partials/two_factor_content.html:148
+msgid ""
+"Enter the 6-digit code shown in your authenticator app to activate "
+"protection."
+msgstr "Weka msimbo wa tarakimu 6 unaoonyeshwa kwenye programu yako ya uthibitishaji ili kuwasha ulinzi."
+
+#: users/templates/users/settings/partials/two_factor_content.html:154
+msgid "6-digit code"
+msgstr "Msimbo wa tarakimu 6"
+
+#: users/templates/users/settings/partials/two_factor_content.html:171
+msgid "Verify and Activate"
+msgstr "Thibitisha na uwashe"
+
+#: users/templates/users/settings/partials/two_factor_content.html:174
+msgid "Cancel"
+msgstr "Ghairi"
+
+#: users/templates/users/settings/partials/two_factor_content.html:195
+msgid "Two-Factor Authentication is Active"
+msgstr "Uthibitishaji wa hatua mbili unatumika"
+
+#: users/templates/users/settings/partials/two_factor_content.html:196
+msgid "Enabled"
+msgstr "Imewashwa"
+
+#: users/templates/users/settings/partials/two_factor_content.html:199
+msgid "Your authenticator app is actively protecting this account."
+msgstr "Programu yako ya uthibitishaji inalinda akaunti hii kwa sasa."
+
+#: users/templates/users/settings/partials/two_factor_content.html:201
+msgid "Enrolled on"
+msgstr "Ilisajiliwa tarehe"
+
+#: users/templates/users/settings/partials/two_factor_content.html:212
+msgid "Recovery Codes"
+msgstr "Misimbo ya kurejesha"
+
+#: users/templates/users/settings/partials/two_factor_content.html:213
+msgid "active recovery code(s) remaining"
+msgstr "msimbo/misimbo ya kurejesha inayotumika imesalia"
+
+#: users/templates/users/settings/partials/two_factor_content.html:217
+msgid "Regenerate Codes"
+msgstr "Tengeneza upya misimbo"
+
+#: users/templates/users/settings/partials/two_factor_content.html:224
+msgid "Regenerate Recovery Codes"
+msgstr "Tengeneza upya misimbo ya kurejesha"
+
+#: users/templates/users/settings/partials/two_factor_content.html:226
+msgid ""
+"Regenerating will permanently invalidate all existing recovery codes. Enter "
+"your current 6-digit authenticator code to confirm."
+msgstr "Kutengeneza upya kutabatilisha kabisa misimbo yote ya sasa ya kurejesha. Weka msimbo wa sasa wa tarakimu 6 wa uthibitishaji ili kuthibitisha."
+
+#: users/templates/users/settings/partials/two_factor_content.html:242
+msgid "Confirm & Generate New Codes"
+msgstr "Thibitisha na utengeneze misimbo mipya"
+
+#: users/templates/users/settings/partials/two_factor_content.html:253
+msgid "Disable Two-Factor Authentication"
+msgstr "Zima uthibitishaji wa hatua mbili"
+
+#: users/templates/users/settings/partials/two_factor_content.html:255
+msgid ""
+"Disabling 2FA removes the extra security layer. You will only need your "
+"password to log in."
+msgstr "Kuzima 2FA huondoa hatua ya ziada ya usalama. Utahitaji nenosiri lako pekee ili kuingia."
+
+#: users/templates/users/settings/partials/two_factor_content.html:259
+msgid "Disable 2FA..."
+msgstr "Zima 2FA..."
+
+#: users/templates/users/settings/partials/two_factor_content.html:265
+msgid "Enter your 6-digit authenticator code to confirm disabling 2FA:"
+msgstr "Weka msimbo wako wa tarakimu 6 wa uthibitishaji ili kuthibitisha kuzima 2FA:"
+
+#: users/templates/users/settings/partials/two_factor_content.html:281
+msgid "Confirm & Disable 2FA"
+msgstr "Thibitisha na uzime 2FA"
+
+#: users/templates/users/settings/partials/two_factor_content.html:302
+msgid ""
+"Two-factor authentication adds an extra layer of security to your PwaniNet "
+"account. Once enabled, you'll enter a 6-digit verification code from your "
+"authenticator app whenever you perform sensitive security actions."
+msgstr "Uthibitishaji wa hatua mbili huongeza ulinzi wa akaunti yako ya PwaniNet. Ukiwashwa, utaweka msimbo wa uthibitishaji wa tarakimu 6 kutoka kwenye programu yako unapotekeleza hatua nyeti za usalama."
+
+#: users/templates/users/settings/partials/two_factor_content.html:309
+msgid "1. Get an App"
+msgstr "1. Pata programu"
+
+#: users/templates/users/settings/partials/two_factor_content.html:310
+msgid "Google Authenticator, Microsoft Authenticator, or Authy."
+msgstr "Google Authenticator, Microsoft Authenticator au Authy."
+
+#: users/templates/users/settings/partials/two_factor_content.html:316
+msgid "2. Scan QR Code"
+msgstr "2. Changanua msimbo wa QR"
+
+#: users/templates/users/settings/partials/two_factor_content.html:317
+msgid "Scan the setup code or enter the key manually."
+msgstr "Changanua msimbo wa usanidi au weka ufunguo mwenyewe."
+
+#: users/templates/users/settings/partials/two_factor_content.html:323
+msgid "3. Save Codes"
+msgstr "3. Hifadhi misimbo"
+
+#: users/templates/users/settings/partials/two_factor_content.html:324
+msgid "Keep single-use recovery codes in case you lose your phone."
+msgstr "Hifadhi misimbo ya matumizi moja ya kurejesha akaunti iwapo utapoteza simu yako."
+
+#: users/templates/users/settings/partials/two_factor_content.html:331
+msgid "Set Up Authenticator"
+msgstr "Sanidi programu ya uthibitishaji"
+
+#: users/templates/users/settings/partials/two_factor_content.html:372
+#: users/templates/users/settings/partials/two_factor_content.html:383
+msgid "Key Copied!"
+msgstr "Ufunguo umenakiliwa!"
+
+#: users/templates/users/settings/partials/two_factor_content.html:399
+#: users/templates/users/settings/partials/two_factor_content.html:406
+msgid "All Codes Copied!"
+msgstr "Misimbo yote imenakiliwa!"
+
+#: users/templates/users/settings/partials/two_factor_content.html:430
+msgid "Downloading\\u2026"
+msgstr "Inapakua…"
+
+#: users/views.py:375
+msgid "Too many recovery attempts. Please wait 5 minutes before trying again."
+msgstr "Majaribio mengi mno ya kurejesha akaunti. Tafadhali subiri dakika 5 kabla ya kujaribu tena."
+
+#: users/views.py:383
+msgid "Please enter your username."
+msgstr "Tafadhali weka jina lako la mtumiaji."
+
+#: users/views.py:393
+msgid "No account found with that username. Please verify and try again."
+msgstr "Hakuna akaunti yenye jina hilo la mtumiaji. Tafadhali hakiki kisha ujaribu tena."
+
+#: users/views.py:400
+msgid ""
+"Two-Factor Authentication is not enabled for this account. Self-service "
+"recovery requires 2FA or a recovery code. Please contact support."
+msgstr "Uthibitishaji wa hatua mbili haujawashwa kwenye akaunti hii. Ili kurejesha akaunti mwenyewe unahitaji 2FA au msimbo wa kurejesha. Tafadhali wasiliana na usaidizi."
+
+#: users/views.py:436
+msgid "Your recovery session expired. Please start over."
+msgstr "Kipindi chako cha kurejesha akaunti kimeisha. Tafadhali anza tena."
+
+#: users/views.py:455
+msgid "Too many incorrect verification attempts. Please start over."
+msgstr "Majaribio mengi mno ya uthibitishaji yasiyo sahihi. Tafadhali anza tena."
+
+#: users/views.py:477
+msgid "Invalid verification code. Please check and try again."
+msgstr "Msimbo wa uthibitishaji si sahihi. Tafadhali hakiki kisha ujaribu tena."
+
+#: users/views.py:512
+msgid "Your password reset authorization has expired. Please start over."
+msgstr "Ruhusa ya kuweka upya nenosiri lako imeisha. Tafadhali anza tena."
+
+#: users/views.py:531
+msgid "Please enter a new password."
+msgstr "Tafadhali weka nenosiri jipya."
+
+#: users/views.py:533
+msgid "The two password fields did not match."
+msgstr "Sehemu mbili za nenosiri hazikulingana."
+
+#: users/views.py:556
+msgid ""
+"Your password has been reset successfully. Please log in with your new "
+"password."
+msgstr "Nenosiri lako limewekwa upya. Tafadhali ingia kwa kutumia nenosiri jipya."
+
+#: users/views.py:1463 users/views.py:1505
+msgid "Two-factor authentication is already enabled."
+msgstr "Uthibitishaji wa hatua mbili tayari umewashwa."
+
+#: users/views.py:1536
+msgid ""
+"Invalid verification code. Please check the time on your device and "
+"authenticator app and try again."
+msgstr "Msimbo wa uthibitishaji si sahihi. Hakiki saa kwenye kifaa na programu yako ya uthibitishaji kisha ujaribu tena."
+
+#: users/views.py:1548 users/views.py:1580
+msgid "Invalid request method."
+msgstr "Njia ya ombi si sahihi."
+
+#: users/views.py:1556 users/views.py:1589
+msgid "Two-factor authentication is not enabled."
+msgstr "Uthibitishaji wa hatua mbili haujawashwa."
+
+#: users/views.py:1561
+msgid "Please provide your 6-digit authenticator code to disable 2FA."
+msgstr "Tafadhali weka msimbo wa tarakimu 6 wa uthibitishaji ili kuzima 2FA."
+
+#: users/views.py:1566
+msgid "Two-factor authentication has been successfully disabled."
+msgstr "Uthibitishaji wa hatua mbili umezimwa kwa mafanikio."
+
+#: users/views.py:1569
+msgid ""
+"Invalid authentication code. Could not disable two-factor authentication."
+msgstr "Msimbo wa uthibitishaji si sahihi. Imeshindwa kuzima uthibitishaji wa hatua mbili."
+
+#: users/views.py:1594
+msgid ""
+"Please provide your 6-digit authenticator code to regenerate recovery codes."
+msgstr "Tafadhali weka msimbo wa tarakimu 6 wa uthibitishaji ili kutengeneza upya misimbo ya kurejesha."
+
+#: users/views.py:1606
+msgid "Invalid authentication code. Could not regenerate recovery codes."
+msgstr "Msimbo wa uthibitishaji si sahihi. Imeshindwa kutengeneza upya misimbo ya kurejesha."
+
+#~ msgid "Manage your profile, username, bio..."
+#~ msgstr "Dhibiti wasifu wako, jina la mtumiaji, wasifu..."
+
+#~ msgid "Theme, dark mode, language..."
+#~ msgstr "Mandhari, hali ya giza, lugha..."
+
+#~ msgid "Push notifications, mentions..."
+#~ msgstr "Arifa za push, matumizi..."
+
+#~ msgid "Password, sessions, blocked users..."
+#~ msgstr "Nenosiri, vikao, watumiaji waliozuiwa..."
+
+#~ msgid "Cache, downloads, storage..."
+#~ msgstr "Akiba, vipakuliwa, hifadhi..."
+
+#~ msgid "Version, support, licenses..."
+#~ msgstr "Toleo, msaada, leseni..."
+
+#~ msgid "Profile settings coming soon..."
+#~ msgstr "Mipangilio ya wasifu inakuja hivi karibuni..."
+
+#~ msgid "Username, display name, bio, avatar, and more"
+#~ msgstr "Jina la mtumiaji, jina la kuonyesha, wasifu, picha, na zaidi"
+
+#~ msgid "Manage application updates and view release information"
+#~ msgstr "Dhibiti visasisho vya programu na ona maelezo vya toleo"
+
+#~ msgid "Change your password and security settings"
+#~ msgstr "Badilisha nenosiri lako na mipangilio ya usalama"
+
+#~ msgid "Password settings coming soon..."
+#~ msgstr "Mipangilio ya nenosiri inakuja hivi karibuni..."
+
+#~ msgid "Session management coming soon..."
+#~ msgstr "Usimamizi wa vikao unakuja hivi karibuni..."
+
+#~ msgid "Storage usage coming soon..."
+#~ msgstr "Matumizi ya hifadhi yana kuja hivi karibuni..."
+
+#~ msgid "Clear search"
+#~ msgstr "Futa utafutaji"
+
+#~ msgid "PDF"
+#~ msgstr "PDF"
+
+#~ msgid "Share to Users"
+#~ msgstr "Shiriki kwa Watumiaji"
+
+#~ msgid "Search users you follow..."
+#~ msgstr "Tafuta watumiaji unaofuata..."
+
+#~ msgid "Start typing to search users you follow"
+#~ msgstr "Anza kuandika kutafuta watumiaji unaofuata"
+
+#~ msgid "Selected users will appear here"
+#~ msgstr "Watumiaji waliochaguliwa wataonekana hapa"
+
+#~ msgid "Add a message (optional)"
+#~ msgstr "Ongeza ujumbe (hiari)"
+
+#~ msgid "Check this out!"
+#~ msgstr "Angalia hili!"
+
+#~ msgid "Share with selected users"
+#~ msgstr "Shiriki na watumiaji waliochaguliwa"
+
+#~ msgid "Search groups you're a member of..."
+#~ msgstr "Tafuta vikundi ambavyo ni mwanza..."
+
+#~ msgid "Start typing to search groups"
+#~ msgstr "Anza kuandika kutafuta vikundi"
+
+#~ msgid "Selected groups will appear here"
+#~ msgstr "Vikundi vilivyochaguliwa vitaonekana hapa"
+
+#~ msgid "Share with selected groups"
+#~ msgstr "Shiriki na vikundi vilivyochaguliwa"
+
+#~ msgid "Identify yourself to access the PwaniNet feed."
+#~ msgstr "Jitambulishe ili kupata PwaniNet feed."
+
+#~ msgid "New to the squad?"
+#~ msgstr "Mpya kwenye kundi?"
+
+#~ msgid "yet."
+#~ msgstr "bado."
