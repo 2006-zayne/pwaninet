@@ -318,6 +318,10 @@ public class MainActivity extends BridgeActivity {
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, pendingSpeechLanguage);
             intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
             intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+            // Keep ordinary pauses inside the same recognition session. Restarting after every
+            // short silence can replay the Android listening chime and interrupts dictation.
+            intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 8000L);
+            intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 10000L);
             try {
                 speechRecognizer.startListening(intent);
                 speechListening = true;

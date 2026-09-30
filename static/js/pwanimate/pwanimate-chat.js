@@ -90,6 +90,8 @@
             this.voiceCapture = workspace.querySelector('#pwanimate-voice-capture');
             this.voiceWaveform = workspace.querySelector('#pwanimate-voice-waveform');
             this.voiceWaveformBars = this.voiceWaveform ? Array.from(this.voiceWaveform.querySelectorAll('span')) : [];
+            this.voiceWaveformHistory = [];
+            this.voiceWaveformLastSampleAt = 0;
             this.voiceRecognition = null;
             this.nativeSpeechBridge = null;
             this._onNativeSpeechEvent = null;
@@ -117,6 +119,7 @@
             this._onKeyDown = null;
             this._mobileMenuSwipeStart = null;
             this._onMobileMenuTouchStart = null;
+            this._onMobileMenuTouchMove = null;
             this._onMobileMenuTouchEnd = null;
             this._onMobileMenuTouchCancel = null;
 
@@ -1396,7 +1399,14 @@
         }
 
         setVoiceListening(isListening) {
+            const wasListening = this.voiceListening;
             this.voiceListening = isListening;
+            if (isListening && !wasListening) {
+                this.voiceWaveformHistory = this.voiceWaveformBars.map(() => 0);
+                this.voiceWaveformLastSampleAt = 0;
+                this.voiceWaveformBars.forEach(bar => { bar.style.height = '3px'; });
+                if (this.voiceCapture) this.voiceCapture.classList.remove('is-speaking');
+            }
             if (this.input) this.input.disabled = isListening || this.voiceStopping || this.isGenerating;
             if (this.composerForm) this.composerForm.classList.toggle('is-voice-recording', isListening || this.voiceStopping);
             if (this.voiceCapture) {
@@ -1531,11 +1541,25 @@
         setVoiceWaveformLevel(level) {
             if (!this.voiceCapture || !this.voiceWaveformBars.length) return;
             const normalized = Math.max(0, Math.min(1, Number(level) || 0));
-            this.voiceCapture.classList.toggle('is-speaking', normalized > 0.08);
+            const isSpeaking = normalized > 0.065;
+            this.voiceCapture.classList.toggle('is-speaking', isSpeaking);
+
+            // Add one audio sample at the right edge at a steady cadence; the existing samples
+            // shift left, creating a scrolling trace that begins as quiet baseline dots.
+            const now = performance.now();
+            if (!this.voiceWaveformLastSampleAt || now - this.voiceWaveformLastSampleAt >= 65) {
+                if (this.voiceWaveformHistory.length !== this.voiceWaveformBars.length) {
+                    this.voiceWaveformHistory = this.voiceWaveformBars.map(() => 0);
+                }
+                this.voiceWaveformHistory.shift();
+                this.voiceWaveformHistory.push(normalized);
+                this.voiceWaveformLastSampleAt = now;
+            }
+
             this.voiceWaveformBars.forEach((bar, index) => {
-                const centerBias = 0.45 + 0.55 * Math.sin(Math.PI * (index + 1) / (this.voiceWaveformBars.length + 1));
-                const variation = 0.35 + Math.random() * 0.65;
-                const height = Math.max(3, 3 + normalized * 31 * centerBias * variation);
+                const sample = this.voiceWaveformHistory[index] || 0;
+                const variation = 0.72 + 0.28 * (0.5 + 0.5 * Math.sin((index + 1) * 2.37));
+                const height = sample > 0.065 ? 3 + Math.pow(sample, 0.78) * 48 * variation : 3;
                 bar.style.height = `${height}px`;
             });
         }
@@ -1550,6 +1574,8 @@
                 try { this.voiceAudioContext.close(); } catch (error) {}
             }
             this.voiceAudioContext = null;
+            this.voiceWaveformHistory = this.voiceWaveformBars.map(() => 0);
+            this.voiceWaveformLastSampleAt = 0;
             this.setVoiceWaveformLevel(0);
         }
 
@@ -3655,11 +3681,28 @@
                         return;
                     }
                     this._mobileMenuSwipeStart = { x: touch.clientX, y: touch.clientY, action: 'close' };
-                } else if (touch.clientX >= window.innerWidth - 32) {
+                } else if (touch.clientX >= window.innerWidth - 64) {
                     this._mobileMenuSwipeStart = { x: touch.clientX, y: touch.clientY, action: 'open' };
                 } else {
                     this._mobileMenuSwipeStart = null;
                 }
+            };
+
+            this._onMobileMenuTouchMove = (event) => {
+                const start = this._mobileMenuSwipeStart;
+                if (!start || start.action !== 'open' || !event.touches || event.touches.length !== 1) return;
+
+                const touch = event.touches[0];
+                const deltaX = touch.clientX - start.x;
+                const deltaY = touch.clientY - start.y;
+                // Open as soon as a deliberate left swipe is clear instead of waiting for release.
+                if (deltaX > -44 || Math.abs(deltaX) < Math.abs(deltaY) * 1.15) return;
+
+                this._mobileMenuSwipeStart = null;
+                const offcanvas = window.bootstrap && window.bootstrap.Offcanvas
+                    ? window.bootstrap.Offcanvas.getOrCreateInstance(menu)
+                    : null;
+                if (offcanvas) offcanvas.show();
             };
 
             this._onMobileMenuTouchEnd = (event) => {
@@ -3689,6 +3732,7 @@
             };
 
             document.addEventListener('touchstart', this._onMobileMenuTouchStart, { passive: true });
+            document.addEventListener('touchmove', this._onMobileMenuTouchMove, { passive: true });
             document.addEventListener('touchend', this._onMobileMenuTouchEnd, { passive: true });
             document.addEventListener('touchcancel', this._onMobileMenuTouchCancel, { passive: true });
         }
@@ -3741,6 +3785,10 @@
             if (this._onMobileMenuTouchEnd) {
                 document.removeEventListener('touchend', this._onMobileMenuTouchEnd);
                 this._onMobileMenuTouchEnd = null;
+            }
+            if (this._onMobileMenuTouchMove) {
+                document.removeEventListener('touchmove', this._onMobileMenuTouchMove);
+                this._onMobileMenuTouchMove = null;
             }
             if (this._onMobileMenuTouchCancel) {
                 document.removeEventListener('touchcancel', this._onMobileMenuTouchCancel);

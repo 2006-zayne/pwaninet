@@ -62,6 +62,11 @@
     --pwanimate-composer-bg: #ffffff;
     --pwanimate-hover-bg: #f1f5f9;
     --pwanimate-muted: #64748b;
+    --pwanimate-waveform-start: #5367d9;
+    --pwanimate-waveform-mid: #3f5de0;
+    --pwanimate-waveform-end: #8764ce;
+    --pwanimate-waveform-idle-opacity: .58;
+    --pwanimate-waveform-active-glow: rgba(63, 93, 224, .24);
 }
 
 [data-theme="dark"],
@@ -114,6 +119,11 @@
     --pwanimate-composer-bg: #242526;
     --pwanimate-hover-bg: #3a3b3c;
     --pwanimate-muted: #94a3b8;
+    --pwanimate-waveform-start: #a9b4ff;
+    --pwanimate-waveform-mid: #8193ff;
+    --pwanimate-waveform-end: #d0b5ff;
+    --pwanimate-waveform-idle-opacity: .64;
+    --pwanimate-waveform-active-glow: rgba(129, 147, 255, .34);
     --pwanimate-close-filter: invert(1);
 }
 
@@ -1483,6 +1493,7 @@ body.keyboard-open .pwanimate-composer-wrapper {
 .pwanimate-composer-actions-end {
     display: flex;
     align-items: center;
+    gap: 0.45rem;
     margin-left: auto;
 }
 
@@ -3812,17 +3823,20 @@ body.pwanimate-active .pwanimate-settings-mobile,
 .pwanimate-voice-feedback.is-error { color: #dc2626; }
 
 .pwanimate-voice-capture {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: .8rem;
+    gap: .7rem;
     width: 100%;
-    min-height: 74px;
-    padding: 0 .1rem;
+    min-height: 68px;
+    padding: 0 .15rem;
 }
 
 .pwanimate-voice-capture.d-none { display: none !important; }
 .pwanimate-composer-box.is-voice-recording .pwanimate-composer-standard { display: none; }
 .pwanimate-voice-cancel, .pwanimate-voice-stop, .pwanimate-voice-send {
+    position: relative;
+    z-index: 1;
     display: grid;
     place-items: center;
     width: 38px;
@@ -3834,35 +3848,29 @@ body.pwanimate-active .pwanimate-settings-mobile,
 }
 .pwanimate-voice-cancel { color: var(--pwanimate-muted, #64748b); background: transparent; font-size: 1rem; }
 .pwanimate-voice-cancel:hover { color: #dc2626; background: rgba(220, 38, 38, .08); }
-.pwanimate-voice-stop { color: #fff; background: #dc2626; font-size: 1.1rem; box-shadow: 0 3px 10px rgba(220, 38, 38, .24); }
-.pwanimate-voice-stop:hover { background: #b91c1c; }
-.pwanimate-voice-send { color: #fff; background: var(--primary, #2563eb); font-size: 1.2rem; box-shadow: 0 3px 10px rgba(37, 99, 235, .2); }
+.pwanimate-voice-stop { margin-left: auto; color: var(--pwanimate-asst-text); background: var(--pwanimate-bg); border: 1px solid var(--pwanimate-border); font-size: 1.05rem; box-shadow: 0 1px 3px rgba(15, 23, 42, .1); }
+.pwanimate-voice-stop:hover { color: var(--pwanimate-asst-text); background: var(--pwanimate-hover-bg); }
+.pwanimate-voice-send { color: #fff; background: var(--primary, #2563eb); font-size: 1.15rem; box-shadow: 0 2px 8px color-mix(in srgb, var(--primary, #2563eb) 22%, transparent); }
 .pwanimate-voice-send:hover { filter: brightness(.94); }
 .pwanimate-voice-stop.is-loading i, .pwanimate-voice-send.is-loading i { display: none; }
 .pwanimate-voice-stop.is-loading .spinner-border, .pwanimate-voice-send.is-loading .spinner-border { display: inline-block !important; width: 15px; height: 15px; border-width: 2px; }
 .pwanimate-voice-capture button:disabled { opacity: .7; cursor: wait; }
 .pwanimate-voice-waveform {
-    position: relative;
+    position: absolute;
+    z-index: 0;
+    top: 50%;
+    left: 7.5%;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 3px;
-    flex: 1 1 auto;
-    height: 54px;
+    justify-content: space-between;
+    gap: 0;
+    flex: 0 0 85%;
+    height: 48px;
     min-width: 0;
+    width: 85%;
+    margin: 0;
     overflow: hidden;
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
-}
-.pwanimate-voice-waveform::before {
-    position: absolute;
-    inset: 0;
-    content: "";
-    background-image: radial-gradient(circle, var(--pwanimate-muted, #94a3b8) 1px, transparent 1.5px);
-    background-size: 8px 8px;
-    background-position: 0 50%;
-    opacity: .4;
-    animation: pwanimate-voice-dots 1.4s linear infinite;
+    transform: translateY(-50%);
 }
 .pwanimate-voice-waveform span {
     position: relative;
@@ -3870,19 +3878,42 @@ body.pwanimate-active .pwanimate-settings-mobile,
     width: 3px;
     height: 3px;
     flex: 0 0 3px;
-    border-radius: 4px;
-    background: var(--primary, #2563eb);
-    transition: height 75ms ease-out;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--pwanimate-waveform-start) 0%, var(--pwanimate-waveform-mid) 48%, var(--pwanimate-waveform-end) 100%);
+    opacity: var(--pwanimate-waveform-idle-opacity);
+    transition: height 85ms linear, opacity 120ms ease, filter 120ms ease;
 }
-.pwanimate-voice-capture.is-speaking .pwanimate-voice-waveform::before { opacity: .14; }
-.pwanimate-voice-capture.is-speaking .pwanimate-voice-waveform span { box-shadow: 0 0 5px color-mix(in srgb, var(--primary, #2563eb) 28%, transparent); }
-.pwanimate-voice-capture.is-stopping .pwanimate-voice-waveform::before { animation-play-state: paused; }
+.pwanimate-voice-capture.is-speaking .pwanimate-voice-waveform span { opacity: .98; filter: drop-shadow(0 0 3px var(--pwanimate-waveform-active-glow)); }
+.pwanimate-voice-capture.is-stopping .pwanimate-voice-waveform span { opacity: .42; }
 .pwanimate-voice-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
-@keyframes pwanimate-voice-dots { to { background-position: -24px 50%; } }
 
-@media (max-width: 575.98px) {
-    .pwanimate-voice-capture { gap: .55rem; }
+@media (max-width: 767.98px) {
+    .pwanimate-voice-capture {
+        display: grid;
+        grid-template-columns: 38px minmax(0, 1fr) 36px 36px;
+        grid-template-rows: 34px 40px;
+        gap: .3rem .5rem;
+        min-height: 0;
+        padding: .1rem 0 0;
+    }
+    .pwanimate-voice-cancel { grid-column: 1; grid-row: 2; }
+    .pwanimate-voice-stop { grid-column: 3; grid-row: 2; margin-left: 0; }
+    .pwanimate-voice-send { grid-column: 4; grid-row: 2; }
+    .pwanimate-voice-waveform {
+        position: relative;
+        top: auto;
+        left: auto;
+        grid-column: 1 / -1;
+        grid-row: 1;
+        width: 100%;
+        height: 34px;
+        transform: none;
+    }
     .pwanimate-voice-cancel, .pwanimate-voice-stop, .pwanimate-voice-send { width: 36px; height: 36px; flex-basis: 36px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pwanimate-voice-waveform span { transition: none; }
 }
 
 .pwanimate-voice-status.is-error {
