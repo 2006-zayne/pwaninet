@@ -227,9 +227,12 @@ def tool_result_to_context_items(tool_name: str, result: ToolResult) -> List[Con
                 )
             ]
         unread_count = data.get("unread_count", 0)
+        total_count = data.get("total_count")
         notifications = data.get("notifications", [])
 
         lines = [f"You have {unread_count} unread notification(s)."]
+        if total_count is not None:
+            lines.append(f"You have {total_count} total notification(s) in your inbox.")
         if notifications:
             lines.append("Recent notifications:")
             for n in notifications:
@@ -241,7 +244,7 @@ def tool_result_to_context_items(tool_name: str, result: ToolResult) -> List[Con
             ContextItem(
                 source="notification",
                 object_id="notification_summary",
-                title=f"Personal Notifications ({unread_count} unread)",
+                title=f"Personal Notifications ({unread_count} unread, {total_count if total_count is not None else 'unknown'} total)",
                 content="\n".join(lines),
                 citation="[Notifications]",
                 url="/notifications/",

@@ -8,10 +8,12 @@ supporting both full-page browser loads and HTMX partial swaps.
 from typing import Any, Dict, Optional
 
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views import View
 
@@ -23,6 +25,7 @@ from pwanimate.models import (
 )
 from pwanimate.services.preferences import PwanimatePreferenceService
 from pwanimate.version import get_version as get_pwanimate_version
+from documents.models import Document
 
 
 def _get_settings_context(
@@ -47,6 +50,8 @@ def _get_settings_context(
         "response_style_choices": PwanimateResponseStyle.choices,
         "conversations_count": conversations_count,
         "user_display": user_display,
+        "student_username": request.user.get_username(),
+        "student_interests": getattr(request.user, "interests", "") or "",
         "active_tab": active_tab,
         "success": success,
         "errors": errors or {},
@@ -87,6 +92,66 @@ class PwanimateUIView(View):
 
         initial_prompt = request.GET.get("prompt", "").strip()
 
+        initial_context_resources = []
+        context_document_id = request.GET.get("context_document", "").strip()
+        if context_document_id:
+            document_qs = Document.objects.filter(
+                share_id=context_document_id,
+                status="ready",
+                is_available=True,
+            )
+            user = request.user
+            is_admin_or_leader = (
+                user.is_staff
+                or user.is_superuser
+                or getattr(user, "global_role", None) in ["PRESIDENT", "DELEGATE"]
+            )
+            if not is_admin_or_leader:
+                visibility_q = Q(visibility="public") | Q(uploaded_by=user)
+                restricted_q = Q(visibility="restricted")
+                programme = getattr(user, "programme", None)
+                if programme:
+                    visibility_q |= restricted_q & Q(
+                        academic_units__academic_unit__programme_units__programme=programme
+                    )
+                elif getattr(user, "course", None):
+                    visibility_q |= restricted_q & Q(
+                        academic_units__academic_unit__code__icontains=user.course.name
+                    )
+                document_qs = document_qs.filter(visibility_q).distinct()
+
+            context_document = document_qs.first()
+            if not context_document:
+                raise Http404("Document not found or unavailable.")
+            latest_version = context_document.latest_version
+            first_file = latest_version.files.first() if latest_version else None
+            if first_file and first_file.file:
+                try:
+                    media_url = first_file.file.url
+                except (ValueError, OSError):
+                    media_url = ""
+                if media_url:
+                    try:
+                        page_number = max(1, int(request.GET.get("page", "1")))
+                    except (TypeError, ValueError):
+                        page_number = 1
+                    initial_context_resources.append({
+                        "resourceType": "document",
+                        "sourceType": "document",
+                        "documentId": str(context_document.share_id),
+                        "documentShareId": str(context_document.share_id),
+                        "documentVersionId": str(latest_version.id),
+                        "fileId": str(first_file.id),
+                        "fileType": (first_file.extension or "").lstrip("."),
+                        "mediaUrl": media_url,
+                        "title": context_document.title,
+                        "url": reverse(
+                            "documents:document_detail",
+                            args=[context_document.share_id],
+                        ),
+                        "pageNumber": page_number,
+                    })
+
         settings_ctx = _get_settings_context(request)
         context = {
             **settings_ctx,
@@ -97,6 +162,7 @@ class PwanimateUIView(View):
             "active_conversation_id": str(active_conversation.id) if active_conversation else "",
             "messages": messages,
             "initial_prompt": initial_prompt,
+            "initial_context_resources": initial_context_resources,
         }
 
         if request.headers.get("HX-Request"):
@@ -270,4 +336,3 @@ class PwanimateSettingsAboutView(View):
                 return render(request, "pwanimate/settings/partials/about_content.html", context)
             return render(request, "pwanimate/settings/partials/settings_mobile_page.html", context)
         return render(request, "pwanimate/settings/index.html", context)
-

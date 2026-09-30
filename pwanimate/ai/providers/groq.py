@@ -6,6 +6,7 @@ chat/completions REST API using direct HTTP requests.
 """
 
 from typing import Any, Dict, List, Optional
+import base64
 import logging
 import requests
 
@@ -24,6 +25,7 @@ from pwanimate.ai.gateway.types import ChatMessage, LLMRequest, LLMResponse
 logger = logging.getLogger(__name__)
 
 GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_VISION_MODELS = {"qwen/qwen3.8-27b"}
 
 
 class GroqLLMProvider(BaseLLMProvider):
@@ -65,7 +67,7 @@ class GroqLLMProvider(BaseLLMProvider):
 
         model = request.model or self.model_name
 
-        # Enforce explicit capability check: Groq text models do not support image attachments
+        # Only the configured Qwen vision models accept image attachments.
         has_images = any(
             getattr(a, "attachment_type", "") == "image"
             for a in (getattr(request, "attachments", []) or [])
@@ -73,10 +75,9 @@ class GroqLLMProvider(BaseLLMProvider):
             any(getattr(a, "attachment_type", "") == "image" for a in (getattr(msg, "attachments", []) or []))
             for msg in request.messages
         )
-        if has_images:
+        if has_images and model.strip().lower() not in GROQ_VISION_MODELS:
             raise AIProviderConfigurationError(
-                f"Selected AI model '{model}' on provider '{self.provider_name}' does not support image attachments. "
-                "Please select Google Gemini for multimodal image analysis.",
+                f"Selected AI model '{model}' on provider '{self.provider_name}' does not support image attachments.",
                 provider=self.provider_name,
             )
 
@@ -144,28 +145,73 @@ class GroqLLMProvider(BaseLLMProvider):
             any(getattr(a, "attachment_type", "") == "image" for a in (getattr(msg, "attachments", []) or []))
             for msg in request.messages
         )
-        if has_images:
+        if has_images and model.strip().lower() not in GROQ_VISION_MODELS:
             raise AIProviderConfigurationError(
-                f"Selected AI model '{model}' on provider '{self.provider_name}' does not support image attachments. "
-                "Please select Google Gemini for multimodal image analysis.",
+                f"Selected AI model '{model}' on provider '{self.provider_name}' does not support image attachments.",
                 provider=self.provider_name,
             )
 
-        messages: List[Dict[str, str]] = []
+        messages: List[Dict[str, Any]] = []
 
         if request.system_instruction:
             messages.append({"role": "system", "content": request.system_instruction})
 
         for msg in request.messages:
-            messages.append({"role": msg.role, "content": msg.content})
+            content: Any = msg.content
+            msg_attachments = list(getattr(msg, "attachments", []) or [])
+            if msg.role == "user" and getattr(request, "attachments", None):
+                seen_ids = {getattr(att, "id", None) for att in msg_attachments}
+                msg_attachments.extend(
+                    att for att in request.attachments
+                    if getattr(att, "id", None) not in seen_ids
+                )
+            image_attachments = [
+                att for att in msg_attachments
+                if getattr(att, "attachment_type", "") == "image"
+            ]
+            if image_attachments:
+                content = [{"type": "text", "text": msg.content}]
+                for attachment in image_attachments:
+                    image_bytes = getattr(attachment, "data_bytes", None)
+                    if not image_bytes and getattr(attachment, "file_path", None):
+                        try:
+                            with open(attachment.file_path, "rb") as image_file:
+                                image_bytes = image_file.read()
+                        except OSError as exc:
+                            raise AIProviderConfigurationError(
+                                f"Could not read image attachment '{getattr(attachment, 'name', 'image')}'.",
+                                provider=self.provider_name,
+                            ) from exc
+                    if not image_bytes:
+                        raise AIProviderConfigurationError(
+                            f"Image attachment '{getattr(attachment, 'name', 'image')}' has no readable content.",
+                            provider=self.provider_name,
+                        )
+                    mime_type = getattr(attachment, "mime_type", "image/jpeg") or "image/jpeg"
+                    image_data = base64.b64encode(image_bytes).decode("ascii")
+                    content.append({
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{mime_type};base64,{image_data}"},
+                    })
+            messages.append({"role": msg.role, "content": content})
 
         # Inject context into messages if present
-        if request.context and (request.context.items or getattr(request.context, "user_context", None)):
+        if request.context and (
+            request.context.items or
+            request.context.explicit_resources or
+            request.context.retrieved_context or
+            getattr(request.context, "user_context", None) or
+            getattr(request.context, "student_context", None)
+        ):
             context_text = request.context.format_context_text()
             if context_text:
                 # If there's a last user message, prepend context
                 if messages and messages[-1]["role"] == "user":
-                    messages[-1]["content"] = f"{context_text}\n\n{messages[-1]['content']}"
+                    last_content = messages[-1]["content"]
+                    if isinstance(last_content, list):
+                        last_content.insert(0, {"type": "text", "text": context_text})
+                    else:
+                        messages[-1]["content"] = f"{context_text}\n\n{last_content}"
                 else:
                     messages.append({"role": "user", "content": context_text})
 

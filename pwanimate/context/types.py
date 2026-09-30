@@ -5,8 +5,11 @@ Defines the bounded, citation-preserving context package consumed by
 future AI Gateway and LLM components.
 """
 
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from pwanimate.retrieval.types import RetrievalResponse, RetrievalResult, SourceType
@@ -22,6 +25,55 @@ def estimate_tokens(text: str) -> int:
     return max(1, math.ceil(len(text) / 4))
 
 
+class GroundingMode(Enum):
+    """
+    Grounding mode determines whether PwaniNet retrieval is required for the request.
+    
+    NONE: General conversation/general knowledge. No PwaniNet retrieval required.
+    OPTIONAL: Model may benefit from PwaniNet context but answering does not depend on it.
+    REQUIRED: Answer depends on PwaniNet data. Retrieval is required.
+    EXPLICIT_RESOURCE: User explicitly selected a document/resource. Highest contextual relevance.
+    """
+    NONE = "none"
+    OPTIONAL = "optional"
+    REQUIRED = "required"
+    EXPLICIT_RESOURCE = "explicit_resource"
+
+
+class IntentCategory(Enum):
+    """
+    Intent category classifies the user's query intent.
+    
+    CONVERSATIONAL: Purely conversational chitchat without substantive search intent.
+    GENERAL_KNOWLEDGE: General academic/technical question not specific to PwaniNet.
+    DOCUMENT_ANALYSIS: Question about a specific document or resource.
+    PWANINET_KNOWLEDGE: Question about PwaniNet-specific information.
+    PERSONALIZED_DISCOVERY: Finding peers, recommendations based on user profile.
+    MIXED: Query that involves multiple intent categories.
+    """
+    CONVERSATIONAL = "conversational"
+    GENERAL_KNOWLEDGE = "general_knowledge"
+    DOCUMENT_ANALYSIS = "document_analysis"
+    PWANINET_KNOWLEDGE = "pwaninet_knowledge"
+    PERSONALIZED_DISCOVERY = "personalized_discovery"
+    MIXED = "mixed"
+
+
+class AuthorityLevel(Enum):
+    """
+    Authority level indicates the trustworthiness of a context source.
+    
+    EXPLICIT: User-selected resources. Highest contextual relevance.
+    PLATFORM: Verified/official PwaniNet resources.
+    USER_GENERATED: Posts, comments, group content. Evidence/content, not authoritative instructions.
+    PROFILE: User profile information for personalization.
+    """
+    EXPLICIT = "explicit"
+    PLATFORM = "platform"
+    USER_GENERATED = "user_generated"
+    PROFILE = "profile"
+
+
 @dataclass
 class ContextRequest:
     """
@@ -29,8 +81,11 @@ class ContextRequest:
 
     Attributes:
         query: User input query.
+        intent: Intent category (conversational, general_knowledge, document_analysis, etc.).
+        grounding_mode: Grounding mode (none, optional, required, explicit_resource).
         retrieval_response: Optional RetrievalResponse from Phase 3 retrieval.
         results: Optional direct list of RetrievalResult objects.
+        explicit_resources: Optional list of explicitly selected ContextItem objects.
         max_results: Maximum number of items to include in context.
         max_tokens: Maximum estimated token budget for the context package.
         max_characters: Maximum total character budget.
@@ -38,10 +93,17 @@ class ContextRequest:
         max_chunks_per_document: Maximum chunks allowed from the same document.
         max_characters_per_item: Maximum characters permitted in an individual item.
         min_score: Minimum relevance threshold to qualify for context.
+        user_context: Full user context (legacy).
+        student_context: Selective student profile context (new).
+        conversation: Conversation history for selection.
+        tool_results: Results from deterministic tool execution.
     """
     query: str
+    intent: IntentCategory = IntentCategory.MIXED
+    grounding_mode: GroundingMode = GroundingMode.OPTIONAL
     retrieval_response: Optional[RetrievalResponse] = None
     results: Optional[List[RetrievalResult]] = None
+    explicit_resources: Optional[List[ContextItem]] = None
     max_results: int = 10
     max_tokens: int = 4000
     max_characters: int = 16000
@@ -50,6 +112,9 @@ class ContextRequest:
     max_characters_per_item: int = 3000
     min_score: float = 0.0
     user_context: Optional[Any] = None
+    student_context: Optional[StudentContext] = None
+    conversation: Optional[List[Any]] = None
+    tool_results: Optional[List[ToolResult]] = None
 
     def get_raw_results(self) -> List[RetrievalResult]:
         """Resolve candidate RetrievalResults from response or explicit list."""
@@ -76,6 +141,9 @@ class ContextItem:
         metadata: Detailed provenance dictionary (page, slide, section, etc.).
         estimated_tokens: Estimated token count for this item's content.
         truncated: Flag indicating if content was truncated due to budget constraints.
+        explicitly_selected: Whether this resource was explicitly selected by the user.
+        authority_level: Trustworthiness level of the source (explicit, platform, user_generated, profile).
+        citation_metadata: Detailed citation information (document_id, page_number, etc.).
     """
     source: SourceType | str
     object_id: Any
@@ -87,6 +155,9 @@ class ContextItem:
     metadata: Dict[str, Any] = field(default_factory=dict)
     estimated_tokens: int = 0
     truncated: bool = False
+    explicitly_selected: bool = False
+    authority_level: AuthorityLevel = AuthorityLevel.USER_GENERATED
+    citation_metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if not self.estimated_tokens:
@@ -98,6 +169,7 @@ class ContextItem:
         Guarantees zero ORM model instances in output.
         """
         src_str = self.source.value if isinstance(self.source, SourceType) else str(self.source)
+        authority_str = self.authority_level.value if isinstance(self.authority_level, AuthorityLevel) else str(self.authority_level)
         # Ensure metadata contains only JSON-serializable primitives
         clean_metadata = {}
         for k, v in self.metadata.items():
@@ -117,6 +189,9 @@ class ContextItem:
             "metadata": clean_metadata,
             "estimated_tokens": self.estimated_tokens,
             "truncated": self.truncated,
+            "explicitly_selected": self.explicitly_selected,
+            "authority_level": authority_str,
+            "citation_metadata": self.citation_metadata,
         }
 
     def format_data_block(self) -> str:
@@ -127,9 +202,11 @@ class ContextItem:
         src_str = self.source.value if isinstance(self.source, SourceType) else str(self.source)
         citation_str = f' citation="{self.citation}"' if self.citation else ""
         url_str = f' url="{self.url}"' if self.url else ""
+        authority_str = f' authority="{self.authority_level.value}"' if isinstance(self.authority_level, AuthorityLevel) else ""
+        explicit_str = ' explicitly_selected="true"' if self.explicitly_selected else ""
 
         lines = [
-            f'<grounding_data source="{src_str}" id="{self.object_id}"{citation_str}{url_str}>',
+            f'<grounding_data source="{src_str}" id="{self.object_id}"{citation_str}{url_str}{authority_str}{explicit_str}>',
             f'  <title>{self.title}</title>',
             '  <content>',
             f'    {self.content}',
@@ -140,21 +217,149 @@ class ContextItem:
 
 
 @dataclass
+class StudentContext:
+    """
+    Selective student profile context for personalization.
+    
+    Only includes relevant profile fields based on query intent,
+    rather than dumping the entire user profile into every request.
+    
+    Attributes:
+        programme_name: Academic programme name (if relevant).
+        level: Academic level (if relevant).
+        relevant_interests: Interests relevant to the current query.
+        relevant_skills: Skills relevant to the current query.
+        collaboration_status: Collaboration availability (if relevant).
+        nickname: Preferred nickname (if set).
+        tone: Preferred tone preference.
+        response_style: Preferred response style.
+        personal_instructions: User-provided interaction preferences.
+    """
+    programme_name: Optional[str] = None
+    level: Optional[str] = None
+    relevant_interests: List[str] = field(default_factory=list)
+    relevant_skills: List[str] = field(default_factory=list)
+    collaboration_status: Optional[str] = None
+    nickname: Optional[str] = None
+    tone: Optional[str] = None
+    response_style: Optional[str] = None
+    personal_instructions: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to JSON-serializable dictionary."""
+        return {
+            "programme_name": self.programme_name,
+            "level": self.level,
+            "relevant_interests": list(self.relevant_interests),
+            "relevant_skills": list(self.relevant_skills),
+            "collaboration_status": self.collaboration_status,
+            "nickname": self.nickname,
+            "tone": self.tone,
+            "response_style": self.response_style,
+            "personal_instructions": self.personal_instructions,
+        }
+
+    def format_context_block(self) -> str:
+        """
+        Format as a compact XML-bounded text block.
+        Only includes fields that have values.
+        """
+        lines = ["<student_context>"]
+        
+        if self.programme_name:
+            lines.append(f"Programme: {self.programme_name}")
+        if self.level:
+            lines.append(f"Level: {self.level}")
+        if self.relevant_interests:
+            lines.append(f"Interests: {', '.join(self.relevant_interests)}")
+        if self.relevant_skills:
+            lines.append(f"Skills: {', '.join(self.relevant_skills)}")
+        if self.collaboration_status:
+            lines.append(f"Collaboration Status: {self.collaboration_status}")
+        
+        if self.nickname or self.tone or self.response_style or self.personal_instructions:
+            lines.append("Preferences:")
+            if self.nickname:
+                lines.append(f"- Nickname: {self.nickname}")
+            if self.tone:
+                lines.append(f"- Tone: {self.tone}")
+            if self.response_style:
+                lines.append(f"- Response Style: {self.response_style}")
+            if self.personal_instructions:
+                lines.append(f"- Personal Instructions: {self.personal_instructions}")
+        
+        lines.append("</student_context>")
+        return "\n".join(lines)
+
+    def has_content(self) -> bool:
+        """Check if any relevant fields are populated."""
+        return bool(
+            self.programme_name or
+            self.level or
+            self.relevant_interests or
+            self.relevant_skills or
+            self.collaboration_status or
+            self.nickname or
+            self.tone or
+            self.response_style or
+            self.personal_instructions
+        )
+
+
+@dataclass
+class ToolResult:
+    """
+    Result from a deterministic domain tool execution.
+    
+    Attributes:
+        tool_name: Name of the tool that was executed.
+        success: Whether the tool execution succeeded.
+        data: Raw data returned by the tool.
+        metadata: Additional tool-specific metadata.
+    """
+    tool_name: str
+    success: bool
+    data: Any = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to JSON-serializable dictionary."""
+        return {
+            "tool_name": self.tool_name,
+            "success": self.success,
+            "data": self.data,
+            "metadata": self.metadata,
+        }
+
+
+@dataclass
 class ContextPackage:
     """
     Bounded, provenance-preserving context container passed to downstream AI components.
 
     Attributes:
         query: Input query.
-        items: Bounded list of selected ContextItem objects.
+        intent: Intent category (conversational, general_knowledge, document_analysis, etc.).
+        grounding_mode: Grounding mode (none, optional, required, explicit_resource).
+        items: Bounded list of selected ContextItem objects (deprecated, use explicit_resources + retrieved_context).
         citations: Deduplicated list of citation labels.
         total_items: Total number of context items included.
         estimated_tokens: Total estimated tokens across all items.
         total_characters: Total character count across all items.
         truncated: True if any item or the overall context was truncated.
         source_counts: Counts of items grouped by source type.
+        user_context: Full user context (legacy, for backward compatibility).
+        student_context: Selective student profile context (new, preferred).
+        explicit_resources: Explicitly selected resources (highest priority).
+        retrieved_context: Retrieved evidence from PwaniNet.
+        tool_results: Results from deterministic tool execution.
+        conversation: Selected conversation history.
+        attachment_context: Attachment text content.
+        metadata: Package metadata (retrieval_used, sources_used, token_budget, context_version).
     """
     query: str
+    intent: IntentCategory = IntentCategory.MIXED
+    grounding_mode: GroundingMode = GroundingMode.OPTIONAL
     items: List[ContextItem] = field(default_factory=list)
     citations: List[str] = field(default_factory=list)
     total_items: int = 0
@@ -163,12 +368,20 @@ class ContextPackage:
     truncated: bool = False
     source_counts: Dict[str, int] = field(default_factory=dict)
     user_context: Optional[Any] = None
+    student_context: Optional[StudentContext] = None
+    explicit_resources: List[ContextItem] = field(default_factory=list)
+    retrieved_context: List[ContextItem] = field(default_factory=list)
+    tool_results: List[ToolResult] = field(default_factory=list)
+    conversation: List[Any] = field(default_factory=list)
     attachment_context: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert package to JSON-serializable dictionary."""
         data = {
             "query": self.query,
+            "intent": self.intent.value if isinstance(self.intent, IntentCategory) else str(self.intent),
+            "grounding_mode": self.grounding_mode.value if isinstance(self.grounding_mode, GroundingMode) else str(self.grounding_mode),
             "items": [item.to_dict() for item in self.items],
             "citations": self.citations,
             "total_items": self.total_items,
@@ -176,13 +389,26 @@ class ContextPackage:
             "total_characters": self.total_characters,
             "truncated": self.truncated,
             "source_counts": self.source_counts,
+            "metadata": self.metadata,
         }
+        
         if self.attachment_context:
             data["attachment_context"] = self.attachment_context
         if self.user_context and hasattr(self.user_context, "to_dict"):
             data["user_context"] = self.user_context.to_dict()
         elif self.user_context is not None:
             data["user_context"] = self.user_context
+        if self.student_context:
+            data["student_context"] = self.student_context.to_dict()
+        if self.explicit_resources:
+            data["explicit_resources"] = [item.to_dict() for item in self.explicit_resources]
+        if self.retrieved_context:
+            data["retrieved_context"] = [item.to_dict() for item in self.retrieved_context]
+        if self.tool_results:
+            data["tool_results"] = [tool.to_dict() for tool in self.tool_results]
+        if self.conversation:
+            data["conversation"] = self.conversation
+        
         return data
 
     def format_context_text(self) -> str:
@@ -192,14 +418,34 @@ class ContextPackage:
         """
         sections = []
 
-        if self.attachment_context:
-            sections.append(self.attachment_context)
-
-        if self.user_context and hasattr(self.user_context, "format_context_block"):
+        # Student context (selective profile)
+        if self.student_context and self.student_context.has_content():
+            sections.append(self.student_context.format_context_block())
+        # Fallback to full user context for backward compatibility
+        elif self.user_context and hasattr(self.user_context, "format_context_block"):
             user_text = self.user_context.format_context_block()
             if user_text:
                 sections.append(user_text)
 
+        # Explicit resources (highest priority)
+        if self.explicit_resources:
+            blocks = [item.format_data_block() for item in self.explicit_resources]
+            if blocks:
+                content_section = "\n\n".join(blocks)
+                header = f'<explicit_resources total_items="{len(self.explicit_resources)}">'
+                footer = "</explicit_resources>"
+                sections.append(f"{header}\n\n{content_section}\n\n{footer}")
+
+        # Retrieved context (PwaniNet evidence)
+        if self.retrieved_context:
+            blocks = [item.format_data_block() for item in self.retrieved_context]
+            if blocks:
+                content_section = "\n\n".join(blocks)
+                header = f'<retrieved_context total_items="{len(self.retrieved_context)}" estimated_tokens="{self.estimated_tokens}">'
+                footer = "</retrieved_context>"
+                sections.append(f"{header}\n\n{content_section}\n\n{footer}")
+
+        # Legacy items (for backward compatibility)
         if self.items:
             blocks = [item.format_data_block() for item in self.items]
             content_section = "\n\n".join(blocks)
@@ -207,8 +453,32 @@ class ContextPackage:
             footer = "</retrieved_context>"
             sections.append(f"{header}\n\n{content_section}\n\n{footer}")
 
+        # Attachment context
+        if self.attachment_context:
+            sections.append(self.attachment_context)
+
         return "\n\n".join(sections)
 
     def has_content(self) -> bool:
-        """Check if package contains either grounding items, attachment context, or user context."""
-        return bool(self.items or self.attachment_context or self.user_context)
+        """Check if package contains any context."""
+        return bool(
+            self.items or
+            self.explicit_resources or
+            self.retrieved_context or
+            self.tool_results or
+            self.conversation or
+            self.attachment_context or
+            self.student_context or
+            self.user_context
+        )
+
+    def get_all_context_items(self) -> List[ContextItem]:
+        """
+        Get all context items in priority order:
+        explicit_resources > retrieved_context > items (legacy)
+        """
+        all_items = []
+        all_items.extend(self.explicit_resources)
+        all_items.extend(self.retrieved_context)
+        all_items.extend(self.items)
+        return all_items

@@ -42,6 +42,7 @@ ALLOWED_HOSTS = [
 
 # Application definition
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -141,7 +142,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True
@@ -298,12 +299,17 @@ CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://127.0.0
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = os.environ.get('TIME_ZONE', 'UTC')
+CELERY_TIMEZONE = os.environ.get('TIME_ZONE', TIME_ZONE)
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
-CELERY_IMPORTS = ('notifications.tasks',)
+CELERY_IMPORTS = (
+    'notifications.tasks',
+    # Keep Pwanimate's task package explicit so workers register attachment
+    # processing as well as the existing ingestion and reconciliation tasks.
+    'pwanimate.tasks',
+)
 
 CELERY_TASK_DEFAULT_QUEUE = 'default'
 
@@ -582,10 +588,15 @@ PWANIMATE_CLOUDFLARE_MODEL = os.environ.get('PWANIMATE_CLOUDFLARE_MODEL', os.env
 # AI Gateway (LLM Generation)
 PWANIMATE_DEFAULT_LLM_PROVIDER = os.environ.get('PWANIMATE_DEFAULT_LLM_PROVIDER', 'gemini')
 PWANIMATE_GEMINI_MODEL = os.environ.get('PWANIMATE_GEMINI_MODEL', 'gemini-3.6-flash')
+PWANIMATE_VISION_MODEL = os.environ.get('PWANIMATE_VISION_MODEL', 'gemini-3.6-flash')
+PWANIMATE_VISION_FALLBACK_CHAIN = [
+    {"provider": "groq", "model": os.environ.get('PWANIMATE_GROQ_VISION_MODEL', 'qwen/qwen3.8-27b')},
+]
+PWANIMATE_ATTACHMENT_VISION_MAX_PAGES = int(os.environ.get('PWANIMATE_ATTACHMENT_VISION_MAX_PAGES', '20'))
 PWANIMATE_GROQ_MODEL = os.environ.get('PWANIMATE_GROQ_MODEL', 'openai/gpt-oss-120b')
 PWANIMATE_OPENROUTER_MODEL = os.environ.get('PWANIMATE_OPENROUTER_MODEL', 'google/gemini-2.5-flash')
 PWANIMATE_LLM_TIMEOUT = float(os.environ.get('PWANIMATE_LLM_TIMEOUT', '30.0'))
-PWANIMATE_LLM_CONNECT_TIMEOUT = float(os.environ.get('PWANIMATE_LLM_CONNECT_TIMEOUT', '5.0'))
+PWANIMATE_LLM_CONNECT_TIMEOUT = float(os.environ.get('PWANIMATE_LLM_CONNECT_TIMEOUT', '2.0'))
 PWANIMATE_PROVIDER_FALLBACK_ORDER = os.environ.get(
     'PWANIMATE_PROVIDER_FALLBACK_ORDER', 'gemini,groq,openrouter'
 ).split(',')
@@ -606,6 +617,9 @@ PWANIMATE_LLM_FALLBACK_CHAIN = [
     {"provider": "groq", "model": "groq/compound-mini"},
     {"provider": "gemini", "model": "gemini-flash-latest"},
     {"provider": "openrouter", "model": "liquid/lfm-2.5-2.6b:free"},
+    # Final fallback: mock provider returns a friendly error message
+    # instead of raising a 502 when all real providers are unreachable
+    {"provider": "mock", "model": "unavailable"},
 ]
 
 # Pwanimate Attachments Subsystem
@@ -613,8 +627,3 @@ PWANIMATE_ATTACHMENTS_DIR = 'pwanimate/attachments'
 PWANIMATE_MAX_IMAGE_SIZE = int(os.environ.get('PWANIMATE_MAX_IMAGE_SIZE', 10 * 1024 * 1024))   # 10MB
 PWANIMATE_MAX_DOC_SIZE = int(os.environ.get('PWANIMATE_MAX_DOC_SIZE', 25 * 1024 * 1024))       # 25MB
 PWANIMATE_MAX_EXTRACT_CHARS = int(os.environ.get('PWANIMATE_MAX_EXTRACT_CHARS', 15000))        # 15,000 chars per attachment
-
-
-
-
-

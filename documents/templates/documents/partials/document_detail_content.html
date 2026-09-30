@@ -50,6 +50,17 @@
     <div class="doc-pdf-viewer doc-order-1" 
          style="background: var(--card-bg); border: 1px solid var(--border); 
                 border-radius: 16px; overflow: hidden; margin-bottom: 24px;">
+        {% if request.user.is_authenticated %}
+            <div class="d-lg-none p-3">
+                <a href="{% url 'pwanimate:index' %}?context_document={{ document.share_id }}&amp;page=1"
+                   class="btn btn-outline-primary w-100 rounded-pill fw-semibold py-2 d-flex align-items-center justify-content-center gap-2"
+                   data-bypass-htmx="true" hx-boost="false"
+                   onclick="return openDocumentInPwanimate(event, this)">
+                    <i class="bi bi-chat-square-heart"></i>
+                    <span>Ask Pwanimate about this document</span>
+                </a>
+            </div>
+        {% endif %}
         {% if document.latest_version %}
             {% with first_file=document.latest_version.files.first %}
                 {% if first_file and first_file.file %}
@@ -488,7 +499,7 @@
             documentVersionId: viewerContainer.dataset.documentVersionId || null,
             fileId: viewerContainer.dataset.fileId || null,
             thumbnail: viewerContainer.dataset.thumbnail || '',
-            fitContainer: false,
+            fitContainer: window.matchMedia('(max-width: 767px)').matches,
             showFullscreen: true,
             showDownload: true
         };
@@ -647,6 +658,19 @@ function toggleShareDropdown() {
     if (dropdown) {
         dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
     }
+}
+
+function openDocumentInPwanimate(event, link) {
+    if (event) event.preventDefault();
+    const target = new URL(link.href, window.location.origin);
+    const viewer = document.getElementById('document-viewer');
+    const currentPage = viewer && viewer._documentViewer &&
+        typeof viewer._documentViewer.getCurrentPage === 'function'
+        ? viewer._documentViewer.getCurrentPage()
+        : 1;
+    target.searchParams.set('page', String(Math.max(1, Number(currentPage) || 1)));
+    window.location.assign(target.toString());
+    return false;
 }
 
 function trackAndDownload(event, documentId, fileId) {
@@ -1504,5 +1528,45 @@ document.addEventListener('click', function(event) {
         font-size: 0.8rem !important;
     }
 }
-</style>
 
+/* Mobile reader uses the full viewport width and height available to the page. */
+@media (max-width: 767px) {
+    .doc-detail-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 0 !important;
+        overflow-x: visible !important;
+        gap: 16px !important;
+    }
+
+    .doc-detail-container > .doc-pdf-viewer {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin-left: calc(50% - 50vw) !important;
+        margin-right: calc(50% - 50vw) !important;
+        border-left: 0 !important;
+        border-right: 0 !important;
+        border-radius: 0 !important;
+        margin-bottom: 16px !important;
+    }
+
+    #document-viewer {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: clamp(240px, calc(100dvh - 205px), 900px) !important;
+        min-height: 240px !important;
+    }
+
+    #document-viewer .pdf-viewer-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 8px !important;
+        box-sizing: border-box !important;
+    }
+
+    #document-viewer .pdf-page-wrapper,
+    #document-viewer canvas {
+        max-width: 100% !important;
+    }
+}
+</style>

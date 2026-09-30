@@ -52,10 +52,17 @@ class MockLLMProvider(BaseLLMProvider):
         context_count = 0
         if request.context:
             citations = list(request.context.citations)
-            context_count = request.context.total_items
+            # Count all context items including new fields
+            context_count = request.context.total_items + len(request.context.explicit_resources) + len(request.context.retrieved_context)
 
         if self.default_response_text is not None:
             content = self.default_response_text
+        elif request.model and "unavailable" in request.model.lower():
+            # Final fallback when all real providers are unreachable
+            content = (
+                "I'm sorry, I'm unable to respond right now. "
+                "The AI service is temporarily unavailable. Please try again in a few minutes."
+            )
         else:
             msg_count = len(request.messages)
             last_msg = request.messages[-1].content if request.messages else ""
@@ -76,8 +83,10 @@ class MockLLMProvider(BaseLLMProvider):
             chars = getattr(request.context, "total_characters", 0)
             if isinstance(chars, int):
                 prompt_len += chars
-            if getattr(request.context, "user_context", None) and hasattr(request.context.user_context, "format_context_block"):
-                prompt_len += len(request.context.user_context.format_context_block())
+            # Include new context fields in token estimation
+            if request.context.has_content():
+                context_text = request.context.format_context_text()
+                prompt_len += len(context_text)
 
         prompt_tokens = max(1, prompt_len // 4)
         completion_tokens = max(1, len(content) // 4)

@@ -10,6 +10,11 @@ from .types import (
     ContextItem,
     ContextPackage,
     estimate_tokens,
+    GroundingMode,
+    IntentCategory,
+    AuthorityLevel,
+    StudentContext,
+    ToolResult,
 )
 from .engine import ContextEngine
 from .user_context import (
@@ -26,6 +31,11 @@ __all__ = [
     'ContextPackage',
     'ContextEngine',
     'estimate_tokens',
+    'GroundingMode',
+    'IntentCategory',
+    'AuthorityLevel',
+    'StudentContext',
+    'ToolResult',
     'UserContext',
     'UserContextService',
     'normalize_interests',

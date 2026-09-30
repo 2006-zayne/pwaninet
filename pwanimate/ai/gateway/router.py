@@ -109,11 +109,19 @@ class LLMRouter:
         Returns:
             List of dicts: [{'provider': str, 'model': str}, ...]
         """
-        configured_chain = getattr(
-            settings,
-            "PWANIMATE_LLM_FALLBACK_CHAIN",
-            None,
-        )
+        required_capability = (request.metadata or {}).get("required_capability")
+        if required_capability == "image":
+            configured_chain = (request.metadata or {}).get("fallback_chain") or getattr(
+                settings,
+                "PWANIMATE_VISION_FALLBACK_CHAIN",
+                [{"provider": "groq", "model": "qwen/qwen3.8-27b"}],
+            )
+        else:
+            configured_chain = getattr(
+                settings,
+                "PWANIMATE_LLM_FALLBACK_CHAIN",
+                None,
+            )
         if configured_chain is None:
             # Backwards compatibility or default fallback chain
             provider_order = getattr(
@@ -158,6 +166,16 @@ class LLMRouter:
                 m_name = None
             raw_candidates.append({"provider": p_name, "model": m_name})
 
+        unique_image_ids = set()
+        for message in request.messages:
+            for attachment in getattr(message, "attachments", []) or []:
+                if getattr(attachment, "attachment_type", "") == "image":
+                    unique_image_ids.add(getattr(attachment, "id", None) or id(attachment))
+        for attachment in request.attachments or []:
+            if getattr(attachment, "attachment_type", "") == "image":
+                unique_image_ids.add(getattr(attachment, "id", None) or id(attachment))
+        image_count = len(unique_image_ids)
+
         # Deduplicate while preserving order & filter by availability and scope
         available: List[Dict[str, str]] = []
         seen = set()
@@ -167,6 +185,16 @@ class LLMRouter:
             m_name = cand["model"]
             if not p_name or p_name not in SUPPORTED_PROVIDERS:
                 continue
+
+            if required_capability == "image":
+                model_id = (m_name or "").strip().lower()
+                supports_images = (
+                    p_name == "gemini" and model_id.startswith("gemini-")
+                ) or (
+                    p_name == "groq" and model_id == "qwen/qwen3.8-27b" and image_count <= 3
+                )
+                if not supports_images:
+                    continue
 
             # If router was given an explicit providers map (e.g. in tests with mock),
             # restrict fallback strictly to providers present in that map

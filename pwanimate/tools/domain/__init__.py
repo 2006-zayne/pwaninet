@@ -10,6 +10,7 @@ from pwanimate.tools.domain.groups import GroupAnnouncementsTool
 from pwanimate.tools.domain.users import UserProfileTool
 from pwanimate.tools.domain.notifications import NotificationSummaryTool
 from pwanimate.tools.domain.people import PeopleDiscoveryTool
+from pwanimate.tools.domain.extra import LocalTimeTool, ContentSearchTool, SendNotificationTool
 
 __all__ = [
     "AcademicLookupTool",
@@ -18,4 +19,5 @@ __all__ = [
     "UserProfileTool",
     "NotificationSummaryTool",
     "PeopleDiscoveryTool",
+    "LocalTimeTool", "ContentSearchTool", "SendNotificationTool",
 ]

@@ -82,13 +82,18 @@ class ConversationService:
     """
 
     @staticmethod
-    def create_conversation(user, title: str = "") -> PwanimateConversation:
+    def create_conversation(
+        user,
+        title: str = "",
+        conversation_id: Optional[uuid.UUID] = None,
+    ) -> PwanimateConversation:
         """
         Create a new persistent conversation for the given user.
         """
         return PwanimateConversation.objects.create(
             user=user,
             title=title.strip() if title else "",
+            **({"id": conversation_id} if conversation_id else {}),
         )
 
     @staticmethod
@@ -120,6 +125,7 @@ class ConversationService:
         conversation: PwanimateConversation,
         max_messages: int = 10,
         max_tokens: int = 1500,
+        exclude_message_id: Optional[int] = None,
     ) -> List[ChatMessage]:
         """
         Load bounded conversation history suitable for passing to the Orchestrator.
@@ -130,8 +136,11 @@ class ConversationService:
         4. Converts to ChatMessage contracts.
         """
         # Fetch newest messages first with prefetched attachments
+        messages_qs = conversation.messages.filter(role__in=["user", "assistant"])
+        if exclude_message_id is not None:
+            messages_qs = messages_qs.exclude(id=exclude_message_id)
         recent_records = list(
-            conversation.messages.filter(role__in=["user", "assistant"])
+            messages_qs
             .prefetch_related("attachments")
             .order_by("-created_at")[:max_messages]
         )
@@ -174,6 +183,26 @@ class ConversationService:
             )
 
         return chat_messages
+
+    @staticmethod
+    def get_retryable_user_message(
+        conversation: PwanimateConversation,
+        content: str,
+        message_id: Optional[int] = None,
+    ) -> Optional[PwanimateMessage]:
+        """Find the original unanswered user turn for a retry request."""
+        messages = conversation.messages.filter(role="user")
+        if message_id is not None:
+            return messages.filter(id=message_id).first()
+
+        for candidate in messages.filter(content=content).order_by("-id")[:10]:
+            has_later_answer = conversation.messages.filter(
+                role="assistant",
+                id__gt=candidate.id,
+            ).exists()
+            if not has_later_answer:
+                return candidate
+        return None
 
     @staticmethod
     def persist_user_message(

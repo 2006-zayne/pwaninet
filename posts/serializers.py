@@ -7,6 +7,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
+from messaging.serializers import LinkPreviewSerializer
 from groups.serializers import GroupSerializer, UserMinimalSerializer
 from courses.models import Course, Unit
 from notifications.models import NotificationObject
@@ -44,6 +45,7 @@ class PostSerializer(serializers.ModelSerializer):
     video_height = serializers.IntegerField(read_only=True)
     is_reel = serializers.BooleanField(read_only=True)
     hls_playlist = serializers.CharField(read_only=True)
+    link_preview = LinkPreviewSerializer(read_only=True)
 
     class Meta:
         model = Post
@@ -51,6 +53,7 @@ class PostSerializer(serializers.ModelSerializer):
             'id', 'post_id', 'share_id', 'author', 'group', 'course', 'unit', 'content',
             'video', 'docs', 'audio', 'gradient_class', 'has_signature',
             'video_status', 'video_duration', 'video_width', 'video_height', 'is_reel', 'hls_playlist',
+            'link_preview',
             'created_at', 'updated_at', 'like_count', 'is_liked',
             'repost_count', 'is_reposted', 'repost_of'
         ]
@@ -455,7 +458,18 @@ class PostCreateSerializer(serializers.ModelSerializer):
             if not post.video_poster:
                 generate_video_poster.delay(post.id)
 
-                
+        # Generate link preview if content contains URLs
+        if post.content:
+            try:
+                from posts.tasks import generate_post_link_preview_task
+                generate_post_link_preview_task.delay(post.id)
+            except Exception:
+                try:
+                    from messaging.services.link_preview_service import LinkPreviewService
+                    LinkPreviewService.generate_preview_for_post(post)
+                except Exception as lp_err:
+                    logger.warning('[PostCreateSerializer] Link preview generation failed: %s', lp_err)
+
         return post
 
 
@@ -472,6 +486,20 @@ class PostUpdateSerializer(serializers.ModelSerializer):
                 name, ext = os.path.splitext(file_obj.name)
                 file_obj.name = f"{name[:180]}{ext}"
         return super().to_internal_value(data)
+
+    def update(self, instance, validated_data):
+        post = super().update(instance, validated_data)
+        if 'content' in validated_data and post.content:
+            try:
+                from posts.tasks import generate_post_link_preview_task
+                generate_post_link_preview_task.delay(post.id)
+            except Exception:
+                try:
+                    from messaging.services.link_preview_service import LinkPreviewService
+                    LinkPreviewService.generate_preview_for_post(post)
+                except Exception as lp_err:
+                    logger.warning('[PostUpdateSerializer] Link preview generation failed: %s', lp_err)
+        return post
 
 
 class CommentSerializer(serializers.ModelSerializer):

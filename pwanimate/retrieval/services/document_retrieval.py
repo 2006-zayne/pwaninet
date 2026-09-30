@@ -126,6 +126,9 @@ class DocumentSemanticRetrievalService:
             if filters.get('document_id'):
                 qs = qs.filter(document_id=filters['document_id'])
 
+            if filters.get('document_ids'):
+                qs = qs.filter(document_id__in=filters['document_ids'])
+
             if filters.get('file_type'):
                 ft = str(filters['file_type']).lower().strip()
                 qs = qs.filter(document__versions__files__extension=ft)

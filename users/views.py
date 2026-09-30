@@ -15,7 +15,7 @@ from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
 from django.db.models import Q
-from users.models import User, Follow, DeviceAccount, Pinch, UserSession, Block, HiddenAuthor, PrivacyLevel
+from users.models import User, Follow, DeviceAccount, Pinch, UserSession, Block, HiddenAuthor, PrivacyLevel, HeroShowcaseSet
 from posts.models import Post, Like, Repost
 from users.forms import PwaniSignupForm, ProfileUpdateForm
 from django.contrib import messages
@@ -134,6 +134,11 @@ class PwaniLoginView(LoginView):
     4. Phase 3: 2FA challenge interception for enrolled users.
     """
     template_name = 'registration/login.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['hero_set'] = HeroShowcaseSet.objects.filter(is_active=True).order_by('?').first()
+        return context
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
@@ -610,6 +615,33 @@ def verify_email_view(request, uidb64, token):
 
 
 @login_required
+def pwanimate_profile_card(request, username):
+    """Render the profile page's visual profile card for Pwanimate's context rail."""
+    from pwanimate.tools.domain.users import UserProfileTool
+
+    try:
+        access = UserProfileTool().execute(user=request.user, username=username)
+    except Exception:
+        return HttpResponse(status=404)
+    if not access.success:
+        return HttpResponse(status=404)
+
+    profile_user = get_object_or_404(
+        User.objects.select_related('programme__department', 'course__school', 'year', 'academic_level'),
+        username=username,
+        is_active=True,
+    )
+    context = {
+        'profile_user': profile_user,
+        'is_following': Follow.objects.filter(follower=request.user, followed=profile_user).exists(),
+        'followers_count': profile_user.follower_relationships.count(),
+        'following_count': profile_user.following_relationships.count(),
+        'total_likes': Like.objects.filter(post__author=profile_user).count(),
+    }
+    return render(request, 'users/partials/pwanimate_profile_card.html', context)
+
+
+@login_required
 def profile_view(request, username):
     profile_user = get_object_or_404(
         User.objects.select_related(
@@ -1040,6 +1072,10 @@ def encrypted_invite_landing(request, token):
     """
     from users.services.invite_service import track_invite_click, decrypt_invite_token
     from users.models import InviteType
+
+    # Sanitize token: strip whitespace and trailing quotes that can appear
+    # when users copy-paste links from messages or documents
+    token = token.strip().strip('"').strip("'").strip("\u201c\u201d\u2018\u2019").strip()
 
     invite = track_invite_click(token)
     resolved_type = None

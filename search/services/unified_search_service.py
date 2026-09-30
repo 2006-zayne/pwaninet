@@ -444,8 +444,39 @@ class UnifiedSearchService:
         base_qs = DocumentSearchIndex.objects.filter(
             document__status='ready',
             document__is_available=True,
-            document__visibility='public'
         )
+
+        # Keep lexical document search aligned with Pwanimate's semantic
+        # retrieval permissions. Restricting this index to public documents
+        # made authorized private/restricted documents disappear whenever they
+        # had no eligible embedding chunks.
+        visibility_q = Q(document__visibility='public')
+        if user and getattr(user, 'is_authenticated', False):
+            global_role = getattr(user, 'global_role', None)
+            is_admin_or_leader = (
+                user.is_staff
+                or user.is_superuser
+                or global_role in ['PRESIDENT', 'DELEGATE']
+            )
+            if is_admin_or_leader:
+                visibility_q = Q()
+            else:
+                visibility_q |= Q(document__uploaded_by=user)
+                restricted_q = Q(document__visibility='restricted')
+                programme = getattr(user, 'programme', None)
+                has_restricted_match = bool(programme)
+                if programme:
+                    visibility_q |= (
+                        restricted_q
+                        & Q(document__academic_units__academic_unit__programme_units__programme=programme)
+                    )
+                course = getattr(user, 'course', None)
+                if course and not has_restricted_match:
+                    visibility_q |= (
+                        restricted_q
+                        & Q(document__academic_units__academic_unit__code__icontains=course.name)
+                    )
+        base_qs = base_qs.filter(visibility_q).distinct()
 
         # Academic, category, and metadata filters
         category = filters.get('category')

@@ -247,6 +247,7 @@ class AttachmentService:
             file_size=uploaded_file.size,
             mime_type=mime_type,
             attachment_type=att_type or "document",
+            processing_status="pending" if (att_type or "document") == "document" else "not_required",
         )
         return attachment
 

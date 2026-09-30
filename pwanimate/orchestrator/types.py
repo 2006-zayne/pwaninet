@@ -38,6 +38,8 @@ class OrchestrationRequest:
     user_context: Optional[Any] = None
     attachments: List[Any] = field(default_factory=list)
     context_resources: List[Dict[str, Any]] = field(default_factory=list)
+    local_time: Optional[str] = None
+    timezone_name: Optional[str] = None
 
     def __post_init__(self):
         if not isinstance(self.query, str) or not self.query.strip():

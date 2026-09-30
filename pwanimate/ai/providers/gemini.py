@@ -181,7 +181,13 @@ class GeminiLLMProvider(BaseLLMProvider):
                 })
 
         # Inject context into contents if present
-        if request.context and (request.context.items or getattr(request.context, "user_context", None)):
+        if request.context and (
+            request.context.items or
+            request.context.explicit_resources or
+            request.context.retrieved_context or
+            getattr(request.context, "user_context", None) or
+            getattr(request.context, "student_context", None)
+        ):
             context_text = request.context.format_context_text()
             if context_text:
                 # If there's a last user message, prepend context parts

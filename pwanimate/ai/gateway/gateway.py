@@ -15,6 +15,7 @@ from pwanimate.ai.exceptions import (
     AIProviderAPIError,
     AIProviderRateLimitError,
     AIProviderTimeoutError,
+    AIProviderAuthenticationError,
 )
 from pwanimate.ai.gateway.base import BaseLLMProvider
 from pwanimate.ai.gateway.router import LLMRouter
@@ -105,6 +106,7 @@ class AIGateway:
                     temperature=request.temperature,
                     max_tokens=request.max_tokens,
                     metadata=request.metadata,
+                    attachments=request.attachments,
                 )
 
                 response = provider.generate(gen_request)
@@ -131,6 +133,19 @@ class AIGateway:
                     "reason": "rate_limit",
                 })
                 continue
+            except AIProviderAuthenticationError as exc:
+                logger.warning(
+                    "AI Gateway authentication failed: candidate=%s error=%s, trying eligible fallback",
+                    candidate_label,
+                    exc,
+                )
+                last_error_exc = exc
+                skipped_candidates.append({
+                    "provider": provider_name,
+                    "model": model_name,
+                    "reason": "authentication_error",
+                })
+                continue
             except (AIProviderAPIError, AIProviderTimeoutError) as exc:
                 duration_ms = round((time.perf_counter() - t_start) * 1000, 2)
                 logger.warning(
@@ -139,6 +154,11 @@ class AIGateway:
                     exc,
                     duration_ms,
                 )
+                # Clear any existing cooldown for this candidate so subsequent
+                # requests can retry it immediately (connection errors are
+                # transient and should not trigger rate-limit cooldown)
+                if self.quota_tracker is not None:
+                    self.quota_tracker.clear_candidate(provider_name, model_name)
                 last_error_exc = exc
                 skipped_candidates.append({
                     "provider": provider_name,
@@ -229,6 +249,8 @@ class AIGateway:
             f"{c['provider']}:{c['model']}" if c.get("model") else c["provider"]
             for c in attempted_candidates
         ]
+        if last_error_exc is not None and last_error_exc is not last_rate_limit_exc:
+            raise last_error_exc
         if last_rate_limit_exc is not None:
             exhausted_msg = (
                 f"All available AI models/providers are temporarily rate-limited or quota exhausted. "

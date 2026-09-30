@@ -434,6 +434,13 @@ class PwanimateAttachment(models.Model):
         ('image', 'Image'),
         ('document', 'Document'),
     ]
+    PROCESSING_STATUS_CHOICES = [
+        ("not_required", "Not required"),
+        ("pending", "Pending"),
+        ("processing", "Processing"),
+        ("ready", "Ready"),
+        ("failed", "Failed"),
+    ]
 
     id = models.UUIDField(
         primary_key=True,
@@ -486,6 +493,14 @@ class PwanimateAttachment(models.Model):
         default='document',
         db_index=True,
     )
+    processing_status = models.CharField(
+        max_length=20,
+        choices=PROCESSING_STATUS_CHOICES,
+        default="not_required",
+        db_index=True,
+    )
+    processing_error = models.TextField(blank=True, default="")
+    processed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(
         auto_now_add=True,
         db_index=True,
@@ -522,3 +537,31 @@ class PwanimateAttachment(models.Model):
         return self.download_url
 
 
+class PwanimateAttachmentChunk(models.Model):
+    """Private, page-aware extracted text belonging to one chat upload."""
+
+    attachment = models.ForeignKey(
+        PwanimateAttachment,
+        on_delete=models.CASCADE,
+        related_name="chunks",
+    )
+    chunk_index = models.PositiveIntegerField()
+    content = models.TextField()
+    content_hash = models.CharField(max_length=64, db_index=True)
+    page_number = models.PositiveIntegerField(null=True, blank=True)
+    page_end = models.PositiveIntegerField(null=True, blank=True)
+    chunk_type = models.CharField(max_length=30, default="text")
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["attachment_id", "chunk_index"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["attachment", "chunk_index"],
+                name="pwanimate_attachment_chunk_unique",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["attachment", "page_number"], name="pwan_attach_page_idx"),
+        ]

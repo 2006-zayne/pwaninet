@@ -3,10 +3,27 @@
 
 {% block content %}
 <style>
-  [data-theme="dark"] .card {
-    background-color: var(--card-bg) !important;
-    border-color: var(--border) !important;
+  .auth-page {
+    position: relative;
+    min-height: 72svh; display: flex; align-items: center;
+    padding: clamp(1.5rem, 5vh, 4rem) 1rem;
   }
+  .auth-brand { position: fixed; top: max(.75rem, env(safe-area-inset-top, 0px)); left: max(1rem, env(safe-area-inset-left, 0px)); z-index: 1100; display: inline-flex; align-items: center; gap: .65rem; color: inherit; text-decoration: none; font-size: 1.2rem; font-weight: 800; letter-spacing: -.04em; }
+  .auth-brand img { width: 38px; height: 38px; object-fit: contain; border-radius: 10px; }
+  .auth-brand .brand-net { color: var(--primary, #2563eb); }
+  .auth-theme-control { position: fixed; top: max(.75rem, env(safe-area-inset-top, 0px)); right: max(1rem, env(safe-area-inset-right, 0px)); z-index: 1100; }
+  .auth-theme-control > .btn { color: var(--text-dark); font-size: 1.25rem; padding: .55rem .7rem; border-radius: 50%; background: var(--card-bg, rgba(255,255,255,.75)); box-shadow: 0 4px 16px rgba(15,23,42,.12); }
+  .auth-card-container { width: 100%; max-width: 36rem; }
+  .auth-card { overflow: visible; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; }
+  .auth-card .card-body { padding: clamp(1.5rem, 4vw, 2.25rem) !important; }
+  .auth-card h2 { letter-spacing: -0.03em; }
+  .auth-card .form-label { margin-bottom: .45rem; }
+  .auth-card .tactical-form-input { min-height: 3.15rem; border-radius: .8rem; font-size: 16px; }
+  .auth-card .btn-primary { min-height: 3.25rem; border-radius: .8rem !important; font-weight: 700; }
+  .auth-card a:focus-visible, .auth-card button:focus-visible, .auth-card input:focus-visible, .auth-card select:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, .35); outline-offset: 2px;
+  }
+  .auth-card .password-toggle-btn { min-width: 3rem; }
   [data-theme="dark"] .text-dark {
     color: #ffffff !important;
   }
@@ -148,34 +165,36 @@
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
   }
 
-  /* Mobile full width card */
   @media (max-width: 767px) {
-    .auth-card-container {
-      padding: 0 !important;
-      max-width: 100% !important;
-    }
-    .auth-card {
-      width: 100% !important;
-      margin-left: 0 !important;
-      margin-right: 0 !important;
-      margin-bottom: 0.125rem !important;
-      border: none !important;
-    }
-    .auth-card .card-body {
-      padding: 1.5rem 1rem !important;
-    }
+    .auth-page { min-height: 0; align-items: flex-start; padding: max(1rem, env(safe-area-inset-top)) .75rem max(1.5rem, env(safe-area-inset-bottom)); }
+    .auth-card-container { max-width: 38rem; }
   }
+  @media (prefers-reduced-motion: reduce) { .auth-card *, .auth-card *::before, .auth-card *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
 </style>
 <script src="{% static 'js/password-strength.js' %}"></script>
-<div class="container">
-    <div class="row justify-content-center align-items-center" style="min-height: 75vh;">
-        <div class="col-md-5 auth-card-container">
-            <div class="card shadow-lg border-0 auth-card rounded-3" style="overflow: hidden;">
+<a class="auth-brand" href="{% url 'posts:home' %}" aria-label="PwaniNet home">
+    <img src="{% static 'images/pwaninet-app-icon.png' %}" alt="">
+    <span>PWANI<span class="brand-net">NET</span></span>
+</a>
+<div class="dropdown auth-theme-control">
+    <button class="btn btn-link" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Choose color theme" title="Choose color theme">
+        <i class="bi bi-circle-half" aria-hidden="true"></i>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end">
+        <li><button class="dropdown-item" type="button" onclick="setTheme('light')"><i class="bi bi-sun me-2"></i>Light</button></li>
+        <li><button class="dropdown-item" type="button" onclick="setTheme('dark')"><i class="bi bi-moon me-2"></i>Dark</button></li>
+        <li><button class="dropdown-item" type="button" onclick="setTheme('system')"><i class="bi bi-display me-2"></i>System</button></li>
+    </ul>
+</div>
+<main class="container auth-page">
+    <div class="row justify-content-center w-100">
+        <div class="col-12 auth-card-container">
+            <section class="auth-card">
                 <div class="row g-0">
                     <div class="card-body p-3">
                         <div class="text-center mb-3">
-                            <h2 class="fw-bold text-dark">Join the Squad, Comrade!</h2>
-                            <p class="text-muted">Create your account to access the PwaniNet feed.</p>
+                            <h2 class="fw-bold text-dark">Create your account</h2>
+                            <p class="text-muted">Join PwaniNet to connect with your campus community.</p>
                         </div>
 
                         {% if inviter_username %}
@@ -242,7 +261,7 @@
                                     {% elif field.name == 'password1' or field.name == 'password2' %}
                                         <div class="password-input-wrapper">
                                             {{ field }}
-                                            <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility" tabindex="-1" data-field="{{ field.name }}">
+                                            <button type="button" class="password-toggle-btn" aria-label="Show {{ field.label|lower }}" aria-pressed="false" data-field="{{ field.name }}">
                                                 <i class="bi bi-eye"></i>
                                             </button>
                                         </div>
@@ -259,7 +278,7 @@
                                     {% if field.help_text %}
                                         <div class="form-text text-muted small">{{ field.help_text }}</div>
                                     {% endif %}
-                                    <div class="field-error" id="{{ field.name }}-error">This field cannot be empty</div>
+                                    <div class="field-error" id="{{ field.name }}-error" aria-live="polite">This field cannot be empty</div>
                                     {% if field.name == 'password1' %}
                                         <div class="password-strength-wrap" id="password-strength-wrap">
                                             <div class="password-strength-track">
@@ -277,7 +296,7 @@
 
                             <div class="d-grid gap-2 mt-3">
                                 <button class="btn btn-primary btn-lg shadow-sm" type="submit" id="registerSubmitBtn" style="border-radius: 10px;">
-                                    <span id="registerBtnText">Create Account</span>
+                                    <span id="registerBtnText">Create account</span>
                                     <span id="registerSpinner" class="spinner-border spinner-border-sm ms-2" style="display: none;"></span>
                                 </button>
                             </div>
@@ -286,19 +305,19 @@
                         <hr class="my-3">
 
                         <div class="text-center">
-                            <p class="mb-0 text-muted">Already in the squad?</p>
-                            <a href="{% url 'login' %}" data-bypass-htmx="true" class="fw-bold text-primary text-decoration-none">Login to Your Account</a>
+                            <p class="mb-0 text-muted">Already have an account?</p>
+                            <a href="{% url 'login' %}" data-bypass-htmx="true" class="fw-bold text-primary text-decoration-none">Sign in</a>
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
             <div class="text-center mt-3">
                 <a href="{% url 'posts:home' %}" class="text-secondary small text-decoration-none">← Back to Public View</a>
             </div>
         </div>
     </div>
-</div>
+</main>
 
 <script>
 (function() {
@@ -315,7 +334,12 @@
         usernameInput.setAttribute('autocapitalize', 'none');
         usernameInput.setAttribute('autocorrect', 'off');
         usernameInput.setAttribute('spellcheck', 'false');
+        usernameInput.setAttribute('autocomplete', 'username');
     }
+    const passwordOneInput = document.getElementById('id_password1');
+    const passwordTwoInput = document.getElementById('id_password2');
+    if (passwordOneInput) passwordOneInput.setAttribute('autocomplete', 'new-password');
+    if (passwordTwoInput) passwordTwoInput.setAttribute('autocomplete', 'new-password');
 
     // Password visibility toggles
     const passwordToggleBtns = document.querySelectorAll('.password-toggle-btn');
@@ -329,6 +353,8 @@
             if (passwordField) {
                 const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
                 passwordField.setAttribute('type', type);
+                btn.setAttribute('aria-pressed', String(type === 'text'));
+                btn.setAttribute('aria-label', type === 'text' ? 'Hide password' : 'Show password');
                 icon.classList.toggle('bi-eye');
                 icon.classList.toggle('bi-eye-slash');
             }
@@ -355,6 +381,7 @@
             errorElement.classList.toggle('visible', isEmpty);
         }
         field.classList.toggle('is-invalid', isEmpty);
+        field.setAttribute('aria-invalid', String(isEmpty));
         return !isEmpty;
     }
 
@@ -422,7 +449,8 @@
 
     function resetSubmitButton() {
         registerSubmitBtn.disabled = false;
-        registerSubmitBtn.innerHTML = '<span id="registerBtnText">Create Account</span><span id="registerSpinner" class="spinner-border spinner-border-sm ms-2" style="display: none;"></span>';
+        registerSubmitBtn.removeAttribute('aria-busy');
+        registerSubmitBtn.innerHTML = '<span id="registerBtnText">Create account</span><span id="registerSpinner" class="spinner-border spinner-border-sm ms-2" style="display: none;"></span>';
     }
 
     registerForm.addEventListener('submit', function(e) {
@@ -475,6 +503,7 @@
         }
 
         registerSubmitBtn.disabled = true;
+        registerSubmitBtn.setAttribute('aria-busy', 'true');
         registerSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating your account…';
     });
 

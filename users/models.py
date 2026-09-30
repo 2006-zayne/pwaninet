@@ -72,6 +72,23 @@ class PrivacyLevel(models.TextChoices):
     PRIVATE = 'PRIVATE', 'Only Me'
 
 
+class HeroShowcaseSet(models.Model):
+    name = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+    center_reel = models.ImageField(upload_to='hero_showcase/reels/')
+    pwani_gate = models.ImageField(upload_to='hero_showcase/campus/')
+    pwanimate = models.ImageField(upload_to='hero_showcase/ai/')
+    doc_repo = models.ImageField(upload_to='hero_showcase/docs/')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Hero Showcase Set'
+        verbose_name_plural = 'Hero Showcase Sets'
+
+    def __str__(self):
+        return f"{self.name} ({'Active' if self.is_active else 'Disabled'})"
+
+
 class CollaborationStatus(models.TextChoices):
     OPEN_TO_PROJECTS = 'open_to_projects', 'Open to Projects'
     OPEN_TO_STUDY_GROUPS = 'open_to_study_groups', 'Open to Study Groups'
@@ -607,5 +624,4 @@ class PlatformInvite(models.Model):
 
     def __str__(self):
         return f"PlatformInvite({self.inviter.username}, type={self.invite_type}, token={self.token})"
-
 

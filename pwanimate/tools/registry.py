@@ -84,8 +84,7 @@ _default_registry: Optional[ToolRegistry] = None
 
 def get_default_tool_registry() -> ToolRegistry:
     """
-    Factory providing the standard Pwanimate tool registry with all five
-    read-only domain tools pre-registered.
+    Factory providing the standard Pwanimate domain tool registry.
     """
     global _default_registry
     if _default_registry is None:
@@ -97,6 +96,7 @@ def get_default_tool_registry() -> ToolRegistry:
             UserProfileTool,
             NotificationSummaryTool,
             PeopleDiscoveryTool,
+            LocalTimeTool, ContentSearchTool, SendNotificationTool,
         )
         registry.register(AcademicLookupTool())
         registry.register(DocumentDetailTool())
@@ -104,5 +104,8 @@ def get_default_tool_registry() -> ToolRegistry:
         registry.register(UserProfileTool())
         registry.register(NotificationSummaryTool())
         registry.register(PeopleDiscoveryTool())
+        registry.register(LocalTimeTool())
+        registry.register(ContentSearchTool())
+        registry.register(SendNotificationTool())
         _default_registry = registry
     return _default_registry

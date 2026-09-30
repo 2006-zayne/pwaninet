@@ -33,7 +33,7 @@ class GeminiEmbeddingProvider(BaseEmbeddingProvider):
         api_key: Optional[str] = None,
         model_name: Optional[str] = None,
         dimensions: int = 768,
-        timeout: int = 30
+        timeout: int = 10
     ):
         self.api_key = api_key if api_key is not None else getattr(settings, 'PWANIMATE_GEMINI_API_KEY', '')
         self.model_name = model_name or getattr(settings, 'PWANIMATE_EMBEDDING_MODEL', 'gemini-embedding-2')

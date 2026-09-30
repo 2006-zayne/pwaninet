@@ -124,8 +124,10 @@ class UserProfileTool(BaseDomainTool):
 
         try:
             profile_url = reverse("users:profile", kwargs={"username": target_user.username})
+            profile_card_url = reverse("users:pwanimate_profile_card", kwargs={"username": target_user.username})
         except Exception:
             profile_url = f"/users/user/{target_user.username}/"
+            profile_card_url = f"{profile_url.rstrip('/')}/pwanimate-card/"
 
         programme_name = (
             target_user.programme.name
@@ -160,6 +162,7 @@ class UserProfileTool(BaseDomainTool):
             "profile_photo_url": profile_photo_url,
             "avatar_url": profile_photo_url,
             "profile_url": profile_url,
+            "profile_card_url": profile_card_url,
             "matched_skills": user_skills,
             "matched_interests": user_interests,
         }

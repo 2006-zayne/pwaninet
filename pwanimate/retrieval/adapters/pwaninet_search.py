@@ -127,16 +127,51 @@ class PwaniNetSearchAdapter:
     def search_people(self, request: RetrievalRequest) -> List[RetrievalResult]:
         """Search people/users via existing UnifiedSearchService."""
         query = (request.query or "").strip()
-        if not query:
-            return []
-
         limit = max(1, int(request.limit or 10))
-        items, _ = self.search_service._search_people(
-            query=query,
-            user=request.user,
-            limit=limit,
-            offset=0
-        )
+        
+        # Detect general exploration queries
+        exploration_keywords = ['which', 'what', 'available', 'list', 'show', 'find', 'all', 'existing', 'students', 'people']
+        is_exploration = any(kw in query.lower() for kw in exploration_keywords) if query else False
+        
+        # Extract actual search terms from exploration queries
+        search_query = query
+        if is_exploration:
+            # Remove exploration keywords to get actual search terms
+            for kw in exploration_keywords:
+                search_query = search_query.lower().replace(kw, '').strip()
+            if not search_query or search_query in ['students', 'people', 'available']:
+                search_query = ""
+        
+        # For general queries or exploration without specific terms, return suggested students
+        if not search_query:
+            users_page, _, _, _, _, _ = self.search_service.search_people_models(
+                query="",
+                user=request.user,
+                connection_type=None,
+                profile_username=None,
+                page=1,
+                page_size=limit
+            )
+            # Convert models to dict format expected by adapter
+            items = [
+                {
+                    "id": u.id,
+                    "title": u.get_full_name() or u.username,
+                    "subtitle": getattr(u, 'course', {}).name if hasattr(u, 'course') and u.course else "",
+                    "username": u.username,
+                    "detail_url": f"/users/user/{u.username}/",
+                    "relevance_rank": 0.0,
+                    "obj": u
+                }
+                for u in users_page
+            ]
+        else:
+            items, _ = self.search_service._search_people(
+                query=search_query,
+                user=request.user,
+                limit=limit,
+                offset=0
+            )
 
         results = []
         for item in items:
@@ -165,16 +200,36 @@ class PwaniNetSearchAdapter:
     def search_groups(self, request: RetrievalRequest) -> List[RetrievalResult]:
         """Search groups via existing UnifiedSearchService."""
         query = (request.query or "").strip()
-        if not query:
-            return []
-
         limit = max(1, int(request.limit or 10))
-        items, _ = self.search_service._search_groups(
-            query=query,
-            user=request.user,
-            limit=limit,
-            offset=0
-        )
+        
+        # Detect general exploration queries (keywords that indicate exploration rather than specific search)
+        exploration_keywords = ['which', 'what', 'available', 'list', 'show', 'all', 'existing']
+        is_exploration = any(kw in query.lower() for kw in exploration_keywords) if query else False
+        
+        # Extract actual search terms from exploration queries
+        search_query = query
+        if is_exploration:
+            # Remove exploration keywords to get actual search terms
+            for kw in exploration_keywords:
+                search_query = search_query.lower().replace(kw, '').strip()
+            if not search_query or search_query in ['groups', 'available']:
+                search_query = ""
+        
+        # For general queries or exploration without specific terms, return top groups by member count
+        if not search_query:
+            items, _ = self.search_service._search_groups(
+                query="",
+                user=request.user,
+                limit=limit,
+                offset=0
+            )
+        else:
+            items, _ = self.search_service._search_groups(
+                query=search_query,
+                user=request.user,
+                limit=limit,
+                offset=0
+            )
 
         results = []
         for item in items:
@@ -212,6 +267,11 @@ class PwaniNetSearchAdapter:
             limit=limit,
             offset=0
         )
+
+        selected_document_ids = (request.filters or {}).get("document_ids")
+        if selected_document_ids:
+            selected_ids = {str(value) for value in selected_document_ids}
+            items = [item for item in items if str(getattr(item.get("obj"), "id", "")) in selected_ids]
 
         results = []
         for item in items:

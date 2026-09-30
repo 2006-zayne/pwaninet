@@ -680,7 +680,7 @@ body.is-native-app .navbar-top {
 body.is-native-app {
     padding-top: calc(var(--navbar-height, 56px) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
     /* Content clearance for the floating pill nav + safe area */
-    padding-bottom: calc(90px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+    padding-bottom: calc(76px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
     /* Ensure content can extend under system bars */
     margin-top: 0;
 }
@@ -688,12 +688,64 @@ body.is-native-app {
 /* Safe area insets for footer in native app - floats above system navigation bar */
 body.is-native-app .mobile-bottom-nav {
     /* Update bottom position to float above system bar with safe area buffer */
-    bottom: calc(12px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+    bottom: calc(6px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
     /* Reset padding-bottom as the container itself is moved up */
     padding-bottom: 0;
     margin-bottom: 0;
     /* Ensure z-index is high enough to stay above other content */
     z-index: 10000;
+}
+
+/* Shared mobile bottom-sheet grab handles: drag upward to expand, downward to dismiss. */
+.comments-modal-handle,
+.reel-quick-tools-handle,
+.people-modal-handle,
+.connections-sheet-handle,
+.push-sheet-handle-bar,
+.chooser-drag-handle,
+.attachment-sheet-handle,
+.pwanimate-attachment-sheet-handle,
+.pwanimate-bottom-sheet-handle,
+[data-bottom-sheet-handle] {
+    cursor: ns-resize;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.bottom-sheet-is-dragged {
+    box-sizing: border-box !important;
+    min-height: 0 !important;
+}
+
+.modal-content.bottom-sheet-is-dragged,
+.attachment-modal-content.bottom-sheet-is-dragged,
+.pwanimate-attachment-modal-content.bottom-sheet-is-dragged {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+.bottom-sheet-is-dragged > .modal-body:not(.people-modal-search) {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+.bottom-sheet-is-dragged.offcanvas-bottom,
+.bottom-sheet-is-dragged.push-sheet-container,
+.bottom-sheet-is-dragged#pwaninet-link-chooser-card {
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+}
+
+.bottom-sheet-is-dragged.offcanvas-bottom > .offcanvas-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
 }
 
 /* =======================================================
@@ -818,14 +870,14 @@ body.keyboard-open .mobile-bottom-nav {
 
     [data-mobile-nav-position="top"] body {
         padding-top: calc(var(--navbar-height, 56px) + 48px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
-        padding-bottom: calc(var(--pwaninet-safe-area-bottom, 0px) + env(safe-area-inset-bottom, 0px)) !important;
+        padding-bottom: var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)) !important;
     }
 
     [data-mobile-nav-position="top"] body.is-native-app,
     [data-mobile-nav-position="top"] body.is-standalone-pwa,
     [data-mobile-nav-position="top"].is-standalone-pwa body {
         padding-top: calc(var(--navbar-height, 56px) + 48px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
-        padding-bottom: calc(var(--pwaninet-safe-area-bottom, 0px) + env(safe-area-inset-bottom, 0px)) !important;
+        padding-bottom: var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)) !important;
     }
 
     [data-mobile-nav-position="top"] body.keyboard-open .mobile-bottom-nav,

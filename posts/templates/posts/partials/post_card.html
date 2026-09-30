@@ -200,7 +200,7 @@
     </div>
 
     {% with post_obj=post.repost_of|default:post %}
-        {% if post_obj.gradient_class != 'none' and not post_obj.images.exists and not post_obj.video and not post_obj.docs and not post_obj.audio and not post_obj.shared_document %}
+        {% if post_obj.gradient_class != 'none' and not post_obj.images.exists and not post_obj.video and not post_obj.docs and not post_obj.audio and not post_obj.shared_document and not post_obj.link_preview and not post.link_preview %}
     <div class="{{ post_obj.gradient_class }} gradient-intel-bg text-center {% if post_obj.has_signature %}signature-overlay{% endif %}"
          style="--gradient-text-color: {{ post_obj.custom_gradient_text_color|default:'#ffffff' }}; color: var(--gradient-text-color); {% if post_obj.gradient_class == 'bg-username-pattern' %}background: linear-gradient(135deg, {{ post_obj.custom_gradient_color1|default:'#141E30' }} 0%, {{ post_obj.custom_gradient_color2|default:'#243B55' }} 100%);{% endif %}">
         {% if post_obj.gradient_class == 'bg-username-pattern' %}
@@ -225,6 +225,12 @@
         {% include "posts/partials/post_content.html" %}
     </div>
         {% endif %}
+
+        {% with preview=post.link_preview|default:post_obj.link_preview %}
+            {% if preview and not preview.fetch_failed and not post_obj.images.exists and not post_obj.video and not post_obj.docs and not post_obj.audio and not post_obj.shared_document %}
+                {% include "posts/partials/link_preview_card.html" with preview=preview %}
+            {% endif %}
+        {% endwith %}
     {% endwith %}
 
     {% if post.audio %}

@@ -1,0 +1,81 @@
+{% load static i18n %}
+{% if preview and not preview.fetch_failed %}
+<div class="postcard-link-preview-container px-3 pb-3">
+    <a href="{{ preview.url }}" 
+       target="_blank" 
+       rel="noopener noreferrer" 
+       class="postcard-link-card d-block text-decoration-none"
+       aria-label="{{ preview.title|default:preview.domain }}">
+        
+        {% if preview.thumbnail_url %}
+        <div class="link-preview-media position-relative">
+            <img src="{{ preview.thumbnail_url }}" 
+                 alt="{{ preview.title|default:'Preview' }}" 
+                 class="link-preview-img w-100" 
+                 loading="lazy"
+                 onerror="this.parentElement.style.display='none';">
+            
+            {% if preview.media_type == 'video' or 'youtube' in preview.domain or 'youtu.be' in preview.domain or 'tiktok' in preview.domain or 'vimeo' in preview.domain %}
+            <div class="link-preview-play-badge">
+                <i class="bi bi-play-fill"></i>
+            </div>
+            {% endif %}
+
+            <div class="link-preview-source-badge">
+                {% if 'youtube' in preview.domain or 'youtu.be' in preview.domain %}
+                    <span class="badge-source badge-youtube"><i class="bi bi-youtube me-1"></i>YouTube</span>
+                {% elif 'tiktok' in preview.domain %}
+                    <span class="badge-source badge-tiktok"><i class="bi bi-tiktok me-1"></i>TikTok</span>
+                {% elif 'instagram' in preview.domain %}
+                    <span class="badge-source badge-instagram"><i class="bi bi-instagram me-1"></i>Instagram</span>
+                {% elif 'spotify' in preview.domain %}
+                    <span class="badge-source badge-spotify"><i class="bi bi-spotify me-1"></i>Spotify</span>
+                {% elif 'twitter' in preview.domain or 'x.com' in preview.domain %}
+                    <span class="badge-source badge-x"><i class="bi bi-twitter-x me-1"></i>X</span>
+                {% else %}
+                    <span class="badge-source"><i class="bi bi-globe me-1"></i>{{ preview.domain|default:'Web' }}</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="link-preview-body p-3">
+            <div class="link-preview-meta d-flex align-items-center justify-content-between mb-1">
+                <div class="d-flex align-items-center gap-2 overflow-hidden">
+                    {% if preview.favicon %}
+                        <img src="{{ preview.favicon.url }}" alt="" class="link-preview-favicon" width="16" height="16" onerror="this.style.display='none';">
+                    {% elif 'youtube' in preview.domain or 'youtu.be' in preview.domain %}
+                        <i class="bi bi-youtube text-danger"></i>
+                    {% elif 'tiktok' in preview.domain %}
+                        <i class="bi bi-tiktok text-dark"></i>
+                    {% elif 'instagram' in preview.domain %}
+                        <i class="bi bi-instagram text-danger"></i>
+                    {% elif 'spotify' in preview.domain %}
+                        <i class="bi bi-spotify text-success"></i>
+                    {% elif 'twitter' in preview.domain or 'x.com' in preview.domain %}
+                        <i class="bi bi-twitter-x text-dark"></i>
+                    {% else %}
+                        <i class="bi bi-globe text-muted"></i>
+                    {% endif %}
+                    <span class="link-preview-domain text-uppercase fw-semibold small text-truncate">
+                        {{ preview.site_name|default:preview.domain }}
+                    </span>
+                </div>
+                <i class="bi bi-box-arrow-up-right text-muted small flex-shrink-0 ms-2"></i>
+            </div>
+
+            {% if preview.title %}
+            <h6 class="link-preview-title mb-1 fw-bold text-truncate-2">
+                {{ preview.title }}
+            </h6>
+            {% endif %}
+
+            {% if preview.description %}
+            <p class="link-preview-description mb-0 text-muted small text-truncate-2">
+                {{ preview.description }}
+            </p>
+            {% endif %}
+        </div>
+    </a>
+</div>
+{% endif %}

@@ -19,6 +19,8 @@ class PwanimateAttachmentSerializer(serializers.ModelSerializer):
             "file_size",
             "mime_type",
             "attachment_type",
+            "processing_status",
+            "processing_error",
             "url",
             "created_at",
         ]

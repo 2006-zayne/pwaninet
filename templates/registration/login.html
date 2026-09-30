@@ -1,12 +1,45 @@
 {% extends 'base.html' %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block content %}
 <style>
-  [data-theme="dark"] .card {
-    background-color: var(--card-bg);
-    border-color: var(--border);
+  .auth-page {
+    position: relative;
+    width: 100%;
+    max-width: none !important;
+    min-height: 100svh;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(360px, 2fr);
+    align-items: center;
+    padding: 1rem clamp(1.5rem, 3vw, 3.5rem);
   }
+  .brand-showcase { min-width: 0; min-height: min(88svh, 760px); display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; }
+  .login-brand { position: absolute; top: max(1rem, env(safe-area-inset-top, 0px)); left: clamp(1rem, 2vw, 2rem); z-index: 5; display: inline-flex; align-items: center; gap: .75rem; color: inherit; text-decoration: none; font-size: 1.35rem; font-weight: 800; letter-spacing: -.04em; }
+  .login-brand img { width: 42px; height: 42px; object-fit: contain; border-radius: 11px; }
+  .login-brand .brand-net { color: var(--primary, #2563eb); }
+  .auth-theme-control { position: fixed; top: max(.75rem, env(safe-area-inset-top, 0px)); right: max(1rem, env(safe-area-inset-right, 0px)); z-index: 1100; }
+  .auth-theme-control > .btn { color: var(--text-dark); font-size: 1.25rem; padding: .55rem .7rem; border-radius: 50%; background: var(--card-bg, rgba(255,255,255,.75)); box-shadow: 0 4px 16px rgba(15,23,42,.12); }
+  .showcase-wrap { width: 100%; display: flex; align-items: center; justify-content: center; transform: translateX(24px); }
+  .showcase-stage { position: relative; flex: 0 0 720px; width: 720px; height: 640px; user-select: none; }
+  .showcase-card { position: absolute; background-size: cover; background-position: center; border: none; box-shadow: 0 16px 36px -6px rgba(0, 15, 45, .22); }
+  .card-doc-repo { width: 210px; height: 250px; left: 75px; top: 175px; border-radius: 20px; z-index: 1; }
+  .card-pwanimate { width: 215px; height: 330px; left: 440px; bottom: 50px; border-radius: 26px; z-index: 2; }
+  .card-center-reel { width: 290px; height: 540px; left: 215px; top: 30px; border-radius: 36px; z-index: 3; box-shadow: 0 28px 60px -8px rgba(0, 10, 35, .34); }
+  .card-pwani-gate { width: 280px; height: 195px; left: 50px; bottom: 45px; border-radius: 24px; z-index: 4; box-shadow: 0 24px 48px -6px rgba(0, 15, 45, .38); }
+  .auth-card-container { width: 100%; max-width: 30rem; }
+  .auth-panel { width: 100%; display: flex; justify-content: flex-end; padding-right: clamp(1rem, 5vw, 5rem); box-sizing: border-box; }
+  .login-tagline { margin: 0; color: var(--primary, #2563eb); font-size: clamp(1.5rem, 2.4vw, 2rem); font-weight: 700; letter-spacing: -.035em; }
+  .auth-card { overflow: visible; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; }
+  .auth-card .card-body { padding: clamp(1.5rem, 4vw, 2.25rem) !important; }
+  .auth-card h2 { letter-spacing: -0.03em; }
+  .auth-card .form-label { margin-bottom: .45rem; }
+  .auth-card .tactical-form-input { min-height: 3.25rem; border-radius: .8rem; font-size: 16px; }
+  .auth-card .btn-primary { min-height: 3.25rem; border-radius: .8rem !important; font-weight: 700; }
+  .auth-card a:focus-visible, .auth-card button:focus-visible, .auth-card input:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, .35); outline-offset: 2px;
+  }
+  .auth-card .password-toggle-btn { min-width: 3rem; }
   [data-theme="dark"] .text-dark,
   [data-theme="dark"] h2 {
     color: #e4e6eb !important;
@@ -47,33 +80,52 @@
     cursor: not-allowed;
   }
 
-  /* Mobile full width card */
-  @media (max-width: 767px) {
-    .auth-card-container {
-      padding: 0 !important;
-      max-width: 100% !important;
-    }
-    .auth-card {
-      width: 100% !important;
-      margin-left: 0 !important;
-      margin-right: 0 !important;
-      margin-bottom: 0.125rem !important;
-      border: none !important;
-    }
-    .auth-card .card-body {
-      padding: 1.5rem 1rem !important;
-    }
+  @media (max-width: 991px) {
+    .auth-page { height: calc(100svh - 5rem); min-height: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); justify-items: center; align-content: stretch; overflow-y: auto; padding: calc(env(safe-area-inset-top, 0px) + .5rem) .75rem max(1rem, env(safe-area-inset-bottom)); }
+    .brand-showcase { display: none; }
+    .login-brand { position: static; grid-row: 1; justify-self: start; margin: .25rem 0 .5rem .25rem; }
+    .auth-card-container { max-width: 32rem; }
+    .auth-panel { grid-row: 2; align-self: center; justify-content: center; padding: 0; }
   }
+  @media (min-width: 992px) and (max-width: 1199px) {
+    .showcase-stage { transform: scale(.78); transform-origin: center; margin: -70px -75px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .auth-card *, .auth-card *::before, .auth-card *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
 </style>
-<div class="container">
-    <div class="row justify-content-center align-items-center" style="min-height: 75vh;">
-        <div class="col-md-5 auth-card-container">
-            <div class="card shadow-lg border-0 auth-card rounded-3" style="overflow: hidden;">
+<main class="auth-page">
+    <a class="login-brand" href="{% url 'posts:home' %}" aria-label="PwaniNet home">
+        <img src="{% static 'images/pwaninet-app-icon.png' %}" alt="">
+        <span>PWANI<span class="brand-net">NET</span></span>
+    </a>
+    <div class="dropdown auth-theme-control">
+        <button class="btn btn-link" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Choose color theme" title="Choose color theme">
+            <i class="bi bi-circle-half" aria-hidden="true"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li><button class="dropdown-item" type="button" onclick="setTheme('light')"><i class="bi bi-sun me-2"></i>Light</button></li>
+            <li><button class="dropdown-item" type="button" onclick="setTheme('dark')"><i class="bi bi-moon me-2"></i>Dark</button></li>
+            <li><button class="dropdown-item" type="button" onclick="setTheme('system')"><i class="bi bi-display me-2"></i>System</button></li>
+        </ul>
+    </div>
+    <section class="brand-showcase" aria-label="PwaniNet campus showcase">
+        <div class="showcase-wrap">
+            <div class="showcase-stage" aria-hidden="true">
+                <div class="showcase-card card-doc-repo" style="background-image: url('{% if hero_set and hero_set.doc_repo %}{{ hero_set.doc_repo.url }}{% else %}{% static 'images/default_group.jpg' %}{% endif %}')"></div>
+                <div class="showcase-card card-pwanimate" style="background-image: url('{% if hero_set and hero_set.pwanimate %}{{ hero_set.pwanimate.url }}{% else %}{% static 'images/pwanimate/pwanimate.png' %}{% endif %}')"></div>
+                <div class="showcase-card card-center-reel" style="background-image: url('{% if hero_set and hero_set.center_reel %}{{ hero_set.center_reel.url }}{% else %}{% static 'images/default_cover.jpg' %}{% endif %}')"></div>
+                <div class="showcase-card card-pwani-gate" style="background-image: url('{% if hero_set and hero_set.pwani_gate %}{{ hero_set.pwani_gate.url }}{% else %}{% static 'images/group_profile.jpg' %}{% endif %}')"></div>
+            </div>
+        </div>
+        <p class="login-tagline">Your campus, connected.</p>
+    </section>
+    <section class="auth-panel" aria-label="Sign in">
+        <div class="auth-card-container">
+            <section class="auth-card">
                 <div class="row g-0">
                     <div class="card-body p-3">
                         <div class="text-center mb-3">
-                            <h2 class="fw-bold text-dark" id="loginWelcomeTitle">{% trans "Welcome Back, Comrade!" %}</h2>
-                            <p class="text-muted">{% trans "Identify yourself to access the PwaniNet feed." %}</p>
+                            <h2 class="fw-bold text-dark" id="loginWelcomeTitle">{% trans "Welcome back" %}</h2>
+                            <p class="text-muted">{% trans "Sign in to your PwaniNet account to continue." %}</p>
                         </div>
 
                         <!-- Alerts & Messages -->
@@ -121,7 +173,7 @@
                                     {% if field.name == 'password' %}
                                         <div class="password-input-wrapper">
                                             {{ field }}
-                                            <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility" tabindex="-1">
+                                            <button type="button" class="password-toggle-btn" aria-label="Show password" aria-pressed="false">
                                                 <i class="bi bi-eye" id="passwordToggleIcon"></i>
                                             </button>
                                         </div>
@@ -136,13 +188,13 @@
                                             <div class="text-danger x-small">{{ error }}</div>
                                         {% endfor %}
                                     {% endif %}
-                                    <div class="field-error" id="{{ field.name }}-error">{% trans "This field cannot be empty" %}</div>
+                                    <div class="field-error" id="{{ field.name }}-error" aria-live="polite">{% trans "This field cannot be empty" %}</div>
                                 </div>
                             {% endfor %}
 
                             <div class="d-grid gap-2 mt-3">
                                 <button class="btn btn-primary btn-lg shadow-sm" type="submit" id="loginSubmitBtn" style="border-radius: 10px;">
-                                    {% trans "Authenticate & Enter" %}
+                                    {% trans "Sign in" %}
                                 </button>
                             </div>
                         </form>
@@ -150,35 +202,43 @@
                         <hr class="my-3">
 
                         <div class="text-center">
-                            <p class="mb-0 text-muted">{% trans "New to the squad?" %}</p>
-                            <a href="{% url 'users:register' %}" data-bypass-htmx="true" class="fw-bold text-primary text-decoration-none">{% trans "Create a New Account" %}</a>
+                            <p class="mb-0 text-muted">{% trans "New to PwaniNet?" %}</p>
+                            <a href="{% url 'users:register' %}" data-bypass-htmx="true" class="fw-bold text-primary text-decoration-none">{% trans "Create an account" %}</a>
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
             <div class="text-center mt-3">
                 <a href="{% url 'posts:home' %}" class="text-secondary small text-decoration-none">{% trans "← Back to Public View" %}</a>
             </div>
         </div>
-    </div>
-</div>
+    </section>
+</main>
 
 <script>
 (function() {
+    function safeSessionGet(key) {
+        try { return sessionStorage.getItem(key); } catch (error) { return null; }
+    }
+    function safeSessionRemove(key) {
+        try { sessionStorage.removeItem(key); } catch (error) { /* Session storage may be disabled in an embedded browser. */ }
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('fresh') === '1') {
-        sessionStorage.removeItem('pwaninet_pending_2fa');
+        safeSessionRemove('pwaninet_pending_2fa');
     }
 
     const DEVICE_ID_KEY = 'pwaninet_device_id';
-    let deviceId = localStorage.getItem(DEVICE_ID_KEY);
+    let deviceId = null;
+    try { deviceId = localStorage.getItem(DEVICE_ID_KEY); } catch (error) { /* Storage can be unavailable in embedded webviews. */ }
     
     if (!deviceId) {
         const array = new Uint8Array(32);
         crypto.getRandomValues(array);
         deviceId = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-        localStorage.setItem(DEVICE_ID_KEY, deviceId);
+        try { localStorage.setItem(DEVICE_ID_KEY, deviceId); } catch (error) { /* The generated ID remains valid for this sign-in. */ }
     }
     
     document.getElementById('device_id_field').value = deviceId;
@@ -197,6 +257,7 @@
                 input.setAttribute('autocapitalize', 'none');
                 input.setAttribute('autocorrect', 'off');
                 input.setAttribute('spellcheck', 'false');
+                input.setAttribute('autocomplete', 'username');
                 {% if request.session.registered_username %}
                 if (!input.value) {
                     input.value = "{{ request.session.registered_username|escapejs }}";
@@ -204,6 +265,9 @@
                 {% endif %}
             } else if (input.id === 'id_password' && !input.getAttribute('placeholder')) {
                 input.setAttribute('placeholder', 'Enter your password');
+                input.setAttribute('autocomplete', 'current-password');
+            } else if (input.id === 'id_password') {
+                input.setAttribute('autocomplete', 'current-password');
             }
         }
     });
@@ -216,6 +280,8 @@
         passwordToggleBtn.addEventListener('click', function() {
             const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordField.setAttribute('type', type);
+            passwordToggleBtn.setAttribute('aria-pressed', String(type === 'text'));
+            passwordToggleBtn.setAttribute('aria-label', type === 'text' ? 'Hide password' : 'Show password');
             passwordToggleIcon.classList.toggle('bi-eye');
             passwordToggleIcon.classList.toggle('bi-eye-slash');
         });
@@ -232,6 +298,7 @@
     function validateField(field, errorElement) {
         if (!field) return false;
         const isEmpty = field.value.trim() === '';
+        field.setAttribute('aria-invalid', String(isEmpty));
         if (errorElement) {
             errorElement.classList.toggle('visible', isEmpty);
         }
@@ -270,14 +337,14 @@
     }
 
     {% if form.errors %}
-    sessionStorage.removeItem('showLoginWelcome');
-    sessionStorage.removeItem('loginWelcomeName');
+    safeSessionRemove('showLoginWelcome');
+    safeSessionRemove('loginWelcomeName');
     {% endif %}
 
     function initPage() {
-        const showRegistrationSuccess = sessionStorage.getItem('showRegistrationSuccess') === 'true';
+        const showRegistrationSuccess = safeSessionGet('showRegistrationSuccess') === 'true';
         if (showRegistrationSuccess) {
-            sessionStorage.removeItem('showRegistrationSuccess');
+            safeSessionRemove('showRegistrationSuccess');
             runPostRegistrationModal();
         }
     }
@@ -299,6 +366,7 @@
         }
 
         loginSubmitBtn.disabled = true;
+        loginSubmitBtn.setAttribute('aria-busy', 'true');
         loginSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing you in…';
     });
 

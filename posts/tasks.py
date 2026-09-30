@@ -931,3 +931,25 @@ def get_text_color(post):
     
     # Default white text for dark gradients
     return (255, 255, 255)
+
+
+@shared_task
+def generate_post_link_preview_task(post_id):
+    """Generate link preview for a post asynchronously."""
+    from posts.models import Post
+    from messaging.services.link_preview_service import LinkPreviewService
+    from users.services.feed_service import invalidate_home_feed_context
+
+    try:
+        post = Post.objects.get(id=post_id)
+        preview = LinkPreviewService.generate_preview_for_post(post)
+        if preview and post.author_id:
+            invalidate_home_feed_context(post.author_id)
+        return bool(preview)
+    except Post.DoesNotExist:
+        logger.warning(f"Post {post_id} not found for link preview generation")
+        return False
+    except Exception as e:
+        logger.error(f"Error in generate_post_link_preview_task for post {post_id}: {e}")
+        return False
+

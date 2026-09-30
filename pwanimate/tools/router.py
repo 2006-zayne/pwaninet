@@ -41,6 +41,8 @@ class ToolRouter:
         r"^(?:show\s+me\s+|what\s+are\s+|check\s+)?(?:all\s+)?my\s+notifications[\s\?\.]*$",
         r"^do\s+i\s+have\s+(?:any\s+)?(?:new\s+|unread\s+)?notifications[\s\?\.]*$",
         r"^how\s+many\s+unread\s+notifications\s+(?:do\s+i\s+have)?[\s\?\.]*$",
+        r"^how\s+many\s+(?:all\s+)?(?:my\s+)?notifications(?:\s+do\s+i\s+have)?[\s\?\.]*$",
+        r"^(?:count|what(?:'s|\s+is)\s+the\s+count\s+of)\s+(?:all\s+)?(?:my\s+)?notifications[\s\?\.]*$",
         r"^what\s+notifications\s+do\s+i\s+have[\s\?\.]*$",
     ]
 
@@ -90,6 +92,8 @@ class ToolRouter:
         query: str,
         user: Any = None,
         user_context: Optional[Any] = None,
+        local_time: Optional[str] = None,
+        timezone_name: Optional[str] = None,
     ) -> Optional[ToolRoute]:
         """
         Evaluate query against high-confidence patterns.
@@ -100,6 +104,24 @@ class ToolRouter:
 
         clean_query = query.strip()
         lower_query = clean_query.lower()
+
+        if re.match(
+            r"^(?:what(?:'s|s| is)\s+(?:the\s+)?(?:current\s+)?time(?:\s+right\s+now)?|what\s+time\s+is\s+it(?:\s+(?:right\s+now|in\s+(?:kenya|nairobi)))?|current\s+time(?:\s+in\s+(?:kenya|nairobi))?|time\s+now|what\s+time\s+now)[\s?!\.]*$",
+            lower_query,
+        ):
+            return ToolRoute("local_time", {"local_time": local_time or "", "timezone_name": timezone_name or "UTC"}, matched_intent="local_time")
+
+        m_search = re.match(
+            r"^(?:(?:have|can|could)\s+you\s+)?(?:seen|search(?:\s+for)?|find|look\s+for|show\s+me)\s+(?:the\s+)?(posts?|documents?|docs?)\s+(?:with\s+(?:the\s+)?(?:content|text)\s+|(?:about|for|on|containing)\s+)(.+?)[\s?.!]*$",
+            clean_query, re.I,
+        )
+        if m_search:
+            kind = m_search.group(1).lower()
+            return ToolRoute("content_search", {"query": m_search.group(2).strip(), "content_type": "post" if kind.startswith("post") else "document", "limit": 5}, matched_intent="content_search")
+
+        m_notify = re.match(r"^(?:notify\s+me\s+(?:that\s+)?|send\s+me\s+a\s+notification\s+(?:saying|that)\s+)(.+)$", clean_query, re.I)
+        if m_notify:
+            return ToolRoute("send_notification", {"summary": m_notify.group(1).strip()}, matched_intent="send_notification")
 
         # 1. Notifications check
         route = self._match_notifications(clean_query, lower_query)
@@ -136,7 +158,10 @@ class ToolRouter:
     def _match_notifications(self, query: str, lower_query: str) -> Optional[ToolRoute]:
         for pattern in self.NOTIFICATION_PATTERNS:
             if re.match(pattern, lower_query, re.IGNORECASE):
-                unread_only = "all" not in lower_query
+                asks_unread = bool(re.search(r"\bunread\b", lower_query))
+                asks_all = bool(re.search(r"\ball\b", lower_query))
+                asks_count = bool(re.search(r"\b(?:how\s+many|count)\b", lower_query))
+                unread_only = asks_unread or not (asks_all or asks_count)
                 return ToolRoute(
                     tool_name="notification_summary",
                     parameters={"unread_only": unread_only, "limit": 5},
@@ -547,4 +572,3 @@ class ToolRouter:
                 )
 
         return None
-

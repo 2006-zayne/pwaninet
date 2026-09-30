@@ -96,16 +96,22 @@ async function initSafeAreaEarly() {
             if (!insets) return;
             console.log('[PWANINET-NATIVE] Safe Area Insets Update:', JSON.stringify(insets));
             const root = document.documentElement;
+            // Some Android edge-to-edge WebViews report the navigation bar and
+            // gesture region together. Keep the bottom inset useful for layout
+            // while preventing an oversized system value from lifting controls
+            // far above the three-button navigation bar.
+            const parsedBottomInset = Number.parseFloat(insets.bottom) || 0;
+            const bottomInset = Math.max(0, Math.min(parsedBottomInset, 36));
             root.classList.add('is-capacitor', 'is-native-app');
             root.style.setProperty('--pwaninet-safe-area-top', insets.top + 'px');
-            root.style.setProperty('--pwaninet-safe-area-bottom', insets.bottom + 'px');
+            root.style.setProperty('--pwaninet-safe-area-bottom', bottomInset + 'px');
             root.style.setProperty('--pwaninet-safe-area-left', insets.left + 'px');
             root.style.setProperty('--pwaninet-safe-area-right', insets.right + 'px');
 
             if (document.body) {
                 document.body.classList.add('is-capacitor', 'is-native-app');
                 document.body.style.setProperty('--pwaninet-safe-area-top', insets.top + 'px');
-                document.body.style.setProperty('--pwaninet-safe-area-bottom', insets.bottom + 'px');
+                document.body.style.setProperty('--pwaninet-safe-area-bottom', bottomInset + 'px');
             }
 
             console.log('[PWANINET-NATIVE] Applied CSS Variables:', {

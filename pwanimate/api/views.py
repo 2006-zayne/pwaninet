@@ -8,7 +8,9 @@ RAG interactions, conversation listings, and detail/deletion.
 import logging
 import uuid
 from django.db import transaction
+from django.db.models import Q
 from django.http import FileResponse, Http404
+from django.template.loader import render_to_string
 from rest_framework import permissions, status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
@@ -35,6 +37,7 @@ from django.core.exceptions import ValidationError
 from pwanimate.services.conversation import ConversationService
 from pwanimate.services.attachment import AttachmentService
 from pwanimate.ai.gateway.quota_tracker import get_quota_tracker
+from documents.models import Document
 
 logger = logging.getLogger(__name__)
 
@@ -86,10 +89,28 @@ class PwanimateChatView(APIView):
                 conversation_id=conversation_id,
             )
             if conversation is None:
-                return Response(
-                    {"error": "Conversation not found."},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
+                if data.get("create_conversation") is True:
+                    try:
+                        requested_id = uuid.UUID(str(conversation_id))
+                    except (ValueError, TypeError, AttributeError):
+                        return Response(
+                            {"error": "Invalid conversation ID."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                    if PwanimateConversation.objects.filter(id=requested_id).exists():
+                        return Response(
+                            {"error": "Conversation not found."},
+                            status=status.HTTP_404_NOT_FOUND,
+                        )
+                    conversation = ConversationService.create_conversation(
+                        user=request.user,
+                        conversation_id=requested_id,
+                    )
+                else:
+                    return Response(
+                        {"error": "Conversation not found."},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
         else:
             conversation = ConversationService.create_conversation(user=request.user)
 
@@ -112,21 +133,75 @@ class PwanimateChatView(APIView):
                     )
                 attachment_objs.append(att)
 
+        conversation_attachments = list(conversation.attachments.all()) if conversation else []
+        all_known_attachments = {str(att.id): att for att in conversation_attachments}
+        all_known_attachments.update({str(att.id): att for att in attachment_objs})
+        pending_documents = [
+            att for att in all_known_attachments.values()
+            if att.attachment_type == "document"
+            and att.processing_status in {"pending", "processing"}
+        ]
+        if pending_documents:
+            return Response(
+                {"error": "Pwanimate is still reading the attached document. Try again when it shows Ready."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        failed_documents = [
+            att for att in attachment_objs
+            if att.attachment_type == "document" and att.processing_status == "failed"
+        ]
+        if failed_documents:
+            return Response(
+                {"error": "Pwanimate could not read one of these documents. Remove it and try a clearer or text-based copy."},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
         context_resources = data.get("context_resources") or []
         if not isinstance(context_resources, list):
             context_resources = []
 
-        # Load bounded history from server persistence
-        server_history = ConversationService.load_history(conversation)
+        clean_query = message.strip()
+        retry_requested = data.get("retry") is True
+        retry_message_id = data.get("retry_user_message_id")
+        if retry_message_id is not None:
+            try:
+                retry_message_id = int(retry_message_id)
+            except (TypeError, ValueError):
+                return Response(
+                    {"error": "Invalid retry message ID."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        user_msg = None
+        if retry_requested:
+            user_msg = ConversationService.get_retryable_user_message(
+                conversation,
+                clean_query,
+                message_id=retry_message_id,
+            )
+            if retry_message_id is not None and user_msg is None:
+                return Response(
+                    {"error": "Message to retry was not found in this conversation."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if user_msg is not None and user_msg.content != clean_query:
+                return Response(
+                    {"error": "Retry content must match the original message."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        if user_msg is None:
+            user_msg = ConversationService.persist_user_message(conversation, clean_query)
+
+        # Load history without the original turn being retried, so it is sent only once.
+        server_history = ConversationService.load_history(
+            conversation,
+            exclude_message_id=user_msg.id if retry_requested else None,
+        )
 
         # Fallback to client history only if no server history exists yet (backward compatibility)
         history = server_history
         if not server_history and not conversation_id and data.get("history"):
             history = data.get("history", [])
-
-        # Persist user message turn
-        clean_query = message.strip()
-        user_msg = ConversationService.persist_user_message(conversation, clean_query)
 
         # Atomically link attachments to conversation and user message
         if attachment_objs:
@@ -142,7 +217,7 @@ class PwanimateChatView(APIView):
         if conversation:
             seen_ids = {a.id for a in active_attachments}
             for conv_att in conversation.attachments.all().order_by("created_at"):
-                if conv_att.id not in seen_ids:
+                if conv_att.id not in seen_ids and conv_att.processing_status != "failed":
                     active_attachments.append(conv_att)
                     seen_ids.add(conv_att.id)
 
@@ -162,6 +237,8 @@ class PwanimateChatView(APIView):
                 model=model,
                 attachments=active_attachments,
                 context_resources=context_resources,
+                local_time=data.get("local_time"),
+                timezone_name=data.get("timezone"),
             )
             orchestrator = self.get_orchestrator()
             # External LLM generation occurs outside database transactions
@@ -180,6 +257,12 @@ class PwanimateChatView(APIView):
             )
 
             res_data = response.to_dict()
+            if response.people:
+                res_data["people_html"] = render_to_string(
+                    "pwanimate/partials/people_section.html",
+                    {"people": response.people},
+                    request=request,
+                )
             res_data["conversation_id"] = str(conversation.id)
             res_data["message_id"] = asst_msg.id
             res_data["user_message_id"] = user_msg.id
@@ -191,6 +274,8 @@ class PwanimateChatView(APIView):
                 "fallback_used": response.metadata.get("fallback_used", False),
                 "original_provider": response.metadata.get("original_provider", response.provider),
                 "provider_used": response.provider,
+                "vision_fallback": response.metadata.get("vision_route") == "fallback",
+                "vision_text_fallback": response.metadata.get("vision_text_fallback", False),
             }
             res_data["fallback_info"] = fallback_info
             res_data["quota_info"] = response.quota_info
@@ -221,13 +306,13 @@ class PwanimateChatView(APIView):
 
         except OrchestratorValidationError as exc:
             return Response(
-                {"error": str(exc), "conversation_id": str(conversation.id)},
+                {"error": str(exc), "conversation_id": str(conversation.id), "user_message_id": user_msg.id},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except AIProviderConfigurationError as exc:
             logger.warning("Pwanimate provider capability error: %s", exc)
             return Response(
-                {"error": exc.message, "conversation_id": str(conversation.id)},
+                {"error": exc.message, "conversation_id": str(conversation.id), "user_message_id": user_msg.id},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except ValidationError as exc:
@@ -236,6 +321,7 @@ class PwanimateChatView(APIView):
                 {
                     "error": str(exc.messages if hasattr(exc, "messages") else exc),
                     "conversation_id": str(conversation.id),
+                    "user_message_id": user_msg.id,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -245,6 +331,7 @@ class PwanimateChatView(APIView):
                 {
                     "error": "AI service is temporarily rate limited. Please try again shortly.",
                     "conversation_id": str(conversation.id),
+                    "user_message_id": user_msg.id,
                 },
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
@@ -254,6 +341,7 @@ class PwanimateChatView(APIView):
                 {
                     "error": "AI service request timed out.",
                     "conversation_id": str(conversation.id),
+                    "user_message_id": user_msg.id,
                 },
                 status=status.HTTP_504_GATEWAY_TIMEOUT,
             )
@@ -263,6 +351,7 @@ class PwanimateChatView(APIView):
                 {
                     "error": f"AI service error: {exc.message}",
                     "conversation_id": str(conversation.id),
+                    "user_message_id": user_msg.id,
                 },
                 status=status.HTTP_502_BAD_GATEWAY,
             )
@@ -272,6 +361,7 @@ class PwanimateChatView(APIView):
                 {
                     "error": "An unexpected error occurred while processing your request.",
                     "conversation_id": str(conversation.id),
+                    "user_message_id": user_msg.id,
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
@@ -302,6 +392,13 @@ class PwanimateAttachmentUploadView(APIView):
                 uploaded_file=file_obj,
                 conversation_id=conversation_id,
             )
+            if attachment.attachment_type == "document":
+                from pwanimate.tasks.attachments import process_pwanimate_attachment
+                try:
+                    process_pwanimate_attachment.delay(str(attachment.id))
+                except Exception:
+                    logger.exception("Could not queue processing for attachment %s; processing inline", attachment.id)
+                    process_pwanimate_attachment(str(attachment.id))
             serializer = PwanimateAttachmentSerializer(attachment)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except ValidationError as exc:
@@ -313,6 +410,87 @@ class PwanimateAttachmentUploadView(APIView):
                 {"error": "Failed to process attachment upload."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class PwanimateContextDocumentSearchView(APIView):
+    """Search repository documents the current student is allowed to open."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        query = (request.query_params.get("q") or "").strip()
+        if len(query) < 2:
+            return Response({"results": []})
+
+        documents = Document.objects.filter(
+            status="ready",
+            is_available=True,
+        ).select_related("category", "uploaded_by").order_by("title")
+
+        user = request.user
+        is_admin_or_leader = (
+            user.is_staff
+            or user.is_superuser
+            or getattr(user, "global_role", None) in {"PRESIDENT", "DELEGATE"}
+        )
+        if not is_admin_or_leader:
+            visibility_q = Q(visibility="public") | Q(uploaded_by=user)
+            restricted_q = Q(visibility="restricted")
+            programme = getattr(user, "programme", None)
+            if programme:
+                visibility_q |= restricted_q & Q(
+                    academic_units__academic_unit__programme_units__programme=programme
+                )
+            elif getattr(user, "course", None):
+                visibility_q |= restricted_q & Q(
+                    academic_units__academic_unit__code__icontains=user.course.name
+                )
+            documents = documents.filter(visibility_q).distinct()
+
+        documents = documents.filter(
+            Q(title__icontains=query) | Q(description__icontains=query)
+        )[:20]
+
+        results = []
+        for document in documents:
+            version = document.latest_version
+            document_file = version.files.first() if version else None
+            if not document_file or not document_file.file:
+                continue
+            try:
+                media_url = document_file.file.url
+            except (ValueError, OSError):
+                continue
+            results.append({
+                "document_id": str(document.share_id),
+                "document_share_id": str(document.share_id),
+                "document_version_id": str(version.id),
+                "file_id": str(document_file.id),
+                "title": document.title,
+                "category": document.category.name if document.category_id else "Document",
+                "file_type": (document_file.extension or "").lstrip(".").lower(),
+                "media_url": media_url,
+                "thumbnail_url": document_file.preview_url or "",
+                "url": f"/documents/document/{document.share_id}/",
+            })
+        return Response({"results": results})
+
+
+class PwanimateAttachmentStatusView(APIView):
+    """Return processing status for an attachment owned by the current student."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, attachment_id):
+        attachment = AttachmentService.get_authorized_attachment(request.user, attachment_id)
+        if not attachment:
+            return Response({"error": "Attachment not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response({
+            "id": str(attachment.id),
+            "processing_status": attachment.processing_status,
+            "processing_error": attachment.processing_error,
+            "chunk_count": attachment.chunks.count(),
+        })
 
 
 class PwanimateAttachmentMediaView(APIView):

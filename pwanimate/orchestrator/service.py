@@ -12,6 +12,7 @@ import re
 import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
+from django.conf import settings
 
 from pwanimate.ai.gateway import (
     AIGateway,
@@ -20,16 +21,18 @@ from pwanimate.ai.gateway import (
     LLMResponse,
     get_task_policy,
 )
+from pwanimate.ai.exceptions import AIGatewayError
 from pwanimate.ai.gateway.types import AttachmentData
-from pwanimate.context import ContextEngine, ContextPackage, ContextRequest
+from pwanimate.context import ContextEngine, ContextPackage, ContextRequest, GroundingMode
+from pwanimate.context.types import AuthorityLevel, ContextItem
 from pwanimate.orchestrator.prompts import (
-    SYSTEM_INSTRUCTION_CONVERSATIONAL,
-    SYSTEM_INSTRUCTION_TUTOR,
+    get_system_instruction,
 )
 from pwanimate.orchestrator.types import OrchestrationRequest, OrchestrationResponse
 from pwanimate.retrieval import (
     RetrievalMode,
     RetrievalRequest,
+    RetrievalResult,
     RetrievalResponse,
     SourceType,
     UnifiedRetrievalService,
@@ -42,6 +45,7 @@ from pwanimate.tools import (
     tool_result_to_context_items,
     build_tool_context_package,
 )
+from pwanimate.tools.selector import LLMToolSelector
 
 logger = logging.getLogger(__name__)
 
@@ -154,13 +158,52 @@ def sanitize_llm_response(text: str) -> str:
     return result.strip()
 
 
-def extract_attachment_text(attachment: Any, max_chars: int = 15000) -> str:
+def extract_attachment_text(attachment: Any, max_chars: int = 15000, query: str = "") -> str:
     """
     Extract bounded textual content from an uploaded document attachment.
     Supports PDF, DOCX, PPTX, TXT, MD, CSV, etc. using Pwanimate extractors.
     """
     file_obj = getattr(attachment, "file", None)
     file_name = getattr(attachment, "file_name", getattr(attachment, "name", "document"))
+
+    if getattr(attachment, "processing_status", None) == "ready":
+        stored_chunks = list(attachment.chunks.all())
+        if stored_chunks:
+            query_terms = set(re.findall(r"[a-z0-9]{3,}", (query or "").lower()))
+            page_match = re.search(r"\b(?:page|p\.)\s*(\d+)\b", query or "", re.IGNORECASE)
+            requested_page = int(page_match.group(1)) if page_match else None
+            ranked = sorted(
+                stored_chunks,
+                key=lambda chunk: (
+                    int(
+                        requested_page is not None
+                        and chunk.page_number is not None
+                        and chunk.page_number <= requested_page <= (chunk.page_end or chunk.page_number)
+                    ),
+                    sum(1 for term in query_terms if term in chunk.content.lower()),
+                    -(chunk.chunk_index),
+                ),
+                reverse=True,
+            )
+            selected = ranked[:6]
+            selected.sort(key=lambda chunk: chunk.chunk_index)
+            lines = []
+            remaining = max_chars
+            for chunk in selected:
+                page = f"page {chunk.page_number}" if chunk.page_number else "page not specified"
+                item = f"[{page}]\n{chunk.content.strip()}"
+                if len(item) > remaining:
+                    item = item[:remaining].rstrip()
+                if item:
+                    lines.append(item)
+                    remaining -= len(item)
+                if remaining <= 0:
+                    break
+            if getattr(attachment, "processing_error", ""):
+                lines.append(f"[Processing note: {attachment.processing_error}]")
+            return "\n\n".join(lines)
+    if getattr(attachment, "processing_status", None) == "failed":
+        return f"[Document processing failed for '{file_name}': {attachment.processing_error or 'no readable text was found'}]"
 
     file_path = None
     if file_obj:
@@ -219,15 +262,17 @@ class PwanimateOrchestrator:
         gateway: Optional[AIGateway] = None,
         tool_router: Optional[ToolRouter] = None,
         tool_registry: Optional[ToolRegistry] = None,
+        tool_selector: Optional[LLMToolSelector] = None,
     ):
         self.retrieval_service = retrieval_service or UnifiedRetrievalService()
         self.context_engine = context_engine or ContextEngine()
         self.gateway = gateway or AIGateway()
         self.tool_router = tool_router or ToolRouter()
         self.tool_registry = tool_registry or get_default_tool_registry()
+        self.tool_selector = tool_selector or LLMToolSelector(self.gateway, self.tool_registry)
 
     def _process_attachments(
-        self, attachments: List[Any]
+        self, attachments: List[Any], query: str = ""
     ) -> Tuple[List[AttachmentData], Optional[str]]:
         """
         Process user attachments:
@@ -271,7 +316,7 @@ class PwanimateOrchestrator:
                 )
 
             elif att_type == "document":
-                extracted_text = extract_attachment_text(att, max_chars=max_chars)
+                extracted_text = extract_attachment_text(att, max_chars=max_chars, query=query)
                 block = [
                     f'<attachment_context id="{att_id}" filename="{att_name}" type="{att_type}">',
                     f'  <title>{att_name}</title>',
@@ -287,13 +332,13 @@ class PwanimateOrchestrator:
 
     def _resolve_context_resources(
         self, user: Any, context_resources: List[Dict[str, Any]]
-    ) -> Tuple[Optional[int], List[Any]]:
+    ) -> Tuple[List[int], List[Any], List[RetrievalResult], List[RetrievalResult]]:
         """
-        Authorize and resolve client context resources (documents and pages).
-        Returns: (filter_document_id, page_chunks)
+        Authorize and resolve client context resources (documents, pages, and posts).
+        Returns: (filter_document_ids, page_chunks, selected_post_results, selected_user_results)
         """
         if not context_resources or not isinstance(context_resources, list):
-            return None, []
+            return [], [], [], []
 
         from documents.models import Document
         from pwanimate.retrieval.services.document_retrieval import DocumentSemanticRetrievalService
@@ -301,17 +346,38 @@ class PwanimateOrchestrator:
         doc_retrieval = DocumentSemanticRetrievalService()
         candidate_qs = doc_retrieval.build_candidate_queryset(user=user)
 
-        filter_doc_id = None
+        filter_doc_ids: List[int] = []
         page_chunks: List[Any] = []
+        selected_post_results: List[RetrievalResult] = []
+        selected_user_results: List[RetrievalResult] = []
 
         for res in context_resources:
             if not isinstance(res, dict):
                 continue
             res_type = str(res.get("type") or res.get("category") or "").lower()
+            resource_id = res.get("id")
             if res_type in ("document", "doc"):
-                doc_id = res.get("id") or res.get("document_id")
-                share_id = res.get("share_id") or res.get("document_share_id")
-                page_raw = res.get("page") or res.get("page_number")
+                # Context rail descriptors are produced by the browser in camelCase,
+                # while older API clients may still send snake_case fields.
+                doc_id = res.get("document_id") or res.get("documentId")
+                share_id = (
+                    res.get("share_id")
+                    or res.get("document_share_id")
+                    or res.get("documentShareId")
+                )
+                if not doc_id and resource_id:
+                    try:
+                        # Older clients used `id` for a numeric document primary key.
+                        doc_id = int(resource_id)
+                    except (ValueError, TypeError):
+                        # The current context rail uses the document's share UUID as `id`.
+                        if not share_id and res_type in ("document", "doc"):
+                            share_id = resource_id
+                page_raw = (
+                    res.get("page")
+                    or res.get("page_number")
+                    or res.get("pageNumber")
+                )
 
                 doc_obj = None
                 if doc_id:
@@ -338,7 +404,8 @@ class PwanimateOrchestrator:
                     )
                     continue
 
-                filter_doc_id = doc_obj.id
+                if doc_obj.id not in filter_doc_ids:
+                    filter_doc_ids.append(doc_obj.id)
 
                 # If page is specified, attempt page chunks retrieval
                 if page_raw is not None:
@@ -355,7 +422,95 @@ class PwanimateOrchestrator:
                     except (ValueError, TypeError):
                         pass
 
-        return filter_doc_id, page_chunks
+            post_id = res.get("post_id") or res.get("postId")
+            source_type = str(res.get("source_type") or res.get("sourceType") or "").lower()
+            if post_id or res_type == "post" or source_type == "post":
+                post_id = post_id or resource_id
+                if not post_id:
+                    url = str(res.get("url") or "")
+                    match = re.search(r"/post(?:s)?/([0-9a-fA-F-]{36})(?:/|$)", url)
+                    post_id = match.group(1) if match else None
+                if post_id:
+                    try:
+                        import uuid
+                        from posts.models import Post
+                        post_qs = Post.objects.select_related("author")
+                        try:
+                            post = post_qs.filter(share_id=uuid.UUID(str(post_id))).first()
+                        except (ValueError, TypeError, AttributeError):
+                            try:
+                                post = post_qs.filter(id=int(post_id)).first()
+                            except (ValueError, TypeError):
+                                post = None
+                    except Exception as exc:
+                        logger.info("Selected Pwanimate post is unavailable: %s", type(exc).__name__)
+                        post = None
+
+                    if post:
+                        author = post.author.get_full_name() or post.author.username
+                        title = str(res.get("title") or f"Post by {author}")[:255]
+                        content_parts = [str(post.content or "").strip()]
+                        transcript = str(getattr(post, "video_transcript", "") or "").strip()
+                        if transcript:
+                            content_parts.append(f"Video transcript: {transcript}")
+                        snippet = "\n\n".join(part for part in content_parts if part)
+                        if snippet:
+                            selected_post_results.append(
+                                RetrievalResult(
+                                    source=SourceType.POST,
+                                    object_id=str(post.share_id),
+                                    title=title,
+                                    snippet=snippet,
+                                    score=1.0,
+                                    url=f"/post/{post.share_id}/",
+                                    citation=f"Post by @{post.author.username}",
+                                    metadata={
+                                        "post_id": str(post.share_id),
+                                        "author_id": post.author_id,
+                                        "author_username": post.author.username,
+                                        "selected_resource": True,
+                                    },
+                                    raw_object=post,
+                                )
+                            )
+
+            person_data = res.get("person") if isinstance(res.get("person"), dict) else {}
+            username = str(
+                res.get("username")
+                or person_data.get("username")
+                or (resource_id if res_type in ("user", "profile") or source_type == "user" else "")
+            ).strip()
+            if username:
+                try:
+                    from pwanimate.tools.domain.users import UserProfileTool
+
+                    profile_result = UserProfileTool().execute(user=user, username=username)
+                    if profile_result.success and isinstance(profile_result.data, dict):
+                        profile = profile_result.data
+                        profile_lines = [
+                            f"{profile.get('display_name') or username} (@{username})",
+                            profile.get("headline") or "",
+                            profile.get("academic_level") or "",
+                            profile.get("programme_name") or "",
+                            profile.get("bio") or "",
+                        ]
+                        profile_lines.extend(str(value) for value in (profile.get("skills") or [])[:12])
+                        profile_lines.extend(str(value) for value in (profile.get("matched_interests") or [])[:12])
+                        profile_text = "\n".join(value for value in profile_lines if value).strip()
+                        selected_user_results.append(RetrievalResult(
+                            source=SourceType.USER,
+                            object_id=profile.get("id", username),
+                            title=f"Profile: {profile.get('display_name') or username}",
+                            snippet=profile_text,
+                            score=1.0,
+                            url=profile.get("profile_url") or f"/users/user/{username}/",
+                            citation=f"Profile @{username}",
+                            metadata=profile,
+                        ))
+                except Exception as exc:
+                    logger.info("Selected Pwanimate profile is unavailable: %s", type(exc).__name__)
+
+        return filter_doc_ids, page_chunks, selected_post_results, selected_user_results
 
     def is_conversational_intent(self, query: str) -> bool:
         """
@@ -384,6 +539,27 @@ class PwanimateOrchestrator:
         policy = get_task_policy(task_category)
         return policy.max_output_tokens
 
+    @staticmethod
+    def _with_local_time(instruction: str, request: OrchestrationRequest) -> str:
+        """Give Pwanimate the browser's current clock and IANA timezone when available."""
+        if not request.local_time:
+            return instruction
+        try:
+            from zoneinfo import ZoneInfo
+            from datetime import datetime
+            requested_zone = request.timezone_name or "Africa/Nairobi"
+            if requested_zone in {"UTC", "Etc/UTC"}:
+                requested_zone = "Africa/Nairobi"
+            zone_obj = ZoneInfo(requested_zone)
+            local_dt = datetime.fromisoformat(str(request.local_time).replace("Z", "+00:00"))
+            if local_dt.tzinfo is None:
+                return instruction
+            local_time = local_dt.astimezone(zone_obj).isoformat()
+            zone = zone_obj.key
+        except Exception:
+            return instruction
+        return f"{instruction}\n\nCurrent user local time: {local_time} ({zone}). Use this as the current time."
+
     def run(self, request: OrchestrationRequest) -> OrchestrationResponse:
         """
         Execute an end-to-end orchestration turn.
@@ -400,6 +576,10 @@ class PwanimateOrchestrator:
         """
         t_start = time.perf_counter()
         query = request.query.strip()
+        from pwanimate.services.social_updates import (
+            get_pending_friend_post_updates,
+        )
+        friend_post_updates = get_pending_friend_post_updates(request.user)
 
         # Construct current-user context snapshot if not already provided
         if request.user and getattr(request.user, "is_authenticated", False) and request.user_context is None:
@@ -409,25 +589,72 @@ class PwanimateOrchestrator:
             except Exception as exc:
                 logger.warning("Could not build UserContext for user %s: %s", getattr(request.user, "id", None), exc)
 
-        # If attachments or context resources are present, we bypass purely conversational shortcuts
+        # Selected resources inform the answer; they do not suppress independent tools.
         has_attachments_or_context = bool(request.attachments or request.context_resources)
 
-        # 1. Check conversational intent
+        # 1. Use exact deterministic routes for clear requests.
+        tool_route = self.tool_router.route(
+            query, user=request.user, user_context=request.user_context,
+            local_time=request.local_time, timezone_name=request.timezone_name,
+        )
+        retrieval_sources = None
+        # 2. Let the configured model resolve paraphrases not covered by patterns.
+        # Avoid an extra selection call for simple greetings and acknowledgements.
+        if (
+            not tool_route
+            and not self.is_conversational_intent(query)
+            and self.tool_selector.might_need_tool(query)
+        ):
+            selection = self.tool_selector.select(
+                query=query,
+                history=request.history,
+                local_time=request.local_time,
+                timezone_name=request.timezone_name,
+                selected_resources=request.context_resources,
+                attachments=request.attachments,
+            )
+            tool_route = selection.route
+            retrieval_sources = selection.sources
+        if tool_route:
+            response = self._run_tool(request, query, tool_route, t_start)
+            return self._append_friend_post_updates(response, request.user, friend_post_updates)
+
+        # 3. Conversational turns can skip platform retrieval after tool choice.
         is_conversational = not has_attachments_or_context and (
             request.task == "general" or self.is_conversational_intent(query)
         )
         if is_conversational:
-            return self._run_conversational(request, query, t_start)
+            response = self._run_conversational(request, query, t_start)
+            return self._append_friend_post_updates(response, request.user, friend_post_updates)
 
-        # 2. Check deterministic tool routing (only if no explicit attachments/context overriding intent)
-        tool_route = None if has_attachments_or_context else self.tool_router.route(
-            query, user=request.user, user_context=request.user_context
-        )
-        if tool_route:
-            return self._run_tool(request, query, tool_route, t_start)
+        # 4. Standard / Attachment / Context RAG
+        response = self._run_rag(request, query, t_start, source_override=retrieval_sources)
+        return self._append_friend_post_updates(response, request.user, friend_post_updates)
 
-        # 3. Standard / Attachment / Context RAG
-        return self._run_rag(request, query, t_start)
+    @staticmethod
+    def _append_friend_post_updates(response, user, updates):
+        """Surface newly received friend posts once, in the next successful chat reply."""
+        if not updates:
+            return response
+        from pwanimate.services.social_updates import mark_friend_post_updates_surfaced
+
+        lines = ["**New from your network:**"]
+        for update in updates:
+            author = str(update.get("author") or "Someone you follow").strip()
+            excerpt = str(update.get("excerpt") or "").strip()
+            label = f"@{author}" if author and not author.startswith("@") else author
+            item = f"- {label} posted"
+            if excerpt:
+                item += f": “{excerpt}”"
+            if update.get("url", "").startswith("/") and not update["url"].startswith("//"):
+                item += f" ([view post]({update['url']}))"
+            lines.append(item)
+
+        response.answer = (response.answer.rstrip() + "\n\n" + "\n".join(lines)).strip()
+        mark_friend_post_updates_surfaced(user, updates)
+        response.metadata = response.metadata or {}
+        response.metadata["friend_post_updates_count"] = len(updates)
+        return response
 
     def _run_conversational(
         self,
@@ -448,7 +675,7 @@ class PwanimateOrchestrator:
             task="general",
             messages=messages,
             context=context_pkg,
-            system_instruction=SYSTEM_INSTRUCTION_CONVERSATIONAL,
+            system_instruction=self._with_local_time(get_system_instruction("conversational"), request),
             provider=request.provider,
             model=request.model,
             temperature=request.temperature,
@@ -591,7 +818,7 @@ class PwanimateOrchestrator:
             task="tool",
             messages=messages,
             context=context_pkg,
-            system_instruction=SYSTEM_INSTRUCTION_TUTOR,
+            system_instruction=self._with_local_time(get_system_instruction("required"), request),
             provider=request.provider,
             model=request.model,
             temperature=request.temperature,
@@ -663,46 +890,106 @@ class PwanimateOrchestrator:
         request: OrchestrationRequest,
         query: str,
         t_start: float,
+        source_override: Optional[List[str]] = None,
     ) -> OrchestrationResponse:
         """Handle knowledge/retrieval-augmented dialogue turns."""
         # 0. Process attachments (images for vision, docs for prompt context)
-        image_attachments, attachment_context = self._process_attachments(request.attachments)
+        image_attachments, attachment_context = self._process_attachments(request.attachments, query=query)
 
         # 1. Resolve authorized context resources (active document / page filtering)
-        filter_doc_id, page_chunks = self._resolve_context_resources(
+        filter_doc_ids, page_chunks, selected_post_results, selected_user_results = self._resolve_context_resources(
             request.user, request.context_resources
         )
 
         # 2. Upstream Authorized Retrieval
         t_ret = time.perf_counter()
-        if page_chunks:
-            retrieval_resp = RetrievalResponse(
-                query=query,
-                results=page_chunks,
-                total_count=len(page_chunks),
-                execution_time_ms=0.0,
-            )
-        else:
-            sources = request.sources or [SourceType.DOCUMENT, SourceType.POST]
-            filters = {}
-            if filter_doc_id:
-                filters["document_id"] = filter_doc_id
-
-            retrieval_req = RetrievalRequest(
-                query=query,
-                user=request.user,
-                sources=sources,
-                mode=RetrievalMode.HYBRID,
-                filters=filters,
-            )
-            retrieval_resp = self.retrieval_service.retrieve(retrieval_req)
+        # Keep searching the requested sources even when a selected document page
+        # is present. Previously page chunks replaced retrieval entirely, which
+        # made unrelated post searches appear to find nothing.
+        requested_sources = request.sources or source_override
+        sources = (
+            [source if isinstance(source, SourceType) else SourceType(str(source).lower())
+             for source in requested_sources]
+            if requested_sources
+            else [SourceType.DOCUMENT, SourceType.POST, SourceType.USER, SourceType.GROUP]
+        )
+        source_set = set(sources)
+        include_documents = SourceType.DOCUMENT in source_set
+        include_posts = SourceType.POST in source_set
+        include_users = SourceType.USER in source_set
+        filters = {"document_ids": filter_doc_ids} if filter_doc_ids and include_documents else {}
+        retrieval_req = RetrievalRequest(
+            query=query,
+            user=request.user,
+            sources=sources,
+            mode=RetrievalMode.HYBRID,
+            filters=filters,
+        )
+        retrieval_resp = self.retrieval_service.retrieve(retrieval_req)
+        if selected_post_results and include_posts:
+            retrieval_resp.results.extend(selected_post_results)
+            retrieval_resp.total_count += len(selected_post_results)
+        if selected_user_results and include_users:
+            retrieval_resp.results.extend(selected_user_results)
+            retrieval_resp.total_count += len(selected_user_results)
         ret_time_ms = round((time.perf_counter() - t_ret) * 1000.0, 2)
 
         # 3. Context Engine Bounding
+        # Mark selected document chunks explicitly so they remain available even
+        # while other sources are searched and ranked for the current question.
+        explicit_retrieval_results = list(page_chunks) if include_documents else []
+        if include_posts:
+            explicit_retrieval_results.extend(selected_post_results)
+        if include_users:
+            explicit_retrieval_results.extend(selected_user_results)
+        selected_doc_id_set = set(filter_doc_ids) if include_documents else set()
+        for result in retrieval_resp.results:
+            metadata = result.metadata if isinstance(result.metadata, dict) else {}
+            if (
+                result.source == SourceType.DOCUMENT
+                and (metadata.get("document_id") or result.object_id) in selected_doc_id_set
+            ):
+                explicit_retrieval_results.append(result)
+        explicit_items = []
+        seen_explicit_ids = set()
+        for result in explicit_retrieval_results:
+            explicit_key = (str(result.source), str(result.object_id))
+            if explicit_key in seen_explicit_ids:
+                continue
+            seen_explicit_ids.add(explicit_key)
+            if len(explicit_items) >= 10:
+                break
+            explicit_items.append(ContextItem(
+                source=result.source,
+                object_id=result.object_id,
+                title=result.title,
+                content=(result.snippet or "")[:3000],
+                citation=result.citation,
+                url=result.url,
+                relevance_score=result.score,
+                metadata=result.metadata,
+                explicitly_selected=True,
+                authority_level=AuthorityLevel.EXPLICIT,
+            ))
+
+        explicit_object_ids = {
+            (str(item.source), str(item.object_id)) for item in explicit_items
+        }
+        retrieval_resp.results = [
+            result for result in retrieval_resp.results
+            if (str(result.source), str(result.object_id)) not in explicit_object_ids
+        ]
+
         context_req = ContextRequest(
             query=query,
             retrieval_response=retrieval_resp,
+            explicit_resources=explicit_items,
             user_context=request.user_context,
+            grounding_mode=(
+                GroundingMode.EXPLICIT_RESOURCE
+                if explicit_items
+                else GroundingMode.OPTIONAL
+            ),
         )
         context_pkg: ContextPackage = self.context_engine.build_context(context_req)
         if attachment_context:
@@ -716,21 +1003,77 @@ class PwanimateOrchestrator:
         messages = list(request.history) + [last_user_msg]
 
         effective_max_tokens = self._resolve_effective_budget(request, "rag")
+        is_multimodal_turn = bool(image_attachments)
 
         llm_request = LLMRequest(
             task="rag",
             messages=messages,
             context=context_pkg,
-            system_instruction=SYSTEM_INSTRUCTION_TUTOR,
-            provider=request.provider,
-            model=request.model,
+            system_instruction=self._with_local_time(get_system_instruction(context_pkg.grounding_mode), request),
+            provider=("gemini" if is_multimodal_turn else request.provider),
+            model=(
+                getattr(settings, "PWANIMATE_VISION_MODEL", "gemini-3.6-flash")
+                if is_multimodal_turn
+                else request.model
+            ),
             temperature=request.temperature,
             max_tokens=effective_max_tokens,
             attachments=image_attachments,
+            metadata={"required_capability": "image"} if is_multimodal_turn else {},
         )
 
         t_gen = time.perf_counter()
-        llm_response = self.gateway.generate(llm_request)
+        vision_text_fallback = False
+        if is_multimodal_turn:
+            try:
+                llm_response = self.gateway.generate(llm_request)
+            except AIGatewayError as vision_error:
+                logger.warning(
+                    "Pwanimate vision route failed; retrying text-only through the normal model chain: %s",
+                    type(vision_error).__name__,
+                )
+                vision_text_fallback = True
+                text_only_messages = [
+                    ChatMessage(role=message.role, content=message.content)
+                    for message in messages
+                ]
+                text_only_instruction = (
+                    (llm_request.system_instruction or "").rstrip()
+                    + "\n\nImage fallback notice: Image analysis is unavailable for this response. "
+                    "Do not claim to have seen or analyzed any attached image. Answer the user's text "
+                    "and available text context only, and clearly mention that the image was not analyzed."
+                )
+                text_request = LLMRequest(
+                    task=llm_request.task,
+                    messages=text_only_messages,
+                    context=llm_request.context,
+                    system_instruction=text_only_instruction,
+                    provider=request.provider,
+                    model=request.model,
+                    temperature=llm_request.temperature,
+                    max_tokens=llm_request.max_tokens,
+                    metadata={},
+                    attachments=[],
+                )
+                llm_response = self.gateway.generate(text_request)
+                llm_request = text_request
+                llm_response.metadata.update({
+                    "vision_route": "text_fallback",
+                    "vision_text_fallback": True,
+                    "vision_fallback_error": type(vision_error).__name__,
+                    "fallback_used": True,
+                    "original_provider": "gemini",
+                    "original_model": getattr(settings, "PWANIMATE_VISION_MODEL", "gemini-3.6-flash"),
+                })
+        else:
+            llm_response = self.gateway.generate(llm_request)
+        if is_multimodal_turn:
+            if not vision_text_fallback:
+                llm_response.metadata["vision_route"] = "fallback" if llm_response.provider != "gemini" else "primary"
+            if not vision_text_fallback and llm_response.provider != "gemini":
+                llm_response.metadata["fallback_used"] = True
+                llm_response.metadata.setdefault("original_provider", "gemini")
+                llm_response.metadata.setdefault("original_model", llm_request.model)
         gen_time_ms = round((time.perf_counter() - t_gen) * 1000.0, 2)
         total_time_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
 
@@ -826,6 +1169,8 @@ class PwanimateOrchestrator:
                 "document_id": meta.get("document_id"),
                 "document_share_id": meta.get("document_share_id") or "",
                 "file_type": meta.get("file_type") or file_ext or "",
+                "post_id": meta.get("post_id") or (item.object_id if src_val == "post" else ""),
+                "snippet": item.content[:1200] if src_val == "post" and item.content else "",
             }
 
             if (

@@ -70,7 +70,7 @@
                     <h6 class="fw-semibold mb-1 small text-body">{% trans "Reference Inspection" %}</h6>
                     <p class="small text-muted mb-3" style="max-width: 320px;">{% trans "Click any citation badge in the conversation to inspect documents, posts, or media here without modifying your working context." %}</p>
                     <div class="p-2 rounded bg-light border text-muted small" style="max-width: 340px;">
-                        <i class="bi bi-info-circle me-1"></i>{% trans "References in Preview do not automatically become AI context until you explicitly add them." %}
+                        <i class="bi bi-info-circle me-1"></i>{% trans "The open preview is included with your next question. Add it to Context to keep it attached while you chat." %}
                     </div>
                 </div>
 
@@ -165,6 +165,9 @@
                     <div class="p-2 rounded bg-light border text-muted small" style="max-width: 340px;">
                         <i class="bi bi-check2-circle text-success me-1"></i>{% trans "Attached resources remain pinned across tab switches and citations." %}
                     </div>
+                    <button type="button" class="btn btn-primary rounded-pill mt-3" data-pwanimate-open-context-picker>
+                        <i class="bi bi-plus-lg me-1"></i>{% trans "Add context item" %}
+                    </button>
                 </div>
 
                 <!-- Active Context State (1+ attached items) -->
@@ -175,6 +178,9 @@
                         <div class="pwanimate-context-chips-list d-flex gap-2 overflow-x-auto pb-1" id="desktopContextChipsList" role="tablist">
                             <!-- Populated dynamically by PwanimateChat -->
                         </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill mt-2" data-pwanimate-open-context-picker>
+                            <i class="bi bi-plus-lg me-1"></i>{% trans "Add a book" %}
+                        </button>
                     </div>
 
                     <!-- Active Surface Card for Selected Context Resource -->

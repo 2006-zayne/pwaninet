@@ -21,8 +21,8 @@ class NotificationSummaryTool(BaseDomainTool):
     """
     name = "notification_summary"
     description = (
-        "Retrieve recent notifications and unread counts strictly for the "
-        "currently authenticated user."
+        "Retrieve the authenticated user's total and unread notification counts, "
+        "plus recent notifications. Only access the currently authenticated user's inbox."
     )
     parameters_schema = {
         "type": "object",
@@ -58,6 +58,7 @@ class NotificationSummaryTool(BaseDomainTool):
 
         # 1. Total unread count for the user
         unread_count = get_unread_count(user)
+        total_count = get_notifications_for_user(user).count()
 
         # 2. Query notifications for this user
         is_read_filter = False if unread_only else None
@@ -83,10 +84,12 @@ class NotificationSummaryTool(BaseDomainTool):
         return ToolResult.ok(
             {
                 "unread_count": unread_count,
+                "total_count": total_count,
                 "count": len(notifications),
                 "unread_only": unread_only,
                 "notifications": notifications,
             },
             unread_count=unread_count,
+            total_count=total_count,
             count=len(notifications),
         )

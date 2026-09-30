@@ -72,7 +72,9 @@ class UnifiedRetrievalService:
                     elif mode == RetrievalMode.LEXICAL:
                         source_results = self.search_adapter.search_documents_lexical(request)
                     elif mode == RetrievalMode.HYBRID:
-                        # Hybrid: semantic first, supplement with lexical if needed
+                        # Always consult both indexes. Chunk-level semantic hits
+                        # can otherwise fill the limit with a couple of documents
+                        # and prevent unchunked documents from reaching lexical search.
                         sem_results = []
                         try:
                             sem_results = self.document_service.retrieve(request)
@@ -83,24 +85,76 @@ class UnifiedRetrievalService:
                                 exc_info=True,
                             )
 
-                        seen_titles = {r.title.lower() for r in sem_results}
-                        source_results.extend(sem_results)
+                        try:
+                            lex_results = self.search_adapter.search_documents_lexical(request)
+                        except Exception as lex_exc:
+                            logger.warning(
+                                "Lexical document retrieval failed in hybrid mode: %s",
+                                lex_exc,
+                                exc_info=True,
+                            )
+                            lex_results = []
 
-                        if len(source_results) < request.limit:
-                            try:
-                                lex_results = self.search_adapter.search_documents_lexical(request)
-                                for lr in lex_results:
-                                    if lr.title.lower() not in seen_titles:
-                                        seen_titles.add(lr.title.lower())
-                                        source_results.append(lr)
-                                        if len(source_results) >= request.limit:
-                                            break
-                            except Exception as lex_exc:
-                                logger.warning(
-                                    "Lexical document retrieval failed in hybrid mode: %s",
-                                    lex_exc,
-                                    exc_info=True,
-                                )
+                        limit = max(1, int(request.limit or 10))
+                        semantic_budget = max(1, (limit + 1) // 2)
+                        seen_document_ids = set()
+                        seen_titles = set()
+                        seen_chunk_ids = set()
+                        semantic_chunks_per_document = {}
+                        for result in sem_results:
+                            metadata = result.metadata if isinstance(result.metadata, dict) else {}
+                            document_id = str(metadata.get("document_id") or "")
+                            title_key = (result.title or "").strip().casefold()
+                            document_key = document_id or title_key
+                            if not document_key:
+                                continue
+                            count = semantic_chunks_per_document.get(document_key, 0)
+                            if count >= 3:
+                                continue
+                            semantic_chunks_per_document[document_key] = count + 1
+                            seen_chunk_ids.add(str(result.object_id))
+                            seen_document_ids.add(document_key)
+                            if title_key:
+                                seen_titles.add(title_key)
+                            source_results.append(result)
+                            if len(source_results) >= semantic_budget:
+                                break
+
+                        # Add distinct lexical documents even if semantic chunks
+                        # filled the former limit, including documents not chunked yet.
+                        for result in lex_results:
+                            metadata = result.metadata if isinstance(result.metadata, dict) else {}
+                            document_key = str(metadata.get("document_id") or result.object_id or "")
+                            title_key = (result.title or "").strip().casefold()
+                            if (document_key and document_key in seen_document_ids) or (
+                                title_key and title_key in seen_titles
+                            ):
+                                continue
+                            if document_key:
+                                seen_document_ids.add(document_key)
+                            if title_key:
+                                seen_titles.add(title_key)
+                            source_results.append(result)
+                            if len(source_results) >= limit:
+                                break
+
+                        # If lexical search added few distinct documents, use the
+                        # remaining semantic hits to fill unused slots, still
+                        # limiting repeated chunks from any one document.
+                        if len(source_results) < limit:
+                            for result in sem_results:
+                                if str(result.object_id) in seen_chunk_ids:
+                                    continue
+                                metadata = result.metadata if isinstance(result.metadata, dict) else {}
+                                document_key = str(metadata.get("document_id") or result.title or "").casefold()
+                                count = semantic_chunks_per_document.get(document_key, 0)
+                                if not document_key or count >= 3:
+                                    continue
+                                semantic_chunks_per_document[document_key] = count + 1
+                                seen_chunk_ids.add(str(result.object_id))
+                                source_results.append(result)
+                                if len(source_results) >= limit:
+                                    break
                 elif source == SourceType.POST:
                     source_results = self.search_adapter.search_posts(request)
                 elif source == SourceType.USER:

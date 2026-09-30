@@ -310,6 +310,10 @@
         initPushSheet(force);
     };
 
+    window.dismissPushPromptSheet = function() {
+        hideSheet(true);
+    };
+
     // Initialize on DOM ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() { initPushSheet(false); });

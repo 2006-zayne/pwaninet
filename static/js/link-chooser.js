@@ -271,9 +271,14 @@
             card.style.transform = 'translateY(100%)';
             setTimeout(() => {
                 sheet.remove();
+                if (window.dismissPwaninetLinkChooser === closeChooser) {
+                    delete window.dismissPwaninetLinkChooser;
+                }
             }, 350);
             sessionStorage.setItem('pwaninet_link_chooser_dismissed', 'true');
         }
+
+        window.dismissPwaninetLinkChooser = closeChooser;
 
         backdrop.addEventListener('click', closeChooser);
         document.getElementById('chooser-dismiss-btn').addEventListener('click', closeChooser);

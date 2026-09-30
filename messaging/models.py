@@ -425,6 +425,13 @@ class LinkPreview(models.Model):
     
     # Domain extraction for fallback UI
     domain = models.CharField(max_length=255, blank=True, null=True)
+    media_type = models.CharField(max_length=50, blank=True, default='link')
+    remote_image_url = models.URLField(
+        max_length=2048,
+        blank=True,
+        null=True,
+        help_text="Fallback remote image URL"
+    )
     
     # Cache management
     cached_at = models.DateTimeField(auto_now=True)
@@ -446,9 +453,19 @@ class LinkPreview(models.Model):
     def __str__(self):
         return f"LinkPreview for {self.url[:50]}..."
     
+    @property
+    def thumbnail_url(self):
+        """Return cached image URL if available, else remote_image_url."""
+        if self.image:
+            try:
+                return self.image.url
+            except Exception:
+                pass
+        return self.remote_image_url or ''
+
     def has_thumbnail(self):
-        """Check if preview has a cached thumbnail image."""
-        return bool(self.image)
+        """Check if preview has a cached thumbnail image or remote image."""
+        return bool(self.image) or bool(self.remote_image_url)
     
     def has_favicon(self):
         """Check if preview has a cached favicon."""

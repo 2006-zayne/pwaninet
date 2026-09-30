@@ -111,7 +111,21 @@
                     {% endif %}
                 </div>
 
-                <div class="d-flex align-items-center justify-content-end mt-2 pt-1 border-top" style="border-color: var(--pwanimate-border) !important;">
+                <div class="d-flex align-items-center justify-content-end gap-2 mt-2 pt-1 border-top" style="border-color: var(--pwanimate-border) !important;">
+                    <button type="button"
+                            class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 pwanimate-person-preview-btn"
+                            data-username="{{ person.username|escape }}"
+                            data-display-name="{{ person.display_name|default:person.username|escape }}"
+                            data-profile-url="{{ person.profile_url|escape }}"
+                            data-profile-card-url="{{ person.profile_card_url|default:''|escape }}"
+                            data-avatar-url="{{ person.avatar_url|default:''|escape }}"
+                            data-headline="{{ person.headline|default:''|escape }}"
+                            data-academic-level="{{ person.academic_level|default:''|escape }}"
+                            data-programme-name="{{ person.programme_name|default:''|escape }}"
+                            data-bio="{{ person.bio|default:''|escape }}"
+                            style="font-size: 0.78rem;">
+                        <i class="bi bi-layout-sidebar-inset me-1"></i>{% trans "Preview here" %}
+                    </button>
                     <a href="{{ person.profile_url }}"
                        class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 pwanimate-view-profile-btn"
                        hx-get="{{ person.profile_url }}"

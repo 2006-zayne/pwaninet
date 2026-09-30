@@ -166,7 +166,13 @@ class OpenRouterLLMProvider(BaseLLMProvider):
             messages.append({"role": msg.role, "content": msg.content})
 
         # Inject context into messages if present
-        if request.context and (request.context.items or getattr(request.context, "user_context", None)):
+        if request.context and (
+            request.context.items or
+            request.context.explicit_resources or
+            request.context.retrieved_context or
+            getattr(request.context, "user_context", None) or
+            getattr(request.context, "student_context", None)
+        ):
             context_text = request.context.format_context_text()
             if context_text:
                 if messages and messages[-1]["role"] == "user":

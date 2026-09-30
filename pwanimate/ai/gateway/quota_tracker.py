@@ -81,6 +81,19 @@ class QuotaTracker:
         with self._lock:
             self._rate_limit_hits.clear()
 
+    def clear_candidate(self, provider_name: str, model_name: Optional[str] = None) -> None:
+        """
+        Clear cooldown for a specific provider/model candidate.
+        Used when a candidate fails with a transient error (e.g. connection
+        failure) so it can be retried immediately on the next request.
+        """
+        keys_to_clear = [self._make_key(provider_name, model_name)]
+        if model_name:
+            keys_to_clear.append(provider_name.strip().lower())
+        with self._lock:
+            for key in keys_to_clear:
+                self._rate_limit_hits.pop(key, None)
+
     def get_cooldown_remaining(
         self, provider_name: str, model_name: Optional[str] = None
     ) -> float:

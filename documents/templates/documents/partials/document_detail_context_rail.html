@@ -21,6 +21,15 @@
 
             <!-- Actions -->
             <div class="d-flex flex-column gap-2 mb-3">
+                {% if request.user.is_authenticated %}
+                    <a href="{% url 'pwanimate:index' %}?context_document={{ document.share_id }}&amp;page=1"
+                       class="btn btn-outline-primary btn-sm rounded-pill fw-semibold py-2 d-flex align-items-center justify-content-center gap-2"
+                       data-bypass-htmx="true" hx-boost="false"
+                       onclick="return openDocumentInPwanimate(event, this)">
+                        <i class="bi bi-chat-square-heart"></i>
+                        <span>{% trans "Open in Pwanimate context" %}</span>
+                    </a>
+                {% endif %}
                 {% if document.latest_version %}
                     {% with first_file=document.latest_version.files.first %}
                         <a href="{% url 'documents:serve_download' document.share_id %}?t={{ download_token }}"

@@ -251,6 +251,18 @@ def create_post_for_user(form, user, files, group_id=None):
     logger.info(f"Final post state - images: {post.images.count()}, video: {post.video.name if post.video else 'None'}, docs: {post.docs.name if post.docs else 'None'}, audio: {post.audio.name if post.audio else 'None'}, gradient_class: {post.gradient_class}, group: {post.group}")
     logger.info(f"get_intel_file returns: {post.get_intel_file.url if post.get_intel_file else 'None'}")
     
+    # Generate link preview if content contains URLs
+    if post.content:
+        try:
+            from posts.tasks import generate_post_link_preview_task
+            generate_post_link_preview_task.delay(post.id)
+        except Exception:
+            try:
+                from messaging.services.link_preview_service import LinkPreviewService
+                LinkPreviewService.generate_preview_for_post(post)
+            except Exception as lp_err:
+                logger.warning(f"Error generating link preview for post {post.id}: {lp_err}")
+
     # Invalidate feeds (outside transaction)
     invalidate_home_feed_context(user.id)
 

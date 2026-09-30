@@ -2,6 +2,7 @@
 {% load static %}
 
 <div class="pwanimate-workspace" id="pwanimate-workspace" data-conversation-id="{{ active_conversation_id }}">
+    {{ initial_context_resources|json_script:"pwanimate-initial-context-resources" }}
     <!-- Mobile Hamburger Menu Offcanvas (Aligned to d-xl-none to match desktop rail collapse <1200px) -->
     <div class="offcanvas offcanvas-end pwanimate-offcanvas d-xl-none" tabindex="-1" id="pwanimateMobileMenu" aria-labelledby="pwanimateMobileMenuLabel">
         <div class="offcanvas-header border-bottom">
@@ -82,9 +83,10 @@
 
     <!-- Resource Preview Bottom Sheet (Mobile): Structured Card Layout with Tabs -->
     <div class="offcanvas offcanvas-bottom pwanimate-offcanvas d-xl-none" tabindex="-1" id="pwanimateResourcePreviewSheet" aria-labelledby="previewSheetTitle" style="height: 85vh; max-height: 90vh; background-color: var(--pwanimate-bg); color: var(--pwanimate-asst-text);">
+        <div class="pwanimate-bottom-sheet-handle" data-bottom-sheet-handle aria-hidden="true"></div>
         <!-- 1. Header: Tabs (Left) | Close Button (Right) -->
-        <div class="offcanvas-header border-bottom px-3 py-2" style="border-color: var(--pwanimate-border) !important;">
-            <ul class="nav nav-pills pwanimate-workspace-tabs" id="mobileWorkspaceTabs" role="tablist">
+        <div class="offcanvas-header border-bottom px-3 py-2 d-flex align-items-center" style="border-color: var(--pwanimate-border) !important;">
+            <ul class="nav nav-pills pwanimate-workspace-tabs flex-grow-1" id="mobileWorkspaceTabs" role="tablist">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active d-flex align-items-center justify-content-center gap-1 py-1 px-3"
                             id="mobileTabPreviewBtn"
@@ -201,6 +203,9 @@
                             <h6 class="fw-semibold mb-0 small text-body">{% trans "Working Context" %}</h6>
                         </div>
                         <p class="small text-muted mb-3">{% trans "No working materials attached yet. Inspect citations in the Preview tab and click '+ Add to Context' to keep key references attached while you chat." %}</p>
+                        <button type="button" class="btn btn-primary btn-sm rounded-pill" data-pwanimate-open-context-picker>
+                            <i class="bi bi-plus-lg me-1"></i>{% trans "Add context item" %}
+                        </button>
                     </div>
 
                     <!-- Active Context State -->
@@ -208,6 +213,9 @@
                         <!-- Chips list -->
                         <div class="px-3 pt-2 pb-1 border-bottom flex-shrink-0" style="background-color: var(--pwanimate-bg); border-color: var(--pwanimate-border) !important;">
                             <div class="pwanimate-context-chips-list d-flex gap-2 overflow-x-auto pb-1" id="mobileContextChipsList" role="tablist"></div>
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill mt-2" data-pwanimate-open-context-picker>
+                                <i class="bi bi-plus-lg me-1"></i>{% trans "Add a book" %}
+                            </button>
                         </div>
 
                         <!-- Subheader: Type Badge, Location Badge, Remove from Context -->
@@ -305,11 +313,11 @@
                                         <div class="pwanimate-user-attachments mb-2 d-flex flex-wrap gap-2">
                                             {% for att in msg.attachments.all %}
                                                 {% if att.attachment_type == 'image' %}
-                                                    <a href="{{ att.url }}" target="_blank" rel="noopener noreferrer" class="pwanimate-attachment-thumb-link" title="{{ att.file_name }}">
+                                                    <a href="{{ att.url }}" class="pwanimate-message-attachment pwanimate-attachment-thumb-link" data-attachment-id="{{ att.id }}" data-file-name="{{ att.file_name }}" data-file-type="{{ att.extension }}" data-media-url="{{ att.url }}" data-preview-type="image" title="Preview {{ att.file_name }}">
                                                         <img src="{{ att.url }}" alt="{{ att.file_name }}" class="pwanimate-attachment-thumb rounded" loading="lazy">
                                                     </a>
                                                 {% else %}
-                                                    <a href="{{ att.download_url }}" class="pwanimate-attachment-doc-chip badge text-decoration-none d-inline-flex align-items-center gap-1 p-2" title="{{ att.file_name }}">
+                                                    <a href="{{ att.url }}" class="pwanimate-message-attachment pwanimate-attachment-doc-chip badge text-decoration-none d-inline-flex align-items-center gap-1 p-2" data-attachment-id="{{ att.id }}" data-file-name="{{ att.file_name }}" data-file-type="{{ att.extension }}" data-media-url="{{ att.url }}" data-preview-type="document" title="Preview {{ att.file_name }}">
                                                         <i class="bi bi-file-earmark-text fs-6"></i>
                                                         <span class="text-truncate" style="max-width: 140px;">{{ att.file_name }}</span>
                                                     </a>
@@ -340,17 +348,7 @@
                                     <div class="pwanimate-markdown-body" data-raw="{{ msg.content|escape }}">{{ msg.content }}</div>
 
                                     {% if msg.people %}
-                                        <div class="pwanimate-people-section mt-3">
-                                            <div class="pwanimate-people-header d-flex align-items-center gap-2 mb-2 text-muted small fw-semibold">
-                                                <i class="bi bi-people-fill text-primary"></i>
-                                                <span>{% trans "Discovered Students & Peers" %}</span>
-                                            </div>
-                                            <div class="pwanimate-people-grid row g-2">
-                                                {% for person in msg.people %}
-                                                    {% include 'pwanimate/partials/person_card.html' with person=person %}
-                                                {% endfor %}
-                                            </div>
-                                        </div>
+                                        {% include 'pwanimate/partials/people_section.html' with people=msg.people %}
                                     {% endif %}
 
                                     {% if msg.sources %}
@@ -363,7 +361,7 @@
                                                 {% for src in msg.sources %}
                                                     {% if not msg.people or src.source != 'user' %}
                                                         {% if src.url %}
-                                                            <a href="{{ src.url }}" class="pwanimate-citation-badge" target="_blank" rel="noopener"
+                                                            <button type="button" data-url="{{ src.url|escape }}" class="pwanimate-citation-badge"
                                                                data-title="{% if src.title %}{{ src.title|escape }}{% elif src.citation %}{{ src.citation|escape }}{% else %}{% trans 'Document' %}{% endif %}"
                                                                data-source-type="{{ src.source|default:'' }}"
                                                                data-resource-type="{{ src.resource_type|default:'' }}"
@@ -371,14 +369,17 @@
                                                                data-thumbnail-url="{{ src.thumbnail_url|default:'' }}"
                                                                data-hls-url="{{ src.hls_url|default:'' }}"
                                                                data-author="{{ src.author|default:'' }}"
+                                                               data-snippet="{{ src.snippet|default:''|escape }}"
+                                                               data-post-id="{{ src.post_id|default:'' }}"
                                                                data-citation="{{ src.citation|default:'' }}"
                                                                data-page-number="{{ src.page_number|default:'' }}"
                                                                data-document-id="{{ src.document_id|default:'' }}"
                                                                data-document-share-id="{{ src.document_share_id|default:'' }}"
-                                                               data-file-type="{{ src.file_type|default:src.file_extension|default:'' }}">
+                                                               data-file-type="{{ src.file_type|default:src.file_extension|default:'' }}"
+                                                               aria-label="View {% if src.title %}{{ src.title|escape }}{% elif src.citation %}{{ src.citation|escape }}{% else %}{% trans 'Document' %}{% endif %}">
                                                                 <i class="bi bi-link-45deg"></i>
                                                                 <span>{% if src.title %}{{ src.title }}{% elif src.citation %}{{ src.citation }}{% else %}{% trans "Document" %}{% endif %}</span>
-                                                            </a>
+                                                            </button>
                                                         {% else %}
                                                             <span class="pwanimate-citation-badge">
                                                                 <i class="bi bi-quote"></i>
@@ -417,26 +418,18 @@
                 {% endfor %}
             {% else %}
                 <!-- Empty State Hero -->
-                <div class="pwanimate-empty-state" id="pwanimate-empty-state">
+                <div class="pwanimate-empty-state"
+                     id="pwanimate-empty-state"
+                     data-nickname="{{ preferences.nickname|default:'' }}"
+                     data-username="{{ student_username|default:'' }}"
+                     data-display-name="{{ user_display|default:'' }}"
+                     data-interests="{{ student_interests|default:'' }}"
+                     data-tone="{{ preferences.tone|default:'neutral' }}">
                     <img src="{% static 'images/pwanimate/pwanimate.png' %}" class="pwanimate-hero-icon" alt="Pwanimate AI" width="88" height="88">
                     <h2 class="pwanimate-empty-title">Pwanimate</h2>
-                    <div class="pwanimate-empty-tagline">{% trans "Your AI assistant for PwaniNet" %}</div>
-                    <p class="pwanimate-empty-desc">
-                        {% trans "Ask questions about course outlines, lecture notes, exam papers, academic units, student groups, announcements, or anything available in PwaniNet." %}
-                    </p>
-                    <div class="pwanimate-suggestion-grid">
-                        <button type="button" class="pwanimate-suggestion-chip" data-prompt="{% trans 'What past exam papers are available in the repository?' %}">
-                            <i class="bi bi-file-earmark-text text-primary me-1"></i> {% trans "Find past exam papers" %}
-                        </button>
-                        <button type="button" class="pwanimate-suggestion-chip" data-prompt="{% trans 'Show me lecture notes for Operating Systems' %}">
-                            <i class="bi bi-journal-code text-success me-1"></i> {% trans "Operating Systems lecture notes" %}
-                        </button>
-                        <button type="button" class="pwanimate-suggestion-chip" data-prompt="{% trans 'What academic units belong to Computer Science Year 2?' %}">
-                            <i class="bi bi-mortarboard text-warning me-1"></i> {% trans "CS Year 2 course units" %}
-                        </button>
-                        <button type="button" class="pwanimate-suggestion-chip" data-prompt="{% trans 'Summarize recent announcements in student groups' %}">
-                            <i class="bi bi-megaphone text-info me-1"></i> {% trans "Recent group announcements" %}
-                        </button>
+                    <p class="pwanimate-empty-greeting" id="pwanimate-empty-greeting" aria-live="polite"></p>
+                    <p class="pwanimate-empty-question" id="pwanimate-empty-question"></p>
+                    <div class="pwanimate-suggestion-grid" id="pwanimate-empty-suggestions" aria-label="Try asking Pwanimate">
                     </div>
                 </div>
             {% endif %}
@@ -595,6 +588,31 @@
         </div>
     </div>
 
+    <!-- Add document to working context -->
+    <div class="modal fade" id="pwanimateContextDocumentModal" tabindex="-1" aria-labelledby="pwanimateContextDocumentModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content pwanimate-context-picker-modal">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title fw-bold" id="pwanimateContextDocumentModalLabel">{% trans "Add a book to context" %}</h5>
+                        <p class="text-muted small mb-0">{% trans "Search the document repository and choose a book to open in your context rail." %}</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="visually-hidden" for="pwanimateContextDocumentSearch">{% trans "Search repository books" %}</label>
+                    <div class="input-group mb-3">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="search" class="form-control" id="pwanimateContextDocumentSearch" placeholder="{% trans 'Search books by title or topic…' %}" autocomplete="off">
+                    </div>
+                    <div id="pwanimateContextDocumentResults" class="pwanimate-context-picker-results" aria-live="polite">
+                        <div class="text-center text-muted small py-4">{% trans "Type at least two characters to search the repository." %}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- AI Models & Quota Status Modal -->
     <div class="modal fade" id="pwanimateQuotaModal" tabindex="-1" aria-labelledby="pwanimateQuotaModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
@@ -657,7 +675,7 @@
             scriptsToLoad.push("{% static 'documents/js/document-viewer.js' %}");
         }
         if (typeof window.initPwanimate !== 'function') {
-            scriptsToLoad.push("{% static 'js/pwanimate/pwanimate-chat.js' %}");
+            scriptsToLoad.push("{% static 'js/pwanimate/pwanimate-chat.js' %}?v={{ pwanimate_version|default:'2.0.0' }}-20260929-5");
         }
 
         function loadNext() {
@@ -725,5 +743,3 @@
         }
     });
 </script>
-
-

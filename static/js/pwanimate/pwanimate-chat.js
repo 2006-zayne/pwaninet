@@ -29,16 +29,18 @@
 
     function isPwanimateCitationLink(element) {
         if (!element) return false;
-        const anchor = (element.tagName === 'A') ? element : (typeof element.closest === 'function' ? element.closest('a') : null);
-        if (!anchor) return false;
-        if (anchor.classList && anchor.classList.contains('pwanimate-citation-badge')) return true;
-        if (typeof anchor.closest === 'function') {
-            if (anchor.closest('.pwanimate-citations') || anchor.closest('.pwanimate-citation-list')) return true;
+        const citationControl = (element.matches && element.matches('a, button'))
+            ? element
+            : (typeof element.closest === 'function' ? element.closest('a, button') : null);
+        if (!citationControl) return false;
+        if (citationControl.classList && citationControl.classList.contains('pwanimate-citation-badge')) return true;
+        if (typeof citationControl.closest === 'function') {
+            if (citationControl.closest('.pwanimate-citations') || citationControl.closest('.pwanimate-citation-list')) return true;
         }
-        if (typeof anchor.hasAttribute === 'function') {
-            if (anchor.hasAttribute('data-pwanimate-resource') || anchor.hasAttribute('data-citation')) return true;
+        if (typeof citationControl.hasAttribute === 'function') {
+            if (citationControl.hasAttribute('data-pwanimate-resource') || citationControl.hasAttribute('data-citation')) return true;
         }
-        const ds = anchor.dataset || {};
+        const ds = citationControl.dataset || {};
         if (ds.resourceType || ds.sourceType || ds.documentShareId || ds.documentId || ds.postId) return true;
         return false;
     }
@@ -74,6 +76,7 @@
         constructor(workspace) {
             this.workspace = workspace;
             this.conversationId = workspace.dataset.conversationId || null;
+            this.pendingConversationId = this.conversationId;
             this.transcript = workspace.querySelector('#pwanimate-transcript');
             this.composerForm = workspace.querySelector('#pwanimate-composer-form');
             this.input = workspace.querySelector('#pwanimate-input');
@@ -89,6 +92,10 @@
             this.lastPreviewTriggerEl = null;
             this._onDocumentClick = null;
             this._onKeyDown = null;
+            this._mobileMenuSwipeStart = null;
+            this._onMobileMenuTouchStart = null;
+            this._onMobileMenuTouchEnd = null;
+            this._onMobileMenuTouchCancel = null;
 
             // Phase 1 Workspace Geometry & State Contract
             this.leftRailCollapsed = localStorage.getItem('pwanimate_left_rail_collapsed') === 'true';
@@ -128,11 +135,15 @@
 
         init() {
             this.initWorkspaceGeometry();
+            this.initInitialContextResources();
             this.initMarkdown();
             this.renderExistingMarkdown();
+            this.initEmptyStateWelcome();
             this.checkCollapsibleUserBubbles();
             requestAnimationFrame(() => this.checkCollapsibleUserBubbles());
             this.bindEvents();
+            this.initMobileMenuSwipeNavigation();
+            this.initContextDocumentPicker();
             this.initAttachmentHandlers();
             this.updateQuotaStatus({ models: this.getDefaultModels() });
             this.updateSelectedModelUI();
@@ -144,6 +155,278 @@
             this.fetchQuotaStatus();
             this.updateTimestamps(); // apply relative time to any server-rendered timestamps
             this.startTimestampTicker();
+        }
+
+        initInitialContextResources() {
+            const jsonEl = document.getElementById('pwanimate-initial-context-resources');
+            let initialResources = [];
+            if (jsonEl) {
+                try {
+                    initialResources = JSON.parse(jsonEl.textContent || '[]');
+                } catch (error) {
+                    console.warn('[Pwanimate] Could not read initial context resources.', error);
+                }
+            }
+
+            this.contextResources = (Array.isArray(initialResources) ? initialResources : []).map(resource =>
+                this.normalizeResource(resource.mediaUrl || resource.url, resource.title, resource)
+            );
+            this.addImageAttachmentsToContext(this.transcript, false);
+            if (!this.contextResources.length) return;
+
+            this.activeContextIndex = 0;
+            this.updateContextCountBadges();
+
+            // Reveal the desktop rail before creating its viewer so the viewer
+            // measures its final width on the first render. switchWorkspaceTab()
+            // calls syncContextView(), so avoid an eager sync here: rendering it
+            // twice immediately destroys the first viewer while it is loading.
+            if (window.innerWidth >= 1200) {
+                this.openContextRail();
+            }
+            this.switchWorkspaceTab('context');
+
+            if (window.innerWidth < 1200) {
+                const sheetEl = document.getElementById('pwanimateResourcePreviewSheet');
+                if (sheetEl && window.bootstrap) {
+                    let offcanvas = bootstrap.Offcanvas.getInstance(sheetEl);
+                    if (!offcanvas) offcanvas = new bootstrap.Offcanvas(sheetEl);
+                    offcanvas.show();
+                }
+            }
+        }
+
+        addImageAttachmentsToContext(root, openRail = true) {
+            if (!root || !root.querySelectorAll) return false;
+            let added = false;
+            root.querySelectorAll('.pwanimate-message-attachment[data-preview-type="image"]').forEach((link) => {
+                const url = link.dataset.mediaUrl || link.getAttribute('href') || '';
+                if (!url) return;
+                const attachmentId = link.dataset.attachmentId || '';
+                const exists = this.contextResources.some(item =>
+                    (attachmentId && item.attachmentId === attachmentId) ||
+                    item.mediaUrl === url || item.url === url
+                );
+                if (exists) return;
+                const name = link.dataset.fileName || 'Image attachment';
+                const resource = this.normalizeResource(url, name, {
+                    sourceType: 'attachment',
+                    resourceType: 'image',
+                    fileType: link.dataset.fileType || '',
+                    mediaUrl: url,
+                    attachmentId: attachmentId,
+                });
+                resource.icon = 'bi-image-fill';
+                this.contextResources.push(resource);
+                added = true;
+            });
+
+            if (added) {
+                this.activeContextIndex = this.contextResources.length - 1;
+                this.updateContextCountBadges();
+                this.updateAddToContextButtons();
+                this.syncContextView();
+                this.switchWorkspaceTab('context');
+                if (openRail) {
+                    if (window.innerWidth >= 1200) this.openContextRail();
+                    else this.openMobileWorkspaceSheet('context');
+                }
+            }
+            return added;
+        }
+
+        initContextDocumentPicker() {
+            this.contextDocumentModalEl = document.getElementById('pwanimateContextDocumentModal');
+            this.contextDocumentSearchInput = document.getElementById('pwanimateContextDocumentSearch');
+            this.contextDocumentResultsEl = document.getElementById('pwanimateContextDocumentResults');
+            this.contextDocumentSearchResults = [];
+            this.contextDocumentSearchTimer = null;
+            this.contextDocumentSearchController = null;
+
+            if (!this.contextDocumentSearchInput || !this.contextDocumentResultsEl) return;
+            this.contextDocumentSearchInput.addEventListener('input', () => {
+                clearTimeout(this.contextDocumentSearchTimer);
+                const query = this.contextDocumentSearchInput.value.trim();
+                if (this.contextDocumentSearchController) this.contextDocumentSearchController.abort();
+                if (query.length < 2) {
+                    this.contextDocumentSearchResults = [];
+                    this.contextDocumentResultsEl.innerHTML = '<div class="text-center text-muted small py-4">Type at least two characters to search the repository.</div>';
+                    return;
+                }
+                this.contextDocumentResultsEl.innerHTML = '<div class="text-center text-muted small py-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Searching books…</div>';
+                this.contextDocumentSearchTimer = setTimeout(() => this.searchContextDocuments(query), 250);
+            });
+
+            this.contextDocumentResultsEl.addEventListener('click', (event) => {
+                const card = event.target.closest('[data-context-document-index]');
+                if (!card) return;
+                const index = Number.parseInt(card.dataset.contextDocumentIndex, 10);
+                const result = this.contextDocumentSearchResults[index];
+                if (!result) return;
+
+                const resource = this.normalizeResource(result.media_url, result.title, {
+                    sourceType: 'document',
+                    resourceType: 'document',
+                    documentId: result.document_id,
+                    documentShareId: result.document_share_id,
+                    documentVersionId: result.document_version_id,
+                    fileId: result.file_id,
+                    fileType: result.file_type,
+                    mediaUrl: result.media_url,
+                    thumbnailUrl: result.thumbnail_url,
+                    citation: result.category,
+                });
+                const modal = window.bootstrap && this.contextDocumentModalEl
+                    ? window.bootstrap.Modal.getInstance(this.contextDocumentModalEl)
+                    : null;
+                if (modal) modal.hide();
+                this.addResourceToContext(resource);
+            });
+        }
+
+        async searchContextDocuments(query) {
+            if (!this.contextDocumentResultsEl) return;
+            const controller = new AbortController();
+            this.contextDocumentSearchController = controller;
+            try {
+                const response = await fetch(`/api/pwanimate/context/documents/?q=${encodeURIComponent(query)}`, {
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal,
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Could not search the document repository.');
+                if (this.contextDocumentSearchInput.value.trim() !== query) return;
+                this.contextDocumentSearchResults = Array.isArray(data.results) ? data.results : [];
+                if (!this.contextDocumentSearchResults.length) {
+                    this.contextDocumentResultsEl.innerHTML = '<div class="text-center text-muted small py-4">No books found. Try another title or topic.</div>';
+                    return;
+                }
+                this.contextDocumentResultsEl.innerHTML = this.contextDocumentSearchResults.map((book, index) => {
+                    const title = escapeHtml(book.title || 'Untitled book');
+                    const category = escapeHtml(book.category || 'Document');
+                    const fileType = escapeHtml((book.file_type || 'file').toUpperCase());
+                    const thumbnail = book.thumbnail_url
+                        ? `<img src="${escapeHtml(book.thumbnail_url)}" alt="" class="pwanimate-context-book-thumbnail">`
+                        : '<span class="pwanimate-context-book-icon"><i class="bi bi-journal-bookmark-fill"></i></span>';
+                    return `<button type="button" class="pwanimate-context-book-result" data-context-document-index="${index}">
+                        ${thumbnail}
+                        <span class="pwanimate-context-book-copy"><strong>${title}</strong><small>${category} · ${fileType}</small></span>
+                        <i class="bi bi-arrow-up-right pwanimate-context-book-open"></i>
+                    </button>`;
+                }).join('');
+            } catch (error) {
+                if (error.name === 'AbortError') return;
+                this.contextDocumentResultsEl.innerHTML = '<div class="text-center text-danger small py-4">Could not search the repository. Try again in a moment.</div>';
+            }
+        }
+
+        openContextDocumentPicker() {
+            if (!this.contextDocumentModalEl || !window.bootstrap) return;
+            const modal = window.bootstrap.Modal.getOrCreateInstance(this.contextDocumentModalEl);
+            modal.show();
+            if (this.contextDocumentSearchInput) {
+                this.contextDocumentSearchInput.value = '';
+                this.contextDocumentSearchInput.dispatchEvent(new Event('input'));
+                window.setTimeout(() => this.contextDocumentSearchInput.focus(), 150);
+            }
+        }
+
+        initEmptyStateWelcome() {
+            const emptyState = this.transcript && this.transcript.querySelector('#pwanimate-empty-state');
+            if (!emptyState) return;
+
+            const greetingEl = emptyState.querySelector('#pwanimate-empty-greeting');
+            const questionEl = emptyState.querySelector('#pwanimate-empty-question');
+            const suggestionsEl = emptyState.querySelector('#pwanimate-empty-suggestions');
+            if (!greetingEl || !questionEl || !suggestionsEl) return;
+
+            const name = (emptyState.dataset.nickname || emptyState.dataset.username || emptyState.dataset.displayName || '').trim();
+            const tone = (emptyState.dataset.tone || 'neutral').toLowerCase();
+            const interests = (emptyState.dataset.interests || '').split(',').map(value => value.trim()).filter(Boolean);
+            const friendly = tone === 'friendly';
+            const formal = tone === 'professional' || tone === 'academic';
+
+            let welcomeLines;
+            if (formal) {
+                welcomeLines = [
+                    { greeting: `Hello${name ? `, ${name}` : ''}.`, question: 'What would you like to work on today?' },
+                    { greeting: `Good to see you${name ? `, ${name}` : ''}.`, question: 'Where should we start?' },
+                    { greeting: `I'm ready when you are${name ? `, ${name}` : ''}.`, question: 'How can I support your studies today?' }
+                ];
+            } else if (friendly) {
+                welcomeLines = [
+                    { greeting: `Hey${name ? ` ${name}` : ''} 👋 How've you been today?`, question: 'What are we getting into today?' },
+                    { greeting: `What's up${name ? `, ${name}` : ''}? I'm here for you.`, question: 'What are we tackling first?' },
+                    { greeting: `Good to see you${name ? `, ${name}` : ''}!`, question: 'What are we in the mood to work on?' },
+                    { greeting: `Hey${name ? ` ${name}` : ''},`, question: 'What’s on your mind today?' }
+                ];
+            } else {
+                welcomeLines = [
+                    { greeting: `Hi${name ? `, ${name}` : ''}.`, question: 'What are we up to today?' },
+                    { greeting: `What's on your mind${name ? `, ${name}` : ''}?`, question: 'Want to talk something through or get some studying done?' },
+                    { greeting: `I'm here for you${name ? `, ${name}` : ''}.`, question: 'Where should we start?' },
+                    { greeting: `Hey${name ? ` ${name}` : ''} — how's today going?`, question: 'What should we tackle first?' }
+                ];
+            }
+
+            if (interests.length) {
+                const interest = interests[Math.floor(Math.random() * interests.length)];
+                welcomeLines.push({
+                    greeting: `Good to see you${name ? `, ${name}` : ''}.`,
+                    question: `Want to use ${interest} for an example today, or start somewhere else?`
+                });
+            }
+
+            const storageKey = `pwanimate_empty_welcome_${emptyState.dataset.username || 'student'}`;
+            let previousIndex = -1;
+            try {
+                previousIndex = Number.parseInt(sessionStorage.getItem(storageKey), 10);
+            } catch (_) {
+                // Use the random selection when session storage is unavailable.
+            }
+            let welcomeIndex = Math.floor(Math.random() * welcomeLines.length);
+            if (welcomeLines.length > 1 && welcomeIndex === previousIndex) {
+                welcomeIndex = (welcomeIndex + 1 + Math.floor(Math.random() * (welcomeLines.length - 1))) % welcomeLines.length;
+            }
+            try {
+                sessionStorage.setItem(storageKey, String(welcomeIndex));
+            } catch (_) {
+                // Ignore storage restrictions; the selected copy still displays.
+            }
+
+            greetingEl.textContent = welcomeLines[welcomeIndex].greeting;
+            questionEl.textContent = welcomeLines[welcomeIndex].question;
+
+            const suggestions = [
+                { label: 'Explain a tricky topic', prompt: 'Help me understand a topic I find difficult. Ask me which topic first.' },
+                { label: 'Find notes or past papers', prompt: 'Help me find lecture notes or past papers for my programme.' },
+                { label: 'Plan a study session', prompt: 'Help me plan a focused study session for today.' },
+                { label: 'Explain it with an example', prompt: 'Explain a difficult academic idea using a simple, concrete example.' },
+                { label: 'Quiz me', prompt: 'Quiz me on a topic I am studying, one question at a time. First ask me which topic.' },
+                { label: 'Brainstorm an assignment', prompt: 'Help me brainstorm ideas for an assignment. Ask what the assignment is about.' }
+            ];
+            if (interests.length) {
+                const interest = interests[Math.floor(Math.random() * interests.length)];
+                suggestions.push({
+                    label: `Explore ${interest}`,
+                    prompt: `Can you help me explore ${interest}? Suggest a useful way to connect it with something I'm studying, if relevant.`
+                });
+            }
+
+            suggestionsEl.replaceChildren();
+            for (let i = suggestions.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [suggestions[i], suggestions[j]] = [suggestions[j], suggestions[i]];
+            }
+            suggestions.slice(0, 3).forEach(suggestion => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'pwanimate-suggestion-chip';
+                button.dataset.prompt = suggestion.prompt;
+                button.textContent = suggestion.label;
+                suggestionsEl.appendChild(button);
+            });
         }
 
         initMarkdown() {
@@ -548,10 +831,56 @@
                         return;
                     }
 
-                    const badge = e.target.closest('a');
+                    const personPreviewBtn = e.target.closest('.pwanimate-person-preview-btn');
+                    if (personPreviewBtn) {
+                        e.preventDefault();
+                        let person = {};
+                        try { person = JSON.parse(personPreviewBtn.dataset.person || '{}'); } catch (error) {}
+                        if (!person.username) {
+                            person = {
+                                username: personPreviewBtn.dataset.username || '',
+                                display_name: personPreviewBtn.dataset.displayName || '',
+                                profile_url: personPreviewBtn.dataset.profileUrl || '',
+                                profile_card_url: personPreviewBtn.dataset.profileCardUrl || '',
+                                avatar_url: personPreviewBtn.dataset.avatarUrl || '',
+                                headline: personPreviewBtn.dataset.headline || '',
+                                academic_level: personPreviewBtn.dataset.academicLevel || '',
+                                programme_name: personPreviewBtn.dataset.programmeName || '',
+                                bio: personPreviewBtn.dataset.bio || '',
+                            };
+                        }
+                        const profileUrl = personPreviewBtn.dataset.profileUrl || person.profile_url || '';
+                        this.previewResource(profileUrl, person.display_name || person.username || 'Student profile', {
+                            sourceType: 'user',
+                            resourceType: 'profile',
+                            username: person.username || '',
+                            person: person,
+                            profileUrl: profileUrl,
+                            profileCardUrl: person.profile_card_url || person.profileCardUrl || '',
+                            description: person.headline || person.bio || '',
+                        });
+                        return;
+                    }
+
+                    const messageAttachment = e.target.closest('.pwanimate-message-attachment');
+                    if (messageAttachment) {
+                        e.preventDefault();
+                        const name = messageAttachment.dataset.fileName || 'Attachment';
+                        const attachmentUrl = messageAttachment.dataset.mediaUrl || messageAttachment.getAttribute('href') || '';
+                        this.previewResource(attachmentUrl, name, {
+                            sourceType: 'attachment',
+                            resourceType: messageAttachment.dataset.previewType || 'document',
+                            fileType: messageAttachment.dataset.fileType || '',
+                            mediaUrl: attachmentUrl,
+                            attachmentId: messageAttachment.dataset.attachmentId || '',
+                        });
+                        return;
+                    }
+
+                    const badge = e.target.closest('a, button');
                     if (badge && isPwanimateCitationLink(badge)) {
                         e.preventDefault();
-                        const url = badge.getAttribute('href');
+                        const url = badge.getAttribute('href') || badge.dataset.url || '';
                         let title = badge.dataset.title || 'Resource Preview';
                         if (title === 'Resource Preview') {
                             const span = badge.querySelector('span');
@@ -568,6 +897,7 @@
                             thumbnailUrl: badge.dataset.thumbnailUrl || '',
                             hlsUrl: badge.dataset.hlsUrl || '',
                             author: badge.dataset.author || '',
+                            snippet: badge.dataset.snippet || '',
                             citation: badge.dataset.citation || '',
                             pageNumber: badge.dataset.pageNumber || null,
                             documentId: badge.dataset.documentId || '',
@@ -658,6 +988,20 @@
                     if (convId) {
                         this.handleDeleteConversation(convId);
                     }
+                    return;
+                }
+
+                const openContextPicker = e.target.closest('[data-pwanimate-open-context-picker]');
+                if (openContextPicker) {
+                    e.preventDefault();
+                    this.openContextDocumentPicker();
+                    return;
+                }
+
+                const mobileContextSheetBtn = e.target.closest('#pwanimateMobileContextSheetBtn');
+                if (mobileContextSheetBtn) {
+                    e.preventDefault();
+                    this.openMobileWorkspaceSheet('context');
                     return;
                 }
 
@@ -924,7 +1268,7 @@
             // Media URLs
             const mediaUrl = meta.mediaUrl || meta.media_url || '';
             const hlsUrl = meta.hlsUrl || meta.hls_url || '';
-            const thumbnailUrl = meta.thumbnailUrl || meta.thumbnail_url || '';
+            const thumbnailUrl = meta.thumbnailUrl || meta.thumbnail_url || meta.avatar_url || meta.profile_photo_url || '';
 
             // File type derivation & normalization
             let fileType = (meta.fileType || meta.file_type || meta.file_extension || meta.extension || '').toLowerCase().trim();
@@ -936,27 +1280,31 @@
             }
 
             // Classification
-            const isVideo = (meta.resourceType === 'video' || meta.resource_type === 'video' || Boolean(hlsUrl) ||
+            const resourceType = String(meta.resourceType || meta.resource_type || meta.type || meta.previewType || meta.preview_type || '').toLowerCase();
+            const sourceType = String(meta.sourceType || meta.source_type || meta.source || '').toLowerCase();
+            const isProfile = resourceType === 'profile' || resourceType === 'user' ||
+                sourceType === 'user' || sourceType === 'profile';
+            const isPost = meta.sourceType === 'post' || meta.source_type === 'post' ||
+                meta.resourceType === 'post' || meta.resource_type === 'post' ||
+                cleanUrl.includes('/post/') || cleanUrl.includes('/posts/');
+            const isVideo = !isPost && (meta.resourceType === 'video' || meta.resource_type === 'video' || Boolean(hlsUrl) ||
                 /\.(mp4|webm|ogg|m3u8)(\?|#|$)/i.test(mediaUrl || cleanUrl));
 
-            const isImage = !isVideo && (meta.resourceType === 'image' || meta.resource_type === 'image' ||
+            const isImage = !isPost && !isProfile && !isVideo && (meta.resourceType === 'image' || meta.resource_type === 'image' ||
                 /\.(jpg|jpeg|png|gif|webp|svg)(\?|#|$)/i.test(mediaUrl || cleanUrl) ||
                 ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(fileType));
 
-            const isDoc = !isVideo && !isImage && (meta.resourceType === 'document' || meta.resource_type === 'document' ||
+            const isDoc = !isVideo && !isImage && !isPost && !isProfile && (meta.resourceType === 'document' || meta.resource_type === 'document' ||
                 meta.sourceType === 'document' || meta.source_type === 'document' ||
                 Boolean(documentShareId) || cleanUrl.includes('/documents/') ||
                 ['pdf', 'docx', 'doc', 'pptx', 'ppt', 'txt', 'md', 'csv', 'log'].includes(fileType));
 
-            const isPost = !isVideo && !isImage && !isDoc && (meta.sourceType === 'post' || meta.source_type === 'post' ||
-                meta.resourceType === 'post' || meta.resource_type === 'post' ||
-                cleanUrl.includes('/post/') || cleanUrl.includes('/posts/'));
-
             let previewType = 'document';
-            if (isVideo) previewType = 'video';
+            if (isProfile) previewType = 'profile';
+            else if (isPost) previewType = 'post';
+            else if (isVideo) previewType = 'video';
             else if (isImage) previewType = 'image';
             else if (isDoc) previewType = 'document';
-            else if (isPost) previewType = 'post';
 
             // Deterministic Page Number Resolution Order:
             // 1. Explicit structured metadata (highest priority)
@@ -1016,6 +1364,13 @@
                 primaryText = 'View Post';
                 primaryIcon = 'bi-chat-square-text';
                 docIcon = 'bi-chat-quote-fill text-success';
+            } else if (previewType === 'profile') {
+                category = 'Student Profile';
+                icon = 'bi-person-vcard-fill';
+                badgeClass = 'bg-primary-subtle text-primary';
+                primaryText = 'Open Profile';
+                primaryIcon = 'bi-person-lines-fill';
+                docIcon = 'bi-person-circle text-primary';
             }
 
             let subtitle = category;
@@ -1032,12 +1387,14 @@
                 : (mediaUrl || cleanUrl);
 
             const cleanTitle = title || meta.title || (previewType === 'document' ? 'Document' : (previewType === 'post' ? 'Post' : 'Resource'));
+            const person = meta.person || meta.profile || (isProfile ? meta : {});
             const description = meta.description || meta.content || meta.snippet || meta.citation ||
                 (previewType === 'document' ? 'Official course or academic document from PwaniNet repository.' :
-                (previewType === 'post' ? 'Discussion post on PwaniNet.' : 'Resource referenced in this conversation.'));
+                (previewType === 'post' ? 'Discussion post on PwaniNet.' :
+                (previewType === 'profile' ? [person.headline, person.academic_level, person.programme_name, person.bio].filter(Boolean).join('\n') : 'Resource referenced in this conversation.')));
 
             return {
-                id: documentShareId || postId || cleanUrl,
+                id: documentShareId || postId || person.id || person.username || cleanUrl,
                 type: previewType,
                 category: category,
                 title: cleanTitle,
@@ -1058,6 +1415,10 @@
                 author: meta.author || '',
                 citation: meta.citation || '',
                 postId: postId,
+                username: meta.username || person.username || '',
+                person: person,
+                profileUrl: meta.profileUrl || meta.profile_url || person.profile_url || cleanUrl,
+                profileCardUrl: meta.profileCardUrl || meta.profile_card_url || person.profile_card_url || '',
                 icon: icon,
                 badgeClass: badgeClass,
                 primaryText: primaryText,
@@ -1209,6 +1570,22 @@
             this.updateContextCountBadges();
             this.updateAddToContextButtons();
             this.syncContextView();
+            this.switchWorkspaceTab('context');
+        }
+
+        getContextResourcesForRequest() {
+            const resources = [...this.contextResources];
+            const preview = this.previewResourceState;
+            if (!preview) return resources;
+
+            const alreadyIncluded = resources.some(item =>
+                (preview.documentId && item.documentId === preview.documentId) ||
+                (preview.documentShareId && item.documentShareId === preview.documentShareId) ||
+                (preview.mediaUrl && item.mediaUrl === preview.mediaUrl) ||
+                (preview.url && item.url === preview.url)
+            );
+            if (!alreadyIncluded) resources.push(preview);
+            return resources;
         }
 
         removeResourceFromContext(index) {
@@ -1223,6 +1600,8 @@
 
             if (this.contextResources.length === 0) {
                 this.activeContextIndex = -1;
+            } else if (index < this.activeContextIndex) {
+                this.activeContextIndex -= 1;
             } else if (this.activeContextIndex >= this.contextResources.length) {
                 this.activeContextIndex = this.contextResources.length - 1;
             }
@@ -1244,8 +1623,13 @@
             const countStr = this.contextResources.length.toString();
             const deskBadge = document.getElementById('desktopContextCountBadge');
             const mobBadge = document.getElementById('mobileContextCountBadge');
+            const mobileComposerBadge = document.getElementById('pwanimateMobileContextSheetCount');
             if (deskBadge) deskBadge.textContent = countStr;
             if (mobBadge) mobBadge.textContent = countStr;
+            if (mobileComposerBadge) {
+                mobileComposerBadge.textContent = countStr;
+                mobileComposerBadge.classList.toggle('d-none', this.contextResources.length === 0);
+            }
         }
 
         updateAddToContextButtons() {
@@ -1347,6 +1731,8 @@
             }
             if (!container || !details) return;
 
+            container.classList.toggle('pwanimate-profile-mode', details.previewType === 'profile');
+
             // 1. Header category badge
             const categoryBadge = container.querySelector(`#${prefix}CategoryBadge`);
             const categoryIcon = container.querySelector(`#${prefix}CategoryIcon`);
@@ -1420,7 +1806,7 @@
                 window.DocumentViewer &&
                 docViewer &&
                 details.mediaUrl &&
-                ['pdf', 'docx', 'pptx', 'txt', 'text', 'csv', 'log'].includes(fileType)
+                ['pdf', 'docx', 'doc', 'pptx', 'ppt', 'md', 'txt', 'text', 'csv', 'log'].includes(fileType)
             );
 
             if (details.previewType === 'video' && video) {
@@ -1561,6 +1947,34 @@
                 origLink.href = details.url;
                 origLink.setAttribute('target', '_blank');
                 origLink.setAttribute('rel', 'noopener');
+            }
+
+            if (details.previewType === 'profile') {
+                this.loadProfilePreviewCard(container, prefix, details);
+            }
+        }
+
+        async loadProfilePreviewCard(container, prefix, details) {
+            const docContainer = container.querySelector(`#${prefix}DocContainer`);
+            if (!docContainer) return;
+            const profileUrl = details.profileUrl || details.url;
+            if (!profileUrl) return;
+            const cardUrl = details.profileCardUrl || `${profileUrl.replace(/\/$/, '')}/pwanimate-card/`;
+            docContainer.dataset.profileCardUrl = cardUrl;
+            docContainer.classList.remove('text-center', 'align-items-center', 'justify-content-center');
+            docContainer.classList.add('align-items-stretch', 'justify-content-start', 'p-2');
+            docContainer.innerHTML = '<div class="spinner-border spinner-border-sm text-primary m-auto" role="status" aria-label="Loading profile"></div>';
+            try {
+                const response = await fetch(cardUrl, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!response.ok) throw new Error(`Profile card request failed (${response.status})`);
+                const html = await response.text();
+                if (!html.includes('pwanimate-mini-profile')) throw new Error('The profile endpoint did not return the profile card fragment.');
+                if (docContainer.dataset.profileCardUrl !== cardUrl) return;
+                docContainer.innerHTML = html;
+            } catch (error) {
+                if (docContainer.dataset.profileCardUrl !== cardUrl) return;
+                docContainer.innerHTML = '<div class="small text-muted text-center m-auto">This profile preview is unavailable.</div>';
+                console.warn('[Pwanimate] Profile card preview could not be loaded:', error);
             }
         }
 
@@ -1749,7 +2163,20 @@
             }
         }
 
+        openMobileWorkspaceSheet(tabName = 'context') {
+            this.switchWorkspaceTab(tabName);
+            const sheetEl = document.getElementById('pwanimateResourcePreviewSheet');
+            if (!sheetEl || !window.bootstrap) return;
+            let offcanvas = window.bootstrap.Offcanvas.getInstance(sheetEl);
+            if (!offcanvas) offcanvas = new window.bootstrap.Offcanvas(sheetEl);
+            offcanvas.show();
+        }
+
         openContextRail() {
+            if (window.innerWidth < 1200) {
+                this.openMobileWorkspaceSheet('context');
+                return;
+            }
             this.contextRailOpen = true;
             try {
                 localStorage.setItem('pwanimateContextRailOpen', 'true');
@@ -2018,6 +2445,13 @@
             // Check if any attachment is still uploading
             const hasUploadingAttachments = this._composerAttachmentsEl && 
                 this._composerAttachmentsEl.querySelector('.pwanimate-staged-chip.is-uploading');
+            const pendingDocument = (this.stagedAttachments || []).some(attachment =>
+                attachment.attachment_type === 'document' &&
+                ['pending', 'processing'].includes(attachment.processing_status)
+            );
+            const failedDocument = (this.stagedAttachments || []).some(attachment =>
+                attachment.attachment_type === 'document' && attachment.processing_status === 'failed'
+            );
 
             if (hasText || hasAttachments) {
                 // Disable send button if any attachment is still uploading
@@ -2026,6 +2460,16 @@
                     this.sendBtn.classList.remove('is-active');
                     this.sendBtn.setAttribute('aria-label', 'Wait for attachments to finish uploading');
                     this.sendBtn.setAttribute('title', 'Wait for attachments to finish uploading');
+                } else if (pendingDocument) {
+                    this.sendBtn.disabled = true;
+                    this.sendBtn.classList.remove('is-active');
+                    this.sendBtn.setAttribute('aria-label', 'Wait for document processing to finish');
+                    this.sendBtn.setAttribute('title', 'Pwanimate is reading the attached document');
+                } else if (failedDocument) {
+                    this.sendBtn.disabled = true;
+                    this.sendBtn.classList.remove('is-active');
+                    this.sendBtn.setAttribute('aria-label', 'Remove the document that could not be processed');
+                    this.sendBtn.setAttribute('title', 'This document could not be processed. Remove it to continue.');
                 } else {
                     this.sendBtn.disabled = false;
                     this.sendBtn.classList.add('is-active');
@@ -2201,12 +2645,22 @@
                     }
                     return;
                 }
-
                 // Success
-                this.stagedAttachments.push({ id: data.id, file_name: data.file_name, attachment_type: data.attachment_type, url: data.url });
+                const stagedAttachment = {
+                    id: data.id,
+                    file_name: data.file_name,
+                    attachment_type: data.attachment_type,
+                    processing_status: data.processing_status || 'not_required',
+                    url: data.url
+                };
+                this.stagedAttachments.push(stagedAttachment);
                 if (chip) {
                     chip.classList.remove('is-uploading');
                     chip.dataset.attachmentId = data.id;
+                    if (data.attachment_type === 'document' && stagedAttachment.processing_status !== 'ready') {
+                        chip.classList.add('is-processing');
+                        this._setAttachmentStatusLabel(chip, 'Reading pages…');
+                    }
                     
                     const mediaContainer = chip.querySelector('.pwanimate-staged-media');
                     const spinner = chip.querySelector('.pwanimate-staged-spinner');
@@ -2242,6 +2696,10 @@
                     chip.appendChild(removeBtn);
                 }
 
+                if (data.attachment_type === 'document' && stagedAttachment.processing_status !== 'ready') {
+                    this._watchAttachmentProcessing(stagedAttachment, chipId);
+                }
+
                 this.updateSendButtonState();
 
             } catch (err) {
@@ -2254,6 +2712,56 @@
                     const spinner = chip.querySelector('.pwanimate-staged-spinner');
                     if (spinner && mediaContainer) spinner.remove();
                     setTimeout(() => { if (chip && chip.parentNode) chip.parentNode.removeChild(chip); }, 3000);
+                }
+            }
+        }
+
+        _setAttachmentStatusLabel(chip, label, isError = false) {
+            if (!chip) return;
+            let statusEl = chip.querySelector('.pwanimate-staged-status');
+            if (!statusEl) {
+                statusEl = document.createElement('span');
+                statusEl.className = 'pwanimate-staged-status';
+                chip.appendChild(statusEl);
+            }
+            statusEl.textContent = label;
+            statusEl.classList.toggle('is-error', isError);
+        }
+
+        async _watchAttachmentProcessing(attachment, chipId) {
+            for (let attempt = 0; attempt < 180; attempt += 1) {
+                if (!this.stagedAttachments.some(item => item.id === attachment.id)) return;
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                try {
+                    const response = await fetch(`/api/pwanimate/attachments/${encodeURIComponent(attachment.id)}/status/`, {
+                        credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (!response.ok) continue;
+                    const data = await response.json();
+                    attachment.processing_status = data.processing_status;
+                    const chip = document.getElementById(chipId);
+                    if (data.processing_status === 'ready') {
+                        if (chip) {
+                            chip.classList.remove('is-processing');
+                            chip.title = data.processing_error || '';
+                            this._setAttachmentStatusLabel(chip, data.processing_error ? 'Ready · partial' : 'Ready');
+                        }
+                        this.updateSendButtonState();
+                        return;
+                    }
+                    if (data.processing_status === 'failed') {
+                        if (chip) {
+                            chip.classList.remove('is-processing');
+                            chip.title = data.processing_error || 'Pwanimate could not read this document.';
+                            this._setAttachmentStatusLabel(chip, 'Could not read', true);
+                        }
+                        attachment.processing_error = data.processing_error || '';
+                        this.updateSendButtonState();
+                        return;
+                    }
+                } catch (error) {
+                    // Keep polling through brief network interruptions.
                 }
             }
         }
@@ -2288,23 +2796,30 @@
             this.scrollToBottom();
         }
 
-        async handleSend() {
+        async handleSend(retryOptions = null) {
             if (this.isGenerating) return;
-            const text = this.input ? this.input.value.trim() : '';
-            const hasStagedAttachments = this.stagedAttachments && this.stagedAttachments.length > 0;
+            const isRetry = Boolean(retryOptions);
+            const text = isRetry ? retryOptions.text : (this.input ? this.input.value.trim() : '');
+            const hasStagedAttachments = isRetry
+                ? (retryOptions.attachments || []).length > 0
+                : (this.stagedAttachments && this.stagedAttachments.length > 0);
             if (!text && !hasStagedAttachments) return;
 
             // Setup AbortController for modern cancellation support
             this.abortController = new AbortController();
 
             // Clear input & reset height
-            this.input.value = '';
-            this.resetTextareaHeight();
-            this.updateSendButtonState();
+            if (!isRetry) {
+                this.input.value = '';
+                this.resetTextareaHeight();
+                this.updateSendButtonState();
+            }
 
             // Snapshot staged attachments and clear the strip before sending
-            const snapshotAttachments = (this.stagedAttachments || []).slice();
-            this._clearStagedAttachments();
+            const snapshotAttachments = isRetry
+                ? (retryOptions.attachments || []).slice()
+                : (this.stagedAttachments || []).slice();
+            if (!isRetry) this._clearStagedAttachments();
 
             // Remove empty state if present
             const emptyState = this.transcript.querySelector('#pwanimate-empty-state');
@@ -2313,19 +2828,45 @@
             }
 
             // Render optimistic user message (with attachment chips)
-            const userRow = this.appendUserMessage(text, null, snapshotAttachments);
+            const userRow = isRetry
+                ? retryOptions.userRow
+                : this.appendUserMessage(text, null, snapshotAttachments);
+            this.addImageAttachmentsToContext(userRow);
             this.showTypingIndicator(text);
             this.setGenerating(true);
             this.scrollToBottom();
 
             const csrfToken = getCsrfToken();
+            if (!this.conversationId && !this.pendingConversationId) {
+                this.pendingConversationId = window.crypto && window.crypto.randomUUID
+                    ? window.crypto.randomUUID()
+                    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                        const r = Math.random() * 16 | 0;
+                        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                    });
+            }
 
             try {
+                const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 const payload = {
-                    message: text || ' '
+                    message: text || ' ',
+                    local_time: new Date().toISOString(),
+                    timezone: (!browserTimezone || browserTimezone === 'UTC' || browserTimezone === 'Etc/UTC')
+                        ? 'Africa/Nairobi'
+                        : browserTimezone
                 };
-                if (this.conversationId) {
-                    payload.conversation_id = this.conversationId;
+                if (isRetry) {
+                    payload.retry = true;
+                    if (retryOptions.userMessageId) {
+                        payload.retry_user_message_id = retryOptions.userMessageId;
+                    }
+                }
+                const targetConversationId = this.conversationId || this.pendingConversationId;
+                if (targetConversationId) {
+                    payload.conversation_id = targetConversationId;
+                }
+                if (!this.conversationId) {
+                    payload.create_conversation = true;
                 }
                 if (this.selectedProvider) {
                     payload.provider = this.selectedProvider;
@@ -2336,8 +2877,9 @@
                 if (snapshotAttachments.length > 0) {
                     payload.attachments = snapshotAttachments.map(a => a.id);
                 }
-                if (this.contextResources && this.contextResources.length > 0) {
-                    payload.context_resources = this.contextResources;
+                const contextResources = this.getContextResourcesForRequest();
+                if (contextResources.length > 0) {
+                    payload.context_resources = contextResources;
                 }
 
                 const response = await fetch('/api/pwanimate/chat/', {
@@ -2357,6 +2899,7 @@
                 // Handle conversation ID update even if there's an error, to prevent spawning new conversations
                 if (data.conversation_id && !this.conversationId) {
                     this.conversationId = data.conversation_id;
+                    this.pendingConversationId = data.conversation_id;
                     this.workspace.dataset.conversationId = data.conversation_id;
 
                     // Update URL without full page reload
@@ -2374,7 +2917,10 @@
                         errMsg = 'Your session has expired. Please refresh the page to sign in again.';
                     }
                     this.removeTypingIndicator();
-                    this.showErrorBubble(errMsg, text);
+                    if (userRow && data.user_message_id) {
+                        userRow.dataset.messageId = data.user_message_id;
+                    }
+                    this.showErrorBubble(errMsg, text, userRow, snapshotAttachments);
                     this.refreshConversationsList();
                     if (data.quota_status) {
                         this.updateQuotaStatus(data.quota_status);
@@ -2403,7 +2949,7 @@
                     fallback_used: data.fallback_info ? data.fallback_info.fallback_used : false
                 });
 
-                this.appendAssistantMessage(data.answer, data.sources, data.citations, data.fallback_info, data.quota_info, data.people, data.message_id);
+                this.appendAssistantMessage(data.answer, data.sources, data.citations, data.fallback_info, data.quota_info, data.people, data.message_id, data.people_html);
                 this.scrollToBottom();
                 this.refreshConversationsList();
                 this.updateQuotaStatus(data.quota_status);
@@ -2417,7 +2963,12 @@
                 } else {
                     console.error('[Pwanimate] Chat network error:', err);
                     this.removeTypingIndicator();
-                    this.showErrorBubble('Network connection error. Please check your internet connection.', text);
+                    this.showErrorBubble(
+                        'Network connection error. Please check your internet connection.',
+                        text,
+                        userRow,
+                        snapshotAttachments
+                    );
                 }
             } finally {
                 this.abortController = null;
@@ -2440,14 +2991,18 @@
             let attachmentHtml = '';
             if (attachments && attachments.length > 0) {
                 const chips = attachments.map(att => {
-                    if (att.attachment_type === 'image' && att.url) {
-                        return `<a href="${escapeHtml(att.url)}" target="_blank" rel="noopener noreferrer" class="pwanimate-attachment-thumb-link" title="${escapeHtml(att.file_name || '')}">
-                            <img src="${escapeHtml(att.url)}" alt="${escapeHtml(att.file_name || '')}" class="pwanimate-attachment-thumb rounded" loading="lazy">
+                    const attachmentUrl = att.url || `/api/pwanimate/attachments/${encodeURIComponent(att.id)}/view/`;
+                    const fileName = att.file_name || 'File';
+                    const fileType = (fileName.split('.').pop() || '').toLowerCase();
+                    const commonAttrs = `href="${escapeHtml(attachmentUrl)}" data-attachment-id="${escapeHtml(att.id || '')}" data-file-name="${escapeHtml(fileName)}" data-file-type="${escapeHtml(fileType)}" data-media-url="${escapeHtml(attachmentUrl)}"`;
+                    if (att.attachment_type === 'image' && attachmentUrl) {
+                        return `<a ${commonAttrs} class="pwanimate-message-attachment pwanimate-attachment-thumb-link" data-preview-type="image" title="Preview ${escapeHtml(fileName)}">
+                            <img src="${escapeHtml(attachmentUrl)}" alt="${escapeHtml(fileName)}" class="pwanimate-attachment-thumb rounded" loading="lazy">
                         </a>`;
                     }
-                    return `<a href="/api/pwanimate/attachments/${escapeHtml(att.id)}/download/" class="pwanimate-attachment-doc-chip badge text-decoration-none d-inline-flex align-items-center gap-1 p-2" title="${escapeHtml(att.file_name || '')}">
+                    return `<a ${commonAttrs} data-preview-type="document" class="pwanimate-message-attachment pwanimate-attachment-doc-chip badge text-decoration-none d-inline-flex align-items-center gap-1 p-2" title="Preview ${escapeHtml(fileName)}">
                         <i class="bi bi-file-earmark-text fs-6"></i>
-                        <span class="text-truncate" style="max-width: 140px;">${escapeHtml(att.file_name || 'File')}</span>
+                        <span class="text-truncate" style="max-width: 140px;">${escapeHtml(fileName)}</span>
                     </a>`;
                 }).join('');
                 attachmentHtml = `<div class="pwanimate-user-attachments mb-2 d-flex flex-wrap gap-2">${chips}</div>`;
@@ -2603,6 +3158,62 @@
             }, 60000);
         }
 
+        initMobileMenuSwipeNavigation() {
+            const menu = document.getElementById('pwanimateMobileMenu');
+            if (!menu) return;
+
+            this._onMobileMenuTouchStart = (event) => {
+                if (!event.touches || event.touches.length !== 1) {
+                    this._mobileMenuSwipeStart = null;
+                    return;
+                }
+
+                const touch = event.touches[0];
+                const isOpen = menu.classList.contains('show');
+                if (isOpen) {
+                    if (!menu.contains(event.target)) {
+                        this._mobileMenuSwipeStart = null;
+                        return;
+                    }
+                    this._mobileMenuSwipeStart = { x: touch.clientX, y: touch.clientY, action: 'close' };
+                } else if (touch.clientX >= window.innerWidth - 32) {
+                    this._mobileMenuSwipeStart = { x: touch.clientX, y: touch.clientY, action: 'open' };
+                } else {
+                    this._mobileMenuSwipeStart = null;
+                }
+            };
+
+            this._onMobileMenuTouchEnd = (event) => {
+                const start = this._mobileMenuSwipeStart;
+                this._mobileMenuSwipeStart = null;
+                if (!start || !event.changedTouches || event.changedTouches.length !== 1) return;
+
+                const touch = event.changedTouches[0];
+                const deltaX = touch.clientX - start.x;
+                const deltaY = touch.clientY - start.y;
+                if (Math.abs(deltaX) < 72 || Math.abs(deltaX) < Math.abs(deltaY) * 1.3) return;
+
+                const shouldOpen = start.action === 'open' && deltaX < 0;
+                const shouldClose = start.action === 'close' && deltaX > 0;
+                if (!shouldOpen && !shouldClose) return;
+
+                const offcanvas = window.bootstrap && window.bootstrap.Offcanvas
+                    ? window.bootstrap.Offcanvas.getOrCreateInstance(menu)
+                    : null;
+                if (!offcanvas) return;
+                if (shouldOpen) offcanvas.show();
+                else offcanvas.hide();
+            };
+
+            this._onMobileMenuTouchCancel = () => {
+                this._mobileMenuSwipeStart = null;
+            };
+
+            document.addEventListener('touchstart', this._onMobileMenuTouchStart, { passive: true });
+            document.addEventListener('touchend', this._onMobileMenuTouchEnd, { passive: true });
+            document.addEventListener('touchcancel', this._onMobileMenuTouchCancel, { passive: true });
+        }
+
         destroy() {
             if (this.isGenerating && this.abortController) {
                 try { this.abortController.abort(); } catch (e) {}
@@ -2623,6 +3234,18 @@
             if (this._onKeyDown) {
                 document.removeEventListener('keydown', this._onKeyDown);
                 this._onKeyDown = null;
+            }
+            if (this._onMobileMenuTouchStart) {
+                document.removeEventListener('touchstart', this._onMobileMenuTouchStart);
+                this._onMobileMenuTouchStart = null;
+            }
+            if (this._onMobileMenuTouchEnd) {
+                document.removeEventListener('touchend', this._onMobileMenuTouchEnd);
+                this._onMobileMenuTouchEnd = null;
+            }
+            if (this._onMobileMenuTouchCancel) {
+                document.removeEventListener('touchcancel', this._onMobileMenuTouchCancel);
+                this._onMobileMenuTouchCancel = null;
             }
             if (this._onWindowResize) {
                 window.removeEventListener('resize', this._onWindowResize);
@@ -2647,7 +3270,7 @@
         }
 
 
-        appendAssistantMessage(answer, sources, citations, fallbackInfo, quotaInfo, people = [], messageId = null) {
+        appendAssistantMessage(answer, sources, citations, fallbackInfo, quotaInfo, people = [], messageId = null, peopleHtmlFromServer = '') {
             const row = document.createElement('div');
             row.className = 'pwanimate-message-row assistant';
             if (messageId) {
@@ -2658,7 +3281,9 @@
 
             let peopleHtml = '';
             if (Array.isArray(people) && people.length > 0) {
-                peopleHtml = this.renderPeopleCards(people);
+                peopleHtml = typeof peopleHtmlFromServer === 'string' && peopleHtmlFromServer
+                    ? peopleHtmlFromServer
+                    : this.renderPeopleCards(people);
             }
 
             let citationsHtml = '';
@@ -2671,7 +3296,8 @@
                 const badges = filteredSources.map((src) => {
                     const title = escapeHtml(src.title || src.citation || 'Document');
                     if (src.url) {
-                        return `<a href="${escapeHtml(src.url)}" class="pwanimate-citation-badge" target="_blank" rel="noopener"
+                        return `<button type="button" class="pwanimate-citation-badge"
+                            data-url="${escapeHtml(src.url)}"
                             data-title="${title}"
                             data-source-type="${escapeHtml(src.source || '')}"
                             data-resource-type="${escapeHtml(src.resource_type || '')}"
@@ -2679,14 +3305,17 @@
                             data-thumbnail-url="${escapeHtml(src.thumbnail_url || '')}"
                             data-hls-url="${escapeHtml(src.hls_url || '')}"
                             data-author="${escapeHtml(src.author || '')}"
+                            data-snippet="${escapeHtml(src.snippet || '')}"
+                            data-post-id="${escapeHtml(src.post_id || '')}"
                             data-citation="${escapeHtml(src.citation || '')}"
                             data-page-number="${escapeHtml(src.page_number || '')}"
                             data-document-id="${escapeHtml(src.document_id || '')}"
                             data-document-share-id="${escapeHtml(src.document_share_id || '')}"
-                            data-file-type="${escapeHtml(src.file_type || src.file_extension || '')}">
+                            data-file-type="${escapeHtml(src.file_type || src.file_extension || '')}"
+                            aria-label="View ${title}">
                             <i class="bi bi-link-45deg"></i>
                             <span>${title}</span>
-                        </a>`;
+                        </button>`;
                     }
                     return `<span class="pwanimate-citation-badge">
                         <i class="bi bi-file-earmark-text"></i>
@@ -2723,7 +3352,15 @@
             }
 
             let fallbackHtml = '';
-            if (quotaInfo && quotaInfo.switched) {
+            if (fallbackInfo && fallbackInfo.vision_text_fallback) {
+                const used = escapeHtml(fallbackInfo.provider_used || 'an available text model');
+                fallbackHtml = `
+                    <div class="pwanimate-fallback-notice">
+                        <i class="bi bi-eye-slash"></i>
+                        <span>Image vision models couldn’t process this request. I continued with your text using <strong>${used}</strong>; the image wasn’t analyzed.</span>
+                    </div>
+                `;
+            } else if (quotaInfo && quotaInfo.switched) {
                 const orig = escapeHtml(quotaInfo.primary_model || quotaInfo.primary_provider || 'primary model');
                 const active = escapeHtml(quotaInfo.active_model || quotaInfo.active_provider || 'alternate model');
                 fallbackHtml = `
@@ -2735,10 +3372,13 @@
             } else if (fallbackInfo && fallbackInfo.fallback_used) {
                 const orig = escapeHtml(fallbackInfo.original_provider || '');
                 const used = escapeHtml(fallbackInfo.provider_used || '');
+                const fallbackText = fallbackInfo.vision_fallback
+                    ? `Gemini vision was unavailable. Answered by <strong>${used}</strong>.`
+                    : `Answered by <strong>${used}</strong> (${orig} quota exceeded).`;
                 fallbackHtml = `
                     <div class="pwanimate-fallback-notice">
                         <i class="bi bi-arrow-repeat"></i>
-                        <span>Answered by <strong>${used}</strong> (${orig} quota exceeded)</span>
+                        <span>${fallbackText}</span>
                     </div>
                 `;
             }
@@ -2783,6 +3423,7 @@
                 const username = escapeHtml(p.username || 'user');
                 const displayName = escapeHtml(p.display_name || p.username || 'User');
                 const profileUrl = escapeHtml(p.profile_url || `/users/user/${username}/`);
+                const personData = escapeHtml(JSON.stringify(p));
                 const initial = escapeHtml((p.display_name || p.username || 'U').charAt(0).toUpperCase());
 
                 let avatarHtml = '';
@@ -2865,7 +3506,10 @@
                                     <div class="d-flex flex-wrap gap-1 pwanimate-person-badges mb-2">
                                         ${badgesHtml}
                                     </div>
-                                    <div class="d-flex align-items-center justify-content-end mt-2 pt-1 border-top" style="border-color: var(--pwanimate-border) !important;">
+                                    <div class="d-flex align-items-center justify-content-end gap-2 mt-2 pt-1 border-top" style="border-color: var(--pwanimate-border) !important;">
+                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 pwanimate-person-preview-btn" data-profile-url="${profileUrl}" data-person="${personData}" style="font-size: 0.78rem;">
+                                            <i class="bi bi-layout-sidebar-inset me-1"></i>Preview here
+                                        </button>
                                         <a href="${profileUrl}" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 pwanimate-view-profile-btn" hx-get="${profileUrl}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true" style="font-size: 0.78rem;">
                                             <i class="bi bi-person me-1"></i>View Profile
                                         </a>
@@ -2890,7 +3534,7 @@
             `;
         }
 
-        showErrorBubble(message, originalText) {
+        showErrorBubble(message, originalText, userRow = null, attachments = []) {
             const row = document.createElement('div');
             row.className = 'pwanimate-message-row assistant';
             row.innerHTML = `
@@ -2911,10 +3555,12 @@
             if (retryBtn) {
                 retryBtn.addEventListener('click', () => {
                     row.remove();
-                    if (this.input) {
-                        this.input.value = originalText;
-                        this.handleSend();
-                    }
+                    this.handleSend({
+                        text: originalText,
+                        userRow,
+                        userMessageId: userRow && userRow.dataset.messageId,
+                        attachments
+                    });
                 });
             }
 

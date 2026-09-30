@@ -4,6 +4,7 @@ from pwanimate.orchestrator.exceptions import OrchestratorError, OrchestratorVal
 from pwanimate.orchestrator.prompts import (
     SYSTEM_INSTRUCTION_CONVERSATIONAL,
     SYSTEM_INSTRUCTION_TUTOR,
+    get_system_instruction,
 )
 from pwanimate.orchestrator.service import PwanimateOrchestrator, sanitize_llm_response
 from pwanimate.orchestrator.types import OrchestrationRequest, OrchestrationResponse
@@ -17,4 +18,5 @@ __all__ = [
     "sanitize_llm_response",
     "SYSTEM_INSTRUCTION_CONVERSATIONAL",
     "SYSTEM_INSTRUCTION_TUTOR",
+    "get_system_instruction",
 ]

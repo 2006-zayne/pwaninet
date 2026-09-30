@@ -23,12 +23,25 @@ from django.views.generic import TemplateView, RedirectView
 from django.http import HttpResponse, HttpResponseRedirect, FileResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
+from django.http import FileResponse
+import os
 from notifications import views as notification_views
 from users.views import (
     toggle_profile_photo_like, PwaniLoginView, login_2fa_challenge_view,
     app_invite_landing, platform_invite_landing, encrypted_invite_landing,
     get_invite_share_data
 )
+
+# Favicon at root (browsers auto-request /favicon.ico)
+@require_http_methods(["GET", "HEAD"])
+@csrf_exempt
+def serve_favicon(request):
+    favicon_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'favicon.ico')
+    try:
+        return FileResponse(open(favicon_path, 'rb'), content_type='image/x-icon')
+    except FileNotFoundError:
+        return HttpResponse('Favicon not found', status=404)
+
 
 # PWA Manifest - served as static file to bypass auth middleware
 @require_http_methods(["GET", "HEAD"])
@@ -257,6 +270,8 @@ def qr_code_svg(request):
     return response
 
 urlpatterns = [
+    # Favicon at root (browsers auto-request /favicon.ico)
+    path('favicon.ico', serve_favicon, name='favicon'),
     path('admin/', admin.site.urls),
     # Custom login with diagnostics and structured logging
     path('accounts/login/', PwaniLoginView.as_view(), name='login'),

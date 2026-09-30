@@ -11,6 +11,8 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
+from pwanimate.context.types import IntentCategory, StudentContext
+
 logger = logging.getLogger(__name__)
 
 
@@ -444,3 +446,27 @@ class UserContextService:
         except Exception as exc:
             logger.warning("Error fetching following user IDs for user %s: %s", user_id, exc)
             return []
+
+    def build_selective_student_context(
+        self,
+        user_context: UserContext,
+        intent: IntentCategory,
+        query: str
+    ) -> StudentContext:
+        """
+        Build selective student context from full UserContext based on intent.
+        
+        This is a convenience method that can be used by the ContextEngine
+        or other components that need selective profile inclusion.
+        
+        Args:
+            user_context: Full UserContext from build() method.
+            intent: Classified intent category.
+            query: User query text for relevance analysis.
+            
+        Returns:
+            StudentContext with only relevant fields.
+        """
+        from pwanimate.context.engine import ContextEngine
+        engine = ContextEngine()
+        return engine.build_student_context(user_context, intent, query)

@@ -6,10 +6,12 @@ from django.urls import path
 from pwanimate.api.views import (
     PwanimateAttachmentDownloadView,
     PwanimateAttachmentMediaView,
+    PwanimateAttachmentStatusView,
     PwanimateAttachmentUploadView,
     PwanimateChatView,
     PwanimateConversationDetailView,
     PwanimateConversationListView,
+    PwanimateContextDocumentSearchView,
     PwanimateQuotaStatusView,
 )
 
@@ -20,7 +22,9 @@ urlpatterns = [
     path("conversations/", PwanimateConversationListView.as_view(), name="conversation_list"),
     path("conversations/<uuid:conversation_id>/", PwanimateConversationDetailView.as_view(), name="conversation_detail"),
     path("quota-status/", PwanimateQuotaStatusView.as_view(), name="quota_status"),
+    path("context/documents/", PwanimateContextDocumentSearchView.as_view(), name="context_document_search"),
     path("attachments/upload/", PwanimateAttachmentUploadView.as_view(), name="attachment_upload"),
+    path("attachments/<uuid:attachment_id>/status/", PwanimateAttachmentStatusView.as_view(), name="attachment_status"),
     path("attachments/<uuid:attachment_id>/view/", PwanimateAttachmentMediaView.as_view(), name="attachment_view"),
     path("attachments/<uuid:attachment_id>/download/", PwanimateAttachmentDownloadView.as_view(), name="attachment_download"),
 ]
