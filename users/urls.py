@@ -58,6 +58,7 @@ urlpatterns = [
     path('pinch/<str:username>/', views.toggle_pinch, name='toggle_pinch'),
     path('settings/', views.settings_view, name='settings'),
     path('settings/profile/', views.settings_profile_view, name='settings_profile'),
+    path('settings/profile/delete/', views.settings_delete_account_view, name='settings_delete_account'),
     path('settings/appearance/', views.settings_appearance_view, name='settings_appearance'),
     path('settings/notifications/', views.settings_notifications_view, name='settings_notifications'),
     path('settings/privacy/', views.settings_privacy_view, name='settings_privacy'),
@@ -87,6 +88,7 @@ urlpatterns = [
     path('api/privacy/sign-out-session/<int:session_id>/', views.api_sign_out_session, name='api_sign_out_session'),
     path('api/privacy/sign-out-all-sessions/', views.api_sign_out_all_sessions, name='api_sign_out_all_sessions'),
     path('api/privacy/unblock/<int:user_id>/', views.api_unblock_user, name='api_unblock_user'),
+    path('api/privacy/block/<int:user_id>/', views.api_block_user, name='api_block_user'),
     path('api/privacy/show-hidden/<int:user_id>/', views.api_show_hidden_author, name='api_show_hidden_author'),
     
     # Online status API

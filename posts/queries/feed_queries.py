@@ -5,6 +5,7 @@ from django.utils import timezone
 from users.models import Follow, User
 from groups.models import Group, Membership, MembershipStatus
 from posts.models import Like, Post, Repost, Comment, HiddenPost
+from users.models import HiddenAuthor
 
 def get_following_ids(user):
     return list(Follow.objects.filter(follower = user).values_list('followed_id', flat = True))
@@ -38,7 +39,11 @@ def get_prioritized_feed_queryset(user, following_ids, user_group_ids):
     if hidden_post_ids:
         filters &= ~Q(id__in=hidden_post_ids)
 
-    return Post.objects.filter(filters).select_related('author', 'unit', 'group').prefetch_related('likes', 'comments', 'reposts', 'reposts__reposter').annotate(
+    hidden_author_ids = HiddenAuthor.objects.filter(hider=user).values_list('hidden_author_id', flat=True)
+    filters &= ~Q(author_id__in=hidden_author_ids)
+
+    from users.services.privacy import visible_posts_for
+    return visible_posts_for(user, Post.objects.filter(filters)).select_related('author', 'unit', 'group').prefetch_related('likes', 'comments', 'reposts', 'reposts__reposter').annotate(
         like_count_annotated=Count('likes', distinct=True),
         comment_count_annotated=Count('comments', distinct=True),
         repost_count_annotated=Count('reposts', distinct=True),

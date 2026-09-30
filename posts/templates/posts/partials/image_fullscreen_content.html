@@ -399,10 +399,10 @@
         <a href="#" class="menu-item download-btn" data-image-url="{{ post_image.image.url }}" data-filename="{{ post_image.image.name|default:'image.jpg' }}" data-post.share_id="{{ post.share_id }}">
           <i class="bi bi-download"></i> Download
         </a>
-        <a href="#" class="menu-item hide-btn">
+        <a href="#" class="menu-item hide-btn" hx-post="/api/posts/{{ post.share_id }}/hide/" hx-target="#fullscreenContainer" hx-swap="outerHTML">
           <i class="bi bi-eye-slash"></i> Hide
         </a>
-        <a href="#" class="menu-item danger report-btn">
+        <a href="#" class="menu-item danger report-btn" data-bs-toggle="modal" data-bs-target="#globalReportModal" data-post-id="{{ post.share_id }}">
           <i class="bi bi-flag"></i> Report
         </a>
       </div>

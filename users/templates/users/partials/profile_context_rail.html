@@ -69,13 +69,22 @@
         </div>
         <div class="text-center pt-5 pb-3 px-3">
             <h5 class="fw-bold mb-0 text-dark">{{ profile_user.get_full_name }}</h5>
-            <p class="text-muted small">@{{ profile_user.username }}</p>
+            <div class="position-relative d-flex justify-content-center align-items-center mb-3">
+                <p class="text-muted small mb-0">@{{ profile_user.username }}</p>
+                {% include 'users/partials/profile_actions_menu.html' %}
+            </div>
 
             <div class="bg-light rounded-3 p-2 mb-3 profile-bio-box">
+                {% if is_limited_profile %}
+                <div class="profile-private-scrim" aria-label="{% trans 'Bio hidden by profile privacy' %}" title="{% trans 'This information is hidden by the profile owner.' %}">
+                    <span></span><span></span><span></span>
+                </div>
+                {% else %}
                 <p class="small mb-0 text-secondary italic">
                     <i class="bi bi-shield-lock me-1"></i>
                     "{{ profile_user.bio|default:_('Pwani University Student.') }}"
                 </p>
+                {% endif %}
             </div>
 
             {% if request.user != profile_user %}
@@ -114,6 +123,7 @@
 
         <div class="row g-0 border-top text-center py-2 profile-stats-row">
             <div class="col-4 border-end">
+                {% if is_limited_profile %}<div class="profile-stat-btn" aria-disabled="true">{% else %}
                 <button type="button" class="profile-stat-btn js-people-trigger"
                         data-bs-toggle="modal"
                         data-bs-target="#peopleModal"
@@ -123,9 +133,11 @@
                         aria-label="View followers">
                     <h6 id="follower-count" class="fw-bold mb-0 count-number">{% if followers_count is not None %}{{ followers_count }}{% else %}{{ profile_user.follower_relationships.count }}{% endif %}</h6>
                     <small class="text-muted text-uppercase count-label" style="font-size: 0.65rem;">{% trans "Followers" %}</small>
-                </button>
+                </button>{% endif %}
+                {% if is_limited_profile %}<h6 id="follower-count" class="fw-bold mb-0 count-number">{{ followers_count }}</h6><small class="text-muted text-uppercase count-label" style="font-size: 0.65rem;">{% trans "Followers" %}</small></div>{% endif %}
             </div>
             <div class="col-4 border-end">
+                {% if is_limited_profile %}<div class="profile-stat-btn" aria-disabled="true">{% else %}
                 <button type="button" class="profile-stat-btn js-people-trigger"
                         data-bs-toggle="modal"
                         data-bs-target="#peopleModal"
@@ -135,7 +147,8 @@
                         aria-label="View following">
                     <h6 id="following-count" class="fw-bold mb-0 count-number">{% if following_count is not None %}{{ following_count }}{% else %}{{ profile_user.following_relationships.count }}{% endif %}</h6>
                     <small class="text-muted text-uppercase count-label" style="font-size: 0.65rem;">{% trans "Following" %}</small>
-                </button>
+                </button>{% endif %}
+                {% if is_limited_profile %}<h6 id="following-count" class="fw-bold mb-0 count-number">{{ following_count }}</h6><small class="text-muted text-uppercase count-label" style="font-size: 0.65rem;">{% trans "Following" %}</small></div>{% endif %}
             </div>
             <div class="col-4 d-flex align-items-center justify-content-center">
                 <div class="py-1">
@@ -175,13 +188,18 @@
     </div>
 
     <!-- Academic Details Card -->
-    {% if profile_user.programme or profile_user.course or profile_user.year %}
+    {% if is_limited_profile or profile_user.programme or profile_user.course or profile_user.year %}
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
         <div class="card-body p-3">
             <h6 class="fw-bold mb-3 text-dark d-flex align-items-center gap-2" style="font-size: 0.92rem;">
                 <i class="bi bi-mortarboard-fill text-primary"></i>
                 {% trans "Academic Info" %}
             </h6>
+            {% if is_limited_profile %}
+            <div class="profile-private-scrim academic-private-scrim" aria-label="{% trans 'Academic details hidden by profile privacy' %}" title="{% trans 'This information is hidden by the profile owner.' %}">
+                <span></span><span></span><span></span><span></span>
+            </div>
+            {% else %}
             <div class="d-flex flex-column gap-2 small text-secondary" style="font-size: 0.84rem;">
                 {% if profile_user.programme %}
                 <div class="d-flex justify-content-between py-1 border-bottom">
@@ -211,6 +229,7 @@
                     <span class="text-dark fw-semibold">{{ profile_user.date_joined|date:"M Y" }}</span>
                 </div>
             </div>
+            {% endif %}
         </div>
     </div>
     {% endif %}
@@ -260,13 +279,19 @@
     {% endwith %}
 
     <!-- About Profile Details Card -->
-    {% if profile_user.headline or profile_user.collaboration_status or profile_user.interests or profile_user.skills or profile_user.projects or profile_user.github_url or profile_user.linkedin_url or profile_user.portfolio_url or profile_user.twitter_url %}
+    {% if is_limited_profile or profile_user.headline or profile_user.collaboration_status or profile_user.interests or profile_user.skills or profile_user.projects or profile_user.github_url or profile_user.linkedin_url or profile_user.portfolio_url or profile_user.twitter_url %}
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
         <div class="card-body p-3">
             <h6 class="fw-bold mb-3 text-dark d-flex align-items-center gap-2" style="font-size: 0.92rem;">
                 <i class="bi bi-person text-primary"></i>
                 {% trans "About" %} {{ profile_user.username }}
             </h6>
+
+            {% if is_limited_profile %}
+            <div class="profile-private-scrim" aria-label="{% trans 'Profile details hidden by profile privacy' %}" title="{% trans 'This information is hidden by the profile owner.' %}">
+                <span></span><span></span><span></span><span></span>
+            </div>
+            {% else %}
 
             {% if profile_user.headline %}
             <p class="small mb-2 fw-semibold text-dark">{{ profile_user.headline }}</p>
@@ -349,6 +374,7 @@
                     {% endif %}
                 </div>
             </div>
+            {% endif %}
             {% endif %}
         </div>
     </div>

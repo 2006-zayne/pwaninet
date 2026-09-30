@@ -8,6 +8,9 @@ def search_users(query, current_user, limit=20):
 
     query_lower = query.lower()
 
+    from users.services.privacy import apply_user_discovery_exclusions
+    discoverable = apply_user_discovery_exclusions(User.objects.all(), viewer=current_user)
+
     # Check for role keywords
     role_keywords = {
         'president': GlobalRole.PRESIDENT,
@@ -17,12 +20,12 @@ def search_users(query, current_user, limit=20):
 
     # If query matches a role keyword, search by role
     if query_lower in role_keywords:
-        return User.objects.filter(
+        return discoverable.filter(
             global_role=role_keywords[query_lower]
         ).exclude(id=current_user.id).select_related('course', 'year')[:limit]
 
     # Otherwise search by name/username
-    return User.objects.filter(
+    return discoverable.filter(
         Q(username__icontains=query) |
         Q(first_name__icontains=query) |
         Q(second_name__icontains=query) |

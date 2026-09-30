@@ -1,4 +1,5 @@
 from django.db import models
+from users.storage import ProfilePictureStorage
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.core.exceptions import ValidationError
 from PIL import Image
@@ -70,6 +71,13 @@ class PrivacyLevel(models.TextChoices):
     AUTHENTICATED = 'AUTHENTICATED', 'PwaniNet Users'
     FOLLOWERS = 'FOLLOWERS', 'Followers Only'
     PRIVATE = 'PRIVATE', 'Only Me'
+
+
+PRIVACY_CHOICES = [
+    (PrivacyLevel.AUTHENTICATED, 'PwaniNet Users'),
+    (PrivacyLevel.FOLLOWERS, 'Followers Only'),
+    (PrivacyLevel.PRIVATE, 'Only Me'),
+]
 
 
 class HeroShowcaseSet(models.Model):
@@ -145,7 +153,13 @@ class User(AbstractUser):
     )
     
     global_role = models.CharField(max_length=20, choices=GlobalRole.choices, default=GlobalRole.NORMAL, db_index=True)
-    profile_pic = models.ImageField(default='profile_pic/default_pic1.jpg', upload_to='profile_pic', null=True, blank=True)
+    profile_pic = models.ImageField(
+        default='profile_pic/default_pic1.jpg',
+        upload_to='profile_pic',
+        null=True,
+        blank=True,
+        storage=ProfilePictureStorage(),
+    )
     cover_photo = models.ImageField(upload_to='covers/', blank=True, null=True)
     bio = models.TextField(max_length=500, blank=True)
     
@@ -232,14 +246,14 @@ class User(AbstractUser):
     # Privacy settings
     profile_privacy = models.CharField(
         max_length=20,
-        choices=PrivacyLevel.choices,
-        default=PrivacyLevel.PUBLIC,
+        choices=PRIVACY_CHOICES,
+        default=PrivacyLevel.AUTHENTICATED,
         help_text="Who can view profile information"
     )
     post_privacy = models.CharField(
         max_length=20,
-        choices=PrivacyLevel.choices,
-        default=PrivacyLevel.PUBLIC,
+        choices=PRIVACY_CHOICES,
+        default=PrivacyLevel.AUTHENTICATED,
         help_text="Default visibility for new posts"
     )
     search_vector = SearchVectorField(null=True, blank=True)
@@ -624,4 +638,3 @@ class PlatformInvite(models.Model):
 
     def __str__(self):
         return f"PlatformInvite({self.inviter.username}, type={self.invite_type}, token={self.token})"
-

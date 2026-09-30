@@ -1,4 +1,5 @@
 from posts.models import AuthorPreference
+from users.models import HiddenAuthor
 from django.core.exceptions import ValidationError
 
 
@@ -25,6 +26,10 @@ def set_author_preference(user, author, preference):
         author=author,
         defaults={'preference': preference}
     )
+    if preference == 'none':
+        HiddenAuthor.objects.get_or_create(hider=user, hidden_author=author)
+    else:
+        HiddenAuthor.objects.filter(hider=user, hidden_author=author).delete()
     return preference_obj
 
 
@@ -104,7 +109,7 @@ def should_show_post(user, post_author):
     
     Returns:
         tuple: (should_show, preference_level)
-        preference_level: 'normal', 'less', or 'none'
+    preference_level: 'normal', 'less', or 'none'
     """
     if not user.is_authenticated or user == post_author:
         return (True, 'normal')

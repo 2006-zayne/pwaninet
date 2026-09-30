@@ -28,7 +28,7 @@ def build_group_detail_context(user, group, query, page=1, post_query=''):
             search_service = UnifiedSearchService()
             posts_queryset = search_service.search_group_posts_queryset(group, post_query.strip(), user=user)
         else:
-            posts_queryset = get_group_posts(group)
+            posts_queryset = get_group_posts(group, user)
     else:
         # Non-members see no posts
         posts_queryset = Post.objects.none()
@@ -56,4 +56,3 @@ def build_group_detail_context(user, group, query, page=1, post_query=''):
         'has_previous': posts_page.has_previous(),
         'next_page': page + 1 if posts_page.has_next() else None,
         'previous_page': page - 1 if posts_page.has_previous() else None }
-

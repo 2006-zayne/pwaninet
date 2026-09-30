@@ -211,6 +211,13 @@
 
             <div class="text-center mt-3">
                 <a href="{% url 'posts:home' %}" class="text-secondary small text-decoration-none">{% trans "← Back to Public View" %}</a>
+                <div class="mt-2 small">
+                    <a href="{% url 'public_privacy' %}" class="text-secondary">{% trans "Privacy Policy" %}</a>
+                    <span class="text-secondary mx-1">·</span>
+                    <a href="{% url 'public_about' %}" class="text-secondary">{% trans "About PwaniNet" %}</a>
+                    <span class="text-secondary mx-1">·</span>
+                    <a href="{% url 'public_licenses' %}" class="text-secondary">{% trans "Licences" %}</a>
+                </div>
             </div>
         </div>
     </section>

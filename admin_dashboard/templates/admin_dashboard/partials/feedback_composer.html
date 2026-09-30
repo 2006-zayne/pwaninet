@@ -1,0 +1,55 @@
+{% load i18n %}
+
+<section id="feedback-composer" class="settings-feedback-composer p-3 p-md-4 border-bottom">
+  <div class="d-flex align-items-start gap-3 mb-3">
+    <div class="settings-category-icon flex-shrink-0">
+      <i class="bi bi-chat-square-text"></i>
+    </div>
+    <div>
+      <h2 class="h6 mb-1">{% trans "Share feedback" %}</h2>
+      <p class="text-muted small mb-0">{% trans "Report a problem or suggest an improvement. The PwaniNet team will review your message." %}</p>
+    </div>
+  </div>
+
+  {% if submitted %}
+  <div class="alert alert-success py-2" role="status">
+    <i class="bi bi-check-circle-fill me-2"></i>{% trans "Thanks—your feedback was sent to the admin team." %}
+  </div>
+  {% endif %}
+  {% if error_message %}
+  <div class="alert alert-danger py-2" role="alert">{{ error_message }}</div>
+  {% endif %}
+
+  <form method="post"
+        hx-post="{% url 'admin_dashboard:submit_feedback' %}"
+        hx-target="#feedback-composer"
+        hx-swap="outerHTML">
+    {% csrf_token %}
+    <input type="hidden" name="current_url" value="{{ form_values.current_url|default:request.path }}">
+    <div class="row g-2">
+      <div class="col-md-4">
+        <label for="feedback-category" class="form-label small fw-semibold">{% trans "Type" %}</label>
+        <select id="feedback-category" name="category" class="form-select" required>
+          {% for value, label in category_choices %}
+          <option value="{{ value }}" {% if form_values.category == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-8">
+        <label for="feedback-subject" class="form-label small fw-semibold">{% trans "Subject" %}</label>
+        <input id="feedback-subject" type="text" name="subject" class="form-control" maxlength="255" required value="{{ form_values.subject|default:'' }}"
+               placeholder="{% trans 'A short summary' %}">
+      </div>
+      <div class="col-12">
+        <label for="feedback-message" class="form-label small fw-semibold">{% trans "Message" %}</label>
+        <textarea id="feedback-message" name="message" class="form-control" rows="3" maxlength="10000" required
+                  placeholder="{% trans 'Tell us what happened or what would make PwaniNet better…' %}">{{ form_values.message|default:'' }}</textarea>
+      </div>
+      <div class="col-12 d-flex justify-content-end">
+        <button type="submit" class="btn btn-primary btn-sm px-3">
+          <i class="bi bi-send me-1"></i>{% trans "Send feedback" %}
+        </button>
+      </div>
+    </div>
+  </form>
+</section>

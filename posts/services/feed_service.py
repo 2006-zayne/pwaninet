@@ -124,8 +124,9 @@ def get_reels_carousel(user, limit=8, offset=0):
             if hidden_ids:
                 filters &= ~Q(id__in=hidden_ids)
 
+        from users.services.privacy import visible_posts_for
         candidate_qs = (
-            Post.objects.filter(filters)
+            visible_posts_for(user, Post.objects.filter(filters))
             .select_related('author', 'unit', 'group')
             .order_by('-created_at')[offset:offset + 40]
         )

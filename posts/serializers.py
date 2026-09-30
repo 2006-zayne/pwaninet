@@ -51,6 +51,7 @@ class PostSerializer(serializers.ModelSerializer):
         model = Post
         fields = [
             'id', 'post_id', 'share_id', 'author', 'group', 'course', 'unit', 'content',
+            'visibility',
             'video', 'docs', 'audio', 'gradient_class', 'has_signature',
             'video_status', 'video_duration', 'video_width', 'video_height', 'is_reel', 'hls_playlist',
             'link_preview',
@@ -92,6 +93,8 @@ class PostSerializer(serializers.ModelSerializer):
                     "You must be an approved member to post in this group."
                 )
         
+        validated_data['visibility'] = request.user.post_privacy
+        validated_data['visibility'] = request.user.post_privacy
         post = Post.objects.create(author=request.user, **validated_data)
         return post
 
@@ -119,11 +122,12 @@ class PostCreateSerializer(serializers.ModelSerializer):
         model = Post
         fields = [
             'id', 'post_id', 'share_id', 'author', 'group', 'course', 'unit', 'content',
+            'visibility',
             'images', 'video', 'docs', 'audio', 'gradient_class', 'has_signature',
             'video_status', 'video_width', 'video_height', 'video_duration', 'video_poster',
             'custom_gradient_text', 'custom_gradient_color1', 'custom_gradient_color2', 'custom_gradient_text_color'
         ]
-        read_only_fields = ['id', 'post_id', 'share_id', 'video_status', 'author']
+        read_only_fields = ['id', 'post_id', 'share_id', 'video_status', 'author', 'visibility']
 
     def validate_content(self, value):
         if value and len(value) > 2500:
@@ -215,6 +219,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
         author = validated_data.get('author') or (request.user if request else None)
 
         if author:
+            validated_data['visibility'] = author.post_privacy
             validated_data['course'] = getattr(author, 'course', None)
             validated_data['author'] = author
         else:
@@ -563,7 +568,8 @@ class ReportSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request = self.context['request']
-        report = Report.objects.create(reporter=request.user, **validated_data)
+        reporter = validated_data.pop('reporter', request.user)
+        report = Report.objects.create(reporter=reporter, **validated_data)
         return report
 
 
@@ -572,6 +578,16 @@ class ReportCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Report
         fields = ['post', 'reason', 'description']
+
+    post = serializers.SlugRelatedField(slug_field='share_id', queryset=Post.objects.all())
+
+    def validate(self, attrs):
+        from users.services.privacy import visible_posts_for
+        request = self.context['request']
+        post = attrs['post']
+        if not visible_posts_for(request.user, Post.objects.filter(pk=post.pk)).exists():
+            raise serializers.ValidationError({'post': 'You cannot report a post you cannot view.'})
+        return attrs
 
     def validate_post(self, value):
         request = self.context['request']
@@ -755,16 +771,12 @@ class AuthorPreferenceCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request = self.context['request']
-        author = validated_data['author']
-        preference = validated_data['preference']
-        
-        # Update or create preference
-        preference_obj, created = AuthorPreference.objects.update_or_create(
-            user=request.user,
-            author=author,
-            defaults={'preference': preference}
+        from posts.services.author_preference_service import set_author_preference
+        return set_author_preference(
+            request.user,
+            validated_data['author'],
+            validated_data['preference'],
         )
-        return preference_obj
 
 
 class SharedPostSerializer(serializers.ModelSerializer):

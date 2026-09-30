@@ -1209,6 +1209,7 @@ def share_document(request, share_id):
             
             post = Post.objects.create(
                 author=request.user,
+                visibility=request.user.post_privacy,
                 course=course,
                 gradient_class='none',
                 thumbnail=doc_thumbnail,
@@ -1265,6 +1266,7 @@ def share_document(request, share_id):
             # Create post in group
             post = Post.objects.create(
                 author=request.user,
+                visibility=request.user.post_privacy,
                 group=group,
                 course=group.course,
                 gradient_class='none',

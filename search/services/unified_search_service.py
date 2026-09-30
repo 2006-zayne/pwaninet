@@ -818,6 +818,9 @@ class UnifiedSearchService:
         from groups.models import Group, Membership, MembershipStatus, PostVisibility
 
         base_filter = Q()
+        from users.services.privacy import visible_posts_for
+        visible_post_ids = visible_posts_for(user).values_list('id', flat=True)
+        base_filter &= Q(id__in=visible_post_ids)
         # Exclude failed videos
         base_filter &= ~Q(video_status=Post.VIDEO_STATUS_FAILED)
 
@@ -1032,8 +1035,10 @@ class UnifiedSearchService:
         author select_related, and media prefetches.
         """
         from posts.models import Post, HiddenPost, AuthorPreference, PostImage
+        from users.services.privacy import visible_posts_for
         query = (query or "").strip()
         base_filter = Q(group=group) & ~Q(video_status=Post.VIDEO_STATUS_FAILED)
+        base_filter &= Q(id__in=visible_posts_for(user).values_list('id', flat=True))
 
         if user and user.is_authenticated:
             hidden_ids = HiddenPost.objects.filter(user=user).values_list('post_id', flat=True)

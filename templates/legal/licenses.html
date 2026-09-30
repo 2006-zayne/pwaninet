@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block content %}
+<article class="container py-4" style="max-width: 860px;">
+  <h1>{% trans "Licences and attributions" %}</h1>
+  <p>PwaniNet's own code is not currently offered under an open-source licence. This notice does not grant permission to copy or reuse PwaniNet code.</p>
+  <p>Software and assets made by other authors remain under their respective licence terms. Required third-party notices and attributions are being assembled and will be published here as that review is completed.</p>
+  <p>For questions about this notice or a rights concern, email <a href="mailto:Engineerzayne005@gmail.com">Engineerzayne005@gmail.com</a>.</p>
+  <p><a href="{% url 'public_about' %}">About PwaniNet</a> · <a href="{% url 'public_privacy' %}">Privacy Policy</a></p>
+</article>
+{% endblock %}

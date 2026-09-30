@@ -17,6 +17,7 @@ def create_post_for_user(form, user, files, group_id=None):
         post = form.save(commit=False)
 
         post.author = user
+        post.visibility = user.post_privacy
         post.course = user.course
         post.year = user.year
 

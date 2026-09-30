@@ -2133,8 +2133,8 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
                     </div>
                     <div class="modal-body">
-                        <form id="globalReportForm" method="POST" hx-post="/api/reports/" hx-target="" hx-swap="outerHTML"
-                              hx-on::after-request="const m = bootstrap.Modal.getInstance(document.getElementById('globalReportModal')); if(m) m.hide();">
+                        <form id="globalReportForm" method="POST" hx-post="/api/reports/" hx-target="#globalReportFeedback" hx-swap="innerHTML"
+                              hx-on::after-request="if (event.detail.successful) { this.reset(); document.getElementById('globalReportFeedback').innerHTML = '<div class=&quot;alert alert-success mb-3&quot; role=&quot;status&quot;>Thanks. Your report has been submitted for review.</div>'; setTimeout(() => { const m = bootstrap.Modal.getInstance(document.getElementById('globalReportModal')); if (m) m.hide(); }, 1200); } else { document.getElementById('globalReportFeedback').innerHTML = '<div class=&quot;alert alert-danger mb-3&quot; role=&quot;alert&quot;>We could not submit the report. Check your selection or try again.</div>'; }">
                             {% csrf_token %}
                             <input type="hidden" name="post" value="">
                             <input type="hidden" name="post_id" value="">
@@ -2146,6 +2146,8 @@
                                     <option value="inappropriate">{% trans "Inappropriate content" %}</option>
                                     <option value="harassment">{% trans "Harassment" %}</option>
                                     <option value="false_information">{% trans "False information" %}</option>
+                                    <option value="copyright">{% trans "Copyright or ownership concern" %}</option>
+                                    <option value="privacy">{% trans "Privacy concern" %}</option>
                                     <option value="other">{% trans "Other" %}</option>
                                 </select>
                             </div>
@@ -2153,6 +2155,7 @@
                                 <label class="form-label">{% trans "Additional details (optional)" %}</label>
                                 <textarea name="description" class="form-control" rows="3" placeholder="{% trans 'Please provide more details about why you are reporting this post...' %}"></textarea>
                             </div>
+                            <div id="globalReportFeedback" aria-live="polite"></div>
                             <button type="submit" class="btn btn-danger w-100">{% trans "Submit Report" %}</button>
                         </form>
                     </div>
@@ -5412,10 +5415,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
             if (modal.id === 'globalReportModal' && postId) {
                 var rForm = modal.querySelector('#globalReportForm');
                 if (rForm) {
-                    var rTargetSel = document.getElementById('reel-card-' + postId) ? '#reel-card-' + postId : '#post-card-' + postId;
                     var postInput = rForm.querySelector('[name="post"]');
                     if (postInput) postInput.value = postId;
-                    rForm.setAttribute('hx-target', rTargetSel);
                     if (window.htmx) htmx.process(rForm);
                     rForm.reset();
                     if (postInput) postInput.value = postId;

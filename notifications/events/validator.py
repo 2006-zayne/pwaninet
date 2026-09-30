@@ -39,6 +39,7 @@ class EventValidator:
         'posts.comment.replied': ['replied'],
         'posts.post.reposted': ['reposted', 'shared'],
         'posts.post.reported': ['reported'],
+        'admin.feedback.submitted': ['submitted'],
         
         # Groups events
         'groups.group.created': ['created'],

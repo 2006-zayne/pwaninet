@@ -59,9 +59,16 @@ GRADIENT_CHOICES = [
 
 
 class Post(models.Model):
+    VISIBILITY_CHOICES = [
+        ('PUBLIC', 'Legacy public post'),
+        ('AUTHENTICATED', 'PwaniNet Users'),
+        ('FOLLOWERS', 'Followers Only'),
+        ('PRIVATE', 'Only Me'),
+    ]
     share_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     group = models.ForeignKey('groups.Group', on_delete=models.CASCADE, null=True, blank=True, related_name='posts')
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='posts')
+    visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='AUTHENTICATED', db_index=True)
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE, null=True, blank=True)
     unit = models.ForeignKey('courses.Unit', on_delete=models.SET_NULL, null=True, blank=True)
     content = models.TextField(blank=True, null=True)
@@ -646,10 +653,28 @@ class PostImageComment(models.Model):
 
 
 class Report(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        REVIEWED = 'REVIEWED', 'Reviewed'
+        ACTIONED = 'ACTIONED', 'Action taken'
+        DISMISSED = 'DISMISSED', 'Dismissed'
+
+    REASON_CHOICES = [
+        ('spam', 'Spam'),
+        ('inappropriate', 'Inappropriate content'),
+        ('harassment', 'Harassment or bullying'),
+        ('false_information', 'False information'),
+        ('copyright', 'Copyright or ownership concern'),
+        ('privacy', 'Privacy concern'),
+        ('other', 'Other'),
+    ]
     reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reports')
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='reports')
-    reason = models.CharField(max_length=50)
+    reason = models.CharField(max_length=50, choices=REASON_CHOICES)
     description = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING, db_index=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_post_reports')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -757,5 +782,3 @@ class SharedPost(models.Model):
         if self.original_post:
             return f"{self.sharer.username} shared post {self.original_post.id} to {target}"
         return f"{self.sharer.username} shared link ({self.shared_link_title or self.shared_link}) to {target}"
-
-

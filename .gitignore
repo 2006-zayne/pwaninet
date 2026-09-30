@@ -25,6 +25,7 @@ db.sqlite3-journal
 # =========================
 staticfiles/
 media/
+private_media/
 
 # =========================
 # ENVIRONMENT SECRETS (CRITICAL)
@@ -45,6 +46,9 @@ celerybeat.pid
 # LOGS
 # =========================
 *.log
+
+# Local machine-specific launch helpers
+serve*.sh
 
 # =========================
 # SSL / KEYS (CRITICAL SECURITY)
@@ -78,6 +82,7 @@ dist/
 # =========================
 node_modules/
 dump.rdb
+/data.json
 # =========================
 # ANDROID / GRADLE
 # =========================

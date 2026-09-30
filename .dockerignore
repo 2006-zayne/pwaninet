@@ -20,14 +20,24 @@ ENV/
 local_settings.py
 db.sqlite3*
 media/
+private_media/
 staticfiles/
 logs/
+dump.rdb
+celerybeat-schedule*
+data.json
 
 # ----------------------
 # Environment
 # ----------------------
 .env
 .env.*
+*.pem
+*.key
+*.crt
+*.jks
+*firebase*.json
+*adminsdk*.json
 
 # ----------------------
 # Git

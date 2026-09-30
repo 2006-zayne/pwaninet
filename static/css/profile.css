@@ -78,6 +78,73 @@
     position: relative;
 }
 
+/* Profile overflow actions follow the active light/dark theme. */
+.profile-actions-menu .profile-actions-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    color: var(--text-main, #0f172a);
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border-soft, #e2e8f0);
+}
+
+.profile-actions-menu .profile-actions-toggle:hover,
+.profile-actions-menu .profile-actions-toggle:focus-visible {
+    color: var(--primary, #2563eb);
+    background: var(--search-bg, #f1f5f9);
+}
+
+.profile-actions-menu .dropdown-menu {
+    color: var(--text-main, #0f172a);
+    background: var(--card-bg, #fff);
+    border-color: var(--border-soft, #e2e8f0) !important;
+}
+
+.profile-actions-menu .dropdown-item {
+    color: var(--text-main, #0f172a);
+}
+
+.profile-actions-menu .dropdown-item:hover,
+.profile-actions-menu .dropdown-item:focus {
+    color: var(--text-main, #0f172a);
+    background: var(--search-bg, #f1f5f9);
+}
+
+[data-theme="dark"] .profile-actions-menu .profile-actions-toggle {
+    color: var(--text-main, #e4e6eb);
+    background: var(--card-bg, #242526);
+    border-color: var(--border-soft, #3a3b3c);
+}
+
+[data-theme="dark"] .profile-actions-menu .profile-actions-toggle:hover,
+[data-theme="dark"] .profile-actions-menu .profile-actions-toggle:focus-visible {
+    color: var(--primary-hover, #a5b4fc);
+    background: var(--search-bg, #3a3b3c);
+}
+
+[data-theme="dark"] .profile-actions-menu .dropdown-menu {
+    color: var(--text-main, #e4e6eb);
+    background: var(--card-bg, #242526);
+    border-color: var(--border-soft, #3a3b3c) !important;
+}
+
+[data-theme="dark"] .profile-actions-menu .dropdown-item {
+    color: var(--text-main, #e4e6eb);
+}
+
+[data-theme="dark"] .profile-actions-menu .dropdown-item:hover,
+[data-theme="dark"] .profile-actions-menu .dropdown-item:focus {
+    color: var(--text-main, #e4e6eb);
+    background: var(--search-bg, #3a3b3c);
+}
+
+[data-theme="dark"] .profile-actions-menu .dropdown-item.text-danger {
+    color: #ff8a8a !important;
+}
+
 [data-theme="dark"] .cover-container {
     background-color: #1e293b;
 }

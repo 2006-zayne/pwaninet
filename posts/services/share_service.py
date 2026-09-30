@@ -127,6 +127,7 @@ def share_post(user, post, shared_to_user=None, shared_to_group=None, message=No
         # Create a repost in the group's feed
         repost = Post.objects.create(
             author=user,
+            visibility=user.post_privacy,
             content=message or '',
             group=shared_to_group,
             video=post.video,

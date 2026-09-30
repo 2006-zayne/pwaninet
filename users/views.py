@@ -15,7 +15,7 @@ from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
 from django.db.models import Q
-from users.models import User, Follow, DeviceAccount, Pinch, UserSession, Block, HiddenAuthor, PrivacyLevel, HeroShowcaseSet
+from users.models import User, Follow, DeviceAccount, Pinch, UserSession, Block, HiddenAuthor, PrivacyLevel, PRIVACY_CHOICES, HeroShowcaseSet
 from posts.models import Post, Like, Repost
 from users.forms import PwaniSignupForm, ProfileUpdateForm
 from django.contrib import messages
@@ -631,6 +631,9 @@ def pwanimate_profile_card(request, username):
         username=username,
         is_active=True,
     )
+    from users.services.privacy import can_view_profile
+    if not can_view_profile(request.user, profile_user):
+        return HttpResponse('', status=404)
     context = {
         'profile_user': profile_user,
         'is_following': Follow.objects.filter(follower=request.user, followed=profile_user).exists(),
@@ -655,6 +658,25 @@ def profile_view(request, username):
         username=username
     )
 
+    from users.services.privacy import can_view_profile
+    is_limited_profile = (
+        request.user != profile_user
+        and profile_user.profile_privacy == PrivacyLevel.PRIVATE
+        and not Block.objects.filter(
+            Q(blocker_id=request.user.pk, blocked_id=profile_user.pk)
+            | Q(blocker_id=profile_user.pk, blocked_id=request.user.pk)
+        ).exists()
+    )
+    if not can_view_profile(request.user, profile_user) and not is_limited_profile:
+        private_context = {
+            'profile_user': profile_user,
+            'is_own_profile': False,
+            'is_following': Follow.objects.filter(follower=request.user, followed=profile_user).exists(),
+        }
+        if request.headers.get('HX-Request'):
+            return render(request, 'users/partials/private_profile_navigation_partial.html', private_context)
+        return render(request, 'users/private_profile.html', private_context)
+
     # Fast individual count queries instead of a massive Cartesian product JOIN
     followers_count = profile_user.follower_relationships.count()
     following_count = profile_user.following_relationships.count()
@@ -674,12 +696,15 @@ def profile_view(request, username):
         status=MembershipStatus.APPROVED
     ).values_list('group_id', flat=True))
 
-    posts_queryset = Post.objects.filter(
+    from users.services.privacy import visible_posts_for
+    posts_queryset = visible_posts_for(request.user, Post.objects.filter(
         author=profile_user,
         repost_of__isnull=True,  # exclude legacy-style reposts — they go in the Reposts tab
     ).filter(
         Q(group__isnull=True) | Q(group_id__in=viewer_group_ids)
-    ).select_related('author', 'group', 'course', 'unit', 'repost_of').prefetch_related('likes', 'images', 'comments').order_by('-created_at')
+    )).select_related('author', 'group', 'course', 'unit', 'repost_of').prefetch_related('likes', 'images', 'comments').order_by('-created_at')
+    if is_limited_profile:
+        posts_queryset = posts_queryset.none()
     paginator = Paginator(posts_queryset, posts_per_page)
     posts_page = paginator.get_page(page)
 
@@ -716,6 +741,8 @@ def profile_view(request, username):
         'original_post__images',
         'original_post__comments',
     ).order_by('-created_at')
+    if is_limited_profile:
+        reposted_posts = reposted_posts.none()
     repost_count = reposted_posts.count()
 
     # Determine if viewing own profile
@@ -751,6 +778,7 @@ def profile_view(request, username):
             'reposted_posts': reposted_posts,
             'repost_count': repost_count,
             'active_tab': active_tab,
+            'is_limited_profile': is_limited_profile,
         }
         return render(request, 'users/partials/profile_navigation_partial.html', context)
 
@@ -781,6 +809,7 @@ def profile_view(request, username):
         'reposted_posts': reposted_posts,
         'repost_count': repost_count,
         'active_tab': active_tab,
+        'is_limited_profile': is_limited_profile,
     })
 
 
@@ -790,6 +819,9 @@ def profile_connections(request, username, list_type):
     from django.core.paginator import Paginator
 
     profile_user = get_object_or_404(User, username=username)
+    from users.services.privacy import can_view_profile
+    if not can_view_profile(request.user, profile_user):
+        return HttpResponse('', status=404)
     page = int(request.GET.get('page', 1))
     page_size = 20
 
@@ -968,6 +1000,11 @@ def toggle_follow(request, username):
             return JsonResponse({'error': 'Cannot follow yourself'}, status=400)
         return redirect('users:profile', username=username)
 
+    if Block.objects.filter(Q(blocker=request.user, blocked=target) | Q(blocker=target, blocked=request.user)).exists():
+        if is_ajax:
+            return JsonResponse({'error': 'This connection is unavailable.'}, status=403)
+        return redirect('users:profile', username=username)
+
     follow_qs = Follow.objects.filter(follower=request.user, followed=target)
     if follow_qs.exists():
         follow_qs.delete()
@@ -1002,6 +1039,23 @@ def toggle_follow(request, username):
         return JsonResponse({'is_following': is_following, 'follower_count': follower_count})
 
     return redirect('users:profile', username=username)
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_block_user(request, user_id):
+    """Block a user, preventing profile and post access and removing follow edges."""
+    target = get_object_or_404(User, pk=user_id, is_active=True)
+    if target.pk == request.user.pk:
+        return JsonResponse({'detail': 'You cannot block your own account.'}, status=400)
+    Block.objects.get_or_create(blocker=request.user, blocked=target)
+    Follow.objects.filter(
+        Q(follower=request.user, followed=target) |
+        Q(follower=target, followed=request.user)
+    ).delete()
+    if request.headers.get('HX-Request'):
+        return HttpResponse('', status=204)
+    return redirect('users:settings_blocked_users')
 
 
 @login_required
@@ -1182,6 +1236,7 @@ def get_invite_share_data(request):
 def settings_view(request):
     """Main settings landing page - navigation hub for all settings categories"""
     from users.services.invite_service import get_invite_data
+    from admin_dashboard.models import FeedbackTicket
     invite_data = {}
     try:
         invite_data = get_invite_data(request.user, request)
@@ -1191,6 +1246,7 @@ def settings_view(request):
     context = {
         'settings_content_partial': 'users/settings/partials/index_content.html',
         'invite_data': invite_data,
+        'feedback_category_choices': FeedbackTicket.Category.choices,
     }
     if request.headers.get('HX-Request'):
         return render(request, 'users/settings/partials/settings_navigation_partial.html', context)
@@ -1229,6 +1285,28 @@ def settings_profile_view(request):
             'form': form,
         })
     return render(request, 'users/settings/profile.html', {'form': form})
+
+
+@login_required
+@require_http_methods(["POST"])
+def settings_delete_account_view(request):
+    """Delete the account and either erase or anonymize its authored content."""
+    choice = request.POST.get('content_action')
+    password = request.POST.get('password', '')
+    confirmed = request.POST.get('confirm_delete') == 'yes'
+    if choice not in {'erase', 'anonymize'} or not confirmed or not request.user.check_password(password):
+        messages.error(request, 'Confirm account deletion and enter your password to continue.')
+        return redirect('users:settings_profile')
+
+    from users.services.account_deletion import erase_account_and_content, anonymize_account_keep_content
+    user = request.user
+    if choice == 'erase':
+        erase_account_and_content(user)
+    else:
+        anonymize_account_keep_content(user)
+    logout(request)
+    messages.success(request, 'Your account deletion request has been completed.')
+    return redirect('login')
 
 
 @login_required
@@ -1723,10 +1801,11 @@ def settings_blocked_users_view(request):
 @login_required
 def settings_profile_privacy_view(request):
     """Profile privacy settings page"""
+    privacy_levels = PRIVACY_CHOICES
     if request.method == 'POST':
         profile_privacy = request.POST.get('profile_privacy')
 
-        if profile_privacy not in PrivacyLevel.values:
+        if profile_privacy not in [value for value, _label in privacy_levels]:
             messages.error(request, 'Invalid privacy level.')
         else:
             request.user.profile_privacy = profile_privacy
@@ -1736,11 +1815,10 @@ def settings_profile_privacy_view(request):
         if request.headers.get('HX-Request'):
             return render(request, 'users/settings/partials/settings_navigation_partial.html', {
                 'settings_content_partial': 'users/settings/partials/profile_privacy_content.html',
-                'privacy_levels': PrivacyLevel.choices
+                'privacy_levels': privacy_levels
             })
         return redirect('users:settings_profile_privacy')
 
-    privacy_levels = PrivacyLevel.choices
     if request.headers.get('HX-Request'):
         return render(request, 'users/settings/partials/settings_navigation_partial.html', {
             'settings_content_partial': 'users/settings/partials/profile_privacy_content.html',
@@ -1754,10 +1832,11 @@ def settings_profile_privacy_view(request):
 @login_required
 def settings_post_privacy_view(request):
     """Post privacy settings page"""
+    privacy_levels = PRIVACY_CHOICES
     if request.method == 'POST':
         post_privacy = request.POST.get('post_privacy')
 
-        if post_privacy not in PrivacyLevel.values:
+        if post_privacy not in [value for value, _label in privacy_levels]:
             messages.error(request, 'Invalid privacy level.')
         else:
             request.user.post_privacy = post_privacy
@@ -1767,7 +1846,7 @@ def settings_post_privacy_view(request):
         if request.headers.get('HX-Request'):
             return render(request, 'users/settings/partials/settings_navigation_partial.html', {
                 'settings_content_partial': 'users/settings/partials/post_privacy_content.html',
-                'privacy_levels': PrivacyLevel.choices
+                'privacy_levels': privacy_levels
             })
         return redirect('users:settings_post_privacy')
 
@@ -1989,6 +2068,8 @@ def api_show_hidden_author(request, user_id):
         hidden_author = User.objects.get(id=user_id)
         hidden = HiddenAuthor.objects.get(hider=request.user, hidden_author=hidden_author)
         hidden.delete()
+        from posts.models import AuthorPreference
+        AuthorPreference.objects.filter(user=request.user, author=hidden_author).update(preference='normal')
 
         return HttpResponse('')  # HTMX will remove the element
     except User.DoesNotExist:
@@ -2371,6 +2452,10 @@ def view_profile_photo_fullscreen(request, username, photo_type):
     """
     profile_user = get_object_or_404(User, username=username)
 
+    from users.services.privacy import can_view_profile
+    if not can_view_profile(request.user, profile_user):
+        return redirect('users:profile', username=username)
+
     # Check if user is allowed to view the photo
     is_own_profile = request.user == profile_user
     is_following = Follow.objects.filter(follower=request.user, followed=profile_user).exists()
@@ -2429,6 +2514,10 @@ def toggle_profile_photo_like(request, username, photo_type):
     """
     profile_user = get_object_or_404(User, username=username)
 
+    from users.services.privacy import can_view_profile
+    if not can_view_profile(request.user, profile_user):
+        return JsonResponse({'detail': 'This profile is not available to you.'}, status=404)
+
     # Validate photo type
     if photo_type not in ['profile', 'cover']:
         return JsonResponse(
@@ -2481,6 +2570,13 @@ class UserViewSet(viewsets.ModelViewSet):
     search_fields = ['username', 'first_name', 'last_name', 'second_name']
     ordering_fields = ['username', 'date_joined', 'last_login']
     ordering = ['-date_joined']
+
+    def get_queryset(self):
+        from users.services.privacy import apply_user_discovery_exclusions
+        visible = apply_user_discovery_exclusions(User.objects.all(), viewer=self.request.user)
+        if self.request.user.is_authenticated:
+            visible = visible | User.objects.filter(pk=self.request.user.pk)
+        return visible.select_related('course__school', 'year', 'programme', 'academic_level', 'academic_year', 'semester').distinct()
 
     def get_serializer_class(self):
         if self.action in ['list', 'retrieve']:
@@ -2589,7 +2685,10 @@ class UserViewSet(viewsets.ModelViewSet):
     def followers(self, request, pk=None):
         """Get list of followers for a user"""
         user = self.get_object()
-        followers = User.objects.filter(follower_relationships__followed=user)
+        from users.services.privacy import apply_user_discovery_exclusions
+        followers = apply_user_discovery_exclusions(
+            User.objects.filter(follower_relationships__followed=user), viewer=request.user
+        )
         page = self.paginate_queryset(followers)
         if page is not None:
             serializer = UserPublicSerializer(page, many=True)
@@ -2606,7 +2705,10 @@ class UserViewSet(viewsets.ModelViewSet):
     def following(self, request, pk=None):
         """Get list of users followed by a user"""
         user = self.get_object()
-        following = User.objects.filter(follower_relationships__follower=user)
+        from users.services.privacy import apply_user_discovery_exclusions
+        following = apply_user_discovery_exclusions(
+            User.objects.filter(follower_relationships__follower=user), viewer=request.user
+        )
         page = self.paginate_queryset(following)
         if page is not None:
             serializer = UserPublicSerializer(page, many=True)
@@ -2752,6 +2854,9 @@ class FollowViewSet(viewsets.ModelViewSet):
         if self.action == 'create':
             return [permissions.IsAuthenticated()]
         return [permissions.IsAuthenticated()]
+
+    def get_queryset(self):
+        return Follow.objects.filter(follower=self.request.user).select_related('follower', 'followed')
 
     def perform_create(self, serializer):
         serializer.save(follower=self.request.user)

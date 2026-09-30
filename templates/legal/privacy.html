@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block content %}
+<article class="container py-4" style="max-width: 860px;">
+  <h1>{% trans "PwaniNet Privacy Policy" %}</h1>
+  <p>This policy explains what information PwaniNet uses, how it is handled, and how you can contact us about it.</p>
+
+  <h2 class="h4 mt-4">Information collected</h2>
+  <p>When you create an account, PwaniNet collects your username, password, programme, academic level, academic year, and semester. You may also provide your name in optional name fields.</p>
+  <p>You may provide profile details and content such as photos, posts, comments, group activity, study documents, feedback, and related interactions. A feedback submission includes its category, subject, message, the page path where it was submitted, and browser user-agent information. PwaniNet also records the account and date and time of authenticated activity, and handles account, session, device, and technical information needed to operate and protect the service.</p>
+
+  <h2 class="h4 mt-4">How information is used</h2>
+  <p>Information is used to manage accounts, provide features, show content to the audiences selected for those features, review feedback and reports, understand platform activity, protect the service, respond to requests, and meet legal obligations.</p>
+
+  <h2 class="h4 mt-4">Content you share</h2>
+  <p>Your posts and uploads are associated with your account. Their visibility depends on feature settings and the audience you select. Share carefully and upload only material you created or have permission to share. Others may copy or save content they can access, so removing it from PwaniNet may not remove copies elsewhere.</p>
+  <p>You keep the rights you have in content you create. You allow PwaniNet to store and display that content as needed to provide the service and according to the audience settings you choose.</p>
+
+  <h2 class="h4 mt-4">Service providers and retention</h2>
+  <p>Service providers may process information on PwaniNet's behalf to host and operate the service. PwaniNet does not sell your personal information. Information is kept for as long as needed to provide and protect PwaniNet, meet legal obligations, and resolve disputes.</p>
+
+  <h2 class="h4 mt-4">Your choices and requests</h2>
+  <p>You can update information through available account settings. You can ask about your information, request a correction or deletion, or raise a privacy concern by contacting us. We may need to verify your identity before acting on a request.</p>
+
+  <h2 class="h4 mt-4">Cookies and device storage</h2>
+  <p>PwaniNet uses cookies and browser or device storage to keep you signed in, remember settings, and support site features. You can manage these through your browser or device settings; some features may not work properly if required storage is disabled.</p>
+
+  <h2 class="h4 mt-4">Changes and contact</h2>
+  <p>Changes to this policy will be published here. For privacy questions or requests, email <a href="mailto:Engineerzayne005@gmail.com">Engineerzayne005@gmail.com</a>.</p>
+  <p><a href="{% url 'public_about' %}">About PwaniNet</a> · <a href="{% url 'public_licenses' %}">Licences and attributions</a></p>
+</article>
+{% endblock %}

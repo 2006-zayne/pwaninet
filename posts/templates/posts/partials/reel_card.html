@@ -143,10 +143,11 @@
                 <li>
                     <button class="dropdown-item d-flex align-items-center gap-2"
                             hx-post="/api/author-preferences/"
-                            hx-vals='{"author": {{ post.author.id }}, "preference": "less"}'
+                            hx-vals='{"author": {{ post.author.id }}, "preference": "none"}'
                             hx-target="body"
-                            hx-swap="none">
-                        <i class="bi bi-person-dash"></i> {% trans "See less from" %} {{ post.author.username }}
+                            hx-swap="none"
+                            hx-on::after-request="if(event.detail.successful) window.location.reload()">
+                        <i class="bi bi-person-dash"></i> {% trans "Hide posts from" %} {{ post.author.username }}
                     </button>
                 </li>
                 <li>

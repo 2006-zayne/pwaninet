@@ -1,11 +1,10 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.http import HttpResponse, JsonResponse
 from django.contrib import messages
 from django.utils import timezone
-from .models import FeedbackTicket, FeedbackReply
+from .models import FeedbackTicket, FeedbackReply, UserDailyActivity
 from notifications.events.publisher import EventPublisher
-from notifications.events.registry import EventSources
+from notifications.events.registry import EventSources, EventTypes
 from django.contrib.auth import get_user_model
 from posts.models import Report
 from groups.models import Group
@@ -28,32 +27,39 @@ def dashboard_home(request):
     open_tickets_count = FeedbackTicket.objects.filter(status__in=[FeedbackTicket.Status.OPEN, FeedbackTicket.Status.IN_PROGRESS]).count()
     
     total_users = User.objects.count()
-    online_users = User.objects.filter(is_online=True).count()
-    pending_reports = Report.objects.count()
+    pending_reports = Report.objects.filter(status=Report.Status.PENDING).count()
     
     recent_feedback = FeedbackTicket.objects.filter(status=FeedbackTicket.Status.UNREAD).order_by('-created_at')[:5]
     
     # Generate data for the last 14 days
-    today = timezone.now().date()
+    now = timezone.now()
+    today = timezone.localdate(now)
+    active_since = now - timedelta(minutes=5)
+    online_users = UserDailyActivity.objects.filter(
+        activity_date=today,
+        last_seen_at__gte=active_since,
+    ).values('user_id').distinct().count()
+    daily_active_users = UserDailyActivity.objects.filter(
+        activity_date=today,
+    ).values('user_id').distinct().count()
     fourteen_days_ago = today - timedelta(days=13)
     
     # 1. User Growth (New signups per day)
-    growth_qs = User.objects.filter(date_joined__date__gte=fourteen_days_ago)\
-        .annotate(day=TruncDate('date_joined'))\
+    growth_qs = User.objects.filter(date_joined__date__gte=fourteen_days_ago, date_joined__date__lte=today)\
+        .annotate(day=TruncDate('date_joined', tzinfo=timezone.get_current_timezone()))\
         .values('day')\
         .annotate(count=Count('id'))\
         .order_by('day')
         
     growth_dict = {str(item['day']): item['count'] for item in growth_qs}
     
-    # 2. Daily Active Users (using last_login)
-    active_qs = User.objects.filter(last_login__date__gte=fourteen_days_ago)\
-        .annotate(day=TruncDate('last_login'))\
-        .values('day')\
-        .annotate(count=Count('id'))\
-        .order_by('day')
-        
-    active_dict = {str(item['day']): item['count'] for item in active_qs}
+    # 2. Daily active users from authenticated request heartbeats.
+    active_qs = UserDailyActivity.objects.filter(
+        activity_date__gte=fourteen_days_ago,
+        activity_date__lte=today,
+    ).values('activity_date').annotate(count=Count('user_id', distinct=True)).order_by('activity_date')
+
+    active_dict = {str(item['activity_date']): item['count'] for item in active_qs}
     
     # Fill in missing days
     labels = []
@@ -71,6 +77,7 @@ def dashboard_home(request):
         'open_tickets_count': open_tickets_count,
         'total_users': total_users,
         'online_users': online_users,
+        'daily_active_users': daily_active_users,
         'pending_reports': pending_reports,
         'recent_feedback': recent_feedback,
         'chart_labels': json.dumps(labels),
@@ -155,24 +162,67 @@ def feedback_detail(request, ticket_id):
 @login_required
 def submit_feedback(request):
     if request.method == 'POST':
-        subject = request.POST.get('subject')
+        subject = request.POST.get('subject', '').strip()
         category = request.POST.get('category', FeedbackTicket.Category.OTHER)
-        message = request.POST.get('message')
-        current_url = request.POST.get('current_url', '')
+        message = request.POST.get('message', '').strip()
+        current_url = request.POST.get('current_url', '').strip()[:500]
         device_info = request.META.get('HTTP_USER_AGENT', '')
-        
-        if subject and message:
-            FeedbackTicket.objects.create(
-                sender=request.user,
-                subject=subject,
-                category=category,
-                message=message,
-                current_url=current_url,
-                device_info=device_info
-            )
-            return HttpResponse('<div class="alert alert-success">Feedback submitted successfully! Our admins will review it shortly.</div>')
-            
-    return render(request, 'admin_dashboard/partials/submit_feedback_modal.html')
+
+        error_message = None
+        if not subject:
+            error_message = 'Add a short subject so we can identify your feedback.'
+        elif len(subject) > 255:
+            error_message = 'Keep the subject under 256 characters.'
+        elif not message:
+            error_message = 'Write a message before submitting.'
+        elif len(message) > 10000:
+            error_message = 'Keep your message under 10,000 characters.'
+        elif category not in FeedbackTicket.Category.values:
+            category = FeedbackTicket.Category.OTHER
+
+        if error_message:
+            return render(request, 'admin_dashboard/partials/feedback_composer.html', {
+                'error_message': error_message,
+                'category_choices': FeedbackTicket.Category.choices,
+                'form_values': {
+                    'category': category,
+                    'subject': subject,
+                    'message': message,
+                    'current_url': current_url,
+                },
+            })
+
+        ticket = FeedbackTicket.objects.create(
+            sender=request.user,
+            subject=subject,
+            category=category,
+            message=message,
+            current_url=current_url,
+            device_info=device_info,
+        )
+        EventPublisher.publish(
+            event_type=EventTypes.ADMIN_FEEDBACK_SUBMITTED.value,
+            source=EventSources.ADMIN.value,
+            action='submitted',
+            target_type='FeedbackTicket',
+            target_id=str(ticket.id),
+            actor=request.user,
+            context_type='FeedbackTicket',
+            context_id=str(ticket.id),
+            audience='ADMINISTRATORS',
+            metadata={
+                'ticket_id': str(ticket.id),
+                'context_name': ticket.subject,
+            },
+        )
+        return render(request, 'admin_dashboard/partials/feedback_composer.html', {
+            'submitted': True,
+            'category_choices': FeedbackTicket.Category.choices,
+        })
+
+    return render(request, 'admin_dashboard/partials/feedback_composer.html', {
+        'category_choices': FeedbackTicket.Category.choices,
+    })
 
 
 @login_required

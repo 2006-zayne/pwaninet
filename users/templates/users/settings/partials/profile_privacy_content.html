@@ -34,9 +34,7 @@
           <div class="privacy-option-content">
             <div class="privacy-option-title">{{ label }}</div>
             <div class="privacy-option-description">
-              {% if value == 'PUBLIC' %}
-                {% trans "Anyone on the internet can view your profile" %}
-              {% elif value == 'AUTHENTICATED' %}
+              {% if value == 'AUTHENTICATED' %}
                 {% trans "Only PwaniNet users can view your profile" %}
               {% elif value == 'FOLLOWERS' %}
                 {% trans "Only your followers can view your profile" %}

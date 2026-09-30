@@ -276,6 +276,10 @@ urlpatterns = [
     # Custom login with diagnostics and structured logging
     path('accounts/login/', PwaniLoginView.as_view(), name='login'),
     path('login/', PwaniLoginView.as_view(), name='login_direct'),
+    # Public project and privacy information.
+    path('about/', TemplateView.as_view(template_name='legal/about.html'), name='public_about'),
+    path('privacy/', TemplateView.as_view(template_name='legal/privacy.html'), name='public_privacy'),
+    path('licenses/', TemplateView.as_view(template_name='legal/licenses.html'), name='public_licenses'),
     # Phase 3: 2FA challenge (shown after valid password, before full login)
     path('login/2fa/', login_2fa_challenge_view, name='login_2fa_challenge'),
     # This maps 'accounts/logout/' and remaining auth views automatically

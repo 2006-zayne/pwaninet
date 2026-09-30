@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import List, Callable, Optional, Dict, Any
 from enum import Enum
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 
 User = get_user_model()
 
@@ -1024,6 +1025,35 @@ ADMIN_FEEDBACK_REPLY_RULE = NotificationRule(
     ]
 )
 
+
+def _active_admin_recipients(event_data: Dict[str, Any]) -> List[int]:
+    """Notify active staff and superusers when a student sends feedback."""
+    actor_id = event_data.get('actor_id')
+    admins = User.objects.filter(is_active=True).filter(Q(is_staff=True) | Q(is_superuser=True))
+    if actor_id:
+        admins = admins.exclude(pk=actor_id)
+    return list(admins.values_list('pk', flat=True))
+
+
+ADMIN_FEEDBACK_SUBMITTED_RULE = NotificationRule(
+    name="New Student Feedback",
+    trigger="admin.feedback.submitted",
+    notification_type="SYSTEM",
+    category="SYSTEM",
+    priority="HIGH",
+    recipients=_active_admin_recipients,
+    title_template="New feedback: {context_name}",
+    summary_template="{actor_username} submitted feedback for the admin team to review.",
+    delivery_policy="IMMEDIATE",
+    aggregation_policy="NEVER",
+    actions=lambda data: [{
+        'action_type': 'LINK',
+        'label': 'Open Feedback',
+        'url': f"/dashboard/feedback/{data.get('target_id', '')}/",
+        'style': 'primary',
+    }],
+)
+
 # All rules registry
 RULES_REGISTRY = [
     POST_LIKE_RULE,
@@ -1055,6 +1085,7 @@ RULES_REGISTRY = [
     COURSE_ASSIGNMENT_PUBLISHED_RULE,
     RELEASE_PUBLISHED_RULE,
     ADMIN_FEEDBACK_REPLY_RULE,
+    ADMIN_FEEDBACK_SUBMITTED_RULE,
 ]
 
 

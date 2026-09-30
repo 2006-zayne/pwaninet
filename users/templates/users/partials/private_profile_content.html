@@ -1,0 +1,25 @@
+{% load i18n %}
+{% load static %}
+
+<main class="container py-5" id="private-profile">
+  <section class="card border-0 shadow-sm mx-auto text-center p-4" style="max-width: 34rem;">
+    <img src="{{ profile_user.profile_pic.url }}"
+         alt="{% trans 'Profile picture' %}"
+         class="rounded-circle mx-auto mb-3"
+         style="width: 5rem; height: 5rem; object-fit: cover;">
+    <div class="position-relative d-flex justify-content-center align-items-center mb-3">
+      <h1 class="h5 mb-0">@{{ profile_user.username }}</h1>
+      {% include 'users/partials/profile_actions_menu.html' %}
+    </div>
+    {% if profile_user.profile_privacy == 'FOLLOWERS' %}
+      <p class="text-muted">{% trans "This profile is visible to followers only. Follow this student to see their profile details and posts." %}</p>
+    {% else %}
+      <p class="text-muted mb-0">{% trans "This student has chosen to keep their profile private." %}</p>
+    {% endif %}
+    {% if profile_user.profile_privacy == 'FOLLOWERS' and not is_following %}
+      <div class="mx-auto" style="max-width: 14rem;">
+        {% include 'users/partials/follow_button_profile.html' %}
+      </div>
+    {% endif %}
+  </section>
+</main>

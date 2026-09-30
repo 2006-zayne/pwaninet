@@ -68,8 +68,9 @@ def get_suggested_groups_from_following(user, limit = 10):
     ).order_by('-suggestion_score', '-following_member_count', '-member_count', 'name')[:limit]
 
 
-def get_group_posts(group):
-    return Post.objects.filter(group = group).select_related('author', 'unit', 'group').prefetch_related('likes').order_by('-created_at')
+def get_group_posts(group, user):
+    from users.services.privacy import visible_posts_for
+    return visible_posts_for(user, Post.objects.filter(group=group)).select_related('author', 'unit', 'group').prefetch_related('likes').order_by('-created_at')
 
 
 def is_group_member(group, user):
@@ -84,4 +85,3 @@ def search_invite_candidates(query, group, limit = 10):
     if not query:
         return None
     return User.objects.filter(username__icontains = query).exclude(id__in = get_group_member_exclusion_ids(group))[:limit]
-

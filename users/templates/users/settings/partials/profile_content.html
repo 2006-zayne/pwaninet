@@ -151,6 +151,29 @@
       </div>
     </div>
   </div>
+
+  <section class="settings-list-container border-danger mt-4" aria-labelledby="delete-account-title">
+    <div class="settings-list-header bg-danger bg-opacity-10">
+      <div class="settings-list-header-icon bg-danger"><i class="bi bi-exclamation-triangle"></i></div>
+      <div class="settings-list-header-content">
+        <h2 class="settings-list-header-title text-danger mb-1" id="delete-account-title">{% trans "Delete account" %}</h2>
+        <div class="settings-list-header-subtitle">{% trans "Choose whether your posts and uploads should also be deleted or kept without your profile details." %}</div>
+      </div>
+    </div>
+    <div class="settings-list-body p-3">
+      <form method="post" action="{% url 'users:settings_delete_account' %}" class="d-grid gap-3">
+        {% csrf_token %}
+        <label class="form-check-label"><input class="form-check-input me-2" type="radio" name="content_action" value="erase" required> {% trans "Delete my account and its posts, comments, and uploaded content" %}</label>
+        <label class="form-check-label"><input class="form-check-input me-2" type="radio" name="content_action" value="anonymize" required> {% trans "Delete my profile and sign-in, but keep my posts, comments, and uploads under a generic deleted-account name" %}</label>
+        <div>
+          <label class="form-label" for="delete-account-password">{% trans "Enter your password to confirm" %}</label>
+          <input class="form-control" id="delete-account-password" type="password" name="password" autocomplete="current-password" required>
+        </div>
+        <label class="form-check-label text-danger"><input class="form-check-input me-2" type="checkbox" name="confirm_delete" value="yes" required> {% trans "I understand this action cannot be undone" %}</label>
+        <button class="btn btn-danger" type="submit">{% trans "Delete my account" %}</button>
+      </form>
+    </div>
+  </section>
 </div>
 
 <style>

@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block content %}
+<article class="container py-4" style="max-width: 860px;">
+  <h1>{% trans "About PwaniNet" %}</h1>
+  <p>PwaniNet is a student community and learning-resource platform for students at Pwani University. It brings student discussions, campus updates, groups, and study resources together in one place.</p>
+  <p>PwaniNet is an independent project created by Zayne Earthman, a student at Pwani University. The project is seeking University guidance and permission regarding its name and relationship to the University; that process is ongoing. PwaniNet is not currently an official Pwani University service or a University assignment.</p>
+
+  <h2 class="h4 mt-4">Share thoughtfully</h2>
+  <p>Posts and uploads are associated with your account and may be seen according to the audience and privacy settings for that feature. Avoid sharing private or confidential information. Upload photos, past papers, lecture notes, and other material only when you created it or have permission to share it. Other people may copy or save content they can access, so removing it from PwaniNet may not remove every copy.</p>
+
+  <h2 class="h4 mt-4">Who can use PwaniNet?</h2>
+  <p>PwaniNet is intended for students enrolled at Pwani University.</p>
+
+  <h2 class="h4 mt-4">Contact</h2>
+  <p>For questions, privacy requests, or content concerns, email <a href="mailto:Engineerzayne005@gmail.com">Engineerzayne005@gmail.com</a>.</p>
+  <p><a href="{% url 'public_privacy' %}">Privacy Policy</a> · <a href="{% url 'public_licenses' %}">Licences and attributions</a></p>
+</article>
+{% endblock %}

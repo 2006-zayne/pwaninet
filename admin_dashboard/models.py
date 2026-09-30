@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 import uuid
+from django.utils import timezone
 
 class FeedbackTicket(models.Model):
     class Status(models.TextChoices):
@@ -60,3 +61,24 @@ class FeedbackReply(models.Model):
         
     def __str__(self):
         return f"Reply on {self.ticket.id} by {self.sender.username}"
+
+
+class UserDailyActivity(models.Model):
+    """One activity heartbeat per account and local calendar day."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='daily_activity',
+    )
+    activity_date = models.DateField(db_index=True)
+    last_seen_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'activity_date'], name='unique_user_daily_activity'),
+        ]
+        indexes = [models.Index(fields=['activity_date', 'last_seen_at'], name='admin_daily_activity_idx')]
+
+    def __str__(self):
+        return f"{self.user_id} active on {self.activity_date}"

@@ -1,0 +1,24 @@
+{% load i18n %}
+
+{% if request.user.is_authenticated and request.user != profile_user %}
+<div class="dropdown profile-actions-menu position-absolute end-0 top-50 translate-middle-y">
+    <button type="button"
+            class="btn btn-sm rounded-circle profile-actions-toggle"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+            aria-label="{% trans 'Profile options' %}">
+        <i class="bi bi-three-dots-vertical"></i>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+        <li>
+            <form method="post" action="{% url 'users:api_block_user' profile_user.id %}"
+                  onsubmit="return confirm('{% trans 'Block this student? They will not be able to view your profile or posts.' %}')">
+                {% csrf_token %}
+                <button type="submit" class="dropdown-item text-danger">
+                    <i class="bi bi-person-fill-slash me-2" aria-hidden="true"></i>{% trans "Block student" %}
+                </button>
+            </form>
+        </li>
+    </ul>
+</div>
+{% endif %}

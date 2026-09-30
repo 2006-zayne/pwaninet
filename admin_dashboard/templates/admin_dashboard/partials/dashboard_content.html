@@ -1,189 +1,183 @@
-<div class="page-header px-4 py-3 border-bottom">
-  <h1 class="page-title fs-3 mb-1">Admin Dashboard</h1>
-  <p class="text-muted small mb-0">Platform telemetry and support mailbox</p>
-</div>
+<style>
+  .admin-dashboard { --admin-ink: #172b4d; --admin-muted: #718096; --admin-line: #e8edf3; color: var(--admin-ink); }
+  .admin-dashboard .dashboard-heading { padding: 2rem clamp(1.25rem, 3vw, 2.5rem) 1.25rem; }
+  .admin-dashboard .dashboard-body { padding: 1rem clamp(1.25rem, 3vw, 2.5rem) 2.5rem; }
+  .admin-dashboard .eyebrow { color: #64748b; font-size: .72rem; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
+  .admin-dashboard .metric-card, .admin-dashboard .panel-card { background: var(--bs-body-bg, #fff); border: 1px solid var(--admin-line) !important; border-radius: 16px; box-shadow: 0 4px 16px rgba(23, 43, 77, .045) !important; }
+  .admin-dashboard .metric-card { min-height: 190px; transition: transform .18s ease, box-shadow .18s ease; }
+  .admin-dashboard .metric-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(23, 43, 77, .09) !important; }
+  .admin-dashboard .metric-icon { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 13px; font-size: 1.2rem; }
+  .admin-dashboard .metric-value { color: var(--admin-ink); font-size: clamp(1.8rem, 3vw, 2.35rem); font-weight: 750; letter-spacing: -.045em; line-height: 1.1; }
+  .admin-dashboard .metric-label { color: var(--admin-muted); font-size: .78rem; font-weight: 600; }
+  .admin-dashboard .panel-card .card-body { padding: 1.35rem; }
+  .admin-dashboard .panel-title { color: var(--admin-ink); font-size: 1rem; font-weight: 700; }
+  .admin-dashboard .chart-wrap { position: relative; height: 270px; width: 100%; }
+  .admin-dashboard .feedback-row { color: inherit; border-color: var(--admin-line); padding: 1rem 1.25rem; transition: background-color .15s ease; }
+  .admin-dashboard .feedback-row:hover { background: rgba(37, 99, 235, .045); }
+  .admin-dashboard .feedback-avatar { width: 38px; height: 38px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 12px; color: #2563eb; background: #eff6ff; }
+  .admin-dashboard .live-dot { display: inline-block; width: 8px; height: 8px; margin-right: .35rem; border-radius: 50%; background: #22a06b; box-shadow: 0 0 0 3px rgba(34, 160, 107, .12); }
+  html[data-theme="dark"] .admin-dashboard { --admin-ink: #e5eaf2; --admin-muted: #a4afbf; --admin-line: #303b4b; }
+  html[data-theme="dark"] .admin-dashboard .metric-card, html[data-theme="dark"] .admin-dashboard .panel-card { background: #1c2532; }
+  html[data-theme="dark"] .admin-dashboard .feedback-avatar { color: #93c5fd; background: #20334b; }
+  @media (max-width: 575.98px) { .admin-dashboard .dashboard-heading { padding-top: 1.35rem; } .admin-dashboard .metric-card { min-height: 170px; } .admin-dashboard .chart-wrap { height: 225px; } }
+</style>
 
-<div class="p-4">
-  <div class="row g-4 mb-4">
-    <!-- Mailbox Card -->
-    <div class="col-md-6 col-lg-3">
-      <div class="card text-dark border-0 shadow-sm h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center mb-3">
-            <div class="flex-shrink-0 bg-primary bg-opacity-10 text-primary rounded p-3">
-              <i class="bi bi-inbox-fill fs-4"></i>
-            </div>
-            <div class="ms-3">
-              <h6 class="card-title mb-1">Feedback Mailbox</h6>
-              <a href="{% url 'admin_dashboard:feedback_inbox' %}" 
-                 hx-get="{% url 'admin_dashboard:feedback_inbox' %}" 
-                 hx-target="#page-content-target" 
-                 hx-push-url="true" 
-                 class="text-decoration-none small">View Inbox <i class="bi bi-arrow-right"></i></a>
-            </div>
-          </div>
-          <div class="row text-center">
-            <div class="col-6 border-end">
-              <h3 class="mb-0 fw-bold">{{ unread_feedback_count }}</h3>
-              <span class="text-muted small">Unread</span>
-            </div>
-            <div class="col-6">
-              <h3 class="mb-0 fw-bold">{{ open_tickets_count }}</h3>
-              <span class="text-muted small">Open</span>
-            </div>
-          </div>
-        </div>
+<main class="admin-dashboard">
+  <header class="dashboard-heading d-flex flex-wrap justify-content-between align-items-end gap-3">
+    <div>
+      <div class="eyebrow mb-2">Overview</div>
+      <h1 class="page-title mb-1" style="font-size:clamp(1.65rem, 3vw, 2rem);font-weight:750;letter-spacing:-.04em;">Admin dashboard</h1>
+      <p class="text-muted mb-0">A clear view of platform activity, support, and safety.</p>
+    </div>
+    <a href="{% url 'admin_dashboard:feedback_inbox' %}" hx-get="{% url 'admin_dashboard:feedback_inbox' %}" hx-target="#page-content-target" hx-push-url="true" class="btn btn-primary rounded-3 px-3 py-2">
+      <i class="bi bi-inbox me-2"></i>Open feedback inbox
+    </a>
+  </header>
+
+  <div class="dashboard-body">
+    <div class="row g-3 g-xl-4 mb-4">
+      <div class="col-sm-6 col-xl-3">
+        <section class="card metric-card h-100"><div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start mb-4"><div><div class="eyebrow mb-1">Community</div><div class="fw-semibold">Registered users</div></div><span class="metric-icon text-primary" style="background:#eff6ff"><i class="bi bi-people-fill"></i></span></div>
+          <div class="metric-value">{{ total_users }}</div><div class="metric-label mt-2">Total accounts</div>
+        </div></section>
+      </div>
+      <div class="col-sm-6 col-xl-3">
+        <section class="card metric-card h-100"><div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start mb-4"><div><div class="eyebrow mb-1">Engagement</div><div class="fw-semibold">Active today</div></div><span class="metric-icon text-success" style="background:#ecfdf3"><i class="bi bi-activity"></i></span></div>
+          <div class="metric-value">{{ daily_active_users }}</div><div class="metric-label mt-2">Unique users today</div>
+        </div></section>
+      </div>
+      <div class="col-sm-6 col-xl-3">
+        <section class="card metric-card h-100"><div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start mb-4"><div><div class="eyebrow mb-1">Online</div><div class="fw-semibold">Live now</div></div><span class="metric-icon text-success" style="background:#ecfdf3"><i class="bi bi-broadcast"></i></span></div>
+          <div class="metric-value"><span class="live-dot"></span>{{ online_users }}</div><div class="metric-label mt-2">Seen in the last five minutes</div>
+        </div></section>
+      </div>
+      <div class="col-sm-6 col-xl-3">
+        <section class="card metric-card h-100"><div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start mb-4"><div><div class="eyebrow mb-1">Needs attention</div><div class="fw-semibold">Pending reports</div></div><span class="metric-icon text-warning" style="background:#fff7e6"><i class="bi bi-shield-exclamation"></i></span></div>
+          <div class="metric-value">{{ pending_reports }}</div><div class="metric-label mt-2">Awaiting moderation</div>
+        </div></section>
       </div>
     </div>
 
-    <!-- Users Card -->
-    <div class="col-md-6 col-lg-3">
-      <div class="card text-dark border-0 shadow-sm h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center mb-3">
-            <div class="flex-shrink-0 bg-success bg-opacity-10 text-success rounded p-3">
-              <i class="bi bi-people-fill fs-4"></i>
-            </div>
-            <div class="ms-3">
-              <h6 class="card-title mb-1">Users</h6>
-              <span class="text-muted small">Platform growth</span>
-            </div>
-          </div>
-          <div class="row text-center">
-            <div class="col-6 border-end">
-              <h3 class="mb-0 fw-bold">{{ total_users }}</h3>
-              <span class="text-muted small">Total</span>
-            </div>
-            <div class="col-6">
-              <h3 class="mb-0 fw-bold text-success">{{ online_users }}</h3>
-              <span class="text-muted small">Online Now</span>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="row g-3 g-xl-4 mb-4">
+      <div class="col-12 col-xl-6"><section class="card panel-card h-100"><div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-3"><div><h2 class="panel-title mb-1">User growth</h2><div class="text-muted small">New registrations over the last 14 days</div></div><span class="metric-icon text-primary" style="background:#eff6ff"><i class="bi bi-graph-up-arrow"></i></span></div>
+        <div class="chart-wrap"><canvas id="growthChart"></canvas><div class="text-muted small" data-chart-fallback aria-live="polite"></div></div>
+      </div></section></div>
+      <div class="col-12 col-xl-6"><section class="card panel-card h-100"><div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-3"><div><h2 class="panel-title mb-1">Daily active users</h2><div class="text-muted small">Engagement over the last 14 days</div></div><span class="metric-icon text-success" style="background:#ecfdf3"><i class="bi bi-bar-chart-line"></i></span></div>
+        <div class="chart-wrap"><canvas id="activeChart"></canvas><div class="text-muted small" data-chart-fallback aria-live="polite"></div></div>
+      </div></section></div>
     </div>
-    
-    <!-- Moderation Card -->
-    <div class="col-md-6 col-lg-3">
-      <div class="card text-dark border-0 shadow-sm h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center mb-3">
-            <div class="flex-shrink-0 bg-warning bg-opacity-10 text-warning rounded p-3">
-              <i class="bi bi-shield-exclamation fs-4"></i>
-            </div>
-            <div class="ms-3">
-              <h6 class="card-title mb-1">Moderation</h6>
-              <span class="text-muted small">Content safety</span>
-            </div>
-          </div>
-          <div class="text-center mt-3">
-             <h3 class="mb-0 fw-bold">{{ pending_reports }}</h3>
-             <span class="text-muted small">Pending Reports</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  <div class="row g-4 mb-4">
-    <!-- Graphs -->
-    <div class="col-md-6">
-      <div class="card text-dark border-0 shadow-sm h-100">
-        <div class="card-body">
-          <h6 class="card-title fw-bold mb-3">User Growth (Last 14 days)</h6>
-          <div style="position: relative; height: 250px; width: 100%;">
-            <canvas id="growthChart"></canvas>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <div class="col-md-6">
-      <div class="card text-dark border-0 shadow-sm h-100">
-        <div class="card-body">
-          <h6 class="card-title fw-bold mb-3">Daily Active Users (Last 14 days)</h6>
-          <div style="position: relative; height: 250px; width: 100%;">
-            <canvas id="activeChart"></canvas>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <h4 class="fs-5 mb-3">Recent Unread Feedback</h4>
-  <div class="list-group shadow-sm">
+    <section class="card panel-card overflow-hidden">
+      <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-2 border-bottom">
+        <div><h2 class="panel-title mb-1">Recent unread feedback</h2><div class="text-muted small">The latest messages waiting for a response</div></div>
+        <div class="d-flex align-items-center gap-3"><span class="badge rounded-pill text-bg-primary">{{ unread_feedback_count }} unread</span><span class="text-muted small">{{ open_tickets_count }} open</span><a href="{% url 'admin_dashboard:feedback_inbox' %}" hx-get="{% url 'admin_dashboard:feedback_inbox' %}" hx-target="#page-content-target" hx-push-url="true" class="small fw-semibold text-decoration-none">View all <i class="bi bi-arrow-right ms-1"></i></a></div>
+      </div>
+      <div class="list-group list-group-flush">
     {% for ticket in recent_feedback %}
     <a href="{% url 'admin_dashboard:feedback_detail' ticket.id %}" 
        hx-get="{% url 'admin_dashboard:feedback_detail' ticket.id %}" 
        hx-target="#page-content-target" 
        hx-push-url="true" 
-       class="list-group-item text-dark list-group-item-action d-flex justify-content-between align-items-center">
-      <div>
-        <h6 class="mb-1">{{ ticket.subject }}</h6>
-        <p class="mb-0 text-muted small">{{ ticket.sender.username }} • {{ ticket.created_at|timesince }} ago</p>
+       class="list-group-item list-group-item-action feedback-row d-flex justify-content-between align-items-center gap-3">
+      <div class="d-flex align-items-center gap-3 min-w-0">
+        <span class="feedback-avatar"><i class="bi bi-chat-left-text"></i></span>
+        <div class="min-w-0"><h3 class="h6 mb-1 text-truncate">{{ ticket.subject }}</h3>
+        <p class="mb-0 text-muted small">{{ ticket.sender.username }} <span class="mx-1">·</span>{{ ticket.created_at|timesince }} ago</p></div>
       </div>
-      <span class="badge bg-primary rounded-pill">{{ ticket.get_category_display }}</span>
+      <span class="d-flex align-items-center gap-2 flex-shrink-0"><span class="badge rounded-pill text-bg-light border">{{ ticket.get_category_display }}</span><i class="bi bi-chevron-right text-muted small"></i></span>
     </a>
     {% empty %}
-    <div class="list-group-item text-dark text-center text-muted py-4">
+    <div class="list-group-item text-center text-muted py-5">
       <i class="bi bi-check-circle fs-3 d-block mb-2 text-success"></i>
-      Inbox zero! No unread feedback.
+      <div class="fw-semibold">You’re all caught up</div><div class="small mt-1">There is no unread feedback right now.</div>
     </div>
     {% endfor %}
+      </div>
+    </section>
   </div>
-</div>
+</main>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   (function() {
-    if (!document.getElementById('growthChart')) return;
-    
-    // Set chart default color based on current theme
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    Chart.defaults.color = isDark ? '#e4e6eb' : '#666';
-    Chart.defaults.scale.grid.color = isDark ? '#3a3b3c' : '#e5e5e5';
-    Chart.defaults.scale.grid.borderColor = isDark ? '#3a3b3c' : '#e5e5e5';
-
     const labels = {{ chart_labels|safe }};
     const growthData = {{ growth_data|safe }};
     const activeData = {{ active_data|safe }};
-    
-    new Chart(document.getElementById('growthChart'), {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'New Registrations',
-          data: growthData,
-          borderColor: '#0d6efd',
-          backgroundColor: 'rgba(13, 110, 253, 0.1)',
-          tension: 0.3,
-          fill: true
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-      }
-    });
 
-    new Chart(document.getElementById('activeChart'), {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Active Users',
-          data: activeData,
-          backgroundColor: '#198754',
-          borderRadius: 4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-      }
-    });
+    function loadChartJs() {
+      if (window.Chart) return Promise.resolve(window.Chart);
+      if (window.pwaninetChartJsPromise) return window.pwaninetChartJsPromise;
+      window.pwaninetChartJsPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        script.onload = () => resolve(window.Chart);
+        script.onerror = () => {
+          window.pwaninetChartJsPromise = null;
+          reject(new Error('Chart.js failed to load'));
+        };
+        document.head.appendChild(script);
+      });
+      return window.pwaninetChartJsPromise;
+    }
+
+    function renderDashboardCharts() {
+      const growthCanvas = document.getElementById('growthChart');
+      const activeCanvas = document.getElementById('activeChart');
+      if (!growthCanvas || !activeCanvas) return;
+
+      loadChartJs().then((Chart) => {
+        if (!Chart || !growthCanvas.isConnected || !activeCanvas.isConnected) return;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        Chart.defaults.color = isDark ? '#e4e6eb' : '#666';
+        Chart.defaults.scale.grid.color = isDark ? '#3a3b3c' : '#e5e5e5';
+        Chart.defaults.scale.grid.borderColor = isDark ? '#3a3b3c' : '#e5e5e5';
+
+        Chart.getChart(growthCanvas)?.destroy();
+        Chart.getChart(activeCanvas)?.destroy();
+        new Chart(growthCanvas, {
+          type: 'line',
+          data: { labels, datasets: [{
+            label: 'New Registrations', data: growthData,
+            borderColor: '#0d6efd', backgroundColor: 'rgba(13, 110, 253, 0.1)',
+            tension: 0.3, fill: true
+          }] },
+          options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+        });
+        new Chart(activeCanvas, {
+          type: 'bar',
+          data: { labels, datasets: [{
+            label: 'Active Users', data: activeData,
+            backgroundColor: '#198754', borderRadius: 4
+          }] },
+          options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+        });
+      }).catch(() => {
+        document.querySelectorAll('[data-chart-fallback]').forEach((el) => {
+          el.textContent = 'Charts could not be loaded. Please try refreshing.';
+        });
+      });
+    }
+
+    window.pwaninetRenderDashboardCharts = renderDashboardCharts;
+    renderDashboardCharts();
+    if (!window.pwaninetDashboardChartEventsBound) {
+      window.pwaninetDashboardChartEventsBound = true;
+      const renderCurrentDashboardCharts = () => {
+        if (typeof window.pwaninetRenderDashboardCharts === 'function') {
+          window.pwaninetRenderDashboardCharts();
+        }
+      };
+      document.addEventListener('htmx:afterSwap', renderCurrentDashboardCharts);
+      document.addEventListener('themeChanged', renderCurrentDashboardCharts);
+    }
   })();
 </script>

@@ -28,6 +28,7 @@ from .permissions import CanDeletePost, CanEditPost, IsPostAuthorOrReadOnly
 from groups.permissions import IsApprovedMember
 from courses.models import Unit
 from users.models import User
+from users.services.privacy import visible_posts_for
 from posts.forms import PostForm
 from posts.services.comment_service import build_comments_context, handle_add_comment_request, toggle_comment_like_for_user, add_comment_to_image
 from posts.services.feed_service import build_home_feed_context
@@ -54,6 +55,9 @@ class PostViewSet(viewsets.ModelViewSet):
         elif self.action in ['update', 'partial_update']:
             return PostUpdateSerializer
         return PostSerializer
+
+    def get_queryset(self):
+        return visible_posts_for(self.request.user, self.queryset)
 
     def get_permissions(self):
         if self.action == 'destroy':
@@ -414,6 +418,8 @@ class PostViewSet(viewsets.ModelViewSet):
         post = self.get_object()
         try:
             hidden_post = hide_post(request.user, post)
+            if request.headers.get('HX-Request'):
+                return HttpResponse('', status=status.HTTP_200_OK)
             return Response(
                 {'detail': 'Post hidden successfully.'},
                 status=status.HTTP_201_CREATED
@@ -731,6 +737,8 @@ class ReportViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Only allow admins to see reports
         user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return self.queryset
         from groups.models import Membership, MembershipRole, MembershipStatus
 
         # Get all groups where user is admin or moderator
@@ -1040,7 +1048,7 @@ def _is_safe_previous_page(url_str, request_host, share_id):
 
 
 def post_detail_view(request, share_id):
-    post = get_object_or_404(Post, share_id=share_id)
+    post = get_object_or_404(visible_posts_for(request.user), share_id=share_id)
     shared_by = request.GET.get('shared_by', '')
     show_all = request.GET.get('show_all') == '1'
     is_reel_requested = (post.is_reel or request.GET.get('reel') == '1') and not show_all
@@ -1106,7 +1114,7 @@ def post_detail_view(request, share_id):
 
 @login_required
 def add_comment(request, share_id):
-    post = get_object_or_404(Post, share_id=share_id)
+    post = get_object_or_404(visible_posts_for(request.user), share_id=share_id)
     if request.method == 'POST':
         comment = handle_add_comment_request(request, post)
         if request.headers.get('HX-Request'):
@@ -1135,7 +1143,7 @@ def toggle_comment_like(request, comment_id):
 
 @login_required
 def toggle_like(request, share_id):
-    post = get_object_or_404(Post, share_id=share_id)
+    post = get_object_or_404(visible_posts_for(request.user), share_id=share_id)
     result = toggle_post_like_for_user(post, request.user)
     is_reel = request.GET.get('is_reel') == '1' or request.POST.get('is_reel') == '1'
 
@@ -1160,7 +1168,7 @@ def toggle_like(request, share_id):
 @login_required
 def post_likers_list(request, share_id):
     from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-    post = get_object_or_404(Post, share_id=share_id)
+    post = get_object_or_404(visible_posts_for(request.user), share_id=share_id)
     likers = User.objects.filter(id__in=post.likes.values_list("user_id", flat=True)).order_by('username')
 
     page = request.GET.get('page', 1)
@@ -1184,7 +1192,7 @@ def post_likers_list(request, share_id):
 @login_required
 def unit_posts_view(request, unit_id):
     unit = get_object_or_404(Unit, id=unit_id)
-    posts = Post.objects.filter(unit=unit).select_related('author', 'unit').order_by('-created_at')
+    posts = visible_posts_for(request.user, Post.objects.filter(unit=unit)).select_related('author', 'unit').order_by('-created_at')
     liked_post_ids = set()
     if request.user.is_authenticated:
         for pid, sid in Like.objects.filter(user=request.user, post__in=posts).values_list('post_id', 'post__share_id'):
@@ -1232,7 +1240,7 @@ def search_view(request):
 
 @login_required
 def view_image_fullscreen(request, share_id, image_index):
-    post = get_object_or_404(Post, share_id=share_id)
+    post = get_object_or_404(visible_posts_for(request.user), share_id=share_id)
     all_images = list(post.images.all())
 
     # Handle both index and ID (for backward compatibility with existing links)
@@ -1285,7 +1293,7 @@ def view_image_fullscreen(request, share_id, image_index):
 def share_post_view(request, share_id):
     """Django view to handle post sharing to multiple users or groups"""
     if request.method == 'POST':
-        post = get_object_or_404(Post, share_id=share_id)
+        post = get_object_or_404(visible_posts_for(request.user), share_id=share_id)
         share_type = request.POST.get('share_type')  # 'user' or 'group'
         message = request.POST.get('message', '')
 
