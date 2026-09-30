@@ -1,4 +1,5 @@
 import uuid
+import os
 """Document domain models.
 
 These models represent academic content and are designed to be lightweight,
@@ -9,6 +10,7 @@ from django.db import models
 from django.conf import settings
 from django.utils.text import slugify
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db.models import Q
 
 
 class Category(models.Model):
@@ -27,6 +29,7 @@ class Category(models.Model):
         ('tutorial', 'Tutorial'),
         ('exam', 'Exam'),
         ('syllabus', 'Syllabus'),
+        ('ai_generated', 'AI Generated Resource'),
         ('other', 'Other'),
     ]
     
@@ -200,6 +203,9 @@ class Document(models.Model):
         blank=True,
         help_text="When the document was published"
     )
+    is_ai_generated = models.BooleanField(default=False, db_index=True)
+    generated_from_message_id = models.PositiveBigIntegerField(null=True, blank=True, db_index=True)
+    generated_format = models.CharField(max_length=10, blank=True, default="")
     
     class Meta:
         ordering = ['-created_at']
@@ -214,6 +220,13 @@ class Document(models.Model):
             models.Index(fields=['uploaded_by']),
             models.Index(fields=['-created_at']),
             models.Index(fields=['-published_at']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['uploaded_by', 'generated_from_message_id', 'generated_format'],
+                condition=Q(is_ai_generated=True),
+                name='unique_generated_resource_per_message_format',
+            ),
         ]
     
     def __str__(self):
@@ -328,6 +341,15 @@ class DocumentVersion(models.Model):
         super().save(*args, **kwargs)
 
 
+def document_file_upload_path(instance, filename):
+    """Store generated resources under a user-private, opaque storage key."""
+    if instance.storage_private:
+        document = instance.document_version.document
+        return f"private-documents/{document.share_id}/{instance.pk}/{os.path.basename(filename)}"
+    from django.utils import timezone
+    return f"documents/{timezone.now():%Y/%m/%d}/{filename}"
+
+
 class DocumentFile(models.Model):
     """Represents a physical file associated with a document version.
     
@@ -361,9 +383,10 @@ class DocumentFile(models.Model):
     
     # Actual file storage
     file = models.FileField(
-        upload_to='documents/%Y/%m/%d/',
+        upload_to=document_file_upload_path,
         help_text="The actual file"
     )
+    storage_private = models.BooleanField(default=False, db_index=True)
     
     # File metadata
     original_filename = models.CharField(
@@ -452,6 +475,12 @@ class DocumentFile(models.Model):
             models.Index(fields=['storage_provider']),
             models.Index(fields=['-uploaded_at']),
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.storage_private:
+            from documents.private_storage import get_private_resource_storage
+            self.file.storage = get_private_resource_storage()
     
     def __str__(self):
         return self.original_filename
@@ -466,9 +495,14 @@ class DocumentFile(models.Model):
         """Return public URL for the preview image, supporting both local and remote storage."""
         if self.preview_path:
             try:
+                if self.storage_private:
+                    from django.urls import reverse
+                    return reverse('documents:private_resource_asset', kwargs={'file_id': self.pk, 'asset': 'preview'})
                 from django.core.files.storage import default_storage
                 return default_storage.url(self.preview_path)
             except Exception:
+                if self.storage_private:
+                    return None
                 from django.conf import settings
                 media_url = getattr(settings, 'MEDIA_URL', '/media/')
                 return f"{media_url.rstrip('/')}/{self.preview_path.lstrip('/')}"
@@ -481,9 +515,14 @@ class DocumentFile(models.Model):
         """Return public URL for the thumbnail image, supporting both local and remote storage."""
         if self.thumbnail_path:
             try:
+                if self.storage_private:
+                    from django.urls import reverse
+                    return reverse('documents:private_resource_asset', kwargs={'file_id': self.pk, 'asset': 'thumbnail'})
                 from django.core.files.storage import default_storage
                 return default_storage.url(self.thumbnail_path)
             except Exception:
+                if self.storage_private:
+                    return None
                 from django.conf import settings
                 media_url = getattr(settings, 'MEDIA_URL', '/media/')
                 return f"{media_url.rstrip('/')}/{self.thumbnail_path.lstrip('/')}"

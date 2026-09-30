@@ -14,6 +14,19 @@
               font-weight: 600; font-size: 0.95rem; transition: all 0.2s ease;">
         Overview
     </a>
+
+    <a href="{% url 'documents:my_resources' %}"
+       hx-get="{% url 'documents:my_resources' %}"
+       hx-target="#page-content-target"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+       hx-history="true"
+       class="doc-library-tab {% if active_tab == 'resources' %}active{% endif %}"
+       style="flex-shrink: 0; padding: 12px 24px; border-radius: 12px;
+              {% if active_tab == 'resources' %}background: var(--primary); color: white;{% else %}background: var(--card-bg); color: var(--text-secondary); border: 1px solid var(--border);{% endif %} text-decoration: none;
+              font-weight: 600; font-size: 0.95rem; transition: all 0.2s ease;">
+        My Resources{% if resource_count is not None %} ({{ resource_count }}){% endif %}
+    </a>
     
     <a href="{% url 'documents:my_uploads' %}" 
        hx-get="{% url 'documents:my_uploads' %}"

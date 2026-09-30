@@ -2,8 +2,11 @@ package com.pwaninet.app;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.DownloadManager;
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageInfo;
 import android.content.res.Configuration;
 import android.graphics.Color;
@@ -12,8 +15,12 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.net.Uri;
+import android.os.Environment;
 import android.os.Build;
 import android.os.Bundle;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
 import android.view.View;
 import android.view.Window;
 import android.webkit.JavascriptInterface;
@@ -22,10 +29,14 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.DownloadListener;
+import android.webkit.CookieManager;
+import android.webkit.URLUtil;
 
 import androidx.activity.EdgeToEdge;
 import androidx.activity.SystemBarStyle;
 import androidx.core.graphics.Insets;
+import androidx.core.content.ContextCompat;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -46,6 +57,8 @@ import android.widget.Toast;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Locale;
+import java.util.ArrayList;
+import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity {
     private boolean isNetworkAvailable = true;
@@ -59,6 +72,11 @@ public class MainActivity extends BridgeActivity {
     private int lastSafeLeft = 0;
     private int lastSafeRight = 0;
     private String pendingDeepLinkPath = null;
+    private static final int REQUEST_SPEECH_AUDIO_PERMISSION = 4301;
+    private SpeechRecognizer speechRecognizer;
+    private boolean speechListening = false;
+    private boolean speechSessionRequested = false;
+    private String pendingSpeechLanguage = "en-US";
 
     public static class WebAppInterface {
         private final java.lang.ref.WeakReference<MainActivity> activityRef;
@@ -130,6 +148,24 @@ public class MainActivity extends BridgeActivity {
         }
 
         @JavascriptInterface
+        public void startSpeechRecognition(String language) {
+            MainActivity activity = activityRef.get();
+            if (activity != null) activity.requestSpeechRecognition(language);
+        }
+
+        @JavascriptInterface
+        public void stopSpeechRecognition() {
+            MainActivity activity = activityRef.get();
+            if (activity != null) activity.stopSpeechRecognition();
+        }
+
+        @JavascriptInterface
+        public void cancelSpeechRecognition() {
+            MainActivity activity = activityRef.get();
+            if (activity != null) activity.cancelSpeechRecognition();
+        }
+
+        @JavascriptInterface
         public String getAppVersionInfo() {
             MainActivity activity = activityRef.get();
             if (activity != null) {
@@ -196,6 +232,186 @@ public class MainActivity extends BridgeActivity {
             webView.addJavascriptInterface(bridge, "AndroidBridge");
             webView.addJavascriptInterface(bridge, "PwaninetBridge");
         }
+    }
+
+    private void requestSpeechRecognition(String language) {
+        runOnUiThread(() -> {
+            speechSessionRequested = true;
+            pendingSpeechLanguage = language == null || language.trim().isEmpty() ? "en-US" : language.trim();
+            if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+                speechSessionRequested = false;
+                dispatchSpeechEvent("", false, "unavailable");
+                return;
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                    != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[] { Manifest.permission.RECORD_AUDIO }, REQUEST_SPEECH_AUDIO_PERMISSION);
+                return;
+            }
+            startSpeechRecognition();
+        });
+    }
+
+    private void startSpeechRecognition() {
+        runOnUiThread(() -> {
+            if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+                speechSessionRequested = false;
+                dispatchSpeechEvent("", false, "unavailable");
+                return;
+            }
+            destroySpeechRecognizer();
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+            speechRecognizer.setRecognitionListener(new RecognitionListener() {
+                @Override public void onReadyForSpeech(Bundle params) { speechListening = true; }
+                @Override public void onBeginningOfSpeech() { speechListening = true; }
+                @Override public void onRmsChanged(float rmsdB) {
+                    float level = Math.max(0f, Math.min(1f, (rmsdB + 2f) / 15f));
+                    dispatchSpeechEvent("", false, null, level);
+                }
+                @Override public void onBufferReceived(byte[] buffer) {}
+                @Override public void onEndOfSpeech() { speechListening = false; }
+                @Override public void onEvent(int eventType, Bundle params) {}
+
+                @Override
+                public void onPartialResults(Bundle partialResults) {
+                    ArrayList<String> matches = partialResults == null ? null
+                            : partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                    if (matches != null && !matches.isEmpty()) dispatchSpeechEvent(matches.get(0), false, null);
+                }
+
+                @Override
+                public void onResults(Bundle results) {
+                    speechListening = false;
+                    ArrayList<String> matches = results == null ? null
+                            : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                    if (matches != null && !matches.isEmpty()) dispatchSpeechEvent(matches.get(0), true, null);
+                    destroySpeechRecognizer();
+                    if (speechSessionRequested) {
+                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                            if (speechSessionRequested) startSpeechRecognition();
+                        }, 250);
+                    }
+                }
+
+                @Override
+                public void onError(int error) {
+                    speechListening = false;
+                    boolean recoverable = error == SpeechRecognizer.ERROR_NO_MATCH
+                            || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                            || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+                            || error == SpeechRecognizer.ERROR_NETWORK
+                            || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT;
+                    boolean retry = speechSessionRequested && recoverable;
+                    if (!retry) speechSessionRequested = false;
+                    dispatchSpeechEvent("", false, speechErrorName(error));
+                    destroySpeechRecognizer();
+                    if (retry) {
+                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                            if (speechSessionRequested) startSpeechRecognition();
+                        }, 400);
+                    }
+                }
+            });
+
+            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, pendingSpeechLanguage);
+            intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+            intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+            try {
+                speechRecognizer.startListening(intent);
+                speechListening = true;
+            } catch (Exception error) {
+                speechListening = false;
+                speechSessionRequested = false;
+                dispatchSpeechEvent("", false, "start-failed");
+                destroySpeechRecognizer();
+            }
+        });
+    }
+
+    private void stopSpeechRecognition() {
+        runOnUiThread(() -> {
+            speechSessionRequested = false;
+            if (speechRecognizer == null) return;
+            try {
+                speechRecognizer.stopListening();
+            } catch (Exception ignored) {
+                destroySpeechRecognizer();
+            }
+        });
+    }
+
+    private void cancelSpeechRecognition() {
+        runOnUiThread(() -> {
+            speechSessionRequested = false;
+            destroySpeechRecognizer();
+        });
+    }
+
+    private void destroySpeechRecognizer() {
+        if (speechRecognizer != null) {
+            try { speechRecognizer.setRecognitionListener(null); } catch (Exception ignored) {}
+            try { speechRecognizer.cancel(); } catch (Exception ignored) {}
+            try { speechRecognizer.destroy(); } catch (Exception ignored) {}
+            speechRecognizer = null;
+        }
+        speechListening = false;
+    }
+
+    private void dispatchSpeechEvent(String text, boolean isFinal, String error) {
+        dispatchSpeechEvent(text, isFinal, error, null);
+    }
+
+    private void dispatchSpeechEvent(String text, boolean isFinal, String error, Float level) {
+        JSONObject detail = new JSONObject();
+        try {
+            detail.put("text", text == null ? "" : text);
+            detail.put("final", isFinal);
+            detail.put("listening", speechSessionRequested);
+            if (level != null) detail.put("level", level);
+            if (error != null) detail.put("error", error);
+        } catch (Exception ignored) {}
+        String js = "window.dispatchEvent(new CustomEvent('pwaninet:native-speech', {detail:" + detail + "}));";
+        runOnUiThread(() -> {
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                getBridge().getWebView().evaluateJavascript(js, null);
+            }
+        });
+    }
+
+    private String speechErrorName(int error) {
+        switch (error) {
+            case SpeechRecognizer.ERROR_AUDIO: return "audio";
+            case SpeechRecognizer.ERROR_CLIENT: return "client";
+            case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS: return "permission";
+            case SpeechRecognizer.ERROR_NETWORK:
+            case SpeechRecognizer.ERROR_NETWORK_TIMEOUT: return "network";
+            case SpeechRecognizer.ERROR_NO_MATCH:
+            case SpeechRecognizer.ERROR_SPEECH_TIMEOUT: return "no-speech";
+            case SpeechRecognizer.ERROR_RECOGNIZER_BUSY: return "busy";
+            case SpeechRecognizer.ERROR_SERVER: return "server";
+            default: return "unknown";
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQUEST_SPEECH_AUDIO_PERMISSION) return;
+        if (!speechSessionRequested) return;
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            startSpeechRecognition();
+        } else {
+            speechSessionRequested = false;
+            dispatchSpeechEvent("", false, "permission");
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        destroySpeechRecognizer();
+        super.onDestroy();
     }
 
     private void setupNotificationChannels() {
@@ -383,6 +599,7 @@ public class MainActivity extends BridgeActivity {
         setupNetworkMonitoring();
         setupCustomWebViewClient();
         setupWebViewCaching();
+        setupWebViewDownloads();
 
         // Ensure custom user agent identifier with version and build is appended
         if (this.bridge != null && this.bridge.getWebView() != null) {
@@ -838,6 +1055,40 @@ public class MainActivity extends BridgeActivity {
         injectSafeAreaInsets();
         syncSystemBarThemeFromDom();
         injectThemeObserver();
+    }
+
+    private void setupWebViewDownloads() {
+        if (getBridge() == null || getBridge().getWebView() == null) return;
+
+        getBridge().getWebView().setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
+            try {
+                Uri downloadUri = Uri.parse(url);
+                DownloadManager downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                if (downloadManager == null) {
+                    Toast.makeText(this, "Unable to start download", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                String filename = URLUtil.guessFileName(url, contentDisposition, mimeType);
+                filename = filename == null ? "pwaninet-resource" : filename.replaceAll("[\\\\/:*?\"<>|]", "_");
+                DownloadManager.Request downloadRequest = new DownloadManager.Request(downloadUri)
+                    .setTitle(filename)
+                    .setDescription("Downloading from PwaniNet")
+                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "PwaniNet/" + filename);
+
+                if (mimeType != null && !mimeType.isEmpty()) downloadRequest.setMimeType(mimeType);
+                if (userAgent != null && !userAgent.isEmpty()) downloadRequest.addRequestHeader("User-Agent", userAgent);
+                String cookies = CookieManager.getInstance().getCookie(url);
+                if (cookies != null && !cookies.isEmpty()) downloadRequest.addRequestHeader("Cookie", cookies);
+
+                downloadManager.enqueue(downloadRequest);
+                Toast.makeText(this, "Download started. Find it in Downloads/PwaniNet", Toast.LENGTH_LONG).show();
+            } catch (Exception error) {
+                System.err.println("[MainActivity] Could not start WebView download: " + error.getMessage());
+                Toast.makeText(this, "Unable to start download", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void setupWebViewCaching() {

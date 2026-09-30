@@ -6,8 +6,8 @@ from django.contrib.auth.decorators import login_required
 from django.db import models
 from django.core.cache import cache
 from django.utils import timezone
-from django.http import HttpResponse, JsonResponse
-from django.views.decorators.http import require_POST
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
+from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import csrf_exempt
 
 logger = logging.getLogger(__name__)
@@ -250,6 +250,10 @@ def document_detail(request, share_id):
     if not document:
         from django.http import Http404
         raise Http404("Document not found")
+    if (document.is_ai_generated or document.visibility == 'private') and (
+        not request.user.is_authenticated or document.uploaded_by_id != request.user.id
+    ):
+        raise Http404("Document not found")
     
     # Record view asynchronously with caching
     cache_key = f'doc_view_{share_id}_{request.session.session_key or request.META.get("REMOTE_ADDR")}'
@@ -348,10 +352,50 @@ def document_detail(request, share_id):
     return render(request, 'documents/document_detail.html', context)
 
 
+@login_required
+@require_GET
+def private_resource_asset(request, file_id, asset):
+    """Serve a generated file/preview only to the student who owns its document."""
+    from documents.documents.models import DocumentFile
+    document_file = get_object_or_404(
+        DocumentFile.objects.select_related('document_version__document'),
+        pk=file_id,
+        storage_private=True,
+    )
+    document = document_file.document_version.document
+    if document.uploaded_by_id != request.user.id or not document.is_ai_generated:
+        raise Http404("Resource not found")
+
+    if asset == 'original':
+        if not document_file.file:
+            raise Http404("Resource file not found")
+        file_handle = document_file.file.open('rb')
+        content_type = document_file.mime_type or 'application/octet-stream'
+        filename = document_file.original_filename
+    elif asset in {'preview', 'thumbnail'}:
+        storage_path = document_file.preview_path if asset == 'preview' else document_file.thumbnail_path
+        if not storage_path:
+            raise Http404("Resource preview not found")
+        file_handle = document_file.file.storage.open(storage_path, 'rb')
+        content_type = 'image/jpeg'
+        filename = f"resource-{file_id}.jpg"
+    else:
+        raise Http404("Resource asset not found")
+
+    response = FileResponse(file_handle, content_type=content_type)
+    safe_filename = filename.replace('"', '').replace('\r', '').replace('\n', '')
+    response['Content-Disposition'] = f'inline; filename="{safe_filename}"'
+    response['Cache-Control'] = 'private, no-store, max-age=0'
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
 def user_can_manage_document(user, document) -> bool:
     """Check if the user has permission to edit, delete, or manage the document."""
     if not user or not user.is_authenticated:
         return False
+    if document.is_ai_generated:
+        return document.uploaded_by_id == user.id
     if document.uploaded_by_id == user.id:
         return True
     if user.is_staff or user.is_superuser:
@@ -409,7 +453,11 @@ def edit_document(request, share_id):
 
     document.title = title
     document.description = description
-    if visibility in ['public', 'private', 'restricted']:
+    if document.is_ai_generated:
+        # Generated resources stay private even if a crafted form submits a
+        # different visibility value. Sharing needs an explicit recipient ACL.
+        document.visibility = 'private'
+    elif visibility in ['public', 'private', 'restricted']:
         document.visibility = visibility
     if language in ['en', 'sw', 'fr', 'other']:
         document.language = language
@@ -796,14 +844,15 @@ def my_library(request):
     user = request.user
     
     # Get statistics
-    upload_count = Document.objects.filter(uploaded_by=user).exclude(status='archived').count()
+    upload_count = Document.objects.filter(uploaded_by=user, is_ai_generated=False).exclude(status='archived').count()
+    resource_count = Document.objects.filter(uploaded_by=user, is_ai_generated=True).exclude(status='archived').count()
     bookmark_count = DocumentBookmark.objects.filter(user=user).count()
     download_count = DocumentDownload.objects.filter(user=user).count()
     view_count = DocumentView.objects.filter(user=user).count()
     
     # Get recent activity
     recent_uploads = list(Document.objects.filter(
-        uploaded_by=user
+        uploaded_by=user, is_ai_generated=False
     ).exclude(
         status='archived'
     ).select_related(
@@ -818,6 +867,7 @@ def my_library(request):
     context = {
         'page_title': 'My Library',
         'upload_count': upload_count,
+        'resource_count': resource_count,
         'bookmark_count': bookmark_count,
         'download_count': download_count,
         'view_count': view_count,
@@ -871,6 +921,31 @@ def my_uploads(request):
     if request.headers.get('HX-Request'):
         return render(request, 'documents/partials/documents_navigation_partial.html', context)
     return render(request, 'documents/library_uploads.html', context)
+
+
+@login_required
+def my_resources(request):
+    """List Pwanimate-generated resources owned by the current student."""
+    documents = list(
+        Document.objects.filter(
+            uploaded_by=request.user,
+            is_ai_generated=True,
+        ).exclude(status='archived').select_related('category').prefetch_related(
+            'versions__files',
+        ).order_by('-created_at')[:100]
+    )
+    context = {
+        'page_title': 'My Resources',
+        'documents': documents,
+        'resource_count': len(documents),
+        'has_processing_uploads': any(doc.is_processing for doc in documents),
+        'document_content_partial': 'documents/partials/library_resources_content.html',
+        'show_library_button': False,
+        'show_upload_button': False,
+    }
+    if request.headers.get('HX-Request'):
+        return render(request, 'documents/partials/documents_navigation_partial.html', context)
+    return render(request, 'documents/library_resources.html', context)
 
 
 @login_required
@@ -947,6 +1022,7 @@ def toggle_bookmark(request, share_id):
     """
     try:
         document = Document.objects.get(share_id=share_id)
+
         bookmark, created = DocumentBookmark.objects.get_or_create(
             document=document,
             user=request.user
@@ -1040,14 +1116,28 @@ def serve_download(request, share_id):
         
     try:
         document = Document.objects.get(share_id=share_id)
+
+        # A signed URL is bound to one document. Private files also require
+        # the owner session; a forwarded link does not grant access.
+        if data != str(document.share_id):
+            return HttpResponseForbidden("Download token does not match this document.")
+        if (document.is_ai_generated or document.visibility == 'private') and (
+            not request.user.is_authenticated or document.uploaded_by_id != request.user.id
+        ):
+            return HttpResponseNotFound("Document not found.")
         
         from .engagement.models import DocumentDownload
         from .models import DocumentFile
         
         file_id = request.GET.get('file_id')
-        document_file = DocumentFile.objects.get(id=file_id) if file_id else document.latest_version.files.first()
-        
+        document_file = DocumentFile.objects.get(id=file_id, document_version__document=document) if file_id else document.latest_version.files.first()
+
         if not document_file:
+            return HttpResponseNotFound("File not found.")
+
+        if document_file.storage_private and (
+            not request.user.is_authenticated or document.uploaded_by_id != request.user.id
+        ):
             return HttpResponseNotFound("File not found.")
             
         # Create download record

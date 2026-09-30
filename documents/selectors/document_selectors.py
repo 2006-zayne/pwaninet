@@ -70,6 +70,7 @@ class DocumentSelector:
             status='ready',
             is_available=True,
             visibility='public',
+            is_ai_generated=False,
         ).select_related(
             'category',
             'uploaded_by',
@@ -108,6 +109,7 @@ class DocumentSelector:
             document__status='ready',
             document__is_available=True,
             document__visibility='public',
+            document__is_ai_generated=False,
         ).select_related('document__analytics').order_by('-popularity_score')[:limit]
         
         documents = [index.document for index in queryset]
@@ -126,7 +128,9 @@ class DocumentSelector:
     ) -> List[Document]:
         """List documents for a user's library."""
         if document_type == 'uploads':
-            queryset = Document.objects.filter(uploaded_by_id=user_id).exclude(status='archived')
+            queryset = Document.objects.filter(uploaded_by_id=user_id, is_ai_generated=False).exclude(status='archived')
+        elif document_type == 'resources':
+            queryset = Document.objects.filter(uploaded_by_id=user_id, is_ai_generated=True).exclude(status='archived')
         elif document_type == 'bookmarks':
             queryset = Document.objects.filter(
                 bookmarks__user_id=user_id
@@ -161,6 +165,7 @@ class DocumentSelector:
             document__status='ready',
             document__is_available=True,
             document__visibility='public',
+            document__is_ai_generated=False,
             document__created_at__gte=cutoff_date,
         ).select_related('document').order_by('-trending_score')[:limit]
         
@@ -240,6 +245,7 @@ class DocumentSelector:
             status='ready',
             is_available=True,
             visibility='public',
+            is_ai_generated=False,
             category__code=category_code,
         ).select_related(
             'category',
@@ -258,6 +264,7 @@ class DocumentSelector:
             status='ready',
             is_available=True,
             visibility='public',
+            is_ai_generated=False,
             academic_units__academic_unit__code=unit_code,
         ).select_related(
             'category',
@@ -349,6 +356,7 @@ class DocumentSelector:
             status='ready',
             is_available=True,
             visibility='public',
+            is_ai_generated=False,
         ).exclude(id=document.id).select_related(
             'category',
         ).prefetch_related(

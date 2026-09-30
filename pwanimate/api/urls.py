@@ -12,6 +12,7 @@ from pwanimate.api.views import (
     PwanimateConversationDetailView,
     PwanimateConversationListView,
     PwanimateContextDocumentSearchView,
+    PwanimateGeneratedResourceView,
     PwanimateQuotaStatusView,
 )
 
@@ -19,6 +20,7 @@ app_name = "pwanimate_api"
 
 urlpatterns = [
     path("chat/", PwanimateChatView.as_view(), name="chat"),
+    path("messages/<int:message_id>/resources/", PwanimateGeneratedResourceView.as_view(), name="generated_resource"),
     path("conversations/", PwanimateConversationListView.as_view(), name="conversation_list"),
     path("conversations/<uuid:conversation_id>/", PwanimateConversationDetailView.as_view(), name="conversation_detail"),
     path("quota-status/", PwanimateQuotaStatusView.as_view(), name="quota_status"),

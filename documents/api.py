@@ -160,11 +160,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
         
         # Staff, superusers, and executive student leaders can view all documents
         if user.is_staff or user.is_superuser or getattr(user, 'global_role', None) in [GlobalRole.PRESIDENT, GlobalRole.DELEGATE]:
-            return queryset
+            return queryset.filter(Q(is_ai_generated=False) | Q(uploaded_by=user))
         
         # Authenticated users can see ready public documents or their own uploads
         return queryset.filter(
-            Q(status='ready', visibility='public') | Q(uploaded_by=user)
+            Q(status='ready', visibility='public', is_ai_generated=False) | Q(uploaded_by=user)
         )
     
     def perform_create(self, serializer):

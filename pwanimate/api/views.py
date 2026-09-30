@@ -10,6 +10,10 @@ import uuid
 from django.db import transaction
 from django.db.models import Q
 from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404
+from django.urls import reverse
+from django.core.signing import TimestampSigner
+from urllib.parse import urlencode
 from django.template.loader import render_to_string
 from rest_framework import permissions, status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -27,7 +31,7 @@ from pwanimate.api.serializers import (
     ConversationListSerializer,
     PwanimateAttachmentSerializer,
 )
-from pwanimate.models import PwanimateConversation, PwanimateAttachment
+from pwanimate.models import PwanimateConversation, PwanimateAttachment, PwanimateMessage
 from pwanimate.orchestrator import (
     OrchestrationRequest,
     OrchestratorValidationError,
@@ -365,6 +369,54 @@ class PwanimateChatView(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class PwanimateGeneratedResourceView(APIView):
+    """Create a private library document from one of the user's assistant replies."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, message_id):
+        message = get_object_or_404(
+            PwanimateMessage.objects.select_related("conversation"),
+            pk=message_id,
+            role="assistant",
+            conversation__user=request.user,
+        )
+        raw_format = request.data.get("format")
+        if not isinstance(raw_format, str):
+            return Response({"error": "Choose PDF or Word format."}, status=status.HTTP_400_BAD_REQUEST)
+        file_format = raw_format.strip().lower()
+        try:
+            from pwanimate.services.generated_documents import create_generated_resource
+            document, document_file, created = create_generated_resource(
+                message=message,
+                user=request.user,
+                file_format=file_format,
+            )
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            logger.exception("Could not create Pwanimate resource from message %s", message_id)
+            return Response(
+                {"error": "The document could not be created. Please try again."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        token = TimestampSigner().sign_object(str(document.share_id))
+        download_path = reverse("documents:serve_download", kwargs={"share_id": document.share_id})
+        download_url = f"{download_path}?{urlencode({'t': token, 'file_id': document_file.id})}"
+        return Response(
+            {
+                "document_id": document.id,
+                "title": document.title,
+                "format": file_format,
+                "download_url": download_url,
+                "library_url": reverse("documents:my_resources"),
+                "created": created,
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
 
 
 class PwanimateAttachmentUploadView(APIView):

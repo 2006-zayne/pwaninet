@@ -1382,7 +1382,7 @@ button.pwanimate-citation-badge {
     background-color: color-mix(in srgb, var(--pwanimate-bg, #f8fafc) 90%, transparent);
     backdrop-filter: blur(16px) saturate(1.3);
     -webkit-backdrop-filter: blur(16px) saturate(1.3);
-    border-top: 1px solid var(--pwanimate-border);
+    border-top: none;
     padding: 0.5rem 1rem 0.75rem 1rem;
     width: 100%;
     max-width: 800px;
@@ -1709,14 +1709,31 @@ body.keyboard-open .pwanimate-composer-wrapper {
 
 .pwanimate-composer-footer {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     margin-top: 0.45rem;
     padding: 0 0.5rem;
     font-size: 0.72rem;
     color: var(--pwanimate-muted);
     pointer-events: auto;
+    text-align: center;
 }
+
+.pwanimate-chat-disclaimer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: .25rem;
+    margin: .65rem auto .25rem;
+    padding: .15rem .5rem;
+    color: var(--pwanimate-muted, #64748b);
+    font-size: 9px;
+    font-weight: 400;
+    line-height: 1.2;
+    opacity: .62;
+    text-align: center;
+}
+.pwanimate-chat-disclaimer i { font-size: 8px; }
 
 @media (max-width: 767.98px) {
     .pwanimate-code-block {
@@ -2093,7 +2110,7 @@ body.pwanimate-active .app-shell-layout {
         margin: 0 !important;
         padding: 0 !important;
         overflow: hidden !important;
-        border-right: 1px solid var(--pwanimate-border);
+        border-right: none;
         background-color: var(--pwanimate-sidebar-bg);
         z-index: 10;
         transition: width 0.15s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.15s cubic-bezier(0.4, 0, 0.2, 1);
@@ -3767,6 +3784,117 @@ body.pwanimate-active .pwanimate-settings-mobile,
 
 .pwanimate-attach-btn:active {
     transform: scale(0.95);
+}
+
+.pwanimate-voice-btn.is-listening {
+    color: #dc2626;
+    background: rgba(220, 38, 38, 0.1);
+    animation: pwanimate-voice-pulse 1.2s ease-in-out infinite;
+}
+
+.pwanimate-voice-btn:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.pwanimate-voice-status {
+    color: var(--pwanimate-muted, #64748b);
+    font-size: .78rem;
+    line-height: 1.35;
+}
+
+.pwanimate-voice-feedback {
+    margin: .35rem .25rem 0;
+    color: var(--pwanimate-muted, #64748b);
+    font-size: .78rem;
+    line-height: 1.35;
+}
+.pwanimate-voice-feedback.is-error { color: #dc2626; }
+
+.pwanimate-voice-capture {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    width: 100%;
+    min-height: 74px;
+    padding: 0 .1rem;
+}
+
+.pwanimate-voice-capture.d-none { display: none !important; }
+.pwanimate-composer-box.is-voice-recording .pwanimate-composer-standard { display: none; }
+.pwanimate-voice-cancel, .pwanimate-voice-stop, .pwanimate-voice-send {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+}
+.pwanimate-voice-cancel { color: var(--pwanimate-muted, #64748b); background: transparent; font-size: 1rem; }
+.pwanimate-voice-cancel:hover { color: #dc2626; background: rgba(220, 38, 38, .08); }
+.pwanimate-voice-stop { color: #fff; background: #dc2626; font-size: 1.1rem; box-shadow: 0 3px 10px rgba(220, 38, 38, .24); }
+.pwanimate-voice-stop:hover { background: #b91c1c; }
+.pwanimate-voice-send { color: #fff; background: var(--primary, #2563eb); font-size: 1.2rem; box-shadow: 0 3px 10px rgba(37, 99, 235, .2); }
+.pwanimate-voice-send:hover { filter: brightness(.94); }
+.pwanimate-voice-stop.is-loading i, .pwanimate-voice-send.is-loading i { display: none; }
+.pwanimate-voice-stop.is-loading .spinner-border, .pwanimate-voice-send.is-loading .spinner-border { display: inline-block !important; width: 15px; height: 15px; border-width: 2px; }
+.pwanimate-voice-capture button:disabled { opacity: .7; cursor: wait; }
+.pwanimate-voice-waveform {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    flex: 1 1 auto;
+    height: 54px;
+    min-width: 0;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+}
+.pwanimate-voice-waveform::before {
+    position: absolute;
+    inset: 0;
+    content: "";
+    background-image: radial-gradient(circle, var(--pwanimate-muted, #94a3b8) 1px, transparent 1.5px);
+    background-size: 8px 8px;
+    background-position: 0 50%;
+    opacity: .4;
+    animation: pwanimate-voice-dots 1.4s linear infinite;
+}
+.pwanimate-voice-waveform span {
+    position: relative;
+    z-index: 1;
+    width: 3px;
+    height: 3px;
+    flex: 0 0 3px;
+    border-radius: 4px;
+    background: var(--primary, #2563eb);
+    transition: height 75ms ease-out;
+}
+.pwanimate-voice-capture.is-speaking .pwanimate-voice-waveform::before { opacity: .14; }
+.pwanimate-voice-capture.is-speaking .pwanimate-voice-waveform span { box-shadow: 0 0 5px color-mix(in srgb, var(--primary, #2563eb) 28%, transparent); }
+.pwanimate-voice-capture.is-stopping .pwanimate-voice-waveform::before { animation-play-state: paused; }
+.pwanimate-voice-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+@keyframes pwanimate-voice-dots { to { background-position: -24px 50%; } }
+
+@media (max-width: 575.98px) {
+    .pwanimate-voice-capture { gap: .55rem; }
+    .pwanimate-voice-cancel, .pwanimate-voice-stop, .pwanimate-voice-send { width: 36px; height: 36px; flex-basis: 36px; }
+}
+
+.pwanimate-voice-status.is-error {
+    color: #dc2626;
+}
+
+@keyframes pwanimate-voice-pulse {
+    50% { box-shadow: 0 0 0 5px rgba(220, 38, 38, .12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pwanimate-voice-btn.is-listening { animation: none; }
 }
 
 .pwanimate-attachment-modal {

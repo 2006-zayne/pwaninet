@@ -450,7 +450,7 @@ class UnifiedSearchService:
         # retrieval permissions. Restricting this index to public documents
         # made authorized private/restricted documents disappear whenever they
         # had no eligible embedding chunks.
-        visibility_q = Q(document__visibility='public')
+        visibility_q = Q(document__visibility='public', document__is_ai_generated=False)
         if user and getattr(user, 'is_authenticated', False):
             global_role = getattr(user, 'global_role', None)
             is_admin_or_leader = (
@@ -459,10 +459,10 @@ class UnifiedSearchService:
                 or global_role in ['PRESIDENT', 'DELEGATE']
             )
             if is_admin_or_leader:
-                visibility_q = Q()
+                visibility_q = Q(document__is_ai_generated=False) | Q(document__uploaded_by=user, document__is_ai_generated=True)
             else:
                 visibility_q |= Q(document__uploaded_by=user)
-                restricted_q = Q(document__visibility='restricted')
+                restricted_q = Q(document__visibility='restricted', document__is_ai_generated=False)
                 programme = getattr(user, 'programme', None)
                 has_restricted_match = bool(programme)
                 if programme:
@@ -669,7 +669,8 @@ class UnifiedSearchService:
             suggestions = DocumentSearchIndex.objects.filter(
                 document__status='ready',
                 document__is_available=True,
-                document__visibility='public'
+                document__visibility='public',
+                document__is_ai_generated=False,
             ).annotate(
                 similarity=TrigramWordSimilarity(Value(query), 'title')
             ).filter(similarity__gte=0.22).order_by('-similarity')[:limit]
@@ -688,6 +689,7 @@ class UnifiedSearchService:
                     document__status='ready',
                     document__is_available=True,
                     document__visibility='public',
+                    document__is_ai_generated=False,
                     title__icontains=query
                 ).values_list('title', flat=True)[:limit])
                 results = [re.sub(r'[_\-]+', ' ', m).strip() for m in raw_matches]
@@ -698,6 +700,7 @@ class UnifiedSearchService:
                 document__status='ready',
                 document__is_available=True,
                 document__visibility='public',
+                document__is_ai_generated=False,
                 title__icontains=query
             ).values_list('title', flat=True)[:limit])
 
@@ -713,7 +716,8 @@ class UnifiedSearchService:
             best = DocumentSearchIndex.objects.filter(
                 document__status='ready',
                 document__is_available=True,
-                document__visibility='public'
+                document__visibility='public',
+                document__is_ai_generated=False,
             ).annotate(
                 sim=TrigramWordSimilarity(Value(query), 'title')
             ).filter(sim__gte=0.22).order_by('-sim').first()
@@ -722,7 +726,8 @@ class UnifiedSearchService:
                 best = DocumentSearchIndex.objects.filter(
                     document__status='ready',
                     document__is_available=True,
-                    document__visibility='public'
+                    document__visibility='public',
+                    document__is_ai_generated=False,
                 ).annotate(
                     sim=TrigramWordSimilarity(Value(query), 'searchable_text')
                 ).filter(sim__gte=0.25).order_by('-sim').first()

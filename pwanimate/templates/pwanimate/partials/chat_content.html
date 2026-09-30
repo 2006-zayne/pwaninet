@@ -376,6 +376,16 @@
                                                                data-document-id="{{ src.document_id|default:'' }}"
                                                                data-document-share-id="{{ src.document_share_id|default:'' }}"
                                                                data-file-type="{{ src.file_type|default:src.file_extension|default:'' }}"
+                                                               {% if src.person %}
+                                                               data-username="{{ src.person.username|default:''|escape }}"
+                                                               data-profile-url="{{ src.person.profile_url|default:''|escape }}"
+                                                               data-profile-card-url="{{ src.person.profile_card_url|default:''|escape }}"
+                                                               data-avatar-url="{{ src.person.avatar_url|default:src.person.profile_photo_url|default:''|escape }}"
+                                                               data-headline="{{ src.person.headline|default:''|escape }}"
+                                                               data-academic-level="{{ src.person.academic_level|default:''|escape }}"
+                                                               data-programme-name="{{ src.person.programme_name|default:src.person.programme|default:''|escape }}"
+                                                               data-bio="{{ src.person.bio|default:''|escape }}"
+                                                               {% endif %}
                                                                aria-label="View {% if src.title %}{{ src.title|escape }}{% elif src.citation %}{{ src.citation|escape }}{% else %}{% trans 'Document' %}{% endif %}">
                                                                 <i class="bi bi-link-45deg"></i>
                                                                 <span>{% if src.title %}{{ src.title }}{% elif src.citation %}{{ src.citation }}{% else %}{% trans "Document" %}{% endif %}</span>
@@ -408,6 +418,15 @@
                                     {% endif %}
                                 </div>
                                 <div class="pwanimate-message-actions assistant-actions">
+                                    <div class="dropdown pwanimate-resource-export">
+                                        <button type="button" class="btn pwanimate-action-btn" data-bs-toggle="dropdown" aria-expanded="false" title="{% trans 'Save response to My Resources' %}" aria-label="{% trans 'Save response to My Resources' %}">
+                                            <i class="bi bi-file-earmark-arrow-down"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end pwanimate-resource-export-menu">
+                                            <li><button type="button" class="dropdown-item pwanimate-resource-download" data-format="pdf"><i class="bi bi-filetype-pdf me-2"></i>{% trans "Download PDF" %}</button></li>
+                                            <li><button type="button" class="dropdown-item pwanimate-resource-download" data-format="docx"><i class="bi bi-filetype-docx me-2"></i>{% trans "Download Word document" %}</button></li>
+                                        </ul>
+                                    </div>
                                     <button type="button" class="btn pwanimate-action-btn copy-btn" title="{% trans 'Copy answer' %}" aria-label="{% trans 'Copy answer' %}">
                                         <i class="bi bi-clipboard"></i>
                                     </button>
@@ -433,6 +452,10 @@
                     </div>
                 </div>
             {% endif %}
+            <div class="pwanimate-chat-disclaimer{% if not active_conversation or not messages %} d-none{% endif %}" id="pwanimate-chat-disclaimer">
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                <span>{% trans "Pwanimate can make mistakes. Please verify important details." %}</span>
+            </div>
         </div>
 
         <!-- Composer Area -->
@@ -447,6 +470,25 @@
                 <input type="file" id="pwanimateFileInput" accept="*/*" multiple class="d-none" style="display: none;">
                 <input type="file" id="pwanimateCameraInput" accept="image/*" capture="environment" class="d-none" style="display: none;">
 
+                <div class="pwanimate-voice-capture d-none" id="pwanimate-voice-capture" aria-live="polite">
+                    <button type="button" class="pwanimate-voice-cancel" id="pwanimateVoiceCancelBtn" aria-label="Cancel voice recording" title="Cancel">
+                        <i class="bi bi-x-lg" aria-hidden="true"></i>
+                    </button>
+                    <div class="pwanimate-voice-waveform" id="pwanimate-voice-waveform" aria-hidden="true">
+                        {% for bar in "123456789012345678901234567890123456" %}<span></span>{% endfor %}
+                    </div>
+                    <span class="visually-hidden" id="pwanimate-voice-status">Recording voice message</span>
+                    <button type="button" class="pwanimate-voice-stop" id="pwanimateVoiceStopBtn" aria-label="Stop and transcribe" title="Stop and transcribe">
+                        <i class="bi bi-stop-fill" aria-hidden="true"></i>
+                        <span class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" class="pwanimate-voice-send" id="pwanimateVoiceSendBtn" aria-label="Transcribe and send" title="Transcribe and send">
+                        <i class="bi bi-arrow-up" aria-hidden="true"></i>
+                        <span class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+                    </button>
+                </div>
+
+                <div class="pwanimate-composer-standard" id="pwanimate-composer-standard">
                 <label for="pwanimate-input" class="visually-hidden">{% trans "Message Pwanimate" %}</label>
                 <div class="pwanimate-composer-input-row">
                     <textarea id="pwanimate-input"
@@ -473,7 +515,6 @@
                                     data-bs-toggle="dropdown"
                                     aria-expanded="false"
                                     title="{% trans 'Select AI Model' %}">
-                                <span class="pwanimate-model-status-dot healthy" id="pwanimate-dropdown-status-dot"></span>
                                 <span id="pwanimate-selected-model-label" class="fw-medium text-truncate" style="max-width: 140px;">Auto</span>
                                 <i class="bi bi-chevron-down ms-1" style="font-size: 0.7rem; opacity: 0.7;"></i>
                             </button>
@@ -508,16 +549,16 @@
                                 </li>
                             </ul>
                         </div>
-                        <button type="button"
-                                class="pwanimate-quota-btn"
-                                data-bs-toggle="modal"
-                                data-bs-target="#pwanimateQuotaModal"
-                                title="{% trans 'View AI Models & Quota Status' %}"
-                                aria-label="{% trans 'View AI Models & Quota Status' %}">
-                            <i class="bi bi-speedometer2"></i>
-                        </button>
                     </div>
                     <div class="pwanimate-composer-actions-end">
+                        <button type="button"
+                                class="pwanimate-attach-btn pwanimate-voice-btn"
+                                id="pwanimateVoiceBtn"
+                                title="{% trans 'Dictate a message' %}"
+                                aria-label="{% trans 'Dictate a message' %}"
+                                aria-pressed="false">
+                            <i class="bi bi-mic-fill" aria-hidden="true"></i>
+                        </button>
                         <button type="button"
                                 id="pwanimate-send-btn"
                                 class="pwanimate-send-btn{% if initial_prompt %} is-active{% endif %}"
@@ -538,11 +579,9 @@
                         </button>
                     </div>
                 </div>
+                </div>
             </form>
-            <div class="pwanimate-composer-footer d-none d-sm-flex">
-                <span><i class="bi bi-shield-check text-success"></i> {% trans "Grounded with verified PwaniNet data" %}</span>
-                <span>{% trans "Press" %} <kbd>Enter</kbd> {% trans "to send" %}, <kbd>Shift+Enter</kbd> {% trans "for newline" %}</span>
-            </div>
+            <div class="pwanimate-voice-feedback d-none" id="pwanimate-voice-feedback" role="status" aria-live="polite"></div>
         </div>
     </section>
 

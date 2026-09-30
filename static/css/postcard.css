@@ -1002,6 +1002,11 @@
     max-height: 520px;
     width: 100%;
   }
+
+  .reel-stage-container .reel-video-element {
+    object-fit: cover;
+    object-position: center center;
+  }
 }
 
 /* Translucent circular overlay buttons for in-feed video stage */

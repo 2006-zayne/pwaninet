@@ -81,6 +81,29 @@
             this.composerForm = workspace.querySelector('#pwanimate-composer-form');
             this.input = workspace.querySelector('#pwanimate-input');
             this.sendBtn = workspace.querySelector('#pwanimate-send-btn');
+            this.voiceBtn = workspace.querySelector('#pwanimateVoiceBtn');
+            this.voiceCancelBtn = workspace.querySelector('#pwanimateVoiceCancelBtn');
+            this.voiceStopBtn = workspace.querySelector('#pwanimateVoiceStopBtn');
+            this.voiceSendBtn = workspace.querySelector('#pwanimateVoiceSendBtn');
+            this.voiceStatus = workspace.querySelector('#pwanimate-voice-status');
+            this.voiceFeedback = workspace.querySelector('#pwanimate-voice-feedback');
+            this.voiceCapture = workspace.querySelector('#pwanimate-voice-capture');
+            this.voiceWaveform = workspace.querySelector('#pwanimate-voice-waveform');
+            this.voiceWaveformBars = this.voiceWaveform ? Array.from(this.voiceWaveform.querySelectorAll('span')) : [];
+            this.voiceRecognition = null;
+            this.nativeSpeechBridge = null;
+            this._onNativeSpeechEvent = null;
+            this.voiceListening = false;
+            this.voiceStopping = false;
+            this.voiceSendAfterTranscription = false;
+            this.voiceFinalTranscript = '';
+            this.voiceSelection = null;
+            this.voiceErrorMessage = '';
+            this.voiceCancelled = false;
+            this.voiceMediaStream = null;
+            this.voiceAudioContext = null;
+            this.voiceAnalyser = null;
+            this.voiceAnimationFrame = null;
             this.sidebarList = document.getElementById('pwanimate-sidebar-list');
             this.mobileList = document.getElementById('pwanimate-mobile-list');
             this.quotaStatusEl = document.getElementById('pwanimate-quota-status');
@@ -142,6 +165,7 @@
             this.checkCollapsibleUserBubbles();
             requestAnimationFrame(() => this.checkCollapsibleUserBubbles());
             this.bindEvents();
+            this.initVoiceInput();
             this.initMobileMenuSwipeNavigation();
             this.initContextDocumentPicker();
             this.initAttachmentHandlers();
@@ -820,6 +844,13 @@
             // Transcript delegated actions (Suggestion chips, Citations, Copy, Edit, Show more)
             if (this.transcript) {
                 this.transcript.addEventListener('click', (e) => {
+                    const resourceDownload = e.target.closest('.pwanimate-resource-download');
+                    if (resourceDownload) {
+                        e.preventDefault();
+                        this.downloadGeneratedResource(resourceDownload);
+                        return;
+                    }
+
                     const chip = e.target.closest('.pwanimate-suggestion-chip');
                     if (chip && chip.dataset.prompt) {
                         e.preventDefault();
@@ -904,6 +935,19 @@
                             documentShareId: badge.dataset.documentShareId || '',
                             fileType: badge.dataset.fileType || '',
                             postId: badge.dataset.postId || '',
+                            username: badge.dataset.username || '',
+                            profileUrl: badge.dataset.profileUrl || '',
+                            profileCardUrl: badge.dataset.profileCardUrl || '',
+                            person: {
+                                username: badge.dataset.username || '',
+                                profile_url: badge.dataset.profileUrl || '',
+                                profile_card_url: badge.dataset.profileCardUrl || '',
+                                avatar_url: badge.dataset.avatarUrl || '',
+                                headline: badge.dataset.headline || '',
+                                academic_level: badge.dataset.academicLevel || '',
+                                programme_name: badge.dataset.programmeName || '',
+                                bio: badge.dataset.bio || '',
+                            },
                             triggerEl: badge
                         };
                         this.previewResource(url, title, meta);
@@ -1191,6 +1235,342 @@
             }
         }
 
+        initVoiceInput() {
+            if (!this.voiceBtn || !this.input) return;
+
+            if (this.voiceStopBtn) this.voiceStopBtn.addEventListener('click', () => this.stopVoiceCapture());
+            if (this.voiceSendBtn) this.voiceSendBtn.addEventListener('click', () => this.stopVoiceCapture(true));
+            if (this.voiceCancelBtn) this.voiceCancelBtn.addEventListener('click', () => this.cancelVoiceCapture());
+
+            const nativeBridge = window.AndroidBridge || window.PwaninetBridge;
+            if (nativeBridge && typeof nativeBridge.startSpeechRecognition === 'function'
+                    && typeof nativeBridge.stopSpeechRecognition === 'function') {
+                this.nativeSpeechBridge = nativeBridge;
+                this._onNativeSpeechEvent = (event) => {
+                    if (this.voiceCancelled) return;
+                    const detail = event.detail || {};
+                    if (detail.error) {
+                        const messages = {
+                            permission: 'Microphone access was denied. Allow microphone access in Android app settings.',
+                            unavailable: 'Speech recognition is not available on this device.',
+                            audio: 'The microphone could not be started. Check your microphone and try again.',
+                            network: 'Android’s speech service could not connect. Please try again.',
+                            'no-speech': 'No speech was detected. Tap the microphone and try again.',
+                            busy: 'Speech recognition is busy. Please try again in a moment.',
+                            server: 'Android’s speech service encountered an error. Please try again.',
+                            'start-failed': 'Could not start the microphone. Please try again.',
+                        };
+                        const message = messages[detail.error] || 'Voice input failed. Please try again.';
+                        this.voiceErrorMessage = message;
+                        if (detail.listening) {
+                            this.setVoiceStatus(detail.error === 'no-speech' ? 'Listening for speech' : `${message} Retrying`, detail.error !== 'no-speech');
+                        } else {
+                            this.setVoiceListening(false);
+                            this.setVoiceStatus(message, true);
+                            this.finishVoiceCapture();
+                        }
+                        return;
+                    }
+                    if (detail.final) {
+                        if (detail.text) {
+                            this.voiceFinalTranscript = [this.voiceFinalTranscript, detail.text.trim()].filter(Boolean).join(' ');
+                        }
+                        if (!detail.listening) {
+                            this.setVoiceListening(false);
+                            this.finishVoiceCapture();
+                        } else this.setVoiceStatus('Recording voice message');
+                    }
+                    if (typeof detail.level === 'number') this.setVoiceWaveformLevel(detail.level);
+                };
+                window.addEventListener('pwaninet:native-speech', this._onNativeSpeechEvent);
+                this.voiceBtn.addEventListener('click', () => {
+                    this.voiceFinalTranscript = '';
+                    this.voiceErrorMessage = '';
+                    this.voiceCancelled = false;
+                    this.voiceSelection = {
+                        start: this.input.selectionStart ?? this.input.value.length,
+                        end: this.input.selectionEnd ?? this.input.value.length,
+                    };
+                    this.setVoiceListening(true);
+                    this.setVoiceStatus('Recording voice message');
+                    try {
+                        nativeBridge.startSpeechRecognition(document.documentElement.lang === 'sw' ? 'sw-KE' : 'en-US');
+                    } catch (error) {
+                        this.setVoiceListening(false);
+                        this.setVoiceStatus('Could not start the microphone. Please try again.', true);
+                    }
+                });
+                return;
+            }
+
+            const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!Recognition) {
+                this.voiceBtn.disabled = true;
+                this.voiceBtn.title = 'Speech input is not supported in this browser.';
+                this.voiceBtn.setAttribute('aria-label', this.voiceBtn.title);
+                this.setVoiceStatus('Voice input is not available in this browser. You can still type.', true);
+                return;
+            }
+
+            const recognition = new Recognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.maxAlternatives = 1;
+            recognition.lang = document.documentElement.lang === 'sw' ? 'sw-KE' : 'en-US';
+            this.voiceRecognition = recognition;
+
+            this.voiceBtn.addEventListener('click', () => {
+                this.voiceFinalTranscript = '';
+                this.voiceErrorMessage = '';
+                this.voiceCancelled = false;
+                this.voiceSelection = {
+                    start: this.input.selectionStart ?? this.input.value.length,
+                    end: this.input.selectionEnd ?? this.input.value.length,
+                };
+
+                try {
+                    recognition.start();
+                    this.setVoiceListening(true);
+                    this.setVoiceStatus('Recording voice message');
+                    this.startVoiceLevelMeter();
+                } catch (error) {
+                    this.setVoiceListening(false);
+                    this.setVoiceStatus('Could not start the microphone. Please try again.', true);
+                }
+            });
+
+            recognition.onstart = () => {
+                this.setVoiceListening(true);
+                this.setVoiceStatus('Recording voice message');
+            };
+
+            recognition.onresult = (event) => {
+                let interimText = '';
+                for (let index = event.resultIndex; index < event.results.length; index += 1) {
+                    const result = event.results[index];
+                    const text = result[0] && result[0].transcript ? result[0].transcript.trim() : '';
+                    if (!text) continue;
+                    if (result.isFinal) {
+                        this.voiceFinalTranscript = [this.voiceFinalTranscript, text].filter(Boolean).join(' ');
+                    } else interimText += `${text} `;
+                }
+                if (interimText.trim()) this.setVoiceStatus('Recording voice message');
+            };
+
+            recognition.onerror = (event) => {
+                if (this.voiceCancelled) return;
+                const messages = {
+                    'no-speech': 'No speech was detected. Tap the microphone and try again.',
+                    'not-allowed': 'Microphone access was blocked. Allow microphone access in your browser settings.',
+                    'service-not-allowed': 'The browser speech service is unavailable or not allowed.',
+                    'audio-capture': 'No microphone was found on this device.',
+                    network: 'The browser speech service could not connect. Please try again.',
+                    aborted: 'Voice input was stopped.',
+                };
+                this.voiceErrorMessage = messages[event.error] || 'Voice input failed. Please try again.';
+                if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                    this.voiceStopping = true;
+                    this.setVoiceListening(false);
+                }
+                this.setVoiceStatus(event.error === 'no-speech' && this.voiceListening ? 'Recording voice message' : this.voiceErrorMessage, event.error !== 'aborted');
+            };
+
+            recognition.onend = () => {
+                if (this.voiceCancelled) {
+                    this.voiceCancelled = false;
+                    return;
+                }
+                if (this.voiceListening) {
+                    window.setTimeout(() => {
+                        if (!this.voiceListening || this.isGenerating) return;
+                        try { recognition.start(); } catch (error) {
+                            this.setVoiceListening(false);
+                            this.finishVoiceCapture();
+                            this.setVoiceStatus('Voice recognition stopped. Review your draft and tap the mic to continue.', true);
+                        }
+                    }, 250);
+                    return;
+                }
+                this.finishVoiceCapture();
+            };
+        }
+
+        setVoiceListening(isListening) {
+            this.voiceListening = isListening;
+            if (this.input) this.input.disabled = isListening || this.voiceStopping || this.isGenerating;
+            if (this.composerForm) this.composerForm.classList.toggle('is-voice-recording', isListening || this.voiceStopping);
+            if (this.voiceCapture) {
+                this.voiceCapture.classList.toggle('is-listening', isListening);
+                this.voiceCapture.classList.toggle('is-stopping', this.voiceStopping);
+                this.voiceCapture.classList.toggle('d-none', !isListening && !this.voiceStopping);
+            }
+            if (this.voiceStopBtn) this.voiceStopBtn.disabled = this.voiceStopping || this.isGenerating;
+            if (this.voiceSendBtn) this.voiceSendBtn.disabled = this.voiceStopping || this.isGenerating;
+            if (!this.voiceBtn) return;
+            this.voiceBtn.disabled = this.isGenerating || this.voiceStopping || (!this.voiceRecognition && !this.nativeSpeechBridge);
+            this.voiceBtn.classList.toggle('is-listening', isListening);
+            this.voiceBtn.setAttribute('aria-pressed', String(isListening));
+            this.voiceBtn.setAttribute('aria-label', isListening ? 'Stop voice input' : 'Dictate a message');
+            this.voiceBtn.title = isListening ? 'Stop voice input' : 'Dictate a message';
+            this.updateSendButtonState();
+        }
+
+        setVoiceStatus(message, isError = false) {
+            if (!this.voiceStatus) return;
+            this.voiceStatus.textContent = message;
+            this.voiceStatus.classList.toggle('d-none', !message);
+            this.voiceStatus.classList.toggle('is-error', Boolean(isError));
+            if (this.voiceFeedback) {
+                const showFeedback = Boolean(message) && !this.voiceListening && !this.voiceStopping;
+                this.voiceFeedback.textContent = message;
+                this.voiceFeedback.classList.toggle('d-none', !showFeedback);
+                this.voiceFeedback.classList.toggle('is-error', Boolean(isError));
+            }
+        }
+
+        finishVoiceCapture() {
+            const transcript = (this.voiceFinalTranscript || '').trim();
+            const sendAfterTranscription = this.voiceSendAfterTranscription && Boolean(transcript);
+            if (transcript) {
+                this.insertVoiceTranscript(transcript.replace(/\s+([,.;?!])/g, '$1'));
+                this.setVoiceStatus(sendAfterTranscription ? 'Sending transcribed message' : 'Speech added to your draft. Review or edit it before sending.');
+            } else if (!this.voiceErrorMessage) {
+                this.setVoiceStatus('No speech was captured. Tap the microphone and try again.', true);
+            }
+            this.voiceFinalTranscript = '';
+            this.voiceStopping = false;
+            this.voiceSendAfterTranscription = false;
+            this.stopVoiceLevelMeter();
+            this.setVoiceListening(false);
+            this.setVoiceTranscribing(false);
+            if (this.voiceStatus) {
+                this.setVoiceStatus(this.voiceStatus.textContent, this.voiceStatus.classList.contains('is-error'));
+            }
+            if (this.input) this.input.disabled = this.isGenerating;
+            if (this.voiceBtn) this.voiceBtn.disabled = this.isGenerating || (!this.voiceRecognition && !this.nativeSpeechBridge);
+            this.updateSendButtonState();
+            if (sendAfterTranscription) this.handleSend();
+        }
+
+        stopVoiceCapture(sendAfterTranscription = false) {
+            if (!this.voiceListening || this.voiceStopping) return;
+            this.voiceErrorMessage = '';
+            this.voiceStopping = true;
+            this.voiceSendAfterTranscription = sendAfterTranscription;
+            this.setVoiceListening(false);
+            this.setVoiceTranscribing(true, sendAfterTranscription);
+            this.setVoiceStatus(sendAfterTranscription ? 'Transcribing voice message before sending' : 'Transcribing voice message');
+            if (this.nativeSpeechBridge) this.nativeSpeechBridge.stopSpeechRecognition();
+            else if (this.voiceRecognition) this.voiceRecognition.stop();
+        }
+
+        setVoiceTranscribing(isLoading, sending = false) {
+            [this.voiceStopBtn, this.voiceSendBtn].forEach((button) => {
+                if (!button) return;
+                const isActive = isLoading && ((sending && button === this.voiceSendBtn) || (!sending && button === this.voiceStopBtn));
+                button.classList.toggle('is-loading', isActive);
+                button.disabled = isLoading || this.isGenerating;
+            });
+        }
+
+        cancelVoiceCapture() {
+            if (!this.voiceListening && !this.voiceStopping) return;
+            this.voiceCancelled = true;
+            this.voiceListening = false;
+            this.voiceStopping = false;
+            this.voiceSendAfterTranscription = false;
+            this.voiceFinalTranscript = '';
+            this.voiceErrorMessage = '';
+            if (this.nativeSpeechBridge) {
+                if (typeof this.nativeSpeechBridge.cancelSpeechRecognition === 'function') this.nativeSpeechBridge.cancelSpeechRecognition();
+                else this.nativeSpeechBridge.stopSpeechRecognition();
+            }
+            if (this.voiceRecognition) {
+                try { this.voiceRecognition.abort(); } catch (error) {}
+            }
+            this.setVoiceListening(false);
+            this.setVoiceTranscribing(false);
+            this.setVoiceStatus('Voice recording cancelled');
+            this.stopVoiceLevelMeter();
+            if (this.voiceCapture) this.voiceCapture.classList.add('d-none');
+        }
+
+        async startVoiceLevelMeter() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || this.voiceMediaStream) return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                if (!this.voiceListening) {
+                    stream.getTracks().forEach(track => track.stop());
+                    return;
+                }
+                this.voiceMediaStream = stream;
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextClass) return;
+                this.voiceAudioContext = new AudioContextClass();
+                this.voiceAnalyser = this.voiceAudioContext.createAnalyser();
+                this.voiceAnalyser.fftSize = 256;
+                this.voiceAudioContext.createMediaStreamSource(stream).connect(this.voiceAnalyser);
+                const samples = new Uint8Array(this.voiceAnalyser.fftSize);
+                const draw = () => {
+                    if (!this.voiceAnalyser) return;
+                    this.voiceAnalyser.getByteTimeDomainData(samples);
+                    let sum = 0;
+                    for (let i = 0; i < samples.length; i += 1) {
+                        const amplitude = (samples[i] - 128) / 128;
+                        sum += amplitude * amplitude;
+                    }
+                    this.setVoiceWaveformLevel(Math.min(1, Math.sqrt(sum / samples.length) * 4));
+                    this.voiceAnimationFrame = window.requestAnimationFrame(draw);
+                };
+                draw();
+            } catch (error) {
+                // Speech recognition still works if a browser does not grant a separate visualizer stream.
+            }
+        }
+
+        setVoiceWaveformLevel(level) {
+            if (!this.voiceCapture || !this.voiceWaveformBars.length) return;
+            const normalized = Math.max(0, Math.min(1, Number(level) || 0));
+            this.voiceCapture.classList.toggle('is-speaking', normalized > 0.08);
+            this.voiceWaveformBars.forEach((bar, index) => {
+                const centerBias = 0.45 + 0.55 * Math.sin(Math.PI * (index + 1) / (this.voiceWaveformBars.length + 1));
+                const variation = 0.35 + Math.random() * 0.65;
+                const height = Math.max(3, 3 + normalized * 31 * centerBias * variation);
+                bar.style.height = `${height}px`;
+            });
+        }
+
+        stopVoiceLevelMeter() {
+            if (this.voiceAnimationFrame) window.cancelAnimationFrame(this.voiceAnimationFrame);
+            this.voiceAnimationFrame = null;
+            this.voiceAnalyser = null;
+            if (this.voiceMediaStream) this.voiceMediaStream.getTracks().forEach(track => track.stop());
+            this.voiceMediaStream = null;
+            if (this.voiceAudioContext) {
+                try { this.voiceAudioContext.close(); } catch (error) {}
+            }
+            this.voiceAudioContext = null;
+            this.setVoiceWaveformLevel(0);
+        }
+
+        insertVoiceTranscript(transcript) {
+            const value = this.input.value;
+            const start = this.voiceSelection ? this.voiceSelection.start : value.length;
+            const end = this.voiceSelection ? this.voiceSelection.end : value.length;
+            const before = value.slice(0, start);
+            const after = value.slice(end);
+            const needsSpaceBefore = Boolean(before && !/\s$/.test(before));
+            const needsSpaceAfter = Boolean(after && !/^\s/.test(after));
+            const spokenText = transcript.trim();
+            const insertion = `${needsSpaceBefore ? ' ' : ''}${spokenText}${needsSpaceAfter ? ' ' : ''}`;
+            const cursor = before.length + insertion.length;
+
+            this.input.value = `${before}${insertion}${after}`;
+            this.input.setSelectionRange(cursor, cursor);
+            this.input.dispatchEvent(new Event('input', { bubbles: true }));
+            this.input.focus({ preventScroll: true });
+        }
+
         scheduleTextareaResize() {
             if (this.resizeFrame) {
                 cancelAnimationFrame(this.resizeFrame);
@@ -1287,8 +1667,8 @@
             const isPost = meta.sourceType === 'post' || meta.source_type === 'post' ||
                 meta.resourceType === 'post' || meta.resource_type === 'post' ||
                 cleanUrl.includes('/post/') || cleanUrl.includes('/posts/');
-            const isVideo = !isPost && (meta.resourceType === 'video' || meta.resource_type === 'video' || Boolean(hlsUrl) ||
-                /\.(mp4|webm|ogg|m3u8)(\?|#|$)/i.test(mediaUrl || cleanUrl));
+            const isVideo = meta.resourceType === 'video' || meta.resource_type === 'video' || Boolean(hlsUrl) ||
+                /\.(mp4|webm|ogg|m3u8)(\?|#|$)/i.test(mediaUrl || cleanUrl);
 
             const isImage = !isPost && !isProfile && !isVideo && (meta.resourceType === 'image' || meta.resource_type === 'image' ||
                 /\.(jpg|jpeg|png|gif|webp|svg)(\?|#|$)/i.test(mediaUrl || cleanUrl) ||
@@ -1301,8 +1681,8 @@
 
             let previewType = 'document';
             if (isProfile) previewType = 'profile';
-            else if (isPost) previewType = 'post';
             else if (isVideo) previewType = 'video';
+            else if (isPost) previewType = 'post';
             else if (isImage) previewType = 'image';
             else if (isDoc) previewType = 'document';
 
@@ -1388,6 +1768,12 @@
 
             const cleanTitle = title || meta.title || (previewType === 'document' ? 'Document' : (previewType === 'post' ? 'Post' : 'Resource'));
             const person = meta.person || meta.profile || (isProfile ? meta : {});
+            const profileUsername = meta.username || person.username ||
+                ((cleanUrl.match(/\/users\/user\/([^/?#]+)/i) || [])[1] || '');
+            const profileUrl = meta.profileUrl || meta.profile_url || person.profile_url ||
+                (profileUsername ? `/users/user/${encodeURIComponent(profileUsername)}/` : cleanUrl);
+            const profileCardUrl = meta.profileCardUrl || meta.profile_card_url || person.profile_card_url ||
+                `${profileUrl.replace(/\/$/, '')}/pwanimate-card/`;
             const description = meta.description || meta.content || meta.snippet || meta.citation ||
                 (previewType === 'document' ? 'Official course or academic document from PwaniNet repository.' :
                 (previewType === 'post' ? 'Discussion post on PwaniNet.' :
@@ -1415,10 +1801,10 @@
                 author: meta.author || '',
                 citation: meta.citation || '',
                 postId: postId,
-                username: meta.username || person.username || '',
+                username: profileUsername,
                 person: person,
-                profileUrl: meta.profileUrl || meta.profile_url || person.profile_url || cleanUrl,
-                profileCardUrl: meta.profileCardUrl || meta.profile_card_url || person.profile_card_url || '',
+                profileUrl: profileUrl,
+                profileCardUrl: profileCardUrl,
                 icon: icon,
                 badgeClass: badgeClass,
                 primaryText: primaryText,
@@ -1810,6 +2196,9 @@
             );
 
             if (details.previewType === 'video' && video) {
+                video.autoplay = true;
+                video.playsInline = true;
+                video.muted = false;
                 if (details.thumbnailUrl) {
                     video.poster = details.thumbnailUrl;
                 }
@@ -1841,6 +2230,19 @@
                     video.src = details.targetSrc;
                 }
                 video.classList.remove('d-none');
+                const tryPlayback = () => {
+                    const playback = video.play();
+                    if (playback && typeof playback.catch === 'function') {
+                        playback.catch((error) => {
+                            if (error && error.name === 'NotAllowedError') {
+                                video.muted = true;
+                                video.play().catch(() => {});
+                            }
+                        });
+                    }
+                };
+                video.addEventListener('loadeddata', tryPlayback, { once: true });
+                tryPlayback();
             } else if (details.previewType === 'image' && imgContainer && img) {
                 if (spinner) spinner.classList.remove('d-none');
                 img.onload = () => { if (spinner) spinner.classList.add('d-none'); };
@@ -2421,14 +2823,46 @@
             });
         }
 
+        scrollToMessageStart(message, smooth = true) {
+            if (!this.transcript || !message) return;
+            const transcriptTop = this.transcript.getBoundingClientRect().top;
+            const messageTop = message.getBoundingClientRect().top;
+            const targetTop = this.transcript.scrollTop + messageTop - transcriptTop - 12;
+            this.transcript.scrollTo({
+                top: Math.max(0, targetTop),
+                behavior: smooth ? 'smooth' : 'auto'
+            });
+        }
+
+        appendTranscriptRow(row) {
+            if (!this.transcript || !row) return;
+            const disclaimer = this.transcript.querySelector('.pwanimate-chat-disclaimer');
+            if (disclaimer) this.transcript.insertBefore(row, disclaimer);
+            else this.transcript.appendChild(row);
+        }
+
         setGenerating(loading) {
             this.isGenerating = loading;
             if (this.input) this.input.disabled = loading;
+            if (this.voiceBtn) this.voiceBtn.disabled = loading || (!this.voiceRecognition && !this.nativeSpeechBridge);
+            if (loading && this.voiceListening) {
+                this.voiceErrorMessage = '';
+                this.setVoiceListening(false);
+                if (this.voiceRecognition) this.voiceRecognition.stop();
+                if (this.nativeSpeechBridge) this.nativeSpeechBridge.stopSpeechRecognition();
+            }
             this.updateSendButtonState();
         }
 
         updateSendButtonState() {
             if (!this.sendBtn) return;
+            if (this.voiceListening || this.voiceStopping) {
+                this.sendBtn.disabled = true;
+                this.sendBtn.classList.remove('is-active');
+                this.sendBtn.setAttribute('aria-label', 'Stop voice input before sending');
+                this.sendBtn.setAttribute('title', 'Stop voice input before sending');
+                return;
+            }
             if (this.isGenerating) {
                 this.sendBtn.disabled = false;
                 this.sendBtn.classList.add('is-generating');
@@ -2792,11 +3226,53 @@
                     <span>${escapeHtml(text)}</span>
                 </div>
             `;
-            this.transcript.appendChild(row);
+            this.appendTranscriptRow(row);
             this.scrollToBottom();
         }
 
+        async downloadGeneratedResource(button) {
+            const row = button.closest('.pwanimate-message-row');
+            const messageId = row && row.dataset.messageId;
+            const fileFormat = button.dataset.format;
+            if (!messageId || !['pdf', 'docx'].includes(fileFormat)) return;
+
+            const originalMarkup = button.innerHTML;
+            const menu = button.closest('.pwanimate-resource-export-menu');
+            const menuButtons = menu ? Array.from(menu.querySelectorAll('.pwanimate-resource-download')) : [button];
+            menuButtons.forEach((item) => { item.disabled = true; });
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Preparing…';
+
+            try {
+                const response = await fetch(`/api/pwanimate/messages/${encodeURIComponent(messageId)}/resources/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                        'Accept': 'application/json',
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ format: fileFormat }),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(data.error || 'Could not create the document. Please try again.');
+                button.innerHTML = '<i class="bi bi-check2 me-2"></i>Saved in My Resources';
+                window.location.assign(data.download_url);
+            } catch (error) {
+                console.error('[Pwanimate] Resource export failed:', error);
+                button.innerHTML = '<i class="bi bi-exclamation-circle me-2"></i>Could not prepare file';
+                window.setTimeout(() => { button.innerHTML = originalMarkup; }, 2600);
+                return;
+            } finally {
+                menuButtons.forEach((item) => { item.disabled = false; });
+            }
+            window.setTimeout(() => { button.innerHTML = originalMarkup; }, 2200);
+        }
+
         async handleSend(retryOptions = null) {
+            if (this.voiceListening || this.voiceStopping) {
+                this.setVoiceStatus('Stop voice input before sending or editing your draft.');
+                return;
+            }
             if (this.isGenerating) return;
             const isRetry = Boolean(retryOptions);
             const text = isRetry ? retryOptions.text : (this.input ? this.input.value.trim() : '');
@@ -2813,6 +3289,7 @@
                 this.input.value = '';
                 this.resetTextareaHeight();
                 this.updateSendButtonState();
+                this.setVoiceStatus('');
             }
 
             // Snapshot staged attachments and clear the strip before sending
@@ -2949,8 +3426,10 @@
                     fallback_used: data.fallback_info ? data.fallback_info.fallback_used : false
                 });
 
-                this.appendAssistantMessage(data.answer, data.sources, data.citations, data.fallback_info, data.quota_info, data.people, data.message_id, data.people_html);
-                this.scrollToBottom();
+                const assistantRow = this.appendAssistantMessage(data.answer, data.sources, data.citations, data.fallback_info, data.quota_info, data.people, data.message_id, data.people_html);
+                const disclaimer = this.transcript.querySelector('#pwanimate-chat-disclaimer');
+                if (disclaimer) disclaimer.classList.remove('d-none');
+                this.scrollToMessageStart(assistantRow);
                 this.refreshConversationsList();
                 this.updateQuotaStatus(data.quota_status);
                 this.updateActiveModelChip(data.quota_info);
@@ -3024,7 +3503,7 @@
                     </div>
                 </div>
             `;
-            this.transcript.appendChild(row);
+            this.appendTranscriptRow(row);
             if (escaped) {
                 this.checkCollapsibleUserBubbles(row);
                 requestAnimationFrame(() => this.checkCollapsibleUserBubbles(row));
@@ -3098,7 +3577,7 @@
                     </div>
                 </div>
             `;
-            this.transcript.appendChild(row);
+            this.appendTranscriptRow(row);
 
             const textEl = row.querySelector('.pwanimate-thinking-text');
             if (textEl && phrases.length > 1) {
@@ -3215,6 +3694,26 @@
         }
 
         destroy() {
+            if (this._onNativeSpeechEvent) {
+                window.removeEventListener('pwaninet:native-speech', this._onNativeSpeechEvent);
+                this._onNativeSpeechEvent = null;
+            }
+            if ((this.voiceListening || this.voiceStopping) && this.nativeSpeechBridge) {
+                try {
+                    if (this.nativeSpeechBridge.cancelSpeechRecognition) this.nativeSpeechBridge.cancelSpeechRecognition();
+                    else this.nativeSpeechBridge.stopSpeechRecognition();
+                } catch (e) {}
+            }
+            this.stopVoiceLevelMeter();
+            this.nativeSpeechBridge = null;
+            if (this.voiceRecognition) {
+                this.voiceRecognition.onstart = null;
+                this.voiceRecognition.onresult = null;
+                this.voiceRecognition.onerror = null;
+                this.voiceRecognition.onend = null;
+                try { this.voiceRecognition.abort(); } catch (e) {}
+                this.voiceRecognition = null;
+            }
             if (this.isGenerating && this.abortController) {
                 try { this.abortController.abort(); } catch (e) {}
             }
@@ -3295,6 +3794,7 @@
             if (Array.isArray(filteredSources) && filteredSources.length > 0) {
                 const badges = filteredSources.map((src) => {
                     const title = escapeHtml(src.title || src.citation || 'Document');
+                    const person = src.person || {};
                     if (src.url) {
                         return `<button type="button" class="pwanimate-citation-badge"
                             data-url="${escapeHtml(src.url)}"
@@ -3312,6 +3812,14 @@
                             data-document-id="${escapeHtml(src.document_id || '')}"
                             data-document-share-id="${escapeHtml(src.document_share_id || '')}"
                             data-file-type="${escapeHtml(src.file_type || src.file_extension || '')}"
+                            data-username="${escapeHtml(person.username || '')}"
+                            data-profile-url="${escapeHtml(person.profile_url || '')}"
+                            data-profile-card-url="${escapeHtml(person.profile_card_url || '')}"
+                            data-avatar-url="${escapeHtml(person.avatar_url || person.profile_photo_url || '')}"
+                            data-headline="${escapeHtml(person.headline || '')}"
+                            data-academic-level="${escapeHtml(person.academic_level || '')}"
+                            data-programme-name="${escapeHtml(person.programme_name || person.programme || '')}"
+                            data-bio="${escapeHtml(person.bio || '')}"
                             aria-label="View ${title}">
                             <i class="bi bi-link-45deg"></i>
                             <span>${title}</span>
@@ -3396,6 +3904,15 @@
                         ${fallbackHtml}
                     </div>
                     <div class="pwanimate-message-actions assistant-actions">
+                        <div class="dropdown pwanimate-resource-export">
+                            <button type="button" class="btn pwanimate-action-btn" data-bs-toggle="dropdown" aria-expanded="false" title="Save response to My Resources" aria-label="Save response to My Resources">
+                                <i class="bi bi-file-earmark-arrow-down"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end pwanimate-resource-export-menu">
+                                <li><button type="button" class="dropdown-item pwanimate-resource-download" data-format="pdf"><i class="bi bi-filetype-pdf me-2"></i>Download PDF</button></li>
+                                <li><button type="button" class="dropdown-item pwanimate-resource-download" data-format="docx"><i class="bi bi-filetype-docx me-2"></i>Download Word document</button></li>
+                            </ul>
+                        </div>
                         <button type="button" class="btn pwanimate-action-btn copy-btn" title="Copy answer" aria-label="Copy answer">
                             <i class="bi bi-clipboard"></i>
                         </button>
@@ -3403,7 +3920,7 @@
                 </div>
             `;
 
-            this.transcript.appendChild(row);
+            this.appendTranscriptRow(row);
             const mdBody = row.querySelector('.pwanimate-markdown-body');
             if (mdBody) {
                 this.postProcessMarkdownDOM(mdBody);
@@ -3564,7 +4081,7 @@
                 });
             }
 
-            this.transcript.appendChild(row);
+            this.appendTranscriptRow(row);
             this.scrollToBottom();
         }
 

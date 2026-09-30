@@ -71,12 +71,14 @@ class DocumentSemanticRetrievalService:
                 global_role in ['PRESIDENT', 'DELEGATE']
             )
 
-            if not is_admin_or_leader:
+            if is_admin_or_leader:
+                qs = qs.filter(Q(document__is_ai_generated=False) | Q(document__uploaded_by=user))
+            else:
                 # Build student visibility query
-                visibility_q = Q(document__visibility='public') | Q(document__uploaded_by=user)
+                visibility_q = Q(document__visibility='public', document__is_ai_generated=False) | Q(document__uploaded_by=user)
 
                 # Restricted visibility check
-                restricted_q = Q(document__visibility='restricted')
+                restricted_q = Q(document__visibility='restricted', document__is_ai_generated=False)
                 has_restricted_match = False
 
                 # 1. Match student's enrolled programme units
@@ -99,7 +101,7 @@ class DocumentSemanticRetrievalService:
                 qs = qs.filter(visibility_q).distinct()
         else:
             # Anonymous users can only view public documents
-            qs = qs.filter(document__visibility='public')
+            qs = qs.filter(document__visibility='public', document__is_ai_generated=False)
 
         # Domain metadata filters
         if filters:

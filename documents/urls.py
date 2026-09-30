@@ -30,6 +30,7 @@ urlpatterns = [
     
     # Document Details
     path('document/<uuid:share_id>/', views.document_detail, name='document_detail'),
+    path('private-resource-files/<int:file_id>/<str:asset>/', views.private_resource_asset, name='private_resource_asset'),
     
     # Document Management
     path('document/<uuid:share_id>/edit/', views.edit_document, name='edit_document'),
@@ -45,6 +46,7 @@ urlpatterns = [
     # My Library
     path('library/', views.my_library, name='my_library'),
     path('library/uploads/', views.my_uploads, name='my_uploads'),
+    path('library/resources/', views.my_resources, name='my_resources'),
     path('library/bookmarks/', views.my_bookmarks, name='my_bookmarks'),
     path('library/downloads/', views.my_downloads, name='my_downloads'),
     path('library/history/', views.my_history, name='my_history'),

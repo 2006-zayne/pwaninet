@@ -383,16 +383,30 @@ def generate_preview(self, file_id: int):
         raise self.retry(exc=e, countdown=30)
 
 
-def _sync_to_storage_if_remote(local_file_path, rel_storage_path):
-    """If default_storage is remote (e.g. S3/R2), upload the locally generated file."""
+def _sync_document_asset(document_file, local_file_path, relative_path):
+    """Store generated previews beside the source, keeping private resources private."""
+    if document_file.storage_private:
+        share_id = document_file.document_version.document.share_id
+        storage_path = f"private-documents/{share_id}/{document_file.id}/{relative_path}"
+        _sync_to_storage_if_remote(local_file_path, storage_path, storage=document_file.file.storage)
+        return storage_path
+    _sync_to_storage_if_remote(local_file_path, relative_path)
+    return relative_path
+
+
+def _sync_to_storage_if_remote(local_file_path, rel_storage_path, storage=None):
+    """Upload generated output to its configured storage when remote or private."""
     try:
         from django.core.files.storage import default_storage
         from django.core.files.base import ContentFile
-        if default_storage.__class__.__name__ != 'FileSystemStorage':
+        active_storage = storage or default_storage
+        if storage is not None or active_storage.__class__.__name__ != 'FileSystemStorage':
             with open(local_file_path, 'rb') as f:
-                if default_storage.exists(rel_storage_path):
-                    default_storage.delete(rel_storage_path)
-                default_storage.save(rel_storage_path, ContentFile(f.read()))
+                if active_storage.exists(rel_storage_path):
+                    active_storage.delete(rel_storage_path)
+                active_storage.save(rel_storage_path, ContentFile(f.read()))
+            if storage is not None:
+                os.remove(local_file_path)
     except Exception as exc:
         logger.warning(f"Failed to sync {rel_storage_path} to remote storage: {exc}")
 
@@ -424,8 +438,7 @@ def _generate_pdf_preview(file):
                 pix.save(preview_path)
                 doc.close()
                 
-                rel_path = f"previews/{preview_filename}"
-                _sync_to_storage_if_remote(preview_path, rel_path)
+                rel_path = _sync_document_asset(file, preview_path, f"previews/{preview_filename}")
                 
                 file.preview_path = rel_path
                 # Also fallback thumbnail_path if missing
@@ -481,8 +494,7 @@ def _generate_docx_preview(file):
             preview_path = preview_dir / preview_filename
             img.save(preview_path)
             
-            rel_path = f"previews/{preview_filename}"
-            _sync_to_storage_if_remote(preview_path, rel_path)
+            rel_path = _sync_document_asset(file, preview_path, f"previews/{preview_filename}")
             
             file.preview_path = rel_path
             if not file.thumbnail_path:
@@ -525,8 +537,7 @@ def _generate_pptx_preview(file):
             preview_path = preview_dir / preview_filename
             img.save(preview_path)
             
-            rel_path = f"previews/{preview_filename}"
-            _sync_to_storage_if_remote(preview_path, rel_path)
+            rel_path = _sync_document_asset(file, preview_path, f"previews/{preview_filename}")
             
             file.preview_path = rel_path
             if not file.thumbnail_path:
@@ -581,8 +592,7 @@ def _generate_text_preview(file):
             preview_path = preview_dir / preview_filename
             img.save(preview_path)
             
-            rel_path = f"previews/{preview_filename}"
-            _sync_to_storage_if_remote(preview_path, rel_path)
+            rel_path = _sync_document_asset(file, preview_path, f"previews/{preview_filename}")
             
             file.preview_path = rel_path
             if not file.thumbnail_path:
@@ -617,8 +627,7 @@ def _generate_pdf_thumbnail(file, thumbnail_dir):
                 pix.save(thumbnail_path)
                 doc.close()
                 
-                rel_path = f"thumbnails/{thumb_filename}"
-                _sync_to_storage_if_remote(thumbnail_path, rel_path)
+                rel_path = _sync_document_asset(file, thumbnail_path, f"thumbnails/{thumb_filename}")
                 
                 file.thumbnail_path = rel_path
                 file.save(update_fields=['thumbnail_path'])
@@ -648,8 +657,7 @@ def _generate_docx_thumbnail(file, thumbnail_dir):
         thumbnail_path = thumbnail_dir / thumb_filename
         img.save(thumbnail_path)
         
-        rel_path = f"thumbnails/{thumb_filename}"
-        _sync_to_storage_if_remote(thumbnail_path, rel_path)
+        rel_path = _sync_document_asset(file, thumbnail_path, f"thumbnails/{thumb_filename}")
         
         file.thumbnail_path = rel_path
         file.save(update_fields=['thumbnail_path'])
@@ -679,8 +687,7 @@ def _generate_pptx_thumbnail(file, thumbnail_dir):
         thumbnail_path = thumbnail_dir / thumb_filename
         img.save(thumbnail_path)
         
-        rel_path = f"thumbnails/{thumb_filename}"
-        _sync_to_storage_if_remote(thumbnail_path, rel_path)
+        rel_path = _sync_document_asset(file, thumbnail_path, f"thumbnails/{thumb_filename}")
         
         file.thumbnail_path = rel_path
         file.save(update_fields=['thumbnail_path'])

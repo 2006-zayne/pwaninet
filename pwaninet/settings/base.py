@@ -426,6 +426,11 @@ ENABLE_NOTIFICATION_PROCESSING = True
 # All values come from .env — no secrets are hardcoded here.
 # ---------------------------------------------------------------------------
 USE_S3 = os.environ.get('USE_S3', '0') == '1'
+PWANIMATE_PRIVATE_MEDIA_BUCKET = os.environ.get('PWANIMATE_PRIVATE_MEDIA_BUCKET', '')
+PWANIMATE_PRIVATE_MEDIA_ROOT = os.environ.get(
+    'PWANIMATE_PRIVATE_MEDIA_ROOT',
+    str(BASE_DIR / 'private_media'),
+)
 
 # Expose CDN domain at module level so Post.get_hls_url can use it
 CDN_DOMAIN = os.environ.get('CDN_DOMAIN', '')
