@@ -61,11 +61,6 @@ const CORE_ASSETS = [
     '/static/images/web-app-manifest-512x512.png',
     '/static/images/pwaninetmonochrome.png',
     '/static/images/browserconfig.xml',
-    '/static/js/messaging/offline-cache.js',
-    '/static/js/messaging/network-status.js',
-    '/static/js/messaging/sync-manager.js',
-    '/static/js/messaging/offline-ui.js',
-    '/static/js/messaging/offline-integration.js',
     '/static/js/native-pwa-install.js',
     '/static/js/downloads/download_storage.js',
     '/static/js/downloads/download_queue.js',
@@ -78,7 +73,6 @@ const CORE_ASSETS = [
 const PAGE_SHELLS = [
     '/',
     '/offline-media/',
-    '/messaging/',
     '/posts/',
     '/users/profile/'
 ];
@@ -264,6 +258,20 @@ self.addEventListener('fetch', (event) => {
 
 async function handleRequest(request) {
     const url = new URL(request.url);
+
+    // Do not serve cached inbox or group chat pages while messaging is frozen.
+    const isFrozenMessagingPath =
+        /^\/messaging(?:\/|$)/.test(url.pathname) ||
+        /^\/groups\/\d+\/chat\/?$/.test(url.pathname) ||
+        /^\/groups\/api\/groups\/\d+\/messages(?:\/|$)/.test(url.pathname) ||
+        /^\/groups\/api\/groups\/attachments\/(?:upload|batch-upload)\/?$/.test(url.pathname);
+    if (isFrozenMessagingPath) {
+        return new Response('Messaging is unavailable while the MVP feature is frozen.', {
+            status: 410,
+            statusText: 'Gone',
+            headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }
+        });
+    }
     
     try {
         // Handle virtual offline media stream with range support (HTTP 206)
@@ -844,26 +852,6 @@ async function cachePage(url) {
         console.error('Failed to cache page:', error);
     }
     return false;
-}
-
-// Background sync for offline messaging
-self.addEventListener('sync', (event) => {
-    if (event.tag === 'messaging-sync') {
-        event.waitUntil(syncOfflineMessages());
-    }
-});
-
-async function syncOfflineMessages() {
-    try {
-        // This would integrate with the offline messaging system
-        console.log('Service Worker: Syncing offline messages...');
-        
-        // Get outbox messages from IndexedDB and try to send them
-        // Implementation depends on the offline messaging system
-        
-    } catch (error) {
-        console.error('Service Worker: Sync failed:', error);
-    }
 }
 
 console.log('Service Worker: Loaded');

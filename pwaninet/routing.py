@@ -8,9 +8,6 @@ Duplicate class names across modules are forbidden.
 
 from django.urls import re_path
 from realtime.consumers import NotificationConsumer, FeedConsumer, OnlineStatusConsumer, CommentConsumer
-from groups.consumers import GroupChatConsumer
-# Messaging routing - Unfrozen for group chat functionality
-from messaging.routing import websocket_urlpatterns as messaging_websocket_urlpatterns
 
 websocket_urlpatterns = [
     # Notification consumer
@@ -21,6 +18,4 @@ websocket_urlpatterns = [
     re_path(r'ws/online/$', OnlineStatusConsumer.as_asgi()),
     # Comment updates consumer (supports both integer ID and UUID share_id)
     re_path(r'ws/post/(?P<post_id>[a-zA-Z0-9_-]+)/comments/$', CommentConsumer.as_asgi()),
-    # Group chat consumer
-    re_path(r'ws/groups/chat/(?P<group_id>\d+)/$', GroupChatConsumer.as_asgi()),
-] + messaging_websocket_urlpatterns
+]

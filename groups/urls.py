@@ -4,6 +4,7 @@ Contains both Django web view routes and API routes.
 """
 from django.urls import path
 from . import views
+from pwaninet.messaging_gate import messaging_frozen
 
 urlpatterns = [
     path('dashboard/', views.groups_dashboard, name='groups_dashboard'),
@@ -16,7 +17,9 @@ urlpatterns = [
     path('<int:group_id>/settings/announcements/', views.group_settings_announcements_view, name='group_settings_announcements'),
     path('<int:group_id>/settings/documents/', views.group_settings_documents_view, name='group_settings_documents'),
     path('<int:group_id>/settings/about/', views.group_settings_about_view, name='group_settings_about'),
-    path('<int:group_id>/chat/', views.group_chat_view, name='group_chat'),
+    # Group chat routes remain named for reverse() compatibility but are
+    # rejected while messaging is frozen for the MVP.
+    path('<int:group_id>/chat/', messaging_frozen, name='group_chat'),
     path('create/', views.create_group_view, name='create_group'),
     path('toggle/<int:group_id>/', views.toggle_group_membership, name='toggle_membership'),
     path('<int:group_id>/edit/', views.edit_group, name='edit_group'),
@@ -50,10 +53,10 @@ urlpatterns = [
     path('api/groups/<int:group_id>/mutual-friends/', views.get_mutual_friends_api, name='get_mutual_friends_api'),
     path('api/groups/<int:group_id>/send-invites/', views.send_group_invites_api, name='send_group_invites_api'),
     # Group Chat API endpoints
-    path('api/groups/<int:group_id>/messages/', views.GroupMessageViewSet.as_view({'get': 'list', 'post': 'create'}), name='group_messages_api'),
-    path('api/groups/<int:group_id>/messages/<int:pk>/', views.GroupMessageViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='group_message_detail_api'),
-    path('api/groups/<int:group_id>/messages/<int:pk>/react/', views.GroupMessageViewSet.as_view({'post': 'react'}), name='group_message_react_api'),
-    path('api/groups/<int:group_id>/messages/<int:pk>/mark-read/', views.GroupMessageViewSet.as_view({'post': 'mark_read'}), name='group_message_mark_read_api'),
-    path('api/groups/attachments/upload/', views.group_attachment_upload, name='group_attachment_upload'),
-    path('api/groups/attachments/batch-upload/', views.group_batch_attachment_upload, name='group_batch_attachment_upload'),
+    path('api/groups/<int:group_id>/messages/', messaging_frozen, name='group_messages_api'),
+    path('api/groups/<int:group_id>/messages/<int:pk>/', messaging_frozen, name='group_message_detail_api'),
+    path('api/groups/<int:group_id>/messages/<int:pk>/react/', messaging_frozen, name='group_message_react_api'),
+    path('api/groups/<int:group_id>/messages/<int:pk>/mark-read/', messaging_frozen, name='group_message_mark_read_api'),
+    path('api/groups/attachments/upload/', messaging_frozen, name='group_attachment_upload'),
+    path('api/groups/attachments/batch-upload/', messaging_frozen, name='group_batch_attachment_upload'),
 ]

@@ -1,4 +1,4 @@
-from django.urls import path, include
+from django.urls import path, include, re_path
 from rest_framework.routers import DefaultRouter
 from .views import (
     ConversationViewSet,
@@ -14,6 +14,7 @@ from .views import (
     fetch_link_metadata,
     unread_message_count
 )
+from pwaninet.messaging_gate import messaging_frozen
 
 router = DefaultRouter()
 router.register(r'conversations', ConversationViewSet, basename='conversation')
@@ -24,6 +25,9 @@ router.register(r'themes', ConversationThemeViewSet, basename='theme')
 app_name = 'messaging'
 
 urlpatterns = [
+    # Keep the named routes below for reverse() compatibility, but reject all
+    # incoming messaging requests while the feature is frozen for the MVP.
+    re_path(r'^.*$', messaging_frozen, name='frozen'),
     path('v1/', include(router.urls)),
     path('', conversation_list, name='conversation_list'),
     path('conversation/<int:conversation_id>/', conversation_detail, name='conversation_detail'),

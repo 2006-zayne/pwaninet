@@ -98,19 +98,6 @@
   ],
   "shortcuts": [
     {
-      "name": "Messages",
-      "short_name": "Chat",
-      "description": "Open your conversations",
-      "url": "/messaging/",
-      "icons": [
-        {
-          "src": "/static/images/shortcut-messages.png",
-          "sizes": "96x96",
-          "type": "image/png"
-        }
-      ]
-    },
-    {
       "name": "Posts",
       "short_name": "Feed",
       "description": "View campus posts",
