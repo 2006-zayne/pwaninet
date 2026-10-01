@@ -47,6 +47,12 @@ celerybeat.pid
 # =========================
 *.log
 
+# =========================
+# PERFORMANCE TEST OUTPUT / TEST CREDENTIALS
+# =========================
+tests/performance/users.csv
+tests/performance/results/
+
 # Local machine-specific launch helpers
 serve*.sh
 

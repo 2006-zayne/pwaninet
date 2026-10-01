@@ -5,11 +5,15 @@
     background-color: var(--card-bg, #ffffff) !important;
     border-color: var(--border, #e2e8f0) !important;
     transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+    min-width: 0;
+    overflow: hidden;
+    box-sizing: border-box;
   }
   .classmate-card .classmate-name {
     color: var(--text-dark, #0f172a);
     transition: color 0.2s ease;
   }
+  .classmate-card .min-w-0 { min-width: 0; }
   .classmate-card .avatar-placeholder {
     background-color: #f1f5f9 !important;
     color: var(--primary, #2563eb) !important;
@@ -29,6 +33,20 @@
     background-color: rgba(255, 255, 255, 0.08) !important;
     color: #cbd5e1 !important;
   }
+  .classmate-card .card-bio-text {
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+  #followAllBtn .follow-all-loading { display: none; align-items: center; gap: .45rem; }
+  #followAllBtn.htmx-request .follow-all-idle { display: none; }
+  #followAllBtn.htmx-request .follow-all-loading { display: inline-flex; }
+  @media (max-width: 380px) {
+    .classmate-card .classmate-heading { flex-wrap: wrap; }
+    .classmate-card .classmate-follow-wrap { margin-left: auto; }
+  }
 </style>
 
 <div class="step-content animate-fade-in" id="step-classmates-container">
@@ -43,8 +61,10 @@
               id="followAllBtn"
               hx-post="{% url 'users:onboarding_batch_follow' %}"
               hx-target="#step-classmates-container"
-              hx-swap="outerHTML">
-        <i class="bi bi-people-fill"></i> Follow All Suggested
+              hx-swap="outerHTML"
+              hx-disabled-elt="this">
+        <span class="follow-all-idle"><i class="bi bi-people-fill"></i> Follow All Suggested</span>
+        <span class="follow-all-loading"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Creating connections…</span>
       </button>
     {% endif %}
   </div>
@@ -64,7 +84,7 @@
       {% for classmate in classmates %}
         <div class="col-12 col-md-6">
           <div class="card h-100 border rounded-4 p-3 shadow-xs hover-lift classmate-card w-100">
-            <div class="d-flex align-items-start gap-3">
+              <div class="d-flex align-items-start gap-3 min-w-0">
               <a href="{% url 'users:profile' classmate.username %}" target="_blank" class="text-decoration-none flex-shrink-0">
                 <div class="position-relative">
                   {% if classmate.profile_pic and classmate.profile_pic.url %}
@@ -82,14 +102,14 @@
               </a>
 
               <div class="flex-grow-1 min-w-0">
-                <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                <div class="d-flex align-items-center justify-content-between gap-2 mb-1 classmate-heading">
                   <div class="min-w-0 flex-grow-1 pe-1">
                     <a href="{% url 'users:profile' classmate.username %}" target="_blank" class="text-decoration-none classmate-name fw-bold text-truncate d-block" style="font-size: 0.95rem;">
                       {{ classmate.get_full_name|default:classmate.username }}
                     </a>
                     <span class="text-muted small d-block text-truncate" style="font-size: 0.78rem;">@{{ classmate.username }}</span>
                   </div>
-                  <div class="flex-shrink-0">
+                  <div class="flex-shrink-0 classmate-follow-wrap">
                     {% if classmate.id in following_ids or all_followed %}
                       <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 fw-bold onboarding-follow-btn"
                               id="onboarding-follow-btn-{{ classmate.id }}"

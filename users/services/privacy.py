@@ -119,13 +119,19 @@ def visible_posts_for(viewer: Optional[Any], queryset: Optional[QuerySet] = None
         return qs.filter(visibility='PUBLIC')
 
     followed_author_ids = Follow.objects.filter(follower_id=viewer.pk).values_list('followed_id', flat=True)
-    visible = (
-        Q(author_id=viewer.pk) |
+    normal_visibility = (
         Q(visibility__in=['PUBLIC', PrivacyLevel.AUTHENTICATED]) |
         Q(visibility=PrivacyLevel.FOLLOWERS, author_id__in=followed_author_ids)
     )
     group_ids = Membership.objects.filter(user_id=viewer.pk, status=MembershipStatus.APPROVED).values_list('group_id', flat=True)
-    visible &= Q(group__isnull=True) | Q(group_id__in=group_ids)
+    visible = (
+        Q(author_id=viewer.pk) |
+        (Q(group__isnull=True) & normal_visibility) |
+        (Q(group_id__in=group_ids) & normal_visibility) |
+        # An Everyone group explicitly widens its posts to all PwaniNet users,
+        # including viewers who do not follow the individual author.
+        (Q(group__post_visibility='everyone') & Q(visibility__in=['PUBLIC', PrivacyLevel.AUTHENTICATED, PrivacyLevel.FOLLOWERS]))
+    )
     qs = qs.filter(visible)
     blocked_ids = Block.objects.filter(blocker_id=viewer.pk).values_list('blocked_id', flat=True)
     blocked_by_ids = Block.objects.filter(blocked_id=viewer.pk).values_list('blocker_id', flat=True)

@@ -7,8 +7,10 @@ RAG interactions, conversation listings, and detail/deletion.
 
 import logging
 import uuid
+import requests
 from django.db import transaction
 from django.db.models import Q
+from django.conf import settings
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -689,3 +691,70 @@ class PwanimateQuotaStatusView(APIView):
             {"quota_status": tracker.get_status()},
             status=status.HTTP_200_OK,
         )
+
+
+class PwanimateVoiceTranscriptionView(APIView):
+    """Transcribe a complete client-recorded voice note with Groq Whisper."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        audio = request.FILES.get('audio')
+        if not audio:
+            return Response({'error': 'Audio recording is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        max_bytes = int(getattr(settings, 'PWANIMATE_VOICE_MAX_BYTES', 25 * 1024 * 1024))
+        if audio.size <= 0 or audio.size > max_bytes:
+            return Response({'error': 'Recording is empty or exceeds the upload limit.'}, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+
+        api_key = getattr(settings, 'PWANIMATE_GROQ_API_KEY', '')
+        if not api_key:
+            return Response({'error': 'Voice transcription is not configured.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        language = (request.data.get('language') or '').strip().lower()
+        if language not in {'en', 'sw'}:
+            language = 'en'
+
+        content_type = (audio.content_type or 'application/octet-stream').split(';', 1)[0].lower()
+        extension_by_type = {
+            'audio/webm': '.webm',
+            'audio/ogg': '.ogg',
+            'audio/mp4': '.m4a',
+            'audio/mpeg': '.mp3',
+            'audio/wav': '.wav',
+            'audio/x-wav': '.wav',
+        }
+        extension = extension_by_type.get(content_type)
+        if not extension:
+            return Response({'error': 'This audio format is not supported.'}, status=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
+
+        audio.seek(0)
+        try:
+            upstream = requests.post(
+                'https://api.groq.com/openai/v1/audio/transcriptions',
+                headers={'Authorization': f'Bearer {api_key}'},
+                files={'file': (f'voice{extension}', audio, content_type)},
+                data={
+                    'model': getattr(settings, 'PWANIMATE_SPEECH_TO_TEXT_MODEL', 'whisper-large-v3-turbo'),
+                    'language': language,
+                    'response_format': 'json',
+                    'temperature': '0',
+                },
+                timeout=(5, int(getattr(settings, 'PWANIMATE_SPEECH_TO_TEXT_TIMEOUT', 60))),
+            )
+        except requests.RequestException:
+            logger.exception('Pwanimate voice transcription request failed')
+            return Response({'error': 'Transcription service could not be reached. Please try again.'}, status=status.HTTP_502_BAD_GATEWAY)
+
+        if upstream.status_code != 200:
+            logger.warning('Pwanimate voice transcription failed with upstream status %s', upstream.status_code)
+            return Response({'error': 'Transcription failed. Please try again.'}, status=status.HTTP_502_BAD_GATEWAY)
+
+        try:
+            transcript = str(upstream.json().get('text') or '').strip()
+        except (ValueError, AttributeError):
+            logger.warning('Pwanimate voice transcription returned an invalid response')
+            return Response({'error': 'Transcription returned an invalid response.'}, status=status.HTTP_502_BAD_GATEWAY)
+
+        return Response({'text': transcript}, status=status.HTTP_200_OK)

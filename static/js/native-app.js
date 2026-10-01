@@ -1015,6 +1015,11 @@ function triggerNativeApkDownload(apkUrl) {
     }
 }
 
+function openNativeUpdateDownloadPage() {
+    // Keep update navigation inside the app and let the downloads page manage the APK state.
+    window.location.href = '/downloads/?native_update=1#downloads-actions';
+}
+
 function semverCompare(v1, v2) {
     if (!v1 || !v2) return 0;
     var p1 = v1.replace(/^v/, '').split('.').map(Number);
@@ -1149,6 +1154,7 @@ async function checkNativeAppUpdates(manual) {
                 if (updateBtn) {
                     updateBtn.classList.remove('d-none');
                     updateBtn.classList.add('d-inline-flex');
+                    updateBtn.href = '/downloads/?native_update=1#downloads-actions';
                 }
                 if (checkBtn) {
                     checkBtn.classList.add('btn-outline-secondary');
@@ -1183,7 +1189,7 @@ async function checkNativeAppUpdates(manual) {
             if (manual) {
                 showNativeUpdateBanner(data);
                 if (confirm('A new native version (v' + targetApkVer + ') is available! Would you like to download the APK update now?')) {
-                    triggerNativeApkDownload(data.apk_url || '/download/app/latest/');
+                    openNativeUpdateDownloadPage();
                 }
                 return;
             }
@@ -1246,7 +1252,7 @@ function showNativeUpdateBanner(data) {
     var dlBtn = document.getElementById('pwaninet-native-update-download-btn');
     if (dlBtn) {
         dlBtn.addEventListener('click', function() {
-            triggerNativeApkDownload(data.apk_url || '/download/app/latest/');
+            openNativeUpdateDownloadPage();
             banner.remove();
         });
     }
@@ -1285,7 +1291,7 @@ function showMandatoryUpdateModal(data) {
     var btn = document.getElementById('pwaninet-mandatory-download-btn');
     if (btn) {
         btn.addEventListener('click', function() {
-            triggerNativeApkDownload(data.apk_url || '/download/app/latest/');
+            openNativeUpdateDownloadPage();
         });
     }
 }

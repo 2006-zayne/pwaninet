@@ -5,14 +5,11 @@ import subprocess
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from posts.models import Post
+from posts.utils.media_tools import resolve_ffprobe
 
 logger = logging.getLogger(__name__)
 
-FFPROBE = getattr(settings, 'FFPROBE_PATH', '/usr/bin/ffprobe')
-if not os.path.isfile(FFPROBE):
-    # Fallback to PATH lookup
-    import shutil
-    FFPROBE = shutil.which('ffprobe') or 'ffprobe'
+FFPROBE = resolve_ffprobe()
 
 
 def get_video_dimensions(file_path):

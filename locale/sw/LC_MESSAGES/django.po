@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PwaniNet\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-01 01:53+0300\n"
+"POT-Creation-Date: 2026-10-01 02:42+0300\n"
 "PO-Revision-Date: 2026-07-22 09:00+0300\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: Swahili\n"
@@ -23,7 +23,8 @@ msgstr "Shiriki maoni"
 msgid ""
 "Report a problem or suggest an improvement. The PwaniNet team will review "
 "your message."
-msgstr "Ripoti tatizo au pendekeza maboresho. Timu ya PwaniNet itapitia ujumbe wako."
+msgstr ""
+"Ripoti tatizo au pendekeza maboresho. Timu ya PwaniNet itapitia ujumbe wako."
 
 #: admin_dashboard/templates/admin_dashboard/partials/feedback_composer.html:16
 msgid "Thanks—your feedback was sent to the admin team."
@@ -186,7 +187,9 @@ msgstr "Hazina ya kitaaluma"
 msgid ""
 "Share course notes, past papers, and revision materials or access your "
 "personal workspace."
-msgstr "Shiriki dondoo za kozi, mitihani ya zamani na nyenzo za marudio, au fungua nafasi yako binafsi."
+msgstr ""
+"Shiriki dondoo za kozi, mitihani ya zamani na nyenzo za marudio, au fungua "
+"nafasi yako binafsi."
 
 #: documents/templates/documents/partials/documents_context_rail.html:25
 #: documents/templates/documents/partials/documents_context_rail.html:41
@@ -226,7 +229,10 @@ msgstr "Mwongozo wa kushiriki"
 msgid ""
 "Ensure uploaded papers, notes, and study guides are clear, properly "
 "categorized, and follow university academic integrity standards."
-msgstr "Hakikisha karatasi, dondoo na miongozo ya masomo iliyopakiwa iko wazi, imeainishwa vizuri na inafuata viwango vya uadilifu wa kitaaluma vya chuo kikuu."
+msgstr ""
+"Hakikisha karatasi, dondoo na miongozo ya masomo iliyopakiwa iko wazi, "
+"imeainishwa vizuri na inafuata viwango vya uadilifu wa kitaaluma vya chuo "
+"kikuu."
 
 #: documents/templates/documents/partials/documents_context_rail.html:150
 #: groups/templates/groups/partials/groups_dashboard_context_rail.html:82
@@ -278,7 +284,10 @@ msgstr "Jinsi vikundi vinavyofanya kazi"
 msgid ""
 "Join study groups to access shared class discussions, course materials, and "
 "connect with peers. Create your own group to collaborate on projects."
-msgstr "Jiunge na vikundi vya masomo ili kupata mijadala ya darasa na nyenzo za kozi zinazoshirikiwa, na kuwasiliana na wenzako. Unda kikundi chako ili mshirikiane kwenye miradi."
+msgstr ""
+"Jiunge na vikundi vya masomo ili kupata mijadala ya darasa na nyenzo za kozi "
+"zinazoshirikiwa, na kuwasiliana na wenzako. Unda kikundi chako ili "
+"mshirikiane kwenye miradi."
 
 #: groups/templates/groups/partials/groups_detail_context_rail.html:53
 #: groups/templates/groups/partials/groups_detail_context_rail.html:175
@@ -452,7 +461,9 @@ msgstr "Kitovu cha chuo"
 #: posts/templates/posts/partials/home_context_rail.html:63
 msgid ""
 "Quick access to course notes, revision papers, and student study circles."
-msgstr "Ufikiaji wa haraka wa dondoo za kozi, karatasi za marudio na vikundi vya masomo vya wanafunzi."
+msgstr ""
+"Ufikiaji wa haraka wa dondoo za kozi, karatasi za marudio na vikundi vya "
+"masomo vya wanafunzi."
 
 #: posts/templates/posts/partials/home_context_rail.html:73
 msgid "Documents & Past Papers"
@@ -586,7 +597,9 @@ msgstr "Bado hakuna midia iliyopakuliwa"
 msgid ""
 "Files you download while browsing PwaniNet will automatically be saved here "
 "for full offline streaming and viewing."
-msgstr "Faili unazopakua unapotumia PwaniNet zitahifadhiwa hapa kiotomatiki ili uzitazame bila intaneti."
+msgstr ""
+"Faili unazopakua unapotumia PwaniNet zitahifadhiwa hapa kiotomatiki ili "
+"uzitazame bila intaneti."
 
 #: posts/templates/posts/partials/offline_media_viewer_content.html:128
 msgid "Browse Feed"
@@ -705,7 +718,9 @@ msgstr "Ingia ili kuchunguza PwaniNet"
 #: posts/templates/posts/partials/post_detail_content.html:118
 msgid ""
 "Join PwaniNet to browse the campus feed, groups, and academic materials."
-msgstr "Jiunge na PwaniNet ili kuvinjari mtiririko wa chuo, vikundi na nyenzo za masomo."
+msgstr ""
+"Jiunge na PwaniNet ili kuvinjari mtiririko wa chuo, vikundi na nyenzo za "
+"masomo."
 
 #: posts/templates/posts/partials/post_detail_content.html:156
 msgid "Add comment..."
@@ -903,7 +918,10 @@ msgstr "Muktadha wa kazi"
 msgid ""
 "No working materials attached yet. Inspect citations in the Preview tab and "
 "click '+ Add to Context' to keep key references attached while you chat."
-msgstr "Bado hakuna nyenzo za kazi zilizoambatishwa. Kagua marejeo kwenye kichupo cha Hakikisho kisha ubofye '+ Ongeza kwenye muktadha' ili kuhifadhi marejeo muhimu unapozungumza."
+msgstr ""
+"Bado hakuna nyenzo za kazi zilizoambatishwa. Kagua marejeo kwenye kichupo "
+"cha Hakikisho kisha ubofye '+ Ongeza kwenye muktadha' ili kuhifadhi marejeo "
+"muhimu unapozungumza."
 
 #: pwanimate/templates/pwanimate/partials/chat_content.html:207
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:169
@@ -1025,7 +1043,8 @@ msgstr "Faili"
 
 #: pwanimate/templates/pwanimate/partials/chat_content.html:625
 msgid "Supported: Images (JPEG, PNG, GIF, WebP), PDFs, and Text Documents"
-msgstr "Vinavyokubaliwa: Picha (JPEG, PNG, GIF, WebP), PDF na nyaraka za maandishi"
+msgstr ""
+"Vinavyokubaliwa: Picha (JPEG, PNG, GIF, WebP), PDF na nyaraka za maandishi"
 
 #: pwanimate/templates/pwanimate/partials/chat_content.html:636
 msgid "Add a book to context"
@@ -1035,7 +1054,9 @@ msgstr "Ongeza kitabu kwenye muktadha"
 msgid ""
 "Search the document repository and choose a book to open in your context "
 "rail."
-msgstr "Tafuta kwenye hazina ya nyaraka na uchague kitabu cha kufungua kwenye paneli ya muktadha."
+msgstr ""
+"Tafuta kwenye hazina ya nyaraka na uchague kitabu cha kufungua kwenye paneli "
+"ya muktadha."
 
 #: pwanimate/templates/pwanimate/partials/chat_content.html:642
 msgid "Search repository books"
@@ -1065,7 +1086,9 @@ msgstr "Onyesha upya"
 msgid ""
 "Select an AI model to manually override default routing, or keep Auto for "
 "automatic zero-downtime failover between tiers."
-msgstr "Chagua modeli ya AI ili kubatilisha mwenyewe uelekezaji chaguomsingi, au acha Kiotomatiki ili mfumo ubadilishe viwango bila kukatika."
+msgstr ""
+"Chagua modeli ya AI ili kubatilisha mwenyewe uelekezaji chaguomsingi, au "
+"acha Kiotomatiki ili mfumo ubadilishe viwango bila kukatika."
 
 #: pwanimate/templates/pwanimate/partials/chat_content.html:681
 msgid "Loading models..."
@@ -1163,13 +1186,17 @@ msgstr "Ukaguzi wa marejeo"
 msgid ""
 "Click any citation badge in the conversation to inspect documents, posts, or "
 "media here without modifying your working context."
-msgstr "Bofya alama yoyote ya rejeleo kwenye mazungumzo ili kukagua nyaraka, machapisho au midia hapa bila kubadilisha muktadha wako wa kazi."
+msgstr ""
+"Bofya alama yoyote ya rejeleo kwenye mazungumzo ili kukagua nyaraka, "
+"machapisho au midia hapa bila kubadilisha muktadha wako wa kazi."
 
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:73
 msgid ""
 "The open preview is included with your next question. Add it to Context to "
 "keep it attached while you chat."
-msgstr "Hakikisho lililo wazi litaambatishwa kwenye swali lako linalofuata. Liongeze kwenye Muktadha ili libaki limeambatishwa unapozungumza."
+msgstr ""
+"Hakikisho lililo wazi litaambatishwa kwenye swali lako linalofuata. Liongeze "
+"kwenye Muktadha ili libaki limeambatishwa unapozungumza."
 
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:95
 msgid "Close preview"
@@ -1177,7 +1204,9 @@ msgstr "Funga hakikisho"
 
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:166
 msgid "Attached resources remain pinned across tab switches and citations."
-msgstr "Nyenzo zilizoambatishwa hubaki zimebandikwa unapobadilisha vichupo na marejeo."
+msgstr ""
+"Nyenzo zilizoambatishwa hubaki zimebandikwa unapobadilisha vichupo na "
+"marejeo."
 
 #: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:13
 #: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:101
@@ -1239,7 +1268,12 @@ msgid ""
 "Built specifically for Pwani University, Pwanimate bridges campus academic "
 "records, lecture materials, student collaboration, and course information to "
 "help you navigate your academic journey."
-msgstr "Pwanimate ni msaidizi wa masomo unaotumia AI na umejumuishwa moja kwa moja kwenye PwaniNet. Umetengenezwa mahsusi kwa Chuo Kikuu cha Pwani, ukiunganisha kumbukumbu za kitaaluma za chuo, nyenzo za mihadhara, ushirikiano wa wanafunzi na taarifa za kozi ili kukusaidia katika safari yako ya masomo."
+msgstr ""
+"Pwanimate ni msaidizi wa masomo unaotumia AI na umejumuishwa moja kwa moja "
+"kwenye PwaniNet. Umetengenezwa mahsusi kwa Chuo Kikuu cha Pwani, "
+"ukiunganisha kumbukumbu za kitaaluma za chuo, nyenzo za mihadhara, "
+"ushirikiano wa wanafunzi na taarifa za kozi ili kukusaidia katika safari "
+"yako ya masomo."
 
 #: pwanimate/templates/pwanimate/settings/partials/about_content.html:26
 msgid "Key Capabilities"
@@ -1254,7 +1288,10 @@ msgid ""
 "Unified retrieval searches campus documents, course outlines, syllabus, and "
 "lecture notes via semantic and keyword search, providing citations with "
 "direct source links."
-msgstr "Utafutaji wa pamoja hutafuta nyaraka za chuo, mihutasari ya kozi, silabasi na dondoo za mihadhara kwa kutumia maana na maneno muhimu, kisha kutoa marejeo yenye viungo vya moja kwa moja vya vyanzo."
+msgstr ""
+"Utafutaji wa pamoja hutafuta nyaraka za chuo, mihutasari ya kozi, silabasi "
+"na dondoo za mihadhara kwa kutumia maana na maneno muhimu, kisha kutoa "
+"marejeo yenye viungo vya moja kwa moja vya vyanzo."
 
 #: pwanimate/templates/pwanimate/settings/partials/about_content.html:43
 msgid "Student Peer Discovery"
@@ -1265,7 +1302,10 @@ msgid ""
 "Discovers active peers based on shared skills, interests, and collaboration "
 "availability, strictly respecting user privacy settings and student profile "
 "visibility."
-msgstr "Hutambua wanafunzi wenza walio hai kwa kuzingatia ujuzi na maslahi yanayofanana pamoja na utayari wa kushirikiana, huku ukiheshimu kikamilifu mipangilio ya faragha na mwonekano wa wasifu."
+msgstr ""
+"Hutambua wanafunzi wenza walio hai kwa kuzingatia ujuzi na maslahi "
+"yanayofanana pamoja na utayari wa kushirikiana, huku ukiheshimu kikamilifu "
+"mipangilio ya faragha na mwonekano wa wasifu."
 
 #: pwanimate/templates/pwanimate/settings/partials/about_content.html:54
 msgid "Campus & Group Awareness"
@@ -1275,7 +1315,9 @@ msgstr "Ufahamu wa chuo na vikundi"
 msgid ""
 "Contextual summaries of course announcements, departmental notices, and "
 "enrolled group updates directly within your chat."
-msgstr "Muhtasari wenye muktadha wa matangazo ya kozi, taarifa za idara na masasisho ya vikundi ulivyojiunga navyo, moja kwa moja kwenye mazungumzo yako."
+msgstr ""
+"Muhtasari wenye muktadha wa matangazo ya kozi, taarifa za idara na masasisho "
+"ya vikundi ulivyojiunga navyo, moja kwa moja kwenye mazungumzo yako."
 
 #: pwanimate/templates/pwanimate/settings/partials/about_content.html:65
 msgid "Personalized Preferences"
@@ -1286,7 +1328,10 @@ msgid ""
 "Customizes conversational tone, response style, and personal instructions "
 "tailored to your preferences while remaining subordinate to system safety "
 "and academic integrity guidelines."
-msgstr "Hubinafsisha mtindo wa mazungumzo, namna ya kujibu na maagizo yako kulingana na mapendeleo yako, huku ukifuata kanuni za usalama za mfumo na uadilifu wa kitaaluma."
+msgstr ""
+"Hubinafsisha mtindo wa mazungumzo, namna ya kujibu na maagizo yako kulingana "
+"na mapendeleo yako, huku ukifuata kanuni za usalama za mfumo na uadilifu wa "
+"kitaaluma."
 
 #: pwanimate/templates/pwanimate/settings/partials/about_content.html:77
 msgid "Academic Boundaries & Privacy"
@@ -1299,7 +1344,12 @@ msgid ""
 "private to your account and never shared with peers or external services. "
 "Pwanimate is an advisory assistant and study tool designed to augment your "
 "learning, not replace faculty instruction or university grading systems."
-msgstr "Pwanimate hufikia tu nyaraka za chuo na kumbukumbu za jukwaa ambazo umeidhinishwa kuona. Maagizo na mapendeleo yako ni ya faragha kwenye akaunti yako na hayashirikiwi na wanafunzi wenzako au huduma za nje. Pwanimate ni msaidizi wa ushauri na zana ya kujifunzia inayosaidia masomo yako; haichukui nafasi ya mafundisho ya wahadhiri au mifumo ya upimaji ya chuo kikuu."
+msgstr ""
+"Pwanimate hufikia tu nyaraka za chuo na kumbukumbu za jukwaa ambazo "
+"umeidhinishwa kuona. Maagizo na mapendeleo yako ni ya faragha kwenye akaunti "
+"yako na hayashirikiwi na wanafunzi wenzako au huduma za nje. Pwanimate ni "
+"msaidizi wa ushauri na zana ya kujifunzia inayosaidia masomo yako; haichukui "
+"nafasi ya mafundisho ya wahadhiri au mifumo ya upimaji ya chuo kikuu."
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:11
 #: pwanimate/templates/pwanimate/settings/partials/settings_mobile_page.html:29
@@ -1311,7 +1361,9 @@ msgstr "Ubinafsishaji"
 msgid ""
 "Configure how Pwanimate interacts with you across conversations and academic "
 "inquiries."
-msgstr "Weka jinsi Pwanimate inavyowasiliana nawe kwenye mazungumzo na maswali ya kitaaluma."
+msgstr ""
+"Weka jinsi Pwanimate inavyowasiliana nawe kwenye mazungumzo na maswali ya "
+"kitaaluma."
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:21
 msgid "Saved!"
@@ -1333,7 +1385,9 @@ msgstr "Pwanimate ikuitaje?"
 msgid ""
 "Optional. This only changes how Pwanimate addresses you in chat, and does "
 "not alter your PwaniNet account or display name."
-msgstr "Si lazima. Hii hubadilisha tu jinsi Pwanimate inavyokuita kwenye mazungumzo; haibadilishi akaunti au jina lako la kuonyesha la PwaniNet."
+msgstr ""
+"Si lazima. Hii hubadilisha tu jinsi Pwanimate inavyokuita kwenye mazungumzo; "
+"haibadilishi akaunti au jina lako la kuonyesha la PwaniNet."
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:56
 msgid "e.g. Zayne"
@@ -1359,7 +1413,8 @@ msgstr "Chaguomsingi"
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:76
 msgid "Clear, objective, balanced, and straightforward responses."
-msgstr "Majibu yaliyo wazi, yasiyoegemea upande, yenye uwiano na ya moja kwa moja."
+msgstr ""
+"Majibu yaliyo wazi, yasiyoegemea upande, yenye uwiano na ya moja kwa moja."
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:82
 msgid "Friendly"
@@ -1427,13 +1482,18 @@ msgid ""
 "Tell Pwanimate how you would like it to work with you. These instructions "
 "guide conversational style, but do not override university policies, safety "
 "rules, or privacy boundaries."
-msgstr "Eleza jinsi unavyotaka Pwanimate ishirikiane nawe. Maagizo haya huongoza mtindo wa mazungumzo, lakini hayabatilishi sera za chuo kikuu, kanuni za usalama au mipaka ya faragha."
+msgstr ""
+"Eleza jinsi unavyotaka Pwanimate ishirikiane nawe. Maagizo haya huongoza "
+"mtindo wa mazungumzo, lakini hayabatilishi sera za chuo kikuu, kanuni za "
+"usalama au mipaka ya faragha."
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:147
 msgid ""
 "e.g. Keep technical explanations practical. Provide concrete code examples "
 "before abstract theory."
-msgstr "kwa mfano: Eleza mambo ya kiufundi kwa njia ya vitendo. Toa mifano halisi ya msimbo kabla ya nadharia ya jumla."
+msgstr ""
+"kwa mfano: Eleza mambo ya kiufundi kwa njia ya vitendo. Toa mifano halisi ya "
+"msimbo kabla ya nadharia ya jumla."
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:168
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:242
@@ -1467,7 +1527,8 @@ msgstr "Matumizi na shughuli"
 msgid ""
 "Overview of your Pwanimate activity, conversational threads, and platform "
 "capabilities."
-msgstr "Muhtasari wa shughuli zako za Pwanimate, mazungumzo na uwezo wa jukwaa."
+msgstr ""
+"Muhtasari wa shughuli zako za Pwanimate, mazungumzo na uwezo wa jukwaa."
 
 #: pwanimate/templates/pwanimate/settings/partials/usage_content.html:25
 msgid "Pwanimate Active"
@@ -1497,14 +1558,19 @@ msgstr "Takwimu za kina za matumizi zinatayarishwa"
 msgid ""
 "Detailed personal activity summaries, query telemetry, and resource "
 "allocation meters are currently in development for a future update."
-msgstr "Muhtasari wa kina wa shughuli binafsi, takwimu za hoja na vipimo vya ugawaji wa rasilimali vinatengenezwa kwa sasisho lijalo."
+msgstr ""
+"Muhtasari wa kina wa shughuli binafsi, takwimu za hoja na vipimo vya ugawaji "
+"wa rasilimali vinatengenezwa kwa sasisho lijalo."
 
 #: pwanimate/templates/pwanimate/settings/partials/usage_content.html:53
 msgid ""
 "Pwanimate is currently available for your academic studies, peer discovery, "
 "and course inquiries under standard Pwani University acceptable academic use "
 "and fair use guidelines."
-msgstr "Kwa sasa Pwanimate inapatikana kwa masomo yako, kutafuta wanafunzi wenzako na maswali ya kozi, kwa kufuata mwongozo wa matumizi yanayokubalika na matumizi ya haki wa Chuo Kikuu cha Pwani."
+msgstr ""
+"Kwa sasa Pwanimate inapatikana kwa masomo yako, kutafuta wanafunzi wenzako "
+"na maswali ya kozi, kwa kufuata mwongozo wa matumizi yanayokubalika na "
+"matumizi ya haki wa Chuo Kikuu cha Pwani."
 
 #: pwanimate/templates/pwanimate/settings/partials/usage_content.html:61
 msgid "Included Capabilities"
@@ -1557,7 +1623,9 @@ msgstr "Ukurasa haujapatikana"
 msgid ""
 "The page or resource you are looking for may have been removed, had its name "
 "changed, or is temporarily unavailable."
-msgstr "Ukurasa au nyenzo unayotafuta huenda imeondolewa, jina lake limebadilishwa au haipatikani kwa sasa."
+msgstr ""
+"Ukurasa au nyenzo unayotafuta huenda imeondolewa, jina lake limebadilishwa "
+"au haipatikani kwa sasa."
 
 #: templates/404.html:188
 msgid "Return to Home"
@@ -1609,7 +1677,7 @@ msgid "Open the downloaded file and tap Install."
 msgstr "Fungua faili lililopakuliwa kisha uguse Sakinisha."
 
 #: templates/base.html:2006
-#: templates/downloads/partials/download_page_content.html:292
+#: templates/downloads/partials/download_page_content.html:297
 msgid "Copy"
 msgstr "Nakili"
 
@@ -1838,7 +1906,9 @@ msgstr "Ingia ili kuchunguza zaidi"
 msgid ""
 "Join the PwaniNet campus network to like, comment, and connect with fellow "
 "students."
-msgstr "Jiunge na mtandao wa chuo wa PwaniNet ili kupenda, kutoa maoni na kuwasiliana na wanafunzi wenzako."
+msgstr ""
+"Jiunge na mtandao wa chuo wa PwaniNet ili kupenda, kutoa maoni na "
+"kuwasiliana na wanafunzi wenzako."
 
 #: templates/base.html:2531
 msgid "Create an Account"
@@ -1959,7 +2029,9 @@ msgstr "Shiriki programu ya simu"
 msgid ""
 "📱 Download the official PwaniNet Android app for campus updates, course "
 "groups, and offline access:"
-msgstr "📱 Pakua programu rasmi ya PwaniNet ya Android ili kupata masasisho ya chuo, vikundi vya kozi na ufikiaji bila intaneti:"
+msgstr ""
+"📱 Pakua programu rasmi ya PwaniNet ya Android ili kupata masasisho ya chuo, "
+"vikundi vya kozi na ufikiaji bila intaneti:"
 
 #: templates/base.html:5028
 msgid "Invite to PwaniNet"
@@ -1969,7 +2041,9 @@ msgstr "Alika kwenye PwaniNet"
 msgid ""
 "🎓 Join me on PwaniNet! Connect with classmates, access course groups, and "
 "collaborate:"
-msgstr "🎓 Jiunge nami kwenye PwaniNet! Wasiliana na wanafunzi wenzako, jiunge na vikundi vya kozi na mshirikiane:"
+msgstr ""
+"🎓 Jiunge nami kwenye PwaniNet! Wasiliana na wanafunzi wenzako, jiunge na "
+"vikundi vya kozi na mshirikiane:"
 
 #: templates/base.html:5159
 msgid "Reposted"
@@ -1981,7 +2055,8 @@ msgstr "Ingia ili kushiriki tena"
 
 #: templates/base.html:5175 templates/base.html:5528
 msgid "Sign in to repost this to your followers and campus profile."
-msgstr "Ingia ili kushiriki hili tena na wafuasi wako na kwenye wasifu wako wa chuo."
+msgstr ""
+"Ingia ili kushiriki hili tena na wafuasi wako na kwenye wasifu wako wa chuo."
 
 #: templates/base.html:5196
 msgid "Reposted to your profile!"
@@ -2001,7 +2076,8 @@ msgstr "Ingia ili kuhifadhi"
 
 #: templates/base.html:5236 templates/base.html:5534
 msgid "Save your favorite posts and reels to your personal library."
-msgstr "Hifadhi machapisho na video fupi unazopenda kwenye maktaba yako binafsi."
+msgstr ""
+"Hifadhi machapisho na video fupi unazopenda kwenye maktaba yako binafsi."
 
 #: templates/base.html:5259 templates/base.html:5539
 msgid "Sign in to download"
@@ -2009,13 +2085,16 @@ msgstr "Ingia ili kupakua"
 
 #: templates/base.html:5260 templates/base.html:5540
 msgid "Sign in to save videos and academic materials for offline viewing."
-msgstr "Ingia ili kuhifadhi video na nyenzo za masomo kwa kutazama bila intaneti."
+msgstr ""
+"Ingia ili kuhifadhi video na nyenzo za masomo kwa kutazama bila intaneti."
 
 #: templates/base.html:5439
 msgid ""
 "Join the PwaniNet campus community to like, comment, and connect with "
 "students."
-msgstr "Jiunge na jumuiya ya chuo ya PwaniNet ili kupenda, kutoa maoni na kuwasiliana na wanafunzi."
+msgstr ""
+"Jiunge na jumuiya ya chuo ya PwaniNet ili kupenda, kutoa maoni na "
+"kuwasiliana na wanafunzi."
 
 #: templates/base.html:5515
 msgid "Sign in to like"
@@ -2023,7 +2102,9 @@ msgstr "Ingia ili kupenda"
 
 #: templates/base.html:5516
 msgid "Create an account or sign in to like this post and support the author."
-msgstr "Fungua akaunti au ingia ili kupenda chapisho hili na kumuunga mkono mwandishi."
+msgstr ""
+"Fungua akaunti au ingia ili kupenda chapisho hili na kumuunga mkono "
+"mwandishi."
 
 #: templates/base.html:5521
 msgid "Sign in to comment"
@@ -2042,7 +2123,9 @@ msgstr "Ingia kwa chaguo zaidi"
 msgid ""
 "Sign in to PwaniNet to save posts, repost, customize your feed, or report "
 "content."
-msgstr "Ingia kwenye PwaniNet ili kuhifadhi machapisho, kuyashiriki tena, kubinafsisha mtiririko wako au kuripoti maudhui."
+msgstr ""
+"Ingia kwenye PwaniNet ili kuhifadhi machapisho, kuyashiriki tena, "
+"kubinafsisha mtiririko wako au kuripoti maudhui."
 
 #: templates/base.html:5551
 msgid "Sign in to view profiles"
@@ -2058,7 +2141,9 @@ msgstr "Ingia ili kuwasiliana na wanafunzi, kuona kozi na shughuli zao chuoni."
 msgid ""
 "Join PwaniNet to explore campus groups, discover trending posts, and access "
 "past papers."
-msgstr "Jiunge na PwaniNet ili kuchunguza vikundi vya chuo, kugundua machapisho yanayovuma na kupata mitihani ya zamani."
+msgstr ""
+"Jiunge na PwaniNet ili kuchunguza vikundi vya chuo, kugundua machapisho "
+"yanayovuma na kupata mitihani ya zamani."
 
 #: templates/downloads/download_page.html:5
 #: templates/downloads/partials/download_page_content.html:5
@@ -2073,7 +2158,9 @@ msgstr "Pakua PwaniNet"
 msgid ""
 "Please read the short installation guide below first to avoid browser "
 "security blocks, then select your download option at the bottom."
-msgstr "Soma kwanza mwongozo mfupi wa usakinishaji hapa chini ili kuepuka vizuizi vya usalama vya kivinjari, kisha uchague njia ya kupakua chini."
+msgstr ""
+"Soma kwanza mwongozo mfupi wa usakinishaji hapa chini ili kuepuka vizuizi "
+"vya usalama vya kivinjari, kisha uchague njia ya kupakua chini."
 
 #: templates/downloads/partials/download_page_content.html:29
 msgid "Verified Safe & Open Source"
@@ -2126,7 +2213,9 @@ msgstr "Pakua hata hivyo"
 msgid ""
 "Chrome shows this standard warning for all APKs outside Google Play. "
 "PwaniNet is 100%% verified & safe."
-msgstr "Chrome huonyesha tahadhari hii ya kawaida kwa APK zote zilizo nje ya Google Play. PwaniNet imethibitishwa kuwa salama kwa 100%%."
+msgstr ""
+"Chrome huonyesha tahadhari hii ya kawaida kwa APK zote zilizo nje ya Google "
+"Play. PwaniNet imethibitishwa kuwa salama kwa 100%%."
 
 #: templates/downloads/partials/download_page_content.html:86
 msgid "Warning 2"
@@ -2189,7 +2278,9 @@ msgstr " kutoka kwenye arifa au folda ya Vipakuliwa ya simu. Kifaa kikisema:"
 msgid ""
 "For your security, your phone is not allowed to install unknown apps from "
 "this source"
-msgstr "Kwa usalama wako, simu yako hairuhusiwi kusakinisha programu zisizojulikana kutoka chanzo hiki"
+msgstr ""
+"Kwa usalama wako, simu yako hairuhusiwi kusakinisha programu zisizojulikana "
+"kutoka chanzo hiki"
 
 #: templates/downloads/partials/download_page_content.html:127
 msgid "toggle ON "
@@ -2257,7 +2348,7 @@ msgid "Click "
 msgstr "Bofya "
 
 #: templates/downloads/partials/download_page_content.html:171
-#: templates/downloads/partials/download_page_content.html:265
+#: templates/downloads/partials/download_page_content.html:270
 msgid "Install Web App (PWA)"
 msgstr "Sakinisha programu ya wavuti (PWA)"
 
@@ -2314,7 +2405,9 @@ msgstr "Chagua njia ya kupakua"
 msgid ""
 "Select between the standalone Android APK or the instant browser Web App "
 "(PWA)."
-msgstr "Chagua kati ya APK huru ya Android au programu ya wavuti (PWA) inayofunguka kwenye kivinjari."
+msgstr ""
+"Chagua kati ya APK huru ya Android au programu ya wavuti (PWA) inayofunguka "
+"kwenye kivinjari."
 
 #: templates/downloads/partials/download_page_content.html:219
 msgid "Android APK"
@@ -2328,45 +2421,69 @@ msgstr "Inapendekezwa kwa Android"
 msgid ""
 "Standalone APK compiled directly from GitHub releases. Enables background "
 "push alerts and native 60fps speed."
-msgstr "APK huru iliyotengenezwa moja kwa moja kutoka matoleo ya GitHub. Huwezesha arifa za chinichini na kasi asilia ya fremu 60 kwa sekunde."
+msgstr ""
+"APK huru iliyotengenezwa moja kwa moja kutoka matoleo ya GitHub. Huwezesha "
+"arifa za chinichini na kasi asilia ya fremu 60 kwa sekunde."
 
-#: templates/downloads/partials/download_page_content.html:234
+#: templates/downloads/partials/download_page_content.html:233
+#: templates/downloads/partials/download_page_content.html:239
 msgid "Download Mobile APK"
 msgstr "Pakua APK ya simu"
 
+#: templates/downloads/partials/download_page_content.html:234
+#: users/templates/users/settings/partials/index_content.html:94
+msgid "Update App"
+msgstr "Sasisha programu"
+
+#: templates/downloads/partials/download_page_content.html:235
+msgid "Native APK Running"
+msgstr "Programu ya Android inatumika"
+
+#: templates/downloads/partials/download_page_content.html:236
+msgid "An app update is ready to install."
+msgstr "Sasisho la programu liko tayari kusakinishwa."
+
 #: templates/downloads/partials/download_page_content.html:237
+msgid "The latest native app version is already installed."
+msgstr "Toleo jipya zaidi la programu tayari limesakinishwa."
+
+#: templates/downloads/partials/download_page_content.html:242
 msgid "Direct file download • No redirect"
 msgstr "Upakuaji wa faili moja kwa moja • Hakuna kuelekezwa kwingine"
 
-#: templates/downloads/partials/download_page_content.html:251
+#: templates/downloads/partials/download_page_content.html:256
 msgid "Web App (PWA)"
 msgstr "Programu ya wavuti (PWA)"
 
-#: templates/downloads/partials/download_page_content.html:254
+#: templates/downloads/partials/download_page_content.html:259
 msgid "Universal • Zero Download"
 msgstr "Kwa vifaa vyote • Hakuna upakuaji"
 
-#: templates/downloads/partials/download_page_content.html:258
+#: templates/downloads/partials/download_page_content.html:263
 msgid ""
 "Installs directly to your home screen or desktop via your browser. Zero "
 "storage overhead and automatic background updates."
-msgstr "Sakinisha moja kwa moja kwenye skrini ya mwanzo au kompyuta kupitia kivinjari. Haitumii nafasi ya ziada na husasishwa kiotomatiki chinichini."
+msgstr ""
+"Sakinisha moja kwa moja kwenye skrini ya mwanzo au kompyuta kupitia "
+"kivinjari. Haitumii nafasi ya ziada na husasishwa kiotomatiki chinichini."
 
-#: templates/downloads/partials/download_page_content.html:268
+#: templates/downloads/partials/download_page_content.html:273
 msgid "Triggers browser install prompt"
 msgstr "Hufungua ombi la usakinishaji la kivinjari"
 
-#: templates/downloads/partials/download_page_content.html:283
+#: templates/downloads/partials/download_page_content.html:288
 msgid "Viewing on a computer? Scan with your phone"
 msgstr "Unatumia kompyuta? Changanua kwa simu yako"
 
-#: templates/downloads/partials/download_page_content.html:287
+#: templates/downloads/partials/download_page_content.html:292
 msgid ""
 "Point your phone camera at the code to open this download page or download "
 "the APK directly on mobile."
-msgstr "Elekeza kamera ya simu kwenye msimbo ili kufungua ukurasa huu wa upakuaji au kupakua APK moja kwa moja kwenye simu."
+msgstr ""
+"Elekeza kamera ya simu kwenye msimbo ili kufungua ukurasa huu wa upakuaji au "
+"kupakua APK moja kwa moja kwenye simu."
 
-#: templates/downloads/partials/download_page_content.html:299
+#: templates/downloads/partials/download_page_content.html:304
 msgid "PwaniNet QR Code"
 msgstr "Msimbo wa QR wa PwaniNet"
 
@@ -2389,7 +2506,9 @@ msgstr "Sera ya faragha ya PwaniNet"
 msgid ""
 "Stay connected with class groups, course revisions, shared notes, and peer "
 "updates."
-msgstr "Endelea kuwasiliana kupitia vikundi vya darasa, marudio ya kozi, dondoo zinazoshirikiwa na masasisho kutoka kwa wanafunzi wenzako."
+msgstr ""
+"Endelea kuwasiliana kupitia vikundi vya darasa, marudio ya kozi, dondoo "
+"zinazoshirikiwa na masasisho kutoka kwa wanafunzi wenzako."
 
 #: templates/partials/default_context_rail.html:33
 msgid "Study Groups"
@@ -2483,7 +2602,11 @@ msgid ""
 "                  Signed in as <strong>@%(uname)s</strong>. Enter the 6-"
 "digit code from your authenticator app.\n"
 "                "
-msgstr "\n                  Umeingia kama <strong>@%(uname)s</strong>. Weka msimbo wa tarakimu 6 kutoka kwenye programu yako ya uthibitishaji.\n                "
+msgstr ""
+"\n"
+"                  Umeingia kama <strong>@%(uname)s</strong>. Weka msimbo wa "
+"tarakimu 6 kutoka kwenye programu yako ya uthibitishaji.\n"
+"                "
 
 #: templates/registration/login_2fa.html:99
 #: templates/registration/password_recovery_verify.html:99
@@ -2496,7 +2619,10 @@ msgid ""
 "\n"
 "                      %(n)s attempt(s) remaining before you are locked out.\n"
 "                    "
-msgstr "\n                      Umebakiza majaribio %(n)s kabla akaunti haijafungwa.\n                    "
+msgstr ""
+"\n"
+"                      Umebakiza majaribio %(n)s kabla akaunti haijafungwa.\n"
+"                    "
 
 #: templates/registration/login_2fa.html:118
 msgid "Authenticator Code"
@@ -2506,7 +2632,9 @@ msgstr "Msimbo wa uthibitishaji"
 msgid ""
 "Open Google Authenticator (or any TOTP app) and enter the current 6-digit "
 "code."
-msgstr "Fungua Google Authenticator (au programu nyingine ya TOTP) na uweke msimbo wa sasa wa tarakimu 6."
+msgstr ""
+"Fungua Google Authenticator (au programu nyingine ya TOTP) na uweke msimbo "
+"wa sasa wa tarakimu 6."
 
 #: templates/registration/login_2fa.html:140
 msgid "Verify & Sign In"
@@ -2523,7 +2651,9 @@ msgstr "Msimbo wa kurejesha"
 #: templates/registration/login_2fa.html:180
 msgid ""
 "Enter one of the single-use recovery codes you saved when you set up 2FA."
-msgstr "Weka mojawapo ya misimbo ya matumizi moja ya kurejesha akaunti uliyohifadhi ulipoweka 2FA."
+msgstr ""
+"Weka mojawapo ya misimbo ya matumizi moja ya kurejesha akaunti uliyohifadhi "
+"ulipoweka 2FA."
 
 #: templates/registration/login_2fa.html:185
 msgid "Sign In with Recovery Code"
@@ -2546,7 +2676,9 @@ msgstr "Urejeshaji wa akaunti"
 msgid ""
 "Enter your username to recover access using your Two-Factor Authentication "
 "or Recovery Code."
-msgstr "Weka jina lako la mtumiaji ili kurejesha ufikiaji kwa kutumia uthibitishaji wa hatua mbili au msimbo wa kurejesha."
+msgstr ""
+"Weka jina lako la mtumiaji ili kurejesha ufikiaji kwa kutumia uthibitishaji "
+"wa hatua mbili au msimbo wa kurejesha."
 
 #: templates/registration/password_recovery_identify.html:91
 msgid "Unable to Recover Account"
@@ -2564,7 +2696,9 @@ msgstr "Weka jina lako la mtumiaji"
 msgid ""
 "No email required. You will verify your identity using your authenticator "
 "app or recovery code."
-msgstr "Barua pepe haihitajiki. Utathibitisha utambulisho wako kwa programu ya uthibitishaji au msimbo wa kurejesha."
+msgstr ""
+"Barua pepe haihitajiki. Utathibitisha utambulisho wako kwa programu ya "
+"uthibitishaji au msimbo wa kurejesha."
 
 #: templates/registration/password_recovery_identify.html:123
 msgid "Continue to Verification"
@@ -2589,7 +2723,11 @@ msgid ""
 "                  Identity confirmed for <strong>@%(uname)s</strong>. Choose "
 "a strong new password for your account.\n"
 "                "
-msgstr "\n                  Utambulisho wa <strong>@%(uname)s</strong> umethibitishwa. Chagua nenosiri jipya thabiti la akaunti yako.\n                "
+msgstr ""
+"\n"
+"                  Utambulisho wa <strong>@%(uname)s</strong> umethibitishwa. "
+"Chagua nenosiri jipya thabiti la akaunti yako.\n"
+"                "
 
 #: templates/registration/password_recovery_set_new.html:75
 msgid "Password Requirements Not Met"
@@ -2638,7 +2776,12 @@ msgid ""
 "                  Recovering access for <strong>@%(uname)s</strong>. Enter "
 "your 6-digit authenticator code or single-use recovery code.\n"
 "                "
-msgstr "\n                  Unarejesha ufikiaji wa <strong>@%(uname)s</strong>. Weka msimbo wa uthibitishaji wa tarakimu 6 au msimbo wa kurejesha wa matumizi moja.\n                "
+msgstr ""
+"\n"
+"                  Unarejesha ufikiaji wa <strong>@%(uname)s</strong>. Weka "
+"msimbo wa uthibitishaji wa tarakimu 6 au msimbo wa kurejesha wa matumizi "
+"moja.\n"
+"                "
 
 #: templates/registration/password_recovery_verify.html:104
 #, python-format
@@ -2647,7 +2790,11 @@ msgid ""
 "                      %(n)s attempt(s) remaining before recovery is locked "
 "out.\n"
 "                    "
-msgstr "\n                      Umebakiza majaribio %(n)s kabla urejeshaji haujafungwa.\n                    "
+msgstr ""
+"\n"
+"                      Umebakiza majaribio %(n)s kabla urejeshaji "
+"haujafungwa.\n"
+"                    "
 
 #: templates/registration/password_recovery_verify.html:117
 msgid "6-Digit Authenticator Code"
@@ -2655,7 +2802,9 @@ msgstr "Msimbo wa uthibitishaji wa tarakimu 6"
 
 #: templates/registration/password_recovery_verify.html:133
 msgid "Open Google Authenticator or your 2FA app to get the current code."
-msgstr "Fungua Google Authenticator au programu yako ya 2FA ili kupata msimbo wa sasa."
+msgstr ""
+"Fungua Google Authenticator au programu yako ya 2FA ili kupata msimbo wa "
+"sasa."
 
 #: templates/registration/password_recovery_verify.html:139
 msgid "Verify & Reset Password"
@@ -2671,7 +2820,8 @@ msgstr "Msimbo wa kurejesha wa matumizi moja"
 
 #: templates/registration/password_recovery_verify.html:178
 msgid "Enter one of the 8 single-use codes you saved when enabling 2FA."
-msgstr "Weka mojawapo ya misimbo 8 ya matumizi moja uliyohifadhi ulipowasha 2FA."
+msgstr ""
+"Weka mojawapo ya misimbo 8 ya matumizi moja uliyohifadhi ulipowasha 2FA."
 
 #: templates/registration/password_recovery_verify.html:183
 msgid "Verify Recovery Code"
@@ -2693,7 +2843,9 @@ msgstr "Picha ya wasifu"
 msgid ""
 "This profile is visible to followers only. Follow this student to see their "
 "profile details and posts."
-msgstr "Wasifu huu unaonekana kwa wafuasi pekee. Mfuate mwanafunzi huyu ili kuona maelezo ya wasifu na machapisho yake."
+msgstr ""
+"Wasifu huu unaonekana kwa wafuasi pekee. Mfuate mwanafunzi huyu ili kuona "
+"maelezo ya wasifu na machapisho yake."
 
 #: users/templates/users/partials/private_profile_content.html:17
 msgid "This student has chosen to keep their profile private."
@@ -3114,7 +3266,9 @@ msgstr "Toka"
 msgid ""
 "This will sign you out of every other device currently logged into your "
 "account."
-msgstr "Hatua hii itakutoa kwenye vifaa vingine vyote vilivyoingia kwenye akaunti yako."
+msgstr ""
+"Hatua hii itakutoa kwenye vifaa vingine vyote vilivyoingia kwenye akaunti "
+"yako."
 
 #: users/templates/users/settings/partials/active_devices_content.html:125
 msgid "Sign Out All Other Devices"
@@ -3406,7 +3560,8 @@ msgstr "Chini (chaguomsingi)"
 
 #: users/templates/users/settings/partials/appearance_content.html:378
 msgid "Floating navigation bar docked near the bottom of your screen."
-msgstr "Upau wa urambazaji unaoelea na kukaa karibu na sehemu ya chini ya skrini."
+msgstr ""
+"Upau wa urambazaji unaoelea na kukaa karibu na sehemu ya chini ya skrini."
 
 #: users/templates/users/settings/partials/appearance_content.html:380
 msgid "Bottom navigation preview"
@@ -3420,7 +3575,9 @@ msgstr "Juu (upana wote)"
 msgid ""
 "Full-width navigation bar docked beneath the header with brand and profile "
 "maintained."
-msgstr "Upau wa urambazaji wa upana wote chini ya kichwa, huku chapa na wasifu vikionekana."
+msgstr ""
+"Upau wa urambazaji wa upana wote chini ya kichwa, huku chapa na wasifu "
+"vikionekana."
 
 #: users/templates/users/settings/partials/appearance_content.html:399
 msgid "Top navigation preview"
@@ -3467,7 +3624,8 @@ msgstr "Waandishi waliofichwa"
 
 #: users/templates/users/settings/partials/hidden_content.html:8
 msgid "Manage authors whose posts are hidden from your feed"
-msgstr "Dhibiti waandishi ambao machapisho yao yamefichwa kwenye mtiririko wako"
+msgstr ""
+"Dhibiti waandishi ambao machapisho yao yamefichwa kwenye mtiririko wako"
 
 #: users/templates/users/settings/partials/hidden_content.html:18
 msgid "Authors you've hidden from your feed"
@@ -3501,7 +3659,9 @@ msgstr "Pakua programu ya simu ya PwaniNet"
 msgid ""
 "Install the official native Android app for faster performance, smoother "
 "animations, and instant background push notifications."
-msgstr "Sakinisha programu rasmi asilia ya Android ili kupata utendaji wa haraka, miondoko laini na arifa za papo hapo za chinichini."
+msgstr ""
+"Sakinisha programu rasmi asilia ya Android ili kupata utendaji wa haraka, "
+"miondoko laini na arifa za papo hapo za chinichini."
 
 #: users/templates/users/settings/partials/index_content.html:46
 #: users/templates/users/settings/partials/index_content.html:160
@@ -3552,10 +3712,6 @@ msgstr "Unatumia programu rasmi asilia ya Android."
 msgid "Latest"
 msgstr "Ya hivi karibuni"
 
-#: users/templates/users/settings/partials/index_content.html:94
-msgid "Download Update"
-msgstr "Pakua sasisho"
-
 #: users/templates/users/settings/partials/index_content.html:97
 msgid "Check for Updates"
 msgstr "Angalia masasisho"
@@ -3573,7 +3729,9 @@ msgstr "Wanafunzi wenzako"
 msgid ""
 "Know students or friends who aren't on PwaniNet yet? Send them a friendly "
 "invite link to join course groups, share notes, and collaborate."
-msgstr "Unawajua wanafunzi au marafiki ambao bado hawapo PwaniNet? Watumie kiungo cha mwaliko wajiunge na vikundi vya kozi, washiriki dondoo na kushirikiana."
+msgstr ""
+"Unawajua wanafunzi au marafiki ambao bado hawapo PwaniNet? Watumie kiungo "
+"cha mwaliko wajiunge na vikundi vya kozi, washiriki dondoo na kushirikiana."
 
 #: users/templates/users/settings/partials/index_content.html:122
 msgid "clicks"
@@ -3668,7 +3826,9 @@ msgstr "Hifadhi mabadiliko"
 msgid ""
 "This setting only affects new posts. Existing posts will keep their current "
 "visibility unless you change them individually."
-msgstr "Mpangilio huu huathiri machapisho mapya pekee. Machapisho yaliyopo yatabaki na mwonekano wake wa sasa isipokuwa uyabadilishe moja moja."
+msgstr ""
+"Mpangilio huu huathiri machapisho mapya pekee. Machapisho yaliyopo yatabaki "
+"na mwonekano wake wa sasa isipokuwa uyabadilishe moja moja."
 
 #: users/templates/users/settings/partials/privacy_content.html:7
 msgid "Privacy & Security"
@@ -3714,7 +3874,9 @@ msgstr "Futa akaunti"
 msgid ""
 "Choose whether your posts and uploads should also be deleted or kept without "
 "your profile details."
-msgstr "Chagua kama machapisho na faili ulizopakia zifutwe pia au zibaki bila maelezo ya wasifu wako."
+msgstr ""
+"Chagua kama machapisho na faili ulizopakia zifutwe pia au zibaki bila "
+"maelezo ya wasifu wako."
 
 #: users/templates/users/settings/partials/profile_content.html:166
 msgid "Delete my account and its posts, comments, and uploaded content"
@@ -3724,7 +3886,9 @@ msgstr "Futa akaunti yangu pamoja na machapisho, maoni na maudhui niliyopakia"
 msgid ""
 "Delete my profile and sign-in, but keep my posts, comments, and uploads "
 "under a generic deleted-account name"
-msgstr "Futa wasifu na uwezo wangu wa kuingia, lakini hifadhi machapisho, maoni na faili nilizopakia chini ya jina la jumla la akaunti iliyofutwa"
+msgstr ""
+"Futa wasifu na uwezo wangu wa kuingia, lakini hifadhi machapisho, maoni na "
+"faili nilizopakia chini ya jina la jumla la akaunti iliyofutwa"
 
 #: users/templates/users/settings/partials/profile_content.html:169
 msgid "Enter your password to confirm"
@@ -3811,7 +3975,10 @@ msgid ""
 "These codes are displayed ONLY ONCE and cannot be recovered later. Each "
 "single-use code can recover your account if you lose access to your "
 "authenticator app."
-msgstr "Misimbo hii huonyeshwa MARA MOJA TU na haiwezi kupatikana tena baadaye. Kila msimbo wa matumizi moja unaweza kurejesha akaunti yako ukipoteza ufikiaji wa programu ya uthibitishaji."
+msgstr ""
+"Misimbo hii huonyeshwa MARA MOJA TU na haiwezi kupatikana tena baadaye. Kila "
+"msimbo wa matumizi moja unaweza kurejesha akaunti yako ukipoteza ufikiaji wa "
+"programu ya uthibitishaji."
 
 #: users/templates/users/settings/partials/two_factor_content.html:76
 msgid "Copy All Codes"
@@ -3837,7 +4004,9 @@ msgstr "Changanua msimbo wa QR wa uthibitishaji"
 msgid ""
 "Use Google Authenticator, Microsoft Authenticator, or any compatible TOTP "
 "app."
-msgstr "Tumia Google Authenticator, Microsoft Authenticator au programu yoyote ya TOTP inayooana."
+msgstr ""
+"Tumia Google Authenticator, Microsoft Authenticator au programu yoyote ya "
+"TOTP inayooana."
 
 #: users/templates/users/settings/partials/two_factor_content.html:115
 msgid "Point your phone camera or authenticator app at this code"
@@ -3853,7 +4022,9 @@ msgstr "Nakili ufunguo"
 
 #: users/templates/users/settings/partials/two_factor_content.html:134
 msgid "Enter this key manually into your app (Time-based / 30 seconds)."
-msgstr "Weka ufunguo huu mwenyewe kwenye programu yako (unaotegemea muda / sekunde 30)."
+msgstr ""
+"Weka ufunguo huu mwenyewe kwenye programu yako (unaotegemea muda / sekunde "
+"30)."
 
 #: users/templates/users/settings/partials/two_factor_content.html:144
 msgid "Step 2 of 2"
@@ -3867,7 +4038,9 @@ msgstr "Weka msimbo wa tarakimu 6"
 msgid ""
 "Enter the 6-digit code shown in your authenticator app to activate "
 "protection."
-msgstr "Weka msimbo wa tarakimu 6 unaoonyeshwa kwenye programu yako ya uthibitishaji ili kuwasha ulinzi."
+msgstr ""
+"Weka msimbo wa tarakimu 6 unaoonyeshwa kwenye programu yako ya uthibitishaji "
+"ili kuwasha ulinzi."
 
 #: users/templates/users/settings/partials/two_factor_content.html:154
 msgid "6-digit code"
@@ -3917,7 +4090,9 @@ msgstr "Tengeneza upya misimbo ya kurejesha"
 msgid ""
 "Regenerating will permanently invalidate all existing recovery codes. Enter "
 "your current 6-digit authenticator code to confirm."
-msgstr "Kutengeneza upya kutabatilisha kabisa misimbo yote ya sasa ya kurejesha. Weka msimbo wa sasa wa tarakimu 6 wa uthibitishaji ili kuthibitisha."
+msgstr ""
+"Kutengeneza upya kutabatilisha kabisa misimbo yote ya sasa ya kurejesha. "
+"Weka msimbo wa sasa wa tarakimu 6 wa uthibitishaji ili kuthibitisha."
 
 #: users/templates/users/settings/partials/two_factor_content.html:242
 msgid "Confirm & Generate New Codes"
@@ -3931,7 +4106,9 @@ msgstr "Zima uthibitishaji wa hatua mbili"
 msgid ""
 "Disabling 2FA removes the extra security layer. You will only need your "
 "password to log in."
-msgstr "Kuzima 2FA huondoa hatua ya ziada ya usalama. Utahitaji nenosiri lako pekee ili kuingia."
+msgstr ""
+"Kuzima 2FA huondoa hatua ya ziada ya usalama. Utahitaji nenosiri lako pekee "
+"ili kuingia."
 
 #: users/templates/users/settings/partials/two_factor_content.html:259
 msgid "Disable 2FA..."
@@ -3939,7 +4116,8 @@ msgstr "Zima 2FA..."
 
 #: users/templates/users/settings/partials/two_factor_content.html:265
 msgid "Enter your 6-digit authenticator code to confirm disabling 2FA:"
-msgstr "Weka msimbo wako wa tarakimu 6 wa uthibitishaji ili kuthibitisha kuzima 2FA:"
+msgstr ""
+"Weka msimbo wako wa tarakimu 6 wa uthibitishaji ili kuthibitisha kuzima 2FA:"
 
 #: users/templates/users/settings/partials/two_factor_content.html:281
 msgid "Confirm & Disable 2FA"
@@ -3950,7 +4128,10 @@ msgid ""
 "Two-factor authentication adds an extra layer of security to your PwaniNet "
 "account. Once enabled, you'll enter a 6-digit verification code from your "
 "authenticator app whenever you perform sensitive security actions."
-msgstr "Uthibitishaji wa hatua mbili huongeza ulinzi wa akaunti yako ya PwaniNet. Ukiwashwa, utaweka msimbo wa uthibitishaji wa tarakimu 6 kutoka kwenye programu yako unapotekeleza hatua nyeti za usalama."
+msgstr ""
+"Uthibitishaji wa hatua mbili huongeza ulinzi wa akaunti yako ya PwaniNet. "
+"Ukiwashwa, utaweka msimbo wa uthibitishaji wa tarakimu 6 kutoka kwenye "
+"programu yako unapotekeleza hatua nyeti za usalama."
 
 #: users/templates/users/settings/partials/two_factor_content.html:309
 msgid "1. Get an App"
@@ -3974,7 +4155,9 @@ msgstr "3. Hifadhi misimbo"
 
 #: users/templates/users/settings/partials/two_factor_content.html:324
 msgid "Keep single-use recovery codes in case you lose your phone."
-msgstr "Hifadhi misimbo ya matumizi moja ya kurejesha akaunti iwapo utapoteza simu yako."
+msgstr ""
+"Hifadhi misimbo ya matumizi moja ya kurejesha akaunti iwapo utapoteza simu "
+"yako."
 
 #: users/templates/users/settings/partials/two_factor_content.html:331
 msgid "Set Up Authenticator"
@@ -3996,7 +4179,9 @@ msgstr "Inapakua…"
 
 #: users/views.py:375
 msgid "Too many recovery attempts. Please wait 5 minutes before trying again."
-msgstr "Majaribio mengi mno ya kurejesha akaunti. Tafadhali subiri dakika 5 kabla ya kujaribu tena."
+msgstr ""
+"Majaribio mengi mno ya kurejesha akaunti. Tafadhali subiri dakika 5 kabla ya "
+"kujaribu tena."
 
 #: users/views.py:383
 msgid "Please enter your username."
@@ -4004,13 +4189,18 @@ msgstr "Tafadhali weka jina lako la mtumiaji."
 
 #: users/views.py:393
 msgid "No account found with that username. Please verify and try again."
-msgstr "Hakuna akaunti yenye jina hilo la mtumiaji. Tafadhali hakiki kisha ujaribu tena."
+msgstr ""
+"Hakuna akaunti yenye jina hilo la mtumiaji. Tafadhali hakiki kisha ujaribu "
+"tena."
 
 #: users/views.py:400
 msgid ""
 "Two-Factor Authentication is not enabled for this account. Self-service "
 "recovery requires 2FA or a recovery code. Please contact support."
-msgstr "Uthibitishaji wa hatua mbili haujawashwa kwenye akaunti hii. Ili kurejesha akaunti mwenyewe unahitaji 2FA au msimbo wa kurejesha. Tafadhali wasiliana na usaidizi."
+msgstr ""
+"Uthibitishaji wa hatua mbili haujawashwa kwenye akaunti hii. Ili kurejesha "
+"akaunti mwenyewe unahitaji 2FA au msimbo wa kurejesha. Tafadhali wasiliana "
+"na usaidizi."
 
 #: users/views.py:436
 msgid "Your recovery session expired. Please start over."
@@ -4018,11 +4208,13 @@ msgstr "Kipindi chako cha kurejesha akaunti kimeisha. Tafadhali anza tena."
 
 #: users/views.py:455
 msgid "Too many incorrect verification attempts. Please start over."
-msgstr "Majaribio mengi mno ya uthibitishaji yasiyo sahihi. Tafadhali anza tena."
+msgstr ""
+"Majaribio mengi mno ya uthibitishaji yasiyo sahihi. Tafadhali anza tena."
 
 #: users/views.py:477
 msgid "Invalid verification code. Please check and try again."
-msgstr "Msimbo wa uthibitishaji si sahihi. Tafadhali hakiki kisha ujaribu tena."
+msgstr ""
+"Msimbo wa uthibitishaji si sahihi. Tafadhali hakiki kisha ujaribu tena."
 
 #: users/views.py:512
 msgid "Your password reset authorization has expired. Please start over."
@@ -4040,7 +4232,8 @@ msgstr "Sehemu mbili za nenosiri hazikulingana."
 msgid ""
 "Your password has been reset successfully. Please log in with your new "
 "password."
-msgstr "Nenosiri lako limewekwa upya. Tafadhali ingia kwa kutumia nenosiri jipya."
+msgstr ""
+"Nenosiri lako limewekwa upya. Tafadhali ingia kwa kutumia nenosiri jipya."
 
 #: users/views.py:1463 users/views.py:1505
 msgid "Two-factor authentication is already enabled."
@@ -4050,7 +4243,9 @@ msgstr "Uthibitishaji wa hatua mbili tayari umewashwa."
 msgid ""
 "Invalid verification code. Please check the time on your device and "
 "authenticator app and try again."
-msgstr "Msimbo wa uthibitishaji si sahihi. Hakiki saa kwenye kifaa na programu yako ya uthibitishaji kisha ujaribu tena."
+msgstr ""
+"Msimbo wa uthibitishaji si sahihi. Hakiki saa kwenye kifaa na programu yako "
+"ya uthibitishaji kisha ujaribu tena."
 
 #: users/views.py:1548 users/views.py:1580
 msgid "Invalid request method."
@@ -4071,16 +4266,25 @@ msgstr "Uthibitishaji wa hatua mbili umezimwa kwa mafanikio."
 #: users/views.py:1569
 msgid ""
 "Invalid authentication code. Could not disable two-factor authentication."
-msgstr "Msimbo wa uthibitishaji si sahihi. Imeshindwa kuzima uthibitishaji wa hatua mbili."
+msgstr ""
+"Msimbo wa uthibitishaji si sahihi. Imeshindwa kuzima uthibitishaji wa hatua "
+"mbili."
 
 #: users/views.py:1594
 msgid ""
 "Please provide your 6-digit authenticator code to regenerate recovery codes."
-msgstr "Tafadhali weka msimbo wa tarakimu 6 wa uthibitishaji ili kutengeneza upya misimbo ya kurejesha."
+msgstr ""
+"Tafadhali weka msimbo wa tarakimu 6 wa uthibitishaji ili kutengeneza upya "
+"misimbo ya kurejesha."
 
 #: users/views.py:1606
 msgid "Invalid authentication code. Could not regenerate recovery codes."
-msgstr "Msimbo wa uthibitishaji si sahihi. Imeshindwa kutengeneza upya misimbo ya kurejesha."
+msgstr ""
+"Msimbo wa uthibitishaji si sahihi. Imeshindwa kutengeneza upya misimbo ya "
+"kurejesha."
+
+#~ msgid "Download Update"
+#~ msgstr "Pakua sasisho"
 
 #~ msgid "Manage your profile, username, bio..."
 #~ msgstr "Dhibiti wasifu wako, jina la mtumiaji, wasifu..."

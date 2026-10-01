@@ -90,8 +90,8 @@
       </div>
     </div>
     <div class="settings-app-download-action d-flex flex-wrap gap-2" id="native-app-update-action">
-      <a href="{% url 'download_android_apk' %}" target="_blank" id="native-app-download-update-btn" class="btn btn-primary btn-sm d-none align-items-center" onclick="if (typeof window.triggerNativeApkDownload === 'function') { window.triggerNativeApkDownload(this.href); return false; }">
-        <i class="bi bi-arrow-up-circle me-1"></i> {% trans "Download Update" %}
+      <a href="{% url 'downloads' %}?native_update=1#downloads-actions" id="native-app-download-update-btn" class="btn btn-primary btn-sm d-none align-items-center" hx-boost="false">
+        <i class="bi bi-arrow-up-circle me-1"></i> {% trans "Update App" %}
       </a>
       <button type="button" class="btn btn-outline-primary btn-sm d-inline-flex align-items-center" id="native-app-check-update-btn" onclick="if (typeof window.checkNativeAppUpdates === 'function') window.checkNativeAppUpdates(true);">
         <i class="bi bi-arrow-clockwise me-1"></i> {% trans "Check for Updates" %}

@@ -92,9 +92,13 @@
             this.voiceWaveformBars = this.voiceWaveform ? Array.from(this.voiceWaveform.querySelectorAll('span')) : [];
             this.voiceWaveformHistory = [];
             this.voiceWaveformLastSampleAt = 0;
-            this.voiceRecognition = null;
-            this.nativeSpeechBridge = null;
-            this._onNativeSpeechEvent = null;
+            this.voiceRecorder = null;
+            this.voiceChunks = [];
+            this.voiceStarting = false;
+            this.voiceTranscriptionAbortController = null;
+            this.voiceRecorderSupported = Boolean(
+                navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder
+            );
             this.voiceListening = false;
             this.voiceStopping = false;
             this.voiceSendAfterTranscription = false;
@@ -128,7 +132,10 @@
             const parsedPreferred = parseInt(localStorage.getItem('pwanimate_context_rail_width'), 10);
             this.savedPreferredWidth = (!isNaN(parsedPreferred) && parsedPreferred >= 280 && parsedPreferred <= 650) ? parsedPreferred : 360;
             this.currentRenderedWidth = 0;
-            this.contextRailOpen = localStorage.getItem('pwanimateContextRailOpen') === 'true';
+            // Start closed. Initial context resources are loaded immediately
+            // after workspace geometry initializes and will open the tray.
+            // Do not restore an old open preference into an empty workspace.
+            this.contextRailOpen = false;
             this.activeResourceDetails = null;
             this.resizerEl = null;
             this.isResizing = false;
@@ -1244,158 +1251,148 @@
             if (this.voiceStopBtn) this.voiceStopBtn.addEventListener('click', () => this.stopVoiceCapture());
             if (this.voiceSendBtn) this.voiceSendBtn.addEventListener('click', () => this.stopVoiceCapture(true));
             if (this.voiceCancelBtn) this.voiceCancelBtn.addEventListener('click', () => this.cancelVoiceCapture());
-
-            const nativeBridge = window.AndroidBridge || window.PwaninetBridge;
-            if (nativeBridge && typeof nativeBridge.startSpeechRecognition === 'function'
-                    && typeof nativeBridge.stopSpeechRecognition === 'function') {
-                this.nativeSpeechBridge = nativeBridge;
-                this._onNativeSpeechEvent = (event) => {
-                    if (this.voiceCancelled) return;
-                    const detail = event.detail || {};
-                    if (detail.error) {
-                        const messages = {
-                            permission: 'Microphone access was denied. Allow microphone access in Android app settings.',
-                            unavailable: 'Speech recognition is not available on this device.',
-                            audio: 'The microphone could not be started. Check your microphone and try again.',
-                            network: 'Android’s speech service could not connect. Please try again.',
-                            'no-speech': 'No speech was detected. Tap the microphone and try again.',
-                            busy: 'Speech recognition is busy. Please try again in a moment.',
-                            server: 'Android’s speech service encountered an error. Please try again.',
-                            'start-failed': 'Could not start the microphone. Please try again.',
-                        };
-                        const message = messages[detail.error] || 'Voice input failed. Please try again.';
-                        this.voiceErrorMessage = message;
-                        if (detail.listening) {
-                            this.setVoiceStatus(detail.error === 'no-speech' ? 'Listening for speech' : `${message} Retrying`, detail.error !== 'no-speech');
-                        } else {
-                            this.setVoiceListening(false);
-                            this.setVoiceStatus(message, true);
-                            this.finishVoiceCapture();
-                        }
-                        return;
-                    }
-                    if (detail.final) {
-                        if (detail.text) {
-                            this.voiceFinalTranscript = [this.voiceFinalTranscript, detail.text.trim()].filter(Boolean).join(' ');
-                        }
-                        if (!detail.listening) {
-                            this.setVoiceListening(false);
-                            this.finishVoiceCapture();
-                        } else this.setVoiceStatus('Recording voice message');
-                    }
-                    if (typeof detail.level === 'number') this.setVoiceWaveformLevel(detail.level);
-                };
-                window.addEventListener('pwaninet:native-speech', this._onNativeSpeechEvent);
-                this.voiceBtn.addEventListener('click', () => {
-                    this.voiceFinalTranscript = '';
-                    this.voiceErrorMessage = '';
-                    this.voiceCancelled = false;
-                    this.voiceSelection = {
-                        start: this.input.selectionStart ?? this.input.value.length,
-                        end: this.input.selectionEnd ?? this.input.value.length,
-                    };
-                    this.setVoiceListening(true);
-                    this.setVoiceStatus('Recording voice message');
-                    try {
-                        nativeBridge.startSpeechRecognition(document.documentElement.lang === 'sw' ? 'sw-KE' : 'en-US');
-                    } catch (error) {
-                        this.setVoiceListening(false);
-                        this.setVoiceStatus('Could not start the microphone. Please try again.', true);
-                    }
-                });
-                return;
-            }
-
-            const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!Recognition) {
+            if (!this.voiceRecorderSupported) {
                 this.voiceBtn.disabled = true;
-                this.voiceBtn.title = 'Speech input is not supported in this browser.';
+                this.voiceBtn.title = 'Audio recording is not supported in this browser.';
                 this.voiceBtn.setAttribute('aria-label', this.voiceBtn.title);
-                this.setVoiceStatus('Voice input is not available in this browser. You can still type.', true);
+                this.setVoiceStatus('Voice recording is not available in this browser. You can still type.', true);
                 return;
             }
-
-            const recognition = new Recognition();
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.maxAlternatives = 1;
-            recognition.lang = document.documentElement.lang === 'sw' ? 'sw-KE' : 'en-US';
-            this.voiceRecognition = recognition;
 
             this.voiceBtn.addEventListener('click', () => {
-                this.voiceFinalTranscript = '';
-                this.voiceErrorMessage = '';
-                this.voiceCancelled = false;
-                this.voiceSelection = {
-                    start: this.input.selectionStart ?? this.input.value.length,
-                    end: this.input.selectionEnd ?? this.input.value.length,
-                };
+                this.startVoiceCapture();
+            });
+        }
 
-                try {
-                    recognition.start();
+        async startVoiceCapture() {
+            if (this.voiceStarting || this.voiceListening || this.voiceStopping || this.isGenerating) return;
+            this.voiceStarting = true;
+            this.voiceCancelled = false;
+            this.voiceFinalTranscript = '';
+            this.voiceErrorMessage = '';
+            this.voiceSelection = {
+                start: this.input.selectionStart ?? this.input.value.length,
+                end: this.input.selectionEnd ?? this.input.value.length,
+            };
+            this.voiceBtn.disabled = true;
+            this.input.disabled = true;
+            if (this.voiceCapture) this.voiceCapture.classList.remove('d-none');
+            if (this.voiceStopBtn) this.voiceStopBtn.disabled = true;
+            if (this.voiceSendBtn) this.voiceSendBtn.disabled = true;
+            this.setVoiceStatus('Starting microphone');
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+                });
+                if (this.voiceCancelled || this.isGenerating) {
+                    stream.getTracks().forEach(track => track.stop());
+                    return;
+                }
+
+                this.voiceMediaStream = stream;
+                const mimeType = this.getVoiceMimeType();
+                this.voiceRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+                this.voiceChunks = [];
+                const recorder = this.voiceRecorder;
+                recorder.addEventListener('dataavailable', event => {
+                    if (event.data && event.data.size) this.voiceChunks.push(event.data);
+                });
+                recorder.addEventListener('start', () => {
+                    this.voiceStarting = false;
                     this.setVoiceListening(true);
                     this.setVoiceStatus('Recording voice message');
-                    this.startVoiceLevelMeter();
-                } catch (error) {
-                    this.setVoiceListening(false);
-                    this.setVoiceStatus('Could not start the microphone. Please try again.', true);
-                }
-            });
-
-            recognition.onstart = () => {
-                this.setVoiceListening(true);
-                this.setVoiceStatus('Recording voice message');
-            };
-
-            recognition.onresult = (event) => {
-                let interimText = '';
-                for (let index = event.resultIndex; index < event.results.length; index += 1) {
-                    const result = event.results[index];
-                    const text = result[0] && result[0].transcript ? result[0].transcript.trim() : '';
-                    if (!text) continue;
-                    if (result.isFinal) {
-                        this.voiceFinalTranscript = [this.voiceFinalTranscript, text].filter(Boolean).join(' ');
-                    } else interimText += `${text} `;
-                }
-                if (interimText.trim()) this.setVoiceStatus('Recording voice message');
-            };
-
-            recognition.onerror = (event) => {
+                    this.startVoiceLevelMeter(stream);
+                }, { once: true });
+                recorder.addEventListener('stop', () => this.handleVoiceRecordingStopped(recorder), { once: true });
+                recorder.addEventListener('error', () => {
+                    this.voiceErrorMessage = 'The recording stopped unexpectedly. Please try again.';
+                    this.setVoiceStatus(this.voiceErrorMessage, true);
+                }, { once: true });
+                recorder.start(1000);
+            } catch (error) {
                 if (this.voiceCancelled) return;
-                const messages = {
-                    'no-speech': 'No speech was detected. Tap the microphone and try again.',
-                    'not-allowed': 'Microphone access was blocked. Allow microphone access in your browser settings.',
-                    'service-not-allowed': 'The browser speech service is unavailable or not allowed.',
-                    'audio-capture': 'No microphone was found on this device.',
-                    network: 'The browser speech service could not connect. Please try again.',
-                    aborted: 'Voice input was stopped.',
-                };
-                this.voiceErrorMessage = messages[event.error] || 'Voice input failed. Please try again.';
-                if (event.error !== 'no-speech' && event.error !== 'aborted') {
-                    this.voiceStopping = true;
-                    this.setVoiceListening(false);
+                this.voiceStarting = false;
+                this.voiceRecorder = null;
+                this.voiceChunks = [];
+                this.setVoiceListening(false);
+                if (this.input) this.input.disabled = this.isGenerating;
+                this.stopVoiceLevelMeter();
+                this.setVoiceStatus('Microphone could not be started. Check microphone permission and try again.', true);
+            } finally {
+                if (!this.voiceRecorder || this.voiceRecorder.state !== 'recording') this.voiceStarting = false;
+                if (this.voiceBtn && !this.voiceListening && !this.voiceStopping && !this.voiceStarting) {
+                    this.voiceBtn.disabled = this.isGenerating || !this.voiceRecorderSupported;
                 }
-                this.setVoiceStatus(event.error === 'no-speech' && this.voiceListening ? 'Recording voice message' : this.voiceErrorMessage, event.error !== 'aborted');
-            };
+            }
+        }
 
-            recognition.onend = () => {
-                if (this.voiceCancelled) {
-                    this.voiceCancelled = false;
-                    return;
-                }
-                if (this.voiceListening) {
-                    window.setTimeout(() => {
-                        if (!this.voiceListening || this.isGenerating) return;
-                        try { recognition.start(); } catch (error) {
-                            this.setVoiceListening(false);
-                            this.finishVoiceCapture();
-                            this.setVoiceStatus('Voice recognition stopped. Review your draft and tap the mic to continue.', true);
-                        }
-                    }, 250);
-                    return;
-                }
+        getVoiceMimeType() {
+            const supportedTypes = [
+                'audio/webm;codecs=opus',
+                'audio/mp4',
+                'audio/ogg;codecs=opus',
+                'audio/webm',
+                'audio/ogg',
+            ];
+            return supportedTypes.find(type => MediaRecorder.isTypeSupported(type)) || '';
+        }
+
+        async handleVoiceRecordingStopped(recorder) {
+            const blob = new Blob(this.voiceChunks, { type: recorder.mimeType || 'audio/webm' });
+            this.voiceChunks = [];
+            this.voiceRecorder = null;
+            this.stopVoiceLevelMeter();
+            if (this.voiceCancelled) return;
+            if (!this.voiceStopping) {
+                this.voiceStopping = true;
+                this.voiceSendAfterTranscription = false;
+                this.setVoiceListening(false);
+                this.setVoiceTranscribing(true);
+            }
+            if (!blob.size) {
+                this.voiceErrorMessage = 'No audio was captured. Please try again.';
+                this.setVoiceStatus(this.voiceErrorMessage, true);
                 this.finishVoiceCapture();
-            };
+                return;
+            }
+            await this.transcribeVoiceRecording(blob);
+        }
+
+        async transcribeVoiceRecording(blob) {
+            this.setVoiceStatus('Transcribing voice message');
+            const formData = new FormData();
+            const mimeType = (blob.type || 'audio/webm').split(';', 1)[0];
+            const extension = mimeType === 'audio/mp4' ? 'm4a'
+                : mimeType === 'audio/ogg' ? 'ogg'
+                    : mimeType === 'audio/wav' || mimeType === 'audio/x-wav' ? 'wav'
+                        : mimeType === 'audio/mpeg' ? 'mp3' : 'webm';
+            formData.append('audio', blob, `voice.${extension}`);
+            formData.append('language', document.documentElement.lang === 'sw' ? 'sw' : 'en');
+
+            const controller = new AbortController();
+            this.voiceTranscriptionAbortController = controller;
+            try {
+                const response = await fetch('/api/pwanimate/voice/transcribe/', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'X-CSRFToken': getCsrfToken() },
+                    body: formData,
+                    signal: controller.signal,
+                });
+                const payload = await response.json();
+                if (!response.ok) throw new Error(payload.error || 'Transcription failed. Please try again.');
+                this.voiceFinalTranscript = (payload.text || '').trim();
+                if (!this.voiceFinalTranscript) this.voiceErrorMessage = 'No speech was recognized. Please try again.';
+            } catch (error) {
+                if (this.voiceCancelled) return;
+                this.voiceErrorMessage = error.message || 'Transcription failed. Please try again.';
+            } finally {
+                if (this.voiceTranscriptionAbortController === controller) this.voiceTranscriptionAbortController = null;
+            }
+            if (this.voiceCancelled) return;
+            if (this.voiceErrorMessage) this.setVoiceStatus(this.voiceErrorMessage, true);
+            this.finishVoiceCapture();
         }
 
         setVoiceListening(isListening) {
@@ -1412,12 +1409,12 @@
             if (this.voiceCapture) {
                 this.voiceCapture.classList.toggle('is-listening', isListening);
                 this.voiceCapture.classList.toggle('is-stopping', this.voiceStopping);
-                this.voiceCapture.classList.toggle('d-none', !isListening && !this.voiceStopping);
+                this.voiceCapture.classList.toggle('d-none', !isListening && !this.voiceStopping && !this.voiceStarting);
             }
-            if (this.voiceStopBtn) this.voiceStopBtn.disabled = this.voiceStopping || this.isGenerating;
-            if (this.voiceSendBtn) this.voiceSendBtn.disabled = this.voiceStopping || this.isGenerating;
+            if (this.voiceStopBtn) this.voiceStopBtn.disabled = this.voiceStarting || this.voiceStopping || this.isGenerating;
+            if (this.voiceSendBtn) this.voiceSendBtn.disabled = this.voiceStarting || this.voiceStopping || this.isGenerating;
             if (!this.voiceBtn) return;
-            this.voiceBtn.disabled = this.isGenerating || this.voiceStopping || (!this.voiceRecognition && !this.nativeSpeechBridge);
+            this.voiceBtn.disabled = this.isGenerating || this.voiceStarting || this.voiceStopping || !this.voiceRecorderSupported;
             this.voiceBtn.classList.toggle('is-listening', isListening);
             this.voiceBtn.setAttribute('aria-pressed', String(isListening));
             this.voiceBtn.setAttribute('aria-label', isListening ? 'Stop voice input' : 'Dictate a message');
@@ -1431,7 +1428,7 @@
             this.voiceStatus.classList.toggle('d-none', !message);
             this.voiceStatus.classList.toggle('is-error', Boolean(isError));
             if (this.voiceFeedback) {
-                const showFeedback = Boolean(message) && !this.voiceListening && !this.voiceStopping;
+                const showFeedback = Boolean(message) && (!this.voiceListening || this.voiceStopping);
                 this.voiceFeedback.textContent = message;
                 this.voiceFeedback.classList.toggle('d-none', !showFeedback);
                 this.voiceFeedback.classList.toggle('is-error', Boolean(isError));
@@ -1439,6 +1436,7 @@
         }
 
         finishVoiceCapture() {
+            if (!this.voiceStopping) return;
             const transcript = (this.voiceFinalTranscript || '').trim();
             const sendAfterTranscription = this.voiceSendAfterTranscription && Boolean(transcript);
             if (transcript) {
@@ -1457,21 +1455,32 @@
                 this.setVoiceStatus(this.voiceStatus.textContent, this.voiceStatus.classList.contains('is-error'));
             }
             if (this.input) this.input.disabled = this.isGenerating;
-            if (this.voiceBtn) this.voiceBtn.disabled = this.isGenerating || (!this.voiceRecognition && !this.nativeSpeechBridge);
+            if (this.voiceBtn) this.voiceBtn.disabled = this.isGenerating || !this.voiceRecorderSupported;
             this.updateSendButtonState();
             if (sendAfterTranscription) this.handleSend();
         }
 
         stopVoiceCapture(sendAfterTranscription = false) {
-            if (!this.voiceListening || this.voiceStopping) return;
+            if ((!this.voiceListening && !this.voiceStarting) || this.voiceStopping) return;
             this.voiceErrorMessage = '';
             this.voiceStopping = true;
             this.voiceSendAfterTranscription = sendAfterTranscription;
             this.setVoiceListening(false);
             this.setVoiceTranscribing(true, sendAfterTranscription);
-            this.setVoiceStatus(sendAfterTranscription ? 'Transcribing voice message before sending' : 'Transcribing voice message');
-            if (this.nativeSpeechBridge) this.nativeSpeechBridge.stopSpeechRecognition();
-            else if (this.voiceRecognition) this.voiceRecognition.stop();
+            this.setVoiceStatus('Finishing recording');
+            if (this.voiceRecorder && this.voiceRecorder.state === 'recording') {
+                try {
+                    this.voiceRecorder.stop();
+                } catch (error) {
+                    this.voiceErrorMessage = 'Recording could not be stopped cleanly. Please try again.';
+                    this.setVoiceStatus(this.voiceErrorMessage, true);
+                    this.finishVoiceCapture();
+                }
+            } else if (!this.voiceRecorder) {
+                this.voiceErrorMessage = 'The microphone did not finish starting. Please try again.';
+                this.setVoiceStatus(this.voiceErrorMessage, true);
+                this.finishVoiceCapture();
+            }
         }
 
         setVoiceTranscribing(isLoading, sending = false) {
@@ -1484,39 +1493,43 @@
         }
 
         cancelVoiceCapture() {
-            if (!this.voiceListening && !this.voiceStopping) return;
+            if (!this.voiceListening && !this.voiceStopping && !this.voiceStarting) return;
             this.voiceCancelled = true;
+            if (this.voiceTranscriptionAbortController) this.voiceTranscriptionAbortController.abort();
+            this.voiceTranscriptionAbortController = null;
             this.voiceListening = false;
+            this.voiceStarting = false;
             this.voiceStopping = false;
             this.voiceSendAfterTranscription = false;
             this.voiceFinalTranscript = '';
             this.voiceErrorMessage = '';
-            if (this.nativeSpeechBridge) {
-                if (typeof this.nativeSpeechBridge.cancelSpeechRecognition === 'function') this.nativeSpeechBridge.cancelSpeechRecognition();
-                else this.nativeSpeechBridge.stopSpeechRecognition();
-            }
-            if (this.voiceRecognition) {
-                try { this.voiceRecognition.abort(); } catch (error) {}
+            if (this.voiceRecorder && this.voiceRecorder.state === 'recording') {
+                const recorder = this.voiceRecorder;
+                recorder.addEventListener('stop', () => {
+                    this.stopVoiceLevelMeter();
+                    this.voiceRecorder = null;
+                    this.voiceChunks = [];
+                }, { once: true });
+                try { recorder.stop(); } catch (error) { this.stopVoiceLevelMeter(); }
+            } else {
+                this.voiceRecorder = null;
+                this.voiceChunks = [];
+                this.stopVoiceLevelMeter();
             }
             this.setVoiceListening(false);
+            if (this.input) this.input.disabled = this.isGenerating;
             this.setVoiceTranscribing(false);
             this.setVoiceStatus('Voice recording cancelled');
-            this.stopVoiceLevelMeter();
             if (this.voiceCapture) this.voiceCapture.classList.add('d-none');
         }
 
-        async startVoiceLevelMeter() {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || this.voiceMediaStream) return;
+        async startVoiceLevelMeter(stream = this.voiceMediaStream) {
+            if (!stream || this.voiceAudioContext) return;
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                if (!this.voiceListening) {
-                    stream.getTracks().forEach(track => track.stop());
-                    return;
-                }
-                this.voiceMediaStream = stream;
                 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
                 if (!AudioContextClass) return;
                 this.voiceAudioContext = new AudioContextClass();
+                if (this.voiceAudioContext.state === 'suspended') this.voiceAudioContext.resume();
                 this.voiceAnalyser = this.voiceAudioContext.createAnalyser();
                 this.voiceAnalyser.fftSize = 256;
                 this.voiceAudioContext.createMediaStreamSource(stream).connect(this.voiceAnalyser);
@@ -1534,7 +1547,7 @@
                 };
                 draw();
             } catch (error) {
-                // Speech recognition still works if a browser does not grant a separate visualizer stream.
+                // Recording remains available if the browser cannot create a visualizer.
             }
         }
 
@@ -2021,6 +2034,9 @@
             this.updateContextCountBadges();
             this.updateAddToContextButtons();
             this.syncContextView();
+            if (this.contextResources.length === 0 && !this.previewResourceState) {
+                this.closeContextRail();
+            }
         }
 
         selectContextResource(index) {
@@ -2475,6 +2491,10 @@
 
             this.updateAddToContextButtons();
 
+            if (this.contextResources.length === 0) {
+                this.closeContextRail();
+            }
+
             // Restore focus
             if (this.lastPreviewTriggerEl && typeof this.lastPreviewTriggerEl.focus === 'function') {
                 this.lastPreviewTriggerEl.focus();
@@ -2870,19 +2890,14 @@
         setGenerating(loading) {
             this.isGenerating = loading;
             if (this.input) this.input.disabled = loading;
-            if (this.voiceBtn) this.voiceBtn.disabled = loading || (!this.voiceRecognition && !this.nativeSpeechBridge);
-            if (loading && this.voiceListening) {
-                this.voiceErrorMessage = '';
-                this.setVoiceListening(false);
-                if (this.voiceRecognition) this.voiceRecognition.stop();
-                if (this.nativeSpeechBridge) this.nativeSpeechBridge.stopSpeechRecognition();
-            }
+            if (this.voiceBtn) this.voiceBtn.disabled = loading || this.voiceStarting || !this.voiceRecorderSupported;
+            if (loading && (this.voiceListening || this.voiceStarting || this.voiceStopping)) this.cancelVoiceCapture();
             this.updateSendButtonState();
         }
 
         updateSendButtonState() {
             if (!this.sendBtn) return;
-            if (this.voiceListening || this.voiceStopping) {
+            if (this.voiceListening || this.voiceStarting || this.voiceStopping) {
                 this.sendBtn.disabled = true;
                 this.sendBtn.classList.remove('is-active');
                 this.sendBtn.setAttribute('aria-label', 'Stop voice input before sending');
@@ -3738,26 +3753,16 @@
         }
 
         destroy() {
-            if (this._onNativeSpeechEvent) {
-                window.removeEventListener('pwaninet:native-speech', this._onNativeSpeechEvent);
-                this._onNativeSpeechEvent = null;
-            }
-            if ((this.voiceListening || this.voiceStopping) && this.nativeSpeechBridge) {
-                try {
-                    if (this.nativeSpeechBridge.cancelSpeechRecognition) this.nativeSpeechBridge.cancelSpeechRecognition();
-                    else this.nativeSpeechBridge.stopSpeechRecognition();
-                } catch (e) {}
+            this.voiceCancelled = true;
+            if (this.voiceTranscriptionAbortController) this.voiceTranscriptionAbortController.abort();
+            this.voiceTranscriptionAbortController = null;
+            if (this.voiceRecorder && this.voiceRecorder.state === 'recording') {
+                this.voiceRecorder.onstop = null;
+                try { this.voiceRecorder.stop(); } catch (e) {}
             }
             this.stopVoiceLevelMeter();
-            this.nativeSpeechBridge = null;
-            if (this.voiceRecognition) {
-                this.voiceRecognition.onstart = null;
-                this.voiceRecognition.onresult = null;
-                this.voiceRecognition.onerror = null;
-                this.voiceRecognition.onend = null;
-                try { this.voiceRecognition.abort(); } catch (e) {}
-                this.voiceRecognition = null;
-            }
+            this.voiceRecorder = null;
+            this.voiceChunks = [];
             if (this.isGenerating && this.abortController) {
                 try { this.abortController.abort(); } catch (e) {}
             }

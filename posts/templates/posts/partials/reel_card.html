@@ -106,7 +106,13 @@
                 {% endif %}
                 <span>{% if post.repost_of %}{{ post.repost_of.created_at|timesince }}{% else %}{{ post.created_at|timesince }}{% endif %} ago</span>
                 <span class="mx-1">&middot;</span>
-                <i class="bi bi-globe-americas text-muted" title="{% trans 'Public' %}" aria-label="{% trans 'Public' %}" style="font-size: 11px;"></i>
+                {% if post.visibility == 'PRIVATE' %}
+                    <i class="bi bi-lock-fill text-muted" title="{% trans 'Only me' %}" aria-label="{% trans 'Only me' %}" style="font-size: 11px;"></i>
+                {% elif post.visibility == 'FOLLOWERS' %}
+                    <i class="bi bi-people-fill text-muted" title="{% trans 'Followers only' %}" aria-label="{% trans 'Followers only' %}" style="font-size: 11px;"></i>
+                {% else %}
+                    <i class="bi bi-globe-americas text-muted" title="{% trans 'PwaniNet students' %}" aria-label="{% trans 'PwaniNet students' %}" style="font-size: 11px;"></i>
+                {% endif %}
             </div>
         </div>
 

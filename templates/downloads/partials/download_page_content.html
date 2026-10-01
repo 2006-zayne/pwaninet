@@ -194,7 +194,7 @@
     </section>
 
     <!-- 3. DOWNLOAD BUTTONS SECTION (NOW COMES AFTER ALL INSTRUCTIONS ARE READ!) -->
-    <section class="downloads-actions-section mb-5">
+    <section class="downloads-actions-section mb-5" id="downloads-actions">
         <div class="text-center mb-4">
             <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1 mb-2">
                 <i class="bi bi-check2-all me-1"></i>{% trans "Instructions Read" %}
@@ -229,7 +229,12 @@
                         <button type="button" 
                                 id="apk-download-trigger-btn" 
                                 class="btn btn-success btn-lg w-100 fw-bold py-3 shadow-sm d-flex align-items-center justify-content-center gap-2"
-                                data-download-url="{{ github_apk_url|default:'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk' }}">
+                                data-download-url="{{ github_apk_url|default:'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk' }}"
+                                data-default-label="{% trans 'Download Mobile APK' %}"
+                                data-update-label="{% trans 'Update App' %}"
+                                data-running-label="{% trans 'Native APK Running' %}"
+                                data-update-ready-message="{% trans 'An app update is ready to install.' %}"
+                                data-running-message="{% trans 'The latest native app version is already installed.' %}">
                             <i class="bi bi-download fs-5"></i>
                             <span id="apk-btn-text">{% trans "Download Mobile APK" %}</span>
                         </button>
@@ -419,6 +424,77 @@
         const alertIcon = document.getElementById('downloads-action-icon');
         const alertText = document.getElementById('downloads-action-text');
 
+        function getNativeAppLabel(attribute, fallback) {
+            return apkBtn ? (apkBtn.getAttribute(attribute) || fallback) : fallback;
+        }
+
+        function compareVersions(left, right) {
+            if (typeof window.semverCompare === 'function') return window.semverCompare(left, right);
+            const a = String(left || '').replace(/^v/, '').split('.').map(Number);
+            const b = String(right || '').replace(/^v/, '').split('.').map(Number);
+            for (let i = 0; i < Math.max(a.length, b.length); i++) {
+                const diff = (a[i] || 0) - (b[i] || 0);
+                if (diff) return diff > 0 ? 1 : -1;
+            }
+            return 0;
+        }
+
+        async function syncNativeApkState() {
+            const isNative = typeof window.isRunningInNativeApp === 'function' && window.isRunningInNativeApp();
+            if (!isNative || !apkBtn || !apkBtnText) return;
+
+            try {
+                const installed = typeof window.getInstalledAppVersion === 'function'
+                    ? await window.getInstalledAppVersion()
+                    : null;
+                if (!installed || !installed.version) return;
+
+                const params = new URLSearchParams({
+                    installed_version: installed.version,
+                    installed_build: String(installed.build || '')
+                });
+                const response = await fetch('/api/releases/version_check/?' + params.toString(), { credentials: 'same-origin' });
+                if (!response.ok) throw new Error('Version check failed');
+                const release = await response.json();
+                const targetVersion = release.latest_apk_version || release.latest_version;
+                const updateAvailable = Boolean(targetVersion && compareVersions(targetVersion, installed.version) > 0);
+
+                apkBtn.disabled = false;
+                apkBtn.classList.remove('btn-outline-success', 'btn-success');
+                if (updateAvailable) {
+                    apkBtn.classList.add('btn-warning');
+                    apkBtnText.textContent = getNativeAppLabel('data-update-label', 'Update App');
+                    apkBtn.setAttribute('data-download-url', release.apk_url || '/download/app/latest/');
+                    if (alertText) {
+                        alertText.textContent = getNativeAppLabel('data-update-ready-message', 'An app update is ready to install.');
+                        alertBox.className = 'alert d-flex align-items-center gap-2 rounded-3 shadow-sm mb-4 alert-warning';
+                        alertIcon.className = 'bi bi-arrow-up-circle-fill fs-5';
+                    }
+                } else {
+                    apkBtn.classList.add('btn-outline-success');
+                    apkBtn.disabled = true;
+                    apkBtnText.innerHTML = '<i class="bi bi-check2-circle fs-5"></i>' + getNativeAppLabel('data-running-label', 'Native APK Running');
+                    if (alertText) {
+                        alertText.textContent = getNativeAppLabel('data-running-message', 'The latest native app version is already installed.');
+                        alertBox.className = 'alert d-flex align-items-center gap-2 rounded-3 shadow-sm mb-4 alert-success';
+                        alertIcon.className = 'bi bi-check-circle-fill fs-5';
+                    }
+                }
+                if (alertBox) alertBox.classList.remove('d-none');
+            } catch (error) {
+                console.warn('[Downloads] Could not check native app version:', error);
+            }
+        }
+
+        function scrollToDownloadActionsIfRequested() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('native_update') !== '1' && window.location.hash !== '#downloads-actions') return;
+            window.setTimeout(function() {
+                const section = document.getElementById('downloads-actions');
+                if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 120);
+        }
+
         function showAlert(message, type, iconClass) {
             if (!alertBox || !alertText) return;
             alertBox.className = 'alert d-flex align-items-center gap-2 rounded-3 shadow-sm mb-4 alert-' + (type || 'info');
@@ -439,12 +515,9 @@
         }
 
         if (typeof window.isNativeAppContainer === 'function' && window.isNativeAppContainer()) {
-            if (apkBtnText) apkBtnText.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Native APK Running ✓';
-            if (apkBtn) {
-                apkBtn.classList.remove('btn-success');
-                apkBtn.classList.add('btn-outline-success');
-            }
+            syncNativeApkState();
         }
+        scrollToDownloadActionsIfRequested();
 
         // 1. PWA INSTALL TRIGGER BUTTON
         if (pwaBtn) {
@@ -492,7 +565,8 @@
                 e.preventDefault();
                 const downloadUrl = apkBtn.getAttribute('data-download-url') || 'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk';
 
-                const originalHtml = apkBtnText ? apkBtnText.innerHTML : 'Download Mobile APK';
+                if (apkBtn.disabled) return;
+                const originalHtml = apkBtnText ? apkBtnText.innerHTML : getNativeAppLabel('data-default-label', 'Download Mobile APK');
                 if (apkBtnText) {
                     apkBtnText.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Starting download...';
                 }

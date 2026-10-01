@@ -284,7 +284,9 @@ public class MainActivity extends BridgeActivity {
                     speechListening = false;
                     ArrayList<String> matches = results == null ? null
                             : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                    if (matches != null && !matches.isEmpty()) dispatchSpeechEvent(matches.get(0), true, null);
+                    // Always send a terminal event. An empty result is still completion and
+                    // the WebView must not remain stuck in its transcribing state.
+                    dispatchSpeechEvent(matches != null && !matches.isEmpty() ? matches.get(0) : "", true, null);
                     destroySpeechRecognizer();
                     if (speechSessionRequested) {
                         new Handler(Looper.getMainLooper()).postDelayed(() -> {
@@ -337,11 +339,17 @@ public class MainActivity extends BridgeActivity {
     private void stopSpeechRecognition() {
         runOnUiThread(() -> {
             speechSessionRequested = false;
-            if (speechRecognizer == null) return;
+            // onResults destroys the recognizer before the continuous-listening restart is
+            // scheduled. A stop during that gap must complete the JS session itself.
+            if (speechRecognizer == null) {
+                dispatchSpeechEvent("", true, null);
+                return;
+            }
             try {
                 speechRecognizer.stopListening();
             } catch (Exception ignored) {
                 destroySpeechRecognizer();
+                dispatchSpeechEvent("", true, null);
             }
         });
     }

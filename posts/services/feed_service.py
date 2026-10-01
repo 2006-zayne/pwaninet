@@ -1,4 +1,5 @@
 import random
+import logging
 from datetime import datetime
 from django.core.cache import cache
 from django.db.models import Q, Count
@@ -11,6 +12,19 @@ from posts.queries.feed_queries import (
 from posts.models import Post
 
 FEED_PAGE_SIZE = 10
+REELS_CACHE_VERSION_KEY = 'feed:reels_carousel:version'
+
+
+def invalidate_reels_carousel_cache():
+    """Version the carousel cache so new or newly-classified reels show at once."""
+    try:
+        cache.add(REELS_CACHE_VERSION_KEY, 0, timeout=None)
+        try:
+            cache.incr(REELS_CACHE_VERSION_KEY)
+        except (NotImplementedError, ValueError):
+            cache.set(REELS_CACHE_VERSION_KEY, int(cache.get(REELS_CACHE_VERSION_KEY, 0)) + 1, timeout=None)
+    except Exception:
+        logging.getLogger(__name__).exception('Failed to invalidate reels carousel cache')
 
 
 def encode_cursor(post):
@@ -108,7 +122,9 @@ def get_ranked_feed(user, cursor=None, limit=10):
 
 def get_reels_carousel(user, limit=8, offset=0):
     """Fetch recent vertical reels for the in-feed carousel shelf."""
-    cache_key = f'feed:reels_carousel:{user.id if user and user.is_authenticated else "anon"}:{offset}'
+    cache.add(REELS_CACHE_VERSION_KEY, 0, timeout=None)
+    cache_version = cache.get(REELS_CACHE_VERSION_KEY, 0)
+    cache_key = f'feed:reels_carousel:v{cache_version}:{user.id if user and user.is_authenticated else "anon"}:{offset}'
     cached = cache.get(cache_key)
     if cached is not None:
         return cached

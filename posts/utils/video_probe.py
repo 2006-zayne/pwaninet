@@ -8,9 +8,10 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
+video_logger = logging.getLogger('posts.video_processing')
 
 FFMPEG = getattr(settings, 'FFMPEG_PATH', '/usr/bin/ffmpeg')
-FFPROBE = getattr(settings, 'FFPROBE_PATH', '/usr/bin/ffprobe')
+from posts.utils.media_tools import resolve_ffprobe
 
 
 def probe_video_metadata(video_file_or_path):
@@ -42,8 +43,9 @@ def probe_video_metadata(video_file_or_path):
                     shutil.copyfileobj(video_file_or_path, dst)
             video_path = tmp_path
 
+        ffprobe = resolve_ffprobe()
         cmd = [
-            FFPROBE, '-v', 'quiet', '-print_format', 'json',
+            ffprobe, '-v', 'quiet', '-print_format', 'json',
             '-show_streams', video_path,
         ]
         result = subprocess.run(cmd, capture_output=True, check=True)
@@ -79,9 +81,14 @@ def probe_video_metadata(video_file_or_path):
         if rotate in (90, 270):
             width, height = height, width
 
+        video_logger.info(
+            'VIDEO_PROBE_EXTRACTED file=%s duration=%.2fs width=%d height=%d rotation=%d',
+            getattr(video_file_or_path, 'name', video_file_or_path), duration, width, height, rotate,
+        )
+
         return duration, width, height
     except Exception as exc:
-        logger.warning('[VideoProbe] Probe failed for %s: %s', video_file_or_path, exc)
+        video_logger.exception('VIDEO_PROBE_FAILED file=%s error=%s', getattr(video_file_or_path, 'name', video_file_or_path), exc)
         return None, None, None
     finally:
         if tmp_path and os.path.exists(tmp_path):

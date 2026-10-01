@@ -73,6 +73,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'pwaninet.middleware.performance_timing.PerformanceTimingMiddleware',
     'pwaninet.middleware.auth_logging_middleware.AuthLoggingMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
@@ -88,6 +89,10 @@ MIDDLEWARE = [
     'pwaninet.middleware.language_preference.LanguagePreferenceMiddleware',
     'pwaninet.middleware.cache_headers.CacheHeadersMiddleware',
 ]
+
+# Enable only during a controlled performance run. Adds Server-Timing headers
+# and one structured application/database timing log line per request.
+PERFORMANCE_TIMING_ENABLED = os.environ.get('PERFORMANCE_TIMING_ENABLED', '0').lower() in ('1', 'true', 'yes')
 
 ROOT_URLCONF = 'pwaninet.urls'
 
@@ -546,8 +551,18 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
+        'video_console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
     },
     'loggers': {
+        'performance': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         'users.auth': {
             'handlers': ['console'],
             'level': 'INFO',
@@ -563,6 +578,11 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
+        'posts.video_processing': {
+            'handlers': ['video_console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
 
@@ -572,6 +592,9 @@ LOGGING = {
 PWANIMATE_ENABLED = os.environ.get('PWANIMATE_ENABLED', 'True').lower() in ('true', '1', 'yes')
 PWANIMATE_GEMINI_API_KEY = os.environ.get('PWANIMATE_GEMINI_API_KEY', '')
 PWANIMATE_GROQ_API_KEY = os.environ.get('PWANIMATE_GROQ_API_KEY', '')
+PWANIMATE_SPEECH_TO_TEXT_MODEL = os.environ.get('PWANIMATE_SPEECH_TO_TEXT_MODEL', 'whisper-large-v3-turbo')
+PWANIMATE_SPEECH_TO_TEXT_TIMEOUT = int(os.environ.get('PWANIMATE_SPEECH_TO_TEXT_TIMEOUT', '60'))
+PWANIMATE_VOICE_MAX_BYTES = int(os.environ.get('PWANIMATE_VOICE_MAX_BYTES', str(25 * 1024 * 1024)))
 PWANIMATE_OPENROUTER_API_KEY = os.environ.get('PWANIMATE_OPENROUTER_API_KEY', '')
 
 # Embedding Subsystem

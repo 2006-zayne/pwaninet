@@ -104,7 +104,21 @@ def create_post_with_media(self, user_id, content, unit_id=None, group_id=None,
             self.update_state(state='PROGRESS', meta={'current': current_step, 'total': total_steps, 'status': 'Processing video...'})
             # Process video file - adapt based on your data format
             post.video = video_data
+            post.video_width = None
+            post.video_height = None
+            post.video_duration = None
             post.save()
+            logging.getLogger('posts.video_processing').info(
+                'VIDEO_UPLOAD_STORED post_id=%s dimensions_reset=true source=create_post_with_media',
+                post.id,
+            )
+            from posts.services.feed_service import invalidate_reels_carousel_cache
+            invalidate_reels_carousel_cache()
+            task = process_large_video.delay(post.id)
+            logging.getLogger('posts.video_processing').info(
+                'VIDEO_TASK_ENQUEUED post_id=%s task_id=%s source=create_post_with_media',
+                post.id, task.id,
+            )
         
         # Step 5: Process docs/audio
         if docs_data:
@@ -156,9 +170,11 @@ def process_large_video(self, post_id):
     from channels.layers import get_channel_layer
     from asgiref.sync import async_to_sync
     from posts.models import Post
+    video_logger = logging.getLogger('posts.video_processing')
 
     FFMPEG  = '/usr/bin/ffmpeg'
-    FFPROBE = '/usr/bin/ffprobe'
+    from posts.utils.media_tools import resolve_ffprobe
+    FFPROBE = resolve_ffprobe()
 
     # ------------------------------------------------------------------
     # Helpers
@@ -233,6 +249,11 @@ def process_large_video(self, post_id):
         post = Post.objects.get(id=post_id)
         user_id = post.author_id
 
+        video_logger.info(
+            'VIDEO_TASK_STARTED post_id=%s task_id=%s has_video=%s',
+            post_id, self.request.id, bool(post.video),
+        )
+
         if not post.video:
             logger.info('[HLS] Post %s has no video, skipping', post_id)
             return
@@ -265,7 +286,11 @@ def process_large_video(self, post_id):
 
         # Probe source
         duration, src_width, src_height = _probe(source_path)
-        logger.info('[HLS] Post %s: duration=%.1fs  %dx%d', post_id, duration, src_width, src_height)
+        video_logger.info(
+            'VIDEO_WORKER_PROBE_EXTRACTED post_id=%s task_id=%s duration=%.1fs width=%d height=%d is_reel=%s',
+            post_id, self.request.id, duration, src_width, src_height,
+            bool(src_width and src_height and src_height > src_width),
+        )
 
         # Update duration and dimensions on post
         update_fields = {}
@@ -276,6 +301,17 @@ def process_large_video(self, post_id):
             update_fields['video_height'] = src_height
         if update_fields:
             Post.objects.filter(id=post_id).update(**update_fields)
+            if 'video_width' in update_fields and 'video_height' in update_fields:
+                from posts.services.feed_service import invalidate_reels_carousel_cache
+                invalidate_reels_carousel_cache()
+            video_logger.info(
+                'VIDEO_WORKER_METADATA_SAVED post_id=%s task_id=%s fields=%s is_reel=%s',
+                post_id, self.request.id, update_fields,
+                bool(update_fields.get('video_height', 0) > update_fields.get('video_width', 0))
+                if update_fields.get('video_width') and update_fields.get('video_height') else 'unchanged',
+            )
+        else:
+            video_logger.warning('VIDEO_WORKER_METADATA_MISSING post_id=%s task_id=%s ffprobe returned no dimensions or duration', post_id, self.request.id)
 
         # ------------------------------------------------------------------
         # Prepare output directory
@@ -487,9 +523,11 @@ def process_large_video(self, post_id):
 
     except Post.DoesNotExist:
         logger.error('[HLS] Post %s not found', post_id)
+        video_logger.error('VIDEO_TASK_POST_NOT_FOUND post_id=%s task_id=%s', post_id, self.request.id)
 
     except Exception as exc:
         logger.error('[HLS] Transcoding failed for post %s: %s', post_id, exc, exc_info=True)
+        video_logger.exception('VIDEO_TASK_FAILED post_id=%s task_id=%s', post_id, self.request.id)
         if post:
             Post.objects.filter(id=post_id).update(video_status=Post.VIDEO_STATUS_FAILED)
             try:
@@ -952,4 +990,3 @@ def generate_post_link_preview_task(post_id):
     except Exception as e:
         logger.error(f"Error in generate_post_link_preview_task for post {post_id}: {e}")
         return False
-

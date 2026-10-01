@@ -39,18 +39,6 @@
                 document.documentElement.classList.add('pwanimate-left-collapsed');
                 document.body.classList.add('pwanimate-left-collapsed');
             }
-            if (localStorage.getItem('pwanimateContextRailOpen') === 'true' && window.innerWidth >= 1200) {
-                document.documentElement.classList.add('pwanimate-context-rail-open');
-                document.body.classList.add('pwanimate-context-rail-open');
-                var savedContextW = parseInt(localStorage.getItem('pwanimate_context_rail_width'), 10);
-                if (!isNaN(savedContextW) && savedContextW >= 280 && savedContextW <= 650) {
-                    document.documentElement.style.setProperty('--pwanimate-context-rail-width', savedContextW + 'px');
-                    document.body.style.setProperty('--pwanimate-context-rail-width', savedContextW + 'px');
-                } else {
-                    document.documentElement.style.setProperty('--pwanimate-context-rail-width', '360px');
-                    document.body.style.setProperty('--pwanimate-context-rail-width', '360px');
-                }
-            }
         } catch(e) {}
     </script>
     {% include 'pwanimate/partials/chat_content.html' %}
@@ -70,5 +58,5 @@
     <script src="{% static 'vendor/prism/prism-bash.min.js' %}"></script>
     <script src="{% static 'vendor/prism/prism-json.min.js' %}"></script>
     <script src="{% static 'documents/js/document-viewer.js' %}"></script>
-    <script src="{% static 'js/pwanimate/pwanimate-chat.js' %}?v={{ pwanimate_version|default:'2.0.0' }}-20260929-5"></script>
+    <script src="{% static 'js/pwanimate/pwanimate-chat.js' %}?v={{ pwanimate_version|default:'2.0.0' }}-20261001-2"></script>
 {% endblock %}

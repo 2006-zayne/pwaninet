@@ -253,13 +253,9 @@
         // Show update notification
         if (data.mandatory_update) {
           alert(`MANDATORY UPDATE: Version ${targetVer} is available. You must update to continue using the app.`);
-          window.location.href = data.apk_url || '/download/app/latest/';
+          window.location.href = '/downloads/?native_update=1#downloads-actions';
         } else if (confirm(`New native version ${targetVer} is available. Would you like to download the update?`)) {
-          if (typeof window.triggerNativeApkDownload === 'function') {
-            window.triggerNativeApkDownload(data.apk_url || '/download/app/latest/');
-          } else {
-            window.location.href = data.apk_url || '/download/app/latest/';
-          }
+          window.location.href = '/downloads/?native_update=1#downloads-actions';
         }
       } else {
         statusDot.style.background = '#22c55e';

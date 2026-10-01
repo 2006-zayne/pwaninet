@@ -24,7 +24,19 @@ def get_prioritized_feed_queryset(user, following_ids, user_group_ids):
 
     # Build query - always include posts from followed users OR reposted by followed users
     # BUT filter out group posts from groups the user is not a member of
-    filters = (Q(author_id__in=following_ids) | Q(reposts__reposter_id__in=following_ids)) & (Q(group__isnull=True) | Q(group_id__in=user_group_ids))
+    filters = (
+        (Q(author_id__in=following_ids) | Q(reposts__reposter_id__in=following_ids))
+        & (Q(group__isnull=True) | Q(group_id__in=user_group_ids))
+    )
+
+    # Seed an unconnected student's feed with posts shared to PwaniNet.
+    # Group posts enter independently only when the group allows everyone
+    # on PwaniNet to see them; visible_posts_for applies the final privacy check.
+    filters |= (
+        Q(author_id=user.id)
+        | Q(group__isnull=True, visibility__in=['PUBLIC', 'AUTHENTICATED'])
+        | Q(group__post_visibility='everyone')
+    )
 
     # Add optional filters (only if they exist)
     if user_group_ids:

@@ -113,9 +113,10 @@ class PostCreateSerializer(serializers.ModelSerializer):
     custom_gradient_text = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=100)
     custom_gradient_color1 = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=7)
     custom_gradient_color2 = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=7)
-    video_width = serializers.IntegerField(required=False, allow_null=True)
-    video_height = serializers.IntegerField(required=False, allow_null=True)
-    video_duration = serializers.IntegerField(required=False, allow_null=True)
+    # Video metadata is server-derived; browser/container metadata is advisory only.
+    video_width = serializers.IntegerField(read_only=True)
+    video_height = serializers.IntegerField(read_only=True)
+    video_duration = serializers.IntegerField(read_only=True)
     video_poster = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
@@ -186,6 +187,16 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
         images_data = validated_data.pop('images', [])
 
+        # Every upload starts unclassified. Only ffprobe against the stored
+        # upload can populate these values and determine whether it is a reel.
+        has_video_upload = bool(validated_data.get('video'))
+        validated_data.pop('video_width', None)
+        validated_data.pop('video_height', None)
+        validated_data.pop('video_duration', None)
+        validated_data['video_width'] = None
+        validated_data['video_height'] = None
+        validated_data['video_duration'] = None
+
         has_media = bool(images_data or validated_data.get('video') or validated_data.get('docs') or validated_data.get('audio'))
         if has_media:
             validated_data['gradient_class'] = 'none'
@@ -229,6 +240,10 @@ class PostCreateSerializer(serializers.ModelSerializer):
         logger.info('[PostCreateSerializer] Creating post with final validated_data')
         post = Post.objects.create(**validated_data)
         logger.info('[PostCreateSerializer] Post created successfully with ID: %s', post.id)
+        if has_video_upload:
+            logging.getLogger('posts.video_processing').info(
+                'VIDEO_UPLOAD_STORED post_id=%s dimensions_reset=true', post.id,
+            )
 
         if post.unit:
             post.course = post.unit.course
@@ -414,6 +429,9 @@ class PostCreateSerializer(serializers.ModelSerializer):
                 invalidate_home_feed_context(author.id)
             except Exception:
                 pass
+        if has_video_upload:
+            from posts.services.feed_service import invalidate_reels_carousel_cache
+            invalidate_reels_carousel_cache()
                 
 
         # Trigger thumbnail generation for gradient/text posts
@@ -428,24 +446,37 @@ class PostCreateSerializer(serializers.ModelSerializer):
         if post.video:
             # Synchronously ensure video_width and video_height are populated before responding
             # so the initial feed load immediately resolves post.is_reel correctly.
-            if not post.video_width or not post.video_height:
-                try:
-                    from posts.utils.video_probe import probe_video_metadata
-                    duration, src_width, src_height = probe_video_metadata(post.video)
-                    update_dims = {}
-                    if src_width and src_height:
-                        post.video_width = src_width
-                        post.video_height = src_height
-                        update_dims['video_width'] = src_width
-                        update_dims['video_height'] = src_height
-                    if duration and not post.video_duration:
-                        post.video_duration = int(duration)
-                        update_dims['video_duration'] = int(duration)
-                    if update_dims:
-                        post.save(update_fields=list(update_dims.keys()))
-                        logger.info('[PostCreateSerializer] Synchronously probed video for post %s: %dx%d', post.id, src_width, src_height)
-                except Exception as probe_err:
-                    logger.warning('[PostCreateSerializer] Synchronous video probe failed: %s', probe_err)
+            try:
+                from posts.utils.video_probe import probe_video_metadata
+                from posts.services.feed_service import invalidate_reels_carousel_cache
+                video_logger = logging.getLogger('posts.video_processing')
+                duration, src_width, src_height = probe_video_metadata(post.video)
+                update_dims = {}
+                if src_width and src_height:
+                    post.video_width = src_width
+                    post.video_height = src_height
+                    update_dims['video_width'] = src_width
+                    update_dims['video_height'] = src_height
+                if duration:
+                    post.video_duration = int(duration)
+                    update_dims['video_duration'] = int(duration)
+                if update_dims:
+                    post.save(update_fields=list(update_dims.keys()))
+                    invalidate_reels_carousel_cache()
+                    video_logger.info(
+                        'VIDEO_DIMENSIONS_SAVED post_id=%s width=%s height=%s duration=%s is_reel=%s source=upload_probe',
+                        post.id, post.video_width, post.video_height,
+                        post.video_duration, post.is_reel,
+                    )
+                else:
+                    video_logger.warning(
+                        'VIDEO_DIMENSIONS_MISSING post_id=%s probe returned no usable dimensions; worker will retry',
+                        post.id,
+                    )
+            except Exception:
+                logging.getLogger('posts.video_processing').exception(
+                    'VIDEO_PROBE_FAILED post_id=%s source=upload_probe', post.id,
+                )
 
             # Synchronously generate poster if missing so ambient blur in reelcard renders immediately
             if not post.video_poster:
@@ -458,8 +489,14 @@ class PostCreateSerializer(serializers.ModelSerializer):
                 except Exception as poster_err:
                     logger.warning('[PostCreateSerializer] Synchronous poster generation failed: %s', poster_err)
 
-            logger.info('[PostCreateSerializer] Triggering HLS transcoding for post %s', post.id)
-            process_large_video.delay(post.id)
+            video_logger = logging.getLogger('posts.video_processing')
+            video_logger.info('VIDEO_TASK_ENQUEUE_ATTEMPT post_id=%s task=process_large_video', post.id)
+            try:
+                task = process_large_video.delay(post.id)
+                video_logger.info('VIDEO_TASK_ENQUEUED post_id=%s task_id=%s', post.id, task.id)
+            except Exception:
+                video_logger.exception('VIDEO_TASK_ENQUEUE_FAILED post_id=%s', post.id)
+                raise
             if not post.video_poster:
                 generate_video_poster.delay(post.id)
 

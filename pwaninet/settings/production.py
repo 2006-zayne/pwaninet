@@ -99,6 +99,12 @@ LOGGING = {
             'stream': sys.stdout,
             'formatter': 'verbose',
         },
+        'video_console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'stream': sys.stdout,
+            'formatter': 'verbose',
+        },
         'file': {
             'level': 'WARNING',
             'class': 'logging.FileHandler',
@@ -107,6 +113,11 @@ LOGGING = {
         },
     },
     'loggers': {
+        'performance': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         'django': {
             'handlers': ['console', 'file'],
             'level': 'INFO',
@@ -127,6 +138,10 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
+        'posts.video_processing': {
+            'handlers': ['video_console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
-
