@@ -15,7 +15,7 @@ The project is an independent personal project. It is not an official Pwani Univ
 3. Users can publish posts, images, comments, reactions, and reposts, with visibility and group-related features governed by the app.
 4. Users can find or share academic documents, browse academic classifications, request resources, bookmark and download available items, and report content.
 5. Notifications surface social, group, document, and service events. Browser or native push is available when configured and enabled by the user.
-6. Search and recommendation components help users find people and content. Pwanimate provides a separate assistant experience and can depend on external model providers when configured.
+6. Search and recommendation components help users find people and content. Pwanimate provides an assistant experience inside the same Django site. Its custom orchestration layer assembles student context, searches the document knowledge base, and can call site tools before requesting a response from a configured AI provider. Provider availability and data routing depend on environment settings.
 
 Direct messaging code and data models remain in the repository, but direct messaging is frozen for now. URL gates return frozen/disabled behavior in current flows. Do not describe it as a launch feature unless that gate has been deliberately changed and reviewed.
 
@@ -33,7 +33,7 @@ Direct messaging code and data models remain in the repository, but direct messa
 | Mobile wrapper | Capacitor Android project in `android/` |
 | WSGI option | Gunicorn is in Python dependencies; confirm deployment command before treating it as the production server |
 
-The project settings live in `pwaninet/settings/`. `pwaninet/asgi.py` routes HTTP requests to Django and WebSocket requests through Channels; the shared WebSocket consumers are in `realtime/`. `pwaninet/celery.py` configures task discovery. The root URL configuration mounts the installed apps and a few project-level endpoints.
+The project settings live in `pwaninet/settings/`. `pwaninet/asgi.py` routes HTTP requests to Django and WebSocket requests through Channels; the shared WebSocket consumers are in `realtime/`. `pwaninet/celery.py` configures task discovery. The root URL configuration mounts the installed apps and project-level endpoints. Much of the site navigation uses HTMX to fetch and swap page sections while Django templates remain the server-rendered source of content. Pwanimate uses a custom browser rendering layer for assistant responses.
 
 ## App map
 
@@ -49,8 +49,11 @@ The project settings live in `pwaninet/settings/`. `pwaninet/asgi.py` routes HTT
 - `releases`: release notes and version information.
 - `admin_dashboard`: internal dashboard and feedback handling.
 - `messaging`: frozen direct-messaging feature code; preserve it while the feature is disabled.
+- `core` and `realtime`: project-level views/utilities and shared ASGI/Channels support; these are not listed as separate installed app guides.
 
 See [the app guides](apps/README.md) for code locations and more detail.
+
+For a learner-friendly walkthrough of the site boundaries, important dependencies, and the Pwanimate request lifecycle, start with the [site owner guide](site-owner-guide.md).
 
 ## Data and files
 

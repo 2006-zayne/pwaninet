@@ -6,6 +6,7 @@ PwaniNet is a Django-based student community and learning-resource platform. It 
 
 - [Documentation index](docs/README.md)
 - [Site overview](docs/site-overview.md)
+- [Understand PwaniNet and Pwanimate](docs/site-owner-guide.md)
 - [New developer setup guide](docs/developer-guide.md)
 - [App-by-app guides](docs/apps/README.md)
 - [Pre-launch documentation drafts](docs/pre-launch/)
@@ -19,6 +20,8 @@ PwaniNet is a Django-based student community and learning-resource platform. It 
 - Celery for background work
 - Gunicorn is included as a WSGI server option; the repository Dockerfile currently starts Daphne
 - Django templates, JavaScript, CSS, HTMX, and Bootstrap for the web interface
+- Django REST Framework and drf-spectacular for JSON APIs and API documentation
+- Pwanimate's custom AI gateway, provider adapters, document ingestion, and pgvector retrieval
 - Capacitor and Android Gradle files for the Android wrapper
 - Cloudflare R2/CDN support for uploaded media when production storage settings enable it
 

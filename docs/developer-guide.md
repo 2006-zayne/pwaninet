@@ -12,6 +12,9 @@ This guide takes a new developer from a clean clone to a local development serve
 - **Django Channels + Daphne** provide the ASGI/WebSocket path. The Dockerfile starts Daphne.
 - **Gunicorn** is installed and can serve the WSGI entry point, but the repository does not currently use it in its Dockerfile. Confirm the live host's process command before describing it as the deployed server.
 - **Django templates, JavaScript, CSS, HTMX, and Bootstrap** make up the web UI.
+- **Django REST Framework and drf-spectacular** provide the JSON API layer and generated OpenAPI documentation.
+- **Pwanimate's AI and retrieval code** uses `requests` for provider APIs, `pgvector` with PostgreSQL for semantic retrieval, and PyMuPDF/python-docx/python-pptx for reading uploaded reference files. It has custom provider adapters rather than a runtime LangChain/OpenAI SDK dependency.
+- **Pwanimate's browser renderer** uses local Marked, DOMPurify, KaTeX, and Prism assets for Markdown, safe HTML, math, and code formatting.
 - **Capacitor and Android Gradle** provide the Android wrapper.
 - **Cloudflare R2/CDN** is an optional configured storage backend for uploads; actual production use depends on environment configuration.
 
