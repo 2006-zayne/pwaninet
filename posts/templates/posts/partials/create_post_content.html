@@ -934,6 +934,7 @@
         {% csrf_token %}
 
         {{ form.gradient_class }}
+        <input type="checkbox" name="allow_downloads" id="id_allow_downloads" value="on" {% if form.allow_downloads.value != False %}checked{% endif %} class="visually-hidden">
 
         <!-- Hidden file inputs (inside form for submission) -->
         <input type="file" name="images" id="{{ form.images.id_for_label }}" class="form-control-file" multiple accept="image/*" style="display: none;">
@@ -957,6 +958,11 @@
             </div>
           </div>
           <div class="compose-right">
+
+            <label class="form-check d-flex align-items-center gap-2 small text-muted mb-2">
+              <input type="checkbox" class="form-check-input" data-download-permission-toggle {% if form.allow_downloads.value != False %}checked{% endif %}>
+              <span>Allow people to download this post’s media</span>
+            </label>
 
             <textarea
               name="content"
@@ -1164,6 +1170,11 @@ function initCreatePostComposer() {
         return;
     }
     postForm.dataset.composerInitialized = 'true';
+    const downloadToggle = postForm.querySelector('[data-download-permission-toggle]');
+    const downloadField = postForm.querySelector('#id_allow_downloads');
+    if (downloadToggle && downloadField) {
+      downloadToggle.addEventListener('change', () => { downloadField.checked = downloadToggle.checked; });
+    }
     const textarea    = document.getElementById('id_content');
     const gradInput   = document.getElementById('id_gradient_class');
     const previewArea = document.getElementById('previewArea');
@@ -1894,6 +1905,7 @@ function initCreatePostComposer() {
             custom_gradient_color1: document.getElementById('customGradientColor1')?.value || null,
             custom_gradient_color2: document.getElementById('customGradientColor2')?.value || null,
             custom_gradient_text_color: document.getElementById('customGradientTextColor')?.value || null,
+            allow_downloads: document.querySelector('[data-download-permission-toggle]')?.checked !== false,
             video_width: videoWidth,
             video_height: videoHeight,
             video_duration: videoDuration,
@@ -1907,6 +1919,7 @@ function initCreatePostComposer() {
             custom_gradient_color1: document.getElementById('customGradientColor1')?.value || null,
             custom_gradient_color2: document.getElementById('customGradientColor2')?.value || null,
             custom_gradient_text_color: document.getElementById('customGradientTextColor')?.value || null,
+            allow_downloads: document.querySelector('[data-download-permission-toggle]')?.checked !== false,
           };
         console.log('[createPost] Metadata being sent:', metadataLog);
         console.log('[createPost] Upload manager createUpload called with:', {

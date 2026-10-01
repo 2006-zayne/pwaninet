@@ -5,6 +5,7 @@ import android.app.NotificationManager;
 import android.app.DownloadManager;
 import android.Manifest;
 import android.content.Context;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageInfo;
@@ -56,6 +57,7 @@ import android.view.HapticFeedbackConstants;
 import android.widget.Toast;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Locale;
 import java.util.ArrayList;
 import org.json.JSONObject;
@@ -104,6 +106,40 @@ public class MainActivity extends BridgeActivity {
             MainActivity activity = activityRef.get();
             if (activity != null) {
                 activity.openExternalUrl(url);
+            }
+        }
+
+        @JavascriptInterface
+        public boolean saveMediaToGallery(String sourceUri, String filename, String mimeType, String category) {
+            MainActivity activity = activityRef.get();
+            if (activity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false;
+            Uri collection = "video".equalsIgnoreCase(category)
+                ? android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                : android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+            ContentValues values = new ContentValues();
+            values.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename);
+            values.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mimeType);
+            values.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,
+                "video".equalsIgnoreCase(category) ? "Movies/PwaniNet" : "Pictures/PwaniNet");
+            values.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1);
+            Uri target = null;
+            try {
+                target = activity.getContentResolver().insert(collection, values);
+                if (target == null) return false;
+                try (InputStream input = activity.getContentResolver().openInputStream(Uri.parse(sourceUri));
+                     OutputStream output = activity.getContentResolver().openOutputStream(target)) {
+                    if (input == null || output == null) throw new IOException("Unable to open media stream");
+                    byte[] buffer = new byte[8192];
+                    int count;
+                    while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                }
+                ContentValues ready = new ContentValues();
+                ready.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0);
+                activity.getContentResolver().update(target, ready, null, null);
+                return true;
+            } catch (Exception error) {
+                if (target != null) activity.getContentResolver().delete(target, null, null);
+                return false;
             }
         }
 

@@ -2730,7 +2730,7 @@
 
 
     {% block mobile_bottom_nav %}
-        {% if request.user.is_authenticated and request.resolver_match.url_name != 'post_details' %}
+        {% if request.user.is_authenticated %}
         <div class="mobile-bottom-nav d-md-none" role="navigation" aria-label="Mobile navigation">
             <a href="{% url 'posts:home' %}"
                class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
@@ -2893,6 +2893,8 @@
 
             e.preventDefault();
             e.stopPropagation();
+
+            if (btn.dataset.downloadAllowed === 'false' || btn.disabled || btn.getAttribute('aria-disabled') === 'true') return;
 
             const url = btn.dataset.url || btn.getAttribute('data-url') || btn.getAttribute('href');
             if (!url) return;
@@ -5065,13 +5067,27 @@ window.addEventListener('beforeinstallprompt', (e) => {
             if (titleEl) titleEl.textContent = '{% trans "Share to" %}';
             if (repostBtn) repostBtn.classList.remove('d-none');
             if (bookmarkBtn) bookmarkBtn.classList.remove('d-none');
-            if (downloadBtn) downloadBtn.classList.remove('d-none');
+            if (downloadBtn) {
+                downloadBtn.classList.remove('d-none', 'opacity-50');
+                downloadBtn.disabled = false;
+                downloadBtn.setAttribute('aria-disabled', 'false');
+                downloadBtn.title = '';
+            }
 
             activePostId = postId ||
                            (button && (button.getAttribute('data-post-id') || button.getAttribute('data-share-id'))) ||
                            (modal.getAttribute('data-post-id')) ||
                            (document.getElementById('globalSharePostId') && document.getElementById('globalSharePostId').value);
             if (!activePostId) return;
+
+            var activePostCard = document.querySelector('[data-post-id="' + activePostId + '"][data-download-allowed]');
+            if (downloadBtn && activePostCard) {
+                var downloadsAllowed = activePostCard.dataset.downloadAllowed !== 'false';
+                downloadBtn.disabled = !downloadsAllowed;
+                downloadBtn.classList.toggle('opacity-50', !downloadsAllowed);
+                downloadBtn.setAttribute('aria-disabled', downloadsAllowed ? 'false' : 'true');
+                downloadBtn.title = downloadsAllowed ? '' : 'The author has disabled downloads for this post.';
+            }
 
             var hiddenInput = document.getElementById('globalSharePostId');
             if (hiddenInput) hiddenInput.value = activePostId;
@@ -5254,6 +5270,11 @@ window.addEventListener('beforeinstallprompt', (e) => {
             var downloadBtn = document.getElementById('globalShareDownloadBtn');
             if (downloadBtn) {
                 downloadBtn.onclick = function () {
+                    var sourceCard = document.querySelector('[data-post-id="' + activePostId + '"][data-download-allowed]');
+                    if (sourceCard && sourceCard.dataset.downloadAllowed === 'false') {
+                        showFeedback('The author has disabled downloads for this post.', 'info');
+                        return;
+                    }
                     if (!window.isAuthenticated) {
                         if (window.bootstrap && window.bootstrap.Modal) {
                             var inst = bootstrap.Modal.getInstance(modal);

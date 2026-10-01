@@ -948,6 +948,50 @@
   pointer-events: none;
 }
 
+/* Multi-image post detail is presented as a full-width feed of image cards. */
+.post-detail-media-feed {
+  width: 100%;
+  max-width: none;
+}
+
+.post-detail-image-card {
+  width: 100%;
+  max-width: none;
+  border-radius: var(--postcard-radius, 8px);
+}
+
+.post-detail-image-link {
+  display: flex;
+  width: 100%;
+  height: min(64vh, 560px);
+  min-height: 260px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #000;
+}
+
+.post-detail-image-link img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 767.98px) {
+  .post-detail-image-link {
+    height: min(58vh, 520px);
+    min-height: 220px;
+  }
+
+  .post-detail-image-card {
+    border-radius: 0;
+    border-left: 0 !important;
+    border-right: 0 !important;
+    margin-bottom: 0.5rem !important;
+  }
+}
+
 /* ==========================================================================
    9. REEL POSTCARD (FEED CARD GEOMETRY & FULLSCREEN CONNECTION)
    ========================================================================== */

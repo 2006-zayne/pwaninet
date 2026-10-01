@@ -1,6 +1,7 @@
 {% load i18n %}
 {% load static %}
 {% load post_filters %}
+{% load download_tags %}
 {% if post.is_reel %}
     {% include "posts/partials/reel_card.html" with post=post %}
 {% else %}
@@ -10,6 +11,7 @@
 <div id="post-card-{{ post.share_id }}"
      class="post-card fb-post-card mb-3 bg-white rounded-3 overflow-hidden border"
      data-post-id="{{ post.share_id }}"
+     data-download-allowed="{{ post.allow_downloads|yesno:'true,false' }}"
      data-author="{{ header_author.get_full_name|default:header_author.username }}"
      data-author-username="{{ header_author.username }}"
      data-author-avatar="{{ header_author.profile_pic.url|default:'/static/images/default-avatar.png' }}"
@@ -178,11 +180,12 @@
                     {% if post_obj.images.exists or post_obj.video or post_obj.docs or post_obj.audio or post_obj.get_intel_file or post_obj.shared_document %}
                 <li><hr class="dropdown-divider"></li>
                 <li>
-                    <button class="dropdown-item d-flex align-items-center gap-2"
+                    <button class="dropdown-item d-flex align-items-center gap-2{% if not post_obj.allow_downloads %} disabled opacity-50{% endif %}" {% if not post_obj.allow_downloads %}disabled aria-disabled="true"{% endif %}
                             data-action="download-media"
                             data-post-id="{{ post_obj.share_id }}"
                             data-media-type="{% if post_obj.video %}video{% elif post_obj.images.exists %}image{% elif post_obj.audio %}audio{% elif post_obj.docs or post_obj.shared_document %}document{% elif post_obj.get_intel_file %}{% with f_url=post_obj.get_intel_file.url|lower %}{% if '.mp4' in f_url or '.mov' in f_url or '.webm' in f_url %}video{% elif '.mp3' in f_url or '.wav' in f_url or '.ogg' in f_url or '.m4a' in f_url %}audio{% elif '.pdf' in f_url or '.doc' in f_url or '.ppt' in f_url or '.xls' in f_url %}document{% else %}image{% endif %}{% endwith %}{% endif %}"
-                            data-url="{% if post_obj.video %}{{ post_obj.get_video_for_feed.url }}{% elif post_obj.images.exists %}{{ post_obj.images.first.image.url }}{% elif post_obj.audio %}{{ post_obj.audio.url }}{% elif post_obj.docs %}{{ post_obj.docs.url }}{% elif post_obj.shared_document %}{{ post_obj.shared_document.file.url }}{% elif post_obj.get_intel_file %}{{ post_obj.get_intel_file.url }}{% endif %}"
+                            data-download-allowed="{{ post_obj.allow_downloads|yesno:'true,false' }}"
+                            {% if post_obj.allow_downloads %}data-url="{% if post_obj.video %}{% protected_download_url post_obj 'video' %}{% elif post_obj.images.exists %}{% protected_download_url post_obj 'image' post_obj.images.first.id %}{% elif post_obj.audio %}{% protected_download_url post_obj 'audio' %}{% elif post_obj.docs or post_obj.shared_document %}{% protected_download_url post_obj 'document' %}{% endif %}"{% endif %}
                             data-filename="{% if post_obj.video %}video_{{ post_obj.share_id }}.mp4{% elif post_obj.images.exists %}image_{{ post_obj.share_id }}.jpg{% elif post_obj.audio %}audio_{{ post_obj.share_id }}.mp3{% elif post_obj.docs %}{{ post_obj.docs.name|default:'document' }}{% elif post_obj.shared_document %}{{ post_obj.shared_document.title|default:'document' }}{% elif post_obj.get_intel_file %}{{ post_obj.get_intel_file.name|default:'media_file' }}{% endif %}"
                             data-thumbnail="{% if post_obj.video %}{{ post_obj.get_video_poster|default:post_obj.thumbnail_url|default:'' }}{% elif post_obj.images.exists %}{% if post_obj.images.first.get_thumbnail_url %}{{ post_obj.images.first.get_thumbnail_url }}{% elif post_obj.images.first.image %}{{ post_obj.images.first.image.url }}{% endif %}{% elif post_obj.thumbnail_url %}{{ post_obj.thumbnail_url }}{% elif post_obj.shared_document %}{% with doc_file=post_obj.shared_document.latest_version.files.first %}{% if doc_file.preview_url %}{{ doc_file.preview_url }}{% elif doc_file.preview_path %}/media/{{ doc_file.preview_path }}{% elif doc_file.thumbnail_path %}/media/{{ doc_file.thumbnail_path }}{% endif %}{% endwith %}{% endif %}">
                         <i class="bi bi-download"></i> {% trans "Download Media" %}
@@ -264,7 +267,7 @@
     {% if post.images.exists %}
     <!-- Facebook Style Adaptive Image Collage -->
     <div class="post-media-wrapper post-media position-relative" data-post-id="{{ post.share_id }}" data-media-type="image">
-        <button class="media-download-btn" data-post-id="{{ post.share_id }}" data-media-type="image" data-url="{{ post.images.first.image.url }}" data-thumbnail="{% if post.images.first.get_thumbnail_url %}{{ post.images.first.get_thumbnail_url }}{% elif post.images.first.image %}{{ post.images.first.image.url }}{% endif %}" title="Download">
+        <button class="media-download-btn{% if not post.allow_downloads %} disabled opacity-50{% endif %}" {% if not post.allow_downloads %}disabled aria-disabled="true"{% endif %} data-download-allowed="{{ post.allow_downloads|yesno:'true,false' }}" data-post-id="{{ post.share_id }}" data-media-type="image" {% if post.allow_downloads %}data-url="{% protected_download_url post 'image' post.images.first.id %}"{% endif %} data-thumbnail="{% if post.images.first.get_thumbnail_url %}{{ post.images.first.get_thumbnail_url }}{% elif post.images.first.image %}{{ post.images.first.image.url }}{% endif %}" title="Download">
             <i class="bi bi-download"></i>
         </button>
         {% with img_count=post.images.count %}
@@ -284,8 +287,8 @@
             <div class="fb-image-collage fb-collage-2">
                 {% for post_image in post.images.all %}
                 <div class="fb-collage-item">
-                    <a href="{% url 'posts:post_details' post.share_id %}"
-                       hx-get="{% url 'posts:post_details' post.share_id %}"
+                    <a href="{% url 'posts:post_details' post.share_id %}?image={{ forloop.counter0 }}"
+                       hx-get="{% url 'posts:post_details' post.share_id %}?image={{ forloop.counter0 }}"
                        hx-target="#page-content-target"
                        hx-swap="innerHTML"
                        hx-push-url="true"
@@ -300,8 +303,8 @@
             <div class="fb-image-collage fb-collage-3">
                 {% for post_image in post.images.all %}
                 <div class="fb-collage-item collage-item-{{ forloop.counter }}">
-                    <a href="{% url 'posts:post_details' post.share_id %}"
-                       hx-get="{% url 'posts:post_details' post.share_id %}"
+                    <a href="{% url 'posts:post_details' post.share_id %}?image={{ forloop.counter0 }}"
+                       hx-get="{% url 'posts:post_details' post.share_id %}?image={{ forloop.counter0 }}"
                        hx-target="#page-content-target"
                        hx-swap="innerHTML"
                        hx-push-url="true"
@@ -316,8 +319,8 @@
             <div class="fb-image-collage fb-collage-4">
                 {% for post_image in post.images.all %}
                 <div class="fb-collage-item collage-item-{{ forloop.counter }}">
-                    <a href="{% url 'posts:post_details' post.share_id %}"
-                       hx-get="{% url 'posts:post_details' post.share_id %}"
+                    <a href="{% url 'posts:post_details' post.share_id %}?image={{ forloop.counter0 }}"
+                       hx-get="{% url 'posts:post_details' post.share_id %}?image={{ forloop.counter0 }}"
                        hx-target="#page-content-target"
                        hx-swap="innerHTML"
                        hx-push-url="true"
@@ -333,8 +336,8 @@
             <div class="fb-image-collage fb-collage-5">
                 {% for post_image in post.images.all|slice:":5" %}
                 <div class="fb-collage-item collage-item-{{ forloop.counter }}">
-                    <a href="{% url 'posts:post_details' post.share_id %}"
-                       hx-get="{% url 'posts:post_details' post.share_id %}"
+                    <a href="{% url 'posts:post_details' post.share_id %}?image={{ forloop.counter0 }}"
+                       hx-get="{% url 'posts:post_details' post.share_id %}?image={{ forloop.counter0 }}"
                        hx-target="#page-content-target"
                        hx-swap="innerHTML"
                        hx-push-url="true"

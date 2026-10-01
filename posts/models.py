@@ -69,6 +69,7 @@ class Post(models.Model):
     group = models.ForeignKey('groups.Group', on_delete=models.CASCADE, null=True, blank=True, related_name='posts')
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='posts')
     visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='AUTHENTICATED', db_index=True)
+    allow_downloads = models.BooleanField(default=True, help_text='Allow viewers to download this post’s media')
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE, null=True, blank=True)
     unit = models.ForeignKey('courses.Unit', on_delete=models.SET_NULL, null=True, blank=True)
     content = models.TextField(blank=True, null=True)

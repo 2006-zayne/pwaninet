@@ -82,6 +82,7 @@ class UploadAPI {
             formData.append('visibility', data.visibility);
             console.log('[UploadAPI] Adding visibility:', data.visibility);
         }
+        formData.append('allow_downloads', data.allow_downloads === false ? 'false' : 'true');
         if (data.gradient_class) {
             formData.append('gradient_class', data.gradient_class);
             console.log('[UploadAPI] Adding gradient_class:', data.gradient_class);
@@ -155,6 +156,7 @@ class UploadAPI {
             unit: session.metadata?.unit || null,
             group: session.metadata?.group || null,
             visibility: session.visibility || null,
+            allow_downloads: session.metadata?.allow_downloads !== false,
             gradient_class: session.metadata?.gradient_class || 'none',
             custom_gradient_text: session.metadata?.custom_gradient_text || null,
             custom_gradient_color1: session.metadata?.custom_gradient_color1 || null,

@@ -1,9 +1,11 @@
 {% load i18n %}
+{% load download_tags %}
 <div class="landscape-video-wrapper position-relative">
-    <button class="media-download-btn position-absolute top-0 start-0 m-2"
+    <button class="media-download-btn position-absolute top-0 start-0 m-2{% if not post.allow_downloads %} disabled opacity-50{% endif %}" {% if not post.allow_downloads %}disabled aria-disabled="true"{% endif %}
             data-post-id="{{ post.share_id }}"
             data-media-type="video"
-            data-url="{{ post.get_video_for_feed.url }}"
+            data-download-allowed="{{ post.allow_downloads|yesno:'true,false' }}"
+            {% if post.allow_downloads %}data-url="{% protected_download_url post 'video' %}"{% endif %}
             data-thumbnail="{{ post.get_video_poster|default:post.thumbnail_url|default:'' }}"
             title="{% trans 'Download' %}"
             aria-label="{% trans 'Download' %}"

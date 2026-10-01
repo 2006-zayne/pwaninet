@@ -1,4 +1,5 @@
 {% csrf_token %}
+{% load download_tags %}
 <script>
   var currentUserProfilePic = "{{ current_user_profile_pic|default:'' }}";
 </script>
@@ -14,25 +15,35 @@
     top: 0;
     left: 0;
     width: 100%;
-    height: 100%;
+    height: 100vh;
+    height: 100dvh;
     background: #000;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 9999;
     overflow: hidden;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+
+  @media (min-width: 768px) {
+    body:has(#fullscreenContainer) { padding-top: 0 !important; }
+    body:has(#fullscreenContainer) #navbar-top { display: none !important; }
+  }
+  body:has(#fullscreenContainer) #navigation-progress { display: none !important; }
 
   .fullscreen-image {
     max-width: 100%;
-    max-height: 100%;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
     object-fit: contain;
     touch-action: pan-y;
   }
 
   .close-btn {
     position: fixed;
-    top: 20px;
+    top: calc(16px + env(safe-area-inset-top, 0px));
     right: 20px;
     width: 50px;
     height: 50px;
@@ -90,7 +101,7 @@
 
   .download-btn {
     position: fixed;
-    top: 20px;
+    top: calc(16px + env(safe-area-inset-top, 0px));
     left: 20px;
     width: 50px;
     height: 50px;
@@ -114,7 +125,7 @@
 
   .image-counter {
     position: fixed;
-    bottom: 80px;
+    top: calc(16px + env(safe-area-inset-top, 0px));
     left: 50%;
     transform: translateX(-50%);
     background: rgba(0, 0, 0, 0.6);
@@ -127,7 +138,7 @@
 
   .likes-display {
     position: fixed;
-    bottom: 20px;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%);
     background: rgba(0, 0, 0, 0.6);
@@ -159,7 +170,7 @@
     background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    padding: 12px 20px;
+    padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -224,7 +235,7 @@
     backdrop-filter: blur(10px);
     border-radius: 12px;
     padding: 8px 0;
-    min-width: 180px;
+    width: 210px;
     display: none;
     z-index: 100000;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
@@ -261,6 +272,7 @@
     background: none;
     width: 100%;
     text-align: left;
+    box-sizing: border-box;
   }
 
   .menu-item:hover {
@@ -279,7 +291,7 @@
 
   @media (max-width: 768px) {
     .close-btn {
-      top: 15px;
+      top: calc(12px + env(safe-area-inset-top, 0px));
       right: 15px;
       width: 45px;
       height: 45px;
@@ -301,22 +313,22 @@
     }
 
     .image-counter {
-      bottom: 70px;
+      top: calc(18px + env(safe-area-inset-top, 0px));
       font-size: 12px;
       padding: 8px 16px;
     }
 
     .likes-display {
-      bottom: 15px;
+      bottom: calc(78px + env(safe-area-inset-bottom, 0px));
       font-size: 12px;
       padding: 10px 16px;
     }
   }
 </style>
 
-<div class="fullscreen-container" id="fullscreenContainer">
-  <a href="{% url 'posts:post_details' post.share_id %}" class="close-btn"
-     hx-get="{% url 'posts:post_details' post.share_id %}"
+<div class="fullscreen-container" id="fullscreenContainer" data-feed-url="{% url 'posts:home' %}">
+  <a href="{% url 'posts:post_details' post.share_id %}?image={{ current_index }}" class="close-btn"
+     hx-get="{% url 'posts:post_details' post.share_id %}?image={{ current_index }}"
      hx-target="#page-content-target"
      hx-swap="innerHTML"
      hx-push-url="true"
@@ -325,7 +337,7 @@
     <i class="bi bi-x-lg"></i>
   </a>
 
-  <button class="download-btn" data-image-url="{{ post_image.image.url }}" data-filename="{{ post_image.image.name|default:'image.jpg' }}" data-post.share_id="{{ post.share_id }}" aria-label="Download image">
+  <button class="download-btn{% if not post.allow_downloads %} disabled opacity-50{% endif %}" {% if not post.allow_downloads %}disabled aria-disabled="true"{% endif %} data-download-allowed="{{ post.allow_downloads|yesno:'true,false' }}" data-image-url="{% if post.allow_downloads %}{% protected_download_url post 'image' post_image.id %}{% endif %}" data-filename="{{ post_image.image.name|default:'image.jpg' }}" data-post.share_id="{{ post.share_id }}" data-media-id="{{ post_image.id }}" aria-label="Download image">
     <i class="bi bi-download"></i>
   </button>
 
@@ -396,11 +408,11 @@
         <i class="bi bi-three-dots"></i>
       </button>
       <div class="menu-dropdown">
-        <a href="#" class="menu-item download-btn" data-image-url="{{ post_image.image.url }}" data-filename="{{ post_image.image.name|default:'image.jpg' }}" data-post.share_id="{{ post.share_id }}">
-          <i class="bi bi-download"></i> Download
-        </a>
-        <a href="#" class="menu-item hide-btn" hx-post="/api/posts/{{ post.share_id }}/hide/" hx-target="#fullscreenContainer" hx-swap="outerHTML">
+        <a href="#" class="menu-item hide-btn" data-action="hide-post" data-post-id="{{ post.share_id }}">
           <i class="bi bi-eye-slash"></i> Hide
+        </a>
+        <a href="#" class="menu-item menu-download-trigger{% if not post.allow_downloads %} disabled opacity-50{% endif %}" {% if not post.allow_downloads %}aria-disabled="true" tabindex="-1"{% endif %} data-download-allowed="{{ post.allow_downloads|yesno:'true,false' }}" data-image-url="{% if post.allow_downloads %}{% protected_download_url post 'image' post_image.id %}{% endif %}" data-filename="{{ post_image.image.name|default:'image.jpg' }}" data-post.share_id="{{ post.share_id }}" data-media-id="{{ post_image.id }}">
+          <i class="bi bi-download"></i> Download
         </a>
         <a href="#" class="menu-item danger report-btn" data-bs-toggle="modal" data-bs-target="#globalReportModal" data-post-id="{{ post.share_id }}">
           <i class="bi bi-flag"></i> Report
@@ -463,10 +475,11 @@
     document.addEventListener('keydown', handleKeyDown);
 
     // Download button functionality
-    const downloadBtns = container.querySelectorAll('.download-btn');
+    const downloadBtns = container.querySelectorAll('.download-btn, .menu-download-trigger');
     downloadBtns.forEach(btn => {
       btn.addEventListener('click', async function(e) {
         e.preventDefault();
+        if (this.dataset.downloadAllowed === 'false' || this.disabled || this.getAttribute('aria-disabled') === 'true') return;
         const imageUrl = this.getAttribute('data-image-url');
         const filename = this.getAttribute('data-filename');
         const postId = this.getAttribute('data-post.share_id');
@@ -477,7 +490,7 @@
             url: imageUrl,
             filename: filename,
             postId: postId,
-            mediaId: postId,
+            mediaId: this.getAttribute('data-media-id'),
             mimeType: 'image/jpeg',
             category: 'image'
           });
@@ -502,6 +515,24 @@
         }
       });
     }
+
+    container.addEventListener('click', async function(e) {
+      const hideAction = e.target.closest('[data-action="hide-post"]');
+      if (!hideAction) return;
+      e.preventDefault();
+      try {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+        const response = await fetch(`/api/posts/${hideAction.dataset.postId}/hide/`, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrfToken, 'Accept': 'application/json' }
+        });
+        if (!response.ok) throw new Error('Could not hide this post.');
+        window.location.assign(container.dataset.feedUrl || '/');
+      } catch (error) {
+        console.error('Hide post failed:', error);
+        alert(error.message || 'Could not hide this post.');
+      }
+    });
 
     // Like button functionality
     const likeBtn = container.querySelector('.like-btn');

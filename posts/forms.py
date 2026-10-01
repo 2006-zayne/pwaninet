@@ -54,7 +54,8 @@ class PostForm(forms.ModelForm):
             'docs',
             'audio',
             'gradient_class',
-            'has_signature']
+            'has_signature',
+            'allow_downloads']
 
         widgets = {
             'content': forms.Textarea(attrs={

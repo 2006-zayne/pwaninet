@@ -149,6 +149,23 @@ class DownloadManager {
                 directory: Directory.Data
             });
 
+            // Capacitor keeps its offline copy privately; also publish media to
+            // Android's shared Photos/Gallery collection when the native bridge supports it.
+            let gallerySaved = false;
+            const mediaCategory = item.mediaType || item.category;
+            if (['image', 'video'].includes(mediaCategory) && window.AndroidBridge?.saveMediaToGallery) {
+                try {
+                    gallerySaved = window.AndroidBridge.saveMediaToGallery(
+                        uriResult.uri,
+                        item.filename,
+                        item.mimeType || (mediaCategory === 'video' ? 'video/mp4' : 'image/jpeg'),
+                        mediaCategory
+                    ) === true;
+                } catch (galleryError) {
+                    console.warn('[DownloadManager] Could not publish media to gallery:', galleryError);
+                }
+            }
+
             // Get file stat for true byte size
             let fileSize = item.totalBytes || 0;
             try {
@@ -184,7 +201,8 @@ class DownloadManager {
                 thumbnail: cachedNativeThumbnail,
                 isNative: true,
                 nativePath: relativePath,
-                nativeUri: uriResult.uri
+                nativeUri: uriResult.uri,
+                gallerySaved
             };
 
             await this.storage.saveMetadata(metadata);

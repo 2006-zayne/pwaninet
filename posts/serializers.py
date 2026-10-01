@@ -52,7 +52,7 @@ class PostSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'post_id', 'share_id', 'author', 'group', 'course', 'unit', 'content',
             'visibility',
-            'video', 'docs', 'audio', 'gradient_class', 'has_signature',
+            'video', 'docs', 'audio', 'gradient_class', 'has_signature', 'allow_downloads',
             'video_status', 'video_duration', 'video_width', 'video_height', 'is_reel', 'hls_playlist',
             'link_preview',
             'created_at', 'updated_at', 'like_count', 'is_liked',
@@ -124,7 +124,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'post_id', 'share_id', 'author', 'group', 'course', 'unit', 'content',
             'visibility',
-            'images', 'video', 'docs', 'audio', 'gradient_class', 'has_signature',
+            'images', 'video', 'docs', 'audio', 'gradient_class', 'has_signature', 'allow_downloads',
             'video_status', 'video_width', 'video_height', 'video_duration', 'video_poster',
             'custom_gradient_text', 'custom_gradient_color1', 'custom_gradient_color2', 'custom_gradient_text_color'
         ]
@@ -519,7 +519,7 @@ class PostUpdateSerializer(serializers.ModelSerializer):
     """Serializer for updating posts"""
     class Meta:
         model = Post
-        fields = ['content', 'video', 'docs', 'audio', 'gradient_class', 'has_signature']
+        fields = ['content', 'video', 'docs', 'audio', 'gradient_class', 'has_signature', 'allow_downloads']
 
     def to_internal_value(self, data):
         for key in ('video', 'docs', 'audio'):

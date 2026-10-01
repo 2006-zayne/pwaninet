@@ -2,6 +2,7 @@
 {% load static %}
 {% load post_filters %}
 {% load user_extras %}
+{% load download_tags %}
 
 {% check_is_liked post as user_has_liked %}
 {% check_is_reposted post as user_has_reposted %}
@@ -10,6 +11,7 @@
 <div id="reel-card-{{ post.share_id }}"
      class="post-card fb-post-card reel-post-card mb-3 bg-white rounded-3 overflow-hidden border position-relative"
      data-post-id="{{ post.share_id }}"
+     data-download-allowed="{{ post.allow_downloads|yesno:'true,false' }}"
      data-author="{{ header_author.get_full_name|default:header_author.username }}"
      data-author-username="{{ header_author.username }}"
      data-author-avatar="{{ header_author.profile_pic.url|default:'/static/images/default-avatar.png' }}"
@@ -186,7 +188,8 @@
                             data-action="download-media"
                             data-post-id="{{ post_obj.share_id }}"
                             data-media-type="video"
-                            data-url="{{ post_obj.get_video_for_feed.url }}"
+                            data-download-allowed="{{ post_obj.allow_downloads|yesno:'true,false' }}"
+                            {% if post_obj.allow_downloads %}data-url="{% protected_download_url post_obj 'video' %}"{% else %}disabled aria-disabled="true"{% endif %}
                             data-filename="reel_{{ post_obj.share_id }}.mp4"
                             data-thumbnail="{{ post_obj.get_video_poster|default:post_obj.thumbnail_url|default:'' }}">
                         <i class="bi bi-download"></i> {% trans "Download Reel" %}

@@ -730,21 +730,41 @@ class PwanimateVoiceTranscriptionView(APIView):
             return Response({'error': 'This audio format is not supported.'}, status=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
 
         audio.seek(0)
-        try:
-            upstream = requests.post(
-                'https://api.groq.com/openai/v1/audio/transcriptions',
-                headers={'Authorization': f'Bearer {api_key}'},
-                files={'file': (f'voice{extension}', audio, content_type)},
-                data={
-                    'model': getattr(settings, 'PWANIMATE_SPEECH_TO_TEXT_MODEL', 'whisper-large-v3-turbo'),
-                    'language': language,
-                    'response_format': 'json',
-                    'temperature': '0',
-                },
-                timeout=(5, int(getattr(settings, 'PWANIMATE_SPEECH_TO_TEXT_TIMEOUT', 60))),
-            )
-        except requests.RequestException:
-            logger.exception('Pwanimate voice transcription request failed')
+        upstream = None
+        transient_statuses = {408, 429, 500, 502, 503, 504}
+        for attempt in range(2):
+            audio.seek(0)
+            try:
+                upstream = requests.post(
+                    'https://api.groq.com/openai/v1/audio/transcriptions',
+                    headers={'Authorization': f'Bearer {api_key}'},
+                    files={'file': (f'voice{extension}', audio, content_type)},
+                    data={
+                        'model': getattr(settings, 'PWANIMATE_SPEECH_TO_TEXT_MODEL', 'whisper-large-v3-turbo'),
+                        'language': language,
+                        'response_format': 'json',
+                        'temperature': '0',
+                    },
+                    timeout=(5, int(getattr(settings, 'PWANIMATE_SPEECH_TO_TEXT_TIMEOUT', 60))),
+                )
+            except requests.RequestException:
+                if attempt == 0:
+                    logger.warning('Pwanimate voice transcription upload failed; retrying once', exc_info=True)
+                    continue
+                logger.exception('Pwanimate voice transcription request failed after retry')
+                break
+
+            if upstream.status_code in transient_statuses and attempt == 0:
+                logger.warning(
+                    'Pwanimate voice transcription upstream returned transient status %s; retrying once',
+                    upstream.status_code,
+                )
+                upstream.close()
+                upstream = None
+                continue
+            break
+
+        if upstream is None:
             return Response({'error': 'Transcription service could not be reached. Please try again.'}, status=status.HTTP_502_BAD_GATEWAY)
 
         if upstream.status_code != 200:

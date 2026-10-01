@@ -1,5 +1,6 @@
 {% load static %}
 {% load i18n %}
+{% load download_tags %}
 
 <style>
   /* Post Detail Specific Layout & Sticky Composer Rules */
@@ -28,6 +29,12 @@
   }
   .post-detail-container .comment-menu-dropdown {
     z-index: 10010 !important;
+  }
+  @media (max-width: 767px) {
+    .post-detail-feed .post-detail-feed-column {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
   }
   /* Hide sticky composer / guest CTA when any modal is open so it cannot overlap */
   body.modal-open .fixed-bottom,
@@ -96,11 +103,11 @@
   }
 </style>
 
-<div class="post-detail-container" data-post-id="{{ post.share_id }}">
-  <div class="container mt-3" style="padding-bottom: 100px;">
+<div class="post-detail-container post-detail-feed" data-post-id="{{ post.share_id }}">
+  <div class="container-fluid p-0 mt-0" style="padding-bottom: 100px;">
     <!-- Back Button Row -->
     <div class="row justify-content-center">
-        <div class="col-12 col-lg-8">
+        <div class="col-12 {% if not is_multi_image_post %}col-lg-8 col-xl-7{% endif %} {% if is_multi_image_post %}post-detail-feed-column{% endif %}">
             {% if request.user.is_authenticated %}
             <a href="{% if is_new_post or 'service-worker' in previous_page or '.js' in previous_page %}{% url 'posts:home' %}{% else %}{{ previous_page }}{% endif %}"
                hx-get="{% if is_new_post or 'service-worker' in previous_page or '.js' in previous_page %}{% url 'posts:home' %}{% else %}{{ previous_page }}{% endif %}"
@@ -110,13 +117,13 @@
                hx-history="true"
                class="btn btn-sm btn-outline-secondary rounded-pill fw-bold text-uppercase mb-3 px-3"
                onclick="if (document.referrer && document.referrer.startsWith(window.location.origin) && window.history.length > 1) { window.history.back(); return false; }">
-                <i class="bi bi-arrow-left me-1"></i> {% trans "Back" %}
+                <i class="bi bi-arrow-left me-1"></i> {% if is_multi_image_post %}{% trans "Back to feed" %}{% else %}{% trans "Back" %}{% endif %}
             </a>
             {% else %}
             <button type="button"
                     class="btn btn-sm btn-outline-secondary rounded-pill fw-bold text-uppercase mb-3 px-3"
                     onclick="if (window.showGuestAuthPrompt) { window.showGuestAuthPrompt({ title: '{% trans "Sign in to explore PwaniNet" %}', subtitle: '{% trans "Join PwaniNet to browse the campus feed, groups, and academic materials." %}' }); }">
-                <i class="bi bi-arrow-left me-1"></i> {% trans "Back" %}
+                <i class="bi bi-arrow-left me-1"></i> {% if is_multi_image_post %}{% trans "Back to feed" %}{% else %}{% trans "Back" %}{% endif %}
             </button>
             {% endif %}
         </div>
@@ -124,18 +131,87 @@
 
     <!-- Main Post & Comments Row -->
     <div class="row justify-content-center">
-        <div class="col-12 col-lg-8">
-            <!-- Unified Post Card -->
-            {% include 'posts/partials/post_card.html' with post=post is_detail=True %}
-
-            <!-- Comments Section -->
-            {% include 'posts/partials/comments_section.html' %}
+        <div class="col-12 {% if not is_multi_image_post %}col-lg-8 col-xl-7{% endif %} p-0 {% if is_multi_image_post %}post-detail-feed-column{% endif %}">
+            {% if post_images|length > 1 %}
+                <div class="post-detail-media-feed" aria-label="Post images">
+                    {% for post_image in post_images %}
+                    <article class="post-card fb-post-card post-detail-image-card mb-3 bg-white rounded-3 overflow-hidden border" id="detail-image-{{ post_image.id }}" data-post-id="{{ post.share_id }}" data-download-allowed="{{ post.allow_downloads|yesno:'true,false' }}" data-image-id="{{ post_image.id }}">
+                        <div class="post-card-header d-flex align-items-center px-3 py-2">
+                            <img src="{{ post.original_author.profile_pic.url|default:'/static/images/default-avatar.png' }}" class="rounded-circle me-2" style="width:44px;height:44px;object-fit:cover" alt="">
+                            <div class="min-w-0">
+                                <div class="fw-semibold text-truncate">{{ post.original_author.get_full_name|default:post.original_author.username }}</div>
+                                <small class="text-muted">{{ post.created_at|timesince }} ago · {{ forloop.counter }} of {{ post_images|length }}</small>
+                            </div>
+                        </div>
+                        {% if post.content %}<div class="post-content-text px-3 pb-2">{{ post.content|urlize|linebreaksbr }}</div>{% endif %}
+                        <a class="post-detail-image-link" href="{% url 'posts:view_image_fullscreen' post.share_id forloop.counter0 %}" hx-get="{% url 'posts:view_image_fullscreen' post.share_id forloop.counter0 %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true" aria-label="Open image {{ forloop.counter }} fullscreen">
+                            <img src="{{ post_image.image.url }}" alt="Post image {{ forloop.counter }}" loading="lazy">
+                        </a>
+                        <div class="postcard-actions px-3 py-2 border-top d-flex align-items-center justify-content-between gap-2">
+                            <button class="btn btn-sm border-0 {% if post_image.viewer_has_liked %}text-primary{% else %}text-muted{% endif %} d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1 image-detail-like" style="flex:1 1 0;min-width:0" type="button" data-post-id="{{ post.share_id }}" data-image-id="{{ post_image.id }}" aria-label="{% trans 'Like image' %}"><i class="bi fs-5 {% if post_image.viewer_has_liked %}bi-heart-fill{% else %}bi-heart{% endif %}"></i> <span class="fw-bold">{{ post_image.likes.count }}</span></button>
+                            <button class="btn btn-sm border-0 text-muted d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1 image-detail-comment" style="flex:1 1 0;min-width:0" type="button" data-post-id="{{ post.share_id }}" data-image-id="{{ post_image.id }}" aria-label="{% trans 'Comment on image' %}"><i class="bi bi-chat-dots fs-5"></i> <span class="fw-bold">{{ post_image.comments.count }}</span></button>
+                            <button class="btn btn-sm border-0 text-muted d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1" style="flex:1 1 0;min-width:0" type="button" data-bs-toggle="modal" data-bs-target="#globalShareModal" data-post-id="{{ post.share_id }}" data-post-url="{% url 'posts:post_details' post.share_id %}?image={{ forloop.counter0 }}" data-post-content="{{ post.content|truncatechars:80|escapejs }}" aria-label="{% trans 'Share image' %}"><i class="bi bi-share fs-5"></i> <span class="fw-bold">{% trans "Share" %}</span></button>
+                            <button class="btn btn-sm border-0 {% if post.allow_downloads %}text-muted{% else %}text-secondary opacity-50{% endif %} d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1" style="flex:1 1 0;min-width:0" type="button" data-action="download-media" data-download-allowed="{{ post.allow_downloads|yesno:'true,false' }}" data-post-id="{{ post.share_id }}" data-media-type="image" {% if post.allow_downloads %}data-url="{% protected_download_url post 'image' post_image.id %}"{% else %}disabled aria-disabled="true"{% endif %} data-filename="{{ post_image.image.name|default:'image.jpg' }}" aria-label="{% trans 'Download image' %}"><i class="bi bi-download fs-5"></i> <span class="fw-bold">{% trans "Download" %}</span></button>
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+                {% include 'posts/partials/comment_modal.html' %}
+                {% csrf_token %}
+                <script>
+                (() => {
+                  const root = document.querySelector('.post-detail-feed');
+                  if (!root || root.dataset.imageActionsReady) return;
+                  root.dataset.imageActionsReady = 'true';
+                  const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+                  const modalEl = document.getElementById('imageCommentsModal');
+                  const loadComments = async (postId, imageId) => {
+                    const list = document.getElementById('imageCommentsModalList');
+                    const empty = document.getElementById('commentsEmptyState');
+                    const form = document.getElementById('commentForm');
+                    if (!list || !form) return;
+                    form.dataset.postId = postId; form.dataset.imageId = imageId;
+                    list.querySelectorAll('.comment-item').forEach(node => node.remove());
+                    const response = await fetch(`/api/posts/${postId}/images/${imageId}/comments/`);
+                    const data = await response.json();
+                    if (!data.comments?.length) { if (empty) empty.style.display = 'block'; return; }
+                    if (empty) empty.style.display = 'none';
+                    data.comments.forEach(comment => {
+                      const row = document.createElement('div'); row.className = 'comment-row';
+                      const img = document.createElement('img'); img.src = comment.author.profile_pic || '/static/images/default-avatar.png'; img.alt = ''; img.width = 32; img.height = 32; img.className = 'rounded-circle me-2';
+                      const body = document.createElement('span'); body.className = 'comment-text'; body.textContent = `${comment.author.full_name || comment.author.username}: ${comment.content}`;
+                      row.append(img, body); list.appendChild(row);
+                    });
+                  };
+                  root.addEventListener('click', async event => {
+                    const like = event.target.closest('.image-detail-like');
+                    if (like) {
+                      const response = await fetch(`/api/posts/${like.dataset.postId}/images/${like.dataset.imageId}/like/`, {method:'POST',headers:{'X-CSRFToken':csrf,'Content-Type':'application/json'}});
+                      if (response.ok) { const data = await response.json(); like.querySelector('span').textContent = data.likes_count; like.classList.toggle('text-primary'); like.classList.toggle('text-muted'); like.querySelector('i').classList.toggle('bi-heart-fill'); like.querySelector('i').classList.toggle('bi-heart'); }
+                    }
+                    const comment = event.target.closest('.image-detail-comment');
+                    if (comment && modalEl && window.bootstrap) { bootstrap.Modal.getOrCreateInstance(modalEl).show(); loadComments(comment.dataset.postId, comment.dataset.imageId); }
+                  });
+                  document.getElementById('commentForm')?.addEventListener('submit', async event => {
+                    event.preventDefault(); const form = event.currentTarget; const input = form.querySelector('[name=content]'); const content = input.value.trim(); if (!content) return;
+                    const response = await fetch(`/api/posts/${form.dataset.postId}/images/${form.dataset.imageId}/comments/`, {method:'POST',headers:{'X-CSRFToken':csrf,'Content-Type':'application/json'},body:JSON.stringify({content})});
+                    if (response.ok) { input.value = ''; loadComments(form.dataset.postId, form.dataset.imageId); }
+                  });
+                  const index = {{ selected_image_index|default:0 }};
+                  const cards = root.querySelectorAll('.post-detail-image-card');
+                  if (cards[index]) requestAnimationFrame(() => cards[index].scrollIntoView({block:'start'}));
+                })();
+                </script>
+            {% else %}
+                {% include 'posts/partials/post_card.html' with post=post is_detail=True %}
+                {% include 'posts/partials/comments_section.html' %}
+            {% endif %}
         </div>
     </div>
   </div>
 
   <!-- Sticky Comment Input / Guest CTA at Bottom -->
-  {% if request.user.is_authenticated %}
+  {% if request.user.is_authenticated and not is_multi_image_post %}
   <div class="fixed-bottom post-detail-composer-bar" style="z-index: 1000; background-color: transparent; border-top: none;">
     <div class="container py-3" style="background-color: transparent;">
         <div class="row justify-content-center">
@@ -167,7 +243,7 @@
         </div>
     </div>
   </div>
-  {% else %}
+  {% elif not is_multi_image_post %}
   <div class="fixed-bottom post-detail-guest-bar">
     <div class="container py-2.5">
         <div class="row justify-content-center">

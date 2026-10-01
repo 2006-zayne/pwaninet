@@ -43,6 +43,7 @@ class UploadManager {
                 metadata: {
                     unit: data.unit || data.metadata?.unit || null,
                     group: data.group || data.metadata?.group || null,
+                    allow_downloads: data.allow_downloads ?? data.metadata?.allow_downloads ?? true,
                     gradient_class: data.gradient_class || data.metadata?.gradient_class || 'none',
                     custom_gradient_text: data.custom_gradient_text || data.metadata?.custom_gradient_text || null,
                     custom_gradient_color1: data.custom_gradient_color1 || data.metadata?.custom_gradient_color1 || null,

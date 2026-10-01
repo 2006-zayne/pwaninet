@@ -4,15 +4,54 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, FileResponse, HttpResponseForbidden, HttpResponseNotFound
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import get_user_model
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.urls import reverse
+from django.core import signing
 from django.conf import settings
 from celery.result import AsyncResult
 
 logger = logging.getLogger(__name__)
+
+
+def download_post_media(request, share_id):
+    """Serve post media only through a short-lived, author-permission-checked URL."""
+    token = request.GET.get('token', '')
+    try:
+        payload = signing.loads(token, salt='posts.media-download', max_age=900)
+    except signing.BadSignature:
+        return HttpResponseForbidden('This download link is invalid or expired.')
+    if payload.get('post') != str(share_id):
+        return HttpResponseForbidden('This download link is invalid.')
+    # The signed, short-lived token is the authorization for native downloaders,
+    # which do not consistently forward the WebView session cookie.
+    download_user = get_user_model().objects.filter(pk=payload.get('user'), is_active=True).first()
+    if not download_user:
+        return HttpResponseForbidden('This download link is invalid or expired.')
+    post = get_object_or_404(visible_posts_for(download_user), share_id=share_id)
+    if not post.allow_downloads:
+        return HttpResponseForbidden('The author has disabled downloads for this post.')
+    media_type = payload.get('type')
+    media = None
+    if media_type == 'image':
+        media = post.images.filter(pk=payload.get('media')).first()
+        media = media.image if media else None
+    elif media_type == 'video':
+        media = post.video or post.video_preview
+    elif media_type == 'audio':
+        media = post.audio
+    elif media_type == 'document':
+        media = post.docs or (post.shared_document.file if post.shared_document_id and post.shared_document.file else None)
+    if not media or not getattr(media, 'name', None):
+        return HttpResponseNotFound('Media not found.')
+    try:
+        response = FileResponse(media.open('rb'), as_attachment=True, filename=media.name.rsplit('/', 1)[-1])
+        return response
+    except (OSError, ValueError):
+        return HttpResponseNotFound('Media is unavailable.')
 
 
 from .models import Post, Comment, Report, Like, Repost, HiddenPost, AuthorPreference, SharedPost, PostImage, PostImageLike, PostImageComment
@@ -1065,6 +1104,22 @@ def post_detail_view(request, share_id):
 
     is_guest = not request.user.is_authenticated
     context = build_comments_context(post, request.user, show_all_comments=show_all)
+    # Multi-image posts open as a feed of image cards. Preserve the image tapped
+    # in the collage so the detail feed can position it as the starting card.
+    try:
+        context['selected_image_index'] = max(0, int(request.GET.get('image', 0)))
+    except (TypeError, ValueError):
+        context['selected_image_index'] = 0
+    context['post_images'] = list(post.images.all())
+    if context['post_images']:
+        context['selected_image_index'] = min(
+            context['selected_image_index'], len(context['post_images']) - 1
+        )
+    context['is_multi_image_post'] = len(context['post_images']) > 1
+    for post_image in context['post_images']:
+        post_image.viewer_has_liked = (
+            request.user.is_authenticated and post_image.likes.filter(user=request.user).exists()
+        )
     context['is_guest'] = is_guest
     context['is_liked'] = post.is_liked_by(request.user) if not is_guest else False
     context['unread_notifications_count'] = get_cached_unread_count(request.user) if not is_guest else 0
