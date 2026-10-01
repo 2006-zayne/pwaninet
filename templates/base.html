@@ -2929,29 +2929,6 @@
                 }, 2000);
             };
 
-            const nativeBridge = window.AndroidBridge || window.PwaninetBridge;
-            if (nativeBridge?.startMediaDownload) {
-                const mimeType = mediaType === 'video' ? 'video/mp4' : mediaType === 'image' ? 'image/jpeg' : '';
-                const nativeResult = nativeBridge.startMediaDownload(absoluteUrl, filename, mimeType, mediaType);
-                if (!nativeResult || nativeResult === 'failed') {
-                    btn.innerHTML = origHtml;
-                    btn.disabled = false;
-                    if (typeof window.showFeedback === 'function') window.showFeedback('Unable to start the download. Please try again.', 'error');
-                } else {
-                    if (nativeResult === 'permission_requested' && typeof window.showFeedback === 'function') {
-                        window.showFeedback('Allow storage access to save this media.', 'info');
-                    }
-                    if (nativeResult === 'permission_requested') {
-                        btn.innerHTML = origHtml;
-                        btn.disabled = false;
-                        return;
-                    }
-                    btn.innerHTML = '<i class="bi bi-check2 text-success"></i>';
-                    setTimeout(() => { btn.innerHTML = origHtml; btn.disabled = false; }, 1800);
-                }
-                return;
-            }
-
             if (window.downloadManager && typeof window.downloadManager.download === 'function') {
                 window.downloadManager.download({
                     url: absoluteUrl,
@@ -2960,7 +2937,10 @@
                     category,
                     filename,
                     thumbnail
-                }).then(() => {
+                }).then((metadata) => {
+                    if (metadata?.isNative && metadata.gallerySaved === false && typeof window.showFeedback === 'function') {
+                        window.showFeedback('Saved for Offline Media, but the Gallery copy failed. Tap download again to retry.', 'danger');
+                    }
                     btn.innerHTML = '<i class="bi bi-check2 text-success"></i>';
                     setTimeout(() => {
                         btn.innerHTML = origHtml;
@@ -2968,6 +2948,13 @@
                     }, 2000);
                 }).catch((err) => {
                     console.error('[Download Click] downloadManager error, falling back to direct browser download:', err);
+                    const nativeBridge = window.AndroidBridge || window.PwaninetBridge;
+                    if (nativeBridge?.startMediaDownload) {
+                        if (typeof window.showFeedback === 'function') window.showFeedback(err.message || 'Unable to save this media.', 'error');
+                        btn.innerHTML = origHtml;
+                        btn.disabled = false;
+                        return;
+                    }
                     triggerDirectBrowserDownload();
                     btn.innerHTML = '<i class="bi bi-check2 text-success"></i>';
                     setTimeout(() => {
@@ -2976,12 +2963,30 @@
                     }, 2000);
                 });
             } else {
-                triggerDirectBrowserDownload();
-                btn.innerHTML = '<i class="bi bi-check2 text-success"></i>';
-                setTimeout(() => {
-                    btn.innerHTML = origHtml;
-                    btn.disabled = false;
-                }, 2000);
+                const nativeBridge = window.AndroidBridge || window.PwaninetBridge;
+                if (nativeBridge?.startMediaDownload) {
+                    const mimeType = mediaType === 'video' ? 'video/mp4' : mediaType === 'image' ? 'image/jpeg' : '';
+                    const nativeResult = nativeBridge.startMediaDownload(absoluteUrl, filename, mimeType, mediaType);
+                    if (!nativeResult || nativeResult === 'failed') {
+                        btn.innerHTML = origHtml;
+                        btn.disabled = false;
+                        if (typeof window.showFeedback === 'function') window.showFeedback('Unable to start the download. Please try again.', 'error');
+                    } else if (nativeResult === 'permission_requested') {
+                        btn.innerHTML = origHtml;
+                        btn.disabled = false;
+                        if (typeof window.showFeedback === 'function') window.showFeedback('Allow storage access to save this media.', 'info');
+                    } else {
+                        btn.innerHTML = '<i class="bi bi-check2 text-success"></i>';
+                        setTimeout(() => { btn.innerHTML = origHtml; btn.disabled = false; }, 1800);
+                    }
+                } else {
+                    triggerDirectBrowserDownload();
+                    btn.innerHTML = '<i class="bi bi-check2 text-success"></i>';
+                    setTimeout(() => {
+                        btn.innerHTML = origHtml;
+                        btn.disabled = false;
+                    }, 2000);
+                }
             }
         });
     </script>
@@ -5326,25 +5331,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         var downloadUrl = protectedDownload ? protectedDownload.dataset.url : activeVideoUrl;
                         try {
                             downloadUrl = new URL(downloadUrl, window.location.href).href;
-                            var nativeBridge = window.AndroidBridge || window.PwaninetBridge;
-                            if (nativeBridge?.startMediaDownload) {
-                                var nativeResult = nativeBridge.startMediaDownload(
-                                    downloadUrl,
-                                    'reel_' + activePostId + '.mp4',
-                                    'video/mp4',
-                                    'video'
-                                );
-                                if (!nativeResult || nativeResult === 'failed') {
-                                    throw new Error('Unable to start the download. Please try again.');
-                                }
-                                showFeedback(
-                                    nativeResult === 'permission_requested' ? 'Allow storage access to save this reel.' : 'Saving video to your Gallery…',
-                                    nativeResult === 'permission_requested' ? 'info' : 'success'
-                                );
-                                return;
-                            }
                             if (window.downloadManager && typeof window.downloadManager.download === 'function') {
-                                await window.downloadManager.download({
+                                var reelDownload = await window.downloadManager.download({
                                     url: downloadUrl,
                                     postId: activePostId,
                                     mediaType: 'video',
@@ -5352,9 +5340,15 @@ window.addEventListener('beforeinstallprompt', (e) => {
                                     filename: 'reel_' + activePostId + '.mp4',
                                     thumbnail: activePosterUrl
                                 });
-                                showFeedback('Download started. It will be saved to your device and Offline Media.', 'success');
+                                showFeedback(reelDownload?.gallerySaved === false
+                                    ? 'Already saved for Offline Media, but the Gallery copy failed. Tap download again to retry.'
+                                    : 'Download started. The download banner will confirm when it is ready.', reelDownload?.gallerySaved === false ? 'danger' : 'info');
                             } else {
-                                throw new Error('Download service is unavailable. Please reload and try again.');
+                                var nativeBridge = window.AndroidBridge || window.PwaninetBridge;
+                                if (!nativeBridge?.startMediaDownload) throw new Error('Download service is unavailable. Please reload and try again.');
+                                var nativeResult = nativeBridge.startMediaDownload(downloadUrl, 'reel_' + activePostId + '.mp4', 'video/mp4', 'video');
+                                if (!nativeResult || nativeResult === 'failed') throw new Error('Unable to start the download. Please try again.');
+                                showFeedback(nativeResult === 'permission_requested' ? 'Allow storage access to save this reel.' : 'Saving video to your Gallery…', nativeResult === 'permission_requested' ? 'info' : 'success');
                             }
                         } catch (error) {
                             console.error('[Share Download] Failed to start reel download:', error);

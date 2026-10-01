@@ -160,7 +160,12 @@ class DownloadUI {
         });
 
         window.addEventListener('pwaninet:download-already-downloaded', (e) => {
-            this.showToast('Already downloaded. Find it in Offline Media.', 'info');
+            const item = e.detail || {};
+            this.showToast(item.gallerySaved === false
+                ? 'Already saved for Offline Media, but the Gallery save still failed.'
+                : item.gallerySaved === true
+                    ? 'Already downloaded. Find it in Offline Media and your Gallery.'
+                    : 'Already downloaded. Find it in Offline Media.', item.gallerySaved === false ? 'error' : 'info');
         });
     }
 
@@ -189,6 +194,7 @@ class DownloadUI {
         this.updateProgress(item.progress || 0, item);
         this.updateQueueBadge();
         this.show();
+        if (item.category === 'video') this.showToast(`Saving ${item.filename || 'video'}…`, 'info');
     }
 
     handleItemProgress(item) {
@@ -197,6 +203,9 @@ class DownloadUI {
             this.updateProgress(item.progress, item);
         }
         this.updateQueueBadge();
+        if (item.category === 'video' && item.progress > 0) {
+            this.showToast(`Saving ${item.filename || 'video'}… ${item.progress}%`, 'info');
+        }
     }
 
     handleItemCompleted(item) {
@@ -207,7 +216,20 @@ class DownloadUI {
         const dotEl = document.getElementById('download-header-dot');
 
         if (titleEl) titleEl.textContent = 'Download complete!';
-        if (subEl) subEl.textContent = `${item.filename} is ready for offline use`;
+        if (subEl) {
+            subEl.textContent = item.gallerySaved === true
+                ? `${item.filename} is ready in Offline Media and your Gallery`
+                : item.isNative && ['image', 'video'].includes(item.category) && item.gallerySaved === false
+                    ? `${item.filename} is ready for Offline Media; Gallery save failed. Tap download to retry.`
+                    : `${item.filename} is ready for offline use`;
+        }
+        if (item.category === 'video') {
+            this.showToast(item.gallerySaved === true
+                ? `${item.filename || 'Video'} saved to Gallery and Offline Media.`
+                : item.isNative && item.gallerySaved === false
+                    ? `${item.filename || 'Video'} saved offline; Gallery save failed. Tap Download to retry.`
+                    : `${item.filename || 'Video'} saved for offline use.`, item.gallerySaved === false ? 'error' : 'success');
+        }
         if (fillEl) fillEl.classList.add('phase-completed');
         if (dotEl) dotEl.classList.add('phase-completed');
 
@@ -242,6 +264,7 @@ class DownloadUI {
 
         if (titleEl) titleEl.textContent = 'Download failed';
         if (subEl) subEl.textContent = item.error || 'Network error';
+        if (item.category === 'video') this.showToast(`Could not save ${item.filename || 'video'}: ${item.error || 'Download failed.'}`, 'error');
         if (fillEl) fillEl.classList.add('phase-error');
         if (dotEl) dotEl.classList.add('phase-error');
 
@@ -371,15 +394,22 @@ class DownloadUI {
     }
 
     showToast(message, type = 'info') {
-        const toast = document.createElement('div');
+        let toast = document.getElementById('pwaninet-download-status-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'pwaninet-download-status-toast';
+            toast.setAttribute('role', 'status');
+            document.body.appendChild(toast);
+        }
         toast.className = `download-toast toast-${type}`;
         toast.textContent = message;
-        document.body.appendChild(toast);
+        toast.style.zIndex = '10950';
+        toast.style.top = 'max(20px, env(safe-area-inset-top, 20px))';
+        clearTimeout(this.toastTimeout);
         setTimeout(() => toast.classList.add('show'), 10);
-        setTimeout(() => {
+        this.toastTimeout = setTimeout(() => {
             toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
+        }, type === 'info' && /%$/.test(message) ? 1200 : 3800);
     }
 
     injectStyles() {
@@ -691,6 +721,8 @@ class DownloadUI {
                 opacity: 1;
                 transform: translateX(-50%) translateY(0);
             }
+            .download-toast.toast-error { border-color: #dc3545; }
+            .download-toast.toast-success { border-color: #198754; }
         `;
         document.head.appendChild(style);
     }

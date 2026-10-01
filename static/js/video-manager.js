@@ -3473,15 +3473,6 @@
                 try {
                     const protectedDownload = card.querySelector('[data-action="download-media"][data-url]');
                     const downloadUrl = new URL(protectedDownload?.dataset.url || videoUrl, window.location.href).href;
-                    const nativeBridge = window.AndroidBridge || window.PwaninetBridge;
-                    if (nativeBridge?.startMediaDownload) {
-                        const result = nativeBridge.startMediaDownload(downloadUrl, `reel_${postId}.mp4`, 'video/mp4', 'video');
-                        if (!result || result === 'failed') throw new Error('Unable to start the download. Please try again.');
-                        if (typeof window.showFeedback === 'function') {
-                            window.showFeedback(result === 'permission_requested' ? 'Allow storage access to save this reel.' : 'Saving video to your Gallery…', result === 'permission_requested' ? 'info' : 'success');
-                        }
-                        return;
-                    }
                     if (!window.downloadManager || typeof window.downloadManager.download !== 'function') {
                         throw new Error('Download service is unavailable. Please reload and try again.');
                     }

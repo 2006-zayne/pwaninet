@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.media.MediaScannerConnection;
 import android.content.pm.PackageInfo;
 import android.content.res.Configuration;
 import android.graphics.Color;
@@ -58,6 +59,8 @@ import android.widget.Toast;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.net.URLConnection;
 import java.util.Locale;
 import java.util.ArrayList;
@@ -122,20 +125,53 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public boolean saveMediaToGallery(String sourceUri, String filename, String mimeType, String category) {
             MainActivity activity = activityRef.get();
-            if (activity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false;
-            Uri collection = "video".equalsIgnoreCase(category)
+            if (activity == null || sourceUri == null || filename == null) return false;
+            boolean isVideo = "video".equalsIgnoreCase(category);
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                if (ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        != PackageManager.PERMISSION_GRANTED) {
+                    activity.runOnUiThread(() -> activity.requestPermissions(
+                        new String[] { Manifest.permission.WRITE_EXTERNAL_STORAGE }, REQUEST_MEDIA_DOWNLOAD_PERMISSION));
+                    return false;
+                }
+                File targetFile = null;
+                try {
+                    File publicMediaDir = Environment.getExternalStoragePublicDirectory(
+                        isVideo ? Environment.DIRECTORY_MOVIES : Environment.DIRECTORY_PICTURES);
+                    File appMediaDir = new File(publicMediaDir, "PwaniNet");
+                    if (!appMediaDir.exists() && !appMediaDir.mkdirs()) {
+                        throw new IOException("Could not create public media directory");
+                    }
+                    targetFile = new File(appMediaDir, filename.replaceAll("[\\\\/:*?\"<>|]", "_"));
+                    try (InputStream input = activity.getContentResolver().openInputStream(Uri.parse(sourceUri));
+                         OutputStream output = new FileOutputStream(targetFile)) {
+                        if (input == null) throw new IOException("Unable to open offline media file");
+                        byte[] buffer = new byte[8192];
+                        int count;
+                        while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                    }
+                    MediaScannerConnection.scanFile(activity, new String[] { targetFile.getAbsolutePath() },
+                        new String[] { mimeType }, null);
+                    return true;
+                } catch (Exception error) {
+                    if (targetFile != null) targetFile.delete();
+                    System.err.println("[MainActivity] Legacy gallery publish failed: " + error.getMessage());
+                    return false;
+                }
+            }
+            Uri collection = isVideo
                 ? android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI
                 : android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
             ContentValues values = new ContentValues();
             values.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename);
             values.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mimeType);
             values.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,
-                "video".equalsIgnoreCase(category) ? "Movies/PwaniNet" : "Pictures/PwaniNet");
+                isVideo ? "Movies/PwaniNet" : "Pictures/PwaniNet");
             values.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1);
             Uri target = null;
             try {
                 target = activity.getContentResolver().insert(collection, values);
-                if (target == null) return false;
+                if (target == null) throw new IOException("MediaStore did not create a gallery entry");
                 try (InputStream input = activity.getContentResolver().openInputStream(Uri.parse(sourceUri));
                      OutputStream output = activity.getContentResolver().openOutputStream(target)) {
                     if (input == null || output == null) throw new IOException("Unable to open media stream");
@@ -145,10 +181,13 @@ public class MainActivity extends BridgeActivity {
                 }
                 ContentValues ready = new ContentValues();
                 ready.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0);
-                activity.getContentResolver().update(target, ready, null, null);
+                if (activity.getContentResolver().update(target, ready, null, null) == 0) {
+                    throw new IOException("MediaStore could not publish the gallery entry");
+                }
                 return true;
             } catch (Exception error) {
                 if (target != null) activity.getContentResolver().delete(target, null, null);
+                System.err.println("[MainActivity] Offline media could not be published to Gallery: " + error.getMessage());
                 return false;
             }
         }
@@ -465,10 +504,12 @@ public class MainActivity extends BridgeActivity {
         if (requestCode == REQUEST_MEDIA_DOWNLOAD_PERMISSION) {
             PendingMediaDownload pending = pendingMediaDownload;
             pendingMediaDownload = null;
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED && pending != null) {
-                startMediaDownload(pending.url, pending.filename, pending.mimeType, pending.category);
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (pending != null) startMediaDownload(pending.url, pending.filename, pending.mimeType, pending.category);
             } else {
-                Toast.makeText(this, "Storage permission is needed to save media on this Android version.", Toast.LENGTH_LONG).show();
+                if (pending != null) {
+                    Toast.makeText(this, "Storage permission is needed to save media on this Android version.", Toast.LENGTH_LONG).show();
+                }
             }
             return;
         }

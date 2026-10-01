@@ -76,6 +76,24 @@ class DownloadManager {
         // Check if file has already been downloaded
         const existing = await this.storage.getMetadataByUrl(options.url);
         if (existing) {
+            // Let users retry a failed gallery publish without downloading the
+            // media a second time; the private offline copy is already present.
+            const existingCategory = existing.category || options.mediaType || options.category;
+            const nativeBridge = window.AndroidBridge || window.PwaninetBridge;
+            if (existing.isNative && existing.gallerySaved === false && existing.nativeUri &&
+                ['image', 'video'].includes(existingCategory) && nativeBridge?.saveMediaToGallery) {
+                try {
+                    existing.gallerySaved = nativeBridge.saveMediaToGallery(
+                        existing.nativeUri,
+                        existing.filename,
+                        existing.mimeType || (existingCategory === 'video' ? 'video/mp4' : 'image/jpeg'),
+                        existingCategory
+                    ) === true;
+                    await this.storage.saveMetadata(existing);
+                } catch (galleryError) {
+                    console.warn('[DownloadManager] Gallery retry failed:', galleryError);
+                }
+            }
             window.dispatchEvent(new CustomEvent('pwaninet:download-already-downloaded', { detail: existing }));
             if (!this.isNativeEnvironment()) {
                 await this.exportToDevice(existing.id);
@@ -160,11 +178,12 @@ class DownloadManager {
 
             // Capacitor keeps its offline copy privately; also publish media to
             // Android's shared Photos/Gallery collection when the native bridge supports it.
-            let gallerySaved = false;
+            let gallerySaved = null;
             const mediaCategory = item.mediaType || item.category;
-            if (['image', 'video'].includes(mediaCategory) && window.AndroidBridge?.saveMediaToGallery) {
+            const nativeBridge = window.AndroidBridge || window.PwaninetBridge;
+            if (['image', 'video'].includes(mediaCategory) && nativeBridge?.saveMediaToGallery) {
                 try {
-                    gallerySaved = window.AndroidBridge.saveMediaToGallery(
+                    gallerySaved = nativeBridge.saveMediaToGallery(
                         uriResult.uri,
                         item.filename,
                         item.mimeType || (mediaCategory === 'video' ? 'video/mp4' : 'image/jpeg'),
