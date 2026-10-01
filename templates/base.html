@@ -2898,10 +2898,18 @@
 
             const url = btn.dataset.url || btn.getAttribute('data-url') || btn.getAttribute('href');
             if (!url) return;
+            let absoluteUrl;
+            try {
+                absoluteUrl = new URL(url, window.location.href).href;
+            } catch (error) {
+                console.error('[Download Click] Invalid media URL:', url, error);
+                if (typeof window.showFeedback === 'function') window.showFeedback('This media link is invalid. Please reload and try again.', 'error');
+                return;
+            }
 
             const postId = btn.dataset.postId || btn.dataset['post.share_id'] || btn.getAttribute('data-post.share_id') || '';
             const mediaType = btn.dataset.mediaType || btn.getAttribute('data-media-type') || 'document';
-            const filename = btn.dataset.filename || btn.getAttribute('data-filename') || url.split('/').pop()?.split('?')[0] || `download_${Date.now()}`;
+            const filename = btn.dataset.filename || btn.getAttribute('data-filename') || new URL(absoluteUrl).pathname.split('/').pop() || `download_${Date.now()}`;
             const category = btn.dataset.category || btn.getAttribute('data-category') || mediaType;
             const thumbnail = btn.dataset.thumbnail || btn.getAttribute('data-thumbnail') || '';
 
@@ -2922,9 +2930,9 @@
             };
 
             const nativeBridge = window.AndroidBridge || window.PwaninetBridge;
-            if (window.Capacitor?.isNativePlatform?.() && nativeBridge?.startMediaDownload) {
+            if (nativeBridge?.startMediaDownload) {
                 const mimeType = mediaType === 'video' ? 'video/mp4' : mediaType === 'image' ? 'image/jpeg' : '';
-                const nativeResult = nativeBridge.startMediaDownload(url, filename, mimeType, mediaType);
+                const nativeResult = nativeBridge.startMediaDownload(absoluteUrl, filename, mimeType, mediaType);
                 if (!nativeResult || nativeResult === 'failed') {
                     btn.innerHTML = origHtml;
                     btn.disabled = false;
@@ -2946,7 +2954,7 @@
 
             if (window.downloadManager && typeof window.downloadManager.download === 'function') {
                 window.downloadManager.download({
-                    url,
+                    url: absoluteUrl,
                     postId,
                     mediaType,
                     category,
@@ -5292,7 +5300,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
             // Setup Download Action Chip
             var downloadBtn = document.getElementById('globalShareDownloadBtn');
             if (downloadBtn) {
-                downloadBtn.onclick = function () {
+                downloadBtn.onclick = async function () {
                     var sourceCard = document.querySelector('[data-post-id="' + activePostId + '"][data-download-allowed]');
                     if (sourceCard && sourceCard.dataset.downloadAllowed === 'false') {
                         showFeedback('The author has disabled downloads for this post.', 'info');
@@ -5313,34 +5321,44 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         return;
                     }
                     if (activeVideoUrl) {
-                        var nativeBridge = window.AndroidBridge || window.PwaninetBridge;
-                        if (window.Capacitor?.isNativePlatform?.() && nativeBridge?.startMediaDownload) {
-                            var nativeResult = nativeBridge.startMediaDownload(activeVideoUrl, 'reel_' + activePostId + '.mp4', 'video/mp4', 'video');
-                            if (!nativeResult || nativeResult === 'failed') {
-                                showFeedback('Unable to start the download. Please try again.', 'danger');
+                        var sourceCard = document.querySelector('[data-post-id="' + activePostId + '"].post-card, .reels-snap-item[data-post-id="' + activePostId + '"]');
+                        var protectedDownload = sourceCard && sourceCard.querySelector('[data-action="download-media"][data-url]');
+                        var downloadUrl = protectedDownload ? protectedDownload.dataset.url : activeVideoUrl;
+                        try {
+                            downloadUrl = new URL(downloadUrl, window.location.href).href;
+                            var nativeBridge = window.AndroidBridge || window.PwaninetBridge;
+                            if (nativeBridge?.startMediaDownload) {
+                                var nativeResult = nativeBridge.startMediaDownload(
+                                    downloadUrl,
+                                    'reel_' + activePostId + '.mp4',
+                                    'video/mp4',
+                                    'video'
+                                );
+                                if (!nativeResult || nativeResult === 'failed') {
+                                    throw new Error('Unable to start the download. Please try again.');
+                                }
+                                showFeedback(
+                                    nativeResult === 'permission_requested' ? 'Allow storage access to save this reel.' : 'Saving video to your Gallery…',
+                                    nativeResult === 'permission_requested' ? 'info' : 'success'
+                                );
                                 return;
                             }
-                            showFeedback(nativeResult === 'permission_requested' ? 'Allow storage access to save this reel.' : 'Download started. Check your notifications or Gallery.', nativeResult === 'permission_requested' ? 'info' : 'success');
-                            return;
-                        }
-                        if (window.downloadManager && typeof window.downloadManager.download === 'function') {
-                            window.downloadManager.download({
-                                url: activeVideoUrl,
-                                postId: activePostId,
-                                mediaType: 'video',
-                                category: 'reels',
-                                filename: 'reel_' + activePostId + '.mp4',
-                                thumbnail: activePosterUrl
-                            });
-                            showFeedback('Download added to library!', 'success');
-                        } else {
-                            var a = document.createElement('a');
-                            a.href = activeVideoUrl;
-                            a.download = 'reel_' + activePostId + '.mp4';
-                            document.body.appendChild(a);
-                            a.click();
-                            setTimeout(function () { a.remove(); }, 1500);
-                            showFeedback('Downloading video...', 'success');
+                            if (window.downloadManager && typeof window.downloadManager.download === 'function') {
+                                await window.downloadManager.download({
+                                    url: downloadUrl,
+                                    postId: activePostId,
+                                    mediaType: 'video',
+                                    category: 'video',
+                                    filename: 'reel_' + activePostId + '.mp4',
+                                    thumbnail: activePosterUrl
+                                });
+                                showFeedback('Download started. It will be saved to your device and Offline Media.', 'success');
+                            } else {
+                                throw new Error('Download service is unavailable. Please reload and try again.');
+                            }
+                        } catch (error) {
+                            console.error('[Share Download] Failed to start reel download:', error);
+                            showFeedback(error.message || 'Unable to start the download. Please try again.', 'danger');
                         }
                     } else {
                         showFeedback('No video file available for download', 'info');

@@ -57,6 +57,15 @@ class DownloadManager {
             throw new Error('Download URL is required');
         }
 
+        // Capacitor's native downloader requires an absolute URL. Django template
+        // tags commonly emit protected endpoints as root-relative paths, which
+        // browsers accept but native URLConnection rejects with "no protocol".
+        try {
+            options.url = new URL(options.url, window.location.href).href;
+        } catch (error) {
+            throw new Error(`Invalid download URL: ${options.url}`);
+        }
+
         if (!options.filename) {
             options.filename = options.url.split('/').pop()?.split('?')[0] || `download_${Date.now()}`;
         }

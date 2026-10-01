@@ -484,9 +484,10 @@
         const filename = this.getAttribute('data-filename');
         const postId = this.getAttribute('data-post.share_id');
         try {
+          const absoluteImageUrl = new URL(imageUrl, window.location.href).href;
           const nativeBridge = window.AndroidBridge || window.PwaninetBridge;
-          if (window.Capacitor?.isNativePlatform?.() && nativeBridge?.startMediaDownload) {
-            const nativeResult = nativeBridge.startMediaDownload(imageUrl, filename, 'image/jpeg', 'image');
+          if (nativeBridge?.startMediaDownload) {
+            const nativeResult = nativeBridge.startMediaDownload(absoluteImageUrl, filename, 'image/jpeg', 'image');
             if (!nativeResult || nativeResult === 'failed') {
               throw new Error('Unable to start the download. Please try again.');
             }
@@ -495,7 +496,7 @@
           const module = await import('/static/js/storage/downloads_manager.js');
           const downloadsManager = module.downloadsManager;
           await downloadsManager.download({
-            url: imageUrl,
+            url: absoluteImageUrl,
             filename: filename,
             postId: postId,
             mediaId: this.getAttribute('data-media-id'),
