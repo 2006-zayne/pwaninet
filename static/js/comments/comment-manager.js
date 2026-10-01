@@ -772,10 +772,12 @@ const CommentManager = {
    */
   closeWebSocket() {
     if (this.ws) {
-      try {
-        this.ws.close();
-      } catch (e) {}
+      const socket = this.ws;
       this.ws = null;
+      this._wsPostId = null;
+      try {
+        socket.close();
+      } catch (e) {}
     }
   },
 
@@ -783,15 +785,21 @@ const CommentManager = {
    * Initialize WebSocket for real-time updates
    */
   initWebSocket() {
+    const postId = this.postId ? String(this.postId) : '';
+    if (this.ws && this._wsPostId === postId &&
+        (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+      return;
+    }
     this.closeWebSocket();
-    if (!this.postId) return;
+    if (!postId) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/post/${this.postId}/comments/`;
+    const wsUrl = `${protocol}//${window.location.host}/ws/post/${postId}/comments/`;
     
     try {
       const ws = new WebSocket(wsUrl);
       this.ws = ws;
+      this._wsPostId = postId;
       
       ws.onmessage = (event) => {
         try {
@@ -810,6 +818,7 @@ const CommentManager = {
       ws.onclose = () => {
         if (this.ws === ws) {
           this.ws = null;
+          this._wsPostId = null;
         }
       };
     } catch (e) {

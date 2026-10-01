@@ -2204,7 +2204,8 @@
     function initSideRailWebSocket(postId) {
         postId = postId ? String(postId).trim() : '';
         if (!postId || postId === 'null' || postId === 'undefined') return;
-        if (sideRailWebSocket && sideRailWsPostId === postId && sideRailWebSocket.readyState === WebSocket.OPEN) {
+        if (sideRailWebSocket && sideRailWsPostId === postId &&
+            (sideRailWebSocket.readyState === WebSocket.CONNECTING || sideRailWebSocket.readyState === WebSocket.OPEN)) {
             return;
         }
         closeSideRailWebSocket();
@@ -2235,8 +2236,9 @@
             };
 
             ws.onclose = function() {
-                if (sideRailWsPostId === postId) {
+                if (sideRailWebSocket === ws && sideRailWsPostId === postId) {
                     sideRailWebSocket = null;
+                    sideRailWsPostId = null;
                 }
             };
         } catch (e) {
