@@ -3203,7 +3203,10 @@
         }
 
         // Let the pending state paint before media and observer teardown begins.
-        requestAnimationFrame(() => {
+        // Allow the disabled button and spinner to paint before decoder/DOM cleanup.
+        // A single rAF still paints only after its callback returns, which made the
+        // close button look frozen while the reel stack was being torn down.
+        requestAnimationFrame(() => requestAnimationFrame(() => {
             try {
                 finishClosingFullscreenReels();
             } finally {
@@ -3224,7 +3227,7 @@
                     closeBtn.querySelector('.close-reels-progress-label')?.classList.add('d-none');
                 }
             }
-        });
+        }));
     }
 
     function finishClosingFullscreenReels() {

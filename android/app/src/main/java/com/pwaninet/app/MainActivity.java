@@ -75,6 +75,15 @@ public class MainActivity extends BridgeActivity {
     private int lastSafeRight = 0;
     private String pendingDeepLinkPath = null;
     private static final int REQUEST_SPEECH_AUDIO_PERMISSION = 4301;
+    private static final int REQUEST_MEDIA_DOWNLOAD_PERMISSION = 4302;
+    private PendingMediaDownload pendingMediaDownload;
+
+    private static final class PendingMediaDownload {
+        final String url, filename, mimeType, category;
+        PendingMediaDownload(String url, String filename, String mimeType, String category) {
+            this.url = url; this.filename = filename; this.mimeType = mimeType; this.category = category;
+        }
+    }
     private SpeechRecognizer speechRecognizer;
     private boolean speechListening = false;
     private boolean speechSessionRequested = false;
@@ -141,6 +150,12 @@ public class MainActivity extends BridgeActivity {
                 if (target != null) activity.getContentResolver().delete(target, null, null);
                 return false;
             }
+        }
+
+        @JavascriptInterface
+        public String startMediaDownload(String url, String filename, String mimeType, String category) {
+            MainActivity activity = activityRef.get();
+            return activity == null ? "failed" : activity.startMediaDownload(url, filename, mimeType, category);
         }
 
         @JavascriptInterface
@@ -446,6 +461,16 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_MEDIA_DOWNLOAD_PERMISSION) {
+            PendingMediaDownload pending = pendingMediaDownload;
+            pendingMediaDownload = null;
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED && pending != null) {
+                startMediaDownload(pending.url, pending.filename, pending.mimeType, pending.category);
+            } else {
+                Toast.makeText(this, "Storage permission is needed to save media on this Android version.", Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
         if (requestCode != REQUEST_SPEECH_AUDIO_PERMISSION) return;
         if (!speechSessionRequested) return;
         if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -1137,6 +1162,44 @@ public class MainActivity extends BridgeActivity {
                 Toast.makeText(this, "Unable to start download", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private String startMediaDownload(String url, String filename, String mimeType, String category) {
+        if (url == null || !url.startsWith("https://") && !url.startsWith("http://")) return "failed";
+        String safeName = filename == null || filename.trim().isEmpty() ? "pwaninet-media" : filename;
+        safeName = safeName.replaceAll("[\\\\/:*?\"<>|]", "_");
+        boolean isImage = "image".equalsIgnoreCase(category);
+        boolean isVideo = "video".equalsIgnoreCase(category) || "reels".equalsIgnoreCase(category);
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            pendingMediaDownload = new PendingMediaDownload(url, safeName, mimeType, category);
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_MEDIA_DOWNLOAD_PERMISSION);
+            Toast.makeText(this, "Allow storage access to save this media", Toast.LENGTH_LONG).show();
+            return "permission_requested";
+        }
+        try {
+            DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            if (manager == null) return "failed";
+            Uri uri = Uri.parse(url);
+            String destinationDirectory = isImage ? Environment.DIRECTORY_PICTURES
+                : isVideo ? Environment.DIRECTORY_MOVIES : Environment.DIRECTORY_DOWNLOADS;
+            DownloadManager.Request request = new DownloadManager.Request(uri)
+                .setTitle(safeName)
+                .setDescription("Downloading from PwaniNet")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalPublicDir(destinationDirectory, "PwaniNet/" + safeName);
+            if (mimeType != null && !mimeType.isEmpty()) request.setMimeType(mimeType);
+            String cookies = CookieManager.getInstance().getCookie(url);
+            if (cookies != null && !cookies.isEmpty()) request.addRequestHeader("Cookie", cookies);
+            request.addRequestHeader("User-Agent", System.getProperty("http.agent", "PwaniNet"));
+            manager.enqueue(request);
+            Toast.makeText(this, "Download started. You can find it in your gallery or Downloads.", Toast.LENGTH_LONG).show();
+            return "started";
+        } catch (Exception error) {
+            System.err.println("[MainActivity] Could not start media download: " + error.getMessage());
+            Toast.makeText(this, "Unable to start download. Check storage permission and try again.", Toast.LENGTH_LONG).show();
+            return "failed";
+        }
     }
 
     private void setupWebViewCaching() {
