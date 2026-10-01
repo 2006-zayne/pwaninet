@@ -58,6 +58,7 @@ import android.widget.Toast;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URLConnection;
 import java.util.Locale;
 import java.util.ArrayList;
 import org.json.JSONObject;
@@ -1170,6 +1171,78 @@ public class MainActivity extends BridgeActivity {
         safeName = safeName.replaceAll("[\\\\/:*?\"<>|]", "_");
         boolean isImage = "image".equalsIgnoreCase(category);
         boolean isVideo = "video".equalsIgnoreCase(category) || "reels".equalsIgnoreCase(category);
+        if (!isImage && !isVideo && (mimeType == null || mimeType.isEmpty())) {
+            mimeType = URLConnection.guessContentTypeFromName(safeName);
+        }
+        final String resolvedMimeType = mimeType == null || mimeType.isEmpty()
+            ? (isImage ? "image/jpeg" : isVideo ? "video/mp4" : "application/octet-stream")
+            : mimeType;
+
+        // On Android 10+ write straight into the shared MediaStore collection. This
+        // avoids scoped-storage restrictions on DownloadManager's public-directory
+        // destination and makes the finished item immediately visible to gallery apps.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && (isImage || isVideo)) {
+            final String displayName = safeName;
+            final String destination = url;
+            final String mediaType = resolvedMimeType;
+            final String webViewUserAgent = getBridge() != null && getBridge().getWebView() != null
+                ? getBridge().getWebView().getSettings().getUserAgentString()
+                : System.getProperty("http.agent", "PwaniNet");
+            new Thread(() -> {
+                Uri target = null;
+                try {
+                    java.net.HttpURLConnection connection = (java.net.HttpURLConnection) new java.net.URL(destination).openConnection();
+                    connection.setConnectTimeout(20000);
+                    connection.setReadTimeout(60000);
+                    connection.setInstanceFollowRedirects(true);
+                    connection.setRequestProperty("User-Agent", webViewUserAgent);
+                    String cookies = CookieManager.getInstance().getCookie(destination);
+                    if (cookies != null && !cookies.isEmpty()) connection.setRequestProperty("Cookie", cookies);
+                    connection.connect();
+                    int responseCode = connection.getResponseCode();
+                    if (responseCode < 200 || responseCode >= 300) {
+                        throw new IOException("Media server returned HTTP " + responseCode);
+                    }
+                    String responseMimeType = connection.getContentType();
+                    if (responseMimeType != null && responseMimeType.contains(";")) {
+                        responseMimeType = responseMimeType.substring(0, responseMimeType.indexOf(';')).trim();
+                    }
+                    Uri collection = isVideo
+                        ? android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                        : android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+                    ContentValues values = new ContentValues();
+                    values.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, displayName);
+                    values.put(android.provider.MediaStore.MediaColumns.MIME_TYPE,
+                        responseMimeType != null && responseMimeType.startsWith(isVideo ? "video/" : "image/")
+                            ? responseMimeType : mediaType);
+                    values.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,
+                        isVideo ? "Movies/PwaniNet" : "Pictures/PwaniNet");
+                    values.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1);
+                    target = getContentResolver().insert(collection, values);
+                    if (target == null) throw new IOException("Could not create gallery media entry");
+
+                    try (InputStream input = connection.getInputStream();
+                         OutputStream output = getContentResolver().openOutputStream(target, "w")) {
+                        if (output == null) throw new IOException("Could not open gallery media entry");
+                        byte[] buffer = new byte[32768];
+                        int count;
+                        while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                    } finally {
+                        connection.disconnect();
+                    }
+                    ContentValues ready = new ContentValues();
+                    ready.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0);
+                    getContentResolver().update(target, ready, null, null);
+                    runOnUiThread(() -> Toast.makeText(this, "Saved to your gallery", Toast.LENGTH_LONG).show());
+                } catch (Exception error) {
+                    if (target != null) getContentResolver().delete(target, null, null);
+                    System.err.println("[MainActivity] Gallery download failed: " + error.getMessage());
+                    runOnUiThread(() -> Toast.makeText(this, "Could not save media. Check your connection and try again.", Toast.LENGTH_LONG).show());
+                }
+            }, "pwaninet-media-download").start();
+            Toast.makeText(this, "Saving to your gallery…", Toast.LENGTH_SHORT).show();
+            return "started";
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             pendingMediaDownload = new PendingMediaDownload(url, safeName, mimeType, category);
@@ -1188,7 +1261,7 @@ public class MainActivity extends BridgeActivity {
                 .setDescription("Downloading from PwaniNet")
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 .setDestinationInExternalPublicDir(destinationDirectory, "PwaniNet/" + safeName);
-            if (mimeType != null && !mimeType.isEmpty()) request.setMimeType(mimeType);
+            request.setMimeType(resolvedMimeType);
             String cookies = CookieManager.getInstance().getCookie(url);
             if (cookies != null && !cookies.isEmpty()) request.addRequestHeader("Cookie", cookies);
             request.addRequestHeader("User-Agent", System.getProperty("http.agent", "PwaniNet"));

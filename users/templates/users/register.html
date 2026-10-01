@@ -24,6 +24,7 @@
     outline: 3px solid rgba(37, 99, 235, .35); outline-offset: 2px;
   }
   .auth-card .password-toggle-btn { min-width: 3rem; }
+  .auth-card :is(input, select, textarea) { scroll-margin-block: 5.5rem 1.5rem; }
   [data-theme="dark"] .text-dark {
     color: #ffffff !important;
   }
@@ -166,7 +167,7 @@
   }
 
   @media (max-width: 767px) {
-    .auth-page { min-height: 0; align-items: flex-start; padding: max(1rem, env(safe-area-inset-top)) .75rem max(1.5rem, env(safe-area-inset-bottom)); }
+    .auth-page { min-height: 0; align-items: flex-start; padding: max(4.5rem, calc(env(safe-area-inset-top, 0px) + 4rem)) .75rem max(1.5rem, env(safe-area-inset-bottom, 0px)); }
     .auth-card-container { max-width: 38rem; }
   }
   @media (prefers-reduced-motion: reduce) { .auth-card *, .auth-card *::before, .auth-card *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }

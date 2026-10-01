@@ -40,6 +40,7 @@
     outline: 3px solid rgba(37, 99, 235, .35); outline-offset: 2px;
   }
   .auth-card .password-toggle-btn { min-width: 3rem; }
+  .auth-card :is(input, select, textarea) { scroll-margin-block: 5.5rem 1.5rem; }
   [data-theme="dark"] .text-dark,
   [data-theme="dark"] h2 {
     color: #e4e6eb !important;
@@ -81,11 +82,11 @@
   }
 
   @media (max-width: 991px) {
-    .auth-page { height: calc(100svh - 5rem); min-height: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); justify-items: center; align-content: stretch; overflow-y: auto; padding: calc(env(safe-area-inset-top, 0px) + .5rem) .75rem max(1rem, env(safe-area-inset-bottom)); }
+    .auth-page { height: auto; min-height: 100svh; min-height: 100dvh; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); justify-items: center; align-content: start; overflow: visible; padding: max(4.5rem, calc(env(safe-area-inset-top, 0px) + 4rem)) .75rem max(1rem, env(safe-area-inset-bottom)); }
     .brand-showcase { display: none; }
-    .login-brand { position: static; grid-row: 1; justify-self: start; margin: .25rem 0 .5rem .25rem; }
+    .login-brand { position: fixed; top: max(.75rem, env(safe-area-inset-top, 0px)); left: max(1rem, env(safe-area-inset-left, 0px)); z-index: 1100; }
     .auth-card-container { max-width: 32rem; }
-    .auth-panel { grid-row: 2; align-self: center; justify-content: center; padding: 0; }
+    .auth-panel { grid-row: 1; align-self: start; justify-content: center; padding: 0; }
   }
   @media (min-width: 992px) and (max-width: 1199px) {
     .showcase-stage { transform: scale(.78); transform-origin: center; margin: -70px -75px; }
