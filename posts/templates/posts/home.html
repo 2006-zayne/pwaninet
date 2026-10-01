@@ -354,7 +354,7 @@
   <div class="content-wrapper">
     <!-- Contextual Profile Nudge - Only shown on initial page load -->
     {% if request.user.profile_completion_percentage < 50 %}
-    <div id="profile-nudge-card" class="card mb-3 border-0 shadow-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+    <div id="profile-nudge-card" class="card mb-3 border-0 shadow-sm" data-profile-nudge-user="{{ request.user.id }}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
       <div class="card-body p-3 text-white">
         <div class="d-flex align-items-center">
           <div class="flex-shrink-0">
@@ -366,7 +366,7 @@
           </div>
           <div class="flex-shrink-0 d-flex gap-2">
             <a href="{% url 'users:update_profile' %}" class="btn btn-sm btn-light fw-bold">Update</a>
-            <button id="dismiss-profile-nudge" class="btn btn-sm btn-outline-light fw-bold">&times;</button>
+            <button type="button" id="dismiss-profile-nudge" class="btn btn-sm btn-outline-light fw-bold" aria-label="{% trans 'Dismiss profile reminder' %}">&times;</button>
           </div>
         </div>
       </div>
@@ -391,25 +391,29 @@
 {% endif %}
 
 <script>
-// Handle profile nudge dismissal
-document.addEventListener('DOMContentLoaded', function() {
-  const nudgeCard = document.getElementById('profile-nudge-card');
-  const dismissBtn = document.getElementById('dismiss-profile-nudge');
-
-  // Check if user has already dismissed the nudge
-  const nudgeDismissed = localStorage.getItem('profileNudgeDismissed');
-  if (nudgeDismissed === 'true' && nudgeCard) {
-    nudgeCard.style.display = 'none';
-  }
-
-  // Handle dismiss button click
-  if (dismissBtn && nudgeCard) {
-    dismissBtn.addEventListener('click', function() {
-      nudgeCard.style.display = 'none';
-      localStorage.setItem('profileNudgeDismissed', 'true');
+(function () {
+  const storageKey = card => `profileNudgeDismissed:${card.dataset.profileNudgeUser || 'user'}`;
+  const hideDismissedCards = root => {
+    (root || document).querySelectorAll?.('#profile-nudge-card').forEach(card => {
+      try {
+        if (localStorage.getItem(storageKey(card)) === 'true') card.classList.add('d-none');
+      } catch (_) {}
     });
+  };
+  if (!window._profileNudgeDismissHandlerBound) {
+    window._profileNudgeDismissHandlerBound = true;
+    document.addEventListener('click', event => {
+      const button = event.target.closest('#dismiss-profile-nudge');
+      if (!button) return;
+      const card = button.closest('#profile-nudge-card');
+      if (!card) return;
+      card.classList.add('d-none');
+      try { localStorage.setItem(storageKey(card), 'true'); } catch (_) {}
+    });
+    document.addEventListener('htmx:afterSwap', event => hideDismissedCards(event.detail?.target || document));
   }
-});
+  hideDismissedCards(document);
+})();
 </script>
 
 {% endblock %}
@@ -591,6 +595,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     repostButton.classList.remove('text-primary');
                     repostButton.classList.add('text-muted');
                 }
+                repostButton.querySelector('.repost-state-label')?.classList.toggle('d-none', !data.is_reposted);
+                repostButton.title = data.is_reposted ? 'Reposted' : 'Repost';
+                repostButton.setAttribute('aria-label', data.is_reposted ? 'Undo repost' : 'Repost');
             }
         });
     }

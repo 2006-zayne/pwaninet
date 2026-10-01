@@ -1005,8 +1005,16 @@ def toggle_follow(request, username):
             return JsonResponse({'error': 'This connection is unavailable.'}, status=403)
         return redirect('users:profile', username=username)
 
+    # Reel follow chips are one-way actions, not toggles. This keeps a stale
+    # client state or a repeated tap from unexpectedly unfollowing someone.
+    follow_only = request.GET.get('action') == 'follow'
     follow_qs = Follow.objects.filter(follower=request.user, followed=target)
-    if follow_qs.exists():
+    if follow_only:
+        _, created = Follow.objects.get_or_create(follower=request.user, followed=target)
+        if created:
+            invalidate_unread_count_cache(target.id)
+        is_following = True
+    elif follow_qs.exists():
         follow_qs.delete()
         is_following = False
     else:

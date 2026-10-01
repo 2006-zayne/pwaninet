@@ -1,6 +1,6 @@
 {% load i18n %}
 {% if repost_users %}
-<div class="reel-repost-scatter-cluster {% if repost_users|length == 1 %}scatter-single{% elif repost_users|length == 2 %}scatter-curve{% else %}scatter-triangle{% endif %} d-inline-flex align-items-center">
+<div class="reel-repost-scatter-cluster scatter-row d-inline-flex align-items-center">
     <div class="scatter-items-group position-relative">
         {% for ru in repost_users %}
         <div class="scatter-item position-relative" title="{{ ru.get_full_name|default:ru.username }} reposted">
@@ -21,9 +21,9 @@
         </div>
         {% endfor %}
     </div>
-    {% if repost_count > repost_users|length %}
-    <span class="badge bg-dark bg-opacity-75 text-white rounded-pill px-2 py-1 ms-2 fw-semibold" style="font-size: 11px; backdrop-filter: blur(4px);">
-        +{{ repost_count|add:"-3" }}
+    {% if visible_repost_count > repost_users|length %}
+    <span class="badge bg-dark bg-opacity-75 text-white rounded-pill px-2 py-1 ms-1 fw-semibold" title="{% trans 'More people you follow reposted this' %}" aria-label="{% trans 'More people you follow reposted this' %}" style="font-size: 0.72rem; backdrop-filter: blur(4px);">
+        +{{ visible_repost_count|add:"-2" }}
     </span>
     {% endif %}
 </div>

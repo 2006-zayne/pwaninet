@@ -1213,6 +1213,21 @@
   border-color: #ffffff !important;
 }
 
+.reel-follow-chip.is-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: wait;
+}
+
+.reel-follow-chip.is-following,
+.reel-follow-chip.is-following:hover {
+  border-color: rgba(187, 247, 208, 0.8) !important;
+  background: rgba(22, 101, 52, 0.72) !important;
+  color: #ffffff !important;
+  cursor: default;
+}
+
 /* Right Engagement Rail - Pure Floating Icons over Video */
 .reel-actions-stack {
   position: absolute;
@@ -2100,6 +2115,20 @@ body.reels-active .modal-backdrop {
   color: #ffffff !important;
 }
 
+.close-fs-reels-btn:disabled {
+  cursor: wait;
+  opacity: 0.9;
+}
+
+.close-fs-reels-btn.is-closing {
+  width: auto;
+  min-width: 44px;
+  gap: 0.45rem;
+  padding: 0 0.8rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+}
+
 @media (min-width: 992px) {
   .fullscreen-reels-modal {
     background: var(--background, #f8fafc);
@@ -2758,7 +2787,7 @@ body.reels-active .modal-backdrop {
 
 /* Bottom scrim in fullscreen: elevated above system navigation bars and gesture areas */
 .reel-fullscreen-content .reel-scrim-bottom {
-  padding-bottom: calc(max(0.85rem, env(safe-area-inset-bottom, 0.85rem)) + 14px) !important;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px) !important;
   padding-left: max(0.85rem, env(safe-area-inset-left, 0.85rem)) !important;
   min-height: 210px;
 }
@@ -3281,9 +3310,16 @@ body.reels-active .modal-backdrop {
 .reel-repost-scatter-cluster {
   display: inline-flex;
   align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.45rem 0.2rem 0.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.58);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   user-select: none;
   pointer-events: auto;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.2s ease, opacity 0.2s ease;
 }
 
 .reel-card-repost-cluster-wrap {
@@ -3295,24 +3331,27 @@ body.reels-active .modal-backdrop {
 
 .scatter-items-group {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
 }
 
 .scatter-item {
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
   transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .scatter-item:hover {
-  transform: scale(1.12) !important;
+  transform: scale(1.06) !important;
   z-index: 10;
 }
 
 .scatter-avatar-img {
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid #ffffff;
@@ -3321,9 +3360,9 @@ body.reels-active .modal-backdrop {
 }
 
 .scatter-repost-icon {
-  width: 18px;
-  height: 18px;
-  font-size: 10px;
+  width: 14px;
+  height: 14px;
+  font-size: 8px;
   background: #2563eb !important;
   color: #ffffff !important;
   border: 2px solid #ffffff;
@@ -3338,59 +3377,15 @@ body.reels-active .modal-backdrop {
   z-index: 3;
 }
 
-/* 1 Avatar: Single */
-.reel-repost-scatter-cluster.scatter-single .scatter-items-group {
-  display: flex;
-}
-
-/* 2 Avatars: Curve formation (no overlap, staggered Y and subtle angles) */
-.reel-repost-scatter-cluster.scatter-curve .scatter-items-group {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 2px;
-}
-
-.reel-repost-scatter-cluster.scatter-curve .scatter-item:nth-child(1) {
-  transform: translateY(-5px) rotate(-4deg);
-}
-
-.reel-repost-scatter-cluster.scatter-curve .scatter-item:nth-child(2) {
-  transform: translateY(4px) rotate(4deg);
-}
-
-/* 3 Avatars: Triangle formation (no overlap, 1 centered top, 2 below) */
-.reel-repost-scatter-cluster.scatter-triangle .scatter-items-group {
-  display: grid;
-  grid-template-columns: repeat(2, 40px);
-  column-gap: 12px;
-  row-gap: 6px;
-  justify-items: center;
-  align-items: center;
-  padding: 2px;
-}
-
-.reel-repost-scatter-cluster.scatter-triangle .scatter-item:nth-child(1) {
-  grid-column: 1 / span 2;
-  justify-self: center;
-  transform: translateY(0);
-}
-
-.reel-repost-scatter-cluster.scatter-triangle .scatter-item:nth-child(2) {
-  grid-column: 1;
-  transform: rotate(-3deg);
-}
-
-.reel-repost-scatter-cluster.scatter-triangle .scatter-item:nth-child(3) {
-  grid-column: 2;
-  transform: rotate(3deg);
-}
+/* Repost social proof stays in one compact row; video remains the focus. */
+.reel-repost-scatter-cluster.scatter-row .scatter-items-group { display: flex; }
 
 /* Fullscreen Reel Player Placement */
 .reel-fullscreen-repost-badge {
   display: flex;
   align-items: center;
-  margin-bottom: 0.5rem;
+  min-height: 0;
+  margin-bottom: 0.25rem;
   pointer-events: auto;
   z-index: 5;
 }
@@ -3403,7 +3398,7 @@ body.reels-active .modal-backdrop {
 .reel-fullscreen-repost-badge .scatter-repost-label {
   color: rgba(255, 255, 255, 0.9) !important;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
-  font-size: 11px;
+  font-size: 0.75rem;
 }
 
 /* Legacy floating badge support (if used elsewhere) */

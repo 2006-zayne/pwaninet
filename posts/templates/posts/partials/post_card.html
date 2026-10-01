@@ -453,8 +453,10 @@
                 style="flex: 1 1 0px; min-width: 0;"
                 data-post-id="{{ post.share_id }}"
                 onclick="const vm = window.videoManager || window.PwaniNetVideoManager; if (vm && vm.toggleReelRepost) { event.preventDefault(); event.stopPropagation(); vm.toggleReelRepost('{{ post.share_id }}'); }"
-                aria-label="{% trans 'Repost' %}">
+                aria-label="{% if user_has_reposted %}{% trans 'Undo repost' %}{% else %}{% trans 'Repost' %}{% endif %}"
+                title="{% if user_has_reposted %}{% trans 'Reposted' %}{% else %}{% trans 'Repost' %}{% endif %}">
             <i class="bi bi-repeat fs-5 {% if user_has_reposted %}text-primary{% endif %}"></i>
+            <span class="repost-state-label {% if not user_has_reposted %}d-none{% endif %}">{% trans "Reposted" %}</span>
             <span class="fw-bold repost-count">{{ post.repost_count }}</span>
         </button>
         <button class="btn btn-sm border-0 text-muted d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1"

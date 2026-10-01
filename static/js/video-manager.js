@@ -45,6 +45,8 @@
         mutationObserver: null,
         currentPlayingVideo: null,
         isFullScreenActive: false,
+        isClosingFullscreen: false,
+        fullscreenReturnFocus: null,
         previousScrollY: 0,
         tapTimers: new Map(), // element -> timer id
         hasLongPressed: false,
@@ -255,19 +257,25 @@
         if (!badgeData || !badgeData.avatars || badgeData.avatars.length === 0) {
             return '';
         }
-        const avatars = badgeData.avatars.slice(0, 3);
-        const count = badgeData.repost_count || avatars.length;
-        const formationClass = avatars.length === 1 ? 'scatter-single' : (avatars.length === 2 ? 'scatter-curve' : 'scatter-triangle');
+        const avatars = badgeData.avatars.slice(0, 2);
+        const count = Number.isFinite(Number(badgeData.visible_repost_count))
+            ? Number(badgeData.visible_repost_count)
+            : avatars.length;
+
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>\"']/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;'
+        }[char]));
 
         let itemsHtml = '';
         avatars.forEach((ru) => {
-            const avatarUrl = ru.avatar || '/static/images/default-avatar.png';
-            const username = ru.username || '';
-            const name = ru.name || username || 'User';
+            const avatarUrl = escapeHtml(ru.avatar || '/static/images/default-avatar.png');
+            const username = String(ru.username || '');
+            const name = escapeHtml(ru.name || username || 'User');
+            const profilePath = `/users/user/${encodeURIComponent(username)}/`;
             itemsHtml += `
                 <div class="scatter-item position-relative" title="${name} reposted">
-                    <a href="/users/user/${username}/"
-                       hx-get="/users/user/${username}/"
+                    <a href="${profilePath}"
+                       hx-get="${profilePath}"
                        hx-target="#page-content-target"
                        hx-swap="innerHTML"
                        hx-push-url="true"
@@ -287,14 +295,14 @@
         let overflowHtml = '';
         if (count > avatars.length) {
             overflowHtml = `
-                <span class="badge bg-dark bg-opacity-75 text-white rounded-pill px-2 py-1 ms-2 fw-semibold" style="font-size: 11px; backdrop-filter: blur(4px);">
+                <span class="badge bg-dark bg-opacity-75 text-white rounded-pill px-2 py-1 ms-1 fw-semibold" title="More people you follow reposted this" aria-label="More people you follow reposted this" style="font-size: 0.72rem; backdrop-filter: blur(4px);">
                     +${count - avatars.length}
                 </span>
             `;
         }
 
         return `
-            <div class="reel-repost-scatter-cluster ${formationClass} d-inline-flex align-items-center">
+            <div class="reel-repost-scatter-cluster scatter-row d-inline-flex align-items-center">
                 <div class="scatter-items-group position-relative">
                     ${itemsHtml}
                 </div>
@@ -318,14 +326,14 @@
                      document.querySelector(`.reel-post-card[data-post-id="${postId}"]`) ||
                      document.querySelector(`[data-post-id="${postId}"]`);
 
-        let badgeData = { repost_count: 0, is_reposted: false, avatars: [], followed_friend: null };
+        let badgeData = { repost_count: 0, visible_repost_count: 0, is_reposted: false, avatars: [], followed_friend: null };
         if (card && card.dataset.repostBadge) {
             try {
                 badgeData = typeof card.dataset.repostBadge === 'string'
                     ? JSON.parse(card.dataset.repostBadge)
                     : card.dataset.repostBadge;
             } catch (e) {
-                badgeData = { repost_count: 0, is_reposted: false, avatars: [], followed_friend: null };
+                badgeData = { repost_count: 0, visible_repost_count: 0, is_reposted: false, avatars: [], followed_friend: null };
             }
         }
         if (!badgeData.avatars) badgeData.avatars = [];
@@ -340,19 +348,6 @@
                 } else {
                     badgeData.repost_count = (badgeData.repost_count || 0) + 1;
                 }
-                const alreadyIn = badgeData.avatars.some(a =>
-                    (user.id && String(a.id) === String(user.id)) ||
-                    (user.username && a.username === user.username)
-                );
-                if (!alreadyIn && (user.username || user.id)) {
-                    badgeData.avatars.unshift({
-                        id: user.id,
-                        username: user.username,
-                        name: user.name || user.username,
-                        avatar: user.avatar || '/static/images/default-avatar.png',
-                        is_self: Boolean(isReposted)
-                    });
-                }
             } else {
                 if (isReposted === false) badgeData.is_reposted = false;
                 if (repostCount !== undefined && repostCount !== null) {
@@ -360,14 +355,14 @@
                 } else {
                     badgeData.repost_count = Math.max(0, (badgeData.repost_count || 1) - 1);
                 }
-                badgeData.avatars = badgeData.avatars.filter(a =>
-                    !(user.id && String(a.id) === String(user.id)) &&
-                    !(user.username && a.username === user.username)
-                );
             }
         } else if (repostCount !== undefined && repostCount !== null) {
             badgeData.repost_count = repostCount;
         }
+        badgeData.visible_repost_count = Math.max(
+            Number(badgeData.visible_repost_count) || 0,
+            badgeData.avatars.length
+        );
 
         document.querySelectorAll(`[data-post-id="${postId}"]`).forEach(c => {
             c.dataset.repostBadge = JSON.stringify(badgeData);
@@ -466,6 +461,10 @@
                 proxyBtn.classList.toggle('text-primary', isReposted);
                 const icon = proxyBtn.querySelector('i');
                 if (icon) icon.className = isReposted ? 'bi bi-repeat text-primary' : 'bi bi-repeat';
+                proxyBtn.title = isReposted ? 'Reposted' : 'Repost';
+                proxyBtn.setAttribute('aria-label', isReposted ? 'Undo repost' : 'Repost');
+                const status = snapItem.querySelector(`#fs-reel-repost-state-${postId}`);
+                if (status) status.classList.toggle('d-none', !isReposted);
             }
             const countEl = snapItem.querySelector(`#fs-reel-repost-count-${postId}`);
             if (countEl && repostCount !== undefined && repostCount !== null) {
@@ -482,6 +481,9 @@
                 desktopRepostBtn.classList.toggle('text-primary', isReposted);
                 const icon = desktopRepostBtn.querySelector('i');
                 if (icon) icon.className = isReposted ? 'bi bi-repeat text-primary' : 'bi bi-repeat';
+                desktopRepostBtn.title = isReposted ? 'Reposted' : 'Repost';
+                desktopRepostBtn.setAttribute('aria-label', isReposted ? 'Undo repost' : 'Repost');
+                document.getElementById('fsDesktopRepostState')?.classList.toggle('d-none', !isReposted);
             }
         }
         if (desktopRepostCount && (desktopRepostBtn?.dataset.postId === postId || currentDesktopRailPostId === postId)) {
@@ -533,6 +535,10 @@
                 btn.classList.toggle('text-muted', !isReposted);
                 const icon = btn.querySelector('i');
                 if (icon) icon.className = isReposted ? 'bi bi-repeat fs-5 text-primary' : 'bi bi-repeat fs-5';
+                const stateLabel = btn.querySelector('.repost-state-label');
+                if (stateLabel) stateLabel.classList.toggle('d-none', !isReposted);
+                btn.title = isReposted ? 'Reposted' : 'Repost';
+                btn.setAttribute('aria-label', isReposted ? 'Undo repost' : 'Repost');
             }
             const countSpan = btn.querySelector('.repost-count') || btn.querySelector('span.fw-bold') || btn.querySelector('span');
             if (countSpan && repostCount !== undefined && repostCount !== null) {
@@ -1871,11 +1877,10 @@
             followBtnHtml = `
                 <button type="button"
                         class="reel-follow-chip"
-                        hx-post="${followUrl}"
-                        hx-swap="none"
+                        data-follow-url="${followUrl}"
+                        data-author-username="${authorUsername}"
                         title="Follow"
-                        aria-label="Follow"
-                        onclick="event.stopPropagation(); this.remove();">
+                        aria-label="Follow ${authorUsername}">
                     Follow
                 </button>
             `;
@@ -1960,22 +1965,6 @@
             }
         }
 
-        // Audio pill
-        let audioWrapHtml = '';
-        const existingAudioWrap = card.querySelector('.reel-audio-wrap');
-        if (existingAudioWrap) {
-            audioWrapHtml = existingAudioWrap.outerHTML;
-        } else {
-            audioWrapHtml = `
-                <div class="reel-audio-wrap d-inline-flex align-items-center">
-                    <span class="badge bg-dark bg-opacity-60 rounded-pill text-white small px-2.5 py-1 d-inline-flex align-items-center gap-1.5 reel-audio-pill" style="font-size: 11px; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.18);">
-                        <i class="bi bi-music-note-beamed text-primary"></i>
-                        <span class="text-truncate reel-audio-ticker-text" style="max-width: 220px;">Original Audio - ${authorUsername}</span>
-                    </span>
-                </div>
-            `;
-        }
-
         // Extract like count & state
         const likeBtn = card.querySelector('.like-button');
         const likeCount = card.dataset.likes ||
@@ -2024,6 +2013,7 @@
         snapItem.dataset.postId = postId;
         snapItem.dataset.authorName = authorName;
         snapItem.dataset.authorUsername = authorUsername;
+        snapItem.dataset.isFollowing = card.dataset.isFollowing === 'true' ? 'true' : 'false';
         snapItem.dataset.authorAvatar = authorAvatar;
         snapItem.dataset.profileUrl = profileUrl;
         snapItem.dataset.unitCode = unitCode;
@@ -2124,10 +2114,11 @@
                     </div>
 
                     <div class="reel-action-unit text-center">
-                        <button type="button" class="reel-action-btn fs-repost-proxy-btn text-white ${isReposted ? 'text-primary is-reposted' : ''}" data-post-id="${postId}" title="Repost" aria-label="Repost">
+                        <button type="button" class="reel-action-btn fs-repost-proxy-btn text-white ${isReposted ? 'text-primary is-reposted' : ''}" data-post-id="${postId}" title="${isReposted ? 'Reposted' : 'Repost'}" aria-label="${isReposted ? 'Undo repost' : 'Repost'}">
                             <i class="bi ${isReposted ? 'bi-repeat text-primary' : 'bi-repeat'}"></i>
                         </button>
                         <span class="reel-action-label" id="fs-reel-repost-count-${postId}">${repostCount}</span>
+                        <span class="reel-action-label fs-repost-state-label ${isReposted ? '' : 'd-none'}" id="fs-reel-repost-state-${postId}">Reposted</span>
                     </div>
 
                     <div class="reel-action-unit text-center">
@@ -2154,13 +2145,12 @@
                 <!-- Bottom Scrim: Creator Identity, Caption, and Audio Pill (Option C) -->
                 <div class="reel-scrim-bottom position-absolute bottom-0 start-0 w-100 d-flex flex-column justify-content-end" style="pointer-events: none; z-index: 4;">
                     <div class="reel-scrim-content">
-                        <!-- Repost Badge sitting just slightly on top of author's avatar and username -->
+                        <!-- Compact followed-account repost context -->
                         <div id="fs-repost-badge-${postId}" class="reel-fullscreen-repost-badge ${repostBadgeHtml ? '' : 'd-none'}">
                             ${repostBadgeHtml}
                         </div>
                         ${creatorRowHtml}
                         ${captionHtml}
-                        ${audioWrapHtml}
                     </div>
                 </div>
 
@@ -2755,9 +2745,12 @@
             fsRepostBtn.setAttribute('data-post-id', postId);
             fsRepostBtn.classList.toggle('text-primary', isReposted);
             fsRepostBtn.classList.toggle('is-reposted', isReposted);
+            fsRepostBtn.title = isReposted ? 'Reposted' : 'Repost';
+            fsRepostBtn.setAttribute('aria-label', isReposted ? 'Undo repost' : 'Repost');
             const rIcon = fsRepostBtn.querySelector('i');
             if (rIcon) rIcon.className = isReposted ? 'bi bi-repeat text-primary' : 'bi bi-repeat';
         }
+        document.getElementById('fsDesktopRepostState')?.classList.toggle('d-none', !isReposted);
         if (fsRepostCount) {
             fsRepostCount.textContent = repostCount;
         }
@@ -3057,6 +3050,7 @@
         }
 
         // Pause feed playback, suspend feed decoders, and save scroll offset
+        state.fullscreenReturnFocus = document.activeElement;
         state.previousScrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
         pauseAllVideos();
         suspendFeedVideos();
@@ -3192,6 +3186,48 @@
     }
 
     function closeFullscreenReels() {
+        const overlay = document.getElementById('fullscreenReelsOverlay');
+        if (!overlay || overlay.classList.contains('d-none') || state.isClosingFullscreen) return;
+
+        state.isClosingFullscreen = true;
+        overlay.setAttribute('aria-busy', 'true');
+        const closeBtn = document.getElementById('closeReelsOverlay');
+        if (closeBtn) {
+            closeBtn.disabled = true;
+            closeBtn.classList.add('is-closing');
+            closeBtn.setAttribute('aria-label', 'Closing reels');
+            closeBtn.title = 'Closing reels…';
+            closeBtn.querySelector('.close-reels-icon')?.classList.add('d-none');
+            closeBtn.querySelector('.close-reels-spinner')?.classList.remove('d-none');
+            closeBtn.querySelector('.close-reels-progress-label')?.classList.remove('d-none');
+        }
+
+        // Let the pending state paint before media and observer teardown begins.
+        requestAnimationFrame(() => {
+            try {
+                finishClosingFullscreenReels();
+            } finally {
+                state.isClosingFullscreen = false;
+                overlay.removeAttribute('aria-busy');
+                const returnFocus = state.fullscreenReturnFocus;
+                state.fullscreenReturnFocus = null;
+                if (returnFocus && returnFocus.isConnected && typeof returnFocus.focus === 'function') {
+                    try { returnFocus.focus({ preventScroll: true }); } catch (_) {}
+                }
+                if (closeBtn) {
+                    closeBtn.disabled = false;
+                    closeBtn.classList.remove('is-closing');
+                    closeBtn.setAttribute('aria-label', 'Close Reels');
+                    closeBtn.title = 'Back to feed';
+                    closeBtn.querySelector('.close-reels-icon')?.classList.remove('d-none');
+                    closeBtn.querySelector('.close-reels-spinner')?.classList.add('d-none');
+                    closeBtn.querySelector('.close-reels-progress-label')?.classList.add('d-none');
+                }
+            }
+        });
+    }
+
+    function finishClosingFullscreenReels() {
         const overlay = document.getElementById('fullscreenReelsOverlay');
         const viewport = document.getElementById('reelsSnapViewport');
         if (!overlay) return;
@@ -4590,6 +4626,58 @@
 
         // Tap and Hitbox handling
         document.addEventListener('click', function(event) {
+            const followChip = event.target.closest('.reel-follow-chip');
+            if (followChip) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (followChip.disabled) return;
+
+                const originalLabel = followChip.textContent.trim() || 'Follow';
+                const authorUsername = followChip.dataset.authorUsername || '';
+                const followUrl = followChip.dataset.followUrl || '';
+                followChip.disabled = true;
+                followChip.classList.add('is-loading');
+                followChip.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>Following…</span>';
+
+                fetch(followUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-CSRFToken': getCsrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
+                }).then(response => {
+                    if (!response.ok) throw new Error('Follow request failed');
+                    return response.json();
+                }).then(data => {
+                    if (!data || data.is_following !== true) throw new Error('Follow was not confirmed');
+
+                    document.querySelectorAll('[data-author-username]').forEach(element => {
+                        if (element.dataset.authorUsername === authorUsername) {
+                            element.dataset.isFollowing = 'true';
+                        }
+                    });
+                    document.querySelectorAll('.reel-follow-chip[data-author-username]').forEach(chip => {
+                        if (chip.dataset.authorUsername !== authorUsername) return;
+                        chip.disabled = true;
+                        chip.classList.remove('is-loading');
+                        chip.classList.add('is-following');
+                        chip.textContent = 'Following';
+                        chip.title = 'Following';
+                        chip.setAttribute('aria-label', `Following ${authorUsername}`);
+                    });
+                }).catch(error => {
+                    console.warn('[VideoManager] Follow request failed:', error);
+                    followChip.disabled = false;
+                    followChip.classList.remove('is-loading');
+                    followChip.textContent = originalLabel;
+                    followChip.title = 'Follow';
+                    followChip.setAttribute('aria-label', `Follow ${authorUsername}`);
+                });
+                return;
+            }
+
             // Hitbox single vs. double tap (pauses/plays or likes)
             const hitbox = event.target.closest('.reel-center-hitbox, .reel-tap-hitbox');
             if (hitbox) {

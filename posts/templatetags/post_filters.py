@@ -94,7 +94,14 @@ def check_is_reposted(context, post):
 def repost_avatars(post, user=None):
     if not post or not hasattr(post, 'get_repost_avatars'):
         return []
-    return post.get_repost_avatars(viewer=user, max_avatars=3)
+    return post.get_repost_avatars(viewer=user, max_avatars=2)
+
+
+@register.simple_tag
+def repost_visible_count(post, user=None):
+    if not post or not hasattr(post, 'get_visible_repost_count'):
+        return 0
+    return post.get_visible_repost_count(viewer=user)
 
 
 @register.filter
@@ -102,7 +109,7 @@ def repost_badge_json(post, user=None):
     if not post or not hasattr(post, 'get_repost_badge_data'):
         return "{}"
     try:
-        return json.dumps(post.get_repost_badge_data(viewer=user, max_avatars=3))
+        return json.dumps(post.get_repost_badge_data(viewer=user, max_avatars=2))
     except Exception:
         return "{}"
 

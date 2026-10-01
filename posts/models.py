@@ -305,62 +305,50 @@ class Post(models.Model):
             return False
         return self.reposts.filter(reposter=user).exists() or self.repost_children.filter(author=user).exists()
 
-    def get_repost_avatars(self, viewer=None, max_avatars=3):
+    def get_repost_avatars(self, viewer=None, max_avatars=2):
         """
-        Get avatar user objects for users who reposted this reel/post.
-        Prioritizes:
-        1. Current viewer (if viewer reposted)
-        2. Users the viewer follows (social proof)
-        3. Other reposters up to max_avatars
+        Get avatars only for accounts the viewer follows.
         """
         if not self.pk:
             return []
 
-        reposters_list = []
-        for r in self.reposts.select_related('reposter').all():
-            if r.reposter:
-                reposters_list.append(r.reposter)
-        for rc in self.repost_children.select_related('author').all():
-            if rc.author:
-                reposters_list.append(rc.author)
-        if getattr(self, 'repost_context', None) and isinstance(self.repost_context, dict):
-            ctx_reposter = self.repost_context.get('reposter')
-            if ctx_reposter:
-                reposters_list.append(ctx_reposter)
-
-        if not reposters_list:
+        if not (viewer and viewer.is_authenticated):
+            self._visible_reposter_users = []
+            self._visible_repost_count = 0
             return []
 
-        viewer_id = viewer.id if (viewer and viewer.is_authenticated) else None
-        following_ids = set()
-        if viewer and viewer.is_authenticated:
-            try:
-                from users.models import Follow
-                following_ids = set(Follow.objects.filter(follower=viewer).values_list('followed_id', flat=True))
-            except Exception:
-                following_ids = set()
+        if not hasattr(self, '_visible_reposter_users'):
+            from users.models import Follow
+            following_ids = set(Follow.objects.filter(follower=viewer).values_list('followed_id', flat=True))
+            followed_reposters = []
+            seen_ids = set()
 
-        self_users = []
-        followed_users = []
-        other_users = []
+            for repost in self.reposts.select_related('reposter').all():
+                reposter = repost.reposter
+                if reposter and reposter.id in following_ids and reposter.id not in seen_ids:
+                    seen_ids.add(reposter.id)
+                    followed_reposters.append(reposter)
+            for repost in self.repost_children.select_related('author').all():
+                reposter = repost.author
+                if reposter and reposter.id in following_ids and reposter.id not in seen_ids:
+                    seen_ids.add(reposter.id)
+                    followed_reposters.append(reposter)
 
-        for reposter in reposters_list:
-            if viewer_id and reposter.id == viewer_id:
-                self_users.append(reposter)
-            elif reposter.id in following_ids:
-                followed_users.append(reposter)
-            else:
-                other_users.append(reposter)
+            context = getattr(self, 'repost_context', None)
+            context_reposter = context.get('reposter') if isinstance(context, dict) else None
+            if (context_reposter and context_reposter.id in following_ids
+                    and context_reposter.id not in seen_ids):
+                followed_reposters.append(context_reposter)
 
-        seen_ids = set()
-        result = []
-        for u in (self_users + followed_users + other_users):
-            if u.id not in seen_ids:
-                seen_ids.add(u.id)
-                result.append(u)
-            if len(result) >= max_avatars:
-                break
-        return result
+            self._visible_reposter_users = followed_reposters
+            self._visible_repost_count = len(followed_reposters)
+
+        return self._visible_reposter_users[:max(0, max_avatars)]
+
+    def get_visible_repost_count(self, viewer=None):
+        """Return the number of distinct followed accounts who reposted this post."""
+        self.get_repost_avatars(viewer=viewer, max_avatars=0)
+        return getattr(self, '_visible_repost_count', 0)
 
     def get_repost_header_info(self, viewer=None):
         """
@@ -464,7 +452,7 @@ class Post(models.Model):
                 'created_at': primary_dt,
             }
 
-    def get_repost_badge_data(self, viewer=None, max_avatars=3):
+    def get_repost_badge_data(self, viewer=None, max_avatars=2):
         """
         Structured metadata for front-end floating repost badge.
         """
@@ -498,6 +486,7 @@ class Post(models.Model):
 
         return {
             'repost_count': total_count,
+            'visible_repost_count': self.get_visible_repost_count(viewer=viewer),
             'is_reposted': is_reposted,
             'avatars': avatars,
             'has_more': max(0, total_count - len(avatars)),

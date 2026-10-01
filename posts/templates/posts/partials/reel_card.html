@@ -6,6 +6,7 @@
 {% check_is_liked post as user_has_liked %}
 {% check_is_reposted post as user_has_reposted %}
 {% with header_author=post.original_author repost_users=post|repost_avatars:request.user %}
+{% repost_visible_count post request.user as visible_repost_count %}
 <div id="reel-card-{{ post.share_id }}"
      class="post-card fb-post-card reel-post-card mb-3 bg-white rounded-3 overflow-hidden border position-relative"
      data-post-id="{{ post.share_id }}"
@@ -13,6 +14,9 @@
      data-author-username="{{ header_author.username }}"
      data-author-avatar="{{ header_author.profile_pic.url|default:'/static/images/default-avatar.png' }}"
      data-author-profile="{% url 'users:profile' header_author.username %}"
+     data-follow-url="{% url 'users:toggle_follow' header_author.username %}?action=follow"
+     data-is-following="{% if request.user.is_authenticated and header_author|is_following:request.user %}true{% else %}false{% endif %}"
+     data-is-self="{% if header_author == request.user %}true{% else %}false{% endif %}"
      data-is-liked="{% if user_has_liked %}true{% else %}false{% endif %}"
      data-likes="{{ post.like_count }}"
      data-is-reposted="{% if user_has_reposted %}true{% else %}false{% endif %}"
@@ -302,7 +306,7 @@
         <div id="reel-card-repost-cluster-{{ post.share_id }}"
              class="reel-card-repost-cluster-wrap position-absolute bottom-0 start-0 m-3 {% if not repost_users %}d-none{% endif %}"
              style="z-index: 5; pointer-events: auto; width: auto;">
-            {% include "posts/partials/repost_scatter_cluster.html" with repost_users=repost_users repost_count=post.repost_count %}
+            {% include "posts/partials/repost_scatter_cluster.html" with repost_users=repost_users visible_repost_count=visible_repost_count %}
         </div>
 
         <!-- Bottom Right Overlay: Mute toggle button -->
@@ -347,8 +351,10 @@
                 style="flex: 1 1 0px; min-width: 0;"
                 data-post-id="{{ post.share_id }}"
                 onclick="const vm = window.videoManager || window.PwaniNetVideoManager; if (vm && vm.toggleReelRepost) { event.preventDefault(); event.stopPropagation(); vm.toggleReelRepost('{{ post.share_id }}'); }"
-                aria-label="{% trans 'Repost' %}">
+                aria-label="{% if user_has_reposted %}{% trans 'Undo repost' %}{% else %}{% trans 'Repost' %}{% endif %}"
+                title="{% if user_has_reposted %}{% trans 'Reposted' %}{% else %}{% trans 'Repost' %}{% endif %}">
             <i class="bi bi-repeat fs-5 {% if user_has_reposted %}text-primary{% endif %}"></i>
+            <span class="repost-state-label {% if not user_has_reposted %}d-none{% endif %}">{% trans "Reposted" %}</span>
             <span class="fw-bold repost-count">{{ post.repost_count }}</span>
         </button>
         <button class="btn btn-sm border-0 text-muted d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1"

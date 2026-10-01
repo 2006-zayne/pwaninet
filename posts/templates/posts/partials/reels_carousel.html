@@ -47,6 +47,7 @@
                  data-author-username="{{ reel.author.username }}"
                  data-author-avatar="{{ reel.author.profile_pic.url|default:'/static/images/default-avatar.png' }}"
                  data-author-profile="{% url 'users:profile' reel.author.username %}"
+                 data-follow-url="{% url 'users:toggle_follow' reel.author.username %}?action=follow"
                  data-caption="{{ reel.content|default:'' }}"
                  data-likes="{{ reel.likes.count|default:0 }}"
                  data-is-liked="{% if user_has_liked %}true{% else %}false{% endif %}"

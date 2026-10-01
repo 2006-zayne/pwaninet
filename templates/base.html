@@ -2549,7 +2549,9 @@
         <div id="fullscreenReelsOverlay" class="fullscreen-reels-modal d-none" aria-hidden="true" role="dialog" aria-label="{% trans 'Reels viewer' %}">
             <!-- Close Button (Top Left) -->
             <button type="button" class="close-fs-reels-btn" id="closeReelsOverlay" title="{% trans 'Back to feed' %}" aria-label="{% trans 'Close Reels' %}">
-                <i class="bi bi-x-lg"></i>
+                <i class="bi bi-x-lg close-reels-icon"></i>
+                <span class="spinner-border spinner-border-sm close-reels-spinner d-none" aria-hidden="true"></span>
+                <span class="close-reels-progress-label d-none">{% trans "Closing…" %}</span>
             </button>
 
             <!-- Main Flex Layout Container -->
@@ -2599,6 +2601,7 @@
                                 <i class="bi bi-repeat"></i>
                             </button>
                             <span class="reel-desktop-action-label" id="fsDesktopRepostCount">0</span>
+                            <span class="reel-desktop-action-label fs-repost-state-label d-none" id="fsDesktopRepostState">{% trans "Reposted" %}</span>
                         </div>
 
                         <div class="reel-desktop-action-unit text-center">
@@ -5209,6 +5212,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
                                     rb.classList.toggle('text-muted', !nowReposted);
                                     var countSpan = rb.querySelector('.repost-count') || rb.parentElement.querySelector('#fsDesktopRepostCount');
                                     if (countSpan) countSpan.textContent = data.repost_count;
+                                    var stateLabel = rb.querySelector('.repost-state-label');
+                                    if (stateLabel) stateLabel.classList.toggle('d-none', !nowReposted);
                                 });
                             }
                         }

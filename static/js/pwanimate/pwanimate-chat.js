@@ -1281,8 +1281,9 @@
             if (this.voiceSendBtn) this.voiceSendBtn.disabled = true;
             this.setVoiceStatus('Starting microphone');
 
+            let stream = null;
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
+                stream = await navigator.mediaDevices.getUserMedia({
                     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
                 });
                 if (this.voiceCancelled || this.isGenerating) {
@@ -1292,7 +1293,15 @@
 
                 this.voiceMediaStream = stream;
                 const mimeType = this.getVoiceMimeType();
-                this.voiceRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+                try {
+                    this.voiceRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+                } catch (error) {
+                    // Some Android WebView builds report a MIME type as supported but
+                    // still reject it when constructing MediaRecorder. Let WebView choose.
+                    if (!mimeType || error.name !== 'NotSupportedError') throw error;
+                    console.warn('[Pwanimate voice] Requested recording format was rejected; retrying with the WebView default.', error);
+                    this.voiceRecorder = new MediaRecorder(stream);
+                }
                 this.voiceChunks = [];
                 const recorder = this.voiceRecorder;
                 recorder.addEventListener('dataavailable', event => {
@@ -1305,12 +1314,26 @@
                     this.startVoiceLevelMeter(stream);
                 }, { once: true });
                 recorder.addEventListener('stop', () => this.handleVoiceRecordingStopped(recorder), { once: true });
-                recorder.addEventListener('error', () => {
-                    this.voiceErrorMessage = 'The recording stopped unexpectedly. Please try again.';
+                recorder.addEventListener('error', event => {
+                    const error = event.error || event;
+                    console.error('[Pwanimate voice] MediaRecorder failed:', error);
+                    this.voiceErrorMessage = this.getVoiceStartupErrorMessage(error);
+                    stream.getTracks().forEach(track => track.stop());
+                    this.voiceMediaStream = null;
+                    this.voiceRecorder = null;
+                    this.voiceChunks = [];
+                    this.voiceStarting = false;
+                    this.voiceStopping = false;
+                    this.setVoiceListening(false);
+                    if (this.input) this.input.disabled = this.isGenerating;
+                    this.stopVoiceLevelMeter();
                     this.setVoiceStatus(this.voiceErrorMessage, true);
                 }, { once: true });
                 recorder.start(1000);
             } catch (error) {
+                console.error('[Pwanimate voice] Could not start recording:', error);
+                if (stream) stream.getTracks().forEach(track => track.stop());
+                this.voiceMediaStream = null;
                 if (this.voiceCancelled) return;
                 this.voiceStarting = false;
                 this.voiceRecorder = null;
@@ -1318,7 +1341,7 @@
                 this.setVoiceListening(false);
                 if (this.input) this.input.disabled = this.isGenerating;
                 this.stopVoiceLevelMeter();
-                this.setVoiceStatus('Microphone could not be started. Check microphone permission and try again.', true);
+                this.setVoiceStatus(this.getVoiceStartupErrorMessage(error), true);
             } finally {
                 if (!this.voiceRecorder || this.voiceRecorder.state !== 'recording') this.voiceStarting = false;
                 if (this.voiceBtn && !this.voiceListening && !this.voiceStopping && !this.voiceStarting) {
@@ -1336,6 +1359,26 @@
                 'audio/ogg',
             ];
             return supportedTypes.find(type => MediaRecorder.isTypeSupported(type)) || '';
+        }
+
+        getVoiceStartupErrorMessage(error) {
+            switch (error && error.name) {
+                case 'NotAllowedError':
+                case 'SecurityError':
+                    return 'Microphone access is blocked. Allow microphone access for Pwaninet in Android settings, then try again.';
+                case 'NotFoundError':
+                case 'DevicesNotFoundError':
+                    return 'No microphone is available on this device.';
+                case 'NotReadableError':
+                case 'TrackStartError':
+                    return 'Android could not open the microphone. Close other apps using it, then try again.';
+                case 'OverconstrainedError':
+                    return 'The microphone could not meet the requested audio settings. Please try again.';
+                case 'NotSupportedError':
+                    return 'This Android WebView could not start a supported audio recording format. Update Android System WebView and try again.';
+                default:
+                    return 'Microphone could not be started. Check microphone permission and try again.';
+            }
         }
 
         async handleVoiceRecordingStopped(recorder) {
