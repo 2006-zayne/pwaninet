@@ -23,6 +23,7 @@ import android.os.Bundle;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
+import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.webkit.JavascriptInterface;
@@ -67,6 +68,7 @@ import java.util.ArrayList;
 import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity {
+    private static final String GALLERY_BRIDGE_TAG = "GalleryBridge";
     private boolean isNetworkAvailable = true;
     private boolean isOfflinePageShowing = false;
     private static final String WEBVIEW_STATE_KEY = "WEBVIEW_STATE";
@@ -81,6 +83,8 @@ public class MainActivity extends BridgeActivity {
     private static final int REQUEST_SPEECH_AUDIO_PERMISSION = 4301;
     private static final int REQUEST_MEDIA_DOWNLOAD_PERMISSION = 4302;
     private PendingMediaDownload pendingMediaDownload;
+    private WebAppInterface androidWebAppInterface;
+    private WebView androidBridgeWebView;
 
     private static final class PendingMediaDownload {
         final String url, filename, mimeType, category;
@@ -124,6 +128,7 @@ public class MainActivity extends BridgeActivity {
 
         @JavascriptInterface
         public boolean saveMediaToGallery(String sourceUri, String filename, String mimeType, String category) {
+            Log.i(GALLERY_BRIDGE_TAG, "Gallery save requested (" + category + ")");
             MainActivity activity = activityRef.get();
             if (activity == null || sourceUri == null || filename == null) return false;
             boolean isVideo = "video".equalsIgnoreCase(category);
@@ -152,10 +157,11 @@ public class MainActivity extends BridgeActivity {
                     }
                     MediaScannerConnection.scanFile(activity, new String[] { targetFile.getAbsolutePath() },
                         new String[] { mimeType }, null);
+                    Log.i(GALLERY_BRIDGE_TAG, "Gallery save completed");
                     return true;
                 } catch (Exception error) {
                     if (targetFile != null) targetFile.delete();
-                    System.err.println("[MainActivity] Legacy gallery publish failed: " + error.getMessage());
+                    Log.e(GALLERY_BRIDGE_TAG, "Legacy gallery publish failed", error);
                     return false;
                 }
             }
@@ -184,10 +190,11 @@ public class MainActivity extends BridgeActivity {
                 if (activity.getContentResolver().update(target, ready, null, null) == 0) {
                     throw new IOException("MediaStore could not publish the gallery entry");
                 }
+                Log.i(GALLERY_BRIDGE_TAG, "Gallery save completed");
                 return true;
             } catch (Exception error) {
                 if (target != null) activity.getContentResolver().delete(target, null, null);
-                System.err.println("[MainActivity] Offline media could not be published to Gallery: " + error.getMessage());
+                Log.e(GALLERY_BRIDGE_TAG, "Gallery publish failed", error);
                 return false;
             }
         }
@@ -317,12 +324,21 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void setupAndroidBridge() {
-        if (getBridge() != null && getBridge().getWebView() != null) {
-            WebView webView = getBridge().getWebView();
-            WebAppInterface bridge = new WebAppInterface(this);
-            webView.addJavascriptInterface(bridge, "AndroidBridge");
-            webView.addJavascriptInterface(bridge, "PwaninetBridge");
+        if (getBridge() == null || getBridge().getWebView() == null) return;
+
+        WebView webView = getBridge().getWebView();
+        if (webView == androidBridgeWebView) return;
+
+        // Keep one Java object for the lifetime of this WebView. Replacing the
+        // object from onPageLoaded/onPageCommitVisible invalidates Chromium's
+        // JavaScript wrappers and produces "WebView: Unknown object" errors.
+        if (androidWebAppInterface == null) {
+            androidWebAppInterface = new WebAppInterface(this);
         }
+        webView.addJavascriptInterface(androidWebAppInterface, "AndroidBridge");
+        webView.addJavascriptInterface(androidWebAppInterface, "PwaninetBridge");
+        androidBridgeWebView = webView;
+        Log.i("MainActivity", "Android JavaScript bridge registered on WebView");
     }
 
     private void requestSpeechRecognition(String language) {

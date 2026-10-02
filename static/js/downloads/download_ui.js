@@ -162,7 +162,9 @@ class DownloadUI {
         window.addEventListener('pwaninet:download-already-downloaded', (e) => {
             const item = e.detail || {};
             this.showToast(item.gallerySaved === false
-                ? 'Already saved for Offline Media, but the Gallery save still failed.'
+                ? (item.galleryError?.includes('bridge is unavailable')
+                    ? 'This app build cannot publish downloads to Gallery. Rebuild and reinstall the app.'
+                    : 'Already saved for Offline Media, but the Gallery save still failed. Tap Download to retry.')
                 : item.gallerySaved === true
                     ? 'Already downloaded. Find it in Offline Media and your Gallery.'
                     : 'Already downloaded. Find it in Offline Media.', item.gallerySaved === false ? 'error' : 'info');
@@ -208,6 +210,13 @@ class DownloadUI {
         }
     }
 
+    getGalleryFailureMessage(item) {
+        if (item.galleryError?.includes('bridge is unavailable')) {
+            return 'Gallery saving is unavailable in this app build. Rebuild and reinstall the Android app.';
+        }
+        return 'Gallery save failed. Tap Download again to retry.';
+    }
+
     handleItemCompleted(item) {
         this.updateProgress(100, item);
         const titleEl = document.getElementById('download-banner-title');
@@ -220,14 +229,14 @@ class DownloadUI {
             subEl.textContent = item.gallerySaved === true
                 ? `${item.filename} is ready in Offline Media and your Gallery`
                 : item.isNative && ['image', 'video'].includes(item.category) && item.gallerySaved === false
-                    ? `${item.filename} is ready for Offline Media; Gallery save failed. Tap download to retry.`
+                    ? `${item.filename} is ready for Offline Media; ${this.getGalleryFailureMessage(item)}`
                     : `${item.filename} is ready for offline use`;
         }
         if (item.category === 'video') {
             this.showToast(item.gallerySaved === true
                 ? `${item.filename || 'Video'} saved to Gallery and Offline Media.`
                 : item.isNative && item.gallerySaved === false
-                    ? `${item.filename || 'Video'} saved offline; Gallery save failed. Tap Download to retry.`
+                    ? `${item.filename || 'Video'} saved offline; ${this.getGalleryFailureMessage(item)}`
                     : `${item.filename || 'Video'} saved for offline use.`, item.gallerySaved === false ? 'error' : 'success');
         }
         if (fillEl) fillEl.classList.add('phase-completed');
@@ -644,12 +653,89 @@ class DownloadUI {
                 text-overflow: ellipsis;
             }
 
+            /* Keep the download notice compact over fullscreen reels. */
+            body.reels-active .download-banner {
+                border-radius: 16px;
+            }
+
+            body.reels-active .download-banner-header {
+                position: absolute;
+                top: 50%;
+                right: 6px;
+                z-index: 2;
+                padding: 0;
+                transform: translateY(-50%);
+            }
+
+            body.reels-active .download-banner-badge-wrapper,
+            body.reels-active .download-banner-sub-row {
+                display: none;
+            }
+
+            body.reels-active .download-header-actions {
+                gap: 2px;
+            }
+
+            body.reels-active .download-action-btn {
+                width: 24px;
+                height: 24px;
+                padding: 4px;
+            }
+
+            body.reels-active .download-banner-body {
+                gap: 8px;
+                padding: 7px 64px 7px 12px;
+            }
+
+            body.reels-active .download-banner-thumb-box {
+                width: 28px;
+                height: 28px;
+                flex: 0 0 28px;
+                border-radius: 8px;
+            }
+
+            body.reels-active .download-banner-thumb {
+                font-size: 16px;
+            }
+
+            body.reels-active .download-banner-info-col,
+            body.reels-active .download-banner-title-row {
+                min-width: 0;
+                width: 100%;
+            }
+
+            body.reels-active .download-banner-info-col {
+                flex: 1 1 0%;
+            }
+
+            body.reels-active .download-banner-title-row {
+                justify-content: flex-start;
+                gap: 6px;
+                line-height: 1.2;
+            }
+
+            body.reels-active .download-primary-title {
+                flex: 1 1 auto;
+                min-width: 0;
+                line-height: 1.2;
+            }
+
+            body.reels-active .download-progress-number {
+                flex: 0 0 3ch;
+                text-align: right;
+                line-height: 1.2;
+            }
+
             /* Progress Track */
             .download-banner-progress-track {
                 width: 100%;
                 height: 4px;
                 background: rgba(128, 128, 128, 0.18);
                 overflow: hidden;
+            }
+
+            body.reels-active .download-banner-progress-track {
+                height: 3px;
             }
 
             .download-banner-progress-fill {

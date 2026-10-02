@@ -89,8 +89,10 @@ class DownloadManager {
                         existing.mimeType || (existingCategory === 'video' ? 'video/mp4' : 'image/jpeg'),
                         existingCategory
                     ) === true;
+                    existing.galleryError = existing.gallerySaved ? null : 'The Android app could not publish the offline file to Gallery.';
                     await this.storage.saveMetadata(existing);
                 } catch (galleryError) {
+                    existing.galleryError = galleryError.message || 'The Android app could not publish the offline file to Gallery.';
                     console.warn('[DownloadManager] Gallery retry failed:', galleryError);
                 }
             }
@@ -179,18 +181,27 @@ class DownloadManager {
             // Capacitor keeps its offline copy privately; also publish media to
             // Android's shared Photos/Gallery collection when the native bridge supports it.
             let gallerySaved = null;
+            let galleryError = null;
             const mediaCategory = item.mediaType || item.category;
             const nativeBridge = window.AndroidBridge || window.PwaninetBridge;
-            if (['image', 'video'].includes(mediaCategory) && nativeBridge?.saveMediaToGallery) {
-                try {
-                    gallerySaved = nativeBridge.saveMediaToGallery(
-                        uriResult.uri,
-                        item.filename,
-                        item.mimeType || (mediaCategory === 'video' ? 'video/mp4' : 'image/jpeg'),
-                        mediaCategory
-                    ) === true;
-                } catch (galleryError) {
-                    console.warn('[DownloadManager] Could not publish media to gallery:', galleryError);
+            if (['image', 'video'].includes(mediaCategory)) {
+                gallerySaved = false;
+                if (nativeBridge?.saveMediaToGallery) {
+                    try {
+                        gallerySaved = nativeBridge.saveMediaToGallery(
+                            uriResult.uri,
+                            item.filename,
+                            item.mimeType || (mediaCategory === 'video' ? 'video/mp4' : 'image/jpeg'),
+                            mediaCategory
+                        ) === true;
+                        if (!gallerySaved) galleryError = 'The Android app could not publish the offline file to Gallery.';
+                    } catch (error) {
+                        galleryError = error.message || 'The Android app could not publish the offline file to Gallery.';
+                        console.warn('[DownloadManager] Could not publish media to gallery:', error);
+                    }
+                } else {
+                    galleryError = 'The Android Gallery bridge is unavailable. Rebuild and reinstall the app, then retry.';
+                    console.error('[DownloadManager] AndroidBridge.saveMediaToGallery is unavailable for this native media download.');
                 }
             }
 
@@ -230,7 +241,8 @@ class DownloadManager {
                 isNative: true,
                 nativePath: relativePath,
                 nativeUri: uriResult.uri,
-                gallerySaved
+                gallerySaved,
+                galleryError
             };
 
             await this.storage.saveMetadata(metadata);

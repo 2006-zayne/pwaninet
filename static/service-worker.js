@@ -7,8 +7,9 @@
 'use strict';
 let CACHE_VERSION = '1.6.2';
 let CACHE_BUILD = '101';
-let CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}`;
-let OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}`;
+const SW_CACHE_REVISION = '2';
+let CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
+let OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
 
 // Service worker version metadata
 const SW_VERSION = {
@@ -25,8 +26,8 @@ self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SET_VERSION') {
         CACHE_VERSION = event.data.version;
         CACHE_BUILD = event.data.build;
-        CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}`;
-        OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}`;
+        CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
+        OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
         SW_VERSION.version = CACHE_VERSION;
         SW_VERSION.build = CACHE_BUILD;
         SW_VERSION.cacheName = CACHE_NAME;
@@ -106,7 +107,10 @@ self.addEventListener('activate', (event) => {
             .then((cacheNames) => {
                 return Promise.all(
                     cacheNames.map((cacheName) => {
-                        if (cacheName !== CACHE_NAME && cacheName !== OFFLINE_CACHE_NAME) {
+                        const isPwaniNetWorkerCache =
+                            cacheName.startsWith('pwaninet-v') ||
+                            cacheName.startsWith('pwaninet-offline-v');
+                        if (isPwaniNetWorkerCache && cacheName !== CACHE_NAME && cacheName !== OFFLINE_CACHE_NAME) {
                             console.log('Service Worker: Deleting old cache:', cacheName);
                             return caches.delete(cacheName);
                         }
