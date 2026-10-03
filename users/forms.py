@@ -230,8 +230,7 @@ class ProfileUpdateForm(forms.ModelForm):
                 else:
                     continue
                 project_lines.append(line_str)
-            self.fields['projects'].initial = '
-'.join(project_lines)
+            self.fields['projects'].initial = '\n'.join(project_lines)
 
     def clean_skills(self):
         """Convert skills textarea to list"""
