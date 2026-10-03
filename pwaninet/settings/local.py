@@ -5,19 +5,7 @@ from .base import *
 
 DEBUG = True           
 
-ALLOWED_HOSTS = [
-    host.split(':')[0].strip()
-    for host in os.environ.get(
-        'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,0.0.0.0,pwaninet.app,192.168.58.221,192.168.43.170,10.0.2.2'
-    ).split(',')
-    if host.strip()
-]
-
-# Ensure the specific IP is in ALLOWED_HOSTS
-if 'pwaninet.app' not in ALLOWED_HOSTS:
-
-        ALLOWED_HOSTS.append('pwaninet.app')
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '[::1]']
 
 
 
@@ -37,6 +25,9 @@ DATABASES = {
 # Disable security features for local development
 SECURE_BROWSER_XSS_FILTER = False
 SECURE_CONTENT_TYPE_NOSNIFF = False
+# Cookie isolation to prevent collisions with production in the same browser
+SESSION_COOKIE_NAME = 'pwaninet_local_sessionid'
+CSRF_COOKIE_NAME = 'pwaninet_local_csrftoken'
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 
@@ -45,58 +36,10 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
 
-# Allow all origins for CSRF in local development (both HTTP and HTTPS)
+# CSRF Trusted Origins for local development
 CSRF_TRUSTED_ORIGINS = [
-    'https://pwaninet.app',
-    'http://pwaninet.app',
-    'https://*.pwaninet.app',
-    'https://*.trycloudflare.com',
-    'http://localhost',
     'http://localhost:8000',
-    'https://localhost',
-    'https://localhost:8000',
-    'http://127.0.0.1',
     'http://127.0.0.1:8000',
-    'https://127.0.0.1',
-    'https://127.0.0.1:8000',
-    'http://0.0.0.0',
-    'http://0.0.0.0:8000',
-    'https://0.0.0.0',
-    'https://0.0.0.0:8000',
-    'http://10.20.152.125',
-    'http://10.20.152.125:8000',
-    'https://10.20.152.125',
-    'https://10.20.152.125:8000',
-    'http://10.0.2.2',
-    'http://10.0.2.2:8000',
-    'http://192.168.213.221',
-    'http://192.168.213.221:8000',
-    'https://192.168.213.221',
-    'https://192.168.213.221:8000',
-    'http://192.168.180.221',
-    'http://192.168.180.221:8000',
-    'https://192.168.180.221',
-    'https://192.168.180.221:8000',
-    'http://192.168.72.88',
-    'http://192.168.72.88:8000',
-    'https://192.168.72.88',
-    'https://192.168.72.88:8000',
-    'http://192.168.85.117',
-    'http://192.168.85.117:8000',
-    'https://192.168.85.117',
-    'https://192.168.85.117:8000',
-    'http://192.168.183.245',
-    'http://192.168.183.245:8000',
-    'https://192.168.183.245',
-    'https://192.168.183.245:8000',
-    'http://172.18.0.1',
-    'http://172.18.0.1:8000',
-    'https://172.18.0.1',
-    'https://172.18.0.1:8000',
-    'capacitor://localhost',
-    'http://localhost',
-    'http://192.168.127.221',
-    'http://192.168.127.221:8000',
 ]
 
 # Disable CSRF for API endpoints in local development

@@ -15,7 +15,7 @@ import os
 import logging
 from django.core.asgi import get_asgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pwaninet.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pwaninet.settings.local')
 
 django_asgi_app = get_asgi_application()
 
