@@ -41,6 +41,7 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - /srv/prod-app/data/media:/app/media
+      - /srv/prod-app/src/firebase-adminsdk.json:/app/firebase-adminsdk.json:ro
     command: >
       sh -c "mkdir -p /app/media/temp &&
              python manage.py migrate --noinput &&
@@ -62,6 +63,7 @@ services:
     env_file: .env
     volumes:
       - /srv/prod-app/data/media:/app/media
+      - /srv/prod-app/src/firebase-adminsdk.json:/app/firebase-adminsdk.json:ro
     command: celery -A pwaninet worker -l info --concurrency=2
     depends_on:
       db:
