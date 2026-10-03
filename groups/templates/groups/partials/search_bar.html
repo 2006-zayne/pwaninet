@@ -36,6 +36,7 @@
             {% for recent_search in recent_searches %}
             <a href="{% url 'groups:groups_dashboard' %}?q={{ recent_search }}"
                class="group-recent-tag"
+               title="{{ recent_search }}"
                style="background: var(--border); padding: 4px 12px; 
                       border-radius: var(--radius-pill); font-size: 0.75rem; 
                       color: var(--text-secondary); cursor: pointer; text-decoration: none; font-weight: 500;">
@@ -52,10 +53,24 @@
 </div>
 
 <style>
+.group-search-input {
+    min-width: 0;
+    box-sizing: border-box;
+}
+
 .group-search-input:focus {
     border-color: var(--brand);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
     background: var(--card-bg);
+}
+
+.group-recent-tag {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 .group-recent-tag:hover {
@@ -67,6 +82,9 @@
     .group-search-input {
         padding: 10px 16px 10px 40px;
         font-size: 0.85rem;
+    }
+    .group-recent-tag {
+        max-width: 150px;
     }
 }
 </style>

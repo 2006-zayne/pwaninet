@@ -83,17 +83,17 @@
             <!-- File Item -->
             <div class="doc-file-item" 
                  style="display: flex; align-items: center; gap: 16px; padding: 16px; 
-                        background: var(--background); border-radius: 12px; margin-bottom: 12px;">
+                        background: var(--background); border-radius: 12px; margin-bottom: 12px; min-width: 0;">
                 <div class="doc-file-icon" 
                      style="width: 48px; height: 48px; background: var(--primary-light); 
-                            border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                            border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                     <i class="bi bi-file-earmark-pdf" style="font-size: 1.5rem; color: var(--primary);"></i>
                 </div>
-                <div style="flex: 1;">
-                    <p style="font-size: 0.95rem; font-weight: 500; color: var(--text-dark); margin: 0;">Database Systems CAT 2.pdf</p>
+                <div style="flex: 1; min-width: 0; overflow: hidden;">
+                    <p style="font-size: 0.95rem; font-weight: 500; color: var(--text-dark); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Database Systems CAT 2.pdf</p>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">2.4 MB</p>
                 </div>
-                <button class="btn btn-outline-secondary" style="padding: 8px 12px; border-radius: 8px;">
+                <button class="btn btn-outline-secondary" style="padding: 8px 12px; border-radius: 8px; flex-shrink: 0;">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
@@ -101,17 +101,17 @@
             <!-- File Item -->
             <div class="doc-file-item" 
                  style="display: flex; align-items: center; gap: 16px; padding: 16px; 
-                        background: var(--background); border-radius: 12px; margin-bottom: 12px;">
+                        background: var(--background); border-radius: 12px; margin-bottom: 12px; min-width: 0;">
                 <div class="doc-file-icon" 
                      style="width: 48px; height: 48px; background: var(--primary-light); 
-                            border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                            border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                     <i class="bi bi-file-earmark-pdf" style="font-size: 1.5rem; color: var(--primary);"></i>
                 </div>
-                <div style="flex: 1;">
-                    <p style="font-size: 0.95rem; font-weight: 500; color: var(--text-dark); margin: 0;">Lecture Notes Week 5.pdf</p>
+                <div style="flex: 1; min-width: 0; overflow: hidden;">
+                    <p style="font-size: 0.95rem; font-weight: 500; color: var(--text-dark); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Lecture Notes Week 5.pdf</p>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">1.8 MB</p>
                 </div>
-                <button class="btn btn-outline-secondary" style="padding: 8px 12px; border-radius: 8px;">
+                <button class="btn btn-outline-secondary" style="padding: 8px 12px; border-radius: 8px; flex-shrink: 0;">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
@@ -119,17 +119,17 @@
             <!-- File Item -->
             <div class="doc-file-item" 
                  style="display: flex; align-items: center; gap: 16px; padding: 16px; 
-                        background: var(--background); border-radius: 12px;">
+                        background: var(--background); border-radius: 12px; min-width: 0;">
                 <div class="doc-file-icon" 
                      style="width: 48px; height: 48px; background: var(--primary-light); 
-                            border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                            border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                     <i class="bi bi-file-earmark-zip" style="font-size: 1.5rem; color: var(--primary);"></i>
                 </div>
-                <div style="flex: 1;">
-                    <p style="font-size: 0.95rem; font-weight: 500; color: var(--text-dark); margin: 0;">Project Files.zip</p>
+                <div style="flex: 1; min-width: 0; overflow: hidden;">
+                    <p style="font-size: 0.95rem; font-weight: 500; color: var(--text-dark); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Project Files.zip</p>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">8.2 MB</p>
                 </div>
-                <button class="btn btn-outline-secondary" style="padding: 8px 12px; border-radius: 8px;">
+                <button class="btn btn-outline-secondary" style="padding: 8px 12px; border-radius: 8px; flex-shrink: 0;">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
@@ -276,18 +276,74 @@
 </div>
 
 <style>
+.doc-upload-container {
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+.doc-selected-files,
+.doc-shared-metadata,
+.doc-per-file-metadata {
+    min-width: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
 .doc-drop-zone:hover {
     border-color: var(--primary);
     background: var(--primary-light);
 }
 
+.doc-shared-metadata > div[style*="grid"] {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 16px;
+    min-width: 0;
+}
+
+.doc-shared-metadata > div[style*="grid"] > div {
+    min-width: 0;
+}
+
+.doc-shared-metadata .form-select,
+.doc-shared-metadata .form-control,
+.doc-per-file-metadata .form-control {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    text-overflow: ellipsis;
+}
+
+.doc-file-item {
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.doc-file-header {
+    min-width: 0;
+}
+
 @media (max-width: 768px) {
     .doc-shared-metadata > div[style*="grid"] {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr) !important;
     }
     
     .doc-upload-actions {
         flex-direction: column;
+    }
+
+    .doc-selected-files,
+    .doc-shared-metadata,
+    .doc-per-file-metadata {
+        padding: 16px !important;
+    }
+
+    .doc-drop-zone {
+        padding: 36px 16px !important;
     }
 }
 </style>
@@ -381,14 +437,14 @@
             const fileSize = formatFileSize(file.size);
             
             fileItem.innerHTML = `
-                <div class="doc-file-icon" style="width: 48px; height: 48px; background: var(--primary-light); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                <div class="doc-file-icon" style="width: 48px; height: 48px; background: var(--primary-light); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                     <i class="bi ${iconClass}" style="font-size: 1.5rem; color: var(--primary);"></i>
                 </div>
-                <div style="flex: 1;">
-                    <p style="font-size: 0.95rem; font-weight: 500; color: var(--text-dark); margin: 0;">${file.name}</p>
+                <div style="flex: 1; min-width: 0; overflow: hidden;">
+                    <p style="font-size: 0.95rem; font-weight: 500; color: var(--text-dark); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${file.name}">${file.name}</p>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">${fileSize}</p>
                 </div>
-                <button class="btn btn-outline-secondary remove-file-btn" data-index="${index}" style="padding: 8px 12px; border-radius: 8px;">
+                <button class="btn btn-outline-secondary remove-file-btn" data-index="${index}" style="padding: 8px 12px; border-radius: 8px; flex-shrink: 0;">
                     <i class="bi bi-x-lg"></i>
                 </button>
             `;
@@ -448,13 +504,13 @@
             fileDetail.style.cssText = 'background: var(--background); border-radius: 12px; margin-bottom: 12px; overflow: hidden;';
             
             fileDetail.innerHTML = `
-                <div class="doc-file-header" style="display: flex; align-items: center; justify-content: space-between; padding: 16px; cursor: pointer;" data-index="${index}">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <i class="bi ${isExpanded ? 'bi-chevron-down' : 'bi-chevron-right'}" style="color: var(--text-secondary);"></i>
-                        <span style="font-size: 0.95rem; font-weight: 500; color: var(--text-dark);">${file.name}</span>
+                <div class="doc-file-header" style="display: flex; align-items: center; justify-content: space-between; padding: 16px; cursor: pointer; min-width: 0;" data-index="${index}">
+                    <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; overflow: hidden;">
+                        <i class="bi ${isExpanded ? 'bi-chevron-down' : 'bi-chevron-right'}" style="color: var(--text-secondary); flex-shrink: 0;"></i>
+                        <span style="font-size: 0.95rem; font-weight: 500; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${file.name}">${file.name}</span>
                     </div>
                 </div>
-                <div class="doc-file-body" style="padding: ${isExpanded ? '16px' : '0'}; display: ${isExpanded ? 'block' : 'none'};">
+                <div class="doc-file-body" style="padding: ${isExpanded ? '16px' : '0'}; display: ${isExpanded ? 'block' : 'none'}; min-width: 0;">
                     <div style="margin-bottom: 16px;">
                         <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; display: block;">
                             Title
@@ -465,7 +521,7 @@
                                value="${file.name.replace(/\.[^/.]+$/, '')}"
                                placeholder="Enter document title"
                                style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); 
-                                      background: var(--card-bg); color: var(--text-dark);">
+                                      background: var(--card-bg); color: var(--text-dark); width: 100%; max-width: 100%; box-sizing: border-box;">
                     </div>
                     <div>
                         <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; display: block;">
@@ -477,7 +533,7 @@
                                rows="3"
                                placeholder="Enter document description"
                                style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); 
-                                      background: var(--card-bg); color: var(--text-dark); resize: vertical;"></textarea>
+                                      background: var(--card-bg); color: var(--text-dark); resize: vertical; width: 100%; max-width: 100%; box-sizing: border-box;"></textarea>
                     </div>
                 </div>
             `;
