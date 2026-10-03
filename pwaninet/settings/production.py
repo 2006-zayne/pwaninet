@@ -145,3 +145,15 @@ LOGGING = {
         },
     },
 }
+
+# ==============================================================================
+# WHITENOISE PRODUCTION CACHE & ASSET OPTIMIZATION
+# ==============================================================================
+# Enable compressed manifest storage for hashed, immutable static assets
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Bump static file caching to 1 year (31,536,000 seconds)
+WHITENOISE_MAX_AGE = 31536000
+
+# Set immutable flag on static files for zero-revalidation browser caching
+WHITENOISE_IMMUTABLE_FILE_TEST = lambda path, url: True
