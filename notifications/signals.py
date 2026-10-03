@@ -44,7 +44,7 @@ def create_like_notification(sender, instance, created, **kwargs):
                 context_type='POST',
                 context_id=str(post.id),
                 metadata={
-                    'post_content': post.content[:100],
+                    'post_content': (post.content or "")[:100],
                     'liker_username': liker.username,
                     'thumbnail_url': thumbnail_url,
                     'resource_type': 'POST',
