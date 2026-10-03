@@ -1107,7 +1107,140 @@ button.pwanimate-citation-badge {
     line-height: inherit;
 }
 
-/* Refined Thinking & Pulse Loader (Invisible Enclosure + Precision-Centered Spin Animation) */
+.pwanimate-web-source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex: 1 1 220px;
+    min-width: 0;
+    max-width: 340px;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--pwanimate-citation-border);
+    border-radius: 12px;
+    background: var(--pwanimate-citation-bg);
+    color: var(--pwanimate-citation-text);
+    text-align: left;
+    text-decoration: none;
+    transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+}
+
+.pwanimate-web-source-badge:hover {
+    border-color: var(--primary);
+    color: var(--pwanimate-citation-text);
+    text-decoration: none;
+    transform: translateY(-1px);
+}
+
+.pwanimate-web-source-copy {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 0.12rem;
+    min-width: 0;
+}
+
+.pwanimate-web-source-title {
+    display: -webkit-box;
+    overflow: hidden;
+    color: inherit;
+    font-size: 0.78rem;
+    font-weight: 650;
+    line-height: 1.25;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.pwanimate-web-source-domain {
+    overflow: hidden;
+    color: var(--pwanimate-muted, #64748b);
+    font-size: 0.69rem;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pwanimate-web-source-external {
+    flex: 0 0 auto;
+    color: var(--pwanimate-muted, #64748b);
+    font-size: 0.72rem;
+}
+
+.pwanimate-web-favicon {
+    position: relative;
+    display: inline-flex;
+    flex: 0 0 24px;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    overflow: hidden;
+    border: 1px solid var(--pwanimate-border);
+    border-radius: 7px;
+    background: var(--card-bg, #fff);
+    color: var(--primary);
+}
+
+.pwanimate-web-favicon img {
+    display: block;
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+}
+
+.pwanimate-web-favicon img[hidden],
+.pwanimate-web-favicon-fallback[hidden] {
+    display: none !important;
+}
+
+.pwanimate-web-favicon-fallback {
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.pwanimate-inline-web-citation {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    max-width: 150px;
+    margin: 0 0.12rem;
+    padding: 0.08rem 0.38rem 0.08rem 0.2rem;
+    border: 1px solid var(--pwanimate-citation-border);
+    border-radius: 999px;
+    background: var(--pwanimate-citation-bg);
+    color: var(--pwanimate-citation-text);
+    font-size: 0.72em;
+    line-height: 1.5;
+    text-decoration: none;
+    vertical-align: 0.12em;
+    white-space: nowrap;
+}
+
+.pwanimate-inline-web-citation:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.pwanimate-inline-web-citation .pwanimate-web-favicon {
+    flex-basis: 15px;
+    width: 15px;
+    height: 15px;
+    border: 0;
+    border-radius: 50%;
+}
+
+.pwanimate-inline-web-citation .pwanimate-web-favicon img {
+    width: 13px;
+    height: 13px;
+}
+
+.pwanimate-inline-web-domain {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Calm Pwanimate activity loader */
 .pwanimate-thinking-loader,
 .pwanimate-typing-indicator {
     display: inline-flex;
@@ -1318,8 +1451,19 @@ button.pwanimate-citation-badge {
     color: #94a3b8;
 }
 
-.pwanimate-thinking-text.fade-out {
-    opacity: 0;
+.pwanimate-thinking-text.status-changing {
+    animation: pwanimate-status-change 0.24s ease-out both;
+}
+
+@keyframes pwanimate-status-change {
+    from {
+        opacity: 0.55;
+        transform: translateY(2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1335,6 +1479,9 @@ button.pwanimate-citation-badge {
     }
     .pwanimate-thinking-text {
         transition: none !important;
+    }
+    .pwanimate-thinking-text.status-changing {
+        animation: none !important;
     }
 }
 

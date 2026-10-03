@@ -7,7 +7,7 @@ posts, people, and groups with execution timing and performance metrics.
 
 import time
 import logging
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from pwanimate.retrieval.types import (
     RetrievalRequest,
@@ -33,7 +33,11 @@ class UnifiedRetrievalService:
         self.document_service = document_service or DocumentSemanticRetrievalService()
         self.search_adapter = search_adapter or PwaniNetSearchAdapter()
 
-    def retrieve(self, request: RetrievalRequest) -> RetrievalResponse:
+    def retrieve(
+        self,
+        request: RetrievalRequest,
+        on_source_start: Optional[Callable[[SourceType], None]] = None,
+    ) -> RetrievalResponse:
         """
         Execute unified cross-source retrieval.
 
@@ -62,6 +66,8 @@ class UnifiedRetrievalService:
         source_metrics = {}
 
         for source in sources:
+            if on_source_start:
+                on_source_start(source)
             source_start = time.perf_counter()
             source_results: List[RetrievalResult] = []
 

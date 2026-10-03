@@ -22,6 +22,8 @@ Document ingestion uses local extractors for PDF, DOCX, PPTX, and text-like form
 
 LLM providers are Gemini, Groq, and OpenRouter. Embedding providers are Gemini, Jina, Voyage, and Cloudflare; a mock embedding provider supports local/testing use. The active providers depend on settings and credentials. The implementation calls provider HTTP APIs with `requests`; it does not require a provider-specific Python SDK. Only providers configured and called in the deployed environment receive request or embedding data. Confirm exact provider use and data sent before describing the feature publicly.
 
+Optional public web search uses one provider-neutral `web_search` tool backed by Tavily, Brave Search, and Serper adapters. The configured order determines fallback priority; blank keys do not prevent startup. See the [web-search developer guide](pwanimate-web-search.md) for configuration and tests.
+
 ## Developer notes
 
 - User prompts, conversation history, and uploaded attachments may contain personal or sensitive content. Preserve ownership, access controls, retention, and provider-routing safeguards.

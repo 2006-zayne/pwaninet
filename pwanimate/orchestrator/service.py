@@ -11,7 +11,7 @@ import os
 import re
 import time
 import uuid
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from django.conf import settings
 
 from pwanimate.ai.gateway import (
@@ -355,6 +355,11 @@ class PwanimateOrchestrator:
             if not isinstance(res, dict):
                 continue
             res_type = str(res.get("type") or res.get("category") or "").lower()
+            source_type = str(res.get("source_type") or res.get("sourceType") or "").lower()
+            # Public web citations are previews in the context rail, not PwaniNet
+            # records. They must never be interpreted as document or post IDs.
+            if source_type in {"web", "web_search"} or res_type in {"web", "web_search"}:
+                continue
             resource_id = res.get("id")
             if res_type in ("document", "doc"):
                 # Context rail descriptors are produced by the browser in camelCase,
@@ -387,7 +392,8 @@ class PwanimateOrchestrator:
                         pass
                 elif share_id:
                     try:
-                        doc_obj = Document.objects.filter(share_id=share_id).first()
+                        share_uuid = uuid.UUID(str(share_id).strip())
+                        doc_obj = Document.objects.filter(share_id=share_uuid).first()
                     except (ValueError, TypeError):
                         pass
 
@@ -423,7 +429,6 @@ class PwanimateOrchestrator:
                         pass
 
             post_id = res.get("post_id") or res.get("postId")
-            source_type = str(res.get("source_type") or res.get("sourceType") or "").lower()
             if post_id or res_type == "post" or source_type == "post":
                 post_id = post_id or resource_id
                 if not post_id:
@@ -560,7 +565,11 @@ class PwanimateOrchestrator:
             return instruction
         return f"{instruction}\n\nCurrent user local time: {local_time} ({zone}). Use this as the current time."
 
-    def run(self, request: OrchestrationRequest) -> OrchestrationResponse:
+    def run(
+        self,
+        request: OrchestrationRequest,
+        on_progress: Optional[Callable[[str], None]] = None,
+    ) -> OrchestrationResponse:
         """
         Execute an end-to-end orchestration turn.
 
@@ -598,7 +607,18 @@ class PwanimateOrchestrator:
             local_time=request.local_time, timezone_name=request.timezone_name,
         )
         retrieval_sources = None
-        # 2. Let the configured model resolve paraphrases not covered by patterns.
+        # 2. Force web search for clear current-events requests and factual follow-ups.
+        # This decision is deterministic so an LLM selector cannot silently skip it.
+        required_web_query = self.tool_selector.required_web_query(query, request.history)
+        if not tool_route and required_web_query:
+            tool_route = ToolRoute(
+                tool_name="web_search",
+                parameters={"query": required_web_query},
+                confidence=1.0,
+                matched_intent="required_public_web_lookup",
+            )
+
+        # 3. Let the configured model resolve other paraphrases not covered by patterns.
         # Avoid an extra selection call for simple greetings and acknowledgements.
         if (
             not tool_route
@@ -616,10 +636,20 @@ class PwanimateOrchestrator:
             tool_route = selection.route
             retrieval_sources = selection.sources
         if tool_route:
-            response = self._run_tool(request, query, tool_route, t_start)
+            if tool_route.tool_name == "web_search" and on_progress:
+                on_progress("searching_web")
+            elif tool_route.tool_name == "content_search" and on_progress:
+                content_type = str(tool_route.parameters.get("content_type") or "").lower()
+                if content_type == "post":
+                    on_progress("searching_posts")
+                elif content_type == "document":
+                    on_progress("searching_documents")
+            elif tool_route.tool_name == "group_announcements" and on_progress:
+                on_progress("searching_posts")
+            response = self._run_tool(request, query, tool_route, t_start, on_progress=on_progress)
             return self._append_friend_post_updates(response, request.user, friend_post_updates)
 
-        # 3. Conversational turns can skip platform retrieval after tool choice.
+        # 4. Conversational turns can skip platform retrieval after tool choice.
         is_conversational = not has_attachments_or_context and (
             request.task == "general" or self.is_conversational_intent(query)
         )
@@ -627,8 +657,14 @@ class PwanimateOrchestrator:
             response = self._run_conversational(request, query, t_start)
             return self._append_friend_post_updates(response, request.user, friend_post_updates)
 
-        # 4. Standard / Attachment / Context RAG
-        response = self._run_rag(request, query, t_start, source_override=retrieval_sources)
+        # 5. Standard / Attachment / Context RAG
+        response = self._run_rag(
+            request,
+            query,
+            t_start,
+            source_override=retrieval_sources,
+            on_progress=on_progress,
+        )
         return self._append_friend_post_updates(response, request.user, friend_post_updates)
 
     @staticmethod
@@ -741,6 +777,7 @@ class PwanimateOrchestrator:
         query: str,
         tool_route: ToolRoute,
         t_start: float,
+        on_progress: Optional[Callable[[str], None]] = None,
     ) -> OrchestrationResponse:
         """Handle high-confidence deterministic domain tool execution."""
         t_tool = time.perf_counter()
@@ -759,7 +796,6 @@ class PwanimateOrchestrator:
             context_items,
             user_context=request.user_context,
         )
-
         # Extract people data if people_discovery or user_profile tool ran
         people_results: List[Dict[str, Any]] = []
         if (
@@ -818,12 +854,25 @@ class PwanimateOrchestrator:
             task="tool",
             messages=messages,
             context=context_pkg,
-            system_instruction=self._with_local_time(get_system_instruction("required"), request),
+            system_instruction=self._with_local_time(
+                get_system_instruction("optional" if tool_route.tool_name == "web_search" else "required"),
+                request,
+            ),
             provider=request.provider,
             model=request.model,
             temperature=request.temperature,
             max_tokens=effective_max_tokens,
         )
+
+        if (
+            tool_route.tool_name == "web_search"
+            and tool_result.success
+            and any(item.source == "web" and item.url for item in context_pkg.items)
+            and on_progress
+        ):
+            on_progress("reading_sources")
+        elif tool_route.tool_name in {"content_search", "group_announcements"} and on_progress:
+            on_progress("devouring_context" if tool_result.success and tool_result.data else "thinking")
 
         t_gen = time.perf_counter()
         llm_response = self.gateway.generate(llm_request)
@@ -891,9 +940,16 @@ class PwanimateOrchestrator:
         query: str,
         t_start: float,
         source_override: Optional[List[str]] = None,
+        on_progress: Optional[Callable[[str], None]] = None,
     ) -> OrchestrationResponse:
         """Handle knowledge/retrieval-augmented dialogue turns."""
         # 0. Process attachments (images for vision, docs for prompt context)
+        has_document_attachment = any(
+            (getattr(attachment, "attachment_type", None) or "document") == "document"
+            for attachment in request.attachments
+        )
+        if has_document_attachment and on_progress:
+            on_progress("devouring_context")
         image_attachments, attachment_context = self._process_attachments(request.attachments, query=query)
 
         # 1. Resolve authorized context resources (active document / page filtering)
@@ -925,7 +981,19 @@ class PwanimateOrchestrator:
             mode=RetrievalMode.HYBRID,
             filters=filters,
         )
-        retrieval_resp = self.retrieval_service.retrieve(retrieval_req)
+        if on_progress:
+            def report_retrieval_source(source):
+                if source == SourceType.DOCUMENT:
+                    on_progress("searching_documents")
+                elif source == SourceType.POST:
+                    on_progress("searching_posts")
+
+            retrieval_resp = self.retrieval_service.retrieve(
+                retrieval_req,
+                on_source_start=report_retrieval_source,
+            )
+        else:
+            retrieval_resp = self.retrieval_service.retrieve(retrieval_req)
         if selected_post_results and include_posts:
             retrieval_resp.results.extend(selected_post_results)
             retrieval_resp.total_count += len(selected_post_results)
@@ -1021,6 +1089,9 @@ class PwanimateOrchestrator:
             attachments=image_attachments,
             metadata={"required_capability": "image"} if is_multimodal_turn else {},
         )
+
+        if on_progress:
+            on_progress("devouring_context" if attachment_context or context_pkg.total_items else "thinking")
 
         t_gen = time.perf_counter()
         vision_text_fallback = False
@@ -1150,7 +1221,7 @@ class PwanimateOrchestrator:
             res_type = meta.get("resource_type") or meta.get("chunk_type") or meta.get("file_type") or src_val
             file_ext = meta.get("file_type") or meta.get("extension") or ""
             author_val = meta.get("author") or meta.get("author_username") or meta.get("author_name") or ""
-            created_val = meta.get("created_at") or ""
+            created_val = meta.get("created_at") or meta.get("published_at") or ""
 
             summary_dict: Dict[str, Any] = {
                 "source": src_val,
@@ -1158,6 +1229,8 @@ class PwanimateOrchestrator:
                 "title": item.title,
                 "citation": item.citation,
                 "url": item.url,
+                "web_citation_index": meta.get("web_citation_index"),
+                "domain": meta.get("source") if src_val == "web" else "",
                 "resource_type": res_type,
                 "file_extension": file_ext,
                 "media_url": meta.get("media_url") or "",
@@ -1165,12 +1238,17 @@ class PwanimateOrchestrator:
                 "hls_url": meta.get("hls_url") or "",
                 "author": author_val,
                 "created_at": str(created_val) if created_val else "",
+                "published_at": str(meta.get("published_at") or ""),
                 "page_number": meta.get("page_number"),
                 "document_id": meta.get("document_id"),
                 "document_share_id": meta.get("document_share_id") or "",
                 "file_type": meta.get("file_type") or file_ext or "",
                 "post_id": meta.get("post_id") or (item.object_id if src_val == "post" else ""),
-                "snippet": item.content[:1200] if src_val == "post" and item.content else "",
+                "snippet": (
+                    (meta.get("snippet") or item.content[:1200])
+                    if src_val in {"post", "web"} and item.content
+                    else ""
+                ),
             }
 
             if (

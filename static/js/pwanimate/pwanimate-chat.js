@@ -116,8 +116,6 @@
             this.isGenerating = false;
             this.abortController = null;
             this.resizeFrame = null;
-            this.thinkingTextInterval = null;
-            this.thinkingFadeTimeout = null;
             this.lastPreviewTriggerEl = null;
             this._onDocumentClick = null;
             this._onKeyDown = null;
@@ -482,6 +480,7 @@
                         try {
                             el.innerHTML = this.renderMarkdownWithMathAndCode(raw);
                             this.postProcessMarkdownDOM(el);
+                            this.enhanceWebSources(el.closest('.pwanimate-message-row'));
                         } catch (e) {
                             console.warn('[Pwanimate] Markdown parse error:', e);
                         }
@@ -654,6 +653,173 @@
             }
 
             return html;
+        }
+
+        getSafeExternalUrl(value) {
+            if (typeof value !== 'string' || !value.trim()) return '';
+            try {
+                const url = new URL(value.trim());
+                if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password) {
+                    return '';
+                }
+                return url.href;
+            } catch (error) {
+                return '';
+            }
+        }
+
+        getWebSourceIndex(source) {
+            const direct = Number(source.webCitationIndex || source.web_citation_index || '');
+            if (Number.isInteger(direct) && direct > 0) return direct;
+            const citation = String(source.citation || '');
+            const match = citation.match(/\[Web\s+(\d+)/i);
+            return match ? Number(match[1]) : null;
+        }
+
+        createWebFavicon(domain, sourceUrl) {
+            const frame = document.createElement('span');
+            frame.className = 'pwanimate-web-favicon';
+            frame.setAttribute('aria-hidden', 'true');
+
+            const image = document.createElement('img');
+            image.alt = '';
+            image.loading = 'lazy';
+            image.decoding = 'async';
+            image.referrerPolicy = 'no-referrer';
+            try {
+                const parsedUrl = new URL(sourceUrl);
+                image.src = `${parsedUrl.origin}/favicon.ico`;
+            } catch (error) {
+                image.hidden = true;
+            }
+
+            const fallback = document.createElement('span');
+            fallback.className = 'pwanimate-web-favicon-fallback';
+            fallback.textContent = (domain || 'W').charAt(0).toUpperCase();
+            fallback.hidden = !image.hidden;
+            image.addEventListener('error', () => {
+                image.hidden = true;
+                fallback.hidden = false;
+            }, { once: true });
+
+            frame.append(image, fallback);
+            return frame;
+        }
+
+        createWebSourceLink(source, compact = false) {
+            const url = this.getSafeExternalUrl(source.url || source.dataset?.url || '');
+            if (!url) return null;
+
+            let domain = '';
+            try {
+                domain = new URL(url).hostname.replace(/^www\./i, '');
+            } catch (error) {}
+            const title = String(source.title || source.dataset?.title || domain || 'Web source');
+            const index = this.getWebSourceIndex(source);
+            const link = document.createElement('a');
+            link.className = compact ? 'pwanimate-inline-web-citation' : 'pwanimate-web-source-badge';
+            link.href = url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.dataset.url = url;
+            link.dataset.sourceType = 'web';
+            link.dataset.resourceType = 'web_search';
+            link.dataset.domain = domain;
+            if (index) link.dataset.webCitationIndex = String(index);
+            link.setAttribute('aria-label', `Open ${title} on ${domain}`);
+            link.title = `${title} · ${domain}`;
+            link.appendChild(this.createWebFavicon(domain, url));
+
+            if (compact) {
+                const label = document.createElement('span');
+                label.className = 'pwanimate-inline-web-domain';
+                label.textContent = domain;
+                link.appendChild(label);
+                return link;
+            }
+
+            const copy = document.createElement('span');
+            copy.className = 'pwanimate-web-source-copy';
+            const titleEl = document.createElement('span');
+            titleEl.className = 'pwanimate-web-source-title';
+            titleEl.textContent = title;
+            const domainEl = document.createElement('span');
+            domainEl.className = 'pwanimate-web-source-domain';
+            domainEl.textContent = domain;
+            copy.append(titleEl, domainEl);
+            link.append(copy);
+
+            const externalIcon = document.createElement('i');
+            externalIcon.className = 'bi bi-box-arrow-up-right pwanimate-web-source-external';
+            externalIcon.setAttribute('aria-hidden', 'true');
+            link.appendChild(externalIcon);
+            return link;
+        }
+
+        enhanceWebSources(row) {
+            if (!row) return;
+
+            row.querySelectorAll('.pwanimate-citation-badge[data-source-type="web"]').forEach((badge) => {
+                const source = {
+                    url: badge.dataset.url || badge.getAttribute('href') || '',
+                    title: badge.dataset.title || badge.textContent.trim(),
+                    citation: badge.dataset.citation || '',
+                    domain: badge.dataset.domain || '',
+                    web_citation_index: badge.dataset.webCitationIndex || '',
+                };
+                const link = this.createWebSourceLink(source, false);
+                if (link) badge.replaceWith(link);
+            });
+
+            const sourcesByIndex = new Map();
+            row.querySelectorAll('.pwanimate-web-source-badge[data-web-citation-index]').forEach((link) => {
+                const index = Number(link.dataset.webCitationIndex);
+                if (Number.isInteger(index) && index > 0 && link.dataset.url) {
+                    sourcesByIndex.set(index, {
+                        url: link.dataset.url,
+                        title: link.querySelector('.pwanimate-web-source-title')?.textContent || '',
+                        citation: link.dataset.citation || '',
+                        web_citation_index: index,
+                    });
+                }
+            });
+
+            const markdown = row.querySelector('.pwanimate-markdown-body');
+            if (!markdown || !sourcesByIndex.size) return;
+            const walker = document.createTreeWalker(markdown, NodeFilter.SHOW_TEXT);
+            const textNodes = [];
+            while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+            const citationPattern = /\[Web\s+(\d+)(?:\s*:[^\]]*)?\]/gi;
+            textNodes.forEach((textNode) => {
+                const parent = textNode.parentElement;
+                if (!parent || parent.closest('a, button, code, pre, script, style, .katex')) return;
+
+                const content = textNode.nodeValue || '';
+                citationPattern.lastIndex = 0;
+                let match;
+                let lastIndex = 0;
+                let replaced = false;
+                const fragment = document.createDocumentFragment();
+                while ((match = citationPattern.exec(content))) {
+                    const source = sourcesByIndex.get(Number(match[1]));
+                    if (!source) continue;
+                    if (match.index > lastIndex) {
+                        fragment.appendChild(document.createTextNode(content.slice(lastIndex, match.index)));
+                    }
+                    const link = this.createWebSourceLink(source, true);
+                    if (!link) continue;
+                    fragment.appendChild(link);
+                    lastIndex = match.index + match[0].length;
+                    replaced = true;
+                }
+                if (replaced) {
+                    if (lastIndex < content.length) {
+                        fragment.appendChild(document.createTextNode(content.slice(lastIndex)));
+                    }
+                    textNode.parentNode.replaceChild(fragment, textNode);
+                }
+            });
         }
 
         postProcessMarkdownDOM(container) {
@@ -920,6 +1086,20 @@
 
                     const badge = e.target.closest('a, button');
                     if (badge && isPwanimateCitationLink(badge)) {
+                        if ((badge.dataset.sourceType || '').toLowerCase() === 'web') {
+                            const webUrl = this.getSafeExternalUrl(badge.dataset.url || badge.getAttribute('href'));
+                            if (!webUrl) {
+                                e.preventDefault();
+                                return;
+                            }
+                            const bridge = window.AndroidBridge || window.PwaninetBridge;
+                            if (bridge && typeof bridge.openExternalUrl === 'function') {
+                                e.preventDefault();
+                                bridge.openExternalUrl(webUrl);
+                            }
+                            return;
+                        }
+
                         e.preventDefault();
                         const url = badge.getAttribute('href') || badge.dataset.url || '';
                         let title = badge.dataset.title || 'Resource Preview';
@@ -1864,6 +2044,8 @@
             return {
                 id: documentShareId || postId || person.id || person.username || cleanUrl,
                 type: previewType,
+                sourceType: sourceType,
+                resourceType: resourceType,
                 category: category,
                 title: cleanTitle,
                 subtitle: subtitle,
@@ -3393,7 +3575,7 @@
                 ? retryOptions.userRow
                 : this.appendUserMessage(text, null, snapshotAttachments);
             this.addImageAttachmentsToContext(userRow);
-            this.showTypingIndicator(text);
+            this.showTypingIndicator();
             this.setGenerating(true);
             this.scrollToBottom();
 
@@ -3448,14 +3630,24 @@
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': csrfToken,
-                        'Accept': 'application/json'
+                        'Accept': 'text/event-stream, application/json'
                     },
                     credentials: 'same-origin',
                     signal: this.abortController.signal,
                     body: JSON.stringify(payload)
                 });
 
-                const data = await response.json();
+                let data;
+                let responseOk = response.ok;
+                let responseStatus = response.status;
+                if ((response.headers.get('content-type') || '').includes('text/event-stream')) {
+                    const streamed = await this.readChatEventStream(response);
+                    data = streamed.data || {};
+                    responseStatus = Number(streamed.status_code) || response.status;
+                    responseOk = responseStatus >= 200 && responseStatus < 300;
+                } else {
+                    data = await response.json();
+                }
 
                 // Handle conversation ID update even if there's an error, to prevent spawning new conversations
                 if (data.conversation_id && !this.conversationId) {
@@ -3468,13 +3660,13 @@
                     window.history.replaceState({ htmx: true }, '', targetUrl);
                 }
 
-                if (!response.ok) {
+                if (!responseOk) {
                     let errMsg = data.error || 'Failed to get answer from Pwanimate.';
-                    if (response.status === 429) {
+                    if (responseStatus === 429) {
                         errMsg = data.error || 'All free-tier model quotas are temporarily depleted. Please wait a moment for limits to reset.';
-                    } else if (response.status === 504) {
+                    } else if (responseStatus === 504) {
                         errMsg = 'Request timed out. Please try asking again.';
-                    } else if (response.status === 401 || response.status === 403) {
+                    } else if (responseStatus === 401 || responseStatus === 403) {
                         errMsg = 'Your session has expired. Please refresh the page to sign in again.';
                     }
                     this.removeTypingIndicator();
@@ -3595,50 +3787,8 @@
             return row;
         }
 
-        getThinkingPhrases(prompt = '') {
-            const lower = (prompt || '').toLowerCase();
-            const peoplePattern = /\b(who|student|students|peer|peers|classmate|classmates|lecturer|lecturers|people|person|profile|profiles|contact|contacts)\b/i;
-            const docPattern = /\b(doc|docs|document|documents|notes|paper|papers|exam|past\s*paper|syllabus|outline|pdf|resource|resources|material|materials|coursework)\b/i;
-
-            if (peoplePattern.test(lower)) {
-                return [
-                    'Thinking…',
-                    'Looking for matches…',
-                    'Checking student profiles…',
-                    'Finding relevant peers…',
-                    'Putting it together…',
-                    'Almost there…'
-                ];
-            }
-
-            if (docPattern.test(lower)) {
-                return [
-                    'Thinking…',
-                    'Checking your resources…',
-                    'Finding relevant material…',
-                    'Connecting the context…',
-                    'Devouring the details…',
-                    'Putting it together…',
-                    'Almost there…'
-                ];
-            }
-
-            return [
-                'Thinking…',
-                'Processing…',
-                'Connecting the dots…',
-                'Devouring the details…',
-                'Checking PwaniNet…',
-                'Putting it together…',
-                'Almost there…'
-            ];
-        }
-
-        showTypingIndicator(userPrompt = '') {
+        showTypingIndicator() {
             this.removeTypingIndicator();
-
-            const phrases = this.getThinkingPhrases(userPrompt);
-            let phraseIndex = 0;
 
             const row = document.createElement('div');
             row.className = 'pwanimate-message-row assistant pwanimate-thinking-loader-row';
@@ -3650,41 +3800,101 @@
                             <img src="/static/images/pwanimate/pwanimate-transparent.png" class="pwanimate-assistant-avatar" alt="Pwanimate">
                             <span>Pwanimate</span>
                         </div>
-                        <div class="pwanimate-thinking-loader pwanimate-typing-indicator" aria-live="polite">
+                        <div class="pwanimate-thinking-loader pwanimate-typing-indicator" role="status" aria-live="polite" aria-atomic="true">
                             <div class="pwanimate-thinking-animation" aria-hidden="true">
                                 <span class="pwanimate-thinking-dot dot-1"></span>
                                 <span class="pwanimate-thinking-dot dot-2"></span>
                                 <span class="pwanimate-thinking-dot dot-3"></span>
                             </div>
-                            <span class="pwanimate-thinking-text">${escapeHtml(phrases[0])}</span>
+                            <span class="pwanimate-thinking-text">Thinking…</span>
                         </div>
                     </div>
                 </div>
             `;
             this.appendTranscriptRow(row);
 
-            const textEl = row.querySelector('.pwanimate-thinking-text');
-            if (textEl && phrases.length > 1) {
-                this.thinkingTextInterval = setInterval(() => {
-                    phraseIndex = (phraseIndex + 1) % phrases.length;
-                    textEl.classList.add('fade-out');
-                    this.thinkingFadeTimeout = setTimeout(() => {
-                        textEl.textContent = phrases[phraseIndex];
-                        textEl.classList.remove('fade-out');
-                    }, 200);
-                }, 2400);
+        }
+
+        updateThinkingStatus(stage) {
+            const labels = {
+                thinking: 'Thinking…',
+                searching_web: 'Searching the web…',
+                reading_sources: 'Reading sources…',
+                devouring_context: 'Devouring the context…',
+                searching_posts: 'Searching PwaniNet…',
+                searching_documents: 'Searching the repository…'
+            };
+            const label = labels[stage];
+            const textEl = this.transcript
+                ? this.transcript.querySelector('#pwanimate-typing-row .pwanimate-thinking-text')
+                : null;
+            if (!textEl || !label || textEl.textContent === label) return;
+
+            textEl.textContent = label;
+            textEl.classList.remove('status-changing');
+            requestAnimationFrame(() => textEl.classList.add('status-changing'));
+        }
+
+        async readChatEventStream(response) {
+            if (!response.body || typeof response.body.getReader !== 'function') {
+                throw new Error('Live progress is not supported by this browser.');
             }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let finalPayload = null;
+
+            const dispatchBlock = (block) => {
+                const lines = block.split(/\r?\n/);
+                const eventLine = lines.find(line => line.startsWith('event:'));
+                const eventName = eventLine ? eventLine.slice(6).trim() : 'message';
+                const data = lines
+                    .filter(line => line.startsWith('data:'))
+                    .map(line => line.slice(5).replace(/^ /, ''))
+                    .join('\n');
+                if (!data) return;
+
+                let payload;
+                try {
+                    payload = JSON.parse(data);
+                } catch (error) {
+                    return;
+                }
+
+                if (eventName === 'status') {
+                    this.updateThinkingStatus(payload.stage);
+                } else if (eventName === 'response') {
+                    finalPayload = payload;
+                }
+            };
+
+            while (!finalPayload) {
+                const { value, done } = await reader.read();
+                buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+                let separator;
+                while ((separator = buffer.match(/\r?\n\r?\n/))) {
+                    const boundary = separator.index;
+                    dispatchBlock(buffer.slice(0, boundary));
+                    buffer = buffer.slice(boundary + separator[0].length);
+                    if (finalPayload) break;
+                }
+
+                if (done) {
+                    if (buffer.trim()) dispatchBlock(buffer);
+                    break;
+                }
+            }
+
+            if (finalPayload) {
+                try { await reader.cancel(); } catch (error) {}
+                return finalPayload;
+            }
+            throw new Error('The chat response ended before the answer was received.');
         }
 
         removeTypingIndicator() {
-            if (this.thinkingTextInterval) {
-                clearInterval(this.thinkingTextInterval);
-                this.thinkingTextInterval = null;
-            }
-            if (this.thinkingFadeTimeout) {
-                clearTimeout(this.thinkingFadeTimeout);
-                this.thinkingFadeTimeout = null;
-            }
             const typingRows = this.transcript ? this.transcript.querySelectorAll('#pwanimate-typing-row, .pwanimate-thinking-loader-row') : [];
             typingRows.forEach(r => r.remove());
         }
@@ -3896,6 +4106,8 @@
                             data-url="${escapeHtml(src.url)}"
                             data-title="${title}"
                             data-source-type="${escapeHtml(src.source || '')}"
+                            data-web-citation-index="${escapeHtml(src.web_citation_index || '')}"
+                            data-domain="${escapeHtml(src.domain || '')}"
                             data-resource-type="${escapeHtml(src.resource_type || '')}"
                             data-media-url="${escapeHtml(src.media_url || '')}"
                             data-thumbnail-url="${escapeHtml(src.thumbnail_url || '')}"
@@ -4021,6 +4233,7 @@
             if (mdBody) {
                 this.postProcessMarkdownDOM(mdBody);
             }
+            this.enhanceWebSources(row);
             if (window.htmx && typeof window.htmx.process === 'function') {
                 window.htmx.process(row);
             }

@@ -5,13 +5,17 @@ Exposes authenticated HTTP endpoints for persistent conversations,
 RAG interactions, conversation listings, and detail/deletion.
 """
 
+import asyncio
+import json
 import logging
+import queue
+import threading
 import uuid
 import requests
-from django.db import transaction
+from django.db import close_old_connections, transaction
 from django.db.models import Q
 from django.conf import settings
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.core.signing import TimestampSigner
@@ -20,6 +24,7 @@ from django.template.loader import render_to_string
 from rest_framework import permissions, status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
+from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
 
 from pwanimate.ai.exceptions import (
@@ -64,6 +69,73 @@ class PwanimateChatView(APIView):
         return self.orchestrator or PwanimateOrchestrator()
 
     def post(self, request):
+        if "text/event-stream" in request.headers.get("Accept", ""):
+            # Parse the request body on the request thread before the worker uses it.
+            # DRF caches parsed data on the Request instance.
+            _ = request.data
+            _ = request.user.is_authenticated
+            return self._stream_chat_response(request)
+        return self._post_chat(request)
+
+    def _stream_chat_response(self, request):
+        """Stream truthful orchestration status updates, followed by the usual JSON payload."""
+        events = queue.Queue()
+
+        def report_progress(stage):
+            if stage in {
+                "searching_web",
+                "reading_sources",
+                "devouring_context",
+                "searching_posts",
+                "searching_documents",
+            }:
+                events.put(("status", {"stage": stage}))
+
+        def perform_request():
+            close_old_connections()
+            try:
+                result = self._post_chat(request, progress_callback=report_progress)
+                events.put(("response", (result.status_code, result.data)))
+            except Exception:
+                logger.exception("Pwanimate streamed chat request failed unexpectedly")
+                events.put(("response", (
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    {"error": "An unexpected error occurred while processing your request."},
+                )))
+            finally:
+                close_old_connections()
+
+        worker = threading.Thread(target=perform_request, name="pwanimate-chat", daemon=True)
+        worker.start()
+
+        async def stream_events():
+            yield 'event: status\ndata: {"stage":"thinking"}\n\n'
+            while True:
+                try:
+                    event_type, payload = await asyncio.to_thread(events.get, True, 12)
+                except queue.Empty:
+                    yield ": keep-alive\n\n"
+                    continue
+
+                if event_type == "status":
+                    yield f"event: status\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
+                    continue
+
+                response_status, response_data = payload
+                encoded = JSONRenderer().render({
+                    "status_code": response_status,
+                    "data": response_data,
+                }).decode("utf-8")
+                yield f"event: response\ndata: {encoded}\n\n"
+                break
+
+        response = StreamingHttpResponse(stream_events(), content_type="text/event-stream")
+        response["Cache-Control"] = "no-cache, no-transform"
+        response["X-Accel-Buffering"] = "no"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    def _post_chat(self, request, progress_callback=None):
         """
         Process a chat or RAG query.
 
@@ -248,7 +320,10 @@ class PwanimateChatView(APIView):
             )
             orchestrator = self.get_orchestrator()
             # External LLM generation occurs outside database transactions
-            response = orchestrator.run(orchestration_req)
+            if progress_callback:
+                response = orchestrator.run(orchestration_req, on_progress=progress_callback)
+            else:
+                response = orchestrator.run(orchestration_req)
 
             # Persist assistant response turn with defensive fallback
             answer_text = (response.answer or "").strip()

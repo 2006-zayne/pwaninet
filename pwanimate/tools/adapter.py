@@ -30,6 +30,69 @@ def tool_result_to_context_items(tool_name: str, result: ToolResult) -> List[Con
 
     data = result.data
 
+    # Public web results keep their original URLs so citations can be rendered
+    # and opened through the existing source-summary UI.
+    if tool_name == "web_search":
+        if not isinstance(data, list) or not data:
+            return [
+                ContextItem(
+                    source="web",
+                    object_id="web_search_none",
+                    title="Web Search",
+                    content="The web search returned no results for this request.",
+                    citation=None,
+                    url="",
+                    metadata={"resource_type": "web_search"},
+                )
+            ]
+        items = []
+        for index, entry in enumerate(data[:10], start=1):
+            if not isinstance(entry, dict):
+                continue
+            title = str(entry.get("title") or "Web result")[:500]
+            url = str(entry.get("url") or "")[:2048]
+            source = str(entry.get("source") or "")[:253]
+            snippet = str(entry.get("snippet") or "")[:2400]
+            published_at = entry.get("published_at")
+            score = entry.get("score")
+            lines = [f"Source: {source}" if source else "Source: public web"]
+            if published_at:
+                lines.append(f"Published: {str(published_at)[:120]}")
+            if url:
+                lines.append(f"URL: {url}")
+            if snippet:
+                lines.extend(["Snippet:", snippet])
+            metadata = {
+                "resource_type": "web_search",
+                "source": source,
+                "published_at": published_at,
+                "snippet": snippet,
+                "web_citation_index": index,
+            }
+            if isinstance(score, (int, float)) and not isinstance(score, bool):
+                metadata["score"] = score
+            items.append(ContextItem(
+                source="web",
+                object_id=url or f"web_result_{index}",
+                title=title,
+                content="\n".join(lines),
+                citation=f"[Web {index}: {source or title[:80]}]",
+                url=url,
+                relevance_score=score if isinstance(score, (int, float)) else 0.0,
+                metadata=metadata,
+            ))
+        return items or [
+            ContextItem(
+                source="web",
+                object_id="web_search_none",
+                title="Web Search",
+                content="The web search returned no usable results for this request.",
+                citation=None,
+                url="",
+                metadata={"resource_type": "web_search"},
+            )
+        ]
+
     # 1. Academic Lookup Tool
     if tool_name == "academic_lookup":
         if not data or not isinstance(data, list):

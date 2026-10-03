@@ -113,7 +113,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body text-center py-4">
-                        <i class="bi bi-box-arrow-up-right text-primary mb-3" style="font-size: 2.5rem;"></i>
+                        <div id="externalLinkLogo" class="d-flex align-items-center justify-content-center mx-auto mb-3 rounded-circle bg-body-secondary" style="width: 76px; height: 76px;" aria-hidden="true">
+                            <i class="bi bi-globe2 text-primary" style="font-size: 2.25rem;"></i>
+                        </div>
                         <p class="mb-2">You are about to leave PwaniNet and visit an external website:</p>
                         <p class="mb-4"><strong id="externalLinkUrl" style="word-break: break-all; color: var(--bs-primary);"></strong></p>
                         <p class="text-muted small mb-0">Are you sure you want to proceed?</p>
@@ -145,6 +147,63 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
+    function updateExternalLinkLogo(url, link) {
+        const logo = document.getElementById('externalLinkLogo');
+        if (!logo) return;
+
+        let hostname = '';
+        try {
+            hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+        } catch (_) {
+            hostname = '';
+        }
+
+        const brands = [
+            { domains: ['youtube.com', 'youtu.be'], icon: 'bi-youtube', color: 'text-danger' },
+            { domains: ['tiktok.com'], icon: 'bi-tiktok', color: 'text-dark' },
+            { domains: ['facebook.com', 'fb.watch'], icon: 'bi-facebook', color: 'text-primary' },
+            { domains: ['instagram.com'], icon: 'bi-instagram', color: 'text-danger' },
+            { domains: ['telegram.org', 't.me'], icon: 'bi-telegram', color: 'text-info' },
+            { domains: ['x.com', 'twitter.com'], icon: 'bi-twitter-x', color: 'text-dark' },
+            { domains: ['spotify.com'], icon: 'bi-spotify', color: 'text-success' }
+        ];
+        const brand = brands.find(item => item.domains.some(domain => hostname === domain || hostname.endsWith(`.${domain}`)));
+        logo.replaceChildren();
+
+        if (brand) {
+            const icon = document.createElement('i');
+            icon.className = `bi ${brand.icon} ${brand.color}`;
+            icon.style.fontSize = '2.25rem';
+            logo.appendChild(icon);
+            return;
+        }
+
+        // Reuse the cached favicon from this post's link preview when available.
+        const post = link && link.closest('[id^="post-card-"]');
+        const favicon = post && post.querySelector('.postcard-link-preview-container .link-preview-favicon');
+        if (favicon && favicon.src) {
+            const image = document.createElement('img');
+            image.src = favicon.src;
+            image.alt = '';
+            image.style.width = '42px';
+            image.style.height = '42px';
+            image.style.objectFit = 'contain';
+            image.onerror = () => {
+                const fallback = document.createElement('i');
+                fallback.className = 'bi bi-globe2 text-primary';
+                fallback.style.fontSize = '2.25rem';
+                logo.replaceChildren(fallback);
+            };
+            logo.appendChild(image);
+            return;
+        }
+
+        const fallback = document.createElement('i');
+        fallback.className = 'bi bi-globe2 text-primary';
+        fallback.style.fontSize = '2.25rem';
+        logo.appendChild(fallback);
+    }
+
     window.proceedToExternalLink = function() {
         if (!pendingExternalUrl) return;
         const targetUrl = pendingExternalUrl;
@@ -173,7 +232,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function processLinks(root) {
         // Target all links inside posts, comments, and shared messages
-        const links = root.querySelectorAll ? root.querySelectorAll('.post-content-wrapper a, .post-content-text a, a:not([class])') : [];
+        const links = root.querySelectorAll
+            ? root.querySelectorAll('.post-content-wrapper a, .post-content-text a, .postcard-link-card, a:not([class])')
+            : [];
         links.forEach(link => {
             if (!link.href || link.href.startsWith('javascript:')) return;
 
@@ -196,6 +257,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         e.preventDefault();
                         e.stopPropagation();
                         pendingExternalUrl = link.href;
+                        updateExternalLinkLogo(pendingExternalUrl, link);
                         const urlEl = document.getElementById('externalLinkUrl');
                         if (urlEl) urlEl.innerText = pendingExternalUrl;
                         const modalEl = document.getElementById('externalLinkModal');

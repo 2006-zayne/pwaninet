@@ -364,6 +364,8 @@
                                                             <button type="button" data-url="{{ src.url|escape }}" class="pwanimate-citation-badge"
                                                                data-title="{% if src.title %}{{ src.title|escape }}{% elif src.citation %}{{ src.citation|escape }}{% else %}{% trans 'Document' %}{% endif %}"
                                                                data-source-type="{{ src.source|default:'' }}"
+                                                               data-web-citation-index="{{ src.web_citation_index|default:'' }}"
+                                                               data-domain="{{ src.domain|default:''|escape }}"
                                                                data-resource-type="{{ src.resource_type|default:'' }}"
                                                                data-media-url="{{ src.media_url|default:'' }}"
                                                                data-thumbnail-url="{{ src.thumbnail_url|default:'' }}"

@@ -590,6 +590,15 @@ LOGGING = {
 # Pwanimate Configuration
 # ---------------------------------------------------------------------------
 PWANIMATE_ENABLED = os.environ.get('PWANIMATE_ENABLED', 'True').lower() in ('true', '1', 'yes')
+# Public web search is optional. Empty provider keys leave Pwanimate running and
+# produce a safe unavailable result only when a web search is requested.
+WEB_SEARCH_ENABLED = os.environ.get('WEB_SEARCH_ENABLED', 'true').lower() in ('true', '1', 'yes', 'on')
+WEB_SEARCH_PROVIDER_ORDER = os.environ.get('WEB_SEARCH_PROVIDER_ORDER', 'tavily,brave,serper').split(',')
+TAVILY_API_KEY = os.environ.get('TAVILY_API_KEY', '')
+BRAVE_SEARCH_API_KEY = os.environ.get('BRAVE_SEARCH_API_KEY', '')
+SERPER_API_KEY = os.environ.get('SERPER_API_KEY', '')
+WEB_SEARCH_TIMEOUT_SECONDS = float(os.environ.get('WEB_SEARCH_TIMEOUT_SECONDS', '10'))
+WEB_SEARCH_MAX_RESULTS = int(os.environ.get('WEB_SEARCH_MAX_RESULTS', '5'))
 PWANIMATE_GEMINI_API_KEY = os.environ.get('PWANIMATE_GEMINI_API_KEY', '')
 PWANIMATE_GROQ_API_KEY = os.environ.get('PWANIMATE_GROQ_API_KEY', '')
 PWANIMATE_SPEECH_TO_TEXT_MODEL = os.environ.get('PWANIMATE_SPEECH_TO_TEXT_MODEL', 'whisper-large-v3-turbo')
