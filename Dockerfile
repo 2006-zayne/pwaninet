@@ -21,8 +21,9 @@ RUN apt-get update \
 # Install Python dependencies
 COPY requirements.txt /app/
 
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt \n    && playwright install --with-deps chromium
+RUN pip install --no-cache-dir --upgrade pip     && pip install --no-cache-dir -r requirements.txt
+
+RUN playwright install --with-deps chromium
 
 # Copy project
 COPY . /app/
