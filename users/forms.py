@@ -219,14 +219,20 @@ class ProfileUpdateForm(forms.ModelForm):
         if self.instance and self.instance.skills:
             self.fields['skills'].initial = '\n'.join(self.instance.skills)
         
-        # Format projects for display (list of dicts to Title|Description|Link format)
+        # Format projects for display (list of dicts or strings to Title|Description|Link format)
         if self.instance and self.instance.projects:
             project_lines = []
             for project in self.instance.projects:
-                line = f"{project.get('title', '')}|{project.get('description', '')}|{project.get('link', '')}"
-                project_lines.append(line)
-            self.fields['projects'].initial = '\n'.join(project_lines)
-    
+                if isinstance(project, dict):
+                    line_str = f"{project.get('title', '')}|{project.get('description', '')}|{project.get('link', '')}"
+                elif isinstance(project, str):
+                    line_str = project
+                else:
+                    continue
+                project_lines.append(line_str)
+            self.fields['projects'].initial = '
+'.join(project_lines)
+
     def clean_skills(self):
         """Convert skills textarea to list"""
         skills_text = self.cleaned_data.get('skills', '')

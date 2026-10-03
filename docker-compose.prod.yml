@@ -1,0 +1,76 @@
+services:
+  db:
+    image: pgvector/pgvector:pg15
+    container_name: pwaninet_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-pwaninet_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - /srv/prod-app/data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-pwaninet_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pwaninet_net
+  redis:
+    image: redis:7-alpine
+    container_name: pwaninet_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 512mb --maxmemory-policy volatile-lru --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - /srv/prod-app/data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pwaninet_net
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pwaninet_web
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - /srv/prod-app/data/media:/app/media
+    command: >
+      sh -c "mkdir -p /app/media/temp &&
+             python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             daphne -b 0.0.0.0 -p 8000 pwaninet.asgi:application"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - pwaninet_net
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pwaninet_celery
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - /srv/prod-app/data/media:/app/media
+    command: celery -A pwaninet worker -l info --concurrency=2
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - pwaninet_net
+
+networks:
+  pwaninet_net:
+    driver: bridge
