@@ -163,8 +163,14 @@
   .card-body { padding: 1.4rem; }
 
   /* ── Sidebar: Your Groups ── */
+  .my-groups-card {
+    min-width: 0;
+    overflow: hidden;
+  }
   .my-groups-card .card-body {
     padding: 1.25rem 0.6rem 1.25rem 0.4rem;
+    min-width: 0;
+    overflow: hidden;
   }
   .my-groups-card .sidebar-label {
     padding-left: 0.4rem;
@@ -183,7 +189,10 @@
   .my-groups-scroll {
     max-height: 56vh;
     overflow-y: auto;
+    overflow-x: hidden;
     padding-right: 2px;
+    min-width: 0;
+    width: 100%;
   }
   .my-groups-scroll::-webkit-scrollbar { width: 3px; }
   .my-groups-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
@@ -198,6 +207,11 @@
     transition: background 0.15s var(--ease), transform 0.15s var(--ease);
     position: relative;
     margin-bottom: 3px;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
   .my-group-row:hover {
     background: var(--brand-light);
@@ -228,6 +242,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 1.25;
+    min-width: 0;
+    width: 100%;
+    display: block;
   }
   .my-group-meta {
     font-size: 0.72rem;
@@ -235,6 +252,10 @@
     font-weight: 500;
     margin-top: 2px;
     line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
   .my-group-preview {
     font-size: 0.73rem;
@@ -243,6 +264,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     margin-top: 2px;
+    min-width: 0;
   }
   .my-group-preview.has-unread {
     font-weight: 700;
@@ -650,8 +672,8 @@
                     <i class="bi bi-people-fill"></i>
                   </div>
                 {% endif %}
-                <div style="min-width:0; flex:1;">
-                  <div class="my-group-name">{{ group.name }}</div>
+                <div style="min-width: 0; flex: 1; overflow: hidden; max-width: 100%;">
+                  <div class="my-group-name" title="{{ group.name }}">{{ group.name }}</div>
                   {% with act=group_activity|get_activity:group.id %}
                     {% if act.total > 0 %}
                       <div class="my-group-preview has-unread">

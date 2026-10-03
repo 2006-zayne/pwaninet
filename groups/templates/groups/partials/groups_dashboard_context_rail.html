@@ -2,9 +2,9 @@
 {% load static %}
 {% load group_extras %}
 
-<div class="groups-dashboard-context-rail d-flex flex-column gap-3">
+<div class="groups-dashboard-context-rail d-flex flex-column gap-3" style="min-width: 0; width: 100%; max-width: 100%;">
     <!-- Your Groups Card -->
-    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden" style="min-width: 0; width: 100%;">
         <div class="card-header bg-transparent border-0 pt-3 px-3 pb-2 d-flex align-items-center justify-content-between">
             <h6 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2" style="font-size: 0.95rem;">
                 <i class="bi bi-person-check-fill text-primary"></i>
@@ -12,11 +12,12 @@
             </h6>
             <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill small">{{ user_groups.count }}</span>
         </div>
-        <div class="card-body p-2 pt-0">
-            <div class="d-flex flex-column" style="max-height: 52vh; overflow-y: auto; scrollbar-width: thin;">
+        <div class="card-body p-2 pt-0" style="min-width: 0; overflow: hidden;">
+            <div class="d-flex flex-column" style="max-height: 52vh; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; min-width: 0; width: 100%;">
                 {% for group in user_groups %}
                 <a href="{% url 'groups:groups_detail' group.id %}"
                    class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none context-rail-item-hover"
+                   style="min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden;"
                    hx-get="{% url 'groups:groups_detail' group.id %}"
                    hx-target="#page-content-target"
                    hx-swap="innerHTML"
@@ -29,8 +30,8 @@
                             <i class="bi bi-people-fill"></i>
                         </div>
                     {% endif %}
-                    <div class="overflow-hidden flex-grow-1" style="min-width: 0;">
-                        <div class="fw-semibold text-dark text-truncate small">{{ group.name }}</div>
+                    <div class="overflow-hidden flex-grow-1" style="min-width: 0; max-width: 100%;">
+                        <div class="fw-semibold text-dark text-truncate small" title="{{ group.name }}">{{ group.name }}</div>
                         <div class="text-secondary x-small text-truncate">
                             {% with act=group_activity|get_activity:group.id %}
                                 {% if act.total > 0 %}
@@ -43,7 +44,7 @@
                     </div>
                     {% with act=group_activity|get_activity:group.id %}
                         {% if act.total > 0 %}
-                            <span class="badge rounded-pill bg-primary" style="font-size: 0.65rem;">{{ act.total }}</span>
+                            <span class="badge rounded-pill bg-primary flex-shrink-0" style="font-size: 0.65rem;">{{ act.total }}</span>
                         {% else %}
                             <i class="bi bi-chevron-right text-muted small flex-shrink-0"></i>
                         {% endif %}
