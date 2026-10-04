@@ -11,6 +11,7 @@
 <div class="settings-list-container">
   {% if request.user.is_staff %}
   {% include 'users/settings/components/settings_category_item.html' with url_name='admin_dashboard:dashboard_home' icon_class='bi-shield-lock-fill text-primary' title='Admin Panel' subtitle='Manage platform & feedback' is_htmx=True %}
+  {% include 'users/settings/components/settings_category_item.html' with url_name='admin:index' icon_class='bi-database-fill-gear text-warning' title='Django Admin' subtitle='Manage database models, users & admin records' is_htmx=False %}
   {% endif %}
   
   {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_profile' icon_class='bi-person' title='Profile Settings' subtitle='Manage your profile, username, bio...' is_htmx=True %}

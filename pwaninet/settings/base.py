@@ -35,7 +35,7 @@ ALLOWED_HOSTS = [
     host.split(':')[0].strip()
     for host in os.environ.get(
         'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,10.20.152.125,pwaninet.app,192.168.114.221,192.168.43.170,192.168.127.221'
+        'localhost,127.0.0.1,10.20.152.125,pwaninet.app,192.168.1.179,192.168.114.221,192.168.43.170,192.168.127.221'
     ).split(',')
     if host.strip()
 ]
@@ -386,7 +386,7 @@ USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
 
 # CSRF settings (supports both http:// and https:// for web and Capacitor)
-_csrf_hosts = [h.split(':')[0].strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,pwaninet.app').split(',') if h.strip()]
+_csrf_hosts = [h.split(':')[0].strip() for h in ALLOWED_HOSTS if h and h != '*']
 CSRF_TRUSTED_ORIGINS = list(set([
     'https://pwaninet.app',
     'https://*.pwaninet.app',
@@ -404,6 +404,8 @@ CSRF_TRUSTED_ORIGINS = list(set([
     'https://127.0.0.1:8000',
     *[f"http://{h}" for h in _csrf_hosts],
     *[f"https://{h}" for h in _csrf_hosts],
+    *[f"http://{h}:8000" for h in _csrf_hosts],
+    *[f"https://{h}:8000" for h in _csrf_hosts],
 ]))
 
 # VAPID keys for Web Push notifications

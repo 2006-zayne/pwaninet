@@ -16,6 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+
+# Configure Django Admin Branding
+admin.site.site_header = "PwaniNet Administration"
+admin.site.site_title = "PwaniNet Admin Portal"
+admin.site.index_title = "Welcome to PwaniNet Admin Portal"
 from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView

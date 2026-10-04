@@ -83,6 +83,18 @@
     </div>
 
     <div class="d-flex align-items-center gap-3">
+        {% if request.user.is_authenticated and request.user.is_staff %}
+        <!-- Django Admin quick access for staff/admins (especially useful on mobile & PWA) -->
+        <a href="{% url 'admin:index' %}"
+           class="btn btn-link p-0 text-decoration-none d-flex align-items-center"
+           style="color: #f59e0b;"
+           title="{% trans 'Django Admin Site' %}"
+           aria-label="{% trans 'Django Admin Site' %}"
+           data-bypass-htmx="true"
+           hx-boost="false">
+            <i class="bi bi-shield-shaded" style="font-size: 1.3rem;"></i>
+        </a>
+        {% endif %}
         {% if request.user.is_authenticated %}
         <!-- Pwanimate Quick Entry (Mobile & Header) -->
         <a href="{% url 'pwanimate:index' %}"

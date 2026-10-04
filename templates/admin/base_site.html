@@ -1,0 +1,27 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('PwaniNet Admin Portal') }}{% endblock %}
+
+{% block branding %}
+<div id="site-name">
+    <a href="{% url 'admin:index' %}">
+        <span style="font-weight: 800; letter-spacing: 0.5px;">PWANI<span style="color: #60a5fa;">NET</span></span>
+        <span style="font-weight: 400; opacity: 0.85; font-size: 0.9em; margin-left: 6px;">{% trans "Administration" %}</span>
+    </a>
+</div>
+{% if user.is_anonymous %}
+  {% include "admin/color_theme_toggle.html" %}
+{% endif %}
+{% endblock %}
+
+{% block nav-global %}
+<div class="pwaninet-admin-nav-banner" style="background: rgba(0, 0, 0, 0.18); border-top: 1px solid rgba(255, 255, 255, 0.12); padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; flex-wrap: wrap; gap: 8px;">
+    <a href="/" style="color: #ffffff; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.12);">
+        &larr; {% trans "Return to PwaniNet App" %}
+    </a>
+    <a href="{% url 'admin_dashboard:dashboard_home' %}" style="color: #93c5fd; text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; background: rgba(37, 99, 235, 0.22);">
+        {% trans "Admin Dashboard" %} &rarr;
+    </a>
+</div>
+{% endblock %}

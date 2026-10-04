@@ -126,7 +126,15 @@
            hx-push-url="true"
            hx-history="true">
             <i class="bi bi-shield-lock-fill left-rail-icon text-primary"></i>
-            <span class="left-rail-label text-primary fw-bold">Admin Panel</span>
+            <span class="left-rail-label text-primary fw-bold">{% trans "Admin Panel" %}</span>
+        </a>
+        <a href="{% url 'admin:index' %}"
+           class="left-rail-link nav-chip"
+           title="{% trans 'Django Admin Site' %}"
+           data-bypass-htmx="true"
+           hx-boost="false">
+            <i class="bi bi-database-fill-gear left-rail-icon text-warning"></i>
+            <span class="left-rail-label text-warning fw-bold">{% trans "Django Admin" %}</span>
         </a>
         {% endif %}
 
