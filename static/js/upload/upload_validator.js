@@ -95,7 +95,8 @@ class ImageValidator {
                 result.addError('dimensions', 'Image dimensions too small');
             }
         } catch (error) {
-            result.addError('read', 'Failed to read image dimensions');
+            console.warn('[upload_validator] Could not read image dimensions client-side, deferring to server:', error);
+            // Non-fatal: do not block upload if browser cannot decode dimensions locally
         }
 
         return result;

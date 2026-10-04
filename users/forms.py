@@ -8,38 +8,28 @@ from documents.academic.models import Programme, AcademicLevel, AcademicYear, Se
 class PwaniSignupForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
         model = User
-        fields = UserCreationForm.Meta.fields + \
-            ('first_name', 'second_name', 'last_name', 
-             'programme', 'academic_level', 'academic_year', 'semester')
+        fields = UserCreationForm.Meta.fields + (
+            'first_name', 'second_name', 'last_name', 
+            'programme', 'academic_level'
+        )
 
-        # We use HTMX for dynamic dropdowns
         widgets = {
             'programme': forms.Select(attrs={
-                'hx-get': '/documents/academic/load-levels/',      # Load academic levels for programme
+                'hx-get': '/documents/academic/load-levels/',
                 'hx-target': '#id_academic_level',
                 'class': 'form-control',
                 'id': 'id_programme',
                 'data-searchable': 'true'
             }),
             'academic_level': forms.Select(attrs={
-                'hx-get': '/documents/academic/load-years/',      # Load academic years for level
-                'hx-target': '#id_academic_year',
-                'class': 'form-control'
-            }),
-            'academic_year': forms.Select(attrs={
-                'hx-get': '/documents/academic/load-semesters/',  # Load semesters for academic year
-                'hx-target': '#id_semester',
-                'class': 'form-control'
-            }),
-            'semester': forms.Select(attrs={
-                'class': 'form-control'
+                'class': 'form-control',
+                'id': 'id_academic_level'
             }),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Add placeholders to form fields
         self.fields['username'].widget.attrs['placeholder'] = 'Choose a username'
         self.fields['first_name'].widget.attrs['placeholder'] = 'Enter your first name (optional)'
         self.fields['second_name'].widget.attrs['placeholder'] = 'Enter your middle name (optional)'
@@ -47,38 +37,28 @@ class PwaniSignupForm(UserCreationForm):
         self.fields['password1'].widget.attrs['placeholder'] = 'Create a password'
         self.fields['password2'].widget.attrs['placeholder'] = 'Confirm your password'
 
-        # Optional fields: never block registration if student hasn't selected them yet
         self.fields['first_name'].required = False
         self.fields['second_name'].required = False
         self.fields['last_name'].required = False
         self.fields['programme'].required = False
         self.fields['academic_level'].required = False
-        self.fields['academic_year'].required = False
-        self.fields['semester'].required = False
 
-        # When validating bound POST data, ensure active querysets exist so valid selections are accepted
-        if self.is_bound:
-            self.fields['academic_level'].queryset = AcademicLevel.objects.filter(is_active=True).order_by('level')
-            self.fields['academic_year'].queryset = AcademicYear.objects.all().order_by('-code')
-            if 'academic_year' in self.data and self.data.get('academic_year'):
-                try:
-                    year_id = int(self.data.get('academic_year'))
-                    self.fields['semester'].queryset = Semester.objects.filter(academic_year_id=year_id).order_by('number')
-                except (ValueError, TypeError):
-                    self.fields['semester'].queryset = Semester.objects.all().order_by('academic_year', 'number')
-            else:
-                self.fields['semester'].queryset = Semester.objects.all().order_by('academic_year', 'number')
-        elif self.instance.pk:
-            if self.instance.programme:
-                self.fields['academic_level'].queryset = AcademicLevel.objects.filter(is_active=True).order_by('level')
-            if self.instance.academic_year:
-                self.fields['semester'].queryset = Semester.objects.filter(
-                    academic_year=self.instance.academic_year).order_by('number')
-        else:
-            # Start with empty querysets for fresh cascading dropdowns on initial GET
-            self.fields['academic_level'].queryset = AcademicLevel.objects.none()
-            self.fields['academic_year'].queryset = AcademicYear.objects.none()
-            self.fields['semester'].queryset = Semester.objects.none()
+        self.fields['academic_level'].queryset = AcademicLevel.objects.filter(is_active=True).order_by('level')
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+
+        current_year = AcademicYear.objects.filter(is_current=True).first()
+        current_semester = Semester.objects.filter(is_current=True).first()
+
+        if current_year:
+            user.academic_year = current_year
+        if current_semester:
+            user.semester = current_semester
+
+        if commit:
+            user.save()
+        return user
 
     def clean_username(self):
         """Clean username by stripping whitespace and checking uniqueness case-insensitively."""

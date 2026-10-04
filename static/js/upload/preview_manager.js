@@ -74,8 +74,13 @@ class PreviewManager {
     async generateImagePreview(file) {
         const url = this.createObjectUrl(file);
 
-        // Load image to get dimensions
-        const dimensions = await this.getImageDimensions(file);
+        // Load image to get dimensions safely
+        let dimensions = { width: 0, height: 0 };
+        try {
+            dimensions = await this.getImageDimensions(file);
+        } catch (err) {
+            console.warn('[preview_manager] Could not get image dimensions, falling back to defaults:', err);
+        }
 
         const preview = new PreviewResult(file, url, 'image', {
             width: dimensions.width,
