@@ -137,33 +137,162 @@
   .strength-strong { background-color: #10b981; color: #059669; }
   .strength-very-strong { background-color: #047857; color: #047857; }
 
-  .course-search-wrapper {
-    position: relative;
+  /* Interactive Trigger System for Bottom Sheet / Modal Pickers */
+  .picker-trigger {
+    min-height: 3.15rem;
+    border-radius: .8rem;
+    font-size: 16px;
+    background-color: #f8fafc;
+    border: 2px solid #e2e8f0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    text-decoration: none;
+    user-select: none;
+    padding: 0 18px;
+    line-height: 1.5;
+    appearance: none;
+    -webkit-appearance: none;
   }
-
-  .course-search-input {
-    position: absolute;
-    top: -38px;
-    left: 0;
-    right: 0;
-    padding: 8px 12px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    z-index: 10;
-    background: white;
-  }
-
-  [data-theme="dark"] .course-search-input {
-    background: var(--card-bg);
-    border-color: var(--border);
-    color: white;
-  }
-
-  .course-search-input:focus {
-    outline: none;
+  .picker-trigger:hover,
+  .picker-trigger:focus-visible,
+  .picker-trigger:focus {
     border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    background-color: #ffffff;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+  [data-theme="dark"] .picker-trigger {
+    background-color: var(--card-bg, #242526);
+    border-color: var(--border, #3a3b3c);
+  }
+  [data-theme="dark"] .picker-trigger:hover,
+  [data-theme="dark"] .picker-trigger:focus-visible,
+  [data-theme="dark"] .picker-trigger:focus {
+    border-color: #3b82f6;
+    background-color: #2a2b2e;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+  }
+
+  /* Placeholder matching other inputs */
+  .picker-trigger .picker-trigger-text {
+    color: #6c757d;
+    font-weight: 400;
+    font-size: 16px;
+  }
+  [data-theme="dark"] .picker-trigger .picker-trigger-text {
+    color: #9ca3af;
+  }
+  .picker-trigger .picker-chevron {
+    color: #6c757d;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+  }
+  [data-theme="dark"] .picker-trigger .picker-chevron {
+    color: #9ca3af;
+  }
+
+  /* When an option is chosen, match standard input text */
+  .picker-trigger.has-value .picker-trigger-text {
+    color: var(--text-dark, #0f172a) !important;
+    font-weight: 500;
+  }
+  [data-theme="dark"] .picker-trigger.has-value .picker-trigger-text {
+    color: #ffffff !important;
+  }
+
+  /* Academic Picker Sheet & Modal (Clean & Professional, No Badges, No Cartoon Emojis) */
+  .academic-picker-modal .modal-content {
+    background-color: var(--card-bg, #ffffff) !important;
+  }
+  [data-theme="dark"] .academic-picker-modal .modal-content {
+    background-color: #242526 !important;
+    border: 1px solid #3a3b3c !important;
+  }
+  .academic-picker-modal .modal-body {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .picker-search-bar {
+    background: inherit;
+  }
+  .picker-search-input {
+    width: 100%;
+    padding: 0.55rem 2.25rem 0.55rem 2.5rem;
+    border-radius: 9999px;
+    border: 1px solid #e2e8f0;
+    background-color: var(--search-bg, #f1f5f9);
+    color: var(--text-dark, #111827);
+    font-size: 14px;
+    outline: none;
+    transition: all 0.2s ease;
+  }
+  .picker-search-input:focus {
+    border-color: #2563eb;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+  [data-theme="dark"] .picker-search-input {
+    background-color: #2a2b2e;
+    border-color: #3a3b3c;
+    color: #f3f4f6;
+  }
+  [data-theme="dark"] .picker-search-input:focus {
+    background-color: #1f2023;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+  }
+
+  /* Clean Professional Row List */
+  .picker-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border, #f1f5f9);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease;
+  }
+  .picker-row:last-child {
+    border-bottom: 0;
+  }
+  .picker-row:hover,
+  .picker-row:focus-visible {
+    background-color: rgba(37, 99, 235, 0.05);
+    outline: none;
+  }
+  .picker-row.is-selected {
+    background-color: rgba(37, 99, 235, 0.08) !important;
+  }
+  [data-theme="dark"] .picker-row {
+    border-bottom-color: #2f3033;
+  }
+  [data-theme="dark"] .picker-row:hover,
+  [data-theme="dark"] .picker-row:focus-visible {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+  [data-theme="dark"] .picker-row.is-selected {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+  }
+
+  .picker-row-title {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--text-dark, #1e293b);
+    line-height: 1.4;
+  }
+  [data-theme="dark"] .picker-row-title {
+    color: #f1f5f9 !important;
+  }
+
+  .picker-row-subtitle {
+    font-size: 0.8125rem;
+    color: #64748b;
+    margin-top: 2px;
+  }
+  [data-theme="dark"] .picker-row-subtitle {
+    color: #94a3b8 !important;
   }
 
   @media (max-width: 767px) {
@@ -255,9 +384,40 @@
                                         {% endif %}
                                     </label>
                                     {% if field.name == 'programme' %}
-                                        <div class="course-search-wrapper">
-                                            <input type="text" class="course-search-input" placeholder="Search programmes..." id="programme-search">
-                                            {{ field }}
+                                        <div class="picker-trigger-wrapper" id="programmePickerWrapper">
+                                            <button type="button"
+                                                    class="form-control tactical-form-input picker-trigger d-flex align-items-center justify-content-between w-100"
+                                                    id="programmePickerTrigger"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#programmePickerModal"
+                                                    aria-haspopup="dialog"
+                                                    aria-expanded="false">
+                                                <span class="picker-trigger-text text-truncate" id="programmeSelectedLabel">
+                                                    Select your programme (optional)
+                                                </span>
+                                                <i class="bi bi-chevron-down picker-chevron ms-2"></i>
+                                            </button>
+                                            <div class="visually-hidden">
+                                                {{ field }}
+                                            </div>
+                                        </div>
+                                    {% elif field.name == 'academic_level' %}
+                                        <div class="picker-trigger-wrapper" id="academicLevelPickerWrapper">
+                                            <button type="button"
+                                                    class="form-control tactical-form-input picker-trigger d-flex align-items-center justify-content-between w-100"
+                                                    id="academicLevelPickerTrigger"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#academicLevelPickerModal"
+                                                    aria-haspopup="dialog"
+                                                    aria-expanded="false">
+                                                <span class="picker-trigger-text text-truncate" id="academicLevelSelectedLabel">
+                                                    Select your year of study (optional)
+                                                </span>
+                                                <i class="bi bi-chevron-down picker-chevron ms-2"></i>
+                                            </button>
+                                            <div class="visually-hidden">
+                                                {{ field }}
+                                            </div>
                                         </div>
                                     {% elif field.name == 'password1' or field.name == 'password2' %}
                                         <div class="password-input-wrapper">
@@ -320,12 +480,161 @@
     </div>
 </main>
 
+<!-- Programme Selection Modal / Bottom Sheet -->
+<div class="modal fade comments-bottom-sheet academic-picker-modal" id="programmePickerModal" tabindex="-1" aria-labelledby="programmePickerModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content shadow-lg border-0">
+            <!-- Mobile Bottom Sheet Handle -->
+            <div class="comments-modal-handle d-sm-none" aria-hidden="true"></div>
+
+            <!-- Modal Header -->
+            <div class="modal-header border-bottom py-3 px-3 d-flex align-items-center justify-content-between">
+                <h6 class="modal-title fw-bold mb-0" id="programmePickerModalTitle">Select Programme</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <!-- Pinned Search Bar -->
+            <div class="picker-search-bar px-3 py-2 border-bottom">
+                <div class="position-relative">
+                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted" style="font-size: 0.85rem;"></i>
+                    <input type="text"
+                           id="programmeModalSearch"
+                           class="picker-search-input form-control"
+                           placeholder="Search programmes..."
+                           autocomplete="off">
+                    <button type="button"
+                            id="programmeSearchClear"
+                            class="btn btn-link position-absolute top-50 end-0 translate-middle-y me-2 text-muted p-0 d-none"
+                            style="text-decoration: none;"
+                            aria-label="Clear search">
+                        <i class="bi bi-x-circle-fill"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scrollable Body / Clean Row List -->
+            <div class="modal-body p-0" id="programmeModalBody" style="max-height: 60vh; overflow-y: auto;">
+                <!-- Clear selection option -->
+                <div class="picker-row programme-option-item text-muted"
+                     data-id=""
+                     data-name=""
+                     data-search-text="clear none select"
+                     role="button"
+                     tabindex="0">
+                    <span class="small">Clear selection</span>
+                    <i class="bi bi-check2 text-primary picker-check-icon d-none fs-5"></i>
+                </div>
+
+                <div id="programmeOptionsList">
+                    {% if programmes %}
+                        {% for prog in programmes %}
+                            <div class="picker-row programme-option-item"
+                                 data-id="{{ prog.id }}"
+                                 data-name="{{ prog.name }}"
+                                 data-code="{{ prog.code }}"
+                                 data-duration="{{ prog.duration_years|default:'' }}"
+                                 data-search-text="{{ prog.name|lower }} {{ prog.code|lower }}"
+                                 role="button"
+                                 tabindex="0">
+                                <div class="me-2 overflow-hidden">
+                                    <div class="picker-row-title">{{ prog.name }}</div>
+                                    {% if prog.code or prog.department %}
+                                        <div class="picker-row-subtitle">{% if prog.code %}{{ prog.code }}{% endif %}{% if prog.code and prog.department %} &bull; {% endif %}{% if prog.department %}{{ prog.department.name }}{% endif %}</div>
+                                    {% endif %}
+                                </div>
+                                <i class="bi bi-check2 text-primary picker-check-icon d-none fs-5 flex-shrink-0 ms-2"></i>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        {% for choice_val, choice_label in form.programme.field.choices %}
+                            {% if choice_val %}
+                                <div class="picker-row programme-option-item"
+                                     data-id="{{ choice_val }}"
+                                     data-name="{{ choice_label }}"
+                                     data-search-text="{{ choice_label|lower }}"
+                                     role="button"
+                                     tabindex="0">
+                                    <div class="picker-row-title">{{ choice_label }}</div>
+                                    <i class="bi bi-check2 text-primary picker-check-icon d-none fs-5 flex-shrink-0 ms-2"></i>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                </div>
+
+                <!-- Empty Search Results State -->
+                <div id="programmeEmptyState" class="text-center py-4 d-none text-muted">
+                    <p class="mb-0 small">No programmes found.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Academic Level (Year) Selection Modal / Bottom Sheet -->
+<div class="modal fade comments-bottom-sheet academic-picker-modal" id="academicLevelPickerModal" tabindex="-1" aria-labelledby="academicLevelPickerModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content shadow-lg border-0">
+            <!-- Mobile Bottom Sheet Handle -->
+            <div class="comments-modal-handle d-sm-none" aria-hidden="true"></div>
+
+            <!-- Modal Header -->
+            <div class="modal-header border-bottom py-3 px-3 d-flex align-items-center justify-content-between">
+                <h6 class="modal-title fw-bold mb-0" id="academicLevelPickerModalTitle">Select Year of Study</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <!-- Scrollable Body / Clean Row List -->
+            <div class="modal-body p-0" id="academicLevelModalBody" style="max-height: 60vh; overflow-y: auto;">
+                <!-- Clear selection option -->
+                <div class="picker-row academic-level-option-item text-muted"
+                     data-id=""
+                     data-name=""
+                     role="button"
+                     tabindex="0">
+                    <span class="small">Clear selection</span>
+                    <i class="bi bi-check2 text-primary picker-check-icon d-none fs-5"></i>
+                </div>
+
+                <div id="academicLevelOptionsList">
+                    {% if academic_levels %}
+                        {% for level in academic_levels %}
+                            <div class="picker-row academic-level-option-item"
+                                 data-id="{{ level.id }}"
+                                 data-name="{{ level.name }}"
+                                 data-level="{{ level.level }}"
+                                 role="button"
+                                 tabindex="0">
+                                <span class="picker-row-title">{{ level.name }}</span>
+                                <i class="bi bi-check2 text-primary picker-check-icon d-none fs-5 flex-shrink-0 ms-2"></i>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        {% for choice_val, choice_label in form.academic_level.field.choices %}
+                            {% if choice_val %}
+                                <div class="picker-row academic-level-option-item"
+                                     data-id="{{ choice_val }}"
+                                     data-name="{{ choice_label }}"
+                                     role="button"
+                                     tabindex="0">
+                                    <span class="picker-row-title">{{ choice_label }}</span>
+                                    <i class="bi bi-check2 text-primary picker-check-icon d-none fs-5 flex-shrink-0 ms-2"></i>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 (function() {
     // Apply tactical-form-input class to all form inputs
     const formInputs = document.querySelectorAll('#registerForm input, #registerForm select');
     formInputs.forEach(function(input) {
-        if (!input.classList.contains('password-toggle-btn') && !input.classList.contains('course-search-input')) {
+        if (!input.classList.contains('password-toggle-btn') && !input.classList.contains('course-search-input') && !input.closest('.visually-hidden')) {
             input.classList.add('tactical-form-input');
         }
     });
@@ -508,42 +817,250 @@
         registerSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating your account…';
     });
 
-    // Programme search functionality
-    const programmeSearchInput = document.getElementById('programme-search');
+    // Interactive Picker Controls (Programme & Academic Level)
     const programmeSelect = document.getElementById('id_programme');
+    const programmeTrigger = document.getElementById('programmePickerTrigger');
+    const programmeLabel = document.getElementById('programmeSelectedLabel');
+    const programmeModalEl = document.getElementById('programmePickerModal');
+    const programmeSearchInput = document.getElementById('programmeModalSearch');
+    const programmeSearchClear = document.getElementById('programmeSearchClear');
+    const programmeEmptyState = document.getElementById('programmeEmptyState');
+    const programmeItems = document.querySelectorAll('#programmePickerModal .programme-option-item');
 
-    if (programmeSearchInput && programmeSelect) {
-        programmeSearchInput.addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase();
-            const options = programmeSelect.querySelectorAll('option');
+    const academicLevelSelect = document.getElementById('id_academic_level');
+    const academicLevelTrigger = document.getElementById('academicLevelPickerTrigger');
+    const academicLevelLabel = document.getElementById('academicLevelSelectedLabel');
+    const academicLevelModalEl = document.getElementById('academicLevelPickerModal');
+    const academicLevelItems = document.querySelectorAll('#academicLevelPickerModal .academic-level-option-item');
 
-            options.forEach(function(option) {
-                const programmeName = option.textContent.toLowerCase();
-                const matches = programmeName.includes(searchTerm);
-                
-                if (searchTerm === '') {
-                    // Show all options when search is empty
-                    option.style.display = '';
-                } else {
-                    // Filter based on search term
-                    option.style.display = matches ? '' : 'none';
-                }
-            });
+    function getModal(el) {
+        if (!el) return null;
+        if (window.bootstrap && window.bootstrap.Modal) {
+            return window.bootstrap.Modal.getInstance(el) || window.bootstrap.Modal.getOrCreateInstance(el);
+        }
+        return null;
+    }
 
-            // If the currently selected option is hidden, select the first visible option
-            if (programmeSelect.selectedIndex >= 0) {
-                const selectedOption = programmeSelect.options[programmeSelect.selectedIndex];
-                if (selectedOption.style.display === 'none') {
-                    const firstVisibleOption = Array.from(options).find(opt => opt.style.display !== 'none');
-                    if (firstVisibleOption) {
-                        programmeSelect.value = firstVisibleOption.value;
-                        // Trigger HTMX to load academic levels for the new programme
-                        programmeSelect.dispatchEvent(new Event('change'));
-                    }
-                }
+    function closeModal(el) {
+        const modal = getModal(el);
+        if (modal) {
+            modal.hide();
+        } else {
+            const closeBtn = el.querySelector('[data-bs-dismiss="modal"]');
+            if (closeBtn) closeBtn.click();
+        }
+    }
+
+    function syncOptionSelection(items, selectedId) {
+        items.forEach(function(item) {
+            const itemId = item.getAttribute('data-id') || '';
+            const checkIcon = item.querySelector('.picker-check-icon');
+            const isMatch = (selectedId !== '' && itemId === selectedId);
+            item.classList.toggle('is-selected', isMatch);
+            if (checkIcon) {
+                checkIcon.classList.toggle('d-none', !isMatch);
             }
         });
     }
+
+    function filterAcademicLevelsByDuration(duration) {
+        if (duration > 0) {
+            academicLevelItems.forEach(function(lvlItem) {
+                const lvlNum = parseInt(lvlItem.getAttribute('data-level') || '0', 10);
+                if (lvlNum > 0 && lvlNum <= 6) {
+                    lvlItem.style.display = (lvlNum <= duration) ? '' : 'none';
+                }
+            });
+            if (academicLevelSelect && academicLevelSelect.value) {
+                const currentSelectedLvlItem = document.querySelector(`#academicLevelPickerModal .academic-level-option-item[data-id="${academicLevelSelect.value}"]`);
+                if (currentSelectedLvlItem) {
+                    const currentLvlNum = parseInt(currentSelectedLvlItem.getAttribute('data-level') || '0', 10);
+                    if (currentLvlNum > duration) {
+                        academicLevelSelect.value = '';
+                        academicLevelSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                        syncAcademicLevelDisplay();
+                    }
+                }
+            }
+        } else {
+            academicLevelItems.forEach(function(lvlItem) {
+                lvlItem.style.display = '';
+            });
+        }
+    }
+
+    function syncProgrammeDisplay() {
+        if (!programmeSelect || !programmeLabel || !programmeTrigger) return;
+        const currentVal = (programmeSelect.value || '').trim();
+        let displayText = '';
+
+        if (currentVal) {
+            const matchItem = document.querySelector(`#programmePickerModal .programme-option-item[data-id="${currentVal}"]`);
+            if (matchItem) {
+                displayText = matchItem.getAttribute('data-name') || matchItem.textContent.trim();
+            } else if (programmeSelect.selectedIndex >= 0) {
+                displayText = programmeSelect.options[programmeSelect.selectedIndex].text;
+            }
+        }
+
+        if (currentVal && displayText) {
+            programmeLabel.textContent = displayText;
+            programmeLabel.classList.remove('text-muted');
+            programmeTrigger.classList.add('has-value');
+        } else {
+            programmeLabel.textContent = 'Select your programme (optional)';
+            programmeLabel.classList.add('text-muted');
+            programmeTrigger.classList.remove('has-value');
+        }
+        syncOptionSelection(programmeItems, currentVal);
+    }
+
+    function syncAcademicLevelDisplay() {
+        if (!academicLevelSelect || !academicLevelLabel || !academicLevelTrigger) return;
+        const currentVal = (academicLevelSelect.value || '').trim();
+        let displayText = '';
+
+        if (currentVal) {
+            const matchItem = document.querySelector(`#academicLevelPickerModal .academic-level-option-item[data-id="${currentVal}"]`);
+            if (matchItem) {
+                displayText = matchItem.getAttribute('data-name') || matchItem.textContent.trim();
+            } else if (academicLevelSelect.selectedIndex >= 0) {
+                displayText = academicLevelSelect.options[academicLevelSelect.selectedIndex].text;
+            }
+        }
+
+        if (currentVal && displayText) {
+            academicLevelLabel.textContent = displayText;
+            academicLevelLabel.classList.remove('text-muted');
+            academicLevelTrigger.classList.add('has-value');
+        } else {
+            academicLevelLabel.textContent = 'Select your year of study (optional)';
+            academicLevelLabel.classList.add('text-muted');
+            academicLevelTrigger.classList.remove('has-value');
+        }
+        syncOptionSelection(academicLevelItems, currentVal);
+    }
+
+    // Initial state sync
+    syncProgrammeDisplay();
+    syncAcademicLevelDisplay();
+    if (programmeSelect && programmeSelect.value) {
+        const selectedProgItem = document.querySelector(`#programmePickerModal .programme-option-item[data-id="${programmeSelect.value}"]`);
+        if (selectedProgItem) {
+            const initialDuration = parseInt(selectedProgItem.getAttribute('data-duration') || '0', 10);
+            filterAcademicLevelsByDuration(initialDuration);
+        }
+    }
+
+    // Re-sync if select values change externally or via HTMX
+    if (programmeSelect) {
+        programmeSelect.addEventListener('change', syncProgrammeDisplay);
+    }
+    if (academicLevelSelect) {
+        academicLevelSelect.addEventListener('change', syncAcademicLevelDisplay);
+    }
+    document.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail && evt.detail.target && evt.detail.target.id === 'id_academic_level') {
+            syncAcademicLevelDisplay();
+        }
+    });
+
+    // Auto-focus search input when Programme modal opens on desktop
+    if (programmeModalEl) {
+        programmeModalEl.addEventListener('shown.bs.modal', function() {
+            if (window.innerWidth >= 576 && programmeSearchInput) {
+                programmeSearchInput.focus();
+            }
+        });
+    }
+
+    // Programme search filtering
+    if (programmeSearchInput) {
+        programmeSearchInput.addEventListener('input', function() {
+            const query = this.value.trim().toLowerCase();
+            let visibleCount = 0;
+
+            if (programmeSearchClear) {
+                programmeSearchClear.classList.toggle('d-none', query === '');
+            }
+
+            programmeItems.forEach(function(item) {
+                const itemId = item.getAttribute('data-id') || '';
+                if (itemId === '') {
+                    item.style.display = (query === '') ? '' : 'none';
+                    return;
+                }
+
+                const searchText = (item.getAttribute('data-search-text') || item.textContent || '').toLowerCase();
+                const matches = (query === '' || searchText.includes(query));
+
+                item.style.display = matches ? '' : 'none';
+                if (matches) visibleCount++;
+            });
+
+            if (programmeEmptyState) {
+                programmeEmptyState.classList.toggle('d-none', visibleCount > 0);
+            }
+        });
+
+        if (programmeSearchClear) {
+            programmeSearchClear.addEventListener('click', function() {
+                programmeSearchInput.value = '';
+                programmeSearchInput.dispatchEvent(new Event('input'));
+                programmeSearchInput.focus();
+            });
+        }
+    }
+
+    // Programme option selection
+    programmeItems.forEach(function(item) {
+        function chooseProgramme() {
+            const progId = item.getAttribute('data-id') || '';
+
+            if (programmeSelect) {
+                programmeSelect.value = progId;
+                programmeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            syncProgrammeDisplay();
+
+            const duration = parseInt(item.getAttribute('data-duration') || '0', 10);
+            filterAcademicLevelsByDuration(duration);
+
+            closeModal(programmeModalEl);
+        }
+
+        item.addEventListener('click', chooseProgramme);
+        item.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                chooseProgramme();
+            }
+        });
+    });
+
+    // Academic level option selection
+    academicLevelItems.forEach(function(item) {
+        function chooseLevel() {
+            const levelId = item.getAttribute('data-id') || '';
+
+            if (academicLevelSelect) {
+                academicLevelSelect.value = levelId;
+                academicLevelSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            syncAcademicLevelDisplay();
+            closeModal(academicLevelModalEl);
+        }
+
+        item.addEventListener('click', chooseLevel);
+        item.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                chooseLevel();
+            }
+        });
+    });
 })();
 </script>
 {% endblock %}

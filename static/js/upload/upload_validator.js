@@ -36,13 +36,13 @@ class ValidationResult {
 const VALIDATION_CONFIG = {
     image: {
         maxSize: 5 * 1024 * 1024, // 5MB
-        allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'],
+        allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif', 'image/bmp'],
         maxDimensions: { width: 10000, height: 10000 },
         minDimensions: { width: 1, height: 1 },
     },
     video: {
         maxSize: 150 * 1024 * 1024, // 150MB
-        allowedTypes: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'],
+        allowedTypes: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/3gpp'],
         maxDuration: 3600, // 1 hour in seconds
     },
     document: {
@@ -51,7 +51,7 @@ const VALIDATION_CONFIG = {
     },
     audio: {
         maxSize: 20 * 1024 * 1024, // 20MB
-        allowedTypes: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/webm'],
+        allowedTypes: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/aac', 'audio/mp4'],
     },
     caption: {
         maxLength: 2500,
@@ -68,8 +68,10 @@ class ImageValidator {
     static async validate(file) {
         const result = new ValidationResult();
 
-        // Check file type
-        if (!VALIDATION_CONFIG.image.allowedTypes.includes(file.type)) {
+        // Check file type (with filename extension fallback for mobile/Capacitor pickers)
+        const isAllowedMime = file.type && VALIDATION_CONFIG.image.allowedTypes.includes(file.type);
+        const hasImageExt = /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name || '');
+        if (!isAllowedMime && !hasImageExt) {
             result.addError('type', `Invalid image type. Allowed: ${VALIDATION_CONFIG.image.allowedTypes.join(', ')}`);
         }
 
@@ -272,15 +274,21 @@ class UploadValidator {
      * @returns {Promise<ValidationResult>}
      */
     static async validateFile(file) {
-        const fileType = file.type;
+        const fileType = file.type || '';
+        const fileName = file.name || '';
 
-        if (fileType.startsWith('image/')) {
+        const isImage = fileType.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(fileName);
+        const isVideo = fileType.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi|3gp)$/i.test(fileName);
+        const isDoc   = fileType === 'application/pdf' || /\.pdf$/i.test(fileName);
+        const isAudio = fileType.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac)$/i.test(fileName);
+
+        if (isImage) {
             return await ImageValidator.validate(file);
-        } else if (fileType.startsWith('video/')) {
+        } else if (isVideo) {
             return await VideoValidator.validate(file);
-        } else if (fileType === 'application/pdf') {
+        } else if (isDoc) {
             return await DocumentValidator.validate(file);
-        } else if (fileType.startsWith('audio/')) {
+        } else if (isAudio) {
             return await AudioValidator.validate(file);
         } else {
             const result = new ValidationResult();

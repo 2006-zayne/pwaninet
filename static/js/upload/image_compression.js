@@ -38,7 +38,8 @@ class ImageCompressor {
      */
     static shouldCompress(file) {
         // Only compress images
-        if (!file.type.startsWith('image/')) {
+        const isImage = (file.type && file.type.startsWith('image/')) || /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name || '');
+        if (!isImage) {
             return false;
         }
 
@@ -212,7 +213,8 @@ class ImageCompressor {
             });
 
             // Skip non-images
-            if (!file.type.startsWith('image/')) {
+            const isImage = (file.type && file.type.startsWith('image/')) || /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name || '');
+            if (!isImage) {
                 results.push(new ImageCompressionResult(file, file, file.size, file.size));
                 continue;
             }

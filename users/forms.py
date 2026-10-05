@@ -44,6 +44,7 @@ class PwaniSignupForm(UserCreationForm):
         self.fields['academic_level'].required = False
 
         self.fields['academic_level'].queryset = AcademicLevel.objects.filter(is_active=True).order_by('level')
+        self.fields['programme'].queryset = Programme.objects.filter(is_active=True).order_by('name')
 
     def save(self, commit=True):
         user = super().save(commit=False)

@@ -10,6 +10,13 @@ def load_academic_levels(request):
     """Load academic levels for a programme (HTMX endpoint)."""
     programme_id = request.GET.get('programme')
     levels = AcademicLevel.objects.filter(is_active=True).order_by('level')
+    if programme_id:
+        try:
+            programme = Programme.objects.filter(id=programme_id).first()
+            if programme and programme.duration_years:
+                levels = levels.filter(level__lte=programme.duration_years)
+        except Exception:
+            pass
     
     context = {'levels': levels}
     return render(request, 'users/partials/academic_level_options.html', context)

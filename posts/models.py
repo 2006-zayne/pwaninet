@@ -1,11 +1,12 @@
+import os
 import uuid
 from django.db import models
 from django.conf import settings
 from django.contrib.postgres.search import SearchVectorField
 from django.contrib.postgres.indexes import GinIndex
-from PIL import Image
+from PIL import Image, ImageOps
 from io import BytesIO
-from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.files.uploadedfile import InMemoryUploadedFile, UploadedFile
 from django.core.files.storage import FileSystemStorage
 from django.db.models.fields.files import ImageFieldFile
 import sys
@@ -518,57 +519,78 @@ class PostImage(models.Model):
         return self.image.url
 
     def save(self, *args, **kwargs):
-        if self.image:
-            img = Image.open(self.image)
-            original_format = img.format
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
+        # Only transcode / resize if a new image file is being uploaded
+        # Avoid re-processing already saved FieldFiles on remote storage (S3/Cloudflare R2)
+        has_new_file = bool(self.image) and (
+            not self.pk or
+            isinstance(getattr(self.image, 'file', None), (InMemoryUploadedFile, UploadedFile, BytesIO)) or
+            hasattr(getattr(self.image, 'file', None), 'temporary_file_path')
+        )
 
-            # Resize original if too large
-            if img.height > 1080 or img.width > 1080:
-                img.thumbnail((1080, 1080))
+        if has_new_file:
+            try:
+                img = Image.open(self.image)
+                # Auto-orient using EXIF orientation tags (common on mobile phone cameras)
+                img = ImageOps.exif_transpose(img)
+                original_format = (img.format or 'JPEG').upper()
 
-            # Save original as WebP if possible, otherwise JPEG
-            output = BytesIO()
-            if original_format == 'PNG' and img.mode == 'RGBA':
-                # Keep PNG for transparency
-                img.save(output, format='PNG', optimize=True)
-                file_ext = 'png'
-                mime_type = 'image/png'
-            else:
-                # Use WebP for better compression
-                img.save(output, format='WEBP', quality=80, method=6)
-                file_ext = 'webp'
-                mime_type = 'image/webp'
-            output.seek(0)
+                # Resize original if too large (capped at 1080x1080)
+                if img.height > 1080 or img.width > 1080:
+                    resample_filter = getattr(getattr(Image, 'Resampling', Image), 'LANCZOS', Image.LANCZOS)
+                    img.thumbnail((1080, 1080), resample_filter)
 
-            file_name = self.image.name.split('.')[0]
-            self.image = InMemoryUploadedFile(
-                output, 'ImageField', f"{file_name}.{file_ext}",
-                mime_type, sys.getsizeof(output), None
-            )
+                raw_name = getattr(self.image, 'name', 'image') or 'image'
+                base_name = os.path.splitext(os.path.basename(raw_name))[0] or f"image_{uuid.uuid4().hex[:8]}"
 
-            # Generate 400px thumbnail for feed
-            img_400 = img.copy()
-            img_400.thumbnail((400, 400))
-            output_400 = BytesIO()
-            img_400.save(output_400, format='WEBP', quality=75, method=6)
-            output_400.seek(0)
-            self.thumbnail_400 = InMemoryUploadedFile(
-                output_400, 'ImageField', f"{file_name}_400.webp",
-                'image/webp', sys.getsizeof(output_400), None
-            )
+                # Save original: keep PNG if transparency exists, otherwise WebP
+                output = BytesIO()
+                if original_format == 'PNG' and img.mode in ('RGBA', 'LA', 'P'):
+                    if img.mode != 'RGBA':
+                        img = img.convert('RGBA')
+                    img.save(output, format='PNG', optimize=True)
+                    file_ext = 'png'
+                    mime_type = 'image/png'
+                else:
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    img.save(output, format='WEBP', quality=80, method=6)
+                    file_ext = 'webp'
+                    mime_type = 'image/webp'
+                output.seek(0)
+                output_size = output.getbuffer().nbytes
 
-            # Generate 800px thumbnail for larger displays
-            img_800 = img.copy()
-            img_800.thumbnail((800, 800))
-            output_800 = BytesIO()
-            img_800.save(output_800, format='WEBP', quality=80, method=6)
-            output_800.seek(0)
-            self.thumbnail_800 = InMemoryUploadedFile(
-                output_800, 'ImageField', f"{file_name}_800.webp",
-                'image/webp', sys.getsizeof(output_800), None
-            )
+                self.image = InMemoryUploadedFile(
+                    output, 'ImageField', f"{base_name}.{file_ext}",
+                    mime_type, output_size, None
+                )
+
+                # Generate 400px thumbnail for feed
+                img_400 = img.copy()
+                resample_filter = getattr(getattr(Image, 'Resampling', Image), 'LANCZOS', Image.LANCZOS)
+                img_400.thumbnail((400, 400), resample_filter)
+                output_400 = BytesIO()
+                img_400.save(output_400, format='WEBP', quality=75, method=6)
+                output_400.seek(0)
+                output_400_size = output_400.getbuffer().nbytes
+                self.thumbnail_400 = InMemoryUploadedFile(
+                    output_400, 'ImageField', f"{base_name}_400.webp",
+                    'image/webp', output_400_size, None
+                )
+
+                # Generate 800px thumbnail for larger displays
+                img_800 = img.copy()
+                img_800.thumbnail((800, 800), resample_filter)
+                output_800 = BytesIO()
+                img_800.save(output_800, format='WEBP', quality=80, method=6)
+                output_800.seek(0)
+                output_800_size = output_800.getbuffer().nbytes
+                self.thumbnail_800 = InMemoryUploadedFile(
+                    output_800, 'ImageField', f"{base_name}_800.webp",
+                    'image/webp', output_800_size, None
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning("Pillow processing failed for PostImage, uploading original: %s", e)
 
         super(PostImage, self).save(*args, **kwargs)
 

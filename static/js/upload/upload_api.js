@@ -26,7 +26,7 @@ class UploadAPI {
     }
 
     /**
-     * Get CSRF token from meta tag or cookie
+     * Get CSRF token from meta tag, form input, global var, or cookies
      * @returns {string}
      */
     getCSRFToken() {
@@ -38,17 +38,25 @@ class UploadAPI {
         try {
             const metaTag = document.querySelector('meta[name="csrf-token"]') || document.querySelector('[name=csrfmiddlewaretoken]');
             if (metaTag) {
-                return metaTag.getAttribute('content') || metaTag.value || '';
+                const token = metaTag.getAttribute('content') || metaTag.value || '';
+                if (token) return token;
             }
         } catch (_) {}
 
-        // Try cookie
+        // Try global variable
+        try {
+            if (typeof window !== 'undefined' && window.csrfToken) {
+                return window.csrfToken;
+            }
+        } catch (_) {}
+
+        // Try cookies (checks both production 'csrftoken' and local 'pwaninet_local_csrftoken')
         try {
             if (document.cookie) {
                 const cookies = document.cookie.split(';');
                 for (const cookie of cookies) {
                     const [name, value] = cookie.trim().split('=');
-                    if (name === 'csrftoken') {
+                    if (name === 'csrftoken' || name === 'pwaninet_local_csrftoken') {
                         return decodeURIComponent(value);
                     }
                 }
@@ -75,16 +83,22 @@ class UploadAPI {
         console.log('[UploadAPI] Creating FormData with data:', data);
         const formData = new FormData();
 
+        // Always append CSRF token into FormData for multipart compatibility
+        const csrfToken = this.getCSRFToken();
+        if (csrfToken) {
+            formData.append('csrfmiddlewaretoken', csrfToken);
+        }
+
         // Add text fields
         if (data.content) {
             formData.append('content', data.content);
             console.log('[UploadAPI] Adding content:', data.content);
         }
-        if (data.unit) {
+        if (data.unit && data.unit !== 'null' && data.unit !== 'undefined' && String(data.unit).trim() !== '') {
             formData.append('unit', data.unit);
             console.log('[UploadAPI] Adding unit:', data.unit);
         }
-        if (data.group) {
+        if (data.group && data.group !== 'null' && data.group !== 'undefined' && String(data.group).trim() !== '') {
             formData.append('group', data.group);
             console.log('[UploadAPI] Adding group:', data.group);
         }
@@ -116,7 +130,7 @@ class UploadAPI {
 
         // Add media files
         if (data.images && data.images.length > 0) {
-            data.images.forEach((image, index) => {
+            data.images.forEach((image) => {
                 formData.append('images', image);
             });
             console.log('[UploadAPI] Adding', data.images.length, 'images');
@@ -157,12 +171,17 @@ class UploadAPI {
     }
 
     createFormDataFromSession(session) {
+        const isImage = (f) => (f.type && f.type.startsWith('image/')) || /\.(jpe?g|png|webp|gif|bmp|heic|heif|svg)$/i.test(f.name || '');
+        const isVideo = (f) => (f.type && f.type.startsWith('video/')) || /\.(mp4|mov|webm|mkv|avi|3gp)$/i.test(f.name || '');
+        const isDoc   = (f) => (f.type === 'application/pdf') || /\.pdf$/i.test(f.name || '');
+        const isAudio = (f) => (f.type && f.type.startsWith('audio/')) || /\.(mp3|wav|ogg|m4a|aac)$/i.test(f.name || '');
+
         return this.createFormData({
             content: session.caption,
-            images: session.files.filter((file) => file.type.startsWith('image/')),
-            video: session.files.find((file) => file.type.startsWith('video/')) || null,
-            docs: session.files.find((file) => file.type === 'application/pdf') || null,
-            audio: session.files.find((file) => file.type.startsWith('audio/')) || null,
+            images: session.files.filter(isImage),
+            video: session.files.find(isVideo) || null,
+            docs: session.files.find(isDoc) || null,
+            audio: session.files.find(isAudio) || null,
             unit: session.metadata?.unit || null,
             group: session.metadata?.group || null,
             visibility: session.visibility || null,
@@ -171,6 +190,7 @@ class UploadAPI {
             custom_gradient_text: session.metadata?.custom_gradient_text || null,
             custom_gradient_color1: session.metadata?.custom_gradient_color1 || null,
             custom_gradient_color2: session.metadata?.custom_gradient_color2 || null,
+            custom_gradient_text_color: session.metadata?.custom_gradient_text_color || null,
             video_width: session.metadata?.video_width || null,
             video_height: session.metadata?.video_height || null,
             video_duration: session.metadata?.video_duration || null,
@@ -186,7 +206,7 @@ class UploadAPI {
     }
 
     /**
-     * Get default headers for requests
+     * Get default headers for requests (fetches live CSRF token dynamically)
      * @returns {object}
      */
     getHeaders() {
@@ -194,8 +214,9 @@ class UploadAPI {
             'X-Requested-With': 'XMLHttpRequest',
         };
 
-        if (this.csrfToken) {
-            headers['X-CSRFToken'] = this.csrfToken;
+        const token = this.getCSRFToken();
+        if (token) {
+            headers['X-CSRFToken'] = token;
         }
 
         return headers;

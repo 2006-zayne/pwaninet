@@ -42,16 +42,22 @@ class PreviewManager {
      * @returns {Promise<PreviewResult>}
      */
     async generatePreview(file) {
-        const fileType = file.type;
+        const fileType = file.type || '';
+        const fileName = file.name || '';
+
+        const isImage = fileType.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(fileName);
+        const isVideo = fileType.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi|3gp)$/i.test(fileName);
+        const isDoc   = fileType === 'application/pdf' || /\.pdf$/i.test(fileName);
+        const isAudio = fileType.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac)$/i.test(fileName);
 
         try {
-            if (fileType.startsWith('image/')) {
+            if (isImage) {
                 return await this.generateImagePreview(file);
-            } else if (fileType.startsWith('video/')) {
+            } else if (isVideo) {
                 return await this.generateVideoPreview(file);
-            } else if (fileType === 'application/pdf') {
+            } else if (isDoc) {
                 return await this.generateDocumentPreview(file);
-            } else if (fileType.startsWith('audio/')) {
+            } else if (isAudio) {
                 return await this.generateAudioPreview(file);
             } else {
                 return await this.generateGenericPreview(file);

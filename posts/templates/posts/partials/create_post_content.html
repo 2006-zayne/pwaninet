@@ -930,7 +930,7 @@
   <!-- ── Compose Card ── -->
   <div class="card">
     <div class="card-body">
-      <form method="POST" enctype="multipart/form-data" id="postForm">
+      <form method="POST" action="{% url 'posts:create_post' %}" enctype="multipart/form-data" id="postForm">
         {% csrf_token %}
 
         {{ form.gradient_class }}
@@ -1170,6 +1170,13 @@ function initCreatePostComposer() {
         return;
     }
     postForm.dataset.composerInitialized = 'true';
+    postForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const deploy = document.getElementById('deployBtn');
+      if (deploy && !deploy.disabled) {
+        deploy.click();
+      }
+    });
     const downloadToggle = postForm.querySelector('[data-download-permission-toggle]');
     const downloadField = postForm.querySelector('#id_allow_downloads');
     if (downloadToggle && downloadField) {
@@ -1511,10 +1518,12 @@ function initCreatePostComposer() {
     }
 
     function inferMediaType(file) {
-      if (file.type.startsWith('image/')) return 'image';
-      if (file.type.startsWith('video/')) return 'video';
-      if (file.type.startsWith('audio/')) return 'audio';
-      if (file.type === 'application/pdf') return 'docs';
+      const type = file.type || '';
+      const name = file.name || '';
+      if (type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(name)) return 'image';
+      if (type.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi|3gp)$/i.test(name)) return 'video';
+      if (type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac)$/i.test(name)) return 'audio';
+      if (type === 'application/pdf' || /\.pdf$/i.test(name)) return 'docs';
       return 'docs';
     }
 

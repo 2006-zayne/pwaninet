@@ -117,8 +117,19 @@ def register_view(request):
     else:
         form = PwaniSignupForm()
 
+    programmes = []
+    academic_levels = []
+    try:
+        from documents.academic.models import Programme, AcademicLevel
+        programmes = Programme.objects.filter(is_active=True).select_related('department__school').order_by('name')
+        academic_levels = AcademicLevel.objects.filter(is_active=True).order_by('level')
+    except Exception as e:
+        logger.warning(f"[register_view] Could not prefetch programmes or academic levels: {e}")
+
     return render(request, 'users/register.html', {
         'form': form,
+        'programmes': programmes,
+        'academic_levels': academic_levels,
         'inviter_username': inviter_username,
         'invite_token': ref_token,
     })
