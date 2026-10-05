@@ -663,6 +663,10 @@ PWANIMATE_LLM_FALLBACK_CHAIN = [
 ]
 
 # Pwanimate Attachments Subsystem
+# KLIPY Integration Settings
+KLIPY_API_KEY = os.environ.get('KLIPY_API_KEY', '')
+KLIPY_API_BASE_URL = 'https://api.klipy.com/api/v1'
+
 PWANIMATE_ATTACHMENTS_DIR = 'pwanimate/attachments'
 PWANIMATE_MAX_IMAGE_SIZE = int(os.environ.get('PWANIMATE_MAX_IMAGE_SIZE', 10 * 1024 * 1024))   # 10MB
 PWANIMATE_MAX_DOC_SIZE = int(os.environ.get('PWANIMATE_MAX_DOC_SIZE', 25 * 1024 * 1024))       # 25MB

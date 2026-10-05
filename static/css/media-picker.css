@@ -1,0 +1,813 @@
+/**
+ * Media Picker CSS - Universal Emoji, GIF & Sticker Picker
+ * Mobile: Native Bottom Sheet
+ * Desktop & Tablets: Floating Model Anchored to Trigger
+ */
+
+:root, [data-theme="light"] {
+  --mp-bg: var(--card-bg, #ffffff);
+  --mp-bg-secondary: var(--search-bg, #f0f2f5);
+  --mp-border: var(--border, #e2e8f0);
+  --mp-text: var(--text-dark, #0f172a);
+  --mp-text-muted: var(--text-muted, #64748b);
+  --mp-primary: var(--primary, #2563eb);
+  --mp-primary-hover: var(--primary-hover, #1d4ed8);
+  --mp-active-tab: rgba(37, 99, 235, 0.1);
+  --mp-chip-bg: var(--search-bg, #f0f2f5);
+  --mp-card-bg: var(--card-bg, #ffffff);
+  --mp-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.18), 0 0 1px 1px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] {
+  --mp-bg: #242526;
+  --mp-bg-secondary: #3a3b3c;
+  --mp-border: #3a3b3c;
+  --mp-text: #e4e6eb;
+  --mp-text-muted: #b0b3b8;
+  --mp-primary: #6366f1;
+  --mp-primary-hover: #818cf8;
+  --mp-active-tab: rgba(99, 102, 241, 0.2);
+  --mp-chip-bg: #3a3b3c;
+  --mp-card-bg: #242526;
+  --mp-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.7), 0 0 1px 1px rgba(255, 255, 255, 0.08);
+}
+
+/* ==========================================================================
+   Media Picker Container & Positioning
+   ========================================================================== */
+
+.media-picker-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 10800;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+.media-picker-backdrop.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.media-picker-modal {
+  position: fixed;
+  z-index: 10850;
+  background: var(--mp-bg);
+  border: 1px solid var(--mp-border);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--mp-shadow);
+  color: var(--mp-text);
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.2s ease;
+}
+
+.media-picker-modal.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Desktop & Tablet: Floating model anchored to trigger */
+@media (min-width: 768px) {
+  .media-picker-backdrop {
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  .media-picker-modal {
+    width: 370px;
+    height: 460px;
+    max-height: 85vh;
+    border-radius: 16px;
+    transform: translateY(10px) scale(0.97);
+  }
+
+  .media-picker-modal.show {
+    transform: translateY(0) scale(1);
+  }
+
+  .media-picker-drag-handle {
+    display: none !important;
+  }
+}
+
+/* Mobile: Bottom Sheet */
+@media (max-width: 767.98px) {
+  .media-picker-modal {
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    height: 70vh !important;
+    max-height: 80vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    border-bottom: none !important;
+    transform: translateY(100%);
+  }
+
+  .media-picker-modal.show {
+    transform: translateY(0);
+  }
+
+  .media-picker-drag-handle {
+    width: 36px;
+    height: 4px;
+    background: var(--mp-border);
+    border-radius: 2px;
+    margin: 8px auto 4px auto;
+    flex-shrink: 0;
+  }
+}
+
+/* ==========================================================================
+   Header & Tabs
+   ========================================================================== */
+
+.media-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--mp-border);
+  background: var(--mp-bg);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.media-picker-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--mp-bg-secondary);
+  padding: 3px;
+  border-radius: 10px;
+  flex: 1;
+}
+
+.media-picker-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--mp-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.media-picker-tab-btn:hover {
+  color: var(--mp-text);
+}
+
+.media-picker-tab-btn.active {
+  background: var(--mp-bg);
+  color: var(--mp-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.media-picker-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--mp-text-muted);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.media-picker-close-btn:hover {
+  background: var(--mp-bg-secondary);
+  color: var(--mp-text);
+}
+
+/* ==========================================================================
+   Quick Reactions Bar
+   ========================================================================== */
+
+.media-picker-quick-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  background: var(--mp-bg-secondary);
+  border-bottom: 1px solid var(--mp-border);
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+
+.media-picker-quick-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.media-picker-quick-emoji {
+  background: transparent;
+  border: none;
+  font-size: 1.45rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 8px;
+  line-height: 1;
+  transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.media-picker-quick-emoji:hover {
+  transform: scale(1.28);
+}
+
+.media-picker-quick-emoji:active {
+  transform: scale(0.92);
+}
+
+/* ==========================================================================
+   Content Panels
+   ========================================================================== */
+
+.media-picker-body {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.media-picker-panel {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.media-picker-panel.active {
+  display: flex;
+}
+
+/* Emojis Panel with emoji-picker-element */
+.media-picker-emoji-container {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  overflow: hidden;
+}
+
+emoji-picker {
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+  --background: var(--mp-bg, #ffffff) !important;
+  --border-color: var(--mp-border, #e2e8f0) !important;
+  --category-emoji-size: 1.15rem;
+  --emoji-size: 1.35rem;
+  --indicator-color: var(--mp-primary, #2563eb) !important;
+  --input-border-color: var(--mp-border, #e2e8f0) !important;
+  --input-font-size: 0.88rem;
+  --input-placeholder-color: var(--mp-text-muted, #64748b) !important;
+  --outline-color: var(--mp-primary, #2563eb) !important;
+}
+
+[data-theme="dark"] emoji-picker {
+  --background: #242526 !important;
+  --border-color: #3a3b3c !important;
+  --indicator-color: #6366f1 !important;
+  --input-border-color: #3a3b3c !important;
+  --input-placeholder-color: #b0b3b8 !important;
+  --outline-color: #6366f1 !important;
+}
+
+/* Search Bar (for GIFs and Stickers) */
+.media-picker-search-wrap {
+  padding: 8px 12px;
+  background: var(--mp-bg);
+  border-bottom: 1px solid var(--mp-border);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.media-picker-search-input {
+  width: 100%;
+  height: 34px;
+  border-radius: 18px;
+  border: 1px solid var(--mp-border);
+  background: var(--mp-bg-secondary);
+  color: var(--mp-text);
+  font-size: 0.85rem;
+  padding: 0 34px 0 36px;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.media-picker-search-input:focus {
+  border-color: var(--mp-primary);
+  background: var(--mp-bg);
+}
+
+.media-picker-search-clear {
+  position: absolute;
+  right: 22px;
+  background: none;
+  border: none;
+  color: var(--mp-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: none;
+  line-height: 1;
+}
+
+.media-picker-search-clear.show {
+  display: block;
+}
+
+/* Category Filter Chips for Quick Search */
+.media-picker-categories {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--mp-bg);
+  border-bottom: 1px solid var(--mp-border);
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  flex-shrink: 0;
+}
+
+.media-picker-categories::-webkit-scrollbar {
+  display: none;
+}
+
+.media-picker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 500;
+  border-radius: 14px;
+  background: var(--mp-bg-secondary);
+  color: var(--mp-text-muted);
+  border: 1px solid var(--mp-border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.media-picker-chip:hover {
+  background: var(--mp-bg);
+  color: var(--mp-text);
+  border-color: var(--mp-primary);
+}
+
+.media-picker-chip.active {
+  background: var(--mp-primary);
+  color: #ffffff;
+  border-color: var(--mp-primary);
+}
+
+.media-picker-pagination-loader {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 0;
+  color: var(--mp-text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.media-picker-empty-action {
+  margin-top: 10px;
+  padding: 6px 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 16px;
+  background: var(--mp-bg-secondary);
+  border: 1px solid var(--mp-border);
+  color: var(--mp-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.media-picker-empty-action:hover {
+  background: var(--mp-primary);
+  color: #ffffff;
+  border-color: var(--mp-primary);
+}
+
+/* Sticker Subtabs */
+.media-picker-subtabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--mp-bg-secondary);
+  border-bottom: 1px solid var(--mp-border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.media-picker-subtabs::-webkit-scrollbar {
+  display: none;
+}
+
+.media-picker-pill {
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  border-radius: 14px;
+  border: 1px solid var(--mp-border);
+  background: var(--mp-bg);
+  color: var(--mp-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.media-picker-pill:hover {
+  color: var(--mp-text);
+}
+
+.media-picker-pill.active {
+  background: var(--mp-primary);
+  color: #ffffff;
+  border-color: var(--mp-primary);
+}
+
+/* Media Grid for GIFs and Stickers */
+.media-picker-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-auto-rows: max-content !important;
+  gap: 10px !important;
+  padding: 10px !important;
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  height: 0 !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  align-content: start;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+.media-picker-grid.stickers-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  padding: 10px !important;
+}
+
+/* Individual Card Styling for GIFs and Stickers - edge-to-edge card tiles */
+.media-picker-item {
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  aspect-ratio: 16 / 10 !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--mp-border) !important;
+  background-color: var(--mp-card-bg, #ffffff) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+  cursor: pointer !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  transform: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease !important;
+}
+
+[data-theme="dark"] .media-picker-item {
+  background-color: #242526 !important;
+  border-color: #3a3b3c !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* GIF Card Image: fills 100% width and height without any padding */
+.media-picker-item img {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 11px !important;
+}
+
+/* Sticker Card: square aspect ratio with full 100% width & height */
+.media-picker-grid.stickers-grid .media-picker-item {
+  aspect-ratio: 1 / 1 !important;
+  padding: 0 !important;
+}
+
+.media-picker-grid.stickers-grid .media-picker-item img {
+  object-fit: contain !important;
+  width: 100% !important;
+  height: 100% !important;
+  padding: 0 !important;
+}
+
+.media-picker-item:hover {
+  transform: translateY(-2px) scale(1.02) !important;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12) !important;
+  border-color: var(--mp-primary) !important;
+  z-index: 5 !important;
+}
+
+.media-picker-item:active {
+  transform: translateY(0) scale(0.98) !important;
+}
+
+/* Sticker Upload Card in My Stickers */
+.media-picker-upload-card {
+  border: 2px dashed var(--mp-border);
+  border-radius: 14px;
+  background: var(--card-bg, #ffffff);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  aspect-ratio: 1 / 1;
+  cursor: pointer;
+  color: var(--mp-text-muted);
+  transition: all 0.18s ease;
+  padding: 8px;
+  text-align: center;
+}
+
+[data-theme="dark"] .media-picker-upload-card {
+  background: #25272a;
+  border-color: #383a40;
+}
+
+.media-picker-upload-card:hover {
+  border-color: var(--mp-primary);
+  color: var(--mp-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.1);
+  background: var(--mp-active-tab);
+}
+
+.media-picker-upload-card i {
+  font-size: 1.4rem;
+}
+
+.media-picker-upload-card span {
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+/* KLIPY Attribution Footer */
+.media-picker-footer {
+  padding: 6px 12px;
+  background: var(--mp-bg);
+  border-top: 1px solid var(--mp-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--mp-text-muted);
+  flex-shrink: 0;
+}
+
+.media-picker-klipy-brand {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  text-decoration: none;
+  color: var(--mp-text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.media-picker-klipy-brand:hover {
+  color: var(--mp-text);
+}
+
+.media-picker-klipy-brand img {
+  height: 14px;
+  width: auto;
+  opacity: 0.85;
+}
+
+/* Loading & Empty States */
+.media-picker-loading,
+.media-picker-empty {
+  grid-column: 1 / -1;
+  padding: 30px 10px;
+  text-align: center;
+  color: var(--mp-text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.media-picker-empty i {
+  font-size: 2.2rem;
+}
+
+/* ==========================================================================
+   Attachment Preview Chip on Comment Composers
+   ========================================================================== */
+
+.comment-attachment-preview-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px 5px 6px;
+  margin-bottom: 8px;
+  background: var(--mp-chip-bg);
+  border: none !important;
+  border-radius: 12px;
+  max-width: 100%;
+  animation: fadeIn 0.2s ease forwards;
+}
+
+.comment-attachment-preview-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--mp-bg-secondary);
+  border: none !important;
+  flex-shrink: 0;
+}
+
+.comment-attachment-preview-thumb.is-sticker {
+  object-fit: contain;
+  background: transparent;
+  border: none !important;
+}
+
+.comment-attachment-preview-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.comment-attachment-preview-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--mp-primary);
+  line-height: 1.2;
+}
+
+.comment-attachment-preview-text {
+  font-size: 0.78rem;
+  color: var(--mp-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.comment-attachment-remove-btn {
+  background: none;
+  border: none;
+  color: var(--mp-text-muted);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-left: 4px;
+  transition: all 0.15s ease;
+}
+
+.comment-attachment-remove-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #ef4444;
+}
+
+[data-theme="dark"] .comment-attachment-remove-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ==========================================================================
+   TikTok-Style Comment Attachment Rendering in Comment Stream
+   ========================================================================== */
+
+.comment-rendered-attachment,
+.comment-attachment-container {
+  display: inline-block !important;
+  position: relative !important;
+  margin-top: 6px !important;
+  margin-bottom: 6px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  line-height: 0 !important;
+}
+
+[data-theme="dark"] .comment-rendered-attachment,
+[data-theme="dark"] .comment-attachment-container {
+  background: transparent !important;
+  border: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.comment-sticker-image,
+.comment-attachment-sticker {
+  display: block !important;
+  width: 120px !important;
+  max-width: 120px !important;
+  height: 120px !important;
+  max-height: 120px !important;
+  border-radius: 13px !important;
+  border: none !important;
+  object-fit: cover !important;
+  cursor: pointer !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transition: transform 0.18s ease !important;
+}
+
+.comment-sticker-image:hover,
+.comment-attachment-sticker:hover {
+  transform: scale(1.03) !important;
+}
+
+.comment-gif-image,
+.comment-attachment-gif {
+  display: block !important;
+  width: auto !important;
+  max-width: min(240px, 80vw) !important;
+  height: auto !important;
+  max-height: 170px !important;
+  border-radius: 13px !important;
+  border: none !important;
+  object-fit: cover !important;
+  cursor: pointer !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transition: transform 0.18s ease !important;
+}
+
+.comment-gif-image:hover,
+.comment-attachment-gif:hover {
+  transform: scale(1.02) !important;
+}
+
+/* Composer Buttons inside comment fields */
+.composer-media-btn {
+  background: none;
+  border: none;
+  color: var(--mp-text-muted);
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  border-radius: 50%;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.composer-media-btn:hover {
+  color: var(--mp-primary);
+  background: rgba(59, 130, 246, 0.08);
+}

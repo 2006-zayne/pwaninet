@@ -26,6 +26,15 @@
             {{ comment.author.get_full_name|default:comment.author.username }}
         </a>
         <p class="mb-0 small comment-text" style="font-size: 14px; line-height: 1.5;" data-full-text="{{ comment.content|urlize }}" data-truncated-length="100">{{ comment.content|urlize }}</p>
+        {% if comment.has_attachment %}
+        <div class="comment-rendered-attachment my-1">
+            {% if comment.attachment_type == 'gif' %}
+                <img src="{{ comment.media_url }}" class="comment-gif-image" alt="GIF" loading="lazy">
+            {% elif comment.attachment_type == 'sticker' or comment.attachment_type == 'image' %}
+                <img src="{{ comment.media_url }}" class="comment-sticker-image" alt="Sticker" loading="lazy" onclick="if(window.openFullscreenImage) window.openFullscreenImage(this.src);">
+            {% endif %}
+        </div>
+        {% endif %}
             <button class="btn btn-sm border-0 p-0 {% if comment.id in liked_comment_ids %}text-danger{% else %}text-muted{% endif %}"
                     hx-post="{% url 'posts:toggle_comment_like' comment.id %}"
                     hx-target="#comment-{{ comment.id }}"
@@ -36,4 +45,3 @@
             </button>
         </div>
     </div>
-</div>

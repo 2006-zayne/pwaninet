@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <radialGradient id="faceGradL" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#FFF385"/>
+      <stop offset="70%" stop-color="#FFB300"/>
+      <stop offset="100%" stop-color="#F57C00"/>
+    </radialGradient>
+    <linearGradient id="tearGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#40C4FF"/>
+      <stop offset="100%" stop-color="#0091EA"/>
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="56" fill="url(#faceGradL)" stroke="#E65100" stroke-width="3"/>
+  <path d="M30 50 Q46 64 54 50" stroke="#5D4037" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M74 50 Q82 64 98 50" stroke="#5D4037" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M32 68 Q64 120 96 68 Z" fill="#5D4037"/>
+  <path d="M38 70 Q64 78 90 70 Q64 74 38 70 Z" fill="#FFFFFF"/>
+  <path d="M46 88 Q64 116 82 88 Q64 96 46 88 Z" fill="#E53935"/>
+  <path d="M18 52 C18 42 28 36 28 36 C28 36 38 42 38 52 C38 60 32 66 28 66 C24 66 18 60 18 52 Z" fill="url(#tearGrad)"/>
+  <path d="M90 52 C90 42 100 36 100 36 C100 36 110 42 110 52 C110 60 104 66 100 66 C96 66 90 60 90 52 Z" fill="url(#tearGrad)"/>
+</svg>

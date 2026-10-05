@@ -1,85 +1,7 @@
 <!-- Modern Threaded Comments Section -->
 <div class="comment-stream" id="comments-section" data-post-id="{{ post.id }}">
     {% for comment in visible_comments %}
-    <div class="comment-item" id="comment-{{ comment.id }}" 
-         data-comment-id="{{ comment.id }}"
-         data-author-id="{{ comment.author.id }}"
-         data-parent-comment-id=""
-         data-reply-count="{{ comment.reply_count }}">
-        
-        <a href="{% url 'users:profile' comment.author.username %}"
-           hx-get="{% url 'users:profile' comment.author.username %}"
-           hx-target="#page-content-target"
-           hx-swap="innerHTML"
-           hx-push-url="true"
-           hx-history="true"
-           class="comment-avatar-link">
-            <img src="{{ comment.author.profile_pic.url|default:'/static/images/default-avatar.png' }}" 
-                 alt="{{ comment.author.get_full_name|default:comment.author.username }}" 
-                 class="comment-avatar"
-                 loading="lazy"
-                 onerror="this.src='/static/images/default-avatar.png'">
-        </a>
-        
-        <div class="comment-content">
-            <div class="comment-header">
-                <a href="{% url 'users:profile' comment.author.username %}"
-                   hx-get="{% url 'users:profile' comment.author.username %}"
-                   hx-target="#page-content-target"
-                   hx-swap="innerHTML"
-                   hx-push-url="true"
-                   hx-history="true"
-                   class="comment-author-link">
-                    {{ comment.author.get_full_name|default:comment.author.username }}
-                </a>
-                <span class="comment-timestamp">{{ comment.created_at|timesince }} ago</span>
-            </div>
-            
-            <div class="comment-body" id="comment-body-{{ comment.id }}">
-                {{ comment.content }}
-            </div>
-            
-            <div class="comment-actions">
-                <button class="comment-action {% if comment.id in liked_comment_ids %}liked{% endif %}" 
-                        data-action="like"
-                        data-comment-id="{{ comment.id }}"
-                        aria-label="Like comment">
-                    <i class="bi {% if comment.id in liked_comment_ids %}bi-heart-fill{% else %}bi-heart{% endif %}"></i>
-                    <span>{{ comment.likes.count }}</span>
-                </button>
-                
-                <button class="comment-action" 
-                        data-action="reply"
-                        data-comment-id="{{ comment.id }}"
-                        aria-label="Reply to comment">
-                    <i class="bi bi-chat-dots"></i>
-                    Reply
-                </button>
-                
-                <div class="comment-menu-wrapper position-relative d-inline-flex">
-                    <button class="comment-menu-btn" 
-                            data-action="menu"
-                            data-comment-id="{{ comment.id }}"
-                            aria-label="More options"
-                            aria-expanded="false">
-                        <i class="bi bi-three-dots"></i>
-                    </button>
-                </div>
-            </div>
-            
-            {% if comment.reply_count > 0 %}
-            <button class="reply-toggle" 
-                    data-action="toggle-replies"
-                    data-comment-id="{{ comment.id }}"
-                    data-reply-count="{{ comment.reply_count }}"
-                    aria-expanded="false"
-                    aria-controls="replies-{{ comment.id }}">
-                <i class="bi bi-chevron-down"></i>
-                <span>View {{ comment.reply_count }} {{ comment.reply_count|pluralize:"reply,replies" }}</span>
-            </button>
-            {% endif %}
-        </div>
-    </div>
+        {% include 'posts/partials/comment_single_item.html' with comment=comment liked_comment_ids=liked_comment_ids %}
     {% empty %}
     <div class="comments-empty">
         <i class="bi bi-chat-dots"></i>
@@ -94,8 +16,20 @@
            hx-target="#comments-section"
            hx-swap="outerHTML"
            class="btn btn-sm btn-outline-secondary rounded-pill px-4 fw-bold" style="font-size: 12px;">
-            <i class="bi bi-chevron-down me-1"></i>View all {{ post.comments.filter|length }} comments
+            <i class="bi bi-chevron-down me-1"></i>View all {{ total_comments_count|default:post.comments.count }} comments
         </a>
+    </div>
+    {% endif %}
+
+    {% if show_all_comments and has_next_page %}
+    <div id="comments-pagination-sentinel-{{ post.id }}" 
+         class="comments-load-more-sentinel text-center py-2" 
+         data-post-id="{{ post.share_id }}" 
+         data-next-page="{{ next_page_number }}">
+        <div class="spinner-border spinner-border-sm text-primary d-none comments-loading-spinner" role="status"></div>
+        <button type="button" class="btn btn-sm btn-link text-decoration-none text-muted comments-load-more-btn" data-action="load-more-comments">
+            Load more comments...
+        </button>
     </div>
     {% endif %}
 </div>

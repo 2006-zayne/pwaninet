@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <radialGradient id="faceGradW" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#FFF385"/>
+      <stop offset="70%" stop-color="#FFB300"/>
+      <stop offset="100%" stop-color="#F57C00"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="64" r="56" fill="url(#faceGradW)" stroke="#E65100" stroke-width="3"/>
+  <!-- high eyebrows -->
+  <path d="M36 34 Q46 24 56 34" stroke="#5D4037" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M72 34 Q82 24 92 34" stroke="#5D4037" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <circle cx="46" cy="52" r="10" fill="#212121"/>
+  <circle cx="44" cy="48" r="3" fill="#FFFFFF"/>
+  <circle cx="82" cy="52" r="10" fill="#212121"/>
+  <circle cx="80" cy="48" r="3" fill="#FFFFFF"/>
+  <ellipse cx="64" cy="88" rx="14" ry="20" fill="#5D4037"/>
+</svg>

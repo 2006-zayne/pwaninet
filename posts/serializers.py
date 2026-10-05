@@ -550,10 +550,14 @@ class CommentSerializer(serializers.ModelSerializer):
     is_liked = serializers.SerializerMethodField()
     reply_count = serializers.ReadOnlyField()
     parent_comment_id = serializers.ReadOnlyField(source='parent_comment.id')
+    attachment_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
-        fields = ['id', 'author', 'content', 'created_at', 'like_count', 'is_liked', 'reply_count', 'parent_comment_id']
+        fields = [
+            'id', 'author', 'content', 'created_at', 'like_count', 'is_liked',
+            'reply_count', 'parent_comment_id', 'attachment_type', 'attachment_url', 'attachment_meta'
+        ]
         read_only_fields = ['author', 'created_at']
 
     def get_like_count(self, obj):
@@ -565,12 +569,32 @@ class CommentSerializer(serializers.ModelSerializer):
             return obj.is_liked_by(request.user)
         return False
 
+    def get_attachment_url(self, obj):
+        return obj.media_url or ''
+
 
 class CommentCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating comments"""
     class Meta:
         model = Comment
-        fields = ['post', 'content']
+        fields = ['post', 'content', 'parent_comment', 'attachment_type', 'attachment_image', 'attachment_url', 'attachment_meta']
+        extra_kwargs = {
+            'content': {'required': False, 'allow_blank': True},
+            'parent_comment': {'required': False, 'allow_null': True},
+            'attachment_type': {'required': False},
+            'attachment_image': {'required': False, 'allow_null': True},
+            'attachment_url': {'required': False, 'allow_blank': True},
+            'attachment_meta': {'required': False},
+        }
+
+    def validate(self, attrs):
+        content = (attrs.get('content') or '').strip()
+        att_type = attrs.get('attachment_type', Comment.ATTACHMENT_NONE)
+        att_img = attrs.get('attachment_image')
+        att_url = attrs.get('attachment_url')
+        if not content and att_type == Comment.ATTACHMENT_NONE and not att_img and not att_url:
+            raise serializers.ValidationError("Comment must contain either text or an attachment.")
+        return attrs
 
     def validate_post(self, value):
         request = self.context['request']
@@ -589,9 +613,35 @@ class CommentCreateSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
+        from posts.services.comment_service import add_comment_to_post
         request = self.context['request']
-        comment = Comment.objects.create(author=request.user, **validated_data)
+        post = validated_data.pop('post')
+        parent = validated_data.pop('parent_comment', None)
+        content = validated_data.pop('content', '')
+        attachment_type = validated_data.pop('attachment_type', Comment.ATTACHMENT_NONE)
+        attachment_image = validated_data.pop('attachment_image', None)
+        attachment_url = validated_data.pop('attachment_url', '')
+        attachment_meta = validated_data.pop('attachment_meta', {})
+
+        comment = add_comment_to_post(
+            post=post,
+            author=request.user,
+            content=content,
+            parent_comment=parent,
+            attachment_type=attachment_type,
+            attachment_image=attachment_image,
+            attachment_url=attachment_url,
+            attachment_meta=attachment_meta
+        )
         return comment
+
+
+class UserStickerSerializer(serializers.ModelSerializer):
+    class Meta:
+        from posts.models import UserSticker
+        model = UserSticker
+        fields = ['id', 'image', 'name', 'created_at']
+        read_only_fields = ['id', 'created_at']
 
 
 class ReportSerializer(serializers.ModelSerializer):

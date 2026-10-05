@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <radialGradient id="faceGradD" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#FFF385"/>
+      <stop offset="70%" stop-color="#FFB300"/>
+      <stop offset="100%" stop-color="#F57C00"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="56" r="48" fill="url(#faceGradD)" stroke="#E65100" stroke-width="3"/>
+  <path d="M40 48 Q48 40 56 48" stroke="#5D4037" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M72 48 Q80 40 88 48" stroke="#5D4037" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M46 68 Q64 88 82 68" stroke="#5D4037" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <!-- Musical notes -->
+  <path d="M22 28 L22 14 L36 10 L36 24" stroke="#7C4DFF" stroke-width="3" fill="none"/>
+  <circle cx="18" cy="28" r="5" fill="#7C4DFF"/>
+  <circle cx="32" cy="24" r="5" fill="#7C4DFF"/>
+  <path d="M98 34 L98 22 L110 18 L110 30" stroke="#FF4081" stroke-width="3" fill="none"/>
+  <circle cx="94" cy="34" r="4" fill="#FF4081"/>
+  <circle cx="106" cy="30" r="4" fill="#FF4081"/>
+</svg>

@@ -642,8 +642,13 @@
                     <span class="comment-timestamp">${comment.created_at}</span>
                   </div>
                   <div class="comment-body" id="comment-body-${comment.id}">
-                    ${comment.content}
+                    ${comment.content || ''}
                   </div>
+                  ${comment.attachment_type && comment.attachment_type !== 'none' && comment.attachment_url ? `
+                    <div class="comment-rendered-attachment my-1">
+                      <img src="${comment.attachment_url}" class="${comment.attachment_type === 'gif' ? 'comment-gif-image' : 'comment-sticker-image'}" alt="Attachment" loading="lazy" onclick="if(window.openFullscreenImage) window.openFullscreenImage(this.src);">
+                    </div>
+                  ` : ''}
                   <div class="comment-actions">
                     <button class="comment-action" data-action="like" data-comment-id="${comment.id}" aria-label="Like comment">
                       <i class="bi bi-heart"></i>
@@ -685,19 +690,51 @@
         const contentInput = this.querySelector('input[name="content"]');
         if (!contentInput) return;
         const content = contentInput.value.trim();
-        if (!content) return;
+
+        const typeInput = this.querySelector('input[name="attachment_type"]');
+        const urlInput = this.querySelector('input[name="attachment_url"]');
+        const metaInput = this.querySelector('input[name="attachment_meta"]');
+        const fileInput = this.querySelector('input[type="file"].comment-photo-input');
+        const file = fileInput?.files?.[0];
+
+        const attachmentType = typeInput ? typeInput.value : 'none';
+        const attachmentUrl = urlInput ? urlInput.value : '';
+        let attachmentMeta = {};
+        try { attachmentMeta = JSON.parse(metaInput?.value || '{}'); } catch (_) {}
+
+        if (!content && attachmentType === 'none' && !file) return;
+
         try {
           const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : '';
-          const response = await fetch(`/api/posts/${postId}/images/${imageId}/comments/`, {
-            method: 'POST',
-            headers: {
+          let bodyData, headers;
+          if (file) {
+            bodyData = new FormData();
+            bodyData.append('content', content);
+            bodyData.append('attachment_type', 'image');
+            bodyData.append('attachment_image', file);
+            bodyData.append('attachment_meta', JSON.stringify(attachmentMeta));
+            headers = { 'X-CSRFToken': csrfToken };
+          } else {
+            bodyData = JSON.stringify({
+              content: content,
+              attachment_type: attachmentType,
+              attachment_url: attachmentUrl,
+              attachment_meta: attachmentMeta
+            });
+            headers = {
               'X-CSRFToken': csrfToken,
               'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ content: content })
+            };
+          }
+
+          const response = await fetch(`/api/posts/${postId}/images/${imageId}/comments/`, {
+            method: 'POST',
+            headers: headers,
+            body: bodyData
           });
           if (response.ok) {
             contentInput.value = '';
+            if (window.MediaPicker) MediaPicker.clearAttachment(this);
             loadImageComments(postId, imageId);
           } else {
             console.error('Failed to post comment');

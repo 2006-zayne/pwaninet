@@ -1,11 +1,12 @@
 import logging
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse, JsonResponse, FileResponse, HttpResponseForbidden, HttpResponseNotFound
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.contrib.auth import get_user_model
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -302,6 +303,9 @@ class PostViewSet(viewsets.ModelViewSet):
                 comments_data.append({
                     'id': comment.id,
                     'content': comment.content,
+                    'attachment_type': comment.attachment_type,
+                    'attachment_url': comment.media_url,
+                    'attachment_meta': comment.attachment_meta,
                     'author': {
                         'id': comment.author.id,
                         'username': comment.author.username,
@@ -317,10 +321,21 @@ class PostViewSet(viewsets.ModelViewSet):
 
         elif request.method == 'POST':
             content = request.data.get('content', '').strip()
+            attachment_type = request.data.get('attachment_type', Comment.ATTACHMENT_NONE)
+            attachment_url = request.data.get('attachment_url', '')
+            attachment_image = request.FILES.get('attachment_image') or request.FILES.get('image')
+            attachment_meta = request.data.get('attachment_meta', {})
+            if isinstance(attachment_meta, str):
+                import json
+                try:
+                    attachment_meta = json.loads(attachment_meta)
+                except Exception:
+                    attachment_meta = {}
 
-            if not content:
+            has_attachment = attachment_type != Comment.ATTACHMENT_NONE and (bool(attachment_image) or bool(attachment_url))
+            if not content and not has_attachment:
                 return Response(
-                    {'detail': 'Comment content is required.'},
+                    {'detail': 'Comment content or attachment is required.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -340,7 +355,15 @@ class PostViewSet(viewsets.ModelViewSet):
                     )
 
             # Use the service function to add comment (mirrors post comment functionality)
-            comment = add_comment_to_image(post_image, request.user, content)
+            comment = add_comment_to_image(
+                post_image,
+                request.user,
+                content,
+                attachment_type=attachment_type,
+                attachment_image=attachment_image,
+                attachment_url=attachment_url,
+                attachment_meta=attachment_meta
+            )
 
             if not comment:
                 return Response(
@@ -687,10 +710,21 @@ class CommentViewSet(viewsets.ModelViewSet):
         """
         parent_comment = self.get_object()
         content = request.data.get('content', '').strip()
+        attachment_type = request.data.get('attachment_type', Comment.ATTACHMENT_NONE)
+        attachment_url = request.data.get('attachment_url', '')
+        attachment_image = request.FILES.get('attachment_image') or request.FILES.get('image')
+        attachment_meta = request.data.get('attachment_meta', {})
+        if isinstance(attachment_meta, str):
+            import json
+            try:
+                attachment_meta = json.loads(attachment_meta)
+            except Exception:
+                attachment_meta = {}
 
-        if not content:
+        has_attachment = attachment_type != Comment.ATTACHMENT_NONE and (bool(attachment_image) or bool(attachment_url))
+        if not content and not has_attachment:
             return Response(
-                {'detail': 'Reply content cannot be empty.'},
+                {'detail': 'Reply content or attachment is required.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -715,7 +749,11 @@ class CommentViewSet(viewsets.ModelViewSet):
             parent_comment.post,
             request.user,
             content,
-            parent_comment=parent_comment
+            parent_comment=parent_comment,
+            attachment_type=attachment_type,
+            attachment_image=attachment_image,
+            attachment_url=attachment_url,
+            attachment_meta=attachment_meta
         )
 
         serializer = CommentSerializer(reply, context={'request': request})
@@ -1086,6 +1124,7 @@ def _is_safe_previous_page(url_str, request_host, share_id):
     return True
 
 
+@ensure_csrf_cookie
 def post_detail_view(request, share_id):
     post = get_object_or_404(visible_posts_for(request.user), share_id=share_id)
     shared_by = request.GET.get('shared_by', '')
@@ -1103,7 +1142,8 @@ def post_detail_view(request, share_id):
             return redirect(target_url)
 
     is_guest = not request.user.is_authenticated
-    context = build_comments_context(post, request.user, show_all_comments=show_all)
+    page = request.GET.get('page', 1)
+    context = build_comments_context(post, request.user, show_all_comments=show_all, page=page)
     # Multi-image posts open as a feed of image cards. Preserve the image tapped
     # in the collage so the detail feed can position it as the starting card.
     try:
@@ -1158,6 +1198,8 @@ def post_detail_view(request, share_id):
 
     # Return comments section whenever show_all=1 is requested
     if show_all:
+        if request.GET.get('chunk_only') == '1':
+            return render(request, 'posts/partials/comments_chunk.html', context)
         return render(request, 'posts/partials/comments_section.html', context)
 
     # For HTMX page navigation requests, return navigation partial
@@ -1735,3 +1777,149 @@ def task_status_view(request, task_id):
     }
 
     return JsonResponse(response_data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def klipy_media_proxy(request):
+    """
+    Proxy endpoint for KLIPY GIFs and Stickers API.
+    Keeps API key secure on the server, adds caching for search/trending queries.
+    """
+    import urllib.request
+    import urllib.parse
+    import json
+    from django.conf import settings
+    from django.core.cache import cache
+
+    media_type = request.GET.get('type', 'gifs').lower()
+    if media_type not in ('gifs', 'stickers'):
+        media_type = 'gifs'
+
+    q = request.GET.get('q', '').strip()
+    requested_action = request.GET.get('action', '').strip().lower()
+    if requested_action in ('categories', 'trending', 'search'):
+        action = requested_action
+    else:
+        action = 'search' if q else 'trending'
+
+    page = request.GET.get('page', '1')
+    per_page = request.GET.get('per_page', '24')
+
+    customer_id = 'anon_guest'
+    if hasattr(request, 'user') and request.user.is_authenticated:
+        customer_id = f"user_{request.user.id}"
+    elif hasattr(request, 'session'):
+        if not getattr(request.session, 'session_key', None):
+            try:
+                request.session.save()
+            except Exception:
+                pass
+        customer_id = f"anon_{getattr(request.session, 'session_key', 'guest') or 'guest'}"
+
+    api_key = getattr(settings, 'KLIPY_API_KEY', '')
+    if not api_key:
+        return JsonResponse({'result': False, 'error': 'KLIPY API key not configured', 'data': {'data': []}})
+
+    # Check cache (normalize key)
+    cache_key = f"klipy_{media_type}_{action}_{q}_{page}_{per_page}".replace(' ', '_')
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        return JsonResponse(cached_data)
+
+    if action == 'categories':
+        query_params = {'customer_id': customer_id}
+    else:
+        query_params = {
+            'page': page,
+            'per_page': per_page,
+            'customer_id': customer_id,
+        }
+        if action == 'search' and q:
+            query_params['q'] = q
+
+    encoded_params = urllib.parse.urlencode(query_params)
+    url = f"{settings.KLIPY_API_BASE_URL}/{api_key}/{media_type}/{action}?{encoded_params}"
+
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                'User-Agent': 'PwaniNet/1.0',
+                'Accept': 'application/json'
+            }
+        )
+        with urllib.request.urlopen(req, timeout=8) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            ttl = 3600 if action == 'categories' else (180 if action == 'search' else 600)
+            cache.set(cache_key, data, ttl)
+            return JsonResponse(data)
+    except Exception as e:
+        logger.warning(f"[KLIPY] Proxy error fetching {url}: {e}")
+        return JsonResponse({'result': False, 'error': str(e), 'data': {'data': []}}, status=200)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def user_stickers_view(request):
+    """
+    List user's custom stickers or upload a new sticker.
+    """
+    from posts.models import UserSticker
+    from posts.serializers import UserStickerSerializer
+    from PIL import Image
+    import io
+    import time
+    from django.core.files.uploadedfile import InMemoryUploadedFile
+
+    if request.method == 'GET':
+        stickers = UserSticker.objects.filter(user=request.user)
+        serializer = UserStickerSerializer(stickers, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        image_file = request.FILES.get('image') or request.FILES.get('sticker')
+        if not image_file:
+            return Response({'detail': 'Image file is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Enforce max 100 stickers per user
+        if UserSticker.objects.filter(user=request.user).count() >= 100:
+            return Response({'detail': 'Maximum 100 custom stickers allowed.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            img = Image.open(image_file)
+            if img.mode not in ('RGBA', 'RGB'):
+                img = img.convert('RGBA')
+
+            img.thumbnail((512, 512), Image.Resampling.LANCZOS)
+            output = io.BytesIO()
+            img.save(output, format='WEBP', quality=85, optimize=True)
+            output.seek(0)
+
+            filename = f"sticker_{request.user.id}_{int(time.time())}.webp"
+            processed_file = InMemoryUploadedFile(
+                output, 'ImageField', filename, 'image/webp', output.getbuffer().nbytes, None
+            )
+
+            sticker = UserSticker.objects.create(
+                user=request.user,
+                image=processed_file,
+                name=request.data.get('name', '')
+            )
+            serializer = UserStickerSerializer(sticker)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'detail': f'Failed to process sticker image: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_user_sticker_view(request, sticker_id):
+    """
+    Delete a user's custom sticker.
+    """
+    from posts.models import UserSticker
+    sticker = get_object_or_404(UserSticker, id=sticker_id, user=request.user)
+    sticker.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+

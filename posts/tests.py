@@ -251,3 +251,90 @@ class PostSerializerFilenameTest(TestCase):
         self.assertTrue(serializer.is_valid(), serializer.errors)
         self.assertLessEqual(len(video.name), 200)
 
+
+class CommentAttachmentTest(TestCase):
+    """Test cases for comment attachments (GIFs, Stickers, and Photo Stickers)"""
+
+    def setUp(self):
+        self.course = Course.objects.create(name='Computer Science')
+        self.year = Year.objects.create(course=self.course, level=1)
+        self.user = User.objects.create_user(
+            username='attachmentuser',
+            email='attach@example.com',
+            course=self.course,
+            year=self.year,
+            password='testpass123'
+        )
+        self.post = Post.objects.create(author=self.user, content='Attachment post', course=self.course)
+
+    def test_comment_with_gif_attachment_blank_content(self):
+        """Comments can be created with blank content if attachment is present"""
+        comment = Comment.objects.create(
+            post=self.post,
+            author=self.user,
+            content="",
+            attachment_type="gif",
+            attachment_url="https://media.klipy.co/v1/test.gif",
+            attachment_meta={"width": 300, "height": 200}
+        )
+        self.assertEqual(comment.attachment_type, "gif")
+        self.assertEqual(comment.attachment_url, "https://media.klipy.co/v1/test.gif")
+        self.assertEqual(comment.content, "")
+
+    def test_comment_with_sticker_attachment(self):
+        """Comments can have built-in sticker attachments"""
+        comment = Comment.objects.create(
+            post=self.post,
+            author=self.user,
+            content="Awesome!",
+            attachment_type="sticker",
+            attachment_url="/static/images/stickers/fire.svg"
+        )
+        self.assertEqual(comment.attachment_type, "sticker")
+        self.assertEqual(comment.content, "Awesome!")
+
+    def test_user_sticker_creation(self):
+        """Users can create and manage their custom sticker collection"""
+        from posts.models import UserSticker
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        sticker_file = SimpleUploadedFile("my_sticker.png", b"fake_png_data", content_type="image/png")
+        user_sticker = UserSticker.objects.create(
+            user=self.user,
+            image=sticker_file
+        )
+        self.assertEqual(user_sticker.user, self.user)
+        self.assertTrue(user_sticker.image.name.startswith("stickers/"))
+
+    def test_comment_create_serializer_with_attachment(self):
+        """CommentCreateSerializer validates successfully with attachment and empty content"""
+        from posts.serializers import CommentCreateSerializer
+
+        serializer = CommentCreateSerializer(
+            data={
+                "post": self.post.id,
+                "content": "",
+                "attachment_type": "gif",
+                "attachment_url": "https://media.klipy.co/v1/trending.gif",
+            },
+            context={"request": type("Req", (), {"user": self.user})()}
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_klipy_media_proxy_search(self):
+        """klipy_media_proxy returns JSON response for media search"""
+        from unittest.mock import patch, MagicMock
+
+        mock_response = MagicMock()
+        mock_response.read.return_value = b'{"result": true, "data": {"data": [{"id": 1, "title": "Test GIF"}]}}'
+        mock_response.__enter__.return_value = mock_response
+
+        with patch('urllib.request.urlopen', return_value=mock_response):
+            response = self.client.get('/api/media/klipy/?type=gifs&q=happy&page=1&per_page=20')
+            self.assertEqual(response.status_code, 200)
+            data = response.json()
+            self.assertTrue(data.get('result'))
+            self.assertEqual(len(data.get('data', {}).get('data', [])), 1)
+
+
+

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="thumbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFD54F"/>
+      <stop offset="100%" stop-color="#FF9800"/>
+    </linearGradient>
+  </defs>
+  <path d="M30 60 L30 110 L48 110 L48 60 Z" fill="#FFA000" stroke="#E65100" stroke-width="3"/>
+  <path d="M48 68 C48 68 54 36 62 20 C68 8 82 12 80 28 C78 40 72 52 72 52 L102 52 C112 52 116 60 112 68 C116 72 116 80 110 84 C114 88 112 96 106 100 C110 104 106 110 98 110 L48 110" fill="url(#thumbGrad)" stroke="#E65100" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M26 62 L48 62" stroke="#FFF9C4" stroke-width="3" stroke-linecap="round"/>
+</svg>

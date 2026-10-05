@@ -122,10 +122,47 @@
     // REEL ENGAGEMENT & SHARING SYNC (LIKES, REPOSTS, EXTERNAL AUTO-LAUNCH)
     // ============================================================================
 
-    function getCsrfToken() {
-        return (document.querySelector('[name=csrfmiddlewaretoken]') && document.querySelector('[name=csrfmiddlewaretoken]').value) ||
-               (document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content')) ||
-               '';
+    function getCsrfToken(formEl) {
+        // 1. Try input inside the specific active form if provided
+        if (formEl && formEl.querySelector) {
+            const input = formEl.querySelector('[name=csrfmiddlewaretoken]');
+            if (input && input.value) return input.value;
+        }
+
+        // 2. Try the meta tag (rendered by Django {{ csrf_token }})
+        const metaTag = document.querySelector('meta[name="csrf-token"]');
+        if (metaTag && metaTag.getAttribute('content')) {
+            const val = metaTag.getAttribute('content').trim();
+            if (val && !val.includes('{{')) return val;
+        }
+
+        // 3. Fallback to active form or any csrfmiddlewaretoken input in DOM
+        const formInput = (document.activeElement && document.activeElement.closest('form')?.querySelector('[name=csrfmiddlewaretoken]')) ||
+                          document.getElementById('reelCommentForm')?.querySelector('[name=csrfmiddlewaretoken]') ||
+                          document.getElementById('fsRailCommentForm')?.querySelector('[name=csrfmiddlewaretoken]') ||
+                          document.querySelector('[name=csrfmiddlewaretoken]');
+        if (formInput && formInput.value) return formInput.value;
+
+        // 4. Try reading the active csrf cookie (prefer local configured name pwaninet_local_csrftoken, fallback to csrftoken)
+        try {
+            if (document.cookie) {
+                const cookies = document.cookie.split(';');
+                let localToken = '';
+                let defaultToken = '';
+                for (const cookie of cookies) {
+                    const [name, value] = cookie.trim().split('=');
+                    if (name === 'pwaninet_local_csrftoken') {
+                        localToken = decodeURIComponent(value || '');
+                    } else if (name === 'csrftoken') {
+                        defaultToken = decodeURIComponent(value || '');
+                    }
+                }
+                if (localToken) return localToken;
+                if (defaultToken) return defaultToken;
+            }
+        } catch (_) {}
+
+        return '';
     }
 
     function syncLikeUiAcrossSite(postId, isLiked, likeCount) {
@@ -2338,6 +2375,19 @@
         const avatar = comment.author?.profile_pic || '/static/images/default_avatar.png';
         const content = (comment.content || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const timeAgo = 'just now';
+
+        let attachmentHtml = '';
+        if (comment.attachment_type) {
+            const url = comment.attachment_url || comment.attachment_image || '';
+            if (url) {
+                if (comment.attachment_type === 'gif') {
+                    attachmentHtml = `<div class="comment-rendered-attachment"><img src="${url}" class="comment-gif-image" alt="GIF" loading="lazy"></div>`;
+                } else {
+                    attachmentHtml = `<div class="comment-rendered-attachment"><img src="${url}" class="comment-sticker-image" alt="Sticker" loading="lazy" onclick="if(window.openFullscreenImage) window.openFullscreenImage(this.src);"></div>`;
+                }
+            }
+        }
+
         return `
             <div class="comment-item ${isReply ? 'comment-reply ms-4' : ''}" id="comment-${comment.id}"
                  data-comment-id="${comment.id}"
@@ -2365,7 +2415,8 @@
                         <span class="comment-timestamp">${timeAgo}</span>
                     </div>
                     <div class="comment-body" id="comment-body-${comment.id}">
-                        ${content}
+                        ${content ? `<div>${content}</div>` : ''}
+                        ${attachmentHtml}
                     </div>
                     <div class="comment-actions">
                         <button class="comment-action" data-action="like" data-comment-id="${comment.id}" aria-label="Like comment">
@@ -2954,8 +3005,14 @@
                 const curPostId = currentDesktopRailPostId;
                 if (!curPostId) return;
 
-                const content = commentInput?.value?.trim();
-                if (!content) return;
+                const content = commentInput?.value?.trim() || '';
+                const attachmentType = formEl.querySelector('[name="attachment_type"]')?.value || '';
+                const attachmentUrl = formEl.querySelector('[name="attachment_url"]')?.value || '';
+                const attachmentMeta = formEl.querySelector('[name="attachment_meta"]')?.value || '';
+                const photoInput = formEl.querySelector('.comment-photo-input') || formEl.querySelector('input[type="file"][name="attachment_image"]');
+                const photoFile = (photoInput && photoInput.files && photoInput.files.length > 0) ? photoInput.files[0] : null;
+
+                if (!content && !attachmentType && !photoFile) return;
 
                 formEl.dataset.submitting = 'true';
                 const sendBtn = formEl.querySelector('button[type="submit"]');
@@ -2963,17 +3020,30 @@
 
                 const targetParentId = (parentInput && parentInput.value) ? parentInput.value : '';
 
-                const formData = new FormData();
-                formData.append('content', content);
-                formData.append('csrfmiddlewaretoken', getCsrfToken());
+                const csrfToken = getCsrfToken(formEl);
+                const formData = new FormData(formEl);
+                formData.set('content', content);
+                formData.set('csrfmiddlewaretoken', csrfToken);
                 if (targetParentId) {
-                    formData.append('parent_id', targetParentId);
+                    formData.set('parent_id', targetParentId);
+                }
+                if (attachmentType) {
+                    formData.set('attachment_type', attachmentType);
+                    if (attachmentUrl) formData.set('attachment_url', attachmentUrl);
+                    if (attachmentMeta) formData.set('attachment_meta', attachmentMeta);
+                }
+                if (photoFile) {
+                    formData.set('attachment_image', photoFile);
+                    if (!attachmentType) formData.set('attachment_type', 'image');
                 }
 
                 fetch(`/post/${curPostId}/comment/`, {
                     method: 'POST',
                     body: formData,
-                    headers: { 'HX-Request': 'true' }
+                    headers: {
+                        'HX-Request': 'true',
+                        'X-CSRFToken': csrfToken
+                    }
                 })
                 .then(res => res.text())
                 .then(html => {
@@ -2982,6 +3052,9 @@
                     if (commentInput) commentInput.value = '';
                     if (parentInput) parentInput.value = '';
                     if (replyBanner) replyBanner.classList.add('d-none');
+                    if (window.MediaPicker) {
+                        window.MediaPicker.clearAttachment(formEl);
+                    }
 
                     if (commentsList) {
                         commentsList.innerHTML = html;
@@ -3325,10 +3398,6 @@
     // REEL QUICK TOOLS & COMMENT HELPERS
     // ============================================================================
 
-    function getCsrfToken() {
-        const match = document.cookie.match(/csrftoken=([^;]+)/);
-        return match ? match[1] : (document.querySelector('[name=csrfmiddlewaretoken]')?.value || '');
-    }
 
     function openReelQuickTools(postId, targetEl) {
         if (!window.isAuthenticated) {
@@ -3695,6 +3764,94 @@
         });
     }
 
+    function setupCommentsInfiniteScroll(containerEl) {
+        if (!containerEl) return;
+        const sentinel = containerEl.querySelector('.comments-load-more-sentinel');
+        if (!sentinel || sentinel.dataset.observed === 'true') return;
+        sentinel.dataset.observed = 'true';
+
+        const loadNextChunk = async () => {
+            if (sentinel.dataset.loading === 'true') return;
+            const nextPage = sentinel.dataset.nextPage;
+            const targetPostId = sentinel.dataset.postId || containerEl.dataset.activePostId || activeCommentsPostId || currentDesktopRailPostId || '';
+            if (!nextPage || !targetPostId) return;
+
+            sentinel.dataset.loading = 'true';
+            const spinner = sentinel.querySelector('.comments-loading-spinner');
+            const btn = sentinel.querySelector('.comments-load-more-btn');
+            if (spinner) spinner.classList.remove('d-none');
+            if (btn) btn.classList.add('d-none');
+
+            try {
+                const res = await fetch(`/post/${targetPostId}/?show_all=1&page=${nextPage}&chunk_only=1`, {
+                    headers: { 'HX-Request': 'true' }
+                });
+                if (!res.ok) throw new Error('Failed to load more comments');
+                const chunkHtml = await res.text();
+
+                // Create a temporary container to parse items
+                const temp = document.createElement('div');
+                temp.innerHTML = chunkHtml;
+
+                const newComments = Array.from(temp.querySelectorAll('.comment-item'));
+                const newSentinel = temp.querySelector('.comments-load-more-sentinel');
+
+                // Insert new comments before the sentinel
+                newComments.forEach(c => {
+                    sentinel.parentNode.insertBefore(c, sentinel);
+                });
+
+                if (newSentinel) {
+                    sentinel.dataset.nextPage = newSentinel.dataset.nextPage;
+                    delete sentinel.dataset.loading;
+                    delete sentinel.dataset.observed;
+                    if (spinner) spinner.classList.add('d-none');
+                    if (btn) {
+                        btn.classList.remove('d-none');
+                        btn.textContent = 'Load more comments...';
+                    }
+                    setupCommentsInfiniteScroll(containerEl);
+                } else {
+                    sentinel.remove();
+                }
+
+                truncateLongComments(containerEl);
+                reinitHtmxElement(containerEl);
+            } catch (err) {
+                console.error('[CommentsSheet] Error loading comment chunk:', err);
+                delete sentinel.dataset.loading;
+                if (spinner) spinner.classList.add('d-none');
+                if (btn) {
+                    btn.classList.remove('d-none');
+                    btn.textContent = 'Retry loading comments...';
+                }
+            }
+        };
+
+        // Click fallback on "Load more comments..." button
+        const btn = sentinel.querySelector('.comments-load-more-btn');
+        if (btn) {
+            btn.onclick = (e) => {
+                e.preventDefault();
+                loadNextChunk();
+            };
+        }
+
+        // Automatic scroll loading via IntersectionObserver
+        if ('IntersectionObserver' in window) {
+            const scrollRoot = containerEl.closest('#commentsModalBody, #fsRailCommentsBody, .modal-body');
+            const observer = new IntersectionObserver((entries) => {
+                if (entries[0] && entries[0].isIntersecting) {
+                    loadNextChunk();
+                }
+            }, {
+                root: scrollRoot || null,
+                rootMargin: '180px'
+            });
+            observer.observe(sentinel);
+        }
+    }
+
     function initSheetCommentsInteractions(listEl, postId) {
         if (!listEl) return;
         if (postId) {
@@ -3702,6 +3859,7 @@
         }
         truncateLongComments(listEl);
         reinitHtmxElement(listEl);
+        setupCommentsInfiniteScroll(listEl);
         if (listEl.dataset.eventsBound === 'true') return;
         listEl.dataset.eventsBound = 'true';
 
@@ -3895,6 +4053,16 @@
                                     const replyUsername = reply.author?.username || '';
                                     const replyLiked = reply.is_liked ? 'liked text-danger' : '';
                                     const profilePath = `/users/user/${replyUsername}/`;
+                                    let replyAttachmentHtml = '';
+                                    const replyAttUrl = reply.attachment_url || reply.attachment_image || '';
+                                    if (reply.attachment_type && reply.attachment_type !== 'none' && replyAttUrl) {
+                                        if (reply.attachment_type === 'gif') {
+                                            replyAttachmentHtml = `<div class="comment-rendered-attachment my-1"><img src="${replyAttUrl}" class="comment-gif-image" alt="GIF" loading="lazy"></div>`;
+                                        } else {
+                                            replyAttachmentHtml = `<div class="comment-rendered-attachment my-1"><img src="${replyAttUrl}" class="comment-sticker-image" alt="Sticker" loading="lazy" onclick="if(window.openFullscreenImage) window.openFullscreenImage(this.src);"></div>`;
+                                        }
+                                    }
+
                                     const replyHtml = `
                                         <div class="comment-item reply-item py-2 border-bottom border-light" id="comment-${reply.id}" data-comment-id="${reply.id}" data-parent-id="${commentId}" data-author-id="${reply.author?.id || ''}" data-author-username="${replyUsername}">
                                             <div class="d-flex align-items-start gap-2">
@@ -3917,6 +4085,7 @@
                                                         <span class="text-muted" style="font-size: 11px;">${reply.created_at ? new Date(reply.created_at).toLocaleDateString() : ''}</span>
                                                     </div>
                                                     <div class="small text-break mt-0.5 comment-body" id="comment-body-${reply.id}">${reply.content}</div>
+                                                    ${replyAttachmentHtml}
                                                     <div class="comment-actions d-flex align-items-center gap-3 mt-1" style="font-size: 11px;">
                                                         <button type="button" class="btn btn-link p-0 text-muted text-decoration-none comment-action ${replyLiked}" data-action="like" data-comment-id="${reply.id}">
                                                             <i class="bi ${reply.is_liked ? 'bi-heart-fill text-danger' : 'bi-heart'}"></i>
@@ -4387,8 +4556,14 @@
                 const curPostId = activeCommentsPostId;
                 if (!curPostId) return;
 
-                const content = inputEl?.value?.trim();
-                if (!content) return;
+                const content = inputEl?.value?.trim() || '';
+                const attachmentType = formEl.querySelector('[name="attachment_type"]')?.value || '';
+                const attachmentUrl = formEl.querySelector('[name="attachment_url"]')?.value || '';
+                const attachmentMeta = formEl.querySelector('[name="attachment_meta"]')?.value || '';
+                const photoInput = formEl.querySelector('.comment-photo-input') || formEl.querySelector('input[type="file"][name="attachment_image"]');
+                const photoFile = (photoInput && photoInput.files && photoInput.files.length > 0) ? photoInput.files[0] : null;
+
+                if (!content && !attachmentType && !photoFile) return;
 
                 formEl.dataset.submitting = 'true';
                 const sendBtn = formEl.querySelector('button[type="submit"]');
@@ -4396,17 +4571,30 @@
 
                 const targetParentId = (parentInput && parentInput.value) ? parentInput.value : '';
 
-                const formData = new FormData();
-                formData.append('content', content);
-                formData.append('csrfmiddlewaretoken', getCsrfToken());
+                const csrfToken = getCsrfToken(formEl);
+                const formData = new FormData(formEl);
+                formData.set('content', content);
+                formData.set('csrfmiddlewaretoken', csrfToken);
                 if (targetParentId) {
-                    formData.append('parent_id', targetParentId);
+                    formData.set('parent_id', targetParentId);
+                }
+                if (attachmentType) {
+                    formData.set('attachment_type', attachmentType);
+                    if (attachmentUrl) formData.set('attachment_url', attachmentUrl);
+                    if (attachmentMeta) formData.set('attachment_meta', attachmentMeta);
+                }
+                if (photoFile) {
+                    formData.set('attachment_image', photoFile);
+                    if (!attachmentType) formData.set('attachment_type', 'image');
                 }
 
                 fetch(`/post/${curPostId}/comment/`, {
                     method: 'POST',
                     body: formData,
-                    headers: { 'HX-Request': 'true' }
+                    headers: {
+                        'HX-Request': 'true',
+                        'X-CSRFToken': csrfToken
+                    }
                 })
                 .then(res => res.text())
                 .then(html => {
@@ -4415,6 +4603,9 @@
                     if (inputEl) inputEl.value = '';
                     if (parentInput) parentInput.value = '';
                     if (replyBanner) replyBanner.classList.add('d-none');
+                    if (window.MediaPicker) {
+                        window.MediaPicker.clearAttachment(formEl);
+                    }
 
                     if (listEl) {
                         listEl.innerHTML = html;

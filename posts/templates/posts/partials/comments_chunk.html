@@ -1,0 +1,15 @@
+{% for comment in visible_comments %}
+    {% include 'posts/partials/comment_single_item.html' with comment=comment liked_comment_ids=liked_comment_ids %}
+{% endfor %}
+
+{% if has_next_page %}
+<div id="comments-pagination-sentinel-{{ post.id }}" 
+     class="comments-load-more-sentinel text-center py-2" 
+     data-post-id="{{ post.share_id }}" 
+     data-next-page="{{ next_page_number }}">
+    <div class="spinner-border spinner-border-sm text-primary d-none comments-loading-spinner" role="status"></div>
+    <button type="button" class="btn btn-sm btn-link text-decoration-none text-muted comments-load-more-btn" data-action="load-more-comments">
+        Load more comments...
+    </button>
+</div>
+{% endif %}

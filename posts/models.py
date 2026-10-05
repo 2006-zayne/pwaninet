@@ -605,11 +605,26 @@ class Like(models.Model):
 
 
 class Comment(models.Model):
+    ATTACHMENT_NONE = 'none'
+    ATTACHMENT_IMAGE = 'image'
+    ATTACHMENT_GIF = 'gif'
+    ATTACHMENT_STICKER = 'sticker'
+    ATTACHMENT_TYPES = [
+        (ATTACHMENT_NONE, 'None'),
+        (ATTACHMENT_IMAGE, 'Image'),
+        (ATTACHMENT_GIF, 'GIF'),
+        (ATTACHMENT_STICKER, 'Sticker'),
+    ]
+
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='comments', db_index=True)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='comments', db_index=True)
-    content = models.TextField()
+    content = models.TextField(blank=True, default='')
     parent_comment = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies', db_index=True)
     reply_count = models.IntegerField(default=0)
+    attachment_type = models.CharField(max_length=20, choices=ATTACHMENT_TYPES, default=ATTACHMENT_NONE)
+    attachment_image = models.ImageField(upload_to='comments/%Y/%m/', null=True, blank=True)
+    attachment_url = models.URLField(max_length=1000, blank=True, default='')
+    attachment_meta = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
@@ -626,6 +641,16 @@ class Comment(models.Model):
         if user.is_authenticated:
             return self.likes.filter(user=user).exists()
         return False
+
+    @property
+    def has_attachment(self):
+        return self.attachment_type != self.ATTACHMENT_NONE and (bool(self.attachment_image) or bool(self.attachment_url))
+
+    @property
+    def media_url(self):
+        if self.attachment_image:
+            return self.attachment_image.url
+        return self.attachment_url
 
 
 class CommentLike(models.Model):
@@ -654,7 +679,11 @@ class PostImageComment(models.Model):
     """Individual comments for post images"""
     post_image = models.ForeignKey(PostImage, on_delete=models.CASCADE, related_name='comments', db_index=True)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='image_comments', db_index=True)
-    content = models.TextField()
+    content = models.TextField(blank=True, default='')
+    attachment_type = models.CharField(max_length=20, choices=Comment.ATTACHMENT_TYPES, default=Comment.ATTACHMENT_NONE)
+    attachment_image = models.ImageField(upload_to='comments/images/%Y/%m/', null=True, blank=True)
+    attachment_url = models.URLField(max_length=1000, blank=True, default='')
+    attachment_meta = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
@@ -662,6 +691,30 @@ class PostImageComment(models.Model):
 
     def __str__(self):
         return f"Comment by {self.author} on image {self.post_image.id}"
+
+    @property
+    def has_attachment(self):
+        return self.attachment_type != Comment.ATTACHMENT_NONE and (bool(self.attachment_image) or bool(self.attachment_url))
+
+    @property
+    def media_url(self):
+        if self.attachment_image:
+            return self.attachment_image.url
+        return self.attachment_url
+
+
+class UserSticker(models.Model):
+    """Custom stickers saved by users"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='custom_stickers', db_index=True)
+    image = models.ImageField(upload_to='stickers/%Y/%m/')
+    name = models.CharField(max_length=100, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Sticker by {self.user} ({self.name or self.id})"
 
 
 class Report(models.Model):

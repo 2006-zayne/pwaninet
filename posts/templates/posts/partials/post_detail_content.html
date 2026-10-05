@@ -219,24 +219,43 @@
                 <form hx-post="{% url 'posts:add_comment' post.share_id %}"
                       hx-target="#comments-section"
                       hx-swap="outerHTML"
-                      class="main-composer"
-                      hx-on::after-request="if(event.detail.successful) this.reset();">
+                      enctype="multipart/form-data"
+                      class="main-composer flex-column"
+                      hx-on::after-request="if(event.detail.successful) { this.reset(); if(window.MediaPicker) MediaPicker.clearAttachment(this); }">
                     {% csrf_token %}
-                    <img src="{{ request.user.profile_pic.url|default:'/static/images/default-avatar.png' }}" 
-                         alt="{{ request.user.username }}" 
-                         class="main-composer-avatar">
-                    <div class="main-composer-input-wrapper">
-                        <input type="text" 
-                               name="content" 
-                               class="main-composer-input" 
-                               placeholder="{% trans 'Add comment...' %}" 
-                               aria-label="{% trans 'Add a comment' %}"
-                               required>
-                        <button type="submit" 
-                                class="main-composer-send" 
-                                aria-label="{% trans 'Send comment' %}">
-                            <i class="bi bi-send-fill"></i>
-                        </button>
+                    <div class="comment-attachment-preview-container w-100"></div>
+                    <div class="d-flex align-items-center w-100 gap-2">
+                        <img src="{{ request.user.profile_pic.url|default:'/static/images/default-avatar.png' }}" 
+                             alt="{{ request.user.username }}" 
+                             class="main-composer-avatar">
+                        <div class="main-composer-input-wrapper position-relative flex-grow-1">
+                            <input type="text" 
+                                   name="content" 
+                                   id="detail-comment-input-{{ post.share_id }}"
+                                   class="main-composer-input" 
+                                   placeholder="{% trans 'Add comment...' %}" 
+                                   aria-label="{% trans 'Add a comment' %}"
+                                   style="padding-right: 96px;">
+                            <label class="btn border-0 p-0 text-muted position-absolute mb-0" 
+                                   style="right: 66px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer;" 
+                                   title="{% trans 'Attach photo as sticker' %}">
+                                <i class="bi bi-camera fs-6"></i>
+                                <input type="file" name="attachment_image" class="comment-photo-input d-none" accept="image/*">
+                            </label>
+                            <button type="button" 
+                                    class="btn border-0 p-0 text-muted position-absolute composer-media-trigger"
+                                    data-media-picker
+                                    data-input="#detail-comment-input-{{ post.share_id }}"
+                                    style="right: 36px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;"
+                                    title="{% trans 'Emoji, GIFs & Stickers' %}">
+                                <i class="bi bi-emoji-smile fs-6"></i>
+                            </button>
+                            <button type="submit" 
+                                    class="main-composer-send" 
+                                    aria-label="{% trans 'Send comment' %}">
+                                <i class="bi bi-send-fill"></i>
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>

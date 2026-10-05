@@ -762,6 +762,7 @@
     <link rel="stylesheet" href="{% static 'css/postcard.css' %}?v={{ app_version }}-{{ app_build }}">
     <link rel="stylesheet" href="{% static 'css/people-modal.css' %}">
     <link rel="stylesheet" href="{% static 'css/comments.css' %}">
+    <link rel="stylesheet" href="{% static 'css/media-picker.css' %}?v={{ app_version }}-{{ app_build }}-20261005-noborder1">
     <link rel="stylesheet" href="{% static 'css/profile.css' %}">
     <link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}">
     <link rel="stylesheet" href="{% static 'css/downloads/offline_media_viewer.css' %}">
@@ -831,7 +832,7 @@
     <script defer src="{% static 'js/lazy-load-images.js' %}"></script>
 
     <!-- Video Manager - replaces auto_video_play.js -->
-    <script defer src="{% static 'js/video-manager.js' %}"></script>
+    <script defer src="{% static 'js/video-manager.js' %}?v={{ app_version }}-{{ app_build }}-20261005-lazy1"></script>
 
     <!-- Global Audio Manager -->
     <script defer src="{% static 'js/global-audio-manager.js' %}"></script>
@@ -869,9 +870,10 @@
     <script defer src="{% static 'js/whats-new-modal.js' %}"></script>
 
     <!-- Comment System - Phase 2 Threaded Comments -->
-    <script defer src="{% static 'js/comments/comment-api.js' %}"></script>
-    <script defer src="{% static 'js/comments/comment-renderer.js' %}"></script>
-    <script defer src="{% static 'js/comments/comment-manager.js' %}"></script>
+    <script defer src="{% static 'js/comments/comment-api.js' %}?v={{ app_version }}-{{ app_build }}-20261005-fullcard3"></script>
+    <script defer src="{% static 'js/comments/comment-renderer.js' %}?v={{ app_version }}-{{ app_build }}-20261005-fullcard3"></script>
+    <script defer src="{% static 'js/comments/comment-manager.js' %}?v={{ app_version }}-{{ app_build }}-20261005-fullcard3"></script>
+    <script defer src="{% static 'js/media-picker/media-picker.js' %}?v={{ app_version }}-{{ app_build }}-20261005-search1"></script>
 
     <script>
         // Synchronously detect standalone PWA mode early to prevent safe area layout shifts
@@ -2453,19 +2455,37 @@
                             <span class="text-muted text-truncate me-2">{% trans "Replying to" %} <b id="commentsModalReplyUser" class="text-primary">@user</b></span>
                             <button type="button" class="btn-close" id="commentsModalCancelReply" aria-label="{% trans 'Cancel reply' %}" style="font-size: 9px;"></button>
                         </div>
-                        <form id="reelCommentForm" class="d-flex align-items-center gap-2 w-100">
+                        <form id="reelCommentForm" class="d-flex flex-column w-100" enctype="multipart/form-data">
                             {% csrf_token %}
                             <input type="hidden" name="parent_id" id="commentsModalParentId" value="">
-                            <input type="text"
-                                   id="reelCommentInput"
-                                   name="content"
-                                   class="form-control border-0 rounded-pill"
-                                   placeholder="{% trans 'Add a comment...' %}"
-                                   style="font-size: 13px; background-color: var(--search-bg, #ffffff); height: 38px;"
-                                   required>
-                            <button type="submit" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; flex-shrink: 0;" aria-label="{% trans 'Send' %}">
-                                <i class="bi bi-send-fill" style="font-size: 14px;"></i>
-                            </button>
+                            <div class="comment-attachment-preview-container w-100"></div>
+                            <div class="d-flex align-items-center gap-2 w-100">
+                                <div class="flex-grow-1 position-relative">
+                                    <input type="text"
+                                           id="reelCommentInput"
+                                           name="content"
+                                           class="form-control border-0 rounded-pill"
+                                           placeholder="{% trans 'Add a comment...' %}"
+                                           style="font-size: 13px; background-color: var(--search-bg, #ffffff); height: 38px; padding-right: 76px;">
+                                    <label class="btn border-0 p-0 text-muted position-absolute mb-0" 
+                                           style="right: 44px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer;" 
+                                           title="{% trans 'Attach photo as sticker' %}">
+                                        <i class="bi bi-camera fs-6"></i>
+                                        <input type="file" name="attachment_image" class="comment-photo-input d-none" accept="image/*">
+                                    </label>
+                                    <button type="button" 
+                                            class="btn border-0 p-0 text-muted position-absolute composer-media-trigger"
+                                            data-media-picker
+                                            data-input="#reelCommentInput"
+                                            style="right: 14px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;"
+                                            title="{% trans 'Emoji, GIFs & Stickers' %}">
+                                        <i class="bi bi-emoji-smile fs-6"></i>
+                                    </button>
+                                </div>
+                                <button type="submit" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; flex-shrink: 0;" aria-label="{% trans 'Send' %}">
+                                    <i class="bi bi-send-fill" style="font-size: 14px;"></i>
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -2708,19 +2728,37 @@
                             <span class="text-muted text-truncate me-2">{% trans "Replying to" %} <b id="fsRailReplyUser" class="text-primary">@user</b></span>
                             <button type="button" class="btn-close" id="fsRailCancelReply" aria-label="{% trans 'Cancel reply' %}" style="font-size: 9px;"></button>
                         </div>
-                        <form id="fsRailCommentForm" class="d-flex align-items-center gap-2 w-100">
+                        <form id="fsRailCommentForm" class="d-flex flex-column w-100" enctype="multipart/form-data">
                             {% csrf_token %}
                             <input type="hidden" name="parent_id" id="fsRailParentId" value="">
-                            <input type="text"
-                                   id="fsRailCommentInput"
-                                   name="content"
-                                   class="form-control border-0 rounded-pill px-3"
-                                   placeholder="{% trans 'Add a comment...' %}"
-                                   style="font-size: 13px; height: 38px;"
-                                   required>
-                            <button type="submit" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px;" aria-label="{% trans 'Send' %}">
-                                <i class="bi bi-send-fill" style="font-size: 13px;"></i>
-                            </button>
+                            <div class="comment-attachment-preview-container w-100"></div>
+                            <div class="d-flex align-items-center gap-2 w-100">
+                                <div class="flex-grow-1 position-relative">
+                                    <input type="text"
+                                           id="fsRailCommentInput"
+                                           name="content"
+                                           class="form-control border-0 rounded-pill px-3"
+                                           placeholder="{% trans 'Add a comment...' %}"
+                                           style="font-size: 13px; height: 38px; padding-right: 76px;">
+                                    <label class="btn border-0 p-0 text-muted position-absolute mb-0" 
+                                           style="right: 44px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer;" 
+                                           title="{% trans 'Attach photo as sticker' %}">
+                                        <i class="bi bi-camera fs-6"></i>
+                                        <input type="file" name="attachment_image" class="comment-photo-input d-none" accept="image/*">
+                                    </label>
+                                    <button type="button" 
+                                            class="btn border-0 p-0 text-muted position-absolute composer-media-trigger"
+                                            data-media-picker
+                                            data-input="#fsRailCommentInput"
+                                            style="right: 14px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;"
+                                            title="{% trans 'Emoji, GIFs & Stickers' %}">
+                                        <i class="bi bi-emoji-smile fs-6"></i>
+                                    </button>
+                                </div>
+                                <button type="submit" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px;" aria-label="{% trans 'Send' %}">
+                                    <i class="bi bi-send-fill" style="font-size: 13px;"></i>
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </aside>
@@ -3135,8 +3173,12 @@
 
         // Handle click-outside-to-dismiss since backdrop has pointer-events: none
         document.addEventListener('click', function(e) {
-            // Do not dismiss if clicking a modal trigger or toggle button
-            if (e.target.closest('[data-bs-toggle="modal"], [data-bs-target], .picker-trigger, [data-action="open-comments"]')) {
+            // Do not dismiss if clicking a modal trigger or inside media picker / emoji picker
+            if (e.target.closest('[data-bs-toggle="modal"], [data-bs-target], .picker-trigger, [data-action="open-comments"], [data-media-picker], .composer-media-trigger, #mediaPickerModal, #mediaPickerBackdrop, .media-picker-modal, .media-picker-backdrop, emoji-picker')) {
+                return;
+            }
+            // Do not dismiss any open modal if the media picker is currently open
+            if (window.MediaPicker && window.MediaPicker.isOpen) {
                 return;
             }
             const openModal = document.querySelector('.modal.show');
@@ -4648,7 +4690,13 @@ window.addEventListener('beforeinstallprompt', (e) => {
         }
 
         function getCsrfToken() {
+            var metaTag = document.querySelector('meta[name="csrf-token"]');
+            if (metaTag && metaTag.getAttribute('content')) {
+                var val = metaTag.getAttribute('content').trim();
+                if (val && !val.includes('{{')) return val;
+            }
             return (document.querySelector('[name=csrfmiddlewaretoken]') && document.querySelector('[name=csrfmiddlewaretoken]').value) ||
+                   ((document.cookie.match(/pwaninet_local_csrftoken=([^;]+)/) || [])[1]) ||
                    ((document.cookie.match(/csrftoken=([^;]+)/) || [])[1]) || '';
         }
 

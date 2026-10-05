@@ -59,6 +59,7 @@ const CommentRenderer = {
           <div class="comment-body" id="comment-body-${commentData.id}">
             ${this.escapeHtml(commentData.content)}
           </div>
+          ${this.renderAttachment(commentData)}
           
           ${showActions ? this.renderActions(commentData, isOwner, replyCount) : ''}
           
@@ -68,6 +69,30 @@ const CommentRenderer = {
     `;
 
     return commentHtml;
+  },
+
+  /**
+   * Render comment attachment (TikTok sticker / GIF)
+   */
+  renderAttachment(commentData) {
+    const type = commentData.attachment_type;
+    const url = commentData.attachment_url || (commentData.attachment_image ? commentData.attachment_image : '');
+    if (!type || type === 'none' || !url) return '';
+
+    if (type === 'sticker' || type === 'image') {
+      return `
+        <div class="comment-rendered-attachment">
+          <img src="${this.escapeHtml(url)}" class="comment-sticker-image" alt="Sticker" loading="lazy" onclick="if(window.openFullscreenImage) window.openFullscreenImage(this.src);">
+        </div>
+      `;
+    } else if (type === 'gif') {
+      return `
+        <div class="comment-rendered-attachment">
+          <img src="${this.escapeHtml(url)}" class="comment-gif-image" alt="GIF" loading="lazy">
+        </div>
+      `;
+    }
+    return '';
   },
 
   /**
@@ -136,19 +161,21 @@ const CommentRenderer = {
             <i class="bi bi-x-lg"></i>
           </button>
         </div>
+        <div class="comment-attachment-preview-container"></div>
         <textarea class="composer-input" 
                   id="composer-input-${commentId}"
                   placeholder="Write your reply..."
-                  rows="3"
+                  rows="2"
                   aria-label="Reply content"></textarea>
         <div class="composer-actions">
           <div class="composer-tools">
-            <button class="composer-tool-btn" data-action="emoji" aria-label="Add emoji" title="Emoji (coming soon)">
+            <button type="button" class="composer-tool-btn composer-media-trigger" data-media-picker data-input="#composer-input-${commentId}" aria-label="Emoji, GIFs and Stickers" title="Emoji, GIFs & Stickers">
               <i class="bi bi-emoji-smile"></i>
             </button>
-            <button class="composer-tool-btn" data-action="attachment" aria-label="Add attachment" title="Attachment (coming soon)">
-              <i class="bi bi-paperclip"></i>
-            </button>
+            <label class="composer-tool-btn mb-0" style="cursor: pointer;" title="Attach photo as sticker">
+              <i class="bi bi-camera"></i>
+              <input type="file" class="comment-photo-input d-none" accept="image/*">
+            </label>
           </div>
           <button class="composer-send" 
                   data-action="send-reply"

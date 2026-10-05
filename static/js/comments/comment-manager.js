@@ -140,8 +140,13 @@ const CommentManager = {
     if (target.classList.contains('composer-input')) {
       const commentId = target.id.replace('composer-input-', '');
       const sendBtn = document.querySelector(`[data-action="send-reply"][data-comment-id="${commentId}"]`);
+      const composer = document.getElementById(`composer-${commentId}`);
+      const typeInput = composer?.querySelector('input[name="attachment_type"]');
+      const hasAttachment = typeInput && typeInput.value && typeInput.value !== 'none';
+      const photoInput = composer?.querySelector('.comment-photo-input') || composer?.querySelector('input[type="file"][name="attachment_image"]');
+      const hasPhoto = Boolean(photoInput && photoInput.files && photoInput.files.length > 0);
       if (sendBtn) {
-        sendBtn.disabled = !target.value.trim();
+        sendBtn.disabled = !target.value.trim() && !hasAttachment && !hasPhoto;
       }
       
       // Save draft
@@ -300,10 +305,36 @@ const CommentManager = {
     this.submittingReplies = this.submittingReplies || new Set();
     if (this.submittingReplies.has(commentId)) return;
 
+    const composer = document.getElementById(`composer-${commentId}`);
     const input = document.getElementById(`composer-input-${commentId}`);
     const content = input ? input.value.trim() : '';
     
-    if (!content) return;
+    let attachment = null;
+    if (composer) {
+      const typeInput = composer.querySelector('input[name="attachment_type"]');
+      const urlInput = composer.querySelector('input[name="attachment_url"]');
+      const metaInput = composer.querySelector('input[name="attachment_meta"]');
+      const photoInput = composer.querySelector('.comment-photo-input') || composer.querySelector('input[type="file"][name="attachment_image"]');
+      const photoFile = (photoInput && photoInput.files && photoInput.files.length > 0) ? photoInput.files[0] : null;
+
+      if (typeInput && typeInput.value && typeInput.value !== 'none') {
+        let meta = {};
+        try { meta = JSON.parse(metaInput?.value || '{}'); } catch (_) {}
+        attachment = {
+          type: typeInput.value,
+          url: urlInput ? urlInput.value : '',
+          meta: meta,
+          file: photoFile
+        };
+      } else if (photoFile) {
+        attachment = {
+          type: 'sticker',
+          file: photoFile
+        };
+      }
+    }
+
+    if (!content && !attachment) return;
     
     const sendBtn = document.querySelector(`[data-action="send-reply"][data-comment-id="${commentId}"]`);
     if (sendBtn) {
@@ -313,10 +344,14 @@ const CommentManager = {
     this.submittingReplies.add(commentId);
     
     try {
-      const reply = await CommentApi.createComment(this.postId, content, commentId);
+      const reply = await CommentApi.createComment(this.postId, content, commentId, attachment);
       
       // Clear draft
       this.draftContent.delete(commentId);
+      
+      if (window.MediaPicker && composer) {
+        window.MediaPicker.clearAttachment(composer);
+      }
       
       // Close composer
       this.closeComposer(commentId, false);

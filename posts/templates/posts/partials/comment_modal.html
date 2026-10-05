@@ -43,23 +43,39 @@
 
       <!-- Comment Input at Bottom -->
       <div class="modal-footer comments-modal-input-footer border-0 pt-0 pb-3">
-        <form id="commentForm" class="d-flex align-items-center gap-2 w-100">
-          <img src="" 
-               alt="Your avatar" 
-               class="comment-input-avatar rounded-circle"
-               style="width: 36px; height: 36px; object-fit: cover; display: none;">
-          <div class="flex-grow-1 position-relative">
-            <input type="text" 
-                   name="content"
-                   class="form-control comment-input-field"
-                   placeholder="Add comment..."
-                   aria-label="Add a comment"
-                   style="border-radius: 20px; padding: 10px 45px 10px 15px;">
-            <button type="submit" 
-                    class="comment-send-btn position-absolute"
-                    style="right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--primary); padding: 4px 8px;">
-              <i class="bi bi-send-fill"></i>
-            </button>
+        <form id="commentForm" class="d-flex flex-column w-100">
+          <div class="comment-attachment-preview-container w-100"></div>
+          <div class="d-flex align-items-center gap-2 w-100">
+            <img src="" 
+                 alt="Your avatar" 
+                 class="comment-input-avatar rounded-circle"
+                 style="width: 36px; height: 36px; object-fit: cover; display: none;">
+            <div class="flex-grow-1 position-relative">
+              <input type="text" 
+                     name="content"
+                     class="form-control comment-input-field"
+                     placeholder="Add comment..."
+                     aria-label="Add a comment"
+                     style="border-radius: 20px; padding: 10px 96px 10px 15px;">
+              <label class="btn border-0 p-0 text-muted position-absolute mb-0" 
+                     style="right: 66px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer;" 
+                     title="Attach photo as sticker">
+                <i class="bi bi-camera fs-6"></i>
+                <input type="file" name="attachment_image" class="comment-photo-input d-none" accept="image/*">
+              </label>
+              <button type="button" 
+                      class="btn border-0 p-0 text-muted position-absolute composer-media-trigger"
+                      data-media-picker
+                      style="right: 36px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;"
+                      title="Emoji, GIFs & Stickers">
+                <i class="bi bi-emoji-smile fs-6"></i>
+              </button>
+              <button type="submit" 
+                      class="comment-send-btn position-absolute"
+                      style="right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--primary); padding: 4px 8px;">
+                <i class="bi bi-send-fill"></i>
+              </button>
+            </div>
           </div>
         </form>
       </div>

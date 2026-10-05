@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <radialGradient id="faceGrad" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#FFF385"/>
+      <stop offset="70%" stop-color="#FFB300"/>
+      <stop offset="100%" stop-color="#F57C00"/>
+    </radialGradient>
+    <linearGradient id="heartGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FF3366"/>
+      <stop offset="100%" stop-color="#D50000"/>
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="56" fill="url(#faceGrad)" stroke="#E65100" stroke-width="3"/>
+  <path d="M42 28 C34 20 22 24 22 36 C22 52 42 66 42 66 C42 66 62 52 62 36 C62 24 50 20 42 28 Z" fill="url(#heartGrad)"/>
+  <path d="M86 28 C78 20 66 24 66 36 C66 52 86 66 86 66 C86 66 106 52 106 36 C106 24 94 20 86 28 Z" fill="url(#heartGrad)"/>
+  <path d="M38 80 Q64 112 90 80 Q64 92 38 80 Z" fill="#795548"/>
+  <path d="M48 84 Q64 106 80 84 Q64 92 48 84 Z" fill="#D32F2F"/>
+  <path d="M44 80 Q64 88 84 80 Q64 84 44 80 Z" fill="#FFFFFF"/>
+</svg>
