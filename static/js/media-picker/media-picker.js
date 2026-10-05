@@ -63,6 +63,7 @@
       this.buildDOM();
       this.bindGlobalEvents();
       this.initEmojiPickerElement();
+      this.initPasteSupport();
     },
 
     buildDOM() {
@@ -561,6 +562,58 @@
           this.clearAttachment(form);
         }
       });
+
+      // 16. Delegate clipboard paste buttons: .composer-clipboard-btn
+      document.addEventListener('click', (e) => {
+        const pasteBtn = e.target.closest('.composer-clipboard-btn, [data-action="paste-clipboard"]');
+        if (pasteBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          const form = pasteBtn.closest('form') || pasteBtn.closest('.comment-composer') || document;
+          this.pasteImageFromClipboard(form);
+        }
+      });
+
+      // 17. Intercept paste event globally on comment forms and editable composers (both desktop Ctrl+V and Gboard screenshot commits)
+      document.addEventListener('paste', (e) => {
+        const target = e.target;
+        const composer = target.closest('form, .comment-composer, .modal-footer, #commentForm, #reelCommentForm, #fsRailCommentForm, .main-composer, .post-detail-comments-container');
+        if (!composer) return;
+
+        const clipboardData = e.clipboardData || window.clipboardData;
+        if (!clipboardData) return;
+
+        let imageFile = null;
+
+        // Check clipboard files
+        if (clipboardData.files && clipboardData.files.length > 0) {
+          for (let i = 0; i < clipboardData.files.length; i++) {
+            const f = clipboardData.files[i];
+            if (f.type && f.type.startsWith('image/')) {
+              imageFile = f;
+              break;
+            }
+          }
+        }
+
+        // Check clipboard items (standard for Gboard CommitContent and browser image copying)
+        if (!imageFile && clipboardData.items && clipboardData.items.length > 0) {
+          for (let i = 0; i < clipboardData.items.length; i++) {
+            const item = clipboardData.items[i];
+            if (item.kind === 'file' && item.type && item.type.startsWith('image/')) {
+              imageFile = item.getAsFile();
+              break;
+            }
+          }
+        }
+
+        if (imageFile) {
+          e.preventDefault();
+          e.stopPropagation();
+          const form = composer.closest('form') || composer.querySelector('form') || composer;
+          this.attachLocalImage(imageFile, form);
+        }
+      }, true);
     },
 
     toggle(triggerEl) {
@@ -727,6 +780,13 @@
       const input = this.currentTargetInput;
       if (!input) return;
 
+      if (input.isContentEditable || input.getAttribute('contenteditable') === 'true') {
+        input.focus();
+        document.execCommand('insertText', false, emoji);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        return;
+      }
+
       const start = input.selectionStart || 0;
       const end = input.selectionEnd || 0;
       const val = input.value || '';
@@ -781,6 +841,16 @@
 
     attachLocalImage(file, form) {
       if (!file || !form) return;
+      form._pastedAttachmentFile = file;
+
+      const fileInput = form.querySelector('input[type="file"].comment-photo-input') || form.querySelector('input[type="file"][name="attachment_image"]');
+      if (fileInput) {
+        try {
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          fileInput.files = dt.files;
+        } catch (_) {}
+      }
 
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -789,18 +859,19 @@
         this.setHiddenInput(form, 'attachment_type', 'image');
         this.setHiddenInput(form, 'attachment_url', '');
         this.setHiddenInput(form, 'attachment_meta', JSON.stringify({
-          name: file.name,
+          name: file.name || 'screenshot.png',
           size: file.size,
-          type: file.type
+          type: file.type || 'image/png'
         }));
 
+        const isScreenshot = !file.name || file.name.includes('screenshot') || file.name.includes('clipboard') || file.name === 'image.png';
         this.renderAttachmentPreviewChip(form, {
           type: 'image',
           thumbUrl: dataUrl,
-          title: 'Photo Sticker'
+          title: isScreenshot ? 'Screenshot' : 'Photo Sticker'
         });
 
-        const sendBtn = form.querySelector('button[type="submit"], [data-action="send-reply"]');
+        const sendBtn = form.querySelector('button[type="submit"], [data-action="send-reply"], .comment-send-btn, .main-composer-send');
         if (sendBtn) sendBtn.disabled = false;
       };
       reader.readAsDataURL(file);
@@ -838,11 +909,12 @@
 
     clearAttachment(form) {
       if (!form) return;
+      delete form._pastedAttachmentFile;
       this.setHiddenInput(form, 'attachment_type', 'none');
       this.setHiddenInput(form, 'attachment_url', '');
       this.setHiddenInput(form, 'attachment_meta', '{}');
 
-      const fileInput = form.querySelector('input[type="file"].comment-photo-input');
+      const fileInput = form.querySelector('input[type="file"].comment-photo-input') || form.querySelector('input[type="file"][name="attachment_image"]');
       if (fileInput) fileInput.value = '';
 
       const previewContainer = form.querySelector('.comment-attachment-preview-container');
@@ -851,10 +923,146 @@
       }
 
       // Check if text input is empty, disable send button if empty
-      const textInput = form.querySelector('input[type="text"], textarea');
-      const sendBtn = form.querySelector('button[type="submit"], [data-action="send-reply"]');
-      if (sendBtn && textInput && !textInput.value.trim()) {
+      const textInput = form.querySelector('.composer-input-editable, input[type="text"], textarea');
+      const val = textInput ? (textInput.value || textInput.innerText || '').trim() : '';
+      const sendBtn = form.querySelector('button[type="submit"], [data-action="send-reply"], .comment-send-btn, .main-composer-send');
+      if (sendBtn && !val) {
         sendBtn.disabled = true;
+      }
+    },
+
+    async pasteImageFromClipboard(form) {
+      if (!form) {
+        form = this.currentForm || 
+               (this.currentTargetInput ? this.currentTargetInput.closest('form, .comment-composer') : null) || 
+               document.querySelector('#reelCommentForm, #commentForm, #fsRailCommentForm, .comment-composer, .main-composer');
+      }
+      if (!form) return false;
+
+      if (navigator.clipboard && typeof navigator.clipboard.read === 'function') {
+        try {
+          const items = await navigator.clipboard.read();
+          for (const item of items) {
+            for (const type of item.types) {
+              if (type.startsWith('image/')) {
+                const blob = await item.getType(type);
+                const ext = (type.split('/')[1] || 'png').split('+')[0];
+                const file = new File([blob], `screenshot_${Date.now()}.${ext}`, { type });
+                this.attachLocalImage(file, form);
+                return true;
+              }
+            }
+          }
+          alert('No image or screenshot found in clipboard. Take a screenshot or copy an image first.');
+          return false;
+        } catch (err) {
+          console.warn('[MediaPicker] Clipboard read error:', err);
+        }
+      }
+
+      alert('Clipboard permission not granted or unsupported. You can also paste directly into the comment box with your keyboard or long-press.');
+      const input = form.querySelector('.composer-input-editable, input[type="text"], textarea');
+      if (input) input.focus();
+      return false;
+    },
+
+    initPasteSupport() {
+      this.bindAllEditableComposers();
+
+      // Listen for HTMX swaps to bind dynamic composers
+      document.addEventListener('htmx:afterSwap', (e) => {
+        this.bindAllEditableComposers(e.target || document);
+      });
+      document.addEventListener('focusin', (e) => {
+        if (e.target && e.target.classList && e.target.classList.contains('composer-input-editable')) {
+          this.bindEditableComposer(e.target);
+        }
+      });
+    },
+
+    bindAllEditableComposers(root = document) {
+      const editables = root.querySelectorAll('.composer-input-editable[contenteditable="true"]');
+      editables.forEach(el => this.bindEditableComposer(el));
+    },
+
+    bindEditableComposer(el) {
+      if (!el || el.dataset.editableBound === 'true') return;
+      el.dataset.editableBound = 'true';
+
+      const form = el.closest('form') || el.closest('.comment-composer');
+      let hiddenInput = form?.querySelector('input[type="hidden"].composer-hidden-content, input[type="hidden"][name="content"]');
+
+      if (form && !hiddenInput) {
+        hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'content';
+        hiddenInput.className = 'composer-hidden-content';
+        form.appendChild(hiddenInput);
+      }
+
+      // Provide .value getter/setter for maximum compatibility with existing JS
+      try {
+        Object.defineProperty(el, 'value', {
+          get() {
+            return (this.innerText || this.textContent || '').trim();
+          },
+          set(v) {
+            this.textContent = v || '';
+            if (hiddenInput) hiddenInput.value = (v || '').trim();
+          },
+          configurable: true
+        });
+      } catch (_) {}
+
+      // Provide .placeholder getter/setter
+      try {
+        Object.defineProperty(el, 'placeholder', {
+          get() {
+            return this.getAttribute('data-placeholder') || '';
+          },
+          set(v) {
+            this.setAttribute('data-placeholder', v || '');
+          },
+          configurable: true
+        });
+      } catch (_) {}
+
+      // Keep hidden input in sync as user types
+      el.addEventListener('input', () => {
+        const val = (el.innerText || el.textContent || '').trim();
+        if (hiddenInput) hiddenInput.value = val;
+
+        const sendBtn = form?.querySelector('button[type="submit"], [data-action="send-reply"], .comment-send-btn, .main-composer-send');
+        const hasAttachment = form?.querySelector('.comment-attachment-preview-chip');
+        if (sendBtn) {
+          sendBtn.disabled = !val && !hasAttachment;
+        }
+      });
+
+      // Submit on Enter (unless Shift+Enter)
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          if (form) {
+            if (typeof form.requestSubmit === 'function') {
+              form.requestSubmit();
+            } else {
+              const submitBtn = form.querySelector('button[type="submit"], [data-action="send-reply"], .comment-send-btn, .main-composer-send');
+              if (submitBtn) submitBtn.click();
+              else form.dispatchEvent(new Event('submit', { cancelable: true }));
+            }
+          }
+        }
+      });
+
+      // Clear when form resets
+      if (form) {
+        form.addEventListener('reset', () => {
+          setTimeout(() => {
+            el.textContent = '';
+            if (hiddenInput) hiddenInput.value = '';
+          }, 0);
+        });
       }
     },
 
@@ -925,16 +1133,21 @@
           grid.innerHTML = '';
         }
 
+        if (json?.error) {
+          console.warn('[MediaPicker] Klipy GIFs error:', json.error);
+        }
+
         if (!items || items.length === 0) {
           if (reset && grid.children.length === 0) {
+            const isError = Boolean(json?.error);
             const emptyMsg = this.gifQuery
               ? `No GIFs found for "${this.escapeHtml(this.gifQuery)}"`
-              : 'No GIFs available at the moment';
+              : (isError ? 'Unable to load GIFs at the moment' : 'No GIFs available at the moment');
             grid.innerHTML = `
               <div class="media-picker-empty">
                 <i class="bi bi-camera-video text-muted"></i>
                 <span class="fw-semibold">${emptyMsg}</span>
-                ${this.gifQuery ? '<button type="button" class="media-picker-empty-action" data-action="clear-gif-search"><i class="bi bi-arrow-clockwise me-1"></i>Browse Trending GIFs</button>' : ''}
+                <button type="button" class="media-picker-empty-action" data-action="clear-gif-search"><i class="bi bi-arrow-clockwise me-1"></i>${isError ? 'Retry' : 'Browse Trending GIFs'}</button>
               </div>
             `;
           }
@@ -1082,16 +1295,21 @@
           }
         }
 
+        if (json?.error) {
+          console.warn('[MediaPicker] Klipy Stickers error:', json.error);
+        }
+
         if (!items || items.length === 0) {
           if (reset && grid.children.length === 0) {
+            const isError = Boolean(json?.error);
             const emptyMsg = this.stickerQuery
               ? `No stickers found for "${this.escapeHtml(this.stickerQuery)}"`
-              : 'No stickers available';
+              : (isError ? 'Unable to load stickers at the moment' : 'No stickers available');
             grid.innerHTML = `
               <div class="media-picker-empty">
                 <i class="bi bi-stickies text-muted"></i>
                 <span class="fw-semibold">${emptyMsg}</span>
-                ${this.stickerQuery ? '<button type="button" class="media-picker-empty-action" data-action="clear-sticker-search"><i class="bi bi-arrow-clockwise me-1"></i>Browse Trending Stickers</button>' : ''}
+                <button type="button" class="media-picker-empty-action" data-action="clear-sticker-search"><i class="bi bi-arrow-clockwise me-1"></i>${isError ? 'Retry' : 'Browse Trending Stickers'}</button>
               </div>
             `;
           }

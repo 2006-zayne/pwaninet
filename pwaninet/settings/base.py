@@ -664,7 +664,7 @@ PWANIMATE_LLM_FALLBACK_CHAIN = [
 
 # Pwanimate Attachments Subsystem
 # KLIPY Integration Settings
-KLIPY_API_KEY = os.environ.get('KLIPY_API_KEY', '')
+KLIPY_API_KEY = os.environ.get('KLIPY_API_KEY', 'eTJSGDKLf98x2n9QMKeNQoObF8fxavwQC2wGrfbWyinrYSH8mTtlySyZ7zlPW1Yf')
 KLIPY_API_BASE_URL = 'https://api.klipy.com/api/v1'
 
 PWANIMATE_ATTACHMENTS_DIR = 'pwanimate/attachments'

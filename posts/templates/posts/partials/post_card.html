@@ -501,12 +501,20 @@
                      style="width: 32px; height: 32px; object-fit: cover;"
                      alt="{{ request.user.username }}">
                 <div class="flex-grow-1 position-relative">
-                    <input type="text"
-                           name="content"
-                           id="comment-input-{{ post.share_id }}"
-                           class="form-control border-0 rounded-pill"
-                           placeholder="{% trans 'Write a comment...' %}"
-                           style="font-size: 13px; background-color: var(--search-bg, #e9ecef); padding-right: 96px; height: 38px;">
+                    <input type="hidden" name="content" class="composer-hidden-content">
+                    <div id="comment-input-{{ post.share_id }}"
+                         class="form-control border-0 rounded-pill composer-input-editable"
+                         contenteditable="true"
+                         role="textbox"
+                         aria-multiline="false"
+                         data-placeholder="{% trans 'Write a comment...' %}"
+                         style="font-size: 13px; background-color: var(--search-bg, #e9ecef); padding: 8px 124px 8px 16px; min-height: 38px; max-height: 120px; overflow-y: auto;"></div>
+                    <button type="button" 
+                            class="btn border-0 p-0 text-muted position-absolute composer-clipboard-btn"
+                            style="right: 96px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;"
+                            title="{% trans 'Paste screenshot or photo from clipboard' %}">
+                        <i class="bi bi-clipboard-plus fs-6"></i>
+                    </button>
                     <label class="btn border-0 p-0 text-muted position-absolute mb-0" 
                            style="right: 66px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer;" 
                            title="{% trans 'Attach photo as sticker' %}">

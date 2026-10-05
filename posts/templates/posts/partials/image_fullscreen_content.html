@@ -695,7 +695,7 @@
         const urlInput = this.querySelector('input[name="attachment_url"]');
         const metaInput = this.querySelector('input[name="attachment_meta"]');
         const fileInput = this.querySelector('input[type="file"].comment-photo-input');
-        const file = fileInput?.files?.[0];
+        const file = (fileInput && fileInput.files && fileInput.files.length > 0) ? fileInput.files[0] : (this._pastedAttachmentFile || null);
 
         const attachmentType = typeInput ? typeInput.value : 'none';
         const attachmentUrl = urlInput ? urlInput.value : '';

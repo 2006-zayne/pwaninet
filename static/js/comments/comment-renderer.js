@@ -176,6 +176,9 @@ const CommentRenderer = {
               <i class="bi bi-camera"></i>
               <input type="file" class="comment-photo-input d-none" accept="image/*">
             </label>
+            <button type="button" class="composer-tool-btn composer-clipboard-btn" title="Paste screenshot or photo from clipboard">
+              <i class="bi bi-clipboard-plus"></i>
+            </button>
           </div>
           <button class="composer-send" 
                   data-action="send-reply"

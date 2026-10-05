@@ -3010,7 +3010,7 @@
                 const attachmentUrl = formEl.querySelector('[name="attachment_url"]')?.value || '';
                 const attachmentMeta = formEl.querySelector('[name="attachment_meta"]')?.value || '';
                 const photoInput = formEl.querySelector('.comment-photo-input') || formEl.querySelector('input[type="file"][name="attachment_image"]');
-                const photoFile = (photoInput && photoInput.files && photoInput.files.length > 0) ? photoInput.files[0] : null;
+                const photoFile = (photoInput && photoInput.files && photoInput.files.length > 0) ? photoInput.files[0] : (formEl._pastedAttachmentFile || null);
 
                 if (!content && !attachmentType && !photoFile) return;
 
@@ -4561,7 +4561,7 @@
                 const attachmentUrl = formEl.querySelector('[name="attachment_url"]')?.value || '';
                 const attachmentMeta = formEl.querySelector('[name="attachment_meta"]')?.value || '';
                 const photoInput = formEl.querySelector('.comment-photo-input') || formEl.querySelector('input[type="file"][name="attachment_image"]');
-                const photoFile = (photoInput && photoInput.files && photoInput.files.length > 0) ? photoInput.files[0] : null;
+                const photoFile = (photoInput && photoInput.files && photoInput.files.length > 0) ? photoInput.files[0] : (formEl._pastedAttachmentFile || null);
 
                 if (!content && !attachmentType && !photoFile) return;
 

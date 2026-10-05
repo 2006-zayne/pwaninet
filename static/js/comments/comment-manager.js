@@ -315,7 +315,7 @@ const CommentManager = {
       const urlInput = composer.querySelector('input[name="attachment_url"]');
       const metaInput = composer.querySelector('input[name="attachment_meta"]');
       const photoInput = composer.querySelector('.comment-photo-input') || composer.querySelector('input[type="file"][name="attachment_image"]');
-      const photoFile = (photoInput && photoInput.files && photoInput.files.length > 0) ? photoInput.files[0] : null;
+      const photoFile = (photoInput && photoInput.files && photoInput.files.length > 0) ? photoInput.files[0] : (composer._pastedAttachmentFile || null);
 
       if (typeInput && typeInput.value && typeInput.value !== 'none') {
         let meta = {};

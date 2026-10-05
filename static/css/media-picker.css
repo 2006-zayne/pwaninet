@@ -811,3 +811,41 @@ emoji-picker {
   color: var(--mp-primary);
   background: rgba(59, 130, 246, 0.08);
 }
+
+/* Contenteditable comment composers for Gboard screenshot & image paste support */
+.composer-input-editable[contenteditable="true"] {
+  outline: none !important;
+  cursor: text !important;
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  line-height: 1.45 !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  display: block !important;
+}
+
+.composer-input-editable[contenteditable="true"]:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted, #64748b) !important;
+  pointer-events: none !important;
+  display: block !important;
+}
+
+/* Clipboard quick-paste button */
+.composer-clipboard-btn {
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-muted, #64748b) !important;
+  cursor: pointer !important;
+  transition: transform 0.15s ease, color 0.15s ease !important;
+  z-index: 2 !important;
+}
+
+.composer-clipboard-btn:hover {
+  color: var(--primary, #3b82f6) !important;
+  transform: translateY(-50%) scale(1.15) !important;
+}
+
+.composer-clipboard-btn:active {
+  transform: translateY(-50%) scale(0.95) !important;
+}

@@ -229,13 +229,21 @@
                              alt="{{ request.user.username }}" 
                              class="main-composer-avatar">
                         <div class="main-composer-input-wrapper position-relative flex-grow-1">
-                            <input type="text" 
-                                   name="content" 
-                                   id="detail-comment-input-{{ post.share_id }}"
-                                   class="main-composer-input" 
-                                   placeholder="{% trans 'Add comment...' %}" 
-                                   aria-label="{% trans 'Add a comment' %}"
-                                   style="padding-right: 96px;">
+                            <input type="hidden" name="content" class="composer-hidden-content">
+                            <div id="detail-comment-input-{{ post.share_id }}"
+                                 class="main-composer-input composer-input-editable"
+                                 contenteditable="true"
+                                 role="textbox"
+                                 aria-multiline="false"
+                                 data-placeholder="{% trans 'Add comment...' %}"
+                                 aria-label="{% trans 'Add a comment' %}"
+                                 style="padding: 10px 124px 10px 15px; min-height: 42px; max-height: 120px; overflow-y: auto;"></div>
+                            <button type="button" 
+                                    class="btn border-0 p-0 text-muted position-absolute composer-clipboard-btn"
+                                    style="right: 96px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;"
+                                    title="{% trans 'Paste screenshot or photo from clipboard' %}">
+                                <i class="bi bi-clipboard-plus fs-6"></i>
+                            </button>
                             <label class="btn border-0 p-0 text-muted position-absolute mb-0" 
                                    style="right: 66px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer;" 
                                    title="{% trans 'Attach photo as sticker' %}">

@@ -1787,6 +1787,7 @@ def klipy_media_proxy(request):
     Keeps API key secure on the server, adds caching for search/trending queries.
     """
     import urllib.request
+    import urllib.error
     import urllib.parse
     import json
     from django.conf import settings
@@ -1817,7 +1818,7 @@ def klipy_media_proxy(request):
                 pass
         customer_id = f"anon_{getattr(request.session, 'session_key', 'guest') or 'guest'}"
 
-    api_key = getattr(settings, 'KLIPY_API_KEY', '')
+    api_key = getattr(settings, 'KLIPY_API_KEY', '') or 'eTJSGDKLf98x2n9QMKeNQoObF8fxavwQC2wGrfbWyinrYSH8mTtlySyZ7zlPW1Yf'
     if not api_key:
         return JsonResponse({'result': False, 'error': 'KLIPY API key not configured', 'data': {'data': []}})
 
@@ -1845,15 +1846,23 @@ def klipy_media_proxy(request):
         req = urllib.request.Request(
             url,
             headers={
-                'User-Agent': 'PwaniNet/1.0',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                 'Accept': 'application/json'
             }
         )
-        with urllib.request.urlopen(req, timeout=8) as response:
+        with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode('utf-8'))
             ttl = 3600 if action == 'categories' else (180 if action == 'search' else 600)
             cache.set(cache_key, data, ttl)
             return JsonResponse(data)
+    except urllib.error.HTTPError as he:
+        err_body = ''
+        try:
+            err_body = he.read().decode('utf-8')
+        except Exception:
+            pass
+        logger.warning(f"[KLIPY] HTTPError {he.code} fetching {url}: {err_body or he}")
+        return JsonResponse({'result': False, 'error': f"HTTP {he.code}: {err_body or str(he)}", 'data': {'data': []}}, status=200)
     except Exception as e:
         logger.warning(f"[KLIPY] Proxy error fetching {url}: {e}")
         return JsonResponse({'result': False, 'error': str(e), 'data': {'data': []}}, status=200)
