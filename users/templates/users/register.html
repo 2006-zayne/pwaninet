@@ -204,10 +204,11 @@
   /* Academic Picker Sheet & Modal (Clean & Professional, No Badges, No Cartoon Emojis) */
   .academic-picker-modal {
     background-color: transparent;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.25s ease;
+    z-index: 10800 !important;
   }
   .academic-picker-modal.show {
-    background-color: rgba(0, 0, 0, 0.45) !important;
+    background-color: rgba(0, 0, 0, 0.5) !important;
   }
   .academic-picker-modal .modal-content {
     background-color: var(--card-bg, #ffffff) !important;
@@ -218,6 +219,68 @@
   }
   .academic-picker-modal .modal-body {
     -webkit-overflow-scrolling: touch;
+  }
+
+  /* Desktop presentation (>= 576px) */
+  @media (min-width: 576px) {
+    .academic-picker-modal .modal-dialog {
+      max-width: 480px;
+      margin: 1.75rem auto;
+    }
+    .academic-picker-modal .modal-content {
+      border-radius: 16px !important;
+      overflow: hidden;
+      box-shadow: 0 15px 50px rgba(0, 0, 0, 0.25);
+    }
+  }
+
+  /* Mobile Bottom Sheet presentation (< 576px) */
+  @media (max-width: 575.98px) {
+    .academic-picker-modal {
+      padding: 0 !important;
+      overflow: hidden !important;
+    }
+    .academic-picker-modal .modal-dialog {
+      position: fixed !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      min-height: 0 !important;
+      height: auto !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: flex-end !important;
+      align-items: stretch !important;
+      pointer-events: none !important;
+      transform: translateY(100%) !important;
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+    .academic-picker-modal.show .modal-dialog {
+      transform: translateY(0) !important;
+    }
+    .academic-picker-modal .modal-content {
+      position: relative !important;
+      width: 100% !important;
+      margin: 0 !important;
+      border: 0 !important;
+      border-top-left-radius: 20px !important;
+      border-top-right-radius: 20px !important;
+      border-bottom-left-radius: 0 !important;
+      border-bottom-right-radius: 0 !important;
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.35) !important;
+      pointer-events: auto !important;
+      max-height: 82vh !important;
+      max-height: 82dvh !important;
+      overflow: hidden !important;
+    }
+    .academic-picker-modal .modal-body {
+      max-height: calc(82dvh - 125px) !important;
+      overflow-y: auto !important;
+      -webkit-overflow-scrolling: touch;
+    }
   }
 
   .picker-search-bar {
@@ -384,7 +447,7 @@
 
                             {% for field in form %}
                                 <div class="mb-2">
-                                    <label class="form-label fw-semibold small" for="{{ field.id_for_label }}">
+                                    <label class="form-label fw-semibold small"{% if field.name == 'programme' %} for="programmePickerTrigger"{% elif field.name == 'academic_level' %} for="academicLevelPickerTrigger"{% else %} for="{{ field.id_for_label }}"{% endif %}>
                                         {{ field.label }}
                                         {% if field.name == 'username' or field.name == 'password1' or field.name == 'password2' %}
                                             <span class="text-danger">*</span>
@@ -404,7 +467,7 @@
                                                 </span>
                                                 <i class="bi bi-chevron-down picker-chevron ms-2"></i>
                                             </button>
-                                            <div class="visually-hidden">
+                                            <div class="d-none" style="display: none !important;" aria-hidden="true" tabindex="-1">
                                                 {{ field }}
                                             </div>
                                         </div>
@@ -422,7 +485,7 @@
                                                 </span>
                                                 <i class="bi bi-chevron-down picker-chevron ms-2"></i>
                                             </button>
-                                            <div class="visually-hidden">
+                                            <div class="d-none" style="display: none !important;" aria-hidden="true" tabindex="-1">
                                                 {{ field }}
                                             </div>
                                         </div>
@@ -840,8 +903,17 @@
     const academicLevelModalEl = document.getElementById('academicLevelPickerModal');
     const academicLevelItems = document.querySelectorAll('#academicLevelPickerModal .academic-level-option-item');
 
+    function ensureModalInBody(modalEl) {
+        if (modalEl && modalEl.parentElement !== document.body) {
+            document.body.appendChild(modalEl);
+        }
+    }
+    ensureModalInBody(programmeModalEl);
+    ensureModalInBody(academicLevelModalEl);
+
     function openPickerModal(modalEl) {
         if (!modalEl) return;
+        ensureModalInBody(modalEl);
         if (window.bootstrap && window.bootstrap.Modal) {
             try {
                 const inst = window.bootstrap.Modal.getOrCreateInstance(modalEl);
