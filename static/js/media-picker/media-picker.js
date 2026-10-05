@@ -563,14 +563,32 @@
         }
       });
 
-      // 16. Delegate clipboard paste buttons: .composer-clipboard-btn
-      document.addEventListener('click', (e) => {
-        const pasteBtn = e.target.closest('.composer-clipboard-btn, [data-action="paste-clipboard"]');
-        if (pasteBtn) {
-          e.preventDefault();
-          e.stopPropagation();
-          const form = pasteBtn.closest('form') || pasteBtn.closest('.comment-composer') || document;
-          this.pasteImageFromClipboard(form);
+      // 16. Images committed by the Android keyboard (Gboard screenshot chip / clipboard)
+      //     are delivered by the native PwaninetWebView as a window event.
+      document.addEventListener('focusin', (e) => {
+        const t = e.target;
+        if (t && t.closest && t.closest('.composer-input-editable, textarea, input[type="text"]')) {
+          const f = t.closest('form') || t.closest('.comment-composer');
+          if (f) this._lastFocusedComposerForm = f;
+        }
+      });
+      window.addEventListener('pwaninet:native-image-paste', (e) => {
+        const detail = e.detail || {};
+        if (!detail.data) return;
+        try {
+          const mime = detail.mimeType || 'image/png';
+          const bin = atob(detail.data);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          const ext = ((mime.split('/')[1] || 'png').split('+')[0]).replace('jpeg', 'jpg');
+          const file = new File([bytes], `keyboard_${Date.now()}.${ext}`, { type: mime });
+          const active = document.activeElement;
+          const form = (active && active.closest && (active.closest('form') || active.closest('.comment-composer'))) ||
+                       this._lastFocusedComposerForm || this.currentForm ||
+                       document.querySelector('#reelCommentForm, #commentForm, #fsRailCommentForm, .comment-composer, .main-composer');
+          if (form) this.attachLocalImage(file, form);
+        } catch (err) {
+          console.warn('[MediaPicker] Native keyboard image failed:', err);
         }
       });
 
@@ -929,41 +947,6 @@
       if (sendBtn && !val) {
         sendBtn.disabled = true;
       }
-    },
-
-    async pasteImageFromClipboard(form) {
-      if (!form) {
-        form = this.currentForm || 
-               (this.currentTargetInput ? this.currentTargetInput.closest('form, .comment-composer') : null) || 
-               document.querySelector('#reelCommentForm, #commentForm, #fsRailCommentForm, .comment-composer, .main-composer');
-      }
-      if (!form) return false;
-
-      if (navigator.clipboard && typeof navigator.clipboard.read === 'function') {
-        try {
-          const items = await navigator.clipboard.read();
-          for (const item of items) {
-            for (const type of item.types) {
-              if (type.startsWith('image/')) {
-                const blob = await item.getType(type);
-                const ext = (type.split('/')[1] || 'png').split('+')[0];
-                const file = new File([blob], `screenshot_${Date.now()}.${ext}`, { type });
-                this.attachLocalImage(file, form);
-                return true;
-              }
-            }
-          }
-          alert('No image or screenshot found in clipboard. Take a screenshot or copy an image first.');
-          return false;
-        } catch (err) {
-          console.warn('[MediaPicker] Clipboard read error:', err);
-        }
-      }
-
-      alert('Clipboard permission not granted or unsupported. You can also paste directly into the comment box with your keyboard or long-press.');
-      const input = form.querySelector('.composer-input-editable, input[type="text"], textarea');
-      if (input) input.focus();
-      return false;
     },
 
     initPasteSupport() {

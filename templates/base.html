@@ -762,7 +762,7 @@
     <link rel="stylesheet" href="{% static 'css/postcard.css' %}?v={{ app_version }}-{{ app_build }}">
     <link rel="stylesheet" href="{% static 'css/people-modal.css' %}">
     <link rel="stylesheet" href="{% static 'css/comments.css' %}">
-    <link rel="stylesheet" href="{% static 'css/media-picker.css' %}?v={{ app_version }}-{{ app_build }}-20261005-paste1">
+    <link rel="stylesheet" href="{% static 'css/media-picker.css' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2">
     <link rel="stylesheet" href="{% static 'css/profile.css' %}">
     <link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}">
     <link rel="stylesheet" href="{% static 'css/downloads/offline_media_viewer.css' %}">
@@ -832,7 +832,7 @@
     <script defer src="{% static 'js/lazy-load-images.js' %}"></script>
 
     <!-- Video Manager - replaces auto_video_play.js -->
-    <script defer src="{% static 'js/video-manager.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste1"></script>
+    <script defer src="{% static 'js/video-manager.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2"></script>
 
     <!-- Global Audio Manager -->
     <script defer src="{% static 'js/global-audio-manager.js' %}"></script>
@@ -870,10 +870,10 @@
     <script defer src="{% static 'js/whats-new-modal.js' %}"></script>
 
     <!-- Comment System - Phase 2 Threaded Comments -->
-    <script defer src="{% static 'js/comments/comment-api.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste1"></script>
-    <script defer src="{% static 'js/comments/comment-renderer.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste1"></script>
-    <script defer src="{% static 'js/comments/comment-manager.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste1"></script>
-    <script defer src="{% static 'js/media-picker/media-picker.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste1"></script>
+    <script defer src="{% static 'js/comments/comment-api.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2"></script>
+    <script defer src="{% static 'js/comments/comment-renderer.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2"></script>
+    <script defer src="{% static 'js/comments/comment-manager.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2"></script>
+    <script defer src="{% static 'js/media-picker/media-picker.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2"></script>
 
     <script>
         // Synchronously detect standalone PWA mode early to prevent safe area layout shifts
@@ -2468,13 +2468,7 @@
                                          role="textbox"
                                          aria-multiline="false"
                                          data-placeholder="{% trans 'Add a comment...' %}"
-                                         style="font-size: 13px; background-color: var(--search-bg, #ffffff); min-height: 38px; max-height: 120px; overflow-y: auto; padding: 8px 104px 8px 16px;"></div>
-                                    <button type="button" 
-                                            class="btn border-0 p-0 text-muted position-absolute composer-clipboard-btn"
-                                            style="right: 74px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;"
-                                            title="{% trans 'Paste screenshot or photo from clipboard' %}">
-                                        <i class="bi bi-clipboard-plus fs-6"></i>
-                                    </button>
+                                         style="font-size: 13px; background-color: var(--search-bg, #ffffff); min-height: 38px; max-height: 120px; overflow-y: auto; padding: 8px 76px 8px 16px;"></div>
                                     <label class="btn border-0 p-0 text-muted position-absolute mb-0" 
                                            style="right: 44px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer;" 
                                            title="{% trans 'Attach photo as sticker' %}">
@@ -2749,13 +2743,7 @@
                                          role="textbox"
                                          aria-multiline="false"
                                          data-placeholder="{% trans 'Add a comment...' %}"
-                                         style="font-size: 13px; min-height: 38px; max-height: 120px; overflow-y: auto; padding: 8px 104px 8px 16px;"></div>
-                                    <button type="button" 
-                                            class="btn border-0 p-0 text-muted position-absolute composer-clipboard-btn"
-                                            style="right: 74px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;"
-                                            title="{% trans 'Paste screenshot or photo from clipboard' %}">
-                                        <i class="bi bi-clipboard-plus fs-6"></i>
-                                    </button>
+                                         style="font-size: 13px; min-height: 38px; max-height: 120px; overflow-y: auto; padding: 8px 76px 8px 16px;"></div>
                                     <label class="btn border-0 p-0 text-muted position-absolute mb-0" 
                                            style="right: 44px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer;" 
                                            title="{% trans 'Attach photo as sticker' %}">
