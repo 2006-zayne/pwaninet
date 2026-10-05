@@ -82,7 +82,10 @@ jobs:
           fetch-depth: 0
 
       - name: Resolve Version and Checkout Target
+        shell: bash
         run: |
+          set -euo pipefail
+
           if [ -n "${{ inputs.tag_name }}" ]; then
             TAG="${{ inputs.tag_name }}"
             RAW="${TAG#v}"
@@ -90,11 +93,31 @@ jobs:
             TAG="${{ needs.version.outputs.new_release_git_tag }}"
             RAW="${{ needs.version.outputs.new_release_version }}"
           fi
-          echo "TAG_NAME=${TAG}" >> $GITHUB_ENV
-          echo "VERSION_NAME=${RAW}" >> $GITHUB_ENV
-          echo "VERSION_CODE=$(git rev-list --count HEAD)" >> $GITHUB_ENV
+
+          if [ -z "${TAG}" ] || [ -z "${RAW}" ]; then
+            echo "::error::Release tag or version is empty."
+            exit 1
+          fi
+
+          echo "Resolving tag: ${TAG}"
+          if ! git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"; then
+            echo "::error::Tag '${TAG}' does not exist on origin."
+            exit 1
+          fi
+
+          if ! git rev-parse --verify --quiet "refs/tags/${TAG}^{commit}" >/dev/null; then
+            echo "::error::Tag '${TAG}' could not be resolved locally after fetch."
+            exit 1
+          fi
+
+          TAG_COMMIT="$(git rev-parse "refs/tags/${TAG}^{commit}")"
+
+          echo "TAG_NAME=${TAG}" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=${RAW}" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$(git rev-list --count "${TAG_COMMIT}")" >> "$GITHUB_ENV"
+
           echo "Building APK for Tag: ${TAG}, Version: ${RAW}"
-          git checkout "${TAG}"
+          git checkout --detach "${TAG_COMMIT}"
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
