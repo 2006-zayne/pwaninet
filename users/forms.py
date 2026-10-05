@@ -1,5 +1,5 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, UsernameField
 from users.models import User, CollaborationStatus
 from courses.models import Year
 from documents.academic.models import Programme, AcademicLevel, AcademicYear, Semester
@@ -28,7 +28,14 @@ class PwaniSignupForm(UserCreationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.fields['username'].widget.attrs['placeholder'] = 'Choose a username'
+        self.fields['username'].label = 'Username or email'
+        self.fields['username'].widget.attrs['placeholder'] = 'Choose a username or enter your email'
+        self.fields['username'].widget.attrs['autocomplete'] = 'username email'
+        self.fields['username'].widget.attrs['autocapitalize'] = 'none'
+        self.fields['username'].widget.attrs['autocorrect'] = 'off'
+        self.fields['username'].widget.attrs['spellcheck'] = 'false'
+        self.fields['username'].help_text = 'You can sign in using your username or email.'
+
         self.fields['first_name'].widget.attrs['placeholder'] = 'Enter your first name (optional)'
         self.fields['second_name'].widget.attrs['placeholder'] = 'Enter your middle name (optional)'
         self.fields['last_name'].widget.attrs['placeholder'] = 'Enter your last name (optional)'
@@ -44,8 +51,105 @@ class PwaniSignupForm(UserCreationForm):
         self.fields['academic_level'].queryset = AcademicLevel.objects.filter(is_active=True).order_by('level')
         self.fields['programme'].queryset = Programme.objects.filter(is_active=True).order_by('name')
 
+    def clean_username(self):
+        """
+        Accept either a username or an email address in the single identifier field:
+        - If input contains '@', treat as email: validate email format, enforce uniqueness,
+          store in self.cleaned_email, and derive a unique, clean campus handle for user.username.
+        - If input does not contain '@' (or is a leading '@handle'), treat as username: validate
+          allowed characters/length, enforce uniqueness, and set self.cleaned_email = ''.
+        """
+        raw_val = self.cleaned_data.get('username')
+        if not raw_val:
+            raise forms.ValidationError("Please enter a username or email address.")
+
+        raw_identifier = raw_val.strip()
+
+        # Handle user typing '@handle' (e.g. '@zayne') instead of email
+        if raw_identifier.startswith('@') and raw_identifier.count('@') == 1 and '.' not in raw_identifier:
+            raw_identifier = raw_identifier.lstrip('@')
+
+        # Scenario 1: Email entered (contains '@')
+        if '@' in raw_identifier:
+            from django.core.validators import validate_email
+            try:
+                validate_email(raw_identifier)
+            except forms.ValidationError:
+                raise forms.ValidationError("Please enter a valid email address or username.")
+
+            clean_email = raw_identifier.lower()
+
+            # Enforce case-insensitive email uniqueness
+            email_qs = User.objects.filter(email__iexact=clean_email)
+            if self.instance and self.instance.pk:
+                email_qs = email_qs.exclude(pk=self.instance.pk)
+            if email_qs.exists():
+                raise forms.ValidationError("An account with this email address already exists. Please sign in.")
+
+            # Also ensure this email string isn't already taken as a username
+            user_qs = User.objects.filter(username__iexact=clean_email)
+            if self.instance and self.instance.pk:
+                user_qs = user_qs.exclude(pk=self.instance.pk)
+            if user_qs.exists():
+                raise forms.ValidationError("An account with this email address already exists. Please sign in.")
+
+            # Derive a clean, valid campus handle from the email's local part
+            import re
+            local_part = clean_email.split('@')[0]
+            clean_base = re.sub(r'[^a-zA-Z0-9_.]', '_', local_part).strip('._')
+            if not clean_base or len(clean_base) < 3:
+                clean_base = f"user_{clean_base}" if clean_base else "user"
+            clean_base = clean_base[:25]
+
+            # Find a unique username candidate
+            candidate = clean_base
+            counter = 1
+            while User.objects.filter(username__iexact=candidate).exists():
+                candidate = f"{clean_base}{counter}"
+                counter += 1
+
+            self.cleaned_email = clean_email
+            return candidate
+
+        # Scenario 2: Username entered (no '@')
+        import re
+        username = raw_identifier
+
+        if len(username) < 3:
+            raise forms.ValidationError("Username must be at least 3 characters long.")
+        if len(username) > 30:
+            raise forms.ValidationError("Username cannot exceed 30 characters.")
+        if not re.match(r'^[a-zA-Z0-9_.]+$', username):
+            raise forms.ValidationError("Usernames can only contain letters, numbers, underscores, and periods.")
+        if username.startswith('.') or username.endswith('.'):
+            raise forms.ValidationError("Username cannot start or end with a period.")
+        if '..' in username:
+            raise forms.ValidationError("Username cannot contain consecutive periods.")
+
+        # Check case-insensitive uniqueness against existing usernames
+        qs = User.objects.filter(username__iexact=username)
+        if self.instance and self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError("A user with this username already exists.")
+
+        # Check against existing emails
+        email_qs = User.objects.filter(email__iexact=username)
+        if self.instance and self.instance.pk:
+            email_qs = email_qs.exclude(pk=self.instance.pk)
+        if email_qs.exists():
+            raise forms.ValidationError("This username is already registered as an account email.")
+
+        self.cleaned_email = ''
+        return username
+
     def save(self, commit=True):
         user = super().save(commit=False)
+
+        if hasattr(self, 'cleaned_email') and self.cleaned_email:
+            user.email = self.cleaned_email
+        else:
+            user.email = ''
 
         current_year = AcademicYear.objects.filter(is_current=True).first()
         current_semester = Semester.objects.filter(is_current=True).first()
@@ -73,17 +177,33 @@ class PwaniSignupForm(UserCreationForm):
             user.save()
         return user
 
-    def clean_username(self):
-        """Clean username by stripping whitespace and checking uniqueness case-insensitively."""
-        username = self.cleaned_data.get('username')
-        if username:
-            username = username.strip()
-            qs = User.objects.filter(username__iexact=username)
-            if self.instance and self.instance.pk:
-                qs = qs.exclude(pk=self.instance.pk)
-            if qs.exists():
-                raise forms.ValidationError("A user with this username already exists.")
-        return username
+
+class PwaniAuthenticationForm(AuthenticationForm):
+    """
+    Authentication form allowing users to sign in with either their
+    username (e.g. '@zayne' or 'zayne') or their registered email address.
+    """
+    username = UsernameField(
+        label="Username or email",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control tactical-form-input',
+            'placeholder': 'Enter your username or email',
+            'autocapitalize': 'none',
+            'autocorrect': 'off',
+            'spellcheck': 'false',
+            'autocomplete': 'username email',
+            'autofocus': True,
+        })
+    )
+    password = forms.CharField(
+        label="Password",
+        strip=False,
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control tactical-form-input',
+            'placeholder': 'Enter your password',
+            'autocomplete': 'current-password',
+        })
+    )
 
 
 class ProfileUpdateForm(forms.ModelForm):

@@ -24,20 +24,33 @@ class CaseInsensitiveAuthBackend(ModelBackend):
         if not clean_username:
             return None
 
-        user = None
-        # If user entered an email address, try matching by email first
-        if '@' in clean_username:
-            user = UserModel.objects.filter(email__iexact=clean_username).first()
-            if user:
-                logger.info(f"[AUTH-BACKEND] Found user by email: '{user.username}' (email='{clean_username}')")
+        # Normalize handle if user typed '@handle' (e.g. '@zayne')
+        lookup_identifier = clean_username
+        if lookup_identifier.startswith('@') and lookup_identifier.count('@') == 1 and '.' not in lookup_identifier:
+            lookup_identifier = lookup_identifier.lstrip('@')
 
-        # Fallback or primary check: case-insensitive username lookup
-        if user is None:
-            user = UserModel.objects.filter(username__iexact=clean_username).first()
+        user = None
+        # If input looks like an email address, try matching by email first
+        if '@' in lookup_identifier:
+            user = UserModel.objects.filter(email__iexact=lookup_identifier).first()
             if user:
-                msg = f"[AUTH-BACKEND] Found user by case-insensitive username: '{user.username}' (input='{clean_username}')"
+                logger.info(f"[AUTH-BACKEND] Found user by email: '{user.username}' (email='{lookup_identifier}')")
+
+        # Case-insensitive username lookup
+        if user is None:
+            user = UserModel.objects.filter(username__iexact=lookup_identifier).first()
+            if user:
+                msg = f"[AUTH-BACKEND] Found user by case-insensitive username: '{user.username}' (input='{lookup_identifier}')"
                 print(msg, flush=True)
                 logger.info(msg)
+
+        # Fallback email lookup (if user identifier matches email)
+        if user is None and '@' not in lookup_identifier:
+            user = UserModel.objects.filter(email__iexact=lookup_identifier).first()
+
+        # Fallback to unstripped clean_username
+        if user is None and lookup_identifier != clean_username:
+            user = UserModel.objects.filter(username__iexact=clean_username).first()
 
         if user is None:
             msg = f"[AUTH-BACKEND] No user found matching identifier '{clean_username}'"

@@ -254,6 +254,113 @@ class RegistrationTest(TestCase):
         # Test leading/trailing spaces match
         self.assertEqual(authenticate(request, username='  JohnDoe  ', password='SecretPassword123!'), user)
 
+        # Test login via handle starting with '@'
+        self.assertEqual(authenticate(request, username='@JohnDoe', password='SecretPassword123!'), user)
+        self.assertEqual(authenticate(request, username='@johndoe', password='SecretPassword123!'), user)
+
+    def test_signup_with_email_derives_handle_and_saves_email(self):
+        """Test that entering an email in the identifier field saves email and derives unique handle"""
+        form_data = {
+            'username': 'student.hero@pu.ac.ke',
+            'password1': 'SecurePass123!',
+            'password2': 'SecurePass123!',
+            'first_name': 'Campus',
+            'last_name': 'Student',
+            'course': self.course.id,
+            'year': self.year.id,
+        }
+        form = PwaniSignupForm(data=form_data)
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+        self.assertEqual(user.email, 'student.hero@pu.ac.ke')
+        self.assertEqual(user.username, 'student.hero')
+
+    def test_signup_with_email_collision_suffixes_counter(self):
+        """Test that if derived handle already exists, a numeric suffix is appended"""
+        User.objects.create_user(
+            username='student.hero',
+            course=self.course,
+            year=self.year,
+            password='testpass123'
+        )
+        form_data = {
+            'username': 'student.hero@gmail.com',
+            'password1': 'SecurePass123!',
+            'password2': 'SecurePass123!',
+            'first_name': 'Another',
+            'last_name': 'Student',
+            'course': self.course.id,
+            'year': self.year.id,
+        }
+        form = PwaniSignupForm(data=form_data)
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+        self.assertEqual(user.email, 'student.hero@gmail.com')
+        self.assertEqual(user.username, 'student.hero1')
+
+    def test_signup_with_duplicate_email_rejected(self):
+        """Test that duplicate email registration is rejected case-insensitively"""
+        User.objects.create_user(
+            username='existinguser',
+            email='campus@pu.ac.ke',
+            course=self.course,
+            year=self.year,
+            password='testpass123'
+        )
+        form_data = {
+            'username': 'CAMPUS@PU.AC.KE',
+            'password1': 'SecurePass123!',
+            'password2': 'SecurePass123!',
+            'first_name': 'Duplicate',
+            'last_name': 'User',
+            'course': self.course.id,
+            'year': self.year.id,
+        }
+        form = PwaniSignupForm(data=form_data)
+        self.assertFalse(form.is_valid())
+        self.assertIn('username', form.errors)
+
+    def test_signup_with_leading_at_handle(self):
+        """Test that entering '@handle' strips the leading '@' cleanly"""
+        form_data = {
+            'username': '@leadcoder',
+            'password1': 'SecurePass123!',
+            'password2': 'SecurePass123!',
+            'first_name': 'Lead',
+            'last_name': 'Coder',
+            'course': self.course.id,
+            'year': self.year.id,
+        }
+        form = PwaniSignupForm(data=form_data)
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+        self.assertEqual(user.username, 'leadcoder')
+        self.assertEqual(user.email, '')
+
+    def test_case_insensitive_auth_backend_with_email(self):
+        """Test CaseInsensitiveAuthBackend authenticates via email in all variations"""
+        from django.contrib.auth import authenticate
+        from django.test import RequestFactory
+        factory = RequestFactory()
+        request = factory.post('/accounts/login/')
+        user = User.objects.create_user(
+            username='CampusHero',
+            email='hero@pu.ac.ke',
+            course=self.course,
+            year=self.year,
+            password='SecretPassword123!'
+        )
+        # Email exact
+        self.assertEqual(authenticate(request, username='hero@pu.ac.ke', password='SecretPassword123!'), user)
+        # Email uppercase
+        self.assertEqual(authenticate(request, username='HERO@PU.AC.KE', password='SecretPassword123!'), user)
+        # Email with surrounding whitespace
+        self.assertEqual(authenticate(request, username='  hero@pu.ac.ke  ', password='SecretPassword123!'), user)
+        # Username fallback
+        self.assertEqual(authenticate(request, username='campushero', password='SecretPassword123!'), user)
+        # Handle with @ prefix
+        self.assertEqual(authenticate(request, username='@campushero', password='SecretPassword123!'), user)
+
 
 class EmailVerificationTest(TestCase):
     """Test cases for email verification"""

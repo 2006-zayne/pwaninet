@@ -17,7 +17,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.db.models import Q
 from users.models import User, Follow, DeviceAccount, Pinch, UserSession, Block, HiddenAuthor, PrivacyLevel, PRIVACY_CHOICES, HeroShowcaseSet
 from posts.models import Post, Like, Repost
-from users.forms import PwaniSignupForm, ProfileUpdateForm
+from users.forms import PwaniSignupForm, PwaniAuthenticationForm, ProfileUpdateForm
 from django.contrib import messages
 from django.utils.translation import gettext_lazy as _
 from django.db import transaction
@@ -101,8 +101,8 @@ def register_view(request):
                     except Exception as e:
                         logger.warning(f"Error processing invite conversion: {e}")
 
-                request.session['registered_username'] = user.username
-                messages.success(request, f"Welcome @{user.username}! Your account has been created successfully. Please log in.")
+                request.session['registered_username'] = user.email or user.username
+                messages.success(request, f"Welcome to PwaniNet, @{user.username}! Your account has been created successfully. Sign in using your username or email.")
                 return redirect('login')
             else:
                 msg_warn = f"[AUTH-REGISTER] Validation failed for username='{submitted_username}', IP={ip}. Errors: {form.errors.as_json()}"
@@ -145,6 +145,14 @@ class PwaniLoginView(LoginView):
     4. Phase 3: 2FA challenge interception for enrolled users.
     """
     template_name = 'registration/login.html'
+    form_class = PwaniAuthenticationForm
+
+    def get_initial(self):
+        initial = super().get_initial()
+        reg_identifier = self.request.session.get('registered_username')
+        if reg_identifier:
+            initial['username'] = reg_identifier
+        return initial
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -204,7 +212,7 @@ class PwaniLoginView(LoginView):
 
         context_extra = {
             'attempted_username': username,
-            'login_error_message': 'Invalid username or password. Please check your credentials and try again.',
+            'login_error_message': 'Invalid username, email, or password. Please check your credentials and try again.',
         }
 
         return self.render_to_response(self.get_context_data(form=form, **context_extra))

@@ -260,12 +260,12 @@
             // Add placeholders based on field name if not already present
             if (input.id === 'id_username') {
                 if (!input.getAttribute('placeholder')) {
-                    input.setAttribute('placeholder', 'Enter your username');
+                    input.setAttribute('placeholder', 'Enter your username or email');
                 }
                 input.setAttribute('autocapitalize', 'none');
                 input.setAttribute('autocorrect', 'off');
                 input.setAttribute('spellcheck', 'false');
-                input.setAttribute('autocomplete', 'username');
+                input.setAttribute('autocomplete', 'username email');
                 {% if request.session.registered_username %}
                 if (!input.value) {
                     input.value = "{{ request.session.registered_username|escapejs }}";
