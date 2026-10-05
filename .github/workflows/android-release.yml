@@ -20,6 +20,10 @@ on:
 permissions:
   contents: write     # needed to push tags and create releases
 
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # ─────────────────────────────────────────────────────────────────────────
   # Step 1: Determine next semantic version from conventional commit messages
@@ -193,4 +197,3 @@ jobs:
                 \"prerelease\": false
               }
             }" || true
-
