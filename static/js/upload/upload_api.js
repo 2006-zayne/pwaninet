@@ -30,20 +30,30 @@ class UploadAPI {
      * @returns {string}
      */
     getCSRFToken() {
-        // Try meta tag first
-        const metaTag = document.querySelector('meta[name="csrf-token"]');
-        if (metaTag) {
-            return metaTag.getAttribute('content');
+        if (typeof document === 'undefined') {
+            return '';
         }
 
-        // Try cookie
-        const cookies = document.cookie.split(';');
-        for (const cookie of cookies) {
-            const [name, value] = cookie.trim().split('=');
-            if (name === 'csrftoken') {
-                return decodeURIComponent(value);
+        // Try meta tag first
+        try {
+            const metaTag = document.querySelector('meta[name="csrf-token"]') || document.querySelector('[name=csrfmiddlewaretoken]');
+            if (metaTag) {
+                return metaTag.getAttribute('content') || metaTag.value || '';
             }
-        }
+        } catch (_) {}
+
+        // Try cookie
+        try {
+            if (document.cookie) {
+                const cookies = document.cookie.split(';');
+                for (const cookie of cookies) {
+                    const [name, value] = cookie.trim().split('=');
+                    if (name === 'csrftoken') {
+                        return decodeURIComponent(value);
+                    }
+                }
+            }
+        } catch (_) {}
 
         return '';
     }

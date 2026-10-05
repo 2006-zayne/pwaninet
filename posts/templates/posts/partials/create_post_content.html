@@ -1539,12 +1539,19 @@ function initCreatePostComposer() {
       }
 
       if (window.uploadManager?.createDraftPreviews) {
-        const previews = await window.uploadManager.createDraftPreviews(draftPreviewId, files);
-        mediaFiles = previews.map((preview) => ({
-          type: preview.type === 'document' ? 'docs' : preview.type,
-          file: preview.file,
-          url: preview.url,
-        }));
+        try {
+          const previews = await window.uploadManager.createDraftPreviews(draftPreviewId, files);
+          mediaFiles = previews.map((preview) => ({
+            type: preview.type === 'document' ? 'docs' : preview.type,
+            file: preview.file,
+            url: preview.url || (preview.file ? URL.createObjectURL(preview.file) : null),
+          }));
+        } catch (e) {
+          console.warn('[rebuildPreviews] uploadManager draft error, falling back to object URLs:', e);
+          mediaFiles = mediaFiles.map(m => ({ ...m, url: m.url || (m.file ? URL.createObjectURL(m.file) : null) }));
+        }
+      } else {
+        mediaFiles = mediaFiles.map(m => ({ ...m, url: m.url || (m.file ? URL.createObjectURL(m.file) : null) }));
       }
 
       if (currentMediaIndex >= mediaFiles.length) {
