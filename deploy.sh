@@ -29,20 +29,17 @@ if [ "$OLD_HEAD" = "$NEW_HEAD" ]; then
     echo "[i] Already up to date. Proceeding with service refresh check."
 fi
 
-# 3. Check if rebuild is necessary
-REBUILD_NEEDED=false
-if [ "$OLD_HEAD" != "$NEW_HEAD" ]; then
-    CHANGED_FILES=$(git diff --name-only "$OLD_HEAD" "$NEW_HEAD")
-    if echo "$CHANGED_FILES" | grep -Eq 'requirements\.txt|Dockerfile'; then
-        REBUILD_NEEDED=true
-    fi
+FORCE_REBUILD=false
+if [ "${1:-}" = "--force" ] || [ "${1:-}" = "-f" ]; then
+    FORCE_REBUILD=true
 fi
 
-if [ "$REBUILD_NEEDED" = true ]; then
-    echo "[2/6] Dependency or Dockerfile change detected. Rebuilding container images..."
+# 3. Build container images on code updates (Docker layer cache makes code-only builds take ~1-2s)
+if [ "$OLD_HEAD" != "$NEW_HEAD" ] || [ "$FORCE_REBUILD" = true ]; then
+    echo "[2/6] Code updates detected. Building fresh container images..."
     docker compose -f "$COMPOSE_FILE" build web celery_worker
 else
-    echo "[2/6] No dependency changes detected. Skipping container rebuild."
+    echo "[2/6] No code changes detected. Rebuild skipped (use --force to override)."
 fi
 
 # 4. Database Migrations
@@ -55,13 +52,9 @@ echo "[4/6] Collecting static assets..."
 docker compose -f "$COMPOSE_FILE" exec -T web python manage.py collectstatic --noinput || \
 docker compose -f "$COMPOSE_FILE" run --rm web python manage.py collectstatic --noinput
 
-# 6. Recreate / Restart Services
+# 6. Recreate Services with Updated Image
 echo "[5/6] Refreshing web and celery services..."
-if [ "$REBUILD_NEEDED" = true ]; then
-    docker compose -f "$COMPOSE_FILE" up -d --force-recreate web celery_worker
-else
-    docker compose -f "$COMPOSE_FILE" restart web celery_worker
-fi
+docker compose -f "$COMPOSE_FILE" up -d --force-recreate web celery_worker
 
 # 7. System Health Status
 echo "[6/6] Verifying service statuses..."
