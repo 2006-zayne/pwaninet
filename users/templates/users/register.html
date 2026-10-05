@@ -202,6 +202,13 @@
   }
 
   /* Academic Picker Sheet & Modal (Clean & Professional, No Badges, No Cartoon Emojis) */
+  .academic-picker-modal {
+    background-color: transparent;
+    transition: background-color 0.2s ease;
+  }
+  .academic-picker-modal.show {
+    background-color: rgba(0, 0, 0, 0.45) !important;
+  }
   .academic-picker-modal .modal-content {
     background-color: var(--card-bg, #ffffff) !important;
   }
@@ -833,27 +840,99 @@
     const academicLevelModalEl = document.getElementById('academicLevelPickerModal');
     const academicLevelItems = document.querySelectorAll('#academicLevelPickerModal .academic-level-option-item');
 
-    function getModal(el) {
-        if (!el) return null;
+    function openPickerModal(modalEl) {
+        if (!modalEl) return;
         if (window.bootstrap && window.bootstrap.Modal) {
-            return window.bootstrap.Modal.getInstance(el) || window.bootstrap.Modal.getOrCreateInstance(el);
+            try {
+                const inst = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+                inst.show();
+                return;
+            } catch (err) {
+                console.warn('[Picker] Bootstrap modal show failed, using fallback:', err);
+            }
         }
-        return null;
+        modalEl.classList.add('show');
+        modalEl.style.display = 'block';
+        modalEl.removeAttribute('aria-hidden');
+        modalEl.setAttribute('aria-modal', 'true');
+        document.body.classList.add('modal-open');
     }
 
-    function closeModal(el) {
-        const modal = getModal(el);
-        if (modal) {
-            modal.hide();
-        } else {
-            const closeBtn = el.querySelector('[data-bs-dismiss="modal"]');
+    function closePickerModal(modalEl) {
+        if (!modalEl) return;
+        let closedViaBootstrap = false;
+        if (window.bootstrap && window.bootstrap.Modal) {
+            try {
+                const inst = window.bootstrap.Modal.getInstance(modalEl);
+                if (inst) {
+                    inst.hide();
+                    closedViaBootstrap = true;
+                }
+            } catch (err) {
+                console.warn('[Picker] Bootstrap modal hide failed:', err);
+            }
+        }
+        if (!closedViaBootstrap) {
+            const closeBtn = modalEl.querySelector('[data-bs-dismiss="modal"]');
             if (closeBtn) closeBtn.click();
+            modalEl.classList.remove('show');
+            modalEl.style.display = 'none';
+            modalEl.setAttribute('aria-hidden', 'true');
+            modalEl.removeAttribute('aria-modal');
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
         }
     }
+
+    // Explicit click triggers with propagation stopping to prevent dismissal by document listener
+    if (programmeTrigger) {
+        programmeTrigger.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            openPickerModal(programmeModalEl);
+        });
+    }
+
+    if (academicLevelTrigger) {
+        academicLevelTrigger.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            openPickerModal(academicLevelModalEl);
+        });
+    }
+
+    // Dismissal when tapping outside the modal content or clicking close buttons
+    [programmeModalEl, academicLevelModalEl].forEach(function(modalEl) {
+        if (!modalEl) return;
+        modalEl.addEventListener('click', function(e) {
+            if (e.target === modalEl || e.target.classList.contains('modal-dialog')) {
+                closePickerModal(modalEl);
+            }
+        });
+        modalEl.querySelectorAll('[data-bs-dismiss="modal"]').forEach(function(closeBtn) {
+            closeBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                closePickerModal(modalEl);
+            });
+        });
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            if (programmeModalEl && (programmeModalEl.classList.contains('show') || programmeModalEl.style.display === 'block')) {
+                closePickerModal(programmeModalEl);
+            }
+            if (academicLevelModalEl && (academicLevelModalEl.classList.contains('show') || academicLevelModalEl.style.display === 'block')) {
+                closePickerModal(academicLevelModalEl);
+            }
+        }
+    });
 
     function syncOptionSelection(items, selectedId) {
         items.forEach(function(item) {
-            const itemId = item.getAttribute('data-id') || '';
+            const itemId = (item.getAttribute('data-id') || '').trim();
             const checkIcon = item.querySelector('.picker-check-icon');
             const isMatch = (selectedId !== '' && itemId === selectedId);
             item.classList.toggle('is-selected', isMatch);
@@ -897,8 +976,8 @@
         if (currentVal) {
             const matchItem = document.querySelector(`#programmePickerModal .programme-option-item[data-id="${currentVal}"]`);
             if (matchItem) {
-                displayText = matchItem.getAttribute('data-name') || matchItem.textContent.trim();
-            } else if (programmeSelect.selectedIndex >= 0) {
+                displayText = matchItem.getAttribute('data-name') || matchItem.querySelector('.picker-row-title')?.textContent.trim() || matchItem.textContent.trim();
+            } else if (programmeSelect.selectedIndex >= 0 && programmeSelect.options[programmeSelect.selectedIndex]) {
                 displayText = programmeSelect.options[programmeSelect.selectedIndex].text;
             }
         }
@@ -923,8 +1002,8 @@
         if (currentVal) {
             const matchItem = document.querySelector(`#academicLevelPickerModal .academic-level-option-item[data-id="${currentVal}"]`);
             if (matchItem) {
-                displayText = matchItem.getAttribute('data-name') || matchItem.textContent.trim();
-            } else if (academicLevelSelect.selectedIndex >= 0) {
+                displayText = matchItem.getAttribute('data-name') || matchItem.querySelector('.picker-row-title')?.textContent.trim() || matchItem.textContent.trim();
+            } else if (academicLevelSelect.selectedIndex >= 0 && academicLevelSelect.options[academicLevelSelect.selectedIndex]) {
                 displayText = academicLevelSelect.options[academicLevelSelect.selectedIndex].text;
             }
         }
@@ -952,21 +1031,22 @@
         }
     }
 
-    // Re-sync if select values change externally or via HTMX
+    // Re-sync if select values change externally
     if (programmeSelect) {
         programmeSelect.addEventListener('change', syncProgrammeDisplay);
     }
     if (academicLevelSelect) {
         academicLevelSelect.addEventListener('change', syncAcademicLevelDisplay);
     }
-    document.addEventListener('htmx:afterSwap', function(evt) {
-        if (evt.detail && evt.detail.target && evt.detail.target.id === 'id_academic_level') {
-            syncAcademicLevelDisplay();
-        }
-    });
 
-    // Auto-focus search input when Programme modal opens on desktop
+    // Auto-focus search input when Programme modal opens on desktop & reset query
     if (programmeModalEl) {
+        programmeModalEl.addEventListener('show.bs.modal', function() {
+            if (programmeSearchInput && programmeSearchInput.value) {
+                programmeSearchInput.value = '';
+                programmeSearchInput.dispatchEvent(new Event('input'));
+            }
+        });
         programmeModalEl.addEventListener('shown.bs.modal', function() {
             if (window.innerWidth >= 576 && programmeSearchInput) {
                 programmeSearchInput.focus();
@@ -985,7 +1065,7 @@
             }
 
             programmeItems.forEach(function(item) {
-                const itemId = item.getAttribute('data-id') || '';
+                const itemId = (item.getAttribute('data-id') || '').trim();
                 if (itemId === '') {
                     item.style.display = (query === '') ? '' : 'none';
                     return;
@@ -1014,11 +1094,26 @@
 
     // Programme option selection
     programmeItems.forEach(function(item) {
-        function chooseProgramme() {
-            const progId = item.getAttribute('data-id') || '';
+        function chooseProgramme(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            const progId = (item.getAttribute('data-id') || '').trim();
+            const progName = (item.getAttribute('data-name') || item.querySelector('.picker-row-title')?.textContent || '').trim();
 
             if (programmeSelect) {
                 programmeSelect.value = progId;
+                if (progId && programmeSelect.value !== progId) {
+                    let opt = programmeSelect.querySelector(`option[value="${progId}"]`);
+                    if (!opt) {
+                        opt = document.createElement('option');
+                        opt.value = progId;
+                        opt.textContent = progName;
+                        programmeSelect.appendChild(opt);
+                    }
+                    programmeSelect.value = progId;
+                }
                 programmeSelect.dispatchEvent(new Event('change', { bubbles: true }));
             }
 
@@ -1027,37 +1122,52 @@
             const duration = parseInt(item.getAttribute('data-duration') || '0', 10);
             filterAcademicLevelsByDuration(duration);
 
-            closeModal(programmeModalEl);
+            closePickerModal(programmeModalEl);
         }
 
         item.addEventListener('click', chooseProgramme);
         item.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                chooseProgramme();
+                chooseProgramme(e);
             }
         });
     });
 
     // Academic level option selection
     academicLevelItems.forEach(function(item) {
-        function chooseLevel() {
-            const levelId = item.getAttribute('data-id') || '';
+        function chooseLevel(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            const levelId = (item.getAttribute('data-id') || '').trim();
+            const levelName = (item.getAttribute('data-name') || item.querySelector('.picker-row-title')?.textContent || '').trim();
 
             if (academicLevelSelect) {
                 academicLevelSelect.value = levelId;
+                if (levelId && academicLevelSelect.value !== levelId) {
+                    let opt = academicLevelSelect.querySelector(`option[value="${levelId}"]`);
+                    if (!opt) {
+                        opt = document.createElement('option');
+                        opt.value = levelId;
+                        opt.textContent = levelName;
+                        academicLevelSelect.appendChild(opt);
+                    }
+                    academicLevelSelect.value = levelId;
+                }
                 academicLevelSelect.dispatchEvent(new Event('change', { bubbles: true }));
             }
 
             syncAcademicLevelDisplay();
-            closeModal(academicLevelModalEl);
+            closePickerModal(academicLevelModalEl);
         }
 
         item.addEventListener('click', chooseLevel);
         item.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                chooseLevel();
+                chooseLevel(e);
             }
         });
     });

@@ -15,8 +15,6 @@ class PwaniSignupForm(UserCreationForm):
 
         widgets = {
             'programme': forms.Select(attrs={
-                'hx-get': '/documents/academic/load-levels/',
-                'hx-target': '#id_academic_level',
                 'class': 'form-control',
                 'id': 'id_programme',
                 'data-searchable': 'true'
@@ -56,6 +54,20 @@ class PwaniSignupForm(UserCreationForm):
             user.academic_year = current_year
         if current_semester:
             user.semester = current_semester
+
+        # Sync legacy academic fields for backward compatibility with feed/post filters
+        if user.programme:
+            try:
+                from courses.models import Course, Year
+                matching_course = Course.objects.filter(name__iexact=user.programme.name).first()
+                if matching_course:
+                    user.course = matching_course
+                    if user.academic_level:
+                        matching_year = Year.objects.filter(course=matching_course, level=user.academic_level.level).first()
+                        if matching_year:
+                            user.year = matching_year
+            except Exception:
+                pass
 
         if commit:
             user.save()

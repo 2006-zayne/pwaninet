@@ -3135,12 +3135,16 @@
 
         // Handle click-outside-to-dismiss since backdrop has pointer-events: none
         document.addEventListener('click', function(e) {
+            // Do not dismiss if clicking a modal trigger or toggle button
+            if (e.target.closest('[data-bs-toggle="modal"], [data-bs-target], .picker-trigger, [data-action="open-comments"]')) {
+                return;
+            }
             const openModal = document.querySelector('.modal.show');
             if (openModal) {
                 const modalContent = openModal.querySelector('.modal-content');
                 if (modalContent && !modalContent.contains(e.target)) {
                     // Click is outside modal content, close it
-                    const modalInstance = bootstrap.Modal.getInstance(openModal);
+                    const modalInstance = (typeof bootstrap !== 'undefined' && bootstrap.Modal) ? bootstrap.Modal.getInstance(openModal) : null;
                     if (modalInstance) {
                         modalInstance.hide();
                     }
