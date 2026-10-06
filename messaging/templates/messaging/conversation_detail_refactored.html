@@ -1,109 +1,776 @@
 {% extends 'base.html' %}
 {% load static %}
+
+{% block html_class %}in-conversation-active{% endblock %}
+{% block body_class %}in-conversation-active{% endblock %}
+
+{% block header %}{% endblock %}
+{% block left_rail %}{% endblock %}
+{% block context_rail %}{% endblock %}
+{% block mobile_bottom_nav %}{% endblock %}
+
 {% block content %}
 <link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}">
 <link rel="stylesheet" href="{% static 'css/chat_theme.css' %}">
 <link rel="stylesheet" href="{% static 'css/messaging/media-composer.css' %}">
 <link rel="stylesheet" href="{% static 'css/chat/telegram-media.css' %}">
+<script>
+  document.documentElement.classList.add('in-conversation-active');
+  document.body.classList.add('in-conversation-active');
+  try {
+    if (localStorage.getItem('messaging_left_rail_collapsed') === 'true') {
+      document.documentElement.classList.add('messaging-left-collapsed');
+      document.body.classList.add('messaging-left-collapsed');
+    }
+  } catch (e) {}
+</script>
 
-
-<div class="chat-container d-flex flex-column" style="height: 100vh;" data-conversation-id="{{ conversation.id }}"
-  data-user-id="{{ request.user.id }}" data-is-encrypted="false">
-  <div class="chat-header" data-conversation-id="{{ conversation.id }}">
-    <a href="{% url 'messaging:conversation_list' %}" class="text-decoration-none" style="color: var(--text-primary);">
-      <i class="bi bi-arrow-left" style="font-size: 20px;"></i>
-    </a>
-    <div class="position-relative">
-      {% if conversation.type == 'group' %}
-      <div class="chat-avatar bg-primary d-flex align-items-center justify-content-center">
-        <i class="bi bi-people-fill text-white"></i>
-      </div>
-      {% else %}
-      {% for member in conversation.members.all %}
-      {% if member.user != request.user %}
-      <a href="/users/user/{{ member.user.username }}/" class="text-decoration-none">
-        {% if member.user.profile_pic %}
-        <img src="{{ member.user.profile_pic.url }}" class="chat-avatar">
-        {% else %}
-        <div class="chat-avatar bg-secondary d-flex align-items-center justify-content-center">
-          <i class="bi bi-person-fill text-white"></i>
+<div class="whatsapp-layout" id="whatsappLayout">
+  <!-- 1. LEFT CONVERSATIONS RAIL (PwaniMate/WhatsApp style) -->
+  <aside class="whatsapp-left-rail d-none d-lg-flex flex-column position-relative" id="whatsappLeftRail">
+    <!-- EXPANDED STATE (320px) -->
+    <div class="p-3 d-flex flex-column messaging-left-rail-expanded" style="height: 100%; overflow: hidden;">
+      <!-- Header Tools & Collapse Toggle -->
+      <div class="d-flex flex-column gap-2 mb-3 pb-3 border-bottom flex-shrink-0">
+        <div class="d-flex align-items-center justify-content-between">
+          <a href="{% url 'posts:home' %}"
+             class="btn btn-outline-secondary btn-sm rounded-pill d-flex align-items-center px-3"
+             data-bypass-htmx="true"
+             hx-boost="false"
+             title="Back to PwaniNet">
+            <i class="bi bi-box-arrow-left me-1"></i> <span class="small">PwaniNet</span>
+          </a>
+          <button type="button"
+                  class="messaging-collapse-toggle-btn"
+                  id="messagingLeftRailCollapseBtn"
+                  onclick="toggleMessagingLeftRail(true);"
+                  title="Collapse sidebar"
+                  aria-label="Collapse sidebar">
+            <i class="bi bi-layout-sidebar-inset"></i>
+          </button>
         </div>
-        {% endif %}
-      </a>
-      {% endif %}
-      {% endfor %}
-      {% endif %}
-    </div>
-    <div class="flex-grow-1">
-      <div class="chat-username">
-        {% if conversation.type == 'group' and conversation.name %}
-        {{ conversation.name }}
-        {% else %}
-        {% for member in conversation.members.all %}
-        {% if member.user != request.user %}
-        {{ member.user.username }}
-        {% endif %}
+        <div class="d-flex gap-2 w-100 justify-content-between mt-1">
+          <div class="btn-group w-100" role="group" aria-label="Theme toggle">
+            <button class="btn btn-outline-secondary btn-sm" onclick="setTheme('light')" title="Light Mode"><i class="bi bi-sun-fill"></i></button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="setTheme('dark')" title="Dark Mode"><i class="bi bi-moon-stars-fill"></i></button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="setTheme('system')" title="System Theme"><i class="bi bi-laptop"></i></button>
+          </div>
+
+          {% if request.user.is_authenticated %}
+          <div class="dropdown">
+            <button class="btn btn-outline-secondary btn-sm text-decoration-none dropdown-toggle d-flex align-items-center justify-content-center px-3 h-100"
+                    id="messagingLeftRailProfile" data-bs-toggle="dropdown" aria-expanded="false">
+              {% if request.user.profile_pic %}
+                <img src="{{ request.user.profile_pic.url }}" class="rounded-circle" style="width: 18px; height: 18px; object-fit: cover;" alt="{{ request.user.username }}">
+              {% else %}
+                <i class="bi bi-person-circle"></i>
+              {% endif %}
+            </button>
+            <ul class="dropdown-menu shadow-sm border-0 mt-1" aria-labelledby="messagingLeftRailProfile">
+              <li><a class="dropdown-item" href="{% url 'users:profile' request.user.username %}" data-bypass-htmx="true" hx-boost="false"><i class="bi bi-person me-2"></i>Profile</a></li>
+              <li><a class="dropdown-item" href="{% url 'users:settings' %}" data-bypass-htmx="true" hx-boost="false"><i class="bi bi-gear me-2"></i>Settings</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <form method="post" action="{% url 'logout' %}" class="m-0 p-0">
+                  {% csrf_token %}
+                  <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right me-2"></i>Logout</button>
+                </form>
+              </li>
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Start New Chat Blue Pill Button -->
+      <button type="button"
+              class="btn btn-primary w-100 btn-sm rounded-pill d-flex align-items-center justify-content-center gap-2 mb-3 flex-shrink-0"
+              data-bs-toggle="modal"
+              data-bs-target="#newConversationModal">
+        <i class="bi bi-chat-plus"></i>
+        <span class="fw-semibold">Start new chat</span>
+      </button>
+
+      <!-- Search in Left Rail -->
+      <div class="whatsapp-rail-search mb-2 flex-shrink-0">
+        <div class="input-group input-group-sm rounded-pill overflow-hidden bg-white" style="border: 1px solid var(--border);">
+          <span class="input-group-text bg-transparent border-0 pe-1 text-muted">
+            <i class="bi bi-search" style="font-size: 0.8rem;"></i>
+          </span>
+          <input type="text" id="railChatSearchInput" class="form-control bg-transparent border-0 shadow-none ps-1 py-1" placeholder="Search chats..." style="font-size: 0.82rem;">
+        </div>
+      </div>
+
+      <h6 class="fw-bold mb-2 text-muted small text-uppercase flex-shrink-0" style="font-size: 0.72rem; letter-spacing: 0.5px;">Active Chats</h6>
+
+      <!-- Scrollable Conversation List -->
+      <div class="whatsapp-rail-chats flex-grow-1 overflow-y-auto" id="whatsappRailChatsList" style="min-height: 0;">
+        {% for item in conversation_data %}
+        {% with conv=item.conversation %}
+        <a href="{% url 'messaging:conversation_detail' conv.id %}"
+           class="whatsapp-chat-item d-flex align-items-center gap-3 px-2 py-2 text-decoration-none rounded-3 mb-1 {% if conversation and conv.id == conversation.id %}active{% endif %}"
+           data-conversation-id="{{ conv.id }}">
+          <div class="position-relative flex-shrink-0">
+            {% if conv.type == 'group' %}
+              <div class="chat-avatar bg-primary text-white d-flex align-items-center justify-content-center rounded-circle" style="width: 44px; height: 44px;">
+                <i class="bi bi-people-fill fs-5"></i>
+              </div>
+            {% else %}
+              {% for member in conv.members.all %}
+                {% if member.user != request.user %}
+                  {% if member.user.profile_pic %}
+                    <img src="{{ member.user.profile_pic.url }}" class="chat-avatar rounded-circle border" style="width: 44px; height: 44px; object-fit: cover;" alt="{{ member.user.username }}" data-user-id="{{ member.user.id }}">
+                  {% else %}
+                    <div class="chat-avatar bg-secondary text-white d-flex align-items-center justify-content-center rounded-circle" style="width: 44px; height: 44px;" data-user-id="{{ member.user.id }}">
+                      <i class="bi bi-person-fill fs-5"></i>
+                    </div>
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          </div>
+          <div class="flex-grow-1 overflow-hidden" style="min-width: 0;">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <span class="whatsapp-chat-name fw-semibold text-truncate" style="font-size: 0.92rem; color: var(--text-primary);">
+                {% if conv.type == 'group' and conv.name %}
+                  {{ conv.name|truncatechars:22 }}
+                {% else %}
+                  {% for member in conv.members.all %}
+                    {% if member.user != request.user %}
+                      {{ member.user.get_full_name|default:member.user.username|truncatechars:20 }}
+                    {% endif %}
+                  {% endfor %}
+                {% endif %}
+              </span>
+              {% if conv.last_msg_time %}
+                <span class="whatsapp-chat-time text-muted" style="font-size: 0.72rem;">{{ conv.last_msg_time|date:"H:i" }}</span>
+              {% endif %}
+            </div>
+            <div class="d-flex align-items-center justify-content-between">
+              <span class="whatsapp-chat-snippet text-muted text-truncate" style="font-size: 0.8rem;">
+                {% if conv.messages.last %}
+                  {{ conv.messages.last.content|truncatechars:28 }}
+                {% else %}
+                  Start chatting...
+                {% endif %}
+              </span>
+              {% if item.unread_count > 0 %}
+                <span class="badge rounded-pill bg-primary ms-1" style="font-size: 0.65rem;">{{ item.unread_count }}</span>
+              {% endif %}
+            </div>
+          </div>
+        </a>
+        {% endwith %}
+        {% empty %}
+          <div class="text-center py-5 text-muted small">
+            <i class="bi bi-chat-dots fs-3 d-block mb-2 opacity-50"></i>
+            No active conversations
+          </div>
         {% endfor %}
+      </div>
+    </div>
+
+    <!-- COLLAPSED UTILITY STRIP (56px) -->
+    <div class="messaging-left-rail-collapsed" style="height: 100%;">
+      <button type="button"
+              class="messaging-rail-icon-btn"
+              id="messagingLeftRailExpandBtn"
+              onclick="toggleMessagingLeftRail(false);"
+              title="Expand sidebar"
+              aria-label="Expand sidebar">
+        <i class="bi bi-layout-sidebar"></i>
+      </button>
+
+      <button type="button"
+              class="messaging-rail-icon-btn btn-primary"
+              title="Start new chat"
+              aria-label="Start new chat"
+              data-bs-toggle="modal"
+              data-bs-target="#newConversationModal">
+        <i class="bi bi-plus-lg"></i>
+      </button>
+
+      <a href="{% url 'posts:home' %}"
+         class="messaging-rail-icon-btn"
+         title="Back to PwaniNet"
+         aria-label="Back to PwaniNet"
+         data-bypass-htmx="true"
+         hx-boost="false">
+        <i class="bi bi-box-arrow-left"></i>
+      </a>
+
+      <!-- Vertically stacked profile avatars of active chats only! -->
+      <div class="d-flex flex-column align-items-center gap-2 my-2 flex-grow-1 overflow-y-auto w-100" style="min-height: 0; padding: 4px 0;">
+        {% for item in conversation_data %}
+        {% with conv=item.conversation %}
+        <a href="{% url 'messaging:conversation_detail' conv.id %}"
+           class="messaging-rail-avatar-link position-relative {% if conversation and conv.id == conversation.id %}active{% endif %}"
+           data-bs-toggle="tooltip"
+           data-bs-placement="right"
+           title="{% if conv.type == 'group' %}{{ conv.name }}{% else %}{% for member in conv.members.all %}{% if member.user != request.user %}{{ member.user.get_full_name|default:member.user.username }}{% endif %}{% endfor %}{% endif %}">
+          {% if conv.type == 'group' %}
+            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; font-size: 0.85rem;">
+              <i class="bi bi-people-fill"></i>
+            </div>
+          {% else %}
+            {% for member in conv.members.all %}
+              {% if member.user != request.user %}
+                {% if member.user.profile_pic %}
+                  <img src="{{ member.user.profile_pic.url }}" class="rounded-circle border" style="width: 38px; height: 38px; object-fit: cover;" alt="{{ member.user.username }}">
+                {% else %}
+                  <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; font-size: 0.85rem;">
+                    <i class="bi bi-person-fill"></i>
+                  </div>
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+          {% if item.unread_count > 0 %}
+            <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle" style="transform: translate(-30%, -20%) !important;">
+              <span class="visually-hidden">unread</span>
+            </span>
+          {% endif %}
+        </a>
+        {% endwith %}
+        {% endfor %}
+      </div>
+
+      <!-- Settings Icon Button at Bottom -->
+      <a href="{% url 'users:settings' %}"
+         class="messaging-rail-icon-btn mt-auto mb-2"
+         title="Settings"
+         aria-label="Settings"
+         data-bypass-htmx="true"
+         hx-boost="false">
+        <i class="bi bi-gear"></i>
+      </a>
+    </div>
+  </aside>
+
+  <!-- 2. CENTER CHAT AREA -->
+  <div class="chat-container d-flex flex-column flex-grow-1" id="chatMainArea"
+       {% if conversation %}data-conversation-id="{{ conversation.id }}" data-user-id="{{ request.user.id }}" data-is-encrypted="false"{% endif %}>
+    {% if conversation %}
+    <!-- Floating Media Rail Reopen Button (Desktop) -->
+    <div class="whatsapp-media-rail-toggle-wrapper d-none d-lg-flex" id="whatsappMediaRailToggleWrapper">
+      <button type="button"
+              class="whatsapp-media-rail-toggle-btn shadow-sm"
+              id="whatsappMediaRailToggleBtn"
+              title="Media, Links & Docs"
+              aria-label="View Media">
+        <i class="bi bi-layout-sidebar-reverse"></i>
+        <span class="small ms-1">Media</span>
+      </button>
+    </div>
+
+    <div class="chat-header d-flex align-items-center justify-content-between px-3 border-bottom" data-conversation-id="{{ conversation.id }}">
+      <div class="d-flex align-items-center gap-2 overflow-hidden flex-grow-1" style="min-width: 0;">
+        <!-- Left Back Chevron -->
+        <a href="{% url 'messaging:conversation_list' %}" class="chat-back-btn text-decoration-none d-flex align-items-center justify-content-center me-1 d-lg-none" style="color: var(--text-primary); width: 36px; height: 36px; flex-shrink: 0;" aria-label="Back">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </a>
+
+        <!-- Avatar -->
+        <div class="position-relative flex-shrink-0" id="headerProfileTrigger" style="cursor: pointer;" title="View info & media">
+          {% if conversation.type == 'group' %}
+          <div class="chat-avatar bg-primary text-white d-flex align-items-center justify-content-center rounded-circle" style="width: 40px; height: 40px;">
+            <i class="bi bi-people-fill fs-5"></i>
+          </div>
+          {% else %}
+          {% for member in conversation.members.all %}
+          {% if member.user != request.user %}
+          <div class="position-relative">
+            {% if member.user.profile_pic %}
+            <img src="{{ member.user.profile_pic.url }}" class="chat-avatar rounded-circle border" style="width: 40px; height: 40px; object-fit: cover;" alt="{{ member.user.username }}">
+            {% else %}
+            <div class="chat-avatar bg-secondary text-white d-flex align-items-center justify-content-center rounded-circle" style="width: 40px; height: 40px;">
+              <i class="bi bi-person-fill fs-5"></i>
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% endfor %}
+          {% endif %}
+        </div>
+
+        <!-- Partner / Group Info -->
+        <div class="flex-grow-1 overflow-hidden ps-1" id="headerInfoTrigger" style="cursor: pointer; min-width: 0;" title="View info & media">
+          <div class="chat-username fw-bold text-truncate" style="font-size: 0.96rem; color: var(--text-primary); line-height: 1.2;">
+            {% if conversation.type == 'group' and conversation.name %}
+            {{ conversation.name }}
+            {% else %}
+            {% for member in conversation.members.all %}
+            {% if member.user != request.user %}
+            {{ member.user.get_full_name|default:member.user.username }}
+            {% endif %}
+            {% endfor %}
+            {% endif %}
+          </div>
+          <div class="chat-status small text-muted text-truncate" id="chatStatus" style="font-size: 0.75rem;">
+            {% if conversation.type == 'group' %}
+            {{ conversation.members.count }} member{{ conversation.members.count|pluralize }}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Far Right End: ONLY 3-dots Menu -->
+      <div class="dropdown flex-shrink-0">
+        <button class="btn btn-link p-0 d-flex align-items-center justify-content-center" data-bs-toggle="dropdown" style="color: var(--text-primary); width: 36px; height: 36px;" aria-label="Chat options">
+          <i class="bi bi-three-dots-vertical" style="font-size: 1.25rem;"></i>
+        </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow-sm border">
+            <li><a class="dropdown-item d-flex align-items-center gap-2" href="#" id="viewMediaBtn"><i class="bi bi-images text-primary"></i> View Media</a></li>
+            <li><a class="dropdown-item d-flex align-items-center gap-2" href="#" id="muteBtn"><i class="bi bi-bell-slash"></i> Mute Notifications</a></li>
+            <li><a class="dropdown-item d-flex align-items-center gap-2" href="#" id="starBtn"><i class="bi bi-star"></i> Starred Messages</a></li>
+            <li>
+              <hr class="dropdown-divider">
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center gap-2" href="#" id="themeBtn" data-bs-no-dropdown="true"><i class="bi bi-palette"></i> Chat Theme</a></li>
+            <li>
+              <hr class="dropdown-divider">
+            </li>
+            <li><a class="dropdown-item d-flex align-items-center gap-2 text-danger" href="#" id="leaveBtn"><i class="bi bi-box-arrow-right"></i> Leave Chat</a></li>
+          </ul>
+        </div>
+      </div>
+
+  <div class="messages-area d-flex flex-column" id="messagesContainer">
+    {% if not conversation.messages.exists %}
+    <div class="pwanimate-empty-state messaging-empty-state my-auto" id="messagingEmptyState">
+      {% if conversation.type == 'group' %}
+        <div class="pwanimate-hero-avatar bg-primary text-white d-flex align-items-center justify-content-center rounded-circle shadow-sm" style="width: 88px; height: 88px; margin-bottom: 1.25rem;">
+          <i class="bi bi-people-fill" style="font-size: 2.75rem;"></i>
+        </div>
+        <h2 class="pwanimate-empty-title">{{ conversation.name|default:"Group Chat" }}</h2>
+        <p class="pwanimate-empty-greeting">{{ conversation.members.count }} member{{ conversation.members.count|pluralize }} in this group</p>
+        <p class="pwanimate-empty-question">Send a message to break the ice!</p>
+      {% else %}
+        {% for member in conversation.members.all %}
+          {% if member.user != request.user %}
+            {% if member.user.profile_pic %}
+              <img src="{{ member.user.profile_pic.url }}" class="pwanimate-hero-avatar rounded-circle shadow-sm" style="width: 88px; height: 88px; object-fit: cover; margin-bottom: 1.25rem; border: 3px solid var(--border);" alt="{{ member.user.username }}">
+            {% else %}
+              <div class="pwanimate-hero-avatar bg-secondary text-white d-flex align-items-center justify-content-center rounded-circle shadow-sm" style="width: 88px; height: 88px; margin-bottom: 1.25rem;">
+                <i class="bi bi-person-fill" style="font-size: 2.75rem;"></i>
+              </div>
+            {% endif %}
+            <h2 class="pwanimate-empty-title">{{ member.user.get_full_name|default:member.user.username }}</h2>
+            <p class="pwanimate-empty-greeting">@{{ member.user.username }}</p>
+            <p class="pwanimate-empty-question">Say hello and start the conversation!</p>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+
+      <div class="pwanimate-suggestion-grid messaging-suggestion-grid" aria-label="Suggested greetings">
+        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="Hello 👋">Hello 👋</button>
+        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="Hey there! How are you?">Hey there! How are you?</button>
+        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="Good morning! ☀️">Good morning! ☀️</button>
+        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="What's up? 🙌">What's up? 🙌</button>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Reusable empty state template for JS renderer -->
+  <template id="emptyStateTemplate">
+    <div class="pwanimate-empty-state messaging-empty-state my-auto" id="messagingEmptyState">
+      {% if conversation.type == 'group' %}
+        <div class="pwanimate-hero-avatar bg-primary text-white d-flex align-items-center justify-content-center rounded-circle shadow-sm" style="width: 88px; height: 88px; margin-bottom: 1.25rem;">
+          <i class="bi bi-people-fill" style="font-size: 2.75rem;"></i>
+        </div>
+        <h2 class="pwanimate-empty-title">{{ conversation.name|default:"Group Chat" }}</h2>
+        <p class="pwanimate-empty-greeting">{{ conversation.members.count }} member{{ conversation.members.count|pluralize }} in this group</p>
+        <p class="pwanimate-empty-question">Send a message to break the ice!</p>
+      {% else %}
+        {% for member in conversation.members.all %}
+          {% if member.user != request.user %}
+            {% if member.user.profile_pic %}
+              <img src="{{ member.user.profile_pic.url }}" class="pwanimate-hero-avatar rounded-circle shadow-sm" style="width: 88px; height: 88px; object-fit: cover; margin-bottom: 1.25rem; border: 3px solid var(--border);" alt="{{ member.user.username }}">
+            {% else %}
+              <div class="pwanimate-hero-avatar bg-secondary text-white d-flex align-items-center justify-content-center rounded-circle shadow-sm" style="width: 88px; height: 88px; margin-bottom: 1.25rem;">
+                <i class="bi bi-person-fill" style="font-size: 2.75rem;"></i>
+              </div>
+            {% endif %}
+            <h2 class="pwanimate-empty-title">{{ member.user.get_full_name|default:member.user.username }}</h2>
+            <p class="pwanimate-empty-greeting">@{{ member.user.username }}</p>
+            <p class="pwanimate-empty-question">Say hello and start the conversation!</p>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+
+      <div class="pwanimate-suggestion-grid messaging-suggestion-grid" aria-label="Suggested greetings">
+        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="Hello 👋">Hello 👋</button>
+        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="Hey there! How are you?">Hey there! How are you?</button>
+        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="Good morning! ☀️">Good morning! ☀️</button>
+        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="What's up? 🙌">What's up? 🙌</button>
+      </div>
+    </div>
+  </template>
+
+  <!-- PwaniMate-Styled Floating Composer Card -->
+  <div class="pwanimate-composer-wrapper input-area">
+    <form id="messaging-composer-form" class="pwanimate-composer-box" onsubmit="return false;">
+      <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.mp4,.mp3,.wav" style="display: none;">
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
+
+      <!-- Reply Preview Banner -->
+      <div class="reply-preview-bar d-none" id="replyPreviewBar">
+        <div class="reply-preview-content flex-grow-1 overflow-hidden" style="text-overflow: ellipsis; white-space: nowrap;">
+          <div class="reply-preview-sender fw-bold text-primary" id="replySenderName" style="font-size: 0.82rem;">Replying to</div>
+          <div class="reply-preview-text text-truncate text-muted" id="replyTextSnippet" style="font-size: 0.8rem;"></div>
+        </div>
+        <button type="button" class="btn-close btn-sm ms-2" id="cancelReplyBtn" aria-label="Cancel reply" style="font-size: 0.7rem;"></button>
+      </div>
+
+      <!-- Edit Preview Banner -->
+      <div class="edit-preview-bar d-none" id="editPreviewBar">
+        <div class="edit-preview-content flex-grow-1 overflow-hidden" style="text-overflow: ellipsis; white-space: nowrap;">
+          <div class="edit-preview-title fw-bold text-warning" id="editTitle" style="font-size: 0.82rem; color: #ca8a04 !important;"><i class="bi bi-pencil me-1"></i>Editing message</div>
+          <div class="edit-preview-text text-truncate text-muted" id="editTextSnippet" style="font-size: 0.8rem;"></div>
+        </div>
+        <button type="button" class="btn-close btn-sm ms-2" id="cancelEditBtn" aria-label="Cancel edit" style="font-size: 0.7rem;"></button>
+      </div>
+
+      <div class="pwanimate-composer-standard" id="composerStandard">
+        <!-- Input Row: Textarea -->
+        <div class="pwanimate-composer-input-row">
+          <textarea id="messageInput"
+                    class="pwanimate-textarea"
+                    rows="1"
+                    placeholder="Message..."
+                    aria-label="Message"></textarea>
+        </div>
+
+        <!-- Action Row -->
+        <div class="pwanimate-composer-action-row">
+          <div class="pwanimate-composer-actions-start d-flex align-items-center gap-1">
+            <!-- Attachment Button (Paperclip) -->
+            <button type="button"
+                    class="pwanimate-attach-btn"
+                    id="attachBtn"
+                    title="Add attachment"
+                    aria-label="Add attachment">
+              <i class="bi bi-paperclip"></i>
+            </button>
+            <!-- Emoji Picker Trigger (Universal Comments Media Picker) -->
+            <button type="button"
+                    class="pwanimate-attach-btn composer-media-trigger"
+                    id="emojiBtn"
+                    data-media-picker
+                    data-input="#messageInput"
+                    title="Emoji, GIFs & Stickers"
+                    aria-label="Insert emoji">
+              <i class="bi bi-emoji-smile"></i>
+            </button>
+          </div>
+
+          <div class="pwanimate-composer-actions-end d-flex align-items-center gap-2">
+            <!-- Combined Dynamic Voice / Send Button -->
+            <button type="button"
+                    class="pwanimate-send-btn"
+                    id="voiceBtn"
+                    title="Voice message"
+                    aria-label="Voice message">
+              <span class="mic-icon-wrapper d-inline-flex align-items-center justify-content-center" id="micIconWrapper">
+                <i class="bi bi-mic-fill" style="font-size: 1.15rem;"></i>
+              </span>
+              <svg class="pwanimate-send-icon d-none" id="sendIconWrapper" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="12" y1="19" x2="12" y2="5"></line>
+                <polyline points="5 12 12 5 19 12"></polyline>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% else %}
+  <!-- Empty Selection State (When no conversation is selected on desktop) -->
+  <div class="d-flex flex-column align-items-center justify-content-center h-100 p-4 text-center my-auto">
+    <div class="pwanimate-empty-state messaging-empty-state">
+      <div class="pwanimate-hero-avatar bg-primary text-white d-flex align-items-center justify-content-center rounded-circle shadow-sm mx-auto mb-3" style="width: 88px; height: 88px;">
+        <i class="bi bi-chat-quote-fill" style="font-size: 2.75rem;"></i>
+      </div>
+      <h2 class="pwanimate-empty-title">Select a chat</h2>
+      <p class="pwanimate-empty-greeting">Choose a conversation from the left to start messaging</p>
+      <p class="pwanimate-empty-question">Or begin a new conversation with someone from your friend circle.</p>
+      <button type="button"
+              class="btn btn-primary rounded-pill px-4 py-2 mt-2 d-inline-flex align-items-center gap-2 shadow-sm"
+              data-bs-toggle="modal"
+              data-bs-target="#newConversationModal">
+        <i class="bi bi-chat-plus"></i>
+        <span class="fw-semibold">Start new chat</span>
+      </button>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- 3. RIGHT MEDIA RAIL (Dynamic WhatsApp Media, Links & Docs) -->
+{% if conversation %}
+<aside class="whatsapp-right-rail border-start bg-white d-none flex-column" id="whatsappRightRail">
+    <!-- Rail Header -->
+    <div class="whatsapp-right-rail-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+      <div class="d-flex align-items-center gap-2">
+        <h6 class="mb-0 fw-bold" style="font-size: 0.95rem;">Media, Links & Docs</h6>
+      </div>
+      <button type="button" class="btn btn-link p-0 text-muted d-flex align-items-center justify-content-center" id="closeRightRailBtn" aria-label="Close media panel" style="width: 32px; height: 32px;">
+        <i class="bi bi-x-lg fs-6"></i>
+      </button>
+    </div>
+
+    <!-- Navigation Tabs: Media | Docs | Audio | Links -->
+    <ul class="nav nav-tabs whatsapp-media-tabs border-bottom px-2" id="mediaTabs" role="tablist">
+      <li class="nav-item flex-fill text-center" role="presentation">
+        <button class="nav-link active w-100 py-2 small fw-semibold" id="tab-media-btn" data-bs-toggle="tab" data-bs-target="#tab-media-content" type="button" role="tab">Media</button>
+      </li>
+      <li class="nav-item flex-fill text-center" role="presentation">
+        <button class="nav-link w-100 py-2 small fw-semibold" id="tab-docs-btn" data-bs-toggle="tab" data-bs-target="#tab-docs-content" type="button" role="tab">Docs</button>
+      </li>
+      <li class="nav-item flex-fill text-center" role="presentation">
+        <button class="nav-link w-100 py-2 small fw-semibold" id="tab-audio-btn" data-bs-toggle="tab" data-bs-target="#tab-audio-content" type="button" role="tab">Audio</button>
+      </li>
+      <li class="nav-item flex-fill text-center" role="presentation">
+        <button class="nav-link w-100 py-2 small fw-semibold" id="tab-links-btn" data-bs-toggle="tab" data-bs-target="#tab-links-content" type="button" role="tab">Links</button>
+      </li>
+    </ul>
+
+    <!-- Tab Panes -->
+    <div class="tab-content flex-grow-1 overflow-y-auto p-3" id="mediaTabsContent">
+      <!-- 1. Media Tab (Photos & Videos) -->
+      <div class="tab-pane fade show active" id="tab-media-content" role="tabpanel">
+        {% if media_photos_videos or legacy_photos_videos %}
+          <div class="media-gallery-grid" id="mediaPhotosVideosGrid">
+            {% for item in media_photos_videos %}
+              <div class="media-gallery-item">
+                {% if item.file_type == 'image' %}
+                  <a href="{{ item.file.url }}" target="_blank" rel="noopener">
+                    <img src="{{ item.file.url }}" alt="Media" loading="lazy">
+                  </a>
+                {% elif item.file_type == 'video' %}
+                  <a href="{{ item.file.url }}" target="_blank" rel="noopener" class="position-relative d-block w-100 h-100">
+                    <video src="{{ item.file.url }}" preload="metadata"></video>
+                    <i class="bi bi-play-circle-fill position-absolute top-50 start-50 translate-middle text-white fs-4"></i>
+                  </a>
+                {% endif %}
+              </div>
+            {% endfor %}
+            {% for item in legacy_photos_videos %}
+              <div class="media-gallery-item">
+                {% if item.attachment_type == 'image' %}
+                  <a href="{{ item.attachment.url }}" target="_blank" rel="noopener">
+                    <img src="{{ item.attachment.url }}" alt="Media" loading="lazy">
+                  </a>
+                {% elif item.attachment_type == 'video' %}
+                  <a href="{{ item.attachment.url }}" target="_blank" rel="noopener" class="position-relative d-block w-100 h-100">
+                    <video src="{{ item.attachment.url }}" preload="metadata"></video>
+                    <i class="bi bi-play-circle-fill position-absolute top-50 start-50 translate-middle text-white fs-4"></i>
+                  </a>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center py-5 text-muted small" id="mediaPhotosVideosEmpty">
+            <i class="bi bi-images fs-2 d-block mb-2 opacity-50"></i>
+            No photos or videos shared yet
+          </div>
         {% endif %}
       </div>
-      <div class="chat-status" id="chatStatus"></div>
+
+      <!-- 2. Docs Tab (Documents & Files) -->
+      <div class="tab-pane fade" id="tab-docs-content" role="tabpanel">
+        {% if media_docs or legacy_docs %}
+          <div class="d-flex flex-column gap-2" id="mediaDocsList">
+            {% for item in media_docs %}
+              <a href="{{ item.file.url }}" download class="d-flex align-items-center gap-3 p-2 rounded border text-decoration-none text-dark bg-light bg-opacity-50">
+                <div class="p-2 bg-primary bg-opacity-10 text-primary rounded">
+                  <i class="bi bi-file-earmark-text fs-4"></i>
+                </div>
+                <div class="flex-grow-1 overflow-hidden" style="min-width: 0;">
+                  <div class="fw-semibold text-truncate small">{{ item.file.name|slice:"20:"|default:"Document" }}</div>
+                  <div class="text-muted x-small" style="font-size: 0.72rem;">{{ item.message.created_at|date:"M d, Y" }}</div>
+                </div>
+                <i class="bi bi-download text-muted"></i>
+              </a>
+            {% endfor %}
+            {% for item in legacy_docs %}
+              <a href="{{ item.attachment.url }}" download class="d-flex align-items-center gap-3 p-2 rounded border text-decoration-none text-dark bg-light bg-opacity-50">
+                <div class="p-2 bg-primary bg-opacity-10 text-primary rounded">
+                  <i class="bi bi-file-earmark-text fs-4"></i>
+                </div>
+                <div class="flex-grow-1 overflow-hidden" style="min-width: 0;">
+                  <div class="fw-semibold text-truncate small">{{ item.attachment.name|slice:"20:"|default:"Document" }}</div>
+                  <div class="text-muted x-small" style="font-size: 0.72rem;">{{ item.created_at|date:"M d, Y" }}</div>
+                </div>
+                <i class="bi bi-download text-muted"></i>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center py-5 text-muted small" id="mediaDocsEmpty">
+            <i class="bi bi-file-earmark-text fs-2 d-block mb-2 opacity-50"></i>
+            No documents shared yet
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- 3. Audio Tab (Voice Messages & Audio Files) -->
+      <div class="tab-pane fade" id="tab-audio-content" role="tabpanel">
+        {% if media_audio or legacy_audio %}
+          <div class="d-flex flex-column gap-2" id="mediaAudioList">
+            {% for item in media_audio %}
+              <div class="p-2 rounded border bg-light bg-opacity-50">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <i class="bi bi-mic text-primary"></i>
+                  <span class="small fw-semibold text-truncate">Voice Note</span>
+                  <span class="text-muted x-small ms-auto" style="font-size: 0.7rem;">{{ item.message.created_at|date:"H:i" }}</span>
+                </div>
+                <audio controls src="{{ item.file.url }}" class="w-100" style="height: 32px;"></audio>
+              </div>
+            {% endfor %}
+            {% for item in legacy_audio %}
+              <div class="p-2 rounded border bg-light bg-opacity-50">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <i class="bi bi-mic text-primary"></i>
+                  <span class="small fw-semibold text-truncate">Voice Note</span>
+                  <span class="text-muted x-small ms-auto" style="font-size: 0.7rem;">{{ item.created_at|date:"H:i" }}</span>
+                </div>
+                <audio controls src="{{ item.attachment.url }}" class="w-100" style="height: 32px;"></audio>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center py-5 text-muted small" id="mediaAudioEmpty">
+            <i class="bi bi-mic fs-2 d-block mb-2 opacity-50"></i>
+            No audio messages shared yet
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- 4. Links Tab (Shared URLs & Link Previews) -->
+      <div class="tab-pane fade" id="tab-links-content" role="tabpanel">
+        {% if media_links %}
+          <div class="d-flex flex-column gap-2" id="mediaLinksList">
+            {% for item in media_links %}
+              <a href="{{ item.link_url }}" target="_blank" rel="noopener" class="d-flex flex-column p-2 rounded border text-decoration-none text-dark bg-light bg-opacity-50">
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi bi-link-45deg text-primary fs-5"></i>
+                  <span class="fw-semibold text-truncate small text-primary">{{ item.link_title|default:item.link_url }}</span>
+                  <i class="bi bi-box-arrow-up-right x-small text-muted ms-auto" style="font-size: 0.75rem;"></i>
+                </div>
+                {% if item.link_description %}
+                  <p class="text-muted x-small mb-1 text-truncate" style="font-size: 0.72rem;">{{ item.link_description }}</p>
+                {% endif %}
+                <span class="text-muted x-small" style="font-size: 0.68rem;">{{ item.created_at|date:"M d, Y" }}</span>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center py-5 text-muted small" id="mediaLinksEmpty">
+            <i class="bi bi-link-45deg fs-2 d-block mb-2 opacity-50"></i>
+            No links shared yet
+          </div>
+        {% endif %}
+      </div>
     </div>
-    <button class="icon-btn" id="searchBtn" title="Search in conversation">
-      <i class="bi bi-search"></i>
-    </button>
-    <div class="dropdown">
-      <button class="btn btn-link" data-bs-toggle="dropdown" style="color: var(--text-primary);">
-        <i class="bi bi-three-dots-vertical" style="font-size: 20px;"></i>
-      </button>
-      <ul class="dropdown-menu dropdown-menu-end">
-        <li><a class="dropdown-item" href="#" id="muteBtn"><i class="bi bi-bell-slash me-2"></i>Mute</a></li>
-        <li><a class="dropdown-item" href="#" id="viewMediaBtn"><i class="bi bi-images me-2"></i>View Media</a></li>
-        <li><a class="dropdown-item" href="#" id="starBtn"><i class="bi bi-star me-2"></i>Star Messages</a></li>
-        <li>
-          <hr class="dropdown-divider">
-        </li>
-        <li><a class="dropdown-item" href="#" id="themeBtn" data-bs-no-dropdown="true"><i
-              class="bi bi-palette me-2"></i>Chat Theme</a></li>
-        <li>
-          <hr class="dropdown-divider">
-        </li>
-        <li><a class="dropdown-item text-danger" href="#" id="leaveBtn"><i
-              class="bi bi-box-arrow-right me-2"></i>Leave</a></li>
-      </ul>
+  </aside>
+  {% endif %}
+</div> <!-- /#whatsappLayout -->
+
+<!-- New Conversation Modal (Desktop & Mobile) -->
+<div class="modal fade" id="newConversationModal" tabindex="-1" aria-labelledby="newConversationModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow rounded-4" style="background: var(--card-bg, #ffffff); border: 1px solid var(--border);">
+      <div class="modal-header border-bottom px-4 py-3">
+        <h5 class="modal-title fw-bold d-flex align-items-center gap-2" id="newConversationModalLabel" style="color: var(--text-primary); font-size: 1.1rem;">
+          <i class="bi bi-chat-plus text-primary"></i>
+          <span>New Conversation</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body px-4 py-3">
+        <div class="mb-3">
+          <div class="input-group rounded-pill overflow-hidden bg-light" style="border: 1px solid var(--border);">
+            <span class="input-group-text bg-transparent border-0 pe-1 text-muted">
+              <i class="bi bi-search"></i>
+            </span>
+            <input type="text"
+                   class="form-control bg-transparent border-0 shadow-none ps-1 py-2"
+                   placeholder="Search friends..."
+                   id="searchUsers"
+                   hx-get="{% url 'messaging:search_followed_users' %}"
+                   hx-target="#userList"
+                   hx-trigger="keyup changed delay:250ms"
+                   name="search">
+          </div>
+        </div>
+
+        <div class="list-group list-group-flush rounded-3" id="userList" style="max-height: 380px; overflow-y: auto;">
+          {% if unmessaged_friends %}
+            <div class="px-2 py-1 text-muted small fw-bold text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+              Friends to message
+            </div>
+            {% for user in unmessaged_friends %}
+            <div class="list-group-item d-flex align-items-center gap-3 px-2 py-2 border-bottom" style="background: transparent; color: var(--text-primary);">
+              {% if user.profile_pic %}
+                <img src="{{ user.profile_pic.url }}" class="rounded-circle border" style="width: 44px; height: 44px; object-fit: cover;" alt="{{ user.username }}">
+              {% else %}
+                <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                  <i class="bi bi-person-fill fs-5"></i>
+                </div>
+              {% endif %}
+              <div class="flex-grow-1 overflow-hidden" style="min-width: 0;">
+                <div class="fw-bold text-truncate" style="font-size: 0.95rem;">{{ user.get_full_name|default:user.username }}</div>
+                <small class="text-muted text-truncate d-block" style="font-size: 0.8rem;">@{{ user.username }}</small>
+              </div>
+              <button type="button" class="btn btn-sm btn-primary rounded-pill start-conversation flex-shrink-0 px-3" data-user-id="{{ user.id }}">
+                <i class="bi bi-chat-dots me-1"></i> Start chat
+              </button>
+            </div>
+            {% endfor %}
+          {% endif %}
+
+          {% if users %}
+            {% if unmessaged_friends %}
+              <div class="px-2 pt-3 pb-1 text-muted small fw-bold text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+                All Friends
+              </div>
+            {% endif %}
+            {% for user in users %}
+              {% if not unmessaged_friends or user not in unmessaged_friends %}
+              <div class="list-group-item d-flex align-items-center gap-3 px-2 py-2 border-bottom" style="background: transparent; color: var(--text-primary);">
+                {% if user.profile_pic %}
+                  <img src="{{ user.profile_pic.url }}" class="rounded-circle border" style="width: 44px; height: 44px; object-fit: cover;" alt="{{ user.username }}">
+                {% else %}
+                  <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                    <i class="bi bi-person-fill fs-5"></i>
+                  </div>
+                {% endif %}
+                <div class="flex-grow-1 overflow-hidden" style="min-width: 0;">
+                  <div class="fw-bold text-truncate" style="font-size: 0.95rem;">{{ user.get_full_name|default:user.username }}</div>
+                  <small class="text-muted text-truncate d-block" style="font-size: 0.8rem;">@{{ user.username }}</small>
+                </div>
+                <button type="button" class="btn btn-sm btn-primary rounded-pill start-conversation flex-shrink-0 px-3" data-user-id="{{ user.id }}">
+                  <i class="bi bi-chat-dots me-1"></i> Message
+                </button>
+              </div>
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+
+          {% if not unmessaged_friends and not users %}
+            <div class="list-group-item border-0 text-center py-4" style="background: transparent; color: var(--text-secondary);">
+              <i class="bi bi-people fs-2 d-block mb-2 opacity-50"></i>
+              Follow users to start conversations with them.
+            </div>
+          {% endif %}
+        </div>
+      </div>
     </div>
-  </div>
-
-  <div class="messages-area" id="messagesContainer">
-    <!-- Messages will be rendered by JavaScript -->
-  </div>
-
-  <div class="input-area">
-    <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.mp4,.mp3,.wav"
-      style="display: none;">
-    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
-
-    
-
-    <!-- Input container on the left -->
-    <div class="input-field-container">
-      <button class="icon-btn" id="emojiBtn" title="Emoji">
-        <i class="bi bi-emoji-smile"></i>
-      </button>
-      <textarea class="message-input" placeholder="Message..." id="messageInput" rows="1"></textarea>
-      <button class="icon-btn" id="cameraBtn" title="Camera">
-        <i class="bi bi-camera"></i>
-      </button>
-      <button class="icon-btn" id="attachBtn" title="Attach file">
-        <i class="bi bi-paperclip"></i>
-      </button>
-    </div>
-
-    <!-- Voice/Send button on the right -->
-    <button class="icon-btn voice-send-btn" id="voiceBtn" title="Voice message">
-      <i class="bi bi-mic"></i>
-    </button>
-
-
   </div>
 </div>
 
@@ -115,6 +782,9 @@
   <div class="context-menu-item" data-action="copy">
     <i class="bi bi-copy"></i> Copy
   </div>
+  <div class="context-menu-item" data-action="edit">
+    <i class="bi bi-pencil"></i> Edit
+  </div>
   <div class="context-menu-item" data-action="forward">
     <i class="bi bi-share"></i> Forward
   </div>
@@ -125,69 +795,45 @@
 
 <!-- Emoji Picker Modal -->
 <div class="overlay" id="overlay"></div>
-<div class="emoji-picker-modal" id="emojiPicker">
-  <div class="emoji-picker-header">
-    <span class="emoji-picker-title">Emoji</span>
-    <div class="emoji-picker-actions">
-      <button class="icon-btn" id="keyboardBtn" title="Keyboard">
-        <i class="bi bi-keyboard"></i>
-      </button>
-      <button class="icon-btn" id="closeEmojiPicker">
+
+<!-- Attachment Options Modal & Bottom Sheet (PwaniMate Style) -->
+<div class="pwanimate-attachment-modal" id="attachmentModal">
+  <div class="pwanimate-attachment-modal-content">
+    <div class="pwanimate-attachment-sheet-handle"></div>
+    <div class="pwanimate-attachment-modal-header">
+      <h4 class="pwanimate-attachment-modal-title">Share Content</h4>
+      <button class="pwanimate-attachment-modal-close" id="closeAttachmentModal" type="button" aria-label="Close">
         <i class="bi bi-x-lg"></i>
       </button>
     </div>
-  </div>
-  <div class="emoji-picker-tabs">
-    <button class="emoji-picker-tab active" data-tab="emojis">😀</button>
-    <button class="emoji-picker-tab" data-tab="gifs">GIF</button>
-    <button class="emoji-picker-tab" data-tab="stickers">Stickers</button>
-  </div>
-  <div class="emoji-picker-content" id="emojiContent">
-    <!-- Emojis will be loaded by JavaScript -->
-  </div>
-  <div class="gif-search-container" id="gifSearchContainer" style="display: none;">
-    <input type="text" class="gif-search-input" id="gifSearchInput" placeholder="Search GIFs...">
-  </div>
-  <div class="gif-content" id="gifContent" style="display: none;">
-    <!-- GIFs will be loaded by JavaScript -->
-  </div>
-  <div class="sticker-content" id="stickerContent" style="display: none;">
-    <!-- Stickers will be loaded by JavaScript -->
-  </div>
-</div>
-
-<!-- Attachment Options Modal -->
-<div class="attachment-modal" id="attachmentModal">
-  <div class="attachment-modal-header">
-    <span class="attachment-modal-title">Attach</span>
-    <button class="attachment-close-btn" id="closeAttachmentModal">
-      <i class="bi bi-x-lg"></i>
-    </button>
-  </div>
-  <div class="attachment-options">
-    <div class="attachment-option" data-type="photos">
-      <div class="attachment-option-icon photos">
-        <i class="bi bi-image"></i>
+    <div class="pwanimate-attachment-options">
+      <div class="pwanimate-attachment-option attachment-option" data-type="camera" id="attachCameraOption">
+        <div class="pwanimate-attachment-icon-circle" style="background-color: rgba(239, 68, 68, 0.1); color: #ef4444;">
+          <i class="bi bi-camera-fill"></i>
+        </div>
+        <span>Camera</span>
       </div>
-      <span class="attachment-option-label">Photos</span>
+      <div class="pwanimate-attachment-option attachment-option" data-type="photos" id="attachPhotosOption">
+        <div class="pwanimate-attachment-icon-circle" style="background-color: rgba(59, 130, 246, 0.1); color: #3b82f6;">
+          <i class="bi bi-image-fill"></i>
+        </div>
+        <span>Gallery</span>
+      </div>
+      <div class="pwanimate-attachment-option attachment-option" data-type="documents" id="attachDocsOption">
+        <div class="pwanimate-attachment-icon-circle" style="background-color: rgba(168, 85, 247, 0.1); color: #a855f7;">
+          <i class="bi bi-file-earmark-text-fill"></i>
+        </div>
+        <span>Docs</span>
+      </div>
+      <div class="pwanimate-attachment-option attachment-option" data-type="audio" id="attachAudioOption">
+        <div class="pwanimate-attachment-icon-circle" style="background-color: rgba(16, 185, 129, 0.1); color: #10b981;">
+          <i class="bi bi-music-note-beamed"></i>
+        </div>
+        <span>Audio</span>
+      </div>
     </div>
-    <div class="attachment-option" data-type="videos">
-      <div class="attachment-option-icon videos">
-        <i class="bi bi-camera-video"></i>
-      </div>
-      <span class="attachment-option-label">Videos</span>
-    </div>
-    <div class="attachment-option" data-type="documents">
-      <div class="attachment-option-icon documents">
-        <i class="bi bi-file-earmark"></i>
-      </div>
-      <span class="attachment-option-label">Documents</span>
-    </div>
-    <div class="attachment-option" data-type="audio">
-      <div class="attachment-option-icon audio">
-        <i class="bi bi-music-note"></i>
-      </div>
-      <span class="attachment-option-label">Audio</span>
+    <div class="text-center text-muted mt-3 small opacity-75">
+      Photos, videos, audio notes, and documents
     </div>
   </div>
 </div>
@@ -885,11 +1531,83 @@
 <script>
   console.log('=== CONVERSATION DETAIL REFACTORED SCRIPT LOADING ===');
   document.body.dataset.userId = '{{ request.user.id }}';
-  document.body.dataset.conversationId = '{{ conversation.id }}';
-  document.body.dataset.isEncrypted = '{% if conversation.is_encrypted %}true{% else %}false{% endif %}';
-  document.body.dataset.conversationType = '{{ conversation.type }}';
+  document.body.dataset.conversationId = '{{ conversation.id|default:"" }}';
+  document.body.dataset.isEncrypted = '{% if conversation and conversation.is_encrypted %}true{% else %}false{% endif %}';
+  document.body.dataset.conversationType = '{{ conversation.type|default:"" }}';
+  window.HAS_CONVERSATION = {% if conversation %}true{% else %}false{% endif %};
+
+  // Left Rail Toggle (Expanded vs Collapsed)
+  window.toggleMessagingLeftRail = function(collapse) {
+    if (collapse) {
+      document.documentElement.classList.add('messaging-left-collapsed');
+      document.body.classList.add('messaging-left-collapsed');
+      try { localStorage.setItem('messaging_left_rail_collapsed', 'true'); } catch(e) {}
+    } else {
+      document.documentElement.classList.remove('messaging-left-collapsed');
+      document.body.classList.remove('messaging-left-collapsed');
+      try { localStorage.setItem('messaging_left_rail_collapsed', 'false'); } catch(e) {}
+    }
+  };
+
+  // Helper for CSRF Token
+  function getCSRFToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta && meta.content) return meta.content;
+    const input = document.querySelector('[name="csrfmiddlewaretoken"]');
+    if (input && input.value) return input.value;
+    const cookie = document.cookie.split('; ').find(row => row.startsWith('csrftoken='));
+    return cookie ? cookie.split('=')[1] : '';
+  }
+
+  // Start new conversation handler
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.start-conversation');
+    if (btn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const userId = btn.dataset.userId;
+      if (!userId) return;
+
+      btn.disabled = true;
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>';
+
+      fetch('/messaging/v1/conversations/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify({
+          type: 'direct',
+          member_ids: [parseInt(userId, 10)]
+        })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.id) {
+          window.location.href = `/messaging/conversation/${data.id}/`;
+        } else {
+          alert('Could not start conversation.');
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      });
+    }
+  });
+
+  // Mobile viewport check: if on mobile screen (< 992px) and no conversation selected, redirect to mobile dashboard
+  if (!window.HAS_CONVERSATION && window.innerWidth < 992) {
+    window.location.replace("{% url 'messaging:conversation_list' %}?view=list");
+  }
 </script>
 
+{% if conversation %}
 {% if conversation.type == 'direct' %}
 {% for member in conversation.members.all %}
 {% if member.user != request.user %}
@@ -965,21 +1683,129 @@
 
 <script src="{% static 'js/encryption.js' %}"></script>
 <script type="module" src="{% static 'js/chat/bootstrap.js' %}?v=12"></script>
-
-<!-- Chat theme handler for per-conversation customization -->
 <script src="{% static 'js/chat-theme-handler.js' %}"></script>
 
 <script>
-  // Handle quick action chip clicks from renderer
+  // Handle quick action and empty state greeting chip clicks
+  document.addEventListener('click', function (e) {
+    const chip = e.target.closest('.empty-greeting-chip, .pwanimate-suggestion-chip');
+    if (chip) {
+      e.preventDefault();
+      const text = chip.getAttribute('data-text') || chip.textContent.trim();
+      const input = document.getElementById('messageInput');
+      if (input) {
+        input.value = text;
+        input.focus();
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+  });
+
   window.addEventListener('quickActionClick', function (e) {
     const input = document.getElementById('messageInput');
     if (input) {
       input.value = e.detail.text;
       input.focus();
-      // Trigger input event for auto-resizing textareas
       input.dispatchEvent(new Event('input', { bubbles: true }));
     }
   });
+</script>
+{% endif %}
+
+<script>
+  // WhatsApp Right Media Rail and Left Rail Search Controller
+  (function() {
+    const rightRail = document.getElementById('whatsappRightRail');
+    const layout = document.getElementById('whatsappLayout');
+    const toggleFloatingBtn = document.getElementById('whatsappMediaRailToggleBtn');
+    const closeBtn = document.getElementById('closeRightRailBtn');
+    const viewMediaBtn = document.getElementById('viewMediaBtn');
+    const profileTrigger = document.getElementById('headerProfileTrigger');
+    const infoTrigger = document.getElementById('headerInfoTrigger');
+
+    window.openMediaRail = function(tabId) {
+      if (!rightRail) return;
+      rightRail.classList.remove('d-none');
+      rightRail.classList.add('open');
+      if (layout) layout.classList.add('whatsapp-media-rail-open');
+      document.body.classList.add('whatsapp-media-rail-open');
+      if (tabId && window.bootstrap) {
+        const tabEl = document.getElementById(tabId);
+        if (tabEl) {
+          const tab = bootstrap.Tab.getOrCreateInstance(tabEl);
+          tab.show();
+        }
+      }
+    };
+
+    window.closeMediaRail = function() {
+      if (!rightRail) return;
+      rightRail.classList.remove('open');
+      rightRail.classList.add('d-none');
+      if (layout) layout.classList.remove('whatsapp-media-rail-open');
+      document.body.classList.remove('whatsapp-media-rail-open');
+    };
+
+    if (toggleFloatingBtn) {
+      toggleFloatingBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        openMediaRail('tab-media-btn');
+      });
+    }
+
+    if (viewMediaBtn) {
+      viewMediaBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        openMediaRail('tab-media-btn');
+      });
+    }
+
+    if (profileTrigger) {
+      profileTrigger.addEventListener('click', function(e) {
+        e.preventDefault();
+        openMediaRail('tab-media-btn');
+      });
+    }
+
+    if (infoTrigger) {
+      infoTrigger.addEventListener('click', function(e) {
+        e.preventDefault();
+        openMediaRail();
+      });
+    }
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        closeMediaRail();
+      });
+    }
+
+    // Left Rail conversation search filter
+    const railSearchInput = document.getElementById('railChatSearchInput');
+    if (railSearchInput) {
+      railSearchInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        const chatItems = document.querySelectorAll('.whatsapp-chat-item');
+        chatItems.forEach(function(item) {
+          const name = (item.querySelector('.whatsapp-chat-name')?.textContent || '').toLowerCase();
+          const snippet = (item.querySelector('.whatsapp-chat-snippet')?.textContent || '').toLowerCase();
+          if (!query || name.includes(query) || snippet.includes(query)) {
+            item.style.setProperty('display', 'flex', 'important');
+          } else {
+            item.style.setProperty('display', 'none', 'important');
+          }
+        });
+      });
+    }
+
+    // Initialize Bootstrap tooltips for avatars in collapsed left rail
+    if (window.bootstrap && bootstrap.Tooltip) {
+      document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) {
+        new bootstrap.Tooltip(el);
+      });
+    }
+  })();
 </script>
 
 {% endblock %}

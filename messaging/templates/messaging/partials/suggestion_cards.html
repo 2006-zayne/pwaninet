@@ -21,7 +21,7 @@
                 </div>
                 <div class="messaging-card-info">
                     <a href="{% url 'users:profile' user.username %}" class="text-decoration-none">
-                        <p class="messaging-card-name mb-1">{{ user.get_full_name|default:user.username }}</p>
+                        <p class="messaging-card-name mb-1" title="{{ user.get_full_name|default:user.username }}">{{ user.get_full_name|default:user.username|truncatechars:22 }}</p>
                         <p class="messaging-card-details mb-2">{{ user.course.name|default:"Student" }} • {{ user.year.name|default:"Year" }}</p>
                     </a>
                     <div class="messaging-card-actions">
@@ -80,9 +80,17 @@
 /* Messaging Suggestions Enhanced Styles */
 .messaging-suggestions-container {
     position: relative;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 .messaging-suggestions-scroll {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     scrollbar-width: none;
     -ms-overflow-style: none;
 }

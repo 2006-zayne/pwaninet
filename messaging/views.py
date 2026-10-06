@@ -414,6 +414,48 @@ def conversation_list(request):
     ).exclude(id=request.user.id).distinct()
     suggested_users = get_friend_suggestions_for_user(request.user, limit=10)
 
+    # Friends not yet messaged in direct conversations
+    existing_direct_user_ids = set(ConversationMember.objects.filter(
+        conversation__type='direct',
+        conversation__members__user=request.user
+    ).exclude(user=request.user).values_list('user_id', flat=True))
+
+    unmessaged_friends = users.exclude(id__in=existing_direct_user_ids)
+
+    # Detect desktop vs mobile client
+    ua_string = request.META.get('HTTP_USER_AGENT', '')
+    is_mobile = False
+    try:
+        from user_agents import parse
+        user_agent = parse(ua_string)
+        is_mobile = user_agent.is_mobile
+    except Exception:
+        is_mobile = any(k in ua_string.lower() for k in ['mobile', 'android', 'iphone', 'ipod'])
+
+    # Desktop: hop directly into three-panel layout with empty state unless view=list requested
+    if not is_mobile and request.GET.get('view') != 'list':
+        from django.utils import timezone
+        from datetime import timedelta
+        today = timezone.now().date()
+        yesterday = today - timedelta(days=1)
+        context = {
+            'conversation': None,
+            'messages': [],
+            'conversation_data': conversation_data,
+            'users': users,
+            'unmessaged_friends': unmessaged_friends,
+            'media_photos_videos': [],
+            'media_docs': [],
+            'media_audio': [],
+            'legacy_photos_videos': [],
+            'legacy_docs': [],
+            'legacy_audio': [],
+            'media_links': [],
+            'today': today.strftime('%Y-%m-%d'),
+            'yesterday': yesterday.strftime('%Y-%m-%d'),
+        }
+        return render(request, 'messaging/conversation_detail_refactored.html', context)
+
     # Get IDs of users that current user is following
     following_ids = set(Follow.objects.filter(
         follower=request.user
@@ -434,6 +476,7 @@ def conversation_list(request):
     context = {
         'conversation_data': conversation_data,
         'users': users,
+        'unmessaged_friends': unmessaged_friends,
         'suggested_users': suggested_users,
         'following_ids': following_ids,
         'active_conversation': active_conversation,
@@ -442,6 +485,7 @@ def conversation_list(request):
     }
 
     return render(request, 'messaging/conversation_list.html', context)
+
 
 
 @login_required
@@ -488,13 +532,87 @@ def conversation_detail(request, conversation_id):
             member.last_read_message = last_message
             member.save()
     
+    # Active conversation list for desktop WhatsApp left rail
+    conversations = Conversation.objects.filter(
+        members__user=request.user
+    ).prefetch_related(
+        'members__user',
+        'messages__sender'
+    ).annotate(
+        last_msg_id=models.Max('messages__id'),
+        last_msg_time=models.Max('messages__created_at')
+    ).order_by('-last_msg_time').distinct()
+
+    conversation_data = []
+    for conv in conversations:
+        last_msg = conv.messages.order_by('-created_at').first()
+        read_status = None
+        if last_msg and last_msg.sender == request.user:
+            read_status = conv.get_last_message_read_status(request.user) or 'sent'
+        
+        mem = conv.members.filter(user=request.user).first()
+        if mem and mem.last_read_message:
+            unread_count = conv.messages.filter(
+                created_at__gt=mem.last_read_message.created_at
+            ).count()
+        else:
+            unread_count = conv.messages.count()
+        
+        conversation_data.append({
+            'conversation': conv,
+            'read_status': read_status,
+            'unread_count': unread_count
+        })
+
+    # Pre-categorize media for the dynamic WhatsApp right media rail
+    attachments = MessageAttachment.objects.filter(
+        message__conversation=conversation
+    ).select_related('message')
+    
+    media_photos_videos = attachments.filter(file_type__in=['image', 'video']).order_by('-message__created_at')
+    media_docs = attachments.filter(file_type='document').order_by('-message__created_at')
+    media_audio = attachments.filter(file_type='audio').order_by('-message__created_at')
+    
+    # Legacy attachments fallback
+    legacy_attachments = messages.filter(attachment__isnull=False).exclude(attachment='')
+    legacy_photos_videos = legacy_attachments.filter(attachment_type__in=['image', 'video']).order_by('-created_at')
+    legacy_docs = legacy_attachments.filter(attachment_type='document').order_by('-created_at')
+    legacy_audio = legacy_attachments.filter(attachment_type='audio').order_by('-created_at')
+    
+    media_links = messages.filter(
+        models.Q(link_url__isnull=False) | models.Q(link_preview__isnull=False)
+    ).exclude(link_url='').select_related('link_preview').order_by('-created_at')
+    
+    # Followed friends for new conversation modal in left rail
+    from users.models import User
+    users = User.objects.filter(
+        follower_relationships__follower=request.user
+    ).exclude(id=request.user.id).distinct()
+
+    existing_direct_user_ids = set(ConversationMember.objects.filter(
+        conversation__type='direct',
+        conversation__members__user=request.user
+    ).exclude(user=request.user).values_list('user_id', flat=True))
+
+    unmessaged_friends = users.exclude(id__in=existing_direct_user_ids)
+
     # Calculate today and yesterday dates
     today = timezone.now().date()
     yesterday = today - timedelta(days=1)
-    
+
     context = {
         'conversation': conversation,
         'messages': messages,
+        'conversation_data': conversation_data,
+        'users': users,
+        'unmessaged_friends': unmessaged_friends,
+        'media_photos_videos': media_photos_videos,
+        'media_docs': media_docs,
+        'media_audio': media_audio,
+        'legacy_photos_videos': legacy_photos_videos,
+        'legacy_docs': legacy_docs,
+        'legacy_audio': legacy_audio,
+        'media_links': media_links,
         'today': today.strftime('%Y-%m-%d'),
         'yesterday': yesterday.strftime('%Y-%m-%d'),
     }

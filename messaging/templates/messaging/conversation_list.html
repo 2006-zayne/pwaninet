@@ -163,21 +163,64 @@ document.addEventListener('click', function(e) {
 
   /* ── Page wrapper ── */
   .page-wrap {
-    max-width: 1400px;
+    max-width: 100%;
     margin: 0 auto;
-    padding: 2rem 1.5rem 5rem;
+    padding: 1.5rem 1rem 5rem;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
   }
 
-  /* ── Mobile Full Screen ── */
-  @media (max-width: 767px) {
+  /* ── Mobile Edge-to-Edge (matches Postcard) ── */
+  @media (max-width: 768px) {
     .page-wrap {
       max-width: 100% !important;
-      padding: 1rem 0 5rem;
+      padding: 0.75rem 0 5rem 0 !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+      overflow-x: hidden !important;
     }
     .container, .container-fluid {
       max-width: 100% !important;
       padding-left: 0 !important;
       padding-right: 0 !important;
+    }
+    .page-header {
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+    .view-toggle {
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+    .section-header {
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+    .card,
+    .conversation-card,
+    .suggestion-card,
+    .tip-card,
+    .empty-state {
+      border-radius: 0 !important;
+      border-left: 0 !important;
+      border-right: 0 !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      margin-bottom: 0.5rem !important;
+      box-shadow: none !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    .card-body {
+      padding: 0.85rem 10px !important;
+    }
+    .suggestions-grid,
+    .conversations-grid {
+      grid-template-columns: 1fr !important;
+      gap: 0.5rem !important;
+      width: 100% !important;
+      padding: 0 !important;
     }
   }
 
@@ -187,8 +230,14 @@ document.addEventListener('click', function(e) {
     align-items: flex-end;
     justify-content: space-between;
     gap: 1rem;
-    margin-bottom: 2.5rem;
+    margin-bottom: 1.5rem;
     flex-wrap: wrap;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .page-header-left {
+    min-width: 0;
+    flex: 1;
   }
   .page-eyebrow {
     font-size: 0.62rem;
@@ -208,11 +257,11 @@ document.addEventListener('click', function(e) {
     display: inline-block;
   }
   .page-title {
-    font-size: 2rem;
+    font-size: 1.85rem;
     font-weight: 900;
     color: var(--text-primary);
-    letter-spacing: -1.5px;
-    line-height: 1;
+    letter-spacing: -1px;
+    line-height: 1.1;
     margin: 0;
   }
 
@@ -220,7 +269,7 @@ document.addEventListener('click', function(e) {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 0.65rem 1.4rem;
+    padding: 0.6rem 1.25rem;
     background: var(--brand);
     color: #fff;
     border: none;
@@ -232,6 +281,7 @@ document.addEventListener('click', function(e) {
     transition: all 0.18s var(--ease);
     letter-spacing: 0.02em;
     white-space: nowrap;
+    flex-shrink: 0;
   }
   .btn-create:hover {
     background: #1d4ed8;
@@ -267,11 +317,20 @@ document.addEventListener('click', function(e) {
 
   /* ── View Toggle ── */
   .view-toggle {
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.25rem;
     border-bottom: 1px solid var(--border);
+    display: flex;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .view-toggle .nav-item {
+    flex: 1;
+    text-align: center;
   }
   .view-toggle .nav-link {
-    padding: 0.6rem 1.4rem;
+    width: 100%;
+    text-align: center;
+    padding: 0.65rem 1rem;
     color: var(--text-secondary) !important;
     font-size: 0.85rem;
     font-weight: 700;
@@ -291,23 +350,28 @@ document.addEventListener('click', function(e) {
     background: transparent !important;
   }
 
-  /* ── Two-column layout ── */
+  /* ── Layout ── */
   .messaging-layout {
-    display: grid;
-    grid-template-columns: 360px 1fr;
-    gap: 2rem;
-    align-items: start;
-  }
-  @media (max-width: 1024px) {
-    .messaging-layout { grid-template-columns: 1fr; }
-    .sidebar-sticky { position: static !important; }
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
   @media (max-width: 768px) {
-    .messaging-layout { gap: 1.5rem; }
-    .page-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+    .messaging-layout { gap: 1rem; }
+    .page-header { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
     .page-title { font-size: 1.5rem; }
   }
-  .sidebar-sticky { position: sticky; top: 88px; }
+  .sidebar-sticky {
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
 
   /* ── Suggestions-only layout ── */
   .suggestions-only-layout {
@@ -619,8 +683,27 @@ document.addEventListener('click', function(e) {
     box-shadow: var(--shadow-card);
     overflow: hidden;
     margin-bottom: 1.25rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
-  .card-body { padding: 0.5rem; }
+  .card-body {
+    padding: 1.25rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  @media (max-width: 768px) {
+    .card {
+      border-radius: var(--radius-md);
+      margin-bottom: 1rem;
+    }
+    .card-body {
+      padding: 0.85rem 0.5rem;
+    }
+  }
 
   /* ── Sidebar: Recent Chats ── */
   .sidebar-label {
@@ -629,37 +712,53 @@ document.addEventListener('click', function(e) {
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    margin-bottom: 1rem;
+    margin-bottom: 0.85rem;
+    padding-left: 0.25rem;
     display: flex;
     align-items: center;
     gap: 6px;
   }
   .chats-scroll {
-    max-height: 56vh;
+    max-height: calc(100vh - 220px);
     overflow-y: auto;
+    overflow-x: hidden;
     padding-right: 2px;
+    width: 100%;
+    box-sizing: border-box;
   }
   .chats-scroll::-webkit-scrollbar { width: 3px; }
   .chats-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 
+  @media (max-width: 768px) {
+    .chats-scroll {
+      max-height: none !important;
+      overflow-y: visible !important;
+      overflow-x: hidden !important;
+    }
+  }
+
   .chat-row {
     display: flex;
     align-items: center;
-    gap: 11px;
-    padding: 0.6rem 0.65rem 0.6rem 0.25rem;
+    gap: 12px;
+    padding: 0.65rem 0.6rem;
     border-radius: var(--radius-md);
     text-decoration: none;
     transition: background 0.15s var(--ease), transform 0.15s var(--ease);
     position: relative;
-    margin-bottom: 2px;
+    margin-bottom: 3px;
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
   .chat-row:hover {
     background: var(--brand-light);
-    transform: translateX(3px);
+    transform: translateX(2px);
   }
   .chat-avatar {
-    width: 56px; height: 56px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
@@ -670,14 +769,34 @@ document.addEventListener('click', function(e) {
     border-color: #22c55e;
   }
   .chat-icon {
-    width: 56px; height: 56px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     background: var(--brand-light);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
     color: var(--brand);
     flex-shrink: 0;
     border: 2px solid var(--border);
+  }
+
+  .chat-info {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .chat-top-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
   }
   .chat-name {
     font-size: 0.95rem;
@@ -686,17 +805,40 @@ document.addEventListener('click', function(e) {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 160px;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    min-width: 0;
+    max-width: 100%;
+    flex: 1;
+    margin: 0;
+  }
+  .chat-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .chat-bottom-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    margin-top: 2px;
   }
   .chat-preview {
-    font-size: 0.75rem;
+    font-size: 0.78rem;
     color: var(--text-muted);
-    font-weight: 600;
-    margin-top: 1px;
+    font-weight: 500;
+    margin: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 160px;
+    min-width: 0;
+    flex: 1;
+    max-width: none;
+    line-height: 1.35;
   }
   .chat-preview-text {
     font-weight: 400;
@@ -763,37 +905,36 @@ document.addEventListener('click', function(e) {
   }
   
   .chat-arrow {
-    margin-left: auto;
+    margin-left: 4px;
     color: var(--text-muted);
     font-size: 13px;
-    opacity: 0;
-    transition: opacity 0.15s;
+    opacity: 0.4;
+    transition: opacity 0.15s, transform 0.15s;
     flex-shrink: 0;
   }
-  .chat-row:hover .chat-arrow { opacity: 1; }
+  .chat-row:hover .chat-arrow {
+    opacity: 1;
+    transform: translateX(2px);
+  }
 
   /* ── Unread Badge ── */
   .unread-badge {
-    background: var(--danger);
+    background: var(--brand);
     color: #fff;
     font-size: 0.65rem;
     font-weight: 800;
     border-radius: var(--radius-pill);
-    padding: 2px 8px;
-    min-width: 20px;
+    padding: 2px 7px;
+    min-width: 18px;
     text-align: center;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    animation: badge-pulse 2s infinite;
+    line-height: 1.2;
   }
   .unread-badge:hover {
-    background: #b91c1c;
+    background: #1d4ed8;
     text-decoration: none;
-  }
-  @keyframes badge-pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
   }
 
   /* Sidebar: tip card */
@@ -989,60 +1130,59 @@ document.addEventListener('click', function(e) {
                     {% else %}
                       {% for member in conversation.members.all %}
                         {% if member.user != request.user %}
-                          <img src="{{ member.user.profile_pic.url }}" 
-                               class="chat-avatar" 
-                               alt="{{ member.user.username }}"
-                               data-user-id="{{ member.user.id }}">
+                          {% if member.user.profile_pic %}
+                            <img src="{{ member.user.profile_pic.url }}" 
+                                 class="chat-avatar" 
+                                 alt="{{ member.user.username }}"
+                                 data-user-id="{{ member.user.id }}">
+                          {% else %}
+                            <div class="chat-avatar d-flex align-items-center justify-content-center bg-secondary text-white"
+                                 data-user-id="{{ member.user.id }}">
+                              <i class="bi bi-person-fill fs-5"></i>
+                            </div>
+                          {% endif %}
                         {% endif %}
                       {% endfor %}
                     {% endif %}
-                    <div style="min-width:0; flex:1; display: flex; align-items: center;">
-                      <div style="flex: 1;">
-                        <div class="chat-name">
+                    <div class="chat-info">
+                      <div class="chat-top-line">
+                        <h4 class="chat-name">
                           {% if conversation.type == 'group' and conversation.name %}
-                            {{ conversation.name }}
+                            <span title="{{ conversation.name }}">{{ conversation.name|truncatechars:28 }}</span>
                           {% else %}
                             {% for member in conversation.members.all %}
                               {% if member.user != request.user %}
-                                {{ member.user.username }}
+                                <span title="{{ member.user.username }}">{{ member.user.username|truncatechars:25 }}</span>
                               {% endif %}
                             {% endfor %}
                           {% endif %}
+                        </h4>
+                        <div class="chat-meta">
                           {% if conversation.unread_count > 0 %}
-                            <a href="{% url 'messaging:conversation_detail' conversation.id %}"
-                               class="unread-badge"
-                               style="margin-left: 8px; text-decoration: none;"
-                               title="{{ conversation.unread_count }} unread messages">
+                            <span class="unread-badge">
                               {{ conversation.unread_count }}
-                            </a>
+                            </span>
+                          {% elif conversation.last_message and conversation.last_message.sender == request.user %}
+                            <span class="read-receipt-icon" style="font-size: 12px; color: var(--text-muted);">&#10003;</span>
                           {% endif %}
                         </div>
+                      </div>
+                      <div class="chat-bottom-line">
                         <div class="chat-preview">
                           {% if conversation.last_message %}
                             {% if conversation.last_message.sender == request.user %}
                               <span class="chat-preview-text{% if conversation.unread_count > 0 %} unread{% endif %}">
-                                You: {{ conversation.last_message.content|truncatechars:60 }}
+                                You: {{ conversation.last_message.content|truncatechars:38 }}
                               </span>
                             {% else %}
                               <span class="chat-preview-text{% if conversation.unread_count > 0 %} unread{% endif %}">
-                                {{ conversation.last_message.sender.username }}: {{ conversation.last_message.content|truncatechars:60 }}
+                                {{ conversation.last_message.sender.username }}: {{ conversation.last_message.content|truncatechars:38 }}
                               </span>
                             {% endif %}
                           {% else %}
                             <span class="chat-preview-text">Start a conversation</span>
                           {% endif %}
                         </div>
-                        {% if conversation.unread_count > 0 %}
-                          <div class="unread-badge-circle" style="background: var(--brand); color: white; font-size: 11px; font-weight: 800; padding: 0; min-width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: absolute; right: 12px; top: 50%; transform: translateY(-50%);">
-                            {{ conversation.unread_count }}
-                          </div>
-                        {% elif conversation.last_message and conversation.last_message.sender == request.user %}
-                        <div class="read-receipt-indicator" data-status="sent" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%);">
-                          <div class="read-receipt-circle" style="width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                            <span class="read-receipt-icon" style="font-size: 10px; font-weight: bold;">&#10003;</span>
-                          </div>
-                        </div>
-                      {% endif %}
                       </div>
                     </div>
                     <i class="bi bi-chevron-right chat-arrow"></i>
@@ -1081,34 +1221,35 @@ document.addEventListener('click', function(e) {
           </div>
 
         </aside>
+      </div> <!-- /.messaging-layout -->
+    </div> <!-- /#messages-content -->
 
-              
-      <!-- Suggestions Tab -->
-      <div class="tab-pane fade" id="suggestions-content" role="tabpanel">
-        <div class="suggestions-only-layout">
-          <div class="section-header">
-            <h2 class="section-title">Suggested Friends</h2>
-            <span class="count-pill">{{ suggested_users|length }} suggestion{{ suggested_users|length|pluralize }}</span>
-          </div>
-
-          <!-- Debug info -->
-          {% if debug %}
-          <div style="background: yellow; padding: 10px; margin: 10px 0;">
-            <strong>DEBUG:</strong> suggested_users count = {{ suggested_users|length }}<br>
-            {% for user in suggested_users %}
-              - {{ user.username }} (ID: {{ user.id }})<br>
-            {% empty %}
-              No suggested users found
-            {% endfor %}
-          </div>
-          {% endif %}
-
-         {% include 'messaging/partials/suggestion_cards.html' %}
+    <!-- Suggestions Tab -->
+    <div class="tab-pane fade" id="suggestions-content" role="tabpanel">
+      <div class="suggestions-only-layout">
+        <div class="section-header">
+          <h2 class="section-title">Suggested Friends</h2>
+          <span class="count-pill">{{ suggested_users|length }} suggestion{{ suggested_users|length|pluralize }}</span>
         </div>
-      </div>
 
-  </div>
-</div>
+        <!-- Debug info -->
+        {% if debug %}
+        <div style="background: yellow; padding: 10px; margin: 10px 0;">
+          <strong>DEBUG:</strong> suggested_users count = {{ suggested_users|length }}<br>
+          {% for user in suggested_users %}
+            - {{ user.username }} (ID: {{ user.id }})<br>
+          {% empty %}
+            No suggested users found
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% include 'messaging/partials/suggestion_cards.html' %}
+      </div>
+    </div> <!-- /#suggestions-content -->
+
+  </div> <!-- /#messagingTabContent -->
+</div> <!-- /.page-wrap -->
 
 <!-- New Conversation Modal -->
 <div class="modal fade" id="newConversationModal" tabindex="-1">

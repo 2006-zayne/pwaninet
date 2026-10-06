@@ -373,6 +373,77 @@ export class Store {
     }
 
     /**
+     * Set recording audio indicator
+     * @param {number} userId - User ID
+     * @param {string} username - Username
+     * @param {boolean} isRecording - Is recording
+     */
+    setRecordingIndicator(userId, username, isRecording) {
+        if (!this._state.recordingUsers) {
+            this._state.recordingUsers = new Map();
+        }
+        if (isRecording) {
+            this._state.recordingUsers.set(userId, username);
+        } else {
+            this._state.recordingUsers.delete(userId);
+        }
+        this._notifySubscribers();
+    }
+
+    /**
+     * Update an optimistic message with real server ID and sent status
+     * @param {string} tempId - Temporary ID
+     * @param {number|string} actualId - Real server ID
+     * @param {string} status - New status ('sent')
+     * @param {string} timestamp - Server timestamp
+     */
+    updateMessageIdAndStatus(tempId, actualId, status = 'sent', timestamp = null) {
+        const msg = this._state.messages.get(tempId);
+        if (!msg) return;
+
+        this._state.messages.delete(tempId);
+        this._state.processedMessageIds.delete(tempId);
+        this._state.processedMessageIds.add(String(actualId));
+
+        const updated = {
+            ...msg,
+            id: String(actualId),
+            status: status,
+            isOptimistic: false,
+            timestamp: timestamp || msg.timestamp
+        };
+
+        const tempIndex = this._state.messageOrder.indexOf(tempId);
+        if (tempIndex !== -1) {
+            this._state.messageOrder[tempIndex] = String(actualId);
+        } else {
+            this._state.messageOrder.push(String(actualId));
+        }
+
+        this._state.messages.set(String(actualId), updated);
+        this._notifySubscribers();
+    }
+
+    /**
+     * Mark all sent messages up to a given ID as read
+     * @param {number|string} lastReadMessageId - Highest message ID read
+     */
+    markMessagesAsReadUpTo(lastReadMessageId) {
+        let changed = false;
+        const targetId = parseInt(lastReadMessageId, 10);
+        for (const [id, msg] of this._state.messages.entries()) {
+            const numericId = parseInt(id, 10);
+            if (!isNaN(numericId) && numericId <= targetId && msg.status !== 'read') {
+                msg.status = 'read';
+                changed = true;
+            }
+        }
+        if (changed) {
+            this._notifySubscribers();
+        }
+    }
+
+    /**
      * Set UI state
      * @param {string} state - UI state
      */

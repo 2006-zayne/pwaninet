@@ -31,7 +31,7 @@
                         </div>
                     {% endif %}
                     <div class="overflow-hidden flex-grow-1" style="min-width: 0; max-width: 100%;">
-                        <div class="fw-semibold text-dark text-truncate small" title="{{ group.name }}">{{ group.name }}</div>
+                        <div class="fw-semibold text-dark text-truncate small" title="{{ group.name }}">{{ group.name|truncatechars:28 }}</div>
                         <div class="text-secondary x-small text-truncate">
                             {% with act=group_activity|get_activity:group.id %}
                                 {% if act.total > 0 %}

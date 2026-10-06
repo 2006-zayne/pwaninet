@@ -292,14 +292,19 @@
                 justify-content: stretch !important;
             }
             .auth-guest-entry-shell > .desktop-left-rail,
-            .auth-guest-entry-shell > .desktop-context-rail {
+            .auth-guest-entry-shell > .desktop-context-rail,
+            .in-conversation-shell > .desktop-left-rail,
+            .in-conversation-shell > .desktop-context-rail {
                 display: none !important;
             }
-            .auth-guest-entry-shell > .desktop-center-panel {
-                grid-column: 1 !important;
+            .auth-guest-entry-shell > .desktop-center-panel,
+            .in-conversation-shell > .desktop-center-panel {
+                grid-column: 1 / -1 !important;
                 width: 100% !important;
                 max-width: none !important;
                 justify-self: stretch !important;
+                padding: 0 !important;
+                margin: 0 !important;
             }
             .desktop-context-rail {
                 grid-column: 3 !important;
@@ -1057,6 +1062,11 @@
                 font-size: 1.45rem;
             }
 
+            .mobile-bottom-nav .nav-chip .nav-profile-avatar {
+                width: 22px;
+                height: 22px;
+            }
+
             .mobile-bottom-nav .nav-chip {
                 padding: 4px 6px;
                 min-width: 38px;
@@ -1189,8 +1199,8 @@
             bottom: calc(6px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
             left: 50%;
             transform: translateX(-50%);
-            width: 95%;
-            max-width: 420px;
+            width: 96%;
+            max-width: 440px;
             display: flex;
             justify-content: space-around;
             align-items: center;
@@ -1198,15 +1208,16 @@
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             z-index: 9999;
-            padding: 0 8px;
+            padding: 0 4px;
             transition: bottom 0.2s ease, transform 0.2s ease;
         }
 
         .mobile-bottom-nav .nav-chip {
             color: var(--text-secondary);
-            padding: 4px 8px;
-            border-radius: 14px;
-            min-width: 44px;
+            padding: 4px 2px;
+            border-radius: 12px;
+            min-width: 36px;
+            flex: 1;
             min-height: 44px;
             display: flex;
             flex-direction: column;
@@ -1242,6 +1253,16 @@
             display: block;
         }
 
+        .mobile-bottom-nav .nav-chip .nav-profile-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            object-fit: cover;
+            display: block;
+            border: 1.5px solid transparent;
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
         .mobile-bottom-nav .nav-chip span {
             font-size: 0.62rem;
             font-weight: 600;
@@ -1254,6 +1275,11 @@
         }
 
         .mobile-bottom-nav .nav-chip.active i {
+            transform: scale(1.08);
+        }
+
+        .mobile-bottom-nav .nav-chip.active .nav-profile-avatar {
+            border-color: var(--primary);
             transform: scale(1.08);
         }
 
@@ -1313,6 +1339,11 @@
                 z-index: 10002 !important;
                 border-bottom: none !important;
                 box-shadow: none !important;
+            }
+
+            /* Hide top header avatar when mobile nav is positioned at top to prevent duplicate profile pictures */
+            [data-mobile-nav-position="top"] .navbar-top .avatar-link {
+                display: none !important;
             }
 
             /* Ensure theme toggle and other dropdown menus in navbar-top sit on top of the navigation bar */
@@ -1849,7 +1880,7 @@
     </div>
 
     <!-- Desktop Three-Surface Shell / Mobile Single-Surface Shell -->
-    <div class="app-shell-layout{% if request.resolver_match.url_name == 'login' or request.resolver_match.url_name == 'login_direct' or request.resolver_match.url_name == 'register' %}{% if not request.user.is_authenticated %} auth-guest-entry-shell{% endif %}{% endif %}" id="app-shell-layout">
+    <div class="app-shell-layout{% if request.resolver_match.url_name == 'login' or request.resolver_match.url_name == 'login_direct' or request.resolver_match.url_name == 'register' %}{% if not request.user.is_authenticated %} auth-guest-entry-shell{% endif %}{% endif %}{% if request.resolver_match.url_name == 'conversation_detail' %} in-conversation-shell{% endif %}" id="app-shell-layout">
 
         <!-- 1. LEFT RAIL: Persistent Global Navigation (Desktop only: >= 992px) -->
         <aside id="left-nav-rail" class="desktop-left-rail d-none d-lg-block" aria-label="{% trans 'Global Navigation' %}">
@@ -2806,6 +2837,20 @@
                 <span>{% trans "Groups" %}</span>
             </a>
             {% if user.is_authenticated %}
+                <a href="{% url 'messaging:conversation_list' %}"
+                   class="nav-chip {% if request.resolver_match.app_name == 'messaging' %}active{% endif %}"
+                   data-haptic="light"
+                   data-bypass-htmx="true"
+                   hx-boost="false"
+                   aria-label="{% trans 'Chats' %}">
+                    <span class="position-relative d-inline-block"
+                          hx-get="{% url 'messaging:unread_message_count' %}"
+                          hx-trigger="load, every 60s"
+                          hx-swap="innerHTML">
+                        <i class="bi bi-chat-dots-fill"></i>
+                    </span>
+                    <span>{% trans "Chats" %}</span>
+                </a>
                 <a href="{% url 'posts:create_post' %}"
                    class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}"
                    data-haptic="light"
@@ -2859,7 +2904,11 @@
                    hx-sync="#page-content-target:replace"
                    hx-trigger="click delay:10ms"
                    aria-label="{% trans 'Profile' %}">
-                    <i class="bi bi-person-circle"></i>
+                    {% if request.user.profile_pic %}
+                        <img src="{{ request.user.profile_pic.url }}" class="nav-profile-avatar" alt="{% trans 'Profile' %}">
+                    {% else %}
+                        <i class="bi bi-person-circle"></i>
+                    {% endif %}
                     <span>{% trans "Profile" %}</span>
                 </a>
             {% endif %}

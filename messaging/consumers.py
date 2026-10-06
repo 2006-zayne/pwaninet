@@ -1,57 +1,53 @@
 import json
 import asyncio
+import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
+from django.utils import timezone
+from django.db.models import Count
 from django.contrib.auth import get_user_model
-from pwaninet.redis_client import get_redis_client
-from .models import Conversation, ConversationMember, Message, PendingMessage
-from .ws_middleware import WebSocketRateLimiter, WebSocketConnectionTracker
-from .observability import metrics
+
+from .models import Conversation, ConversationMember, Message, MessageReaction, MessageAttachment
+from .serializers import MessageSerializer
 from .presence import PresenceService
+from .ws_middleware import WebSocketConnectionTracker, WebSocketRateLimiter
+from .observability import metrics
+from .services.link_preview_service import LinkPreviewService
 
-# ARCHITECTURAL RULE:
-# Each WebSocket consumer must have a single source of truth file.
-# Duplicate class names across modules are forbidden.
-# This file contains ONLY ChatConsumer for messaging functionality.
-
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
-# Heartbeat interval in seconds
-HEARTBEAT_INTERVAL = 30
-MESSAGE_TIMEOUT = 5  # seconds to wait for message processing
-WS_MESSAGE_RATE = 100  # messages per minute
+HEARTBEAT_INTERVAL = 25
+WS_MESSAGE_RATE = 120  # messages per minute
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
-    """WebSocket consumer for real-time chat in conversations with heartbeat."""
+    """
+    High-performance real-time 1:1 and group WebSocket consumer.
+    Provides instant message transmission, real WhatsApp-style checkmark receipts
+    (Sent -> Delivered -> Read), Telegram-speed optimistic ACKs, typing indicators,
+    audio recording states, and floating emoji reactions.
+    """
 
-    
     async def connect(self):
-        """Handle WebSocket connection with heartbeat task and rate limiting."""
-
         self.user = self.scope.get('user')
-        self.user_id = getattr(self.user, "id", None)
-
+        self.user_id = getattr(self.user, 'id', None)
         self.conversation_id = self.scope['url_route']['kwargs']['conversation_id']
         self.room_group_name = f'chat_{self.conversation_id}'
-        self.heartbeat_task = None
         self.connection_id = self.channel_name
 
-        print(f"[BACKEND] WebSocket connection attempt from user {self.user_id} to conversation {self.conversation_id}")
-
         if not self.user or not self.user.is_authenticated:
-            print("[BACKEND] Unauthenticated user, closing connection")
-            await self.close()
+            await self.close(code=4001)
             return
 
-        is_member = await self.is_conversation_member()
-
+        is_member = await self._is_member()
         if not is_member:
-            print(f"[BACKEND] User {self.user_id} is not a member, closing connection")
-            await self.close()
+            logger.warning(f"User {self.user_id} denied access to conversation {self.conversation_id}")
+            await self.close(code=4003)
             return
 
-        tracked = WebSocketConnectionTracker.register_connection(
+        # Register connection tracking & presence
+        WebSocketConnectionTracker.register_connection(
             self.user_id,
             self.connection_id,
             metadata={
@@ -60,348 +56,333 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }
         )
 
-        if not tracked:
-            print("[BACKEND] Connection not tracked, closing")
-            await self.close()
-            return
-
-        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
-        try:
-            await self.accept()
-        except RuntimeError as e:
-            print(f"[BACKEND] Error accepting WebSocket connection: {e}")
-            await self.close()
-            return
-
-        # Record initial heartbeat for this connection
         PresenceService.record_heartbeat(
             self.user_id,
             self.connection_id,
-            metadata={
-                'conversation_id': self.conversation_id,
-                'ip': self.scope.get('client', ['unknown'])[0],
-            }
+            metadata={'conversation_id': self.conversation_id}
         )
 
-        connection_count = WebSocketConnectionTracker.get_connection_count(self.user_id)
+        # Join conversation room group
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.accept()
 
-        # Record reconnect metrics if this is a reconnection
-        if connection_count > 1:
-            metrics.record_websocket_reconnect(self.user_id, self.conversation_id)
-
-        # Broadcast user online status based on heartbeat freshness
-        is_online = PresenceService.is_user_online(self.user_id)
-        if is_online:
+        # Mark all pending messages sent to this user as 'delivered'
+        delivered_ids = await self._mark_received_messages_delivered()
+        for msg_id in delivered_ids:
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
-                    'type': 'user_status',
-                    'user_id': self.user_id,
-                    'username': self.user.username,
-                    'is_online': True
+                    'type': 'message_status_event',
+                    'message_id': msg_id,
+                    'status': 'delivered'
                 }
             )
 
-            other_members = await self.get_other_conversation_members()
-
-            for member_id in other_members:
-                await self.channel_layer.group_send(
-                    f'notifications_{member_id}',
-                    {
-                        'type': 'user_status',
-                        'user_id': self.user_id,
-                        'username': self.user.username,
-                        'is_online': True
-                    }
-                )
-
-        await self.send_peer_online_status()
-
-        # Record active connection
-        metrics.record_active_connection(self.user_id, self.conversation_id, 'connect')
-
-        # Retry pending messages on reconnect
-        await self.retry_pending_messages()
-   
-
-    async def disconnect(self, close_code):
-        """Handle WebSocket disconnection and cleanup."""
-
-        # Safe guard: ensure user_id exists
-        user_id = getattr(self, "user_id", None)
-        conversation_id = getattr(self, "conversation_id", None)
-        if not user_id:
-            return
-
-
-        # Leave room group safely
-        room_group_name = getattr(self, "room_group_name", None)
-        if room_group_name:
-            await self.channel_layer.group_discard(
-                room_group_name,
-                self.channel_name
-            )
-
-        # Remove connection from presence tracking
-        PresenceService.remove_connection(user_id, self.channel_name)
-
-        # Unregister connection safely
-        WebSocketConnectionTracker.unregister_connection(user_id, self.channel_name)
-
-        # Check connection count safely and clamp to 0
-        connection_count = WebSocketConnectionTracker.get_connection_count(user_id)
-        if connection_count <= 0:
-            connection_count = 0
-
-        # Debug logging
-        print(f"[TRACKER] User {user_id} connections after disconnect: {connection_count}")
-
-        # Record disconnect metrics
-        if conversation_id:
-            metrics.record_active_connection(user_id, conversation_id, 'disconnect')
-
-        # Check if user is still online based on heartbeat freshness
-        # Do NOT rely solely on disconnect events
-        is_online = PresenceService.is_user_online(user_id)
-
-        # Broadcast current status based on heartbeat freshness
-        username = getattr(self.user, "username", "")
-        last_seen = PresenceService.get_last_seen(user_id)
-
+        # Broadcast online status
         await self.channel_layer.group_send(
-            room_group_name,
+            self.room_group_name,
             {
-                'type': 'user_status',
-                'user_id': user_id,
-                'username': username,
-                'is_online': is_online,
-                'last_seen': last_seen.isoformat() if last_seen else None
+                'type': 'user_status_event',
+                'user_id': self.user_id,
+                'username': self.user.username,
+                'is_online': True,
+                'last_seen': None
             }
         )
 
-        other_members = await self.get_other_conversation_members()
+        # Send peer's current presence status to the newly connected user
+        peer_status = await self._get_peer_presence()
+        if peer_status:
+            await self.send(text_data=json.dumps({
+                'type': 'peer_status',
+                **peer_status
+            }))
 
-        for member_id in other_members:
+    async def disconnect(self, close_code):
+        if not self.user_id:
+            return
+
+        # Discard from room group
+        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+
+        # Unregister presence & connection
+        PresenceService.remove_connection(self.user_id, self.channel_name)
+        WebSocketConnectionTracker.unregister_connection(self.user_id, self.channel_name)
+
+        is_still_online = PresenceService.is_user_online(self.user_id)
+        last_seen = PresenceService.get_last_seen(self.user_id) or timezone.now()
+
+        if not is_still_online:
+            await PresenceService.persist_last_seen_to_db(self.user_id)
             await self.channel_layer.group_send(
-                f'notifications_{member_id}',
+                self.room_group_name,
                 {
-                    'type': 'user_status',
-                    'user_id': user_id,
-                    'username': username,
-                    'is_online': is_online,
-                    'last_seen': last_seen.isoformat() if last_seen else None
+                    'type': 'user_status_event',
+                    'user_id': self.user_id,
+                    'username': self.user.username,
+                    'is_online': False,
+                    'last_seen': last_seen.isoformat() if hasattr(last_seen, 'isoformat') else str(last_seen)
                 }
             )
 
-        # If user is truly offline (no heartbeat, no connections), persist to DB
-        if not is_online and connection_count == 0:
-            await PresenceService.persist_last_seen_to_db(user_id)
-            PresenceService.cleanup_stale_presence(user_id)
-
-
     async def receive(self, text_data):
-        """Handle incoming WebSocket messages with timeout and rate limiting."""
-        # Check rate limit
-        if WebSocketRateLimiter.is_rate_limited(self.user.id, self.connection_id, WS_MESSAGE_RATE):
+        """Receive message from WebSocket and dispatch action."""
+        if WebSocketRateLimiter.is_rate_limited(self.user_id, self.connection_id, WS_MESSAGE_RATE):
             await self.send(text_data=json.dumps({
                 'type': 'error',
-                'message': 'Rate limit exceeded'
+                'message': 'Rate limit exceeded. Please wait a moment.'
             }))
             return
 
         try:
             data = json.loads(text_data)
-            message_type = data.get('type')
-
-            # Handle client heartbeat for presence tracking
-            if message_type == 'heartbeat':
-                await self.handle_heartbeat()
-                return
-
-            # Skip heartbeat responses
-            if message_type == 'pong':
-                return
-
-            if message_type == 'chat_message':
-                await asyncio.wait_for(self.handle_chat_message(data), timeout=MESSAGE_TIMEOUT)
-            elif message_type == 'typing_indicator':
-                await asyncio.wait_for(self.handle_typing_indicator(data), timeout=MESSAGE_TIMEOUT)
-            elif message_type == 'read_receipt':
-                await asyncio.wait_for(self.handle_read_receipt(data), timeout=MESSAGE_TIMEOUT)
-        except asyncio.TimeoutError:
-            await self.send(text_data=json.dumps({
-                'type': 'error',
-                'message': 'Message processing timeout'
-            }))
         except json.JSONDecodeError:
-            pass
-        except Exception as e:
-            await self.send(text_data=json.dumps({
-                'type': 'error',
-                'message': str(e)
-            }))
-
-    async def handle_chat_message(self, data):
-        """Handle incoming chat message with retry logic and latency tracking."""
-        content = data.get('content')
-        encrypted_content = data.get('encrypted_content')
-        is_encrypted = data.get('is_encrypted', False)
-        reply_to_id = data.get('reply_to')
-        attachment = data.get('attachment')
-        attachment_type = data.get('attachment_type')
-        link_url = data.get('link_url')
-        link_title = data.get('link_title')
-        link_description = data.get('link_description')
-        link_image = data.get('link_image')
-        link_type = data.get('link_type')
-        
-        print(f'[BACKEND] Handling chat message from user {self.user.id} in conversation {self.conversation_id}')
-        temp_id = data.get('temp_id')  # Get temp_id for optimistic update matching
-
-        # Must have either plain content, encrypted content, attachment, or link
-        if not content and not encrypted_content and not attachment and not link_url:
             return
 
-        # Track message latency
-        start_time = asyncio.get_event_loop().time()
+        msg_type = data.get('type')
 
-        try:
-            # Create message in database
-            message = await self.create_message(content, encrypted_content, is_encrypted, reply_to_id, attachment, attachment_type, link_url, link_title, link_description, link_image, link_type)
+        if msg_type == 'heartbeat':
+            PresenceService.record_heartbeat(self.user_id, self.connection_id)
+            await self.send(text_data=json.dumps({'type': 'pong'}))
 
-            # Add temp_id to message for client-side optimistic update matching
-            if temp_id:
-                message['temp_id'] = temp_id
+        elif msg_type == 'chat_message':
+            await self._handle_chat_message(data)
 
-            # Broadcast to room group
-            print(f'[BACKEND] Broadcasting message {message["id"]} to room group: {self.room_group_name}')
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'chat_message',
-                    'message': message
-                }
-            )
-            print(f'[BACKEND] Message {message["id"]} broadcasted to room group')
-            
-            # Calculate and record latency
-            end_time = asyncio.get_event_loop().time()
-            latency_ms = (end_time - start_time) * 1000
-            metrics.record_message_latency(self.user.id, self.conversation_id, latency_ms)
-            
-            # Update message status to 'delivered' since it was broadcast to the room
-            await self.update_message_status(message['id'], 'delivered')
-            
-            # Broadcast conversation update to other members (not sender) for real-time list updates
-            await self.broadcast_conversation_update_to_others(message)
-            
-            # Broadcast "delivered" status to other members (not the sender)
-            other_members = await self.get_other_conversation_members()
-            for other_member_id in other_members:
-                if other_member_id != self.user.id:
-                    await self.channel_layer.group_send(
-                        self.room_group_name,
-                        {
-                            'type': 'message_delivered',
-                            'message_id': message['id'],
-                            'user_id': other_member_id,
-                            'status': 'delivered'
-                        }
-                    )
-            
-            # Mark any pending message with this temp_id as sent
-            if temp_id:
-                await self.mark_pending_message_sent(temp_id)
-                
-        except Exception as e:
-            print(f'[BACKEND] Error sending message: {e}')
-            # Persist failed message for retry
-            if temp_id:
-                await self.persist_failed_message(data, str(e))
+        elif msg_type == 'message_delivered':
+            await self._handle_message_delivered(data)
 
-    async def handle_typing_indicator(self, data):
-        """Handle typing indicator."""
-        is_typing = data.get('is_typing', False)
+        elif msg_type == 'read_receipt':
+            await self._handle_read_receipt(data)
 
-        # Broadcast to room group
+        elif msg_type == 'typing':
+            await self._handle_typing(data)
+
+        elif msg_type == 'recording_audio':
+            await self._handle_recording_audio(data)
+
+        elif msg_type == 'reaction':
+            await self._handle_reaction(data)
+
+        elif msg_type == 'edit_message':
+            await self._handle_edit_message(data)
+
+        elif msg_type == 'delete_message':
+            await self._handle_delete_message(data)
+
+    # -------------------------------------------------------------
+    # Action Handlers
+    # -------------------------------------------------------------
+
+    async def _handle_chat_message(self, data):
+        temp_id = data.get('temp_id')
+        content = data.get('content', '').strip()
+        reply_to_id = data.get('reply_to_id')
+        message_type = data.get('message_type', 'text')
+        link_url = data.get('link_url')
+
+        if not content and not data.get('attachment_url') and not data.get('attachments'):
+            return
+
+        # Save to database
+        saved_msg, serialized = await self._save_message(data)
+        if not saved_msg:
+            return
+
+        # 1. Send immediate ACK back to sender (Telegram instant feel)
+        await self.send(text_data=json.dumps({
+            'type': 'message_ack',
+            'temp_id': temp_id,
+            'message_id': saved_msg.id,
+            'status': saved_msg.status,
+            'created_at': saved_msg.created_at.isoformat()
+        }))
+
+        # 2. Broadcast message to all conversation members in the room
         await self.channel_layer.group_send(
             self.room_group_name,
             {
-                'type': 'typing_indicator',
-                'user_id': self.user.id,
+                'type': 'chat_message_event',
+                'message': serialized,
+                'temp_id': temp_id
+            }
+        )
+
+        # 3. Check if recipient is active to mark delivered automatically
+        other_members = await self._get_other_members()
+        any_peer_online = any(PresenceService.is_user_online(uid) for uid in other_members)
+        if any_peer_online:
+            await self._set_message_status(saved_msg.id, 'delivered')
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'message_status_event',
+                    'message_id': saved_msg.id,
+                    'status': 'delivered'
+                }
+            )
+
+        # 4. Notify members' personal channel for conversation list updates
+        preview_text = content or (f"[{message_type.capitalize()}]" if message_type != 'text' else 'New message')
+        for member_id in other_members:
+            unread_count = await self._get_unread_count(member_id)
+            await self.channel_layer.group_send(
+                f'notifications_{member_id}',
+                {
+                    'type': 'conversation_update',
+                    'conversation_id': self.conversation_id,
+                    'message_preview': preview_text,
+                    'sender_name': self.user.username,
+                    'timestamp': saved_msg.created_at.isoformat(),
+                    'unread_count': unread_count
+                }
+            )
+
+    async def _handle_message_delivered(self, data):
+        message_id = data.get('message_id')
+        if not message_id:
+            return
+
+        updated = await self._set_message_status(message_id, 'delivered')
+        if updated:
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'message_status_event',
+                    'message_id': message_id,
+                    'status': 'delivered'
+                }
+            )
+
+    async def _handle_read_receipt(self, data):
+        message_id = data.get('message_id')
+        last_id = await self._update_last_read(message_id)
+        if last_id:
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'read_receipt_event',
+                    'user_id': self.user_id,
+                    'last_read_message_id': last_id
+                }
+            )
+
+    async def _handle_typing(self, data):
+        is_typing = bool(data.get('is_typing', False))
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'typing_event',
+                'user_id': self.user_id,
                 'username': self.user.username,
                 'is_typing': is_typing
             }
         )
-        
-        # Broadcast to notification groups for conversation list updates
-        await self.broadcast_typing_indicator(is_typing)
 
-    async def handle_read_receipt(self, data):
-        """Handle read receipt."""
-        message_id = data.get('message_id')
-
-        if not message_id:
-            return
-
-        print(f'[BACKEND] Processing read receipt for message {message_id} from user {self.user.id}')
-
-        # Mark message as read
-        await self.mark_message_as_read(message_id)
-
-        # Update message status to 'read'
-        await self.update_message_status(message_id, 'read')
-
-        # Get user avatar for the read receipt
-        read_avatar = await self.get_user_avatar()
-        print(f'[BACKEND] Got avatar for read receipt: {read_avatar}')
-
-        # Broadcast to room group
+    async def _handle_recording_audio(self, data):
+        is_recording = bool(data.get('is_recording', False))
         await self.channel_layer.group_send(
             self.room_group_name,
             {
-                'type': 'read_receipt',
+                'type': 'recording_audio_event',
+                'user_id': self.user_id,
+                'username': self.user.username,
+                'is_recording': is_recording
+            }
+        )
+
+    async def _handle_reaction(self, data):
+        message_id = data.get('message_id')
+        emoji = data.get('emoji')
+        if not message_id or not emoji:
+            return
+
+        grouped_reactions = await self._toggle_reaction(message_id, emoji)
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'reaction_event',
                 'message_id': message_id,
-                'user_id': self.user.id,
-                'read_avatar': read_avatar
+                'reactions': grouped_reactions
             }
         )
-        print(f'[BACKEND] Broadcasted read receipt for message {message_id}')
 
-    async def handle_heartbeat(self):
-        """Handle client heartbeat for presence tracking."""
-        # Record heartbeat in presence service
-        PresenceService.record_heartbeat(
-            self.user.id,
-            self.connection_id,
-            metadata={
-                'conversation_id': self.conversation_id,
-                'ip': self.scope.get('client', ['unknown'])[0],
-            }
-        )
-        print(f'[BACKEND] Heartbeat received from user {self.user.id}')
+    async def _handle_edit_message(self, data):
+        message_id = data.get('message_id')
+        content = data.get('content', '').strip()
+        if not message_id or not content:
+            return
 
-    async def chat_message(self, event):
-        """Send chat message to WebSocket."""
-        message = event['message']
-        print(f'[BACKEND] Sending message to client: {message["id"]}')
+        edited = await self._edit_message(message_id, content)
+        if edited:
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'message_edited_event',
+                    'message_id': message_id,
+                    'content': content,
+                    'edited_at': edited.edited_at.isoformat()
+                }
+            )
+
+    async def _handle_delete_message(self, data):
+        message_id = data.get('message_id')
+        if not message_id:
+            return
+
+        deleted = await self._delete_message(message_id)
+        if deleted:
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'message_deleted_event',
+                    'message_id': message_id
+                }
+            )
+
+    # -------------------------------------------------------------
+    # Group Broadcast Dispatches (Downlink to WebSocket)
+    # -------------------------------------------------------------
+
+    async def chat_message_event(self, event):
         await self.send(text_data=json.dumps({
-            'type': 'message',
-            'data': message
+            'type': 'chat_message',
+            'message': event['message'],
+            'temp_id': event.get('temp_id')
         }))
-        print(f'[BACKEND] Message sent to client')
 
-    async def typing_indicator(self, event):
-        """Send typing indicator to WebSocket."""
+    async def message_status_event(self, event):
         await self.send(text_data=json.dumps({
-            'type': 'typing',
+            'type': 'message_status',
+            'message_id': event['message_id'],
+            'status': event['status']
+        }))
+
+    async def read_receipt_event(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'read_receipt',
             'user_id': event['user_id'],
-            'username': event['username'],
-            'is_typing': event['is_typing']
+            'last_read_message_id': event['last_read_message_id']
         }))
 
-    async def user_status(self, event):
-        """Send user online/offline status to WebSocket."""
+    async def typing_event(self, event):
+        if event['user_id'] != self.user_id:
+            await self.send(text_data=json.dumps({
+                'type': 'typing',
+                'user_id': event['user_id'],
+                'username': event['username'],
+                'is_typing': event['is_typing']
+            }))
+
+    async def recording_audio_event(self, event):
+        if event['user_id'] != self.user_id:
+            await self.send(text_data=json.dumps({
+                'type': 'recording_audio',
+                'user_id': event['user_id'],
+                'username': event['username'],
+                'is_recording': event['is_recording']
+            }))
+
+    async def user_status_event(self, event):
         await self.send(text_data=json.dumps({
             'type': 'user_status',
             'user_id': event['user_id'],
@@ -410,429 +391,209 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'last_seen': event.get('last_seen')
         }))
 
-    async def read_receipt(self, event):
-        """Send read receipt to WebSocket."""
+    async def reaction_event(self, event):
         await self.send(text_data=json.dumps({
-            'type': 'read_receipt',
+            'type': 'reaction_update',
             'message_id': event['message_id'],
-            'user_id': event['user_id'],
-            'read_avatar': event.get('read_avatar')
+            'reactions': event['reactions']
         }))
 
-    async def message_delivered(self, event):
-        """Send message delivered status to WebSocket."""
-        # Only send to the recipient (user_id in event), not back to all room members
-        if event.get('user_id') == self.user.id or not event.get('user_id'):
-            # Broadcast to all in room
-            await self.send(text_data=json.dumps({
-                'type': 'message_delivered',
-                'message_id': event['message_id'],
-                'status': 'delivered'
-            }))
+    async def message_edited_event(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'message_edited',
+            'message_id': event['message_id'],
+            'content': event['content'],
+            'edited_at': event['edited_at']
+        }))
+
+    async def message_deleted_event(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'message_deleted',
+            'message_id': event['message_id']
+        }))
+
+    # -------------------------------------------------------------
+    # Database Operations (Async-Safe)
+    # -------------------------------------------------------------
 
     @database_sync_to_async
-    def is_conversation_member(self):
-        """Check if user is a member of the conversation."""
-        try:
-            conversation = Conversation.objects.get(id=self.conversation_id)
-            return conversation.members.filter(user=self.user).exists()
-        except Conversation.DoesNotExist:
-            return False
+    def _is_member(self):
+        return ConversationMember.objects.filter(
+            conversation_id=self.conversation_id,
+            user_id=self.user_id
+        ).exists()
 
     @database_sync_to_async
-    def create_message(self, content, encrypted_content, is_encrypted, reply_to_id, attachment=None, attachment_type=None, link_url=None, link_title=None, link_description=None, link_image=None, link_type=None):
-        """Create a new message in the database."""
-        try:
-            conversation = Conversation.objects.get(id=self.conversation_id)
-            reply_to = None
-            if reply_to_id:
-                reply_to = Message.objects.filter(id=reply_to_id).first()
+    def _get_other_members(self):
+        return list(
+            ConversationMember.objects.filter(conversation_id=self.conversation_id)
+            .exclude(user_id=self.user_id)
+            .values_list('user_id', flat=True)
+        )
 
-            # If conversation is encrypted by default, mark message as encrypted
-            if is_encrypted or (conversation.is_encrypted and encrypted_content):
-                message = Message.objects.create(
-                    conversation=conversation,
-                    sender=self.user,
-                    content=None,  # Don't store plaintext for encrypted messages
-                    encrypted_content=encrypted_content,
-                    is_encrypted=True,
-                    reply_to=reply_to,
-                    attachment=attachment,
-                    attachment_type=attachment_type,
-                    link_url=link_url,
-                    link_title=link_title,
-                    link_description=link_description,
-                    link_image=link_image,
-                    link_type=link_type
-                )
-            else:
-                message = Message.objects.create(
-                    conversation=conversation,
-                    sender=self.user,
-                    content=content,
-                    reply_to=reply_to,
-                    attachment=attachment,
-                    attachment_type=attachment_type,
-                    link_url=link_url,
-                    link_title=link_title,
-                    link_description=link_description,
-                    link_image=link_image,
-                    link_type=link_type
-                )
+    @database_sync_to_async
+    def _get_peer_presence(self):
+        other_member = ConversationMember.objects.filter(
+            conversation_id=self.conversation_id
+        ).exclude(user_id=self.user_id).select_related('user').first()
 
-            # Update conversation timestamp
-            conversation.save()
-
-            # Serialize message
-            from .serializers import MessageSerializer
-            serializer = MessageSerializer(message)
-            return serializer.data
-        except Conversation.DoesNotExist:
+        if not other_member:
             return None
 
-    @database_sync_to_async
-    def mark_message_as_read(self, message_id):
-        """Mark a message as read for the current user using ConversationMember.last_read_message."""
-        try:
-            message = Message.objects.get(id=message_id)
+        peer_user = other_member.user
+        is_online = PresenceService.is_user_online(peer_user.id)
+        last_seen = PresenceService.get_last_seen(peer_user.id)
 
-            # Update member's last read message (replaces per-message read receipts)
-            member = message.conversation.members.filter(user=self.user).first()
-            if member:
-                member.last_read_message = message
-                member.save()
-        except Message.DoesNotExist:
-            pass
+        return {
+            'user_id': peer_user.id,
+            'username': peer_user.username,
+            'is_online': is_online,
+            'last_seen': last_seen.isoformat() if hasattr(last_seen, 'isoformat') else str(last_seen) if last_seen else None
+        }
 
     @database_sync_to_async
-    def get_user_avatar(self):
-        """Get current user's avatar URL for read receipts."""
+    def _save_message(self, data):
         try:
-            if self.user.profile_photo:
-                return self.user.profile_photo.url
-        except Exception:
-            pass
-        return None
+            conv = Conversation.objects.get(id=self.conversation_id)
+            reply_to = None
+            if data.get('reply_to_id'):
+                reply_to = Message.objects.filter(id=data['reply_to_id'], conversation=conv).first()
 
-    @database_sync_to_async
-    def get_other_conversation_members(self):
-        try:
-            if not self.user or not hasattr(self.user, "id"):
-                return []
-
-            conversation = Conversation.objects.get(id=self.conversation_id)
-
-            return list(
-                conversation.members
-                .exclude(user_id=self.user.id)
-                .values_list('user_id', flat=True)
-            )
-
-        except Conversation.DoesNotExist:
-            return []
-
-    def is_peer_online(self, peer_id):
-        """Check if a peer user is currently online based on heartbeat freshness."""
-        return PresenceService.is_user_online(peer_id)
-
-    async def send_peer_online_status(self):
-        """Send the current peer's online status to the connected user."""
-        try:
-            # Get all other members in conversation
-            other_members = await self.get_other_conversation_members()
-
-            # For direct conversations, there should be only one other member
-            if other_members:
-                peer_id = other_members[0]
-                is_online = self.is_peer_online(peer_id)
-                last_seen = PresenceService.get_last_seen(peer_id)
-
-                # Send peer's current online status
-                await self.send(text_data=json.dumps({
-                    'type': 'user_status',
-                    'user_id': peer_id,
-                    'is_online': is_online,
-                    'last_seen': last_seen.isoformat() if last_seen else None
-                }))
-                print(f'[BACKEND] Sent peer {peer_id} status (online={is_online}) to user {self.user.id}')
-        except Exception as e:
-            print(f'[BACKEND] Error sending peer online status: {e}')
-
-    async def update_message_status(self, message_id, status):
-        """Update message status in database."""
-        try:
-            from messaging.models import Message
-            message = await database_sync_to_async(Message.objects.get)(id=message_id)
-            message.status = status
-            await database_sync_to_async(message.save)()
-            print(f'[BACKEND] Updated message {message_id} status to {status}')
-        except Exception as e:
-            print(f'[BACKEND] Error updating message status: {e}')
-
-    async def broadcast_conversation_update_to_others(self, message):
-        """Broadcast conversation update to other members (not sender) for real-time list updates."""
-        try:
-            print(f'[BACKEND] Starting conversation update broadcast for conversation {self.conversation_id}')
-            
-            # Get conversation details for update
-            conversation = await database_sync_to_async(Conversation.objects.get)(id=self.conversation_id)
-            other_members = await self.get_other_conversation_members()
-            
-            # Only send to others, not the sender
-            all_member_ids = other_members
-            print(f'[BACKEND] Broadcasting to other members: {all_member_ids}')
-            
-            # Get message preview text
-            content = message.get('content', '')
-            encrypted_content = message.get('encrypted_content', '')
-            preview_text = content if content else (encrypted_content[:50] + '...' if encrypted_content else 'Encrypted message')
-            
-            # Get sender name
-            sender_name = self.user.username if self.user.username else 'Unknown'
-            
-            # Send update to other conversation members
-            for member_id in all_member_ids:
-                # Calculate unread count for this member
-                member = await database_sync_to_async(
-                    lambda: conversation.members.filter(user_id=member_id).select_related('last_read_message').first()
-                )()
-                unread_count = 0
-                if member and member.last_read_message:
-                    unread_count = await database_sync_to_async(
-                        lambda: conversation.messages.filter(
-                            created_at__gt=member.last_read_message.created_at
-                        ).count()
-                    )()
-                elif member:
-                    # If no last_read_message, count all messages as unread
-                    unread_count = await database_sync_to_async(conversation.messages.count)()
-                
-                update_data = {
-                    'type': 'conversation_update',
-                    'conversation_id': self.conversation_id,
-                    'message_preview': preview_text,
-                    'sender_name': sender_name,
-                    'timestamp': message.get('created_at'),
-                    'unread_count': unread_count
-                }
-                
-                print(f'[BACKEND] Sending conversation update to user {member_id}: {update_data}')
-                await self.channel_layer.group_send(
-                    f'notifications_{member_id}',
-                    update_data
-                )
-                print(f'[BACKEND] Successfully sent conversation update to user {member_id} for conversation {self.conversation_id}')
-                
-        except Exception as e:
-            print(f'[BACKEND] Error broadcasting conversation update: {e}')
-            import traceback
-            traceback.print_exc()
-
-    async def broadcast_conversation_update(self, message):
-        """Broadcast conversation update to all members for real-time list updates."""
-        try:
-            print(f'[BACKEND] Starting conversation update broadcast for conversation {self.conversation_id}')
-            
-            # Get conversation details for update
-            conversation = await database_sync_to_async(Conversation.objects.get)(id=self.conversation_id)
-            other_members = await self.get_other_conversation_members()
-            
-            # Include sender in the update list
-            all_member_ids = other_members + [self.user.id]
-            print(f'[BACKEND] Broadcasting to members: {all_member_ids}')
-            
-            # Get message preview text
-            content = message.get('content', '')
-            encrypted_content = message.get('encrypted_content', '')
-            preview_text = content if content else (encrypted_content[:50] + '...' if encrypted_content else 'Encrypted message')
-            
-            # Get sender name
-            sender_name = self.user.username if self.user.username else 'Unknown'
-            
-            # Send update to all conversation members
-            for member_id in all_member_ids:
-                # Calculate unread count for this member
-                member = await database_sync_to_async(
-                    lambda: conversation.members.filter(user_id=member_id).select_related('last_read_message').first()
-                )()
-                unread_count = 0
-                if member and member.last_read_message:
-                    unread_count = await database_sync_to_async(
-                        lambda: conversation.messages.filter(
-                            created_at__gt=member.last_read_message.created_at
-                        ).count()
-                    )()
-                elif member:
-                    # If no last_read_message, count all messages as unread
-                    unread_count = await database_sync_to_async(conversation.messages.count)()
-                
-                update_data = {
-                    'type': 'conversation_update',
-                    'conversation_id': self.conversation_id,
-                    'message_preview': preview_text,
-                    'sender_name': sender_name,
-                    'timestamp': message.get('created_at'),
-                    'unread_count': unread_count
-                }
-                
-                print(f'[BACKEND] Sending conversation update to user {member_id}: {update_data}')
-                await self.channel_layer.group_send(
-                    f'notifications_{member_id}',
-                    update_data
-                )
-                print(f'[BACKEND] Successfully sent conversation update to user {member_id} for conversation {self.conversation_id}')
-                
-        except Exception as e:
-            print(f'[BACKEND] Error broadcasting conversation update: {e}')
-            import traceback
-            traceback.print_exc()
-
-    async def broadcast_typing_indicator(self, is_typing):
-        """Broadcast typing indicator to all conversation members for list updates."""
-        try:
-            print(f'[BACKEND] Starting typing indicator broadcast for conversation {self.conversation_id}, typing: {is_typing}')
-            
-            # Get conversation details
-            conversation = await database_sync_to_async(Conversation.objects.get)(id=self.conversation_id)
-            other_members = await self.get_other_conversation_members()
-            
-            # Include sender in the update list (except sender doesn't need to see their own typing)
-            all_member_ids = other_members  # Only send to others, not self
-            print(f'[BACKEND] Broadcasting typing indicator to members: {all_member_ids}')
-            
-            # Get sender name
-            sender_name = self.user.username if self.user.username else 'Unknown'
-            
-            # Send typing indicator to all other conversation members
-            for member_id in all_member_ids:
-                typing_data = {
-                    'type': 'typing_indicator',
-                    'conversation_id': self.conversation_id,
-                    'user_id': self.user.id,
-                    'username': sender_name,
-                    'is_typing': is_typing
-                }
-                
-                print(f'[BACKEND] Sending typing indicator to user {member_id}: {typing_data}')
-                await self.channel_layer.group_send(
-                    f'notifications_{member_id}',
-                    typing_data
-                )
-                
-                if is_typing:
-                    print(f'[BACKEND] Successfully sent typing indicator to user {member_id} for conversation {self.conversation_id}')
-                else:
-                    print(f'[BACKEND] Successfully sent typing stopped indicator to user {member_id} for conversation {self.conversation_id}')
-                    
-        except Exception as e:
-            print(f'[BACKEND] Error broadcasting typing indicator: {e}')
-            import traceback
-            traceback.print_exc()
-
-
-    async def retry_pending_messages(self):
-        """Retry pending messages for this user and conversation."""
-        try:
-            pending_messages = await database_sync_to_async(
-                lambda: list(PendingMessage.objects.filter(
-                    user=self.user,
-                    conversation_id=self.conversation_id,
-                    status='pending'
-                ).select_related('conversation')[:10])  # Limit to 10 retries per reconnect
-            )()
-            
-            for pending in pending_messages:
-                print(f'[BACKEND] Retrying pending message {pending.temp_id}')
-                try:
-                    # Reconstruct message data
-                    data = {
-                        'content': pending.content,
-                        'encrypted_content': pending.encrypted_content,
-                        'is_encrypted': pending.is_encrypted,
-                        'reply_to': pending.reply_to_id,
-                        'attachment': pending.attachment.name if pending.attachment else None,
-                        'attachment_type': pending.attachment_type,
-                        'link_url': pending.link_url,
-                        'link_title': pending.link_title,
-                        'link_description': pending.link_description,
-                        'link_image': pending.link_image,
-                        'link_type': pending.link_type,
-                        'temp_id': pending.temp_id
-                    }
-                    
-                    # Try to send the message again
-                    await self.handle_chat_message(data)
-                    
-                    # If successful, increment retry count and mark as sent
-                    await database_sync_to_async(
-                        lambda: PendingMessage.objects.filter(id=pending.id).update(
-                            status='sent',
-                            retry_count=pending.retry_count + 1
-                        )
-                    )()
-                    
-                except Exception as e:
-                    print(f'[BACKEND] Failed to retry pending message {pending.temp_id}: {e}')
-                    # Update retry count and error
-                    await database_sync_to_async(
-                        lambda: PendingMessage.objects.filter(id=pending.id).update(
-                            retry_count=pending.retry_count + 1,
-                            last_error=str(e)
-                        )
-                    )()
-                    
-        except Exception as e:
-            print(f'[BACKEND] Error retrying pending messages: {e}')
-
-    async def persist_failed_message(self, data, error):
-        """Persist a failed message to the queue for retry."""
-        try:
-            # Check if pending message already exists (prevent duplicates)
-            temp_id = data.get('temp_id')
-            if not temp_id:
-                return
-                
-            existing = await database_sync_to_async(
-                PendingMessage.objects.filter(temp_id=temp_id).exists
-            )()
-            
-            if existing:
-                print(f'[BACKEND] Pending message {temp_id} already exists, skipping')
-                return
-            
-            # Create pending message
-            await database_sync_to_async(
-                PendingMessage.objects.create
-            )(
-                user=self.user,
-                conversation_id=self.conversation_id,
-                temp_id=temp_id,
-                content=data.get('content'),
-                encrypted_content=data.get('encrypted_content'),
-                is_encrypted=data.get('is_encrypted', False),
-                reply_to_id=data.get('reply_to'),
-                attachment=data.get('attachment'),
-                attachment_type=data.get('attachment_type'),
+            msg = Message.objects.create(
+                conversation=conv,
+                sender=self.user,
+                content=data.get('content', ''),
+                reply_to=reply_to,
+                message_type=data.get('message_type', 'text'),
+                global_caption=data.get('global_caption', ''),
                 link_url=data.get('link_url'),
                 link_title=data.get('link_title'),
                 link_description=data.get('link_description'),
                 link_image=data.get('link_image'),
-                link_type=data.get('link_type'),
-                status='pending',
-                last_error=error
+                link_type=data.get('link_type', 'link'),
+                status='sent'
             )
-            
-            print(f'[BACKEND] Persisted failed message {temp_id} for retry')
-            
-        except Exception as e:
-            print(f'[BACKEND] Error persisting failed message: {e}')
 
-    async def mark_pending_message_sent(self, temp_id):
-        """Mark a pending message as successfully sent."""
-        try:
-            await database_sync_to_async(
-                PendingMessage.objects.filter(temp_id=temp_id).update
-            )(status='sent')
-            print(f'[BACKEND] Marked pending message {temp_id} as sent')
+            # Link preview fetch if applicable
+            if msg.link_url:
+                try:
+                    LinkPreviewService.generate_preview_for_message(msg)
+                except Exception as e:
+                    logger.debug(f"Link preview generation skipped: {e}")
+
+            conv.save(update_fields=['updated_at'])
+            serialized = MessageSerializer(msg).data
+            return msg, serialized
         except Exception as e:
-            print(f'[BACKEND] Error marking pending message as sent: {e}')
+            logger.error(f"Error saving message: {e}", exc_info=True)
+            return None, None
+
+    @database_sync_to_async
+    def _set_message_status(self, message_id, new_status):
+        try:
+            rows = Message.objects.filter(id=message_id, conversation_id=self.conversation_id).update(status=new_status)
+            return rows > 0
+        except Exception:
+            return False
+
+    @database_sync_to_async
+    def _mark_received_messages_delivered(self):
+        delivered_ids = list(
+            Message.objects.filter(
+                conversation_id=self.conversation_id,
+                status='sent'
+            ).exclude(sender_id=self.user_id).values_list('id', flat=True)
+        )
+        if delivered_ids:
+            Message.objects.filter(id__in=delivered_ids).update(status='delivered')
+        return delivered_ids
+
+    @database_sync_to_async
+    def _update_last_read(self, message_id=None):
+        try:
+            member = ConversationMember.objects.filter(
+                conversation_id=self.conversation_id,
+                user_id=self.user_id
+            ).first()
+            if not member:
+                return None
+
+            if message_id:
+                target_msg = Message.objects.filter(id=message_id, conversation_id=self.conversation_id).first()
+            else:
+                target_msg = Message.objects.filter(conversation_id=self.conversation_id).order_by('-id').first()
+
+            if target_msg:
+                member.last_read_message = target_msg
+                member.save(update_fields=['last_read_message'])
+
+                # Update messages up to this id as read
+                Message.objects.filter(
+                    conversation_id=self.conversation_id,
+                    id__lte=target_msg.id
+                ).exclude(sender_id=self.user_id).update(status='read')
+
+                return target_msg.id
+            return None
+        except Exception as e:
+            logger.error(f"Error updating read receipt: {e}")
+            return None
+
+    @database_sync_to_async
+    def _toggle_reaction(self, message_id, emoji):
+        try:
+            msg = Message.objects.get(id=message_id, conversation_id=self.conversation_id)
+            existing = MessageReaction.objects.filter(message=msg, user=self.user, emoji=emoji).first()
+            if existing:
+                existing.delete()
+            else:
+                MessageReaction.objects.create(message=msg, user=self.user, emoji=emoji)
+
+            # Build aggregated summary: [{'emoji': '❤️', 'count': 2, 'user_ids': [1, 2]}]
+            reactions = msg.reactions.all().select_related('user')
+            agg = {}
+            for r in reactions:
+                if r.emoji not in agg:
+                    agg[r.emoji] = {'emoji': r.emoji, 'count': 0, 'user_ids': [], 'usernames': []}
+                agg[r.emoji]['count'] += 1
+                agg[r.emoji]['user_ids'].append(r.user.id)
+                agg[r.emoji]['usernames'].append(r.user.username)
+            return list(agg.values())
+        except Exception as e:
+            logger.error(f"Error toggling reaction: {e}")
+            return []
+
+    @database_sync_to_async
+    def _edit_message(self, message_id, content):
+        try:
+            msg = Message.objects.get(id=message_id, conversation_id=self.conversation_id, sender=self.user)
+            msg.content = content
+            msg.edited_at = timezone.now()
+            msg.save(update_fields=['content', 'edited_at'])
+            return msg
+        except Exception as e:
+            logger.error(f"Error editing message: {e}")
+            return None
+
+    @database_sync_to_async
+    def _delete_message(self, message_id):
+        try:
+            rows = Message.objects.filter(id=message_id, conversation_id=self.conversation_id, sender=self.user).update(
+                is_deleted=True,
+                content='This message was deleted'
+            )
+            return rows > 0
+        except Exception as e:
+            logger.error(f"Error deleting message: {e}")
+            return False
+
+    @database_sync_to_async
+    def _get_unread_count(self, user_id):
+        try:
+            conv = Conversation.objects.get(id=self.conversation_id)
+            member = conv.members.filter(user_id=user_id).first()
+            if member and member.last_read_message:
+                return conv.messages.filter(id__gt=member.last_read_message.id).count()
+            return conv.messages.count()
+        except Exception:
+            return 0

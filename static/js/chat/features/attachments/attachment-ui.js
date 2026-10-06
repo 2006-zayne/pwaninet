@@ -183,13 +183,22 @@ export class AttachmentUI {
         this.hideAttachmentModal();
 
         switch (type) {
+            case 'camera':
+                if (this.cameraInput) {
+                    this.cameraInput.click();
+                } else {
+                    this.handleCameraCapture();
+                }
+                break;
             case 'photos':
-                this.triggerFileInput('image/*');
+            case 'gallery':
+                this.triggerFileInput('image/*,video/*');
                 break;
             case 'videos':
                 this.triggerFileInput('video/*');
                 break;
             case 'documents':
+            case 'docs':
                 this.triggerFileInput('.pdf,.doc,.docx,.txt');
                 break;
             case 'audio':

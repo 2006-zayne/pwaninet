@@ -25,9 +25,6 @@ router.register(r'themes', ConversationThemeViewSet, basename='theme')
 app_name = 'messaging'
 
 urlpatterns = [
-    # Keep the named routes below for reverse() compatibility, but reject all
-    # incoming messaging requests while the feature is frozen for the MVP.
-    re_path(r'^.*$', messaging_frozen, name='frozen'),
     path('v1/', include(router.urls)),
     path('', conversation_list, name='conversation_list'),
     path('conversation/<int:conversation_id>/', conversation_detail, name='conversation_detail'),

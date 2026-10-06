@@ -1,6 +1,6 @@
 {% load static %}
 {% load i18n %}
-<div class="container d-flex justify-content-between align-items-center">
+<div class="container d-flex justify-content-between align-items-center h-100 flex-nowrap px-2 px-sm-3">
     <a class="nav-brand-tactical"
        href="{% url 'posts:home' %}"
        hx-get="{% url 'posts:home' %}"
@@ -11,7 +11,7 @@
         PWANI<span class="brand-net">NET</span>
     </a>
 
-    <div class="d-none d-md-flex d-lg-none gap-2">
+    <div class="d-none d-md-flex d-lg-none gap-1 gap-md-2">
         <a href="{% url 'posts:home' %}"
            class="nav-chip {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
            style="display: flex; flex-direction: column; align-items: center; gap: 0px;"
@@ -20,7 +20,7 @@
            hx-swap="innerHTML"
            hx-push-url="true"
            hx-history="true">
-            <i class="bi bi-house-fill" style="font-size: 1.5rem;"></i>
+            <i class="bi bi-house-fill" style="font-size: 1.35rem;"></i>
             <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Home" %}</span>
         </a>
         <a href="{% url 'groups:groups_dashboard' %}"
@@ -32,16 +32,26 @@
            hx-push-url="true"
            hx-history="true">
             <span style="position: relative; display: inline-block;">
-                <i class="bi bi-people-fill" style="font-size: 1.5rem;"></i>
+                <i class="bi bi-people-fill" style="font-size: 1.35rem;"></i>
                 <span class="nav-groups-dot" title="New group activity" style="{% if not has_unread_group_activity %}display: none;{% endif %}"></span>
             </span>
             <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Groups" %}</span>
         </a>
         {% if request.user.is_authenticated %}
-        <!--{# Messaging navigation - FROZEN FOR MVP #}
-         <a href="#" class="nav-chip">
-            <i class="bi bi-chat-dots-fill"></i>
-        </a> -->
+        <a href="{% url 'messaging:conversation_list' %}"
+           class="nav-chip {% if request.resolver_match.app_name == 'messaging' %}active{% endif %}"
+           data-bypass-htmx="true"
+           hx-boost="false"
+           style="display: flex; flex-direction: column; align-items: center; gap: 0px;"
+           aria-label="{% trans 'Chats' %}">
+            <span style="position: relative; display: inline-block;"
+                  hx-get="{% url 'messaging:unread_message_count' %}"
+                  hx-trigger="load, every 60s"
+                  hx-swap="innerHTML">
+                <i class="bi bi-chat-dots-fill" style="font-size: 1.35rem;"></i>
+            </span>
+            <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Chats" %}</span>
+        </a>
         <a href="{% url 'posts:create_post' %}"
            class="nav-chip {% if request.resolver_match.url_name == 'create_post' %}active{% endif %}"
            hx-get="{% url 'posts:create_post' %}"
@@ -50,21 +60,21 @@
            hx-push-url="true"
            hx-history="true"
            style="display: flex; flex-direction: column; align-items: center; gap: 0px;">
-            <i class="bi bi-plus-circle-fill" style="font-size: 1.5rem;"></i>
+            <i class="bi bi-plus-circle-fill" style="font-size: 1.35rem;"></i>
             <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Post" %}</span>
         </a>
         {% endif %}
         <a href="{% url 'notifications:notifications' %}"
            class="nav-chip {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}"
            id="notification-badge-container-desktop"
-           style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 60px;"
+           style="display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 50px;"
            hx-get="{% url 'notifications:notifications' %}"
            hx-target="#page-content-target"
            hx-swap="innerHTML"
            hx-push-url="true"
            hx-history="true">
             <span style="position: relative; display: inline-block;">
-                <i class="bi bi-bell-fill" style="font-size: 1.5rem;"></i>
+                <i class="bi bi-bell-fill" style="font-size: 1.35rem;"></i>
                 {% if unread_notifications_count > 0 %}
                     <span class="position-absolute badge rounded-pill bg-danger border border-light notification-badge"
                         style="font-size: 0.65rem; padding: 0.3em 0.45em; min-width: 18px; text-align: center; top: -4px; right: -6px; z-index: 10;">
@@ -82,11 +92,11 @@
         </a>
     </div>
 
-    <div class="d-flex align-items-center gap-3">
+    <div class="d-flex align-items-center gap-2 gap-sm-3 flex-nowrap">
         {% if request.user.is_authenticated and request.user.is_staff %}
-        <!-- Django Admin quick access for staff/admins (especially useful on mobile & PWA) -->
+        <!-- Django Admin quick access for staff/admins (Desktop only) -->
         <a href="{% url 'admin:index' %}"
-           class="btn btn-link p-0 text-decoration-none d-flex align-items-center"
+           class="btn btn-link p-0 text-decoration-none d-none d-lg-flex align-items-center"
            style="color: #f59e0b;"
            title="{% trans 'Django Admin Site' %}"
            aria-label="{% trans 'Django Admin Site' %}"
@@ -95,11 +105,12 @@
             <i class="bi bi-shield-shaded" style="font-size: 1.3rem;"></i>
         </a>
         {% endif %}
+
         {% if request.user.is_authenticated %}
-        <!-- Pwanimate Quick Entry (Mobile & Header) -->
+        <!-- Pwanimate Quick Entry (Mobile & Desktop) -->
         <a href="{% url 'pwanimate:index' %}"
-           class="btn btn-link p-0 text-decoration-none d-md-none"
-           style="color: var(--primary, #2563eb);"
+           class="btn btn-link p-0 text-decoration-none d-flex align-items-center justify-content-center"
+           style="color: var(--primary, #2563eb); width: 28px; height: 28px;"
            title="Pwanimate AI Assistant"
            aria-label="Pwanimate AI Assistant"
            data-bypass-htmx="true"
@@ -108,9 +119,9 @@
         </a>
         {% endif %}
 
-        <!-- Theme Toggle -->
+        <!-- Theme Toggle (Mobile & Desktop) -->
         <div class="dropdown">
-            <button class="btn btn-link p-0" data-bs-toggle="dropdown" style="color: var(--text-dark);">
+            <button class="btn btn-link p-0" data-bs-toggle="dropdown" style="color: var(--text-dark); display: flex; align-items: center; justify-content: center; width: 28px; height: 28px;" aria-label="{% trans 'Theme Toggle' %}">
                 <i class="bi bi-circle-half" style="font-size: 1.2rem;"></i>
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
@@ -131,15 +142,23 @@
                 </li>
             </ul>
         </div>
+
         {% if request.user.is_authenticated %}
+            <!-- Profile avatar: Top header avatar (hidden on mobile when nav is at top to avoid duplicate avatars) -->
             <a href="{% url 'users:profile' request.user.username %}"
                hx-get="{% url 'users:profile' request.user.username %}"
                hx-target="#page-content-target"
                hx-swap="innerHTML"
                hx-push-url="true"
                hx-history="true"
-               class="avatar-link">
-                <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 35px; height: 35px; object-fit: cover; margin-right:8px;" alt="Profile">
+               class="avatar-link d-flex align-items-center">
+                {% if request.user.profile_pic %}
+                    <img src="{{ request.user.profile_pic.url }}" class="rounded-circle border" style="width: 36px; height: 36px; object-fit: cover;" alt="Profile">
+                {% else %}
+                    <div class="rounded-circle border d-inline-flex align-items-center justify-content-center bg-secondary text-white" style="width: 36px; height: 36px;">
+                        <i class="bi bi-person-fill fs-5"></i>
+                    </div>
+                {% endif %}
             </a>
         {% else %}
             <a href="{% url 'login' %}" class="btn btn-primary btn-sm rounded-pill px-3">{% trans "Login" %}</a>

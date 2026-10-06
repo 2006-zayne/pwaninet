@@ -240,6 +240,23 @@ export class MessageService {
         if (raw.global_caption) {
             metadata.global_caption = raw.global_caption;
         }
+
+        // Add reply, reaction, edit, and deletion metadata
+        if (raw.reply_to_details) {
+            metadata.reply_to_details = raw.reply_to_details;
+        }
+        if (raw.reply_to) {
+            metadata.reply_to = raw.reply_to;
+        }
+        if (raw.reactions && Array.isArray(raw.reactions)) {
+            metadata.reactions = raw.reactions;
+        }
+        if (raw.edited_at) {
+            metadata.edited_at = raw.edited_at;
+        }
+        if (raw.is_deleted) {
+            metadata.is_deleted = raw.is_deleted;
+        }
         
         return this._createCanonicalMessage({
             id: String(raw.id),
@@ -247,7 +264,7 @@ export class MessageService {
             senderId: Number(raw.sender?.id ?? raw.sender_id),
             timestamp: new Date(raw.created_at || raw.timestamp).toISOString(),
             status: mappedStatus,
-            content: raw.content || raw.body || "",
+            content: raw.is_deleted ? 'This message was deleted' : (raw.content || raw.body || ""),
             type: messageType,
             metadata: metadata,
             isOptimistic: false,
@@ -322,72 +339,58 @@ export class MessageService {
         }
 
         const cleanContent = content.trim();
-        
-        // Create temp ID
         const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
-        // Initialize message state as DRAFT
+
         this.messageStates.set(tempId, {
-            status: MESSAGE_STATE.DRAFT,
+            status: MESSAGE_STATE.SENDING,
             retryCount: 0,
             lastError: null,
             createdAt: Date.now()
         });
-        
+
         // Detect URLs in content and fetch metadata
         const urls = this.extractUrls(cleanContent);
         let linkMetadata = null;
-        
         if (urls.length > 0) {
-            // Use the first URL found
-            const url = urls[0];
             try {
-                linkMetadata = await this.fetchLinkMetadata(url);
-                this._log('LINK_METADATA_FETCHED', linkMetadata);
+                linkMetadata = await this.fetchLinkMetadata(urls[0]);
             } catch (error) {
-                this._log('LINK_METADATA_FETCH_FAILED', error);
-                console.error('Failed to fetch link metadata:', error);
+                console.debug('Failed to fetch link metadata:', error);
             }
         }
 
-        // Create optimistic message with DRAFT status
+        // Instant optimistic message render (Telegram feel: 0ms!)
         const optimisticMessage = this._createCanonicalMessage({
             id: tempId,
             conversationId: state.conversationId,
             senderId: state.currentUserId,
             timestamp: new Date().toISOString(),
-            status: MESSAGE_STATE.DRAFT,
+            status: MESSAGE_STATE.SENDING,
             content: cleanContent,
             type: options.type || 'text',
-            metadata: options.metadata || {},
+            metadata: {
+                ...(options.metadata || {}),
+                reply_to_id: options.reply_to_id || null,
+                reply_to_details: options.reply_to_details || null,
+                temp_id: tempId
+            },
             isOptimistic: true,
             sortOrder: Date.now()
         });
 
-        // Add optimistic update to store (ONLY store mutates)
+        // Add to store immediately
         store.addMessage(optimisticMessage);
-        console.log('[MESSAGE_SERVICE] Message added to store with status:', optimisticMessage.status);
 
-        // Transition to QUEUED (with delay for UI to render)
-        setTimeout(() => {
-            this._transitionMessageState(tempId, MESSAGE_STATE.QUEUED);
-            store.updateMessage(tempId, { 
-                status: MESSAGE_STATE.QUEUED,
-                metadata: { ...options.metadata, queuedAt: Date.now() }
-            });
-            console.log('[MESSAGE_SERVICE] Status updated to QUEUED for:', tempId);
-        }, 3000);
-
-        // Prepare message data for WebSocket (transport only)
+        // Prepare message payload
         let messageData = {
             type: 'chat_message',
-            temp_id : tempId,
+            temp_id: tempId,
             content: cleanContent,
+            reply_to_id: options.reply_to_id || null,
             message_type: options.type || 'text',
             metadata: options.metadata || {}
         };
-        
-        // Add link metadata if available
+
         if (linkMetadata) {
             messageData.link_url = linkMetadata.url;
             messageData.link_title = linkMetadata.title;
@@ -396,88 +399,32 @@ export class MessageService {
             messageData.link_type = linkMetadata.type;
         }
 
-        // Handle encryption if needed
-        if (state.isEncrypted && this.e2eEncryption && this.recipientPublicKey) {
-            try {
-                const encryptedContent = await this.e2eEncryption.encryptMessage(
-                    cleanContent, 
-                    this.recipientPublicKey
-                );
-                messageData = {
-                    type: 'chat_message',
-                    content: null,
-                    temp_id: tempId,
-                    encrypted_content: encryptedContent,
-                    is_encrypted: true,
-                    message_type: options.type || 'text',
-                    metadata: options.metadata || {}
-                };
-                this._log('MESSAGE_ENCRYPTED', { tempId });
-            } catch (error) {
-                this._log('ENCRYPTION_FAILED', error);
-                console.error('MessageService: Encryption failed, sending plaintext:', error);
+        // Send immediately over WebSocket
+        webSocketManager.send(messageData).then(sent => {
+            if (!sent) {
+                // If WebSocket down, fallback to REST API
+                fetch('/messaging/v1/messages/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    body: JSON.stringify({
+                        conversation: state.conversationId,
+                        content: cleanContent,
+                        reply_to: options.reply_to_id || null
+                    })
+                }).then(res => {
+                    if (!res.ok) throw new Error('REST fallback failed');
+                    return res.json();
+                }).then(saved => {
+                    store.updateMessageIdAndStatus(tempId, saved.id, 'sent', saved.created_at);
+                }).catch(err => {
+                    store.updateMessageStatus(tempId, MESSAGE_STATE.FAILED_SEND);
+                    this.messageQueue.push({ ...messageData, tempId });
+                });
             }
-        }
-
-        // Transition to SENDING (with delay for UI to render)
-        setTimeout(() => {
-            this._transitionMessageState(tempId, MESSAGE_STATE.SENDING);
-            store.updateMessage(tempId, { status: MESSAGE_STATE.SENDING });
-            console.log('[MESSAGE_SERVICE] Status updated to SENDING for:', tempId);
-
-            // Send via WebSocket (transport ONLY)
-            webSocketManager.send(messageData).then(sent => {
-                if (!sent) {
-                    // WebSocket down - try REST API fallback
-                    this._log('WEBSOCKET_FAILED_TRYING_REST', { tempId });
-                    fetch('/messaging/v1/messages/', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': getCSRFToken()
-                        },
-                        body: JSON.stringify({
-                            conversation: state.conversationId,
-                            content: cleanContent
-                        })
-                    }).then(response => {
-                        if (!response.ok) throw new Error('HTTP error');
-                        return response.json();
-                    }).then(savedMessage => {
-                        // Transition to SENT with delay
-                        setTimeout(() => {
-                            this._transitionMessageState(tempId, MESSAGE_STATE.SENT);
-                            console.log('[MESSAGE_SERVICE] Status updated to SENT for:', tempId);
-                            
-                            // Replace optimistic with confirmed message
-                            store.replaceOptimisticMessage(tempId, this.normalizeServerMessage(savedMessage));
-                            this._log('MESSAGE_SENT_VIA_REST', { tempId, id: savedMessage.id });
-                        }, 2000);
-                    }).catch(restError => {
-                        // Transition to FAILED
-                        this._transitionMessageState(tempId, MESSAGE_STATE.FAILED_SEND, restError.message);
-                        store.updateMessage(tempId, { status: MESSAGE_STATE.FAILED_SEND });
-                        console.log('[MESSAGE_SERVICE] Status updated to FAILED for:', tempId);
-
-                        // Queue message for retry
-                        this.messageQueue.push({
-                            ...messageData,
-                            tempId,
-                            timestamp: new Date().toISOString()
-                        });
-                        this._log('MESSAGE_QUEUED', { tempId, reason: 'REST failed' });
-                        console.error('MessageService: REST fallback failed:', restError);
-                    });
-                } else {
-                    // WebSocket sent successfully, transition to SENT with delay
-                    setTimeout(() => {
-                        this._transitionMessageState(tempId, MESSAGE_STATE.SENT);
-                        store.updateMessage(tempId, { status: MESSAGE_STATE.SENT });
-                        console.log('[MESSAGE_SERVICE] Status updated to SENT for:', tempId);
-                    }, 2000);
-                }
-            });
-        }, 3000);
+        });
 
         return tempId;
     }
@@ -491,21 +438,83 @@ export class MessageService {
 
         try {
             switch (data.type) {
+                case 'message_ack':
+                    // Instant server ACK: convert temp_id to real server ID with sent tick
+                    store.updateMessageIdAndStatus(data.temp_id, data.message_id, data.status || 'sent', data.created_at);
+                    break;
+
+                case 'chat_message':
                 case 'message':
-                    await this._processChatMessage(data.data);
+                    const msgData = data.message || data.data || data;
+                    if (data.temp_id && store.getMessageById(data.temp_id)) {
+                        store.updateMessageIdAndStatus(data.temp_id, msgData.id, msgData.status || 'sent', msgData.created_at);
+                    } else {
+                        const canonical = this.normalizeServerMessage(msgData);
+                        store.addMessage(canonical);
+                        // If sent by peer, send delivery ACK & play audio
+                        const currentUserId = store.getState().currentUserId;
+                        if (canonical.senderId !== currentUserId) {
+                            webSocketManager.send({
+                                type: 'message_delivered',
+                                message_id: canonical.id
+                            });
+                            messageSoundManager.playMessageReceived();
+                        }
+                    }
                     break;
-                case 'typing':
-                    this._processTypingIndicator(data);
+
+                case 'message_status':
+                    // data: { message_id, status }
+                    store.updateMessageStatus(String(data.message_id), data.status);
                     break;
-                case 'read_receipt':
-                    this._processReadReceipt(data);
-                    break;
+
                 case 'message_delivered':
-                    this._processMessageDelivered(data);
+                    store.updateMessageStatus(String(data.message_id), 'delivered');
                     break;
+
+                case 'read_receipt':
+                    // data: { last_read_message_id, user_id }
+                    if (data.last_read_message_id) {
+                        store.markMessagesAsReadUpTo(data.last_read_message_id);
+                    } else if (data.message_id) {
+                        store.updateMessageStatus(String(data.message_id), 'read');
+                    }
+                    break;
+
+                case 'typing':
+                    store.setTypingIndicator(data.user_id, data.username, data.is_typing);
+                    break;
+
+                case 'recording_audio':
+                    store.setRecordingIndicator(data.user_id, data.username, data.is_recording);
+                    break;
+
+                case 'peer_status':
                 case 'user_status':
-                    this._processUserStatus(data);
+                    store.setPeerOnlineStatus(data.user_id, data.is_online, data.last_seen);
                     break;
+
+                case 'reaction_update':
+                    store.updateMessage(String(data.message_id), { reactions: data.reactions });
+                    break;
+
+                case 'message_edited':
+                    store.updateMessage(String(data.message_id), {
+                        content: data.content,
+                        editedAt: data.edited_at
+                    });
+                    break;
+
+                case 'message_deleted':
+                    store.updateMessage(String(data.message_id), {
+                        isDeleted: true,
+                        content: 'This message was deleted'
+                    });
+                    break;
+
+                case 'pong':
+                    break;
+
                 default:
                     this._log('UNKNOWN_MESSAGE_TYPE', data.type);
             }

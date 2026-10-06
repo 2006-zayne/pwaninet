@@ -168,11 +168,11 @@ export class UIController {
             });
         }
 
-        // Voice/Send button toggle logic
+        // Combined Voice / Send button logic
         const voiceBtn = document.getElementById('voiceBtn');
         if (voiceBtn) {
             voiceBtn.addEventListener('click', (e) => {
-                const isSendMode = voiceBtn.querySelector('.bi-send') || voiceBtn.querySelector('.bi-send-fill');
+                const isSendMode = voiceBtn.classList.contains('send-mode');
                 if (isSendMode) {
                     this._handleSendClick(messageInput);
                 } else {
@@ -181,10 +181,10 @@ export class UIController {
                 }
             });
 
-            // Long press for recording (WhatsApp style)
+            // Long press for recording (WhatsApp style, only in voice mode)
             let longPressTimer;
             voiceBtn.addEventListener('mousedown', () => {
-                const isSendMode = voiceBtn.querySelector('.bi-send') || voiceBtn.querySelector('.bi-send-fill');
+                const isSendMode = voiceBtn.classList.contains('send-mode');
                 if (!isSendMode) {
                     longPressTimer = setTimeout(() => {
                         eventBus.emit(EVENTS.VOICE_START);
@@ -198,7 +198,7 @@ export class UIController {
 
             // Touch events for mobile
             voiceBtn.addEventListener('touchstart', (e) => {
-                const isSendMode = voiceBtn.querySelector('.bi-send') || voiceBtn.querySelector('.bi-send-fill');
+                const isSendMode = voiceBtn.classList.contains('send-mode');
                 if (!isSendMode) {
                     e.preventDefault();
                     const touch = e.touches[0];
@@ -210,7 +210,7 @@ export class UIController {
             }, { passive: false });
 
             voiceBtn.addEventListener('touchmove', (e) => {
-                const isSendMode = voiceBtn.querySelector('.bi-send') || voiceBtn.querySelector('.bi-send-fill');
+                const isSendMode = voiceBtn.classList.contains('send-mode');
                 if (!isSendMode) {
                     const touch = e.touches[0];
                     import('../features/voice/voice.service.js').then(({ voiceService }) => {
@@ -220,7 +220,7 @@ export class UIController {
             }, { passive: true });
 
             voiceBtn.addEventListener('touchend', (e) => {
-                const isSendMode = voiceBtn.querySelector('.bi-send') || voiceBtn.querySelector('.bi-send-fill');
+                const isSendMode = voiceBtn.classList.contains('send-mode');
                 if (!isSendMode) {
                     import('../features/voice/voice.service.js').then(({ voiceService }) => {
                         if (!voiceService.isLocked) {
@@ -231,61 +231,33 @@ export class UIController {
             });
         }
 
-        // Feature button handlers
-        const emojiBtn = document.getElementById('emojiBtn');
-        if (emojiBtn) {
-            emojiBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                eventBus.emit(EVENTS.EMOJI_PICKER_TOGGLE);
+        // Reply & Edit cancel button handlers
+        const cancelReplyBtn = document.getElementById('cancelReplyBtn');
+        if (cancelReplyBtn) {
+            cancelReplyBtn.addEventListener('click', () => {
+                this.replyToMessageId = null;
+                const bar = document.getElementById('replyPreviewBar');
+                if (bar) bar.classList.add('d-none');
             });
         }
 
-        // Close emoji picker button
-        const closeEmojiPicker = document.getElementById('closeEmojiPicker');
-        if (closeEmojiPicker) {
-            closeEmojiPicker.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                eventBus.emit(EVENTS.EMOJI_PICKER_TOGGLE);
+        const cancelEditBtn = document.getElementById('cancelEditBtn');
+        if (cancelEditBtn) {
+            cancelEditBtn.addEventListener('click', () => {
+                this.editingMessageId = null;
+                const bar = document.getElementById('editPreviewBar');
+                if (bar) bar.classList.add('d-none');
+                const messageInput = document.getElementById('messageInput');
+                if (messageInput) messageInput.value = '';
             });
         }
 
-        // Overlay click to close picker
-        const overlay = document.getElementById('overlay');
-        if (overlay) {
-            overlay.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const picker = document.getElementById('emojiPicker');
-                if (picker && picker.classList.contains('show')) {
-                    eventBus.emit(EVENTS.EMOJI_PICKER_TOGGLE);
-                }
-            });
-        }
-
-        // Tab switching for emoji picker
-        const tabs = document.querySelectorAll('.emoji-picker-tab');
-        tabs.forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const tabName = tab.dataset.tab;
-                
-                // Update active tab
-                tabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                
-                // Show/hide content
-                const emojiContent = document.getElementById('emojiContent');
-                const gifContent = document.getElementById('gifContent');
-                const stickerContent = document.getElementById('stickerContent');
-                
-                if (emojiContent) emojiContent.style.display = tabName === 'emojis' ? 'grid' : 'none';
-                if (gifContent) gifContent.style.display = tabName === 'gifs' ? 'block' : 'none';
-                if (stickerContent) stickerContent.style.display = tabName === 'stickers' ? 'grid' : 'none';
-            });
+        // Context menu action handler (Reply, Edit, Copy, Delete)
+        eventBus.on(EVENTS.CONTEXT_MENU_ACTION, (detail) => {
+            this._handleContextMenuAction(detail);
         });
+
+
 
         const themeBtn = document.getElementById('themeBtn');
         if (themeBtn) {
@@ -308,8 +280,89 @@ export class UIController {
                 if (cameraView) cameraView.classList.add('show');
             });
         }
+    }
 
-        // Attach button is handled by attachmentUI to prevent conflicts
+    _handleContextMenuAction(detail) {
+        const { action, messageId } = detail;
+        const message = store.getMessageById(messageId);
+        if (!message) return;
+
+        if (action === 'reply') {
+            this.replyToMessageId = messageId;
+            this.editingMessageId = null;
+            const editBar = document.getElementById('editPreviewBar');
+            if (editBar) editBar.classList.add('d-none');
+
+            const replyBar = document.getElementById('replyPreviewBar');
+            const replySender = document.getElementById('replySenderName');
+            const replyText = document.getElementById('replyTextSnippet');
+            if (replyBar && replySender && replyText) {
+                const currentUserId = store.getState().currentUserId;
+                const isOwn = message.senderId === currentUserId;
+                replySender.textContent = isOwn ? 'Replying to yourself' : 'Replying to message';
+                replyText.textContent = message.content || '[Attachment]';
+                replyBar.classList.remove('d-none');
+            }
+            const input = document.getElementById('messageInput');
+            if (input) input.focus();
+
+        } else if (action === 'edit') {
+            const currentUserId = store.getState().currentUserId;
+            if (message.senderId !== currentUserId) {
+                alert('You can only edit your own messages.');
+                return;
+            }
+            this.editingMessageId = messageId;
+            this.replyToMessageId = null;
+            const replyBar = document.getElementById('replyPreviewBar');
+            if (replyBar) replyBar.classList.add('d-none');
+
+            const editBar = document.getElementById('editPreviewBar');
+            const editText = document.getElementById('editTextSnippet');
+            if (editBar && editText) {
+                editText.textContent = message.content;
+                editBar.classList.remove('d-none');
+            }
+            const input = document.getElementById('messageInput');
+            if (input) {
+                input.value = message.content || '';
+                input.focus();
+                this._toggleVoiceSendButton(input.value);
+            }
+
+        } else if (action === 'copy') {
+            if (message.content) {
+                navigator.clipboard.writeText(message.content).then(() => {
+                    const toast = document.createElement('div');
+                    toast.className = 'position-fixed bottom-0 start-50 translate-middle-x bg-dark text-white px-3 py-2 rounded-pill shadow';
+                    toast.style.zIndex = '9999';
+                    toast.style.marginBottom = '80px';
+                    toast.style.fontSize = '0.85rem';
+                    toast.textContent = 'Message copied to clipboard';
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 2000);
+                });
+            }
+
+        } else if (action === 'delete') {
+            const currentUserId = store.getState().currentUserId;
+            if (message.senderId !== currentUserId) {
+                alert('You can only delete your own messages.');
+                return;
+            }
+            if (confirm('Delete this message for everyone?')) {
+                import('../core/websocket.js').then(({ webSocketManager }) => {
+                    webSocketManager.send({
+                        type: 'delete_message',
+                        message_id: parseInt(messageId, 10)
+                    });
+                });
+                store.updateMessage(messageId, {
+                    isDeleted: true,
+                    content: 'This message was deleted'
+                });
+            }
+        }
     }
 
     /**
@@ -324,7 +377,7 @@ export class UIController {
         }
         if (messageInput) {
             this._handleSendMessage(messageInput.value);
-            this._toggleVoiceSendButton(''); // Reset icon
+            this._toggleVoiceSendButton('');
         }
     }
 
@@ -334,21 +387,34 @@ export class UIController {
      */
     _toggleVoiceSendButton(content) {
         const voiceBtn = document.getElementById('voiceBtn');
-        if (!voiceBtn) return;
+        const sendBtn = document.getElementById('sendBtn');
+        const micWrapper = document.getElementById('micIconWrapper');
+        const sendWrapper = document.getElementById('sendIconWrapper');
+        const hasText = content && content.trim().length > 0;
 
-        const icon = voiceBtn.querySelector('i');
-        if (!icon) return;
+        if (sendBtn) {
+            if (hasText) {
+                sendBtn.classList.add('is-active');
+                sendBtn.removeAttribute('disabled');
+            } else {
+                sendBtn.classList.remove('is-active');
+            }
+        }
 
-        if (content && content.trim().length > 0) {
-            // Change to send icon
-            icon.className = 'bi bi-send-fill';
-            voiceBtn.title = 'Send message';
-            voiceBtn.classList.add('send-mode');
-        } else {
-            // Change back to mic icon
-            icon.className = 'bi bi-mic';
-            voiceBtn.title = 'Voice message';
-            voiceBtn.classList.remove('send-mode');
+        if (voiceBtn) {
+            if (hasText) {
+                if (micWrapper) micWrapper.classList.add('d-none');
+                if (sendWrapper) sendWrapper.classList.remove('d-none');
+                voiceBtn.title = 'Send message';
+                voiceBtn.setAttribute('aria-label', 'Send message');
+                voiceBtn.classList.add('send-mode', 'is-active');
+            } else {
+                if (micWrapper) micWrapper.classList.remove('d-none');
+                if (sendWrapper) sendWrapper.classList.add('d-none');
+                voiceBtn.title = 'Voice message';
+                voiceBtn.setAttribute('aria-label', 'Voice message');
+                voiceBtn.classList.remove('send-mode', 'is-active');
+            }
         }
     }
     
@@ -378,32 +444,60 @@ export class UIController {
             return;
         }
 
-        // Clear input (pure UI behavior)
+        const clean = content.trim();
+
+        // Clear input
         const messageInput = document.getElementById('messageInput');
         if (messageInput) {
             messageInput.value = '';
             messageInput.style.height = 'auto';
         }
 
-        // Send through message service (ONLY ingestion layer)
-        await messageService.sendMessage(content.trim());
+        // Handle edit mode
+        if (this.editingMessageId) {
+            const editId = this.editingMessageId;
+            this.editingMessageId = null;
+            const editBar = document.getElementById('editPreviewBar');
+            if (editBar) editBar.classList.add('d-none');
+
+            import('../core/websocket.js').then(({ webSocketManager }) => {
+                webSocketManager.send({
+                    type: 'edit_message',
+                    message_id: parseInt(editId, 10),
+                    content: clean
+                });
+            });
+            store.updateMessage(editId, {
+                content: clean,
+                editedAt: new Date().toISOString()
+            });
+            return;
+        }
+
+        // Handle reply mode
+        const replyId = this.replyToMessageId;
+        this.replyToMessageId = null;
+        const replyBar = document.getElementById('replyPreviewBar');
+        if (replyBar) replyBar.classList.add('d-none');
+
+        await messageService.sendMessage(clean, {
+            reply_to_id: replyId ? parseInt(replyId, 10) : null
+        });
     }
 
     /**
      * Handle typing indicator (UI interaction only)
      */
     _handleTyping() {
-        // Send typing indicator start
         messageService.sendTypingIndicator(true);
 
-        // Debounce stop indicator
         if (this.typingTimeout) {
             clearTimeout(this.typingTimeout);
         }
 
         this.typingTimeout = setTimeout(() => {
             messageService.sendTypingIndicator(false);
-        }, 1000); // Stop typing indicator after 1 second of inactivity
+        }, 1500);
 
         this._log('TYPING_INDICATOR_SENT');
     }
@@ -413,8 +507,6 @@ export class UIController {
      */
     _handleReconnect() {
         this._log('RECONNECT_REQUESTED');
-        
-        // Trigger reconnection through app controller (orchestration only)
         if (window.appController) {
             window.appController.handleReconnect();
         }
@@ -428,15 +520,16 @@ export class UIController {
         const statusElement = document.getElementById('chatStatus');
         if (statusElement) {
             const statusMap = {
-                'connected': 'Online',
+                'connected': 'Active now',
                 'connecting': 'Connecting...',
-                'disconnected': 'Offline',
-                'reconnecting': 'Reconnecting...',
-                'error': 'Connection Error'
+                'disconnected': 'Waiting for network...',
+                'reconnecting': 'Connecting...',
+                'error': 'Connection error'
             };
-            
-            statusElement.textContent = statusMap[connectionState] || connectionState;
-            statusElement.className = `chat-status ${connectionState}`;
+            if (connectionState !== 'connected') {
+                statusElement.textContent = statusMap[connectionState] || connectionState;
+                statusElement.className = `chat-status ${connectionState} text-muted`;
+            }
         }
     }
 
@@ -453,74 +546,55 @@ export class UIController {
 
         const typingArray = Array.from(typingUsers.values());
         const peerArray = Array.from(peerOnlineStatus.entries());
+        const state = store.getState();
+        const recordingUsers = state.recordingUsers || new Map();
+        const recordingArray = Array.from(recordingUsers.values());
 
-        console.log('[UI] _updateTypingIndicators called', { typingArray, peerArray });
-
-        // Get the first peer (other user in conversation)
         const peer = peerArray.length > 0 ? peerArray[0][1] : null;
         const isPeerOnline = peer ? peer.isOnline : false;
         const lastSeen = peer ? peer.lastSeen : null;
 
-        console.log('[UI] Peer status', { peer, isPeerOnline, lastSeen });
-
         if (typingArray.length > 0) {
-            // User is typing - show ghost bubble with animated dots
             const username = typingArray[0];
             this.renderer.showTypingIndicator(username);
-
-            // Also show status text
             chatStatus.textContent = 'typing...';
-            chatStatus.className = 'chat-status typing';
-            if (chatAvatar) {
-                chatAvatar.classList.remove('avatar-online');
-            }
-        } else {
-            // User is not typing - hide ghost bubble
+            chatStatus.className = 'chat-status typing text-primary fw-semibold';
+            if (chatAvatar) chatAvatar.classList.remove('avatar-online');
+        } else if (recordingArray.length > 0) {
             this.renderer.hideTypingIndicator();
-
+            chatStatus.textContent = 'recording voice note...';
+            chatStatus.className = 'chat-status text-danger fw-semibold';
+            if (chatAvatar) chatAvatar.classList.remove('avatar-online');
+        } else {
+            this.renderer.hideTypingIndicator();
             if (isPeerOnline) {
-                // User is online but not typing
-                chatStatus.textContent = '';
-                chatStatus.className = 'chat-status';
-                if (chatAvatar) {
-                    chatAvatar.classList.add('avatar-online');
-                }
+                chatStatus.textContent = 'Active now';
+                chatStatus.className = 'chat-status text-success fw-semibold';
+                if (chatAvatar) chatAvatar.classList.add('avatar-online');
             } else {
-                // User is offline - show last seen
-                if (lastSeen) {
-                    chatStatus.textContent = this._formatLastSeen(lastSeen);
-                } else {
-                    chatStatus.textContent = '';
-                }
-                chatStatus.className = 'chat-status';
-                if (chatAvatar) {
-                    chatAvatar.classList.remove('avatar-online');
-                }
+                chatStatus.textContent = lastSeen ? this._formatLastSeen(lastSeen) : '';
+                chatStatus.className = 'chat-status text-muted';
+                if (chatAvatar) chatAvatar.classList.remove('avatar-online');
             }
         }
     }
 
     /**
      * Format last seen timestamp to human readable string
-     * @param {number} timestamp - Last seen timestamp (milliseconds since epoch)
+     * @param {number|string} timestamp - Last seen timestamp
      * @returns {string} Formatted string
      */
     _formatLastSeen(timestamp) {
+        if (!timestamp) return '';
         const now = new Date();
         const lastSeen = new Date(timestamp);
+        if (isNaN(lastSeen.getTime())) return '';
         const diffMs = now - lastSeen;
         const diffSeconds = Math.floor(diffMs / 1000);
         const diffMinutes = Math.floor(diffSeconds / 60);
 
-        // < 60 seconds: "just now"
-        if (diffSeconds < 60) {
-            return 'just now';
-        }
-
-        // < 1 hour: "5 mins ago"
-        if (diffMinutes < 60) {
-            return `${diffMinutes} mins ago`;
-        }
+        if (diffSeconds < 60) return 'last seen just now';
+        if (diffMinutes < 60) return `last seen ${diffMinutes}m ago`;
 
         // Check if same day
         const today = new Date();
@@ -531,35 +605,20 @@ export class UIController {
         const lastSeenDate = new Date(lastSeen);
         lastSeenDate.setHours(0, 0, 0, 0);
 
-        // Same day: "today at 2:31 PM"
         if (lastSeenDate.getTime() === today.getTime()) {
-            const timeStr = lastSeen.toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-            });
-            return `today at ${timeStr}`;
+            const timeStr = lastSeen.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            return `last seen today at ${timeStr}`;
         }
 
-        // Yesterday: "yesterday at 8:22 PM"
         if (lastSeenDate.getTime() === yesterday.getTime()) {
-            const timeStr = lastSeen.toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-            });
-            return `yesterday at ${timeStr}`;
+            const timeStr = lastSeen.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            return `last seen yesterday at ${timeStr}`;
         }
 
-        // Older: "14 May at 11:30 AM"
         const day = lastSeen.getDate();
         const month = lastSeen.toLocaleDateString('en-US', { month: 'short' });
-        const timeStr = lastSeen.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-        });
-        return `${day} ${month} at ${timeStr}`;
+        const timeStr = lastSeen.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        return `last seen ${day} ${month} at ${timeStr}`;
     }
 
     /**

@@ -32,6 +32,7 @@ export class MessageRenderer {
             return;
         }
 
+        this._attachEmptyStateListeners();
         this._log('RENDERER_INITIALIZED');
     }
 
@@ -111,6 +112,13 @@ export class MessageRenderer {
 
             console.log("[RENDERER] Starting render with", messages?.length || 0, "messages");
 
+            if (!messages || messages.length === 0) {
+                this.container.innerHTML = '';
+                this._renderEmptyState();
+                this.lastRenderedCount = 0;
+                return;
+            }
+
             // Always FULL RENDER (no diffing inside renderer)
             this.container.innerHTML = '';
 
@@ -174,7 +182,40 @@ export class MessageRenderer {
             });
         });
     }
-        /**
+
+    /**
+     * Render empty state if template exists
+     */
+    _renderEmptyState() {
+        const template = document.getElementById('emptyStateTemplate');
+        if (template && this.container) {
+            const clone = template.content.cloneNode(true);
+            this.container.appendChild(clone);
+            this._attachEmptyStateListeners();
+        }
+    }
+
+    /**
+     * Attach click listeners to greeting chips
+     */
+    _attachEmptyStateListeners() {
+        if (!this.container) return;
+        const chips = this.container.querySelectorAll('.empty-greeting-chip');
+        chips.forEach(chip => {
+            chip.addEventListener('click', (e) => {
+                e.preventDefault();
+                const text = chip.getAttribute('data-text') || chip.textContent.trim();
+                const input = document.getElementById('messageInput');
+                if (input) {
+                    input.value = text;
+                    input.focus();
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            });
+        });
+    }
+
+    /**
      * Build view from messages (pure data transformation)
      * @param {Array} messages - Messages array (canonical schema)
      * @returns {Array} View items
@@ -414,9 +455,52 @@ export class MessageRenderer {
         // Use canonical schema fields
         const status = message.status || 'sent';
 
+        // Render reply quote if present
+        let replyHtml = '';
+        const replyDetails = message.metadata?.reply_to_details;
+        if (replyDetails) {
+            const senderName = replyDetails.sender?.username || (replyDetails.senderId === this.currentUserId ? 'You' : 'User');
+            const snippet = escapeHtml(replyDetails.content || (replyDetails.type === 'media' ? '[Media]' : 'Message'));
+            replyHtml = `
+                <div class="message-reply-quote" onclick="document.querySelector('[data-message-id=\\'${replyDetails.id}\\']')?.scrollIntoView({ behavior: 'smooth', block: 'center' })" style="cursor: pointer; padding: 4px 8px; margin-bottom: 6px; border-left: 3px solid var(--brand); background: rgba(0,0,0,0.06); border-radius: 4px; font-size: 0.8rem;">
+                    <div class="fw-bold" style="color: var(--brand); font-size: 0.75rem;">${escapeHtml(senderName)}</div>
+                    <div class="text-truncate text-muted" style="max-width: 260px;">${snippet}</div>
+                </div>
+            `;
+        }
+
+        // Render edited tag if edited
+        let editedHtml = '';
+        if (message.metadata?.edited_at) {
+            editedHtml = `<span class="edited-tag text-muted ms-1" style="font-size: 0.72rem; font-style: italic;">(edited)</span>`;
+        }
+
+        // Render reactions if present
+        let reactionsHtml = '';
+        const reactions = message.metadata?.reactions;
+        if (reactions && Array.isArray(reactions) && reactions.length > 0) {
+            const counts = {};
+            reactions.forEach(r => {
+                const em = r.emoji || (typeof r === 'string' ? r : null);
+                if (em) counts[em] = (counts[em] || 0) + (r.count || 1);
+            });
+            const badges = Object.entries(counts).map(([em, cnt]) => `
+                <span class="reaction-badge badge bg-light text-dark border rounded-pill px-2 py-1 me-1 shadow-sm" style="font-size: 0.75rem;">
+                    ${em} ${cnt > 1 ? cnt : ''}
+                </span>
+            `).join('');
+            reactionsHtml = `
+                <div class="message-reactions-container d-flex flex-wrap mt-1">
+                    ${badges}
+                </div>
+            `;
+        }
+
         // Bubble content
         messageDiv.innerHTML = `
-            <p class="message-content">${escapeHtml(message.content || '')}</p>
+            ${replyHtml}
+            <p class="message-content">${escapeHtml(message.content || '')}${editedHtml}</p>
+            ${reactionsHtml}
         `;
 
         // Render link preview if available
@@ -431,45 +515,25 @@ export class MessageRenderer {
 
         contentWrapper.appendChild(messageDiv);
 
-        // Determine whether to render meta (timestamp + receipt): single messages or last in group
-        const shouldRenderMeta = message.groupPosition === 'single' || message.groupPosition === 'last' || !!message.hasFloatingReadReceipt;
-        if (shouldRenderMeta) {
-            const metaDiv = document.createElement('div');
-            metaDiv.className = 'message-meta';
+        // Always render meta (timestamp + receipt) on all messages
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'message-meta d-flex align-items-center justify-content-end';
+        metaDiv.style.gap = '4px';
 
-            const timeSpan = document.createElement('span');
-            timeSpan.className = 'timestamp';
-            timeSpan.textContent = formatTime(message.timestamp);
-            metaDiv.appendChild(timeSpan);
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'timestamp';
+        timeSpan.textContent = formatTime(message.timestamp);
+        metaDiv.appendChild(timeSpan);
 
-            // Read receipt / status to appear next to timestamp
-            if (message.isOwn) {
-                if (message.status === 'read' && message.isLastRead) {
-                    const receiverAvatar = document.body.dataset.receiverAvatar;
-                    const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = 'message-read-receipt read-avatar-only';
-                    receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                    metaDiv.appendChild(receiptSpan);
-                } else if (message.isLastSent && !message.hideReadReceipt) {
-                    // Show status only on last sent message
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = `message-read-receipt status-${status}`;
-                    const avatarUrl = message.metadata?.read_avatar || null;
-                    receiptSpan.innerHTML = this._getStatusIcon(status, message.id, avatarUrl, message);
-                    metaDiv.appendChild(receiptSpan);
-                }
-            } else if (message.hasFloatingReadReceipt) {
-                const receiverAvatar = document.body.dataset.receiverAvatar;
-                const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                const receiptSpan = document.createElement('span');
-                receiptSpan.className = 'message-read-receipt floating-read-receipt';
-                receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                metaDiv.appendChild(receiptSpan);
-            }
-
-            contentWrapper.appendChild(metaDiv);
+        // WhatsApp-style status checkmarks for all sent messages
+        if (message.isOwn) {
+            const receiptSpan = document.createElement('span');
+            receiptSpan.className = `message-read-receipt status-${status}`;
+            receiptSpan.innerHTML = this._getStatusIcon(status, message.id, null, message);
+            metaDiv.appendChild(receiptSpan);
         }
+
+        contentWrapper.appendChild(metaDiv);
 
         wrapperDiv.appendChild(contentWrapper);
         return wrapperDiv;

@@ -55,16 +55,52 @@
     padding: 2rem 1.5rem 5rem;
   }
 
-  /* ── Mobile Full Screen ── */
+  /* ── Mobile Edge-to-Edge (matches Postcard) ── */
   @media (max-width: 767px) {
     .page-wrap {
       max-width: 100% !important;
-      padding: 1rem 0.75rem 5rem;
+      width: 100% !important;
+      padding: 0.75rem 0 5rem 0 !important;
+      overflow-x: hidden !important;
     }
     .container, .container-fluid {
       max-width: 100% !important;
       padding-left: 0 !important;
       padding-right: 0 !important;
+    }
+    .page-header, .section-header {
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+    .groups-grid {
+      grid-template-columns: 1fr !important;
+      gap: 0.5rem !important;
+      width: 100% !important;
+      padding: 0 !important;
+    }
+    .card,
+    .group-card,
+    .my-groups-card,
+    .tip-card,
+    .empty-state {
+      border-radius: 0 !important;
+      border-left: 0 !important;
+      border-right: 0 !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      margin-bottom: 0.5rem !important;
+      box-shadow: none !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    .my-groups-card .card-body {
+      padding: 1rem 12px !important;
+    }
+    .group-card-header {
+      padding: 0.85rem 14px !important;
+    }
+    .group-card-footer {
+      padding: 0.75rem 14px !important;
     }
   }
 
@@ -241,8 +277,11 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    word-break: break-all;
+    overflow-wrap: anywhere;
     line-height: 1.25;
     min-width: 0;
+    max-width: 100%;
     width: 100%;
     display: block;
   }
@@ -537,10 +576,13 @@
     margin: 0;
     line-height: 1.3;
     min-width: 0;
+    max-width: 100%;
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    word-break: break-all;
+    overflow-wrap: anywhere;
   }
   .group-card-desc {
     font-size: 0.85rem;
@@ -550,7 +592,10 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    word-break: break-all;
+    overflow-wrap: anywhere;
     min-width: 0;
+    max-width: 100%;
   }
   .group-card-footer {
     padding: 1rem 1.25rem;
@@ -673,7 +718,7 @@
                   </div>
                 {% endif %}
                 <div style="min-width: 0; flex: 1; overflow: hidden; max-width: 100%;">
-                  <div class="my-group-name" title="{{ group.name }}">{{ group.name }}</div>
+                  <div class="my-group-name" title="{{ group.name }}">{{ group.name|truncatechars:28 }}</div>
                   {% with act=group_activity|get_activity:group.id %}
                     {% if act.total > 0 %}
                       <div class="my-group-preview has-unread">
@@ -753,7 +798,7 @@
                 {% endif %}
                 <div class="group-card-info">
                   <div class="group-card-top">
-                    <h3 class="group-card-name" title="{{ group.name }}">{{ group.name }}</h3>
+                    <h3 class="group-card-name" title="{{ group.name }}">{{ group.name|truncatechars:32 }}</h3>
                     {% if group.is_official %}
                       <span class="badge-official"><i class="bi bi-patch-check-fill"></i> Official</span>
                     {% else %}
@@ -761,7 +806,7 @@
                     {% endif %}
                   </div>
                   <p class="group-card-desc">
-                    {{ group.description|default:"No description available." }}
+                    {{ group.description|default:"No description available."|truncatechars:65 }}
                   </p>
                 </div>
               </div>

@@ -46,13 +46,13 @@ export class MessageStatusRenderer {
                 return this._getClockIcon();
 
             case MESSAGE_STATE.SENT:
-                return this._getSingleCheckIcon('grey');
+                return this._getSingleCheckIcon();
 
             case MESSAGE_STATE.DELIVERED:
-                return this._getSingleCheckIcon('blue');
+                return this._getDoubleCheckIcon('grey');
 
             case MESSAGE_STATE.READ:
-                return this._getReadAvatar(avatarUrl);
+                return this._getDoubleCheckIcon('blue');
 
             case MESSAGE_STATE.FAILED_UPLOAD:
                 return this._getErrorIcon(retryButton);
@@ -155,21 +155,20 @@ export class MessageStatusRenderer {
         return this._getClockIcon();
     }
 
-    static _getSingleCheckIcon(color) {
-        // Clean circular check icon - stroke-based, not filled
-        if (color === 'blue') {
-            // Delivered: blue circular check
-            return `<svg class="check-circle delivered" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Delivered">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M9 12l2 2 4-4"></path>
-            </svg>`;
-        } else {
-            // Sent: grey circular check
-            return `<svg class="check-circle sent" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Sent">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M9 12l2 2 4-4"></path>
-            </svg>`;
-        }
+    static _getSingleCheckIcon() {
+        return `<svg class="check-marks sent" width="13" height="11" viewBox="0 0 13 11" fill="none" style="vertical-align: middle;">
+            <path d="M1.5 5.5L4.5 8.5L11.5 1.5" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`;
+    }
+
+    static _getDoubleCheckIcon(color = 'grey') {
+        const strokeColor = color === 'blue' ? '#2563eb' : '#94a3b8';
+        const label = color === 'blue' ? 'Read' : 'Delivered';
+        const className = color === 'blue' ? 'check-marks read' : 'check-marks delivered';
+        return `<svg class="${className}" width="17" height="11" viewBox="0 0 17 11" fill="none" aria-label="${label}" style="vertical-align: middle;">
+            <path d="M1 5.5L4 8.5L11 1.5" stroke="${strokeColor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5.5 5.5L8.5 8.5L15.5 1.5" stroke="${strokeColor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`;
     }
 
     static _getErrorIcon(retryButton) {
