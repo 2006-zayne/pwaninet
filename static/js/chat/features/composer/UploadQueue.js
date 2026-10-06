@@ -1,17 +1,17 @@
 /**
  * UploadQueue - Handles batch upload of media files
- * Manages upload progress, retry logic, and optimistic messaging
+ * Manages background upload progress, retry logic, and optimistic messaging
  */
 
 import { EVENTS } from '../../shared/constants.js';
 import { eventBus } from '../../core/event-bus.js';
+import { ImageCompressor } from './ImageCompressor.js';
+import { deviceMediaStore } from '../../core/device-media-store.js';
 
 export class UploadQueue {
     constructor(composer) {
         this.composer = composer;
-        this.uploads = [];
-        this.isUploading = false;
-        
+        this.activeUploads = new Map();
         this.initialized = false;
     }
     
@@ -24,88 +24,219 @@ export class UploadQueue {
     }
     
     /**
-     * Upload media items
+     * Upload media items in background
      * @param {Array} mediaItems - Media items to upload
      * @param {string} globalCaption - Global caption
      * @param {number} conversationId - Conversation ID
      */
     async upload(mediaItems, globalCaption, conversationId) {
-        console.log('[UPLOAD_QUEUE] Upload called with:', mediaItems.length, 'items, conversation:', conversationId);
-        
-        if (this.isUploading) {
-            console.warn('[UPLOAD_QUEUE] Upload already in progress');
-            return;
-        }
-        
-        this.isUploading = true;
-        
-        // Declare tempId outside try block for error handling
-        let tempId;
-        
+        if (!mediaItems || mediaItems.length === 0) return;
+        console.log('[UPLOAD_QUEUE] Background upload started with:', mediaItems.length, 'items, conversation:', conversationId);
+
+        // 1. Generate temp ID and emit optimistic message immediately so user sees bubble in chat right away
+        const tempId = this._generateTempId();
+        console.log('[UPLOAD_QUEUE] Generated tempId:', tempId);
+
+        // Ensure all items have preview URLs
+        const itemsWithPreviews = mediaItems.map(item => ({
+            ...item,
+            previewUrl: item.previewUrl || (item.file ? URL.createObjectURL(item.file) : '')
+        }));
+
+        this._emitOptimisticMessage(tempId, itemsWithPreviews, globalCaption);
+
+        // Persist sender's original blobs to device storage (Capacitor flash storage or Web IndexedDB)
+        itemsWithPreviews.forEach(item => {
+            if (item.file) {
+                deviceMediaStore.saveSenderMedia(tempId, item.file, item.file.name || 'media');
+            }
+        });
+
         try {
-            // Create optimistic message
-            tempId = this._generateTempId();
-            console.log('[UPLOAD_QUEUE] Generated tempId:', tempId);
-            this._emitOptimisticMessage(tempId, mediaItems, globalCaption);
-            
-            // Prepare form data
+            // 2. Client-side pre-compression on photos (documents/videos/audio bypass)
+            const processedItems = await Promise.all(itemsWithPreviews.map(async (item) => {
+                if (item.type === 'image' && item.file && !item.isDocument) {
+                    try {
+                        const compressedFile = await ImageCompressor.compressImage(item.file);
+                        return {
+                            ...item,
+                            file: compressedFile,
+                            size: compressedFile.size,
+                            name: compressedFile.name
+                        };
+                    } catch (err) {
+                        console.warn('[UPLOAD_QUEUE] Image compression fallback to original:', err);
+                        return item;
+                    }
+                }
+                return item;
+            }));
+
+            // 3. Prepare form data
             const formData = new FormData();
             formData.append('conversation_id', conversationId);
-            formData.append('global_caption', globalCaption);
+            formData.append('global_caption', globalCaption || '');
             
             // Add files
-            mediaItems.forEach((item, index) => {
-                console.log('[UPLOAD_QUEUE] Adding file:', index, item.file.name, item.type);
+            processedItems.forEach((item, index) => {
+                console.log('[UPLOAD_QUEUE] Adding file:', index, item.file.name, item.type, `(${item.size} bytes)`);
                 formData.append('files', item.file);
             });
             
             // Add attachment metadata
-            const attachmentsData = mediaItems.map((item, index) => ({
-                caption: item.caption,
-                order: index,
-                size: item.size
-            }));
+            const attachmentsData = processedItems.map((item, index) => {
+                const isTrimmed = item.type === 'video' && (
+                    (item.trimStart && item.trimStart > 0.05) ||
+                    (item.duration && item.trimEnd && (item.duration - item.trimEnd) > 0.15)
+                );
+                return {
+                    caption: item.caption || '',
+                    order: index,
+                    size: item.size,
+                    rotation: item.rotation || 0,
+                    crop_aspect: item.cropAspect || 'free',
+                    duration: item.duration || 0,
+                    trim_start: item.trimStart || 0,
+                    trim_end: isTrimmed ? (item.trimEnd || item.duration || 0) : (item.duration || 0),
+                    is_trimmed: !!isTrimmed,
+                    is_muted: !!item.isMuted
+                };
+            });
             formData.append('attachments_data', JSON.stringify(attachmentsData));
             
-            console.log('[UPLOAD_QUEUE] Starting upload to server...');
-            
-            // Upload to server
-            const response = await fetch('/messaging/api/attachments/batch-upload/', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': this._getCSRFToken(),
-                },
-            });
-            
-            console.log('[UPLOAD_QUEUE] Server response status:', response.status);
-            
-            if (response.ok) {
-                const data = await response.json();
-                console.log('[UPLOAD_QUEUE] Upload successful:', data);
-                
-                // Emit success event
-                eventBus.emit(EVENTS.MESSAGE_UPLOAD_SUCCESS, {
-                    tempId,
-                    serverMessage: data
-                });
-            } else {
-                const errorData = await response.json();
-                console.error('[UPLOAD_QUEUE] Server error:', errorData);
-                throw new Error(errorData.error || 'Upload failed');
+            const csrfToken = this._getCSRFToken();
+            if (csrfToken) {
+                formData.append('csrfmiddlewaretoken', csrfToken);
             }
+
+            // 4. Execute upload via XMLHttpRequest for real-time progress events
+            await this._performXHRUpload(tempId, formData, csrfToken);
+
         } catch (error) {
-            console.error('[UPLOAD_QUEUE] Upload failed:', error);
-            
-            // Emit error event
+            console.error('[UPLOAD_QUEUE] Upload error:', error);
+            this.activeUploads.delete(tempId);
             eventBus.emit(EVENTS.MESSAGE_UPLOAD_FAILED, {
                 tempId,
-                error: error.message
+                error: error.message || 'Upload failed'
             });
-            
-            throw error;
-        } finally {
-            this.isUploading = false;
+        }
+    }
+
+    /**
+     * Perform XHR upload with progress events
+     */
+    _performXHRUpload(tempId, formData, csrfToken) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            this.activeUploads.set(tempId, xhr);
+
+            xhr.open('POST', '/messaging/api/attachments/batch-upload/', true);
+            if (csrfToken) {
+                xhr.setRequestHeader('X-CSRFToken', csrfToken);
+            }
+
+            // Live progress tracking
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable && e.total > 0) {
+                    const percent = Math.min(99, Math.max(1, Math.round((e.loaded / e.total) * 100)));
+                    this._updateProgressUI(tempId, percent);
+                    eventBus.emit(EVENTS.MESSAGE_UPLOAD_PROGRESS, {
+                        tempId,
+                        progress: percent,
+                        loaded: e.loaded,
+                        total: e.total
+                    });
+                }
+            };
+
+            xhr.onload = () => {
+                this.activeUploads.delete(tempId);
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    // Complete one full circle (100%)
+                    this._updateProgressUI(tempId, 100);
+
+                    setTimeout(() => {
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            console.log('[UPLOAD_QUEUE] Server response parsed successfully:', data);
+
+                            if (Array.isArray(data)) {
+                                data.forEach((serverMsg, idx) => {
+                                    const currentTempId = idx === 0 ? tempId : `${tempId}_${idx}`;
+                                    if (serverMsg?.id) {
+                                        deviceMediaStore.rekeyMedia(currentTempId, serverMsg.id);
+                                    }
+                                    eventBus.emit(EVENTS.MESSAGE_UPLOAD_SUCCESS, {
+                                        tempId: currentTempId,
+                                        serverMessage: serverMsg
+                                    });
+                                });
+                            } else {
+                                if (data?.id) {
+                                    deviceMediaStore.rekeyMedia(tempId, data.id);
+                                }
+                                eventBus.emit(EVENTS.MESSAGE_UPLOAD_SUCCESS, {
+                                    tempId,
+                                    serverMessage: data
+                                });
+                            }
+                            resolve(data);
+                        } catch (err) {
+                            console.error('[UPLOAD_QUEUE] JSON parse error:', err);
+                            reject(new Error('Invalid server response format'));
+                        }
+                    }, 350); // Small pause to display 100% full circle completion
+                } else {
+                    let errorData = null;
+                    try {
+                        errorData = JSON.parse(xhr.responseText);
+                    } catch (_) {}
+                    const errorMsg = (errorData && (errorData.error || errorData.detail || errorData.message)) ||
+                                     `Upload failed (${xhr.status})`;
+                    reject(new Error(errorMsg));
+                }
+            };
+
+            xhr.onerror = () => {
+                this.activeUploads.delete(tempId);
+                reject(new Error('Network connection error during upload'));
+            };
+
+            xhr.ontimeout = () => {
+                this.activeUploads.delete(tempId);
+                reject(new Error('Upload request timed out'));
+            };
+
+            xhr.send(formData);
+        });
+    }
+
+    /**
+     * Update progress indicator directly in DOM for smooth 60fps rendering
+     */
+    _updateProgressUI(tempId, percent) {
+        const msgEl = document.querySelector(`[data-message-id="${tempId}"]`);
+        if (!msgEl) return;
+
+        const overlay = msgEl.querySelector('.media-upload-overlay');
+        if (!overlay) return;
+
+        const circleBar = overlay.querySelector('.upload-circle-bar');
+        const textEl = overlay.querySelector('.upload-progress-text');
+
+        if (circleBar) {
+            // Circumference of r=15 is 2 * PI * 15 ≈ 94.25
+            const circumference = 94.25;
+            const offset = circumference * (1 - percent / 100);
+            circleBar.style.strokeDashoffset = Math.max(0, offset).toFixed(1);
+        }
+
+        if (textEl) {
+            textEl.textContent = `${percent}%`;
+        }
+
+        if (percent >= 100) {
+            overlay.classList.add('upload-complete');
         }
     }
     
@@ -125,40 +256,138 @@ export class UploadQueue {
      */
     _emitOptimisticMessage(tempId, mediaItems, globalCaption) {
         console.log('[UPLOAD_QUEUE] Emitting optimistic message:', tempId);
-        console.log('[UPLOAD_QUEUE] [DEBUG] FULL OPTIMISTIC MESSAGE SHAPE:');
-        console.log('[UPLOAD_QUEUE] [DEBUG] mediaItems count:', mediaItems.length);
-        console.log('[UPLOAD_QUEUE] [DEBUG] global_caption:', globalCaption);
-        
+
+        // Check if all items are documents or audio
+        const areAllDocs = mediaItems.every(item => item.type === 'document');
+        const areAllAudios = mediaItems.every(item => item.type === 'audio');
+
+        if (areAllDocs) {
+            // Emit separate optimistic document message for each document
+            mediaItems.forEach((item, index) => {
+                const docTempId = index === 0 ? tempId : `${tempId}_${index}`;
+                const optMsg = {
+                    id: docTempId,
+                    temp_id: docTempId,
+                    message_type: 'media',
+                    attachment_type: 'document',
+                    content: item.caption || item.file?.name || item.name || 'Document',
+                    sender: { id: null, username: 'You' },
+                    metadata: {
+                        type: 'document',
+                        url: item.previewUrl || (item.file ? URL.createObjectURL(item.file) : ''),
+                        file_name: item.file?.name || item.name || 'Document',
+                        size: item.size,
+                        uploadProgress: 0
+                    },
+                    created_at: new Date().toISOString(),
+                    status: 'uploading'
+                };
+                eventBus.emit(EVENTS.MESSAGE_OPTIMISTIC_ADD, optMsg);
+            });
+            return;
+        }
+
+        if (areAllAudios) {
+            // Emit separate optimistic audio message for each audio
+            mediaItems.forEach((item, index) => {
+                const audioTempId = index === 0 ? tempId : `${tempId}_${index}`;
+                const optMsg = {
+                    id: audioTempId,
+                    temp_id: audioTempId,
+                    message_type: 'audio',
+                    attachment_type: 'audio',
+                    content: item.caption || item.file?.name || item.name || 'Audio',
+                    sender: { id: null, username: 'You' },
+                    metadata: {
+                        type: 'audio',
+                        url: item.previewUrl || (item.file ? URL.createObjectURL(item.file) : ''),
+                        file_name: item.file?.name || item.name || 'Audio',
+                        size: item.size,
+                        duration: item.duration || 0,
+                        uploadProgress: 0
+                    },
+                    created_at: new Date().toISOString(),
+                    status: 'uploading'
+                };
+                eventBus.emit(EVENTS.MESSAGE_OPTIMISTIC_ADD, optMsg);
+            });
+            return;
+        }
+
+        // Single photo or video
+        if (mediaItems.length === 1) {
+            const singleItem = mediaItems[0];
+            const optimisticMessage = {
+                id: tempId,
+                temp_id: tempId,
+                message_type: 'media',
+                attachment_type: singleItem.type,
+                content: singleItem.caption || globalCaption || '',
+                global_caption: singleItem.caption || globalCaption || '',
+                sender: { id: null, username: 'You' },
+                metadata: {
+                    type: singleItem.type,
+                    url: singleItem.previewUrl || (singleItem.file ? URL.createObjectURL(singleItem.file) : ''),
+                    file_name: singleItem.name || singleItem.file?.name || 'Media',
+                    size: singleItem.size,
+                    duration: singleItem.duration || 0,
+                    uploadProgress: 0
+                },
+                attachments: [{
+                    id: `temp_attach_0`,
+                    file_url: singleItem.previewUrl || (singleItem.file ? URL.createObjectURL(singleItem.file) : ''),
+                    file_type: singleItem.type,
+                    caption: singleItem.caption || globalCaption || '',
+                    order: 0,
+                    size: singleItem.size,
+                    duration: singleItem.duration || 0
+                }],
+                created_at: new Date().toISOString(),
+                status: 'uploading'
+            };
+            eventBus.emit(EVENTS.MESSAGE_OPTIMISTIC_ADD, optimisticMessage);
+            return;
+        }
+
+        // Standard photos & videos media group (2 or more items)
         const optimisticMessage = {
             id: tempId,
             temp_id: tempId,
             message_type: 'media_group',
-            global_caption: globalCaption,
-            content: '',
+            global_caption: globalCaption || '',
+            content: globalCaption || '',
             sender: {
-                id: null, // Will be filled by frontend
+                id: null,
                 username: 'You'
+            },
+            metadata: {
+                attachments: mediaItems.map((item, index) => ({
+                    id: `temp_attach_${index}`,
+                    file_url: item.previewUrl || (item.file ? URL.createObjectURL(item.file) : ''),
+                    file_type: item.type,
+                    caption: item.caption || '',
+                    order: index,
+                    size: item.size,
+                    duration: item.duration || 0
+                })),
+                global_caption: globalCaption || '',
+                uploadProgress: 0
             },
             attachments: mediaItems.map((item, index) => ({
                 id: `temp_attach_${index}`,
-                file_url: item.previewUrl,
+                file_url: item.previewUrl || (item.file ? URL.createObjectURL(item.file) : ''),
                 file_type: item.type,
-                caption: item.caption,
+                caption: item.caption || '',
                 order: index,
-                size: item.size
+                size: item.size,
+                duration: item.duration || 0
             })),
             created_at: new Date().toISOString(),
             status: 'uploading'
         };
         
-        console.log('[UPLOAD_QUEUE] [DEBUG] FULL MESSAGE:', JSON.stringify(optimisticMessage, null, 2));
-        console.log('[UPLOAD_QUEUE] [DEBUG] ATTACHMENTS (top-level):', optimisticMessage.attachments);
-        console.log('[UPLOAD_QUEUE] [DEBUG] ATTACHMENT COUNT:', optimisticMessage.attachments?.length);
-        console.log('[UPLOAD_QUEUE] [DEBUG] METADATA:', optimisticMessage.metadata);
-        console.log('[UPLOAD_QUEUE] [DEBUG] METADATA ATTACHMENTS:', optimisticMessage.metadata?.attachments);
-        
         eventBus.emit(EVENTS.MESSAGE_OPTIMISTIC_ADD, optimisticMessage);
-        console.log('[UPLOAD_QUEUE] Optimistic message emitted');
+        console.log('[UPLOAD_QUEUE] Optimistic media group message emitted');
     }
     
     /**
@@ -166,16 +395,21 @@ export class UploadQueue {
      * @returns {string} CSRF token
      */
     _getCSRFToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta && meta.getAttribute('content')) {
+            return meta.getAttribute('content');
+        }
+        const input = document.querySelector('[name="csrfmiddlewaretoken"]');
+        if (input && input.value) {
+            return input.value;
+        }
         const cookies = document.cookie.split(';');
         for (const cookie of cookies) {
             const [name, value] = cookie.trim().split('=');
             if (name === 'csrftoken') {
-                const token = decodeURIComponent(value);
-                console.log('[UPLOAD_QUEUE] CSRF token found:', token.substring(0, 10) + '...');
-                return token;
+                return decodeURIComponent(value);
             }
         }
-        console.error('[UPLOAD_QUEUE] CSRF token not found');
         return '';
     }
     
@@ -184,32 +418,27 @@ export class UploadQueue {
      * @param {string} tempId - Temporary ID of failed message
      */
     async retry(tempId) {
-        // In a full implementation, this would:
-        // 1. Retrieve the failed message from local storage
-        // 2. Re-upload the files
-        // 3. Update the message with server response
-        
         console.log('[UPLOAD_QUEUE] Retry upload for:', tempId);
     }
     
     /**
      * Cancel upload
      */
-    cancel() {
-        // In a full implementation, this would:
-        // 1. Abort the fetch request
-        // 2. Clean up temporary message
-        // 3. Revert to draft state
-        
-        console.log('[UPLOAD_QUEUE] Cancel upload');
+    cancel(tempId) {
+        if (tempId && this.activeUploads.has(tempId)) {
+            const xhr = this.activeUploads.get(tempId);
+            xhr.abort();
+            this.activeUploads.delete(tempId);
+            console.log('[UPLOAD_QUEUE] Cancelled upload for:', tempId);
+        }
     }
     
     /**
      * Destroy upload queue
      */
     destroy() {
-        this.uploads = [];
-        this.isUploading = false;
+        this.activeUploads.forEach(xhr => xhr.abort());
+        this.activeUploads.clear();
         this.initialized = false;
         console.log('[UPLOAD_QUEUE] Upload queue destroyed');
     }

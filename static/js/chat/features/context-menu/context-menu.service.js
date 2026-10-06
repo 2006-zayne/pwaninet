@@ -68,28 +68,29 @@ export class ContextMenuService {
    */
   attachToMessages() {
     console.log('[CONTEXT_MENU_SERVICE] Attaching to messages...');
-    
-    // Remove existing listeners first (to avoid duplicates)
-    this._detachFromMessages();
 
-    // Attach to all message bubbles
+    // Attach to all unattached message bubbles safely without destructive DOM cloning
     const messageBubbles = document.querySelectorAll('.message-bubble');
+    let attachedCount = 0;
     messageBubbles.forEach(bubble => {
+      if (bubble.dataset.hasContextMenu === 'true') return;
       this._attachToBubble(bubble);
+      bubble.dataset.hasContextMenu = 'true';
+      attachedCount++;
     });
 
-    console.log(`[CONTEXT_MENU_SERVICE] Attached to ${messageBubbles.length} message bubbles`);
+    console.log(`[CONTEXT_MENU_SERVICE] Attached to ${attachedCount} new message bubbles (${messageBubbles.length} total)`);
   }
 
   /**
    * Detach listeners from message bubbles
    */
   _detachFromMessages() {
+    // Non-destructive: do NOT clone nodes, as cloning destroys all child event listeners
+    // (such as voice note speed buttons, play/pause buttons, waveforms, audio elements, etc.)
     const messageBubbles = document.querySelectorAll('.message-bubble');
     messageBubbles.forEach(bubble => {
-      // Clone element to remove all event listeners
-      const newBubble = bubble.cloneNode(true);
-      bubble.parentNode.replaceChild(newBubble, bubble);
+      delete bubble.dataset.hasContextMenu;
     });
   }
 
@@ -100,12 +101,20 @@ export class ContextMenuService {
   _attachToBubble(bubble) {
     // Desktop: right-click
     bubble.addEventListener('contextmenu', (e) => {
+      // Ignore right-clicks on interactive controls
+      if (e.target.closest('button, a, input, audio, video, .vn-speed-btn, .vn-play-btn, .vn-waveform')) {
+        return;
+      }
       e.preventDefault();
       this._handleRightClick(e, bubble);
     });
 
     // Mobile: long-press detection
     bubble.addEventListener('touchstart', (e) => {
+      // Ignore touches on interactive controls (speed buttons, play buttons, waveform scrubbers)
+      if (e.target.closest('button, a, input, audio, video, .vn-speed-btn, .vn-play-btn, .vn-waveform')) {
+        return;
+      }
       this._handleTouchStart(e, bubble);
     }, { passive: true });
 
@@ -129,6 +138,9 @@ export class ContextMenuService {
    * @param {HTMLElement} bubble - Message bubble element
    */
   _handleRightClick(e, bubble) {
+    if (e.target.closest('button, a, input, audio, video, .vn-speed-btn, .vn-play-btn, .vn-waveform')) {
+      return;
+    }
     console.log('[CONTEXT_MENU_SERVICE] Right-click on message:', bubble.dataset.messageId);
     
     this.selectedMessageId = bubble.dataset.messageId;
@@ -143,6 +155,9 @@ export class ContextMenuService {
    * @param {HTMLElement} bubble - Message bubble element
    */
   _handleTouchStart(e, bubble) {
+    if (e.target.closest('button, a, input, audio, video, .vn-speed-btn, .vn-play-btn, .vn-waveform')) {
+      return;
+    }
     this.isLongPress = false;
     this.touchStartX = e.touches[0].clientX;
     this.touchStartY = e.touches[0].clientY;

@@ -1,17 +1,16 @@
 /**
- * CaptionInput - Handles global and per-media caption inputs
- * Switches between global and media-specific caption contexts
+ * CaptionInput - Handles unified floating caption input in the media composer
  */
 
 export class CaptionInput {
     constructor(composer) {
         this.composer = composer;
+        this.unifiedInput = null;
         this.globalContainer = null;
         this.mediaContainer = null;
         this.globalInput = null;
         this.mediaInput = null;
-        this.isGlobalMode = true;
-        
+        this.isGlobalMode = false;
         this.initialized = false;
     }
     
@@ -19,25 +18,37 @@ export class CaptionInput {
      * Initialize caption input
      */
     init() {
+        this.unifiedInput = document.getElementById('mediaCaptionInput');
         this.globalContainer = document.getElementById('mediaComposerGlobalCaption');
         this.mediaContainer = document.getElementById('mediaComposerMediaCaption');
         
-        if (this.globalContainer) {
-            this.globalInput = this.globalContainer.querySelector('textarea');
-            this.globalInput.addEventListener('input', (e) => {
+        if (this.unifiedInput) {
+            this.unifiedInput.addEventListener('input', (e) => {
+                this.composer.updateMediaCaption(e.target.value);
                 this.composer.updateGlobalCaption(e.target.value);
             });
         }
         
+        if (this.globalContainer) {
+            this.globalInput = this.globalContainer.querySelector('textarea');
+            if (this.globalInput) {
+                this.globalInput.addEventListener('input', (e) => {
+                    this.composer.updateGlobalCaption(e.target.value);
+                });
+            }
+        }
+        
         if (this.mediaContainer) {
             this.mediaInput = this.mediaContainer.querySelector('textarea');
-            this.mediaInput.addEventListener('input', (e) => {
-                this.composer.updateMediaCaption(e.target.value);
-            });
+            if (this.mediaInput) {
+                this.mediaInput.addEventListener('input', (e) => {
+                    this.composer.updateMediaCaption(e.target.value);
+                });
+            }
         }
         
         this.initialized = true;
-        console.log('[CAPTION_INPUT] Caption input initialized');
+        console.log('[CAPTION_INPUT] Unified caption input initialized');
     }
     
     /**
@@ -45,8 +56,11 @@ export class CaptionInput {
      * @param {string} caption - Global caption text
      */
     setGlobalCaption(caption) {
+        if (this.unifiedInput && !this.unifiedInput.value) {
+            this.unifiedInput.value = caption || '';
+        }
         if (this.globalInput) {
-            this.globalInput.value = caption;
+            this.globalInput.value = caption || '';
         }
     }
     
@@ -55,8 +69,11 @@ export class CaptionInput {
      * @param {string} caption - Media-specific caption text
      */
     setMediaCaption(caption) {
+        if (this.unifiedInput) {
+            this.unifiedInput.value = caption || '';
+        }
         if (this.mediaInput) {
-            this.mediaInput.value = caption;
+            this.mediaInput.value = caption || '';
         }
     }
     
@@ -64,12 +81,6 @@ export class CaptionInput {
      * Switch to global caption mode
      */
     showGlobalCaption() {
-        if (this.globalContainer) {
-            this.globalContainer.style.display = 'block';
-        }
-        if (this.mediaContainer) {
-            this.mediaContainer.style.display = 'none';
-        }
         this.isGlobalMode = true;
     }
     
@@ -77,12 +88,6 @@ export class CaptionInput {
      * Switch to media caption mode
      */
     showMediaCaption() {
-        if (this.globalContainer) {
-            this.globalContainer.style.display = 'none';
-        }
-        if (this.mediaContainer) {
-            this.mediaContainer.style.display = 'block';
-        }
         this.isGlobalMode = false;
     }
     
@@ -91,6 +96,9 @@ export class CaptionInput {
      * @returns {string} Current caption text
      */
     getCurrentCaption() {
+        if (this.unifiedInput) {
+            return this.unifiedInput.value;
+        }
         if (this.isGlobalMode && this.globalInput) {
             return this.globalInput.value;
         } else if (!this.isGlobalMode && this.mediaInput) {
@@ -103,6 +111,9 @@ export class CaptionInput {
      * Clear all captions
      */
     clear() {
+        if (this.unifiedInput) {
+            this.unifiedInput.value = '';
+        }
         if (this.globalInput) {
             this.globalInput.value = '';
         }

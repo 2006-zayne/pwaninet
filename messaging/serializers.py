@@ -80,6 +80,9 @@ class MessageSerializer(serializers.ModelSerializer):
     read_status = serializers.SerializerMethodField()
     attachments = MessageAttachmentSerializer(many=True, read_only=True)
     link_preview = LinkPreviewSerializer(read_only=True)
+    is_voice_note = serializers.SerializerMethodField()
+    file_size = serializers.SerializerMethodField()
+    file_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
@@ -88,7 +91,8 @@ class MessageSerializer(serializers.ModelSerializer):
             'attachment', 'attachment_type', 'reply_to', 'reactions',
             'reply_to_details', 'attachment_url', 'read_status', 'status', 'created_at', 'edited_at', 'is_deleted',
             'link_url', 'link_title', 'link_description', 'link_image', 'link_type',
-            'global_caption', 'message_type', 'attachments', 'link_preview'
+            'global_caption', 'message_type', 'attachments', 'link_preview',
+            'is_voice_note', 'file_size', 'file_name'
         ]
         read_only_fields = ['id', 'created_at', 'edited_at', 'is_encrypted', 'status']
 
@@ -102,6 +106,41 @@ class MessageSerializer(serializers.ModelSerializer):
         """Get the URL of the attachment (legacy single attachment)."""
         if obj.attachment:
             return obj.attachment.url
+        return None
+
+    def get_is_voice_note(self, obj):
+        """Determine if this message is a recorded voice note."""
+        if getattr(obj, 'attachment_type', None) == 'voice_note':
+            return True
+        if getattr(obj, 'message_type', None) == 'voice_note':
+            return True
+        if obj.attachment:
+            name = str(obj.attachment.name).lower()
+            if 'voice_' in name or 'voice_note' in name or 'voice_message' in name:
+                return True
+        return False
+
+    def get_file_size(self, obj):
+        """Get byte size of attachment."""
+        if obj.attachment:
+            try:
+                return obj.attachment.size
+            except Exception:
+                pass
+        first_att = obj.attachments.first()
+        if first_att:
+            return first_att.size
+        return 0
+
+    def get_file_name(self, obj):
+        """Get display file name of attachment."""
+        if obj.attachment:
+            import os
+            return os.path.basename(obj.attachment.name)
+        first_att = obj.attachments.first()
+        if first_att and first_att.file:
+            import os
+            return os.path.basename(first_att.file.name)
         return None
 
     def get_read_status(self, obj):
@@ -143,12 +182,25 @@ class FileUploadValidator:
     
     ALLOWED_TYPES = {
         'image': ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
-        'video': ['video/mp4', 'video/webm', 'video/quicktime'],
-        'audio': ['audio/mpeg', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/aac'],
-        'document': ['application/pdf', 'text/plain', 'application/msword', 
-                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    'application/vnd.ms-excel',
-                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+        'video': ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska'],
+        'audio': [
+            'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/vnd.wave',
+            'audio/webm', 'audio/ogg', 'application/ogg', 'audio/aac',
+            'audio/mp4', 'audio/x-m4a', 'audio/opus', 'audio/3gpp', 'audio/flac',
+            'audio/x-matroska'
+        ],
+        'document': [
+            'application/pdf', 'text/plain', 'text/csv', 'text/markdown',
+            'application/msword', 
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/zip', 'application/x-zip-compressed',
+            'application/x-rar-compressed', 'application/x-tar', 'application/gzip',
+            'application/json'
+        ]
     }
     
     MIME_EXT_MAP = {
@@ -160,13 +212,34 @@ class FileUploadValidator:
         'video/mp4': ['.mp4'],
         'video/webm': ['.webm'],
         'video/quicktime': ['.mov'],
+        'video/x-matroska': ['.mkv'],
         'audio/mpeg': ['.mp3'],
+        'audio/mp3': ['.mp3'],
         'audio/wav': ['.wav'],
-        'audio/webm': ['.webm'],
-        'audio/ogg': ['.ogg'],
+        'audio/x-wav': ['.wav'],
+        'audio/vnd.wave': ['.wav'],
+        'audio/webm': ['.webm', '.weba'],
+        'audio/ogg': ['.ogg', '.opus', '.oga'],
+        'application/ogg': ['.ogg', '.opus', '.oga'],
+        'audio/opus': ['.opus', '.ogg'],
         'audio/aac': ['.aac'],
+        'audio/mp4': ['.m4a', '.mp4'],
+        'audio/x-m4a': ['.m4a'],
+        'audio/3gpp': ['.3gp'],
+        'audio/flac': ['.flac'],
         'application/pdf': ['.pdf'],
         'text/plain': ['.txt'],
+        'text/csv': ['.csv'],
+        'text/markdown': ['.md'],
+        'application/msword': ['.doc'],
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+        'application/vnd.ms-excel': ['.xls'],
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+        'application/vnd.ms-powerpoint': ['.ppt'],
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
+        'application/zip': ['.zip'],
+        'application/x-zip-compressed': ['.zip'],
+        'application/json': ['.json'],
     }
     
     @classmethod
@@ -175,8 +248,20 @@ class FileUploadValidator:
         if not file:
             return False, 'NO_FILE', 'No file provided', None
         
-        content_type = file.content_type.lower()
-        
+        raw_content_type = (getattr(file, 'content_type', '') or '').lower().strip()
+        # Clean parameter parts like ;codecs=opus or charset=utf-8
+        content_type = raw_content_type.split(';')[0].strip()
+
+        file_name = getattr(file, 'name', '') or ''
+        file_ext = os.path.splitext(file_name)[1].lower() if file_name else ''
+
+        # If MIME type is missing or generic octet-stream, try to guess from file name
+        if (not content_type or content_type == 'application/octet-stream') and file_name:
+            import mimetypes
+            guessed_type, _ = mimetypes.guess_type(file_name)
+            if guessed_type:
+                content_type = guessed_type.lower().split(';')[0].strip()
+
         # Determine attachment type and validate MIME type
         attachment_type = None
         max_size = None
@@ -191,12 +276,15 @@ class FileUploadValidator:
                 return False, 'INVALID_VIDEO_TYPE', f'Video type {content_type} is not allowed. Allowed types: MP4, WebM, QuickTime', None
             attachment_type = 'video'
             max_size = cls.FILE_SIZE_LIMITS['video']
-        elif content_type.startswith('audio/'):
+        elif content_type.startswith('audio/') or content_type == 'application/ogg':
             if content_type not in cls.ALLOWED_TYPES['audio']:
                 return False, 'INVALID_AUDIO_TYPE', f'Audio type {content_type} is not allowed. Allowed types: MP3, WAV, WebM, OGG, AAC', None
             attachment_type = 'audio'
             max_size = cls.FILE_SIZE_LIMITS['audio']
-        elif content_type in cls.ALLOWED_TYPES['document']:
+        elif content_type in cls.ALLOWED_TYPES['document'] or file_ext in [
+            '.pdf', '.txt', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+            '.zip', '.csv', '.json', '.md'
+        ]:
             attachment_type = 'document'
             max_size = cls.FILE_SIZE_LIMITS['document']
         else:
@@ -207,10 +295,10 @@ class FileUploadValidator:
             size_mb = max_size / (1024 * 1024)
             return False, 'FILE_TOO_LARGE', f'File size exceeds {size_mb:.0f}MB limit for {attachment_type}s', attachment_type
         
-        # Validate file extension matches MIME type
-        file_ext = os.path.splitext(file.name)[1].lower()
-        if content_type in cls.MIME_EXT_MAP and file_ext not in cls.MIME_EXT_MAP[content_type]:
-            return False, 'EXTENSION_MISMATCH', f'File extension {file_ext} does not match MIME type {content_type}', attachment_type
+        # Validate file extension matches MIME type (only when extension is provided)
+        if file_ext and content_type in cls.MIME_EXT_MAP:
+            if file_ext not in cls.MIME_EXT_MAP[content_type]:
+                return False, 'EXTENSION_MISMATCH', f'File extension {file_ext} does not match MIME type {content_type}', attachment_type
         
         return True, None, None, attachment_type
 

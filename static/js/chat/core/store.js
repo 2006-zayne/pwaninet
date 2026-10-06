@@ -34,6 +34,7 @@ export class Store {
             messages: new Map(), // messageId -> message (Map for O(1) operations)
             messageOrder: [],   // Array of messageIds for ordering
             processedMessageIds: new Set(), // For deduplication
+            isInitialHistoryLoaded: false,
 
             // UI state
             uiState: UI_STATE.IDLE,
@@ -96,6 +97,7 @@ export class Store {
             conversationId: this._state.conversationId,
             currentUserId: this._state.currentUserId,
             isEncrypted: this._state.isEncrypted,
+            isInitialHistoryLoaded: Boolean(this._state.isInitialHistoryLoaded),
             messages: this._getMessagesArray(),
             messageQueue: [], // Queue handled by message service
             processedMessageIds: new Set(this._state.processedMessageIds),
@@ -105,6 +107,16 @@ export class Store {
             currentTheme: this._state.currentTheme,
             themeMode: this._state.themeMode
         };
+    }
+
+    /**
+     * Mark initial history loading completed (or failed)
+     * @param {boolean} loaded
+     */
+    setInitialHistoryLoaded(loaded = true) {
+        this._logMutation('SET_INITIAL_HISTORY_LOADED', { loaded });
+        this._state.isInitialHistoryLoaded = Boolean(loaded);
+        this._notifySubscribers();
     }
 
     /**
@@ -479,6 +491,7 @@ export class Store {
         this._state.typingUsers.clear();
         this._state.peerOnlineStatus.clear();
         this._state.uiState = UI_STATE.IDLE;
+        this._state.isInitialHistoryLoaded = false;
 
         this._notifySubscribers();
     }
@@ -511,7 +524,7 @@ export class Store {
 
         // Type validation
         const validStates = Object.values(MESSAGE_STATE);
-        const validTypes = ['text', 'media', 'system', 'emoji', 'link', 'media_group'];
+        const validTypes = ['text', 'media', 'system', 'emoji', 'link', 'media_group', 'audio', 'voice_note', 'document'];
 
         const validation = {
             id: typeof message.id === 'string',

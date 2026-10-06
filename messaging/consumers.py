@@ -350,12 +350,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'temp_id': event.get('temp_id')
         }))
 
+    async def chat_message(self, event):
+        await self.chat_message_event(event)
+
     async def message_status_event(self, event):
         await self.send(text_data=json.dumps({
             'type': 'message_status',
             'message_id': event['message_id'],
             'status': event['status']
         }))
+
+    async def message_status(self, event):
+        await self.message_status_event(event)
 
     async def read_receipt_event(self, event):
         await self.send(text_data=json.dumps({

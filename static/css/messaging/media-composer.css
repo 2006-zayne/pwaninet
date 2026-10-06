@@ -1,498 +1,1242 @@
 /**
- * Media Composer - Fullscreen media composition interface
- * Cinematic, immersive, dark UI for multi-file media sharing
+ * Media Composer - Modern Fullscreen Media Composition & Playground Interface
+ * Inspired by WhatsApp, Telegram, Full-screen Reel Player & Instagram
+ * Features:
+ * - Floating round semi-transparent circular controls
+ * - Full bleed edge-to-edge media stage (0 padding, full mobile viewport)
+ * - Animated "Closing…" exit state matching Fullscreen Reel Player
+ * - Floating Crop Aspect Ratio Dropdown (Free, 1:1, 4:5, 16:9)
+ * - Full-width interactive video timeline trimmer with highlighted cropping & mask fading
+ * - Video playback strictly bounded to trimmed segment
+ * - Floating video size & duration badge below close button
+ * - Semi-transparent floating caption input & send button
  */
 
-/* ==================== Overlay Container ==================== */
+/* ==================== 1. Core Cinema Overlay ==================== */
 .media-composer-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.95);
-    backdrop-filter: blur(20px);
-    z-index: 10000;
-    display: none;
-    opacity: 0;
-    transition: opacity 0.3s ease;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 10800;
+  background: #000000;
+  display: none;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  touch-action: manipulation;
 }
 
 .media-composer-overlay.show {
-    display: flex;
-    opacity: 1;
+  display: block;
+  opacity: 1;
 }
 
-/* ==================== Main Container ==================== */
 .media-composer-container {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    background: #0a0a0a;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: #000000;
 }
 
-/* ==================== Header ==================== */
+/* ==================== 2. Floating Top Scrim & Controls ==================== */
 .media-composer-header {
-    display: flex;
-    align-items: center;
-    padding: 16px 24px;
-    background: rgba(20, 20, 20, 0.8);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: max(14px, env(safe-area-inset-top, 14px)) max(16px, env(safe-area-inset-right, 16px)) 24px max(16px, env(safe-area-inset-left, 16px));
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.3) 60%, rgba(0, 0, 0, 0) 100%);
+  pointer-events: none;
 }
 
-.media-composer-close {
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    cursor: pointer;
-    transition: all 0.2s ease;
+.media-composer-header-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: auto;
 }
 
-.media-composer-close:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: rotate(90deg);
+.media-composer-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
 }
 
-.media-composer-title {
-    margin-left: 16px;
-    color: white;
-    font-size: 18px;
-    font-weight: 600;
+/* Floating Video Size & Duration Badge (Below Close Button) */
+.media-composer-size-badge {
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.95);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  white-space: nowrap;
+  animation: fadeIn 0.18s ease;
 }
 
-/* ==================== Main Content Area ==================== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Floating Center Counter Badge (e.g. 1 / 3) */
+.media-composer-center-counter {
+  position: absolute;
+  left: 50%;
+  top: max(16px, env(safe-area-inset-top, 16px));
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 55;
+}
+
+.media-composer-counter-badge {
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.95);
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  display: inline-block;
+}
+
+/* Floating Round Semi-Transparent Circles */
+.media-composer-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+  padding: 0;
+  outline: none;
+}
+
+.media-composer-btn:hover {
+  background: rgba(0, 0, 0, 0.78);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  transform: scale(1.08);
+}
+
+.media-composer-btn:active {
+  transform: scale(0.95);
+}
+
+.media-composer-btn.active {
+  background: rgba(37, 99, 235, 0.75);
+  border-color: #3b82f6;
+  color: #ffffff;
+}
+
+.media-composer-btn.text-danger-hover:hover {
+  background: rgba(239, 68, 68, 0.85);
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
+/* Exit / Close Button "Closing…" State */
+.media-composer-close.is-closing {
+  width: auto;
+  min-width: 42px;
+  gap: 0.45rem;
+  padding: 0 0.85rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  background: rgba(0, 0, 0, 0.75);
+  cursor: wait;
+}
+
+/* ==================== 3. Crop Aspect Ratio Dropdown ==================== */
+.media-crop-btn-wrapper {
+  position: relative;
+}
+
+.media-crop-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 190px;
+  background: rgba(18, 22, 32, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+  border-radius: 16px;
+  padding: 6px;
+  z-index: 60;
+  animation: dropdownFade 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: auto;
+}
+
+@keyframes dropdownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.crop-dropdown-header {
+  padding: 6px 12px 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.crop-dropdown-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.crop-option-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.84rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.crop-option-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.crop-option-btn.active {
+  background: rgba(37, 99, 235, 0.28);
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.crop-option-btn.active .check-icon {
+  display: inline-block !important;
+  color: #60a5fa;
+}
+
+/* ==================== 4. Full Bleed Edge-to-Edge Media Stage ==================== */
 .media-composer-main {
-    flex: 1;
-    display: flex;
-    position: relative;
-    overflow: hidden;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  background: #000000;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
 }
 
-/* ==================== Preview Canvas ==================== */
 .media-preview-container {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #000;
-    overflow: hidden;
-    position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
 }
 
-.media-preview-image,
+.media-preview-image {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 0;
+  box-shadow: none;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  pointer-events: auto;
+}
+
+.media-preview-video-wrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+  background: #000000;
+}
+
 .media-preview-video {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-    transition: transform 0.1s ease;
-    cursor: grab;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 0;
+  box-shadow: none;
+  outline: none;
+  background: #000000;
+  pointer-events: none;
 }
 
-.media-preview-image:active,
-.media-preview-video:active {
-    cursor: grabbing;
+/* Strip native browser controls */
+.media-preview-video::-webkit-media-controls {
+  display: none !important;
+}
+.media-preview-video::-webkit-media-controls-start-playback-button {
+  display: none !important;
+}
+.media-preview-video::-webkit-media-controls-enclosure {
+  display: none !important;
 }
 
-.media-preview-audio,
-.media-preview-document {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    text-align: center;
+/* Center Tap to Play / Pause Indicator */
+.media-video-tap-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.7);
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 15;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
-.audio-icon,
-.document-icon {
-    margin-bottom: 16px;
-    color: rgba(255, 255, 255, 0.6);
+.media-video-tap-indicator.visible-paused {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
 }
 
-.audio-player {
-    margin-top: 16px;
-    width: 300px;
+.media-video-tap-indicator.pulse {
+  opacity: 1;
+  animation: tapPulse 0.45s ease forwards;
 }
 
-.audio-info,
-.document-info {
-    margin-top: 16px;
-    color: rgba(255, 255, 255, 0.8);
+@keyframes tapPulse {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.3);
+  }
 }
 
-.document-name {
-    font-size: 16px;
-    font-weight: 500;
-    margin-bottom: 8px;
+/* Reel-Player-Style Frosted Video Loading Screen */
+.media-video-loading-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 18;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
 }
 
-.document-size {
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.5);
+.media-video-loading-screen.is-loading {
+  opacity: 1;
+  pointer-events: auto;
 }
 
-.document-icon {
-    width: 80px;
-    height: 80px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    font-weight: 700;
-    color: white;
+.media-video-loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3.5px solid rgba(255, 255, 255, 0.22);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: composerVideoSpin 0.72s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+  box-shadow: 0 0 18px rgba(59, 130, 246, 0.4);
 }
 
-/* ==================== Tool Rail ==================== */
-.media-tools-rail {
-    position: absolute;
-    right: 24px;
-    top: 50%;
-    transform: translateY(-50%);
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    padding: 16px 12px;
-    background: rgba(30, 30, 30, 0.2);
-    border-radius: 24px;
-    backdrop-filter: blur(5px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+@keyframes composerVideoSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
-.tool-button {
-    background: transparent;
-    border: none;
-    color: white;
-    cursor: pointer;
-    padding: 12px;
-    border-radius: 12px;
-    transition: all 0.2s ease;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
+/* Audio & Document Center Stage Cards */
+.media-preview-document,
+.media-preview-audio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 24, 33, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+  border-radius: 24px;
+  padding: 32px 36px;
+  max-width: 380px;
+  width: 88%;
+  text-align: center;
+  color: #ffffff;
 }
 
-.tool-button:hover {
-    background: rgba(255, 255, 255, 0.1);
+.media-preview-document .document-icon,
+.media-preview-audio .audio-icon {
+  width: 68px;
+  height: 68px;
+  border-radius: 20px;
+  background: rgba(37, 99, 235, 0.16);
+  color: #3b82f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  margin-bottom: 16px;
 }
 
-.tool-button:active {
-    transform: scale(0.95);
+.media-preview-document .document-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 6px;
+  word-break: break-all;
 }
 
-.tool-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.media-preview-document .document-size {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
 }
 
-.tool-label {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.6);
+.media-preview-audio audio {
+  width: 100%;
+  margin-top: 16px;
+  border-radius: 24px;
 }
 
-/* ==================== Footer ==================== */
+/* ==================== 5. Full-Width Video Timeline Trimmer ==================== */
+.media-video-trimmer-bar {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  background: rgba(10, 14, 23, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0;
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+  pointer-events: auto;
+  animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.trimmer-timestamps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.trimmer-duration-badge {
+  background: rgba(37, 99, 235, 0.25);
+  color: #60a5fa;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+}
+
+.trimmer-track {
+  position: relative;
+  width: 100%;
+  height: 48px;
+  background: #000000;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  box-sizing: border-box;
+}
+
+.trimmer-filmstrip {
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05),
+    rgba(255, 255, 255, 0.05) 18px,
+    rgba(255, 255, 255, 0.12) 18px,
+    rgba(255, 255, 255, 0.12) 36px
+  );
+  opacity: 0.88;
+}
+
+/* Faded Out Unselected Masks */
+.trimmer-mask-left,
+.trimmer-mask-right {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  pointer-events: none;
+  z-index: 2;
+  transition: width 0.03s linear;
+}
+
+.trimmer-mask-left {
+  left: 0;
+  width: 0%;
+}
+
+.trimmer-mask-right {
+  right: 0;
+  width: 0%;
+}
+
+/* Highlighted Active Selection Window */
+.trimmer-selection-window {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0%;
+  right: 0%;
+  border-top: 3px solid #3b82f6;
+  border-bottom: 3px solid #3b82f6;
+  background: rgba(59, 130, 246, 0.18);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.45);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.trimmer-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  background: #3b82f6;
+  cursor: ew-resize;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 4;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.trimmer-handle::after {
+  content: "";
+  width: 2px;
+  height: 16px;
+  background: #ffffff;
+  border-radius: 1px;
+}
+
+.trimmer-handle.handle-left {
+  left: 0;
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+.trimmer-handle.handle-right {
+  right: 0;
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+.trimmer-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0%;
+  width: 2px;
+  background: #ffffff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* ==================== 6. Floating Footer & Bottom Dock ==================== */
 .media-composer-footer {
-    display: flex;
-    flex-direction: column;
-    background: rgba(20, 20, 20, 0.9);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    padding-bottom: calc(12px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.88) 0%, rgba(0, 0, 0, 0.45) 60%, rgba(0, 0, 0, 0) 100%);
+  pointer-events: none;
 }
 
-/* ==================== Thumbnail Strip ==================== */
+/* Thumbnail Carousel Strip */
+.media-thumbnails-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 0;
+  pointer-events: auto;
+}
+
+.media-thumbnails-wrap::-webkit-scrollbar {
+  display: none;
+}
+
 .media-thumbnails {
-    display: flex;
-    gap: 8px;
-    padding: 16px 24px;
-    overflow-x: auto;
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-}
-
-.media-thumbnails::-webkit-scrollbar {
-    height: 4px;
-}
-
-.media-thumbnails::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 2px;
-}
-
-.media-thumbnails::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 2px;
-}
-
-.media-thumbnails::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .media-thumbnail {
-    flex-shrink: 0;
-    width: 80px;
-    height: 80px;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-    cursor: pointer;
-    border: 2px solid transparent;
-    transition: all 0.2s ease;
-    background: rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  border: 2px solid transparent;
+  background: rgba(30, 41, 59, 0.7);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  transition: transform 0.16s ease, border-color 0.16s ease;
 }
 
 .media-thumbnail:hover {
-    border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .media-thumbnail.active {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
-}
-
-.media-thumbnail.add-more {
-    border: 2px dashed rgba(255, 255, 255, 0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.media-thumbnail.add-more:hover {
-    border-color: rgba(255, 255, 255, 0.5);
-    background: rgba(255, 255, 255, 0.05);
+  border-color: #2563eb;
+  transform: scale(1.06);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
 }
 
 .thumbnail-content {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.thumbnail-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+.thumbnail-image,
+.thumbnail-video-element {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .thumbnail-video {
-    width: 100%;
-    height: 100%;
-    position: relative;
-    background: #000;
-}
-
-.thumbnail-video-element {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: #000;
 }
 
 .thumbnail-play-icon {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: white;
-    background: rgba(0, 0, 0, 0.5);
-    border-radius: 50%;
-    padding: 8px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
 }
 
 .thumbnail-audio,
 .thumbnail-document {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: rgba(255, 255, 255, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  color: #3b82f6;
 }
 
-.thumbnail-add-icon {
-    color: rgba(255, 255, 255, 0.4);
+/* Thumbnail Add Button */
+.media-thumbnail-add-btn {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  border: 2px dashed rgba(255, 255, 255, 0.28);
+  background: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  font-size: 0.72rem;
+  font-weight: 500;
 }
 
-.thumbnail-remove {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    background: rgba(0, 0, 0, 0.7);
-    border: none;
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    cursor: pointer;
+.media-thumbnail-add-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #ffffff;
+  transform: translateY(-2px);
+}
+
+/* ==================== 7. Floating Semi-Transparent Caption & Send Bar ==================== */
+.media-composer-action-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+/* Floating Semi-Transparent Caption Pill */
+.media-caption-pill {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  background: rgba(18, 22, 32, 0.55) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 26px;
+  padding: 6px 12px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+  box-sizing: border-box;
+}
+
+.media-caption-emoji-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.media-caption-emoji-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.media-caption-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  resize: none;
+  max-height: 100px;
+  padding: 4px 8px;
+  box-sizing: border-box;
+}
+
+.media-caption-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Floating Semi-Transparent Circular Brand Send Button */
+.media-composer-send-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.65) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35);
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.media-composer-send-btn:hover {
+  background: rgba(37, 99, 235, 0.88) !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+  transform: scale(1.06);
+}
+
+.media-composer-send-btn:active {
+  transform: scale(0.94);
+}
+
+.media-composer-send-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ==================== 8. Animations & Responsiveness ==================== */
+@keyframes slideUp {
+  from {
     opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.media-thumbnail:hover .thumbnail-remove {
+    transform: translateY(10px);
+  }
+  to {
     opacity: 1;
-}
-
-.thumbnail-remove:hover {
-    background: rgba(239, 68, 68, 0.9);
-}
-
-/* ==================== Caption Inputs ==================== */
-.media-captions {
-    padding: 12px 24px;
-    display: flex;
-    gap: 12px;
-}
-
-.global-caption-container,
-.media-caption-container {
-    flex: 1;
-}
-
-.caption-input {
-    width: 100%;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 12px 16px;
-    color: white;
-    font-size: 14px;
-    resize: none;
-    transition: all 0.2s ease;
-}
-
-.caption-input::placeholder {
-    color: rgba(255, 255, 255, 0.4);
-}
-
-.caption-input:focus {
-    outline: none;
-    border-color: #3b82f6;
-    background: rgba(255, 255, 255, 0.08);
-}
-
-/* ==================== Send Button ==================== */
-.media-composer-send {
-    align-self: flex-end;
-    margin: 12px 24px 24px;
-    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-    border: none;
-    border-radius: 24px;
-    padding: 12px 32px;
-    color: white;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.2s ease;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-}
-
-.media-composer-send:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
-}
-
-.media-composer-send:active {
     transform: translateY(0);
+  }
 }
 
-.media-composer-send:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
+@media (max-width: 576px) {
+  .media-composer-header {
+    padding: max(12px, env(safe-area-inset-top, 12px)) 12px 18px 12px;
+  }
+
+  .media-composer-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 1.05rem;
+  }
+
+  .media-composer-close.is-closing {
+    min-width: 38px;
+    padding: 0 0.75rem;
+    font-size: 0.78rem;
+  }
+
+  .media-thumbnail,
+  .media-thumbnail-add-btn {
+    width: 48px;
+    height: 48px;
+  }
+
+  .media-composer-send-btn {
+    width: 42px;
+    height: 42px;
+    font-size: 1.15rem;
+  }
+
+  .media-caption-pill {
+    padding: 5px 10px;
+  }
+
+  .media-caption-input {
+    font-size: 0.9rem;
+  }
 }
 
-.media-composer-send svg {
-    transition: transform 0.2s ease;
+/* ==================== 9. Interactive Image Cropping Engine ==================== */
+.media-preview-image-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 100%;
+  user-select: none;
 }
 
-.media-composer-send:hover svg {
-    transform: translateX(2px);
+.media-crop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  pointer-events: auto;
+  touch-action: none;
 }
 
-/* ==================== Responsive Design ==================== */
-@media (max-width: 768px) {
-    .media-tools-rail {
-        right: 12px;
-        padding: 12px 8px;
-        gap: 12px;
-    }
-    
-    .tool-button {
-        padding: 8px;
-    }
-    
-    .tool-label {
-        display: none;
-    }
-    
-    .media-thumbnails {
-        padding: 12px 16px;
-    }
-    
-    .media-thumbnail {
-        width: 64px;
-        height: 64px;
-    }
-    
-    .media-captions {
-        padding: 12px 16px;
-        flex-direction: column;
-    }
-    
-    .media-composer-send {
-        margin: 12px 16px 16px;
-        width: calc(100% - 32px);
-        justify-content: center;
-    }
+/* 4 Directional Backdrop Masks */
+.crop-backdrop-mask {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.65);
+  pointer-events: none;
+  transition: opacity 0.15s ease;
 }
 
-/* ==================== Animations ==================== */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
+.crop-backdrop-mask.mask-top {
+  top: 0;
+  left: 0;
+  right: 0;
 }
 
-.media-thumbnail {
-    animation: fadeIn 0.3s ease;
+.crop-backdrop-mask.mask-bottom {
+  bottom: 0;
+  left: 0;
+  right: 0;
 }
 
-/* ==================== Accessibility ==================== */
-.media-composer-overlay:focus-within {
-    outline: none;
+.crop-backdrop-mask.mask-left {
+  left: 0;
 }
 
-.tool-button:focus-visible,
-.media-composer-close:focus-visible,
-.media-composer-send:focus-visible {
-    outline: 2px solid #3b82f6;
-    outline-offset: 2px;
+.crop-backdrop-mask.mask-right {
+  right: 0;
 }
 
-/* ==================== Dark Mode Support ==================== */
-@media (prefers-color-scheme: dark) {
-    .media-composer-overlay {
-        background: rgba(0, 0, 0, 0.98);
-    }
+/* Center Highlighted Crop Box */
+.media-crop-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 0 24px rgba(0, 0, 0, 0.6);
+  cursor: move;
+  touch-action: none;
+}
+
+/* 3x3 Rule-of-Thirds Grid */
+.crop-grid-line {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+}
+
+.crop-grid-line.grid-h1 {
+  top: 33.333%;
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+.crop-grid-line.grid-h2 {
+  top: 66.666%;
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+.crop-grid-line.grid-v1 {
+  left: 33.333%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+.crop-grid-line.grid-v2 {
+  left: 66.666%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+/* 8 Resize Handles */
+.crop-handle {
+  position: absolute;
+  touch-action: none;
+  z-index: 5;
+}
+
+/* Corner Handles: Sleek iOS/WhatsApp/Telegram Corner Brackets */
+.crop-handle.handle-nw,
+.crop-handle.handle-ne,
+.crop-handle.handle-se,
+.crop-handle.handle-sw {
+  width: 24px;
+  height: 24px;
+}
+
+.crop-handle.handle-nw {
+  top: -3px;
+  left: -3px;
+  border-top: 3.5px solid #ffffff;
+  border-left: 3.5px solid #ffffff;
+  cursor: nwse-resize;
+}
+
+.crop-handle.handle-ne {
+  top: -3px;
+  right: -3px;
+  border-top: 3.5px solid #ffffff;
+  border-right: 3.5px solid #ffffff;
+  cursor: nesw-resize;
+}
+
+.crop-handle.handle-se {
+  bottom: -3px;
+  right: -3px;
+  border-bottom: 3.5px solid #ffffff;
+  border-right: 3.5px solid #ffffff;
+  cursor: nwse-resize;
+}
+
+.crop-handle.handle-sw {
+  bottom: -3px;
+  left: -3px;
+  border-bottom: 3.5px solid #ffffff;
+  border-left: 3.5px solid #ffffff;
+  cursor: nesw-resize;
+}
+
+/* Edge Handles */
+.crop-handle.handle-n {
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 4px;
+  background: #ffffff;
+  border-radius: 2px;
+  cursor: ns-resize;
+}
+
+.crop-handle.handle-s {
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 4px;
+  background: #ffffff;
+  border-radius: 2px;
+  cursor: ns-resize;
+}
+
+.crop-handle.handle-w {
+  left: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 24px;
+  width: 4px;
+  background: #ffffff;
+  border-radius: 2px;
+  cursor: ew-resize;
+}
+
+.crop-handle.handle-e {
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 24px;
+  width: 4px;
+  background: #ffffff;
+  border-radius: 2px;
+  cursor: ew-resize;
+}
+
+/* Floating Crop Actions Dock - Positioned at Top of the Bar */
+.media-crop-actions-dock {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top, 14px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.65), 0 0 20px rgba(59, 130, 246, 0.25);
+  animation: cropSlideDown 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: auto;
+  max-width: calc(100vw - 20px);
+}
+
+@keyframes cropSlideDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* When cropping is active: prioritize top crop dock */
+.media-composer-overlay.is-cropping .media-composer-center-counter {
+  display: none !important;
+}
+
+@media (max-width: 576px) {
+  .media-composer-overlay.is-cropping .media-composer-header-actions {
+    display: none !important;
+  }
+  .media-composer-overlay.is-cropping .media-composer-header-left {
+    display: none !important;
+  }
+  .media-crop-actions-dock {
+    top: max(10px, env(safe-area-inset-top, 10px));
+    padding: 5px 8px;
+    gap: 4px;
+    width: auto;
+    max-width: calc(100vw - 16px);
+  }
+  .crop-dock-btn {
+    padding: 5px 10px;
+    font-size: 0.78rem;
+  }
+  .crop-aspect-pill {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+  }
+}
+
+.crop-dock-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.crop-dock-cancel {
+  color: #f87171;
+}
+
+.crop-dock-cancel:hover {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.crop-dock-apply {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+}
+
+.crop-dock-apply:hover {
+  background: #1d4ed8;
+  transform: scale(1.04);
+}
+
+.crop-dock-aspect-pills {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 3px 5px;
+  border-radius: 999px;
+}
+
+.crop-aspect-pill {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.crop-aspect-pill:hover {
+  color: #ffffff;
+}
+
+.crop-aspect-pill.active {
+  background: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
+}
+
+#mediaResetBtn.has-edits {
+  color: #60a5fa !important;
+  position: relative;
+}
+
+#mediaResetBtn.has-edits::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3b82f6;
+  box-shadow: 0 0 6px #3b82f6;
 }

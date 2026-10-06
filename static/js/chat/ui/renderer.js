@@ -7,6 +7,9 @@
 import { formatDateLabel, formatTime, formatPreciseTime, escapeHtml } from '../shared/utils.js';
 import { renderMessageStatus } from '../shared/message-status-renderer.js';
 import { linkPreviewRenderer } from '../features/link-preview/link-preview-renderer.js';
+import { EVENTS } from '../shared/constants.js';
+import { eventBus } from '../core/event-bus.js';
+import { deviceMediaStore } from '../core/device-media-store.js';
 
 export class MessageRenderer {
     constructor() {
@@ -15,6 +18,7 @@ export class MessageRenderer {
         this.lastRenderedCount = 0;
         this.isRendering = false;
         this.typingIndicatorElement = null;
+        this.downloadedMediaIds = new Set();
         this.debugMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     }
 
@@ -27,13 +31,211 @@ export class MessageRenderer {
         this.container = document.getElementById('messagesContainer');
         this.currentUserId = currentUserId;
 
+        // Initialize device media store (Capacitor filesystem or IndexedDB)
+        deviceMediaStore.init().catch(err => console.warn('[RENDERER] DeviceMediaStore init error:', err));
+
         if (!this.container) {
             console.error('MessageRenderer: Messages container not found');
             return;
         }
 
         this._attachEmptyStateListeners();
+        this._setupDelegatedEventListeners();
+
+        // Listen for live upload progress updates
+        eventBus.on(EVENTS.MESSAGE_UPLOAD_PROGRESS, (data) => {
+            if (data?.tempId) {
+                this._updateUploadProgress(data.tempId, data.progress);
+            }
+        });
+
         this._log('RENDERER_INITIALIZED');
+    }
+
+    /**
+     * Set up container-level delegated event listeners for resilient control handling
+     */
+    _setupDelegatedEventListeners() {
+        if (!this.container || this._delegatedListenersAttached) return;
+        this._delegatedListenersAttached = true;
+
+        this.container.addEventListener('click', (e) => {
+            // Speed button handler delegation
+            const speedBtn = e.target.closest('.vn-speed-btn');
+            if (speedBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const bubble = speedBtn.closest('.voice-note-bubble');
+                const audio = bubble?.querySelector('.vn-audio-el');
+                const cur = parseFloat(speedBtn.dataset.speed || '1');
+                const next = cur === 1 ? 1.5 : (cur === 1.5 ? 2 : 1);
+                speedBtn.dataset.speed = String(next);
+                speedBtn.textContent = `${next}x`;
+                if (audio) {
+                    audio.defaultPlaybackRate = next;
+                    audio.playbackRate = next;
+                }
+                return;
+            }
+
+            // Play button handler delegation
+            const playBtn = e.target.closest('.vn-play-btn');
+            if (playBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const bubble = playBtn.closest('.voice-note-bubble');
+                const audio = bubble?.querySelector('.vn-audio-el');
+                const playIcon = bubble?.querySelector('.vn-play-icon');
+                if (!audio) return;
+
+                if (audio.paused) {
+                    document.querySelectorAll('.vn-audio-el, .track-audio-el').forEach(other => {
+                        if (other !== audio && !other.paused) {
+                            other.pause();
+                            other.currentTime = 0;
+                            const otherBubble = other.closest('.voice-note-bubble, .audio-track-bubble');
+                            otherBubble?.querySelector('.vn-play-icon, .track-play-icon')?.classList.replace('bi-pause-fill', 'bi-play-fill');
+                            otherBubble?.querySelectorAll('.vn-bar')?.forEach(b => b.classList.remove('is-played'));
+                        }
+                    });
+
+                    const currentSpeed = parseFloat(bubble?.querySelector('.vn-speed-btn')?.dataset.speed || '1');
+                    audio.defaultPlaybackRate = currentSpeed;
+                    audio.playbackRate = currentSpeed;
+
+                    audio.play().then(() => {
+                        playIcon?.classList.replace('bi-play-fill', 'bi-pause-fill');
+                    }).catch(err => console.warn('[VOICE_NOTE] Delegated play blocked:', err));
+                } else {
+                    audio.pause();
+                    playIcon?.classList.replace('bi-pause-fill', 'bi-play-fill');
+                }
+                return;
+            }
+
+            // Waveform scrubber delegation
+            const waveform = e.target.closest('.vn-waveform');
+            if (waveform) {
+                e.preventDefault();
+                e.stopPropagation();
+                const bubble = waveform.closest('.voice-note-bubble');
+                const audio = bubble?.querySelector('.vn-audio-el');
+                if (!audio || !audio.duration) return;
+
+                const rect = waveform.getBoundingClientRect();
+                const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                audio.currentTime = ratio * audio.duration;
+                return;
+            }
+
+            // Media on-demand download button delegation
+            const dlBtn = e.target.closest('.media-download-pill, .media-download-overlay');
+            if (dlBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const bubble = dlBtn.closest('.media-bubble');
+                const messageId = dlBtn.getAttribute('data-message-id') || bubble?.getAttribute('data-message-id');
+                if (messageId && bubble) {
+                    this._handleMediaDownload(messageId, bubble);
+                }
+                return;
+            }
+        });
+    }
+
+    /**
+     * Check if media is downloaded locally
+     */
+    _isMediaDownloaded(messageId) {
+        if (!messageId) return true;
+        if (this.downloadedMediaIds.has(String(messageId))) return true;
+        if (deviceMediaStore.hasMedia(messageId)) return true;
+        try {
+            return localStorage.getItem(`media_dl_${messageId}`) === 'true';
+        } catch (_) {
+            return false;
+        }
+    }
+
+    /**
+     * Update live upload progress in DOM
+     */
+    _updateUploadProgress(tempId, progress) {
+        if (!this.container) return;
+        const msgEl = this.container.querySelector(`[data-message-id="${tempId}"]`);
+        if (!msgEl) return;
+        const overlay = msgEl.querySelector('.media-upload-overlay');
+        if (!overlay) return;
+        const circleBar = overlay.querySelector('.upload-circle-bar');
+        const textEl = overlay.querySelector('.upload-progress-text');
+        if (circleBar) {
+            const circumference = 94.25;
+            const offset = Math.max(0, circumference * (1 - progress / 100));
+            circleBar.style.strokeDashoffset = offset.toFixed(1);
+        }
+        if (textEl) {
+            textEl.textContent = `${progress}%`;
+        }
+        if (progress >= 100) {
+            overlay.classList.add('upload-complete');
+        }
+    }
+
+    /**
+     * Handle on-demand download for received media
+     */
+    async _handleMediaDownload(messageId, bubble) {
+        if (!bubble || bubble.dataset.isDownloading === 'true') return;
+        bubble.dataset.isDownloading = 'true';
+
+        const pill = bubble.querySelector('.media-download-pill');
+        const dlIcon = pill?.querySelector('.dl-icon');
+        const spinner = pill?.querySelector('.download-spinner');
+        const sizeText = pill?.querySelector('.media-download-size');
+
+        if (dlIcon) dlIcon.classList.add('d-none');
+        if (spinner) spinner.classList.remove('d-none');
+        if (sizeText) sizeText.textContent = 'Saving...';
+
+        try {
+            const imgs = Array.from(bubble.querySelectorAll('img'));
+            const vids = Array.from(bubble.querySelectorAll('video'));
+            const mediaEls = [...imgs, ...vids];
+
+            // Save all media elements permanently to device storage
+            for (const el of mediaEls) {
+                const src = el.getAttribute('src');
+                if (src && !src.startsWith('blob:') && !src.startsWith('capacitor:') && !src.startsWith('http://localhost/_capacitor_file_')) {
+                    const filename = src.split('/').pop()?.split('?')[0] || `media_${messageId}`;
+                    const localUrl = await deviceMediaStore.downloadMedia(messageId, src, filename);
+                    if (localUrl) {
+                        el.src = localUrl;
+                    }
+                }
+            }
+
+            // Mark as downloaded locally
+            this.downloadedMediaIds.add(String(messageId));
+            try {
+                localStorage.setItem(`media_dl_${messageId}`, 'true');
+            } catch (_) {}
+
+            // Smooth reveal
+            bubble.classList.remove('not-downloaded');
+            delete bubble.dataset.isDownloading;
+
+            const overlay = bubble.querySelector('.media-download-overlay');
+            if (overlay) {
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.remove(), 250);
+            }
+        } catch (err) {
+            console.error('[MEDIA_DOWNLOAD] Failed:', err);
+            delete bubble.dataset.isDownloading;
+            if (dlIcon) dlIcon.classList.remove('d-none');
+            if (spinner) spinner.classList.add('d-none');
+            if (sizeText) sizeText.textContent = 'Retry';
+        }
     }
 
     /**
@@ -113,6 +315,11 @@ export class MessageRenderer {
             console.log("[RENDERER] Starting render with", messages?.length || 0, "messages");
 
             if (!messages || messages.length === 0) {
+                const storeState = window.__store?.getState?.();
+                if (storeState && storeState.isInitialHistoryLoaded === false) {
+                    console.log("[RENDERER] Initial history loading in progress, deferring empty state");
+                    return;
+                }
                 this.container.innerHTML = '';
                 this._renderEmptyState();
                 this.lastRenderedCount = 0;
@@ -399,12 +606,12 @@ export class MessageRenderer {
         return this._createEmojiMessage(message);
         }
 
-        if (message.type === 'media') {
-        return this._createMediaMessage(message);
+        if (message.type === 'media' || message.type === 'audio' || message.type === 'voice_note' || message.type === 'document') {
+            return this._createMediaMessage(message);
         }
 
-        if (message.type === 'media_group') {
-        return this._createMediaGroupMessage(message);
+        if (message.type === 'media_group' || (message.attachments && message.attachments.length > 1)) {
+            return this._createMediaGroupMessage(message);
         }
 
         if (message.type === 'link') {
@@ -689,9 +896,14 @@ export class MessageRenderer {
         const attachmentType = metadata.type || 'image';
         const mediaUrl = metadata.url || '';
         const caption = message.content || '';
+        const isUploading = message.status === 'uploading' || message.status === 'sending' || message.isOptimistic;
+        const isNotDownloaded = !message.isOwn && !isUploading && !this._isMediaDownloaded(message.id);
 
         const bubble = document.createElement('div');
         bubble.className = `media-bubble single-media ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition}`;
+        if (isNotDownloaded) {
+            bubble.classList.add('not-downloaded');
+        }
         bubble.setAttribute('data-message-id', message.id);
         bubble.setAttribute('data-sender-id', message.senderId);
         bubble.setAttribute('data-status', message.status);
@@ -708,23 +920,85 @@ export class MessageRenderer {
                         <polygon points="5,3 19,12 5,21"></polygon>
                     </svg>
                 </div>
-                <video src="${escapeHtml(mediaUrl)}" muted preload="metadata"></video>
+                <video src="${escapeHtml(mediaUrl)}" muted preload="metadata" playsinline tabindex="-1" style="pointer-events: none;"></video>
             `;
         }
 
         bubble.innerHTML = mediaContent;
 
+        // Asynchronously check and use locally stored device media if available
+        if (!isNotDownloaded && !isUploading) {
+            deviceMediaStore.getLocalMediaUrl(message.id).then(localUrl => {
+                if (localUrl) {
+                    const el = bubble.querySelector('img, video');
+                    if (el && el.src !== localUrl) {
+                        el.src = localUrl;
+                    }
+                }
+            }).catch(() => {});
+        }
+
+        // 1. Sender optimistic upload progress overlay
+        if (isUploading) {
+            const initialProgress = metadata.uploadProgress || 0;
+            const circumference = 94.25;
+            const initialOffset = Math.max(0, circumference * (1 - initialProgress / 100)).toFixed(1);
+            const uploadOverlay = document.createElement('div');
+            uploadOverlay.className = 'media-upload-overlay';
+            uploadOverlay.setAttribute('data-upload-id', message.id);
+            uploadOverlay.innerHTML = `
+                <div class="upload-progress-widget">
+                    <svg class="upload-progress-circle" width="44" height="44" viewBox="0 0 38 38">
+                        <circle class="upload-circle-bg" cx="19" cy="19" r="15" stroke="rgba(255,255,255,0.25)" stroke-width="2.5" fill="none"/>
+                        <circle class="upload-circle-bar" cx="19" cy="19" r="15" stroke="#ffffff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-dasharray="94.25" stroke-dashoffset="${initialOffset}"/>
+                    </svg>
+                    <span class="upload-progress-text">${initialProgress}%</span>
+                </div>
+            `;
+            bubble.appendChild(uploadOverlay);
+        }
+
+        // 2. Receiver on-demand download overlay with actual file size
+        if (isNotDownloaded) {
+            const fileSize = this._formatFileSize(metadata.size || 0);
+            const downloadOverlay = document.createElement('div');
+            downloadOverlay.className = 'media-download-overlay';
+            downloadOverlay.setAttribute('data-message-id', message.id);
+            downloadOverlay.innerHTML = `
+                <button type="button" class="media-download-pill" title="Download media">
+                    <div class="download-icon-wrap">
+                        <svg class="dl-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <svg class="download-spinner d-none" width="20" height="20" viewBox="0 0 38 38">
+                            <circle cx="19" cy="19" r="15" stroke="rgba(255,255,255,0.3)" stroke-width="3" fill="none"/>
+                            <circle class="dl-spinner-bar" cx="19" cy="19" r="15" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="94.25" stroke-dashoffset="60"/>
+                        </svg>
+                    </div>
+                    <span class="media-download-size">${fileSize || 'Download'}</span>
+                </button>
+            `;
+            bubble.appendChild(downloadOverlay);
+        }
+
         // Add caption if present (inside the bubble)
         if (caption && caption.trim()) {
-            console.log('[MEDIA_CAPTION] Rendering caption:', caption);
             const captionDiv = document.createElement('div');
             captionDiv.className = 'media-caption';
             captionDiv.textContent = caption;
             bubble.appendChild(captionDiv);
         }
 
-        // Add click handler for fullscreen viewer
-        bubble.addEventListener('click', () => {
+        // Click handler: if not downloaded, trigger download; if downloaded, open fullscreen viewer
+        bubble.addEventListener('click', (e) => {
+            if (bubble.classList.contains('not-downloaded')) {
+                e.stopPropagation();
+                this._handleMediaDownload(message.id, bubble);
+                return;
+            }
+            if (isUploading) return;
             console.log('[MEDIA_VIEWER] Opening attachment:', message.id);
             this.renderFullscreenMediaViewer([{
                 id: message.id,
@@ -746,17 +1020,18 @@ export class MessageRenderer {
      */
     renderMediaGroupBubble(message) {
         console.log('[MEDIA_GROUP] Rendering media group bubble for:', message.id);
-        console.log('[MEDIA_GROUP] Layout selection based on attachment count');
 
         const attachments = message.attachments || message.metadata?.attachments || [];
         const globalCaption = message.global_caption || message.metadata?.global_caption || '';
         const attachmentCount = attachments.length;
-
-        console.log('[MEDIA_GROUP] Attachment count:', attachmentCount);
-        console.log('[MEDIA_GROUP] Layout selected:', this._getTelegramLayoutClass(attachmentCount));
+        const isUploading = message.status === 'uploading' || message.status === 'sending' || message.isOptimistic;
+        const isNotDownloaded = !message.isOwn && !isUploading && !this._isMediaDownloaded(message.id);
 
         const bubble = document.createElement('div');
         bubble.className = `media-bubble media-group ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition}`;
+        if (isNotDownloaded) {
+            bubble.classList.add('not-downloaded');
+        }
         bubble.setAttribute('data-message-id', message.id);
         bubble.setAttribute('data-sender-id', message.senderId);
         bubble.setAttribute('data-status', message.status);
@@ -771,9 +1046,6 @@ export class MessageRenderer {
         const visibleAttachments = attachments.slice(0, visibleLimit);
         const hiddenCount = attachmentCount - visibleLimit;
 
-        console.log('[MEDIA_GROUP] Visible attachments:', visibleAttachments.length);
-        console.log('[MEDIA_GROUP] Remaining count:', hiddenCount);
-
         // Render each media tile
         visibleAttachments.forEach((attachment, index) => {
             const tile = this._renderMediaTile(attachment, index, attachmentCount, hiddenCount);
@@ -782,19 +1054,80 @@ export class MessageRenderer {
 
         bubble.appendChild(contentDiv);
 
+        // 1. Sender optimistic upload progress overlay
+        if (isUploading) {
+            const initialProgress = message.metadata?.uploadProgress || 0;
+            const circumference = 94.25;
+            const initialOffset = Math.max(0, circumference * (1 - initialProgress / 100)).toFixed(1);
+            const uploadOverlay = document.createElement('div');
+            uploadOverlay.className = 'media-upload-overlay group-upload-overlay';
+            uploadOverlay.setAttribute('data-upload-id', message.id);
+            uploadOverlay.innerHTML = `
+                <div class="upload-progress-widget">
+                    <svg class="upload-progress-circle" width="48" height="48" viewBox="0 0 38 38">
+                        <circle class="upload-circle-bg" cx="19" cy="19" r="15" stroke="rgba(255,255,255,0.25)" stroke-width="2.5" fill="none"/>
+                        <circle class="upload-circle-bar" cx="19" cy="19" r="15" stroke="#ffffff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-dasharray="94.25" stroke-dashoffset="${initialOffset}"/>
+                    </svg>
+                    <span class="upload-progress-text">${initialProgress}%</span>
+                </div>
+            `;
+            bubble.appendChild(uploadOverlay);
+        }
+
+        // 2. Receiver bundle download overlay with combined bundle size
+        if (isNotDownloaded) {
+            const bundleSize = attachments.reduce((acc, att) => acc + (att.size || 0), 0);
+            const formattedBundleSize = this._formatFileSize(bundleSize);
+            const downloadOverlay = document.createElement('div');
+            downloadOverlay.className = 'media-download-overlay group-download-overlay';
+            downloadOverlay.setAttribute('data-message-id', message.id);
+            downloadOverlay.innerHTML = `
+                <button type="button" class="media-download-pill group-download-pill" title="Download bundle">
+                    <div class="download-icon-wrap">
+                        <svg class="dl-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <svg class="download-spinner d-none" width="22" height="22" viewBox="0 0 38 38">
+                            <circle cx="19" cy="19" r="15" stroke="rgba(255,255,255,0.3)" stroke-width="3" fill="none"/>
+                            <circle class="dl-spinner-bar" cx="19" cy="19" r="15" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="94.25" stroke-dashoffset="60"/>
+                        </svg>
+                    </div>
+                    <div class="group-dl-text">
+                        <span class="group-dl-label">Download all</span>
+                        <span class="media-download-size">${formattedBundleSize || ''}</span>
+                    </div>
+                </button>
+            `;
+            bubble.appendChild(downloadOverlay);
+        }
+
         // Add global caption if present (inside the bubble)
         if (globalCaption && globalCaption.trim()) {
-            console.log('[MEDIA_CAPTION] Rendering global caption:', globalCaption);
             const captionDiv = document.createElement('div');
             captionDiv.className = 'media-caption';
             captionDiv.textContent = globalCaption;
             bubble.appendChild(captionDiv);
         }
 
-        // Add click handler for fullscreen viewer
-        bubble.addEventListener('click', () => {
-            console.log('[MEDIA_VIEWER] Opening media group:', message.id);
-            this.renderFullscreenMediaViewer(attachments, 0);
+        // Click handler: if not downloaded, trigger download; if downloaded, open fullscreen viewer
+        bubble.addEventListener('click', (e) => {
+            if (bubble.classList.contains('not-downloaded')) {
+                e.stopPropagation();
+                this._handleMediaDownload(message.id, bubble);
+                return;
+            }
+            if (isUploading) return;
+            const clickedTile = e.target.closest('.media-tile');
+            let startIndex = 0;
+            if (clickedTile) {
+                const tiles = Array.from(bubble.querySelectorAll('.media-tile'));
+                const idx = tiles.indexOf(clickedTile);
+                if (idx !== -1) startIndex = idx;
+            }
+            console.log('[MEDIA_VIEWER] Opening media group:', message.id, 'startIndex:', startIndex);
+            this.renderFullscreenMediaViewer(attachments, startIndex);
         });
 
         console.log('[MEDIA_GROUP] Media group bubble created');
@@ -815,8 +1148,8 @@ export class MessageRenderer {
         const tile = document.createElement('div');
         tile.className = 'media-tile';
 
-        const fileType = attachment.file_type || 'image';
-        const fileUrl = attachment.file_url || '';
+        const fileType = attachment.file_type || attachment.type || 'image';
+        const fileUrl = attachment.file_url || attachment.file || attachment.url || '';
         const caption = attachment.caption || '';
 
         // Add video class if applicable
@@ -837,7 +1170,7 @@ export class MessageRenderer {
                             <polygon points="5,3 19,12 5,21"></polygon>
                         </svg>
                     </div>
-                    <video src="${escapeHtml(fileUrl)}" muted preload="metadata"></video>
+                    <video src="${escapeHtml(fileUrl)}" muted preload="metadata" playsinline tabindex="-1" style="pointer-events: none;"></video>
                 `;
                 break;
             default:
@@ -895,9 +1228,31 @@ export class MessageRenderer {
         const container = document.createElement('div');
         container.className = 'media-viewer-container';
 
-        // Create header with close button
+        let currentIndex = startIndex;
+
+        // Create header with download and close button
         const header = document.createElement('div');
         header.className = 'media-viewer-header';
+
+        const downloadButton = document.createElement('button');
+        downloadButton.className = 'media-viewer-btn media-viewer-download';
+        downloadButton.title = 'Save to device / Download';
+        downloadButton.innerHTML = `
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+        `;
+        downloadButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentItem = attachments[currentIndex];
+            if (currentItem) {
+                const url = currentItem.file_url || currentItem.file || currentItem.url || '';
+                const filename = currentItem.filename || currentItem.name || url.split('/').pop()?.split('?')[0] || `media_${Date.now()}`;
+                deviceMediaStore.downloadToDevice(url, filename);
+            }
+        });
 
         const closeButton = document.createElement('button');
         closeButton.className = 'media-viewer-close';
@@ -912,6 +1267,7 @@ export class MessageRenderer {
             setTimeout(() => overlay.remove(), 300);
         });
 
+        header.appendChild(downloadButton);
         header.appendChild(closeButton);
 
         // Create main content area
@@ -972,7 +1328,7 @@ export class MessageRenderer {
         });
 
         // Current index state
-        let currentIndex = startIndex;
+        currentIndex = startIndex;
 
         // Function to render current attachment
         const renderAttachment = (index) => {
@@ -1180,49 +1536,18 @@ export class MessageRenderer {
             console.log('[RENDERER] [MEDIA] Using Telegram-style single media bubble');
             const mediaBubble = this.renderSingleMediaBubble(message);
             contentWrapper.appendChild(mediaBubble);
+        } else if (metadata.is_voice_note || attachmentType === 'voice_note' || message.is_voice_note) {
+            console.log('[RENDERER] [VOICE_NOTE] Using Voice Note bubble with waveform');
+            const voiceBubble = this.renderVoiceNoteBubble(message, metadata);
+            contentWrapper.appendChild(voiceBubble);
+        } else if (attachmentType === 'audio') {
+            console.log('[RENDERER] [AUDIO] Using Audio Track bubble');
+            const audioBubble = this.renderAudioTrackBubble(message, metadata);
+            contentWrapper.appendChild(audioBubble);
         } else {
-            console.log('[RENDERER] [MEDIA] Using traditional bubble for non-image/video');
-            // Traditional bubble for audio, files, etc.
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} media-message group-${message.groupPosition}`;
-            messageDiv.setAttribute('data-message-id', message.id);
-            messageDiv.setAttribute('data-sender-id', message.senderId);
-            messageDiv.setAttribute('data-status', message.status);
-            messageDiv.setAttribute('data-group-position', message.groupPosition);
-            this._applyBubbleStyle(messageDiv);
-
-            let mediaContent = '';
-
-            if (metadata.url) {
-                switch (attachmentType) {
-                    case 'audio':
-                        mediaContent = `
-                            <div class="media-audio-container">
-                                <audio controls class="media-audio">
-                                    <source src="${escapeHtml(metadata.url)}" type="audio/mpeg">
-                                    Your browser does not support the audio tag.
-                                </audio>
-                            </div>`;
-                        break;
-                    default:
-                        // Document or other file types
-                        const fileName = message.content || 'Attachment';
-                        const fileIcon = this._getFileIcon(attachmentType);
-                        mediaContent = `
-                            <a href="${escapeHtml(metadata.url)}" target="_blank" class="media-link">
-                                <div class="media-file">
-                                    <span class="file-icon">${fileIcon}</span>
-                                    <span class="file-name">${escapeHtml(fileName)}</span>
-                                </div>
-                            </a>`;
-                        break;
-                }
-            } else {
-                mediaContent = `<p class="message-content">${escapeHtml(message.content || '')}</p>`;
-            }
-
-            messageDiv.innerHTML = mediaContent;
-            contentWrapper.appendChild(messageDiv);
+            console.log('[RENDERER] [DOC] Using Document card bubble');
+            const docBubble = this.renderDocumentBubble(message, metadata);
+            contentWrapper.appendChild(docBubble);
         }
 
         // Determine whether to render meta (timestamp + receipt)
@@ -1266,6 +1591,337 @@ export class MessageRenderer {
 
         wrapperDiv.appendChild(contentWrapper);
         return wrapperDiv;
+    }
+
+    /**
+     * Render distinct document card bubble
+     */
+    renderDocumentBubble(message, metadata = {}) {
+        const bubble = document.createElement('div');
+        bubble.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} document-bubble group-${message.groupPosition}`;
+        bubble.setAttribute('data-message-id', message.id);
+        bubble.setAttribute('data-sender-id', message.senderId);
+        bubble.setAttribute('data-status', message.status);
+        bubble.setAttribute('data-group-position', message.groupPosition);
+        this._applyBubbleStyle(bubble);
+
+        const fileUrl = metadata.url || '';
+        const rawName = metadata.file_name || message.content || 'Document';
+        const fileName = rawName.split('/').pop().split('\\').pop();
+        const ext = (fileName.split('.').pop() || 'doc').toLowerCase();
+        const fileSizeFormatted = this._formatFileSize(metadata.size);
+        const docStyles = this._getDocumentTypeInfo(ext);
+
+        bubble.innerHTML = `
+            <div class="document-card-inner">
+                <div class="document-badge ${docStyles.badgeClass}">
+                    <i class="bi ${docStyles.icon}"></i>
+                    <span class="document-ext-pill">${ext.toUpperCase().slice(0, 4)}</span>
+                </div>
+                <div class="document-details">
+                    <div class="document-filename" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div>
+                    <div class="document-meta-row">
+                        ${fileSizeFormatted ? `<span class="document-size-label">${fileSizeFormatted}</span><span class="document-dot">•</span>` : ''}
+                        <span class="document-type-label">${docStyles.label}</span>
+                    </div>
+                </div>
+                <a href="${escapeHtml(fileUrl)}" download="${escapeHtml(fileName)}" target="_blank" rel="noopener" class="document-download-btn" title="Download ${escapeHtml(fileName)}" aria-label="Download">
+                    <i class="bi bi-arrow-down"></i>
+                </a>
+            </div>
+        `;
+
+        return bubble;
+    }
+
+    /**
+     * Render distinct voice note bubble with interactive waveform and speed toggle
+     */
+    renderVoiceNoteBubble(message, metadata = {}) {
+        const bubble = document.createElement('div');
+        bubble.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} voice-note-bubble group-${message.groupPosition}`;
+        bubble.setAttribute('data-message-id', message.id);
+        bubble.setAttribute('data-sender-id', message.senderId);
+        bubble.setAttribute('data-status', message.status);
+        bubble.setAttribute('data-group-position', message.groupPosition);
+        this._applyBubbleStyle(bubble);
+
+        const audioUrl = metadata.url || '';
+
+        // Generate 26 balanced waveform bars
+        const barHeights = [25, 45, 70, 50, 85, 60, 95, 75, 40, 70, 90, 35, 55, 80, 100, 65, 45, 85, 60, 75, 40, 65, 50, 80, 55, 30];
+        const barsHtml = barHeights.map((h, i) => `<span class="vn-bar" data-idx="${i}" style="height: ${h}%;"></span>`).join('');
+
+        bubble.innerHTML = `
+            <div class="voice-note-inner">
+                <button type="button" class="vn-play-btn" aria-label="Play voice note">
+                    <i class="bi bi-play-fill vn-play-icon"></i>
+                </button>
+                <div class="vn-content">
+                    <div class="vn-waveform" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                        ${barsHtml}
+                    </div>
+                    <div class="vn-meta-row">
+                        <span class="vn-timer">0:00</span>
+                        <span class="vn-dot">•</span>
+                        <span class="vn-mic-indicator"><i class="bi bi-mic-fill"></i> Voice Note</span>
+                    </div>
+                </div>
+                <button type="button" class="vn-speed-btn" title="Playback speed" data-speed="1">1x</button>
+                <audio src="${escapeHtml(audioUrl)}" preload="metadata" class="d-none vn-audio-el"></audio>
+            </div>
+        `;
+
+        this._bindVoiceNoteEvents(bubble);
+        return bubble;
+    }
+
+    /**
+     * Bind interactive voice note events (play/pause, seek, 1x/1.5x/2x speed)
+     */
+    _bindVoiceNoteEvents(bubble) {
+        const playBtn = bubble.querySelector('.vn-play-btn');
+        const playIcon = bubble.querySelector('.vn-play-icon');
+        const audio = bubble.querySelector('.vn-audio-el');
+        const timer = bubble.querySelector('.vn-timer');
+        const speedBtn = bubble.querySelector('.vn-speed-btn');
+        const waveform = bubble.querySelector('.vn-waveform');
+        const bars = bubble.querySelectorAll('.vn-bar');
+
+        if (!playBtn || !audio) return;
+
+        playBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (audio.paused) {
+                // Pause all other playing audio on the page
+                document.querySelectorAll('.vn-audio-el, .track-audio-el').forEach(other => {
+                    if (other !== audio && !other.paused) {
+                        other.pause();
+                        other.currentTime = 0;
+                        const otherBubble = other.closest('.voice-note-bubble, .audio-track-bubble');
+                        otherBubble?.querySelector('.vn-play-icon, .track-play-icon')?.classList.replace('bi-pause-fill', 'bi-play-fill');
+                        otherBubble?.querySelectorAll('.vn-bar')?.forEach(b => b.classList.remove('is-played'));
+                    }
+                });
+
+                const currentSpeed = parseFloat(speedBtn?.dataset.speed || '1');
+                audio.defaultPlaybackRate = currentSpeed;
+                audio.playbackRate = currentSpeed;
+
+                audio.play().then(() => {
+                    playIcon.classList.replace('bi-play-fill', 'bi-pause-fill');
+                }).catch(err => console.warn('[VOICE_NOTE] Play blocked:', err));
+            } else {
+                audio.pause();
+                playIcon.classList.replace('bi-pause-fill', 'bi-play-fill');
+            }
+        });
+
+        audio.addEventListener('play', () => {
+            const currentSpeed = parseFloat(speedBtn?.dataset.speed || '1');
+            audio.defaultPlaybackRate = currentSpeed;
+            audio.playbackRate = currentSpeed;
+        });
+
+        audio.addEventListener('playing', () => {
+            const currentSpeed = parseFloat(speedBtn?.dataset.speed || '1');
+            audio.defaultPlaybackRate = currentSpeed;
+            audio.playbackRate = currentSpeed;
+        });
+
+        audio.addEventListener('timeupdate', () => {
+            if (timer) timer.textContent = this._formatAudioDuration(audio.currentTime);
+            const duration = audio.duration || 1;
+            const pct = audio.currentTime / duration;
+            const activeCount = Math.floor(pct * bars.length);
+            bars.forEach((bar, idx) => {
+                if (idx <= activeCount) {
+                    bar.classList.add('is-played');
+                } else {
+                    bar.classList.remove('is-played');
+                }
+            });
+        });
+
+        audio.addEventListener('ended', () => {
+            playIcon.classList.replace('bi-pause-fill', 'bi-play-fill');
+            bars.forEach(b => b.classList.remove('is-played'));
+            if (timer) timer.textContent = '0:00';
+            audio.currentTime = 0;
+        });
+
+        if (speedBtn) {
+            speedBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const cur = parseFloat(speedBtn.dataset.speed || '1');
+                const next = cur === 1 ? 1.5 : (cur === 1.5 ? 2 : 1);
+                speedBtn.dataset.speed = String(next);
+                speedBtn.textContent = `${next}x`;
+                audio.defaultPlaybackRate = next;
+                audio.playbackRate = next;
+            });
+        }
+
+        if (waveform) {
+            waveform.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!audio.duration) return;
+                const rect = waveform.getBoundingClientRect();
+                const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                audio.currentTime = ratio * audio.duration;
+            });
+        }
+    }
+
+    /**
+     * Render distinct audio track card bubble
+     */
+    renderAudioTrackBubble(message, metadata = {}) {
+        const bubble = document.createElement('div');
+        bubble.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} audio-track-bubble group-${message.groupPosition}`;
+        bubble.setAttribute('data-message-id', message.id);
+        bubble.setAttribute('data-sender-id', message.senderId);
+        bubble.setAttribute('data-status', message.status);
+        bubble.setAttribute('data-group-position', message.groupPosition);
+        this._applyBubbleStyle(bubble);
+
+        const audioUrl = metadata.url || '';
+        const rawName = metadata.file_name || message.content || 'Audio Track';
+        const fileName = rawName.split('/').pop().split('\\').pop();
+        const sizeStr = this._formatFileSize(metadata.size);
+
+        bubble.innerHTML = `
+            <div class="audio-track-inner">
+                <button type="button" class="audio-track-play-btn" aria-label="Play track">
+                    <i class="bi bi-play-fill track-play-icon"></i>
+                </button>
+                <div class="audio-track-details">
+                    <div class="audio-track-title" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div>
+                    <div class="audio-track-scrubber-track">
+                        <div class="audio-track-scrubber-fill" style="width: 0%;"></div>
+                    </div>
+                    <div class="audio-track-meta-row">
+                        <span class="audio-track-time">0:00</span>
+                        ${sizeStr ? `<span class="audio-track-dot">•</span><span class="audio-track-size">${sizeStr}</span>` : ''}
+                    </div>
+                </div>
+                <div class="audio-track-badge">
+                    <i class="bi bi-music-note-beamed"></i>
+                </div>
+                <audio src="${escapeHtml(audioUrl)}" preload="metadata" class="d-none track-audio-el"></audio>
+            </div>
+        `;
+
+        this._bindAudioTrackEvents(bubble);
+        return bubble;
+    }
+
+    /**
+     * Bind audio track playback and scrubber events
+     */
+    _bindAudioTrackEvents(bubble) {
+        const playBtn = bubble.querySelector('.audio-track-play-btn');
+        const playIcon = bubble.querySelector('.track-play-icon');
+        const audio = bubble.querySelector('.track-audio-el');
+        const timer = bubble.querySelector('.audio-track-time');
+        const fill = bubble.querySelector('.audio-track-scrubber-fill');
+        const track = bubble.querySelector('.audio-track-scrubber-track');
+
+        if (!playBtn || !audio) return;
+
+        playBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (audio.paused) {
+                // Pause all other audio
+                document.querySelectorAll('.vn-audio-el, .track-audio-el').forEach(other => {
+                    if (other !== audio && !other.paused) {
+                        other.pause();
+                        other.currentTime = 0;
+                        const otherBubble = other.closest('.voice-note-bubble, .audio-track-bubble');
+                        otherBubble?.querySelector('.vn-play-icon, .track-play-icon')?.classList.replace('bi-pause-fill', 'bi-play-fill');
+                    }
+                });
+
+                audio.play().then(() => {
+                    playIcon.classList.replace('bi-play-fill', 'bi-pause-fill');
+                }).catch(err => console.warn('[AUDIO_TRACK] Play blocked:', err));
+            } else {
+                audio.pause();
+                playIcon.classList.replace('bi-pause-fill', 'bi-play-fill');
+            }
+        });
+
+        audio.addEventListener('timeupdate', () => {
+            if (timer) timer.textContent = this._formatAudioDuration(audio.currentTime);
+            const duration = audio.duration || 1;
+            const pct = Math.min(100, (audio.currentTime / duration) * 100);
+            if (fill) fill.style.width = `${pct}%`;
+        });
+
+        audio.addEventListener('ended', () => {
+            playIcon.classList.replace('bi-pause-fill', 'bi-play-fill');
+            if (fill) fill.style.width = '0%';
+            if (timer) timer.textContent = '0:00';
+            audio.currentTime = 0;
+        });
+
+        if (track) {
+            track.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!audio.duration) return;
+                const rect = track.getBoundingClientRect();
+                const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                audio.currentTime = ratio * audio.duration;
+            });
+        }
+    }
+
+    _formatAudioDuration(seconds) {
+        if (isNaN(seconds) || seconds < 0) return '0:00';
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    _formatFileSize(bytes) {
+        if (!bytes || isNaN(bytes) || bytes <= 0) return '';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+    }
+
+    _getDocumentTypeInfo(ext) {
+        const cleanExt = (ext || '').toLowerCase().replace('.', '');
+        switch (cleanExt) {
+            case 'pdf':
+                return { icon: 'bi-file-earmark-pdf-fill', badgeClass: 'doc-badge-pdf', label: 'PDF Document' };
+            case 'doc':
+            case 'docx':
+                return { icon: 'bi-file-earmark-word-fill', badgeClass: 'doc-badge-word', label: 'Word Document' };
+            case 'xls':
+            case 'xlsx':
+            case 'csv':
+                return { icon: 'bi-file-earmark-excel-fill', badgeClass: 'doc-badge-excel', label: 'Spreadsheet' };
+            case 'ppt':
+            case 'pptx':
+                return { icon: 'bi-file-earmark-ppt-fill', badgeClass: 'doc-badge-ppt', label: 'Presentation' };
+            case 'zip':
+            case 'rar':
+            case '7z':
+            case 'tar':
+            case 'gz':
+                return { icon: 'bi-file-earmark-zip-fill', badgeClass: 'doc-badge-zip', label: 'Archive' };
+            case 'txt':
+            case 'py':
+            case 'js':
+            case 'html':
+            case 'css':
+            case 'json':
+                return { icon: 'bi-file-earmark-code-fill', badgeClass: 'doc-badge-code', label: 'Code File' };
+            default:
+                return { icon: 'bi-file-earmark-fill', badgeClass: 'doc-badge-generic', label: 'Document' };
+        }
     }
 
     /**

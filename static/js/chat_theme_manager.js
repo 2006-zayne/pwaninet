@@ -426,11 +426,11 @@ class ChatThemeManager {
                     bottom: 0;
                     background-color: ${overlayColor};
                     opacity: ${overlayOpacity};
-                    pointer-events: none;
-                    z-index: 1;
+                    pointer-events: none !important;
+                    z-index: 0 !important;
                 `;
                 messagesArea.style.position = 'relative';
-                messagesArea.appendChild(overlay);
+                messagesArea.prepend(overlay);
             }
         }
     }

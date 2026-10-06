@@ -76,6 +76,7 @@ export const EVENTS = {
   ATTACHMENT_MODAL_TOGGLE: 'attachment:modal_toggle',
   
   // Media composer events
+  MESSAGE_UPLOAD_PROGRESS: 'message:upload_progress',
   MESSAGE_UPLOAD_SUCCESS: 'message:upload_success',
   MESSAGE_UPLOAD_FAILED: 'message:upload_failed',
 

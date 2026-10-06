@@ -15,6 +15,10 @@ from asgiref.sync import async_to_sync
 import requests
 from urllib.parse import urlparse
 import re
+import logging
+
+logger = logging.getLogger(__name__)
+
 from .models import Conversation, ConversationMember, Message, MessageReaction, ConversationTheme, MessageAttachment
 from .services.link_preview_service import LinkPreviewService
 from .serializers import (
@@ -797,14 +801,33 @@ def attachment_upload(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Check if this is a recorded voice note
+        is_voice_note = request.data.get('is_voice_note') in ['true', 'True', True, '1', 1] or file.name.startswith('voice_')
+        final_attachment_type = 'voice_note' if is_voice_note else attachment_type
+        final_message_type = 'voice_note' if is_voice_note else ('audio' if attachment_type == 'audio' else 'media')
+
         # Create message with attachment
         message = Message.objects.create(
             conversation=conversation,
             sender=request.user,
             attachment=file,
-            attachment_type=attachment_type,
-            content=''  # Empty content for attachment-only messages
+            attachment_type=final_attachment_type,
+            message_type=final_message_type,
+            content=file.name if final_attachment_type in ['document', 'audio'] else ''
         )
+
+        # Also create MessageAttachment for media rail indexing
+        try:
+            MessageAttachment.objects.create(
+                message=message,
+                file=message.attachment,
+                file_type='audio' if is_voice_note else attachment_type,
+                caption='',
+                order=0,
+                size=file.size
+            )
+        except Exception as ma_err:
+            logger.warning(f"Could not create secondary MessageAttachment: {ma_err}")
         
         # Update conversation timestamp
         conversation.save()
@@ -829,6 +852,114 @@ def attachment_upload(request):
             {'error': str(e), 'error_code': 'SERVER_ERROR'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+def process_video_attachment(uploaded_file, trim_start=0.0, trim_end=None, is_muted=False, rotation=0, is_trimmed=False):
+    """
+    Trims, mutes, and/or rotates a video file using ffmpeg.
+    Returns (processed_file, file_size, duration).
+    Falls back safely to original file if processing is not required or fails.
+    """
+    needs_trim = bool(is_trimmed) or (trim_start and float(trim_start) > 0.05) or (trim_end and float(trim_end) > 0.05)
+    needs_mute = bool(is_muted)
+    needs_rotate = bool(rotation and (int(rotation) % 360) != 0)
+
+    if not (needs_trim or needs_mute or needs_rotate):
+        return uploaded_file, uploaded_file.size, None
+
+    in_temp_path = None
+    out_temp_path = None
+
+    try:
+        import os
+        import subprocess
+        import tempfile
+        import logging
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        logger = logging.getLogger(__name__)
+
+        ext = os.path.splitext(uploaded_file.name)[1].lower() or '.mp4'
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as in_temp:
+            in_temp_path = in_temp.name
+            for chunk in uploaded_file.chunks():
+                in_temp.write(chunk)
+
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as out_temp:
+            out_temp_path = out_temp.name
+
+        cmd = ['/usr/bin/ffmpeg', '-y', '-i', in_temp_path]
+
+        start_val = max(0.0, float(trim_start)) if trim_start else 0.0
+        if start_val > 0.05:
+            cmd.extend(['-ss', f'{start_val:.3f}'])
+
+        end_val = float(trim_end) if trim_end else 0.0
+        if end_val > start_val:
+            duration = end_val - start_val
+            cmd.extend(['-t', f'{duration:.3f}'])
+        elif start_val > 0.05 and not end_val:
+            duration = None
+        else:
+            duration = None
+
+        vf_filters = []
+        if needs_rotate:
+            rot = int(rotation) % 360
+            if rot == 90:
+                vf_filters.append('transpose=1')
+            elif rot == 180:
+                vf_filters.append('transpose=2,transpose=2')
+            elif rot == 270:
+                vf_filters.append('transpose=2')
+
+        if vf_filters:
+            cmd.extend(['-vf', ','.join(vf_filters)])
+
+        cmd.extend(['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23'])
+
+        if needs_mute:
+            cmd.append('-an')
+        else:
+            cmd.extend(['-c:a', 'aac', '-b:a', '128k'])
+
+        cmd.extend(['-movflags', '+faststart', out_temp_path])
+
+        logger.info(f"[VIDEO_TRIM] Running: {' '.join(cmd)}")
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+
+        if res.returncode != 0:
+            logger.error(f"[VIDEO_TRIM] FFmpeg error ({res.returncode}): {res.stderr.decode('utf-8', errors='ignore')[-400:]}")
+            uploaded_file.seek(0)
+            return uploaded_file, uploaded_file.size, None
+
+        with open(out_temp_path, 'rb') as f:
+            processed_data = f.read()
+
+        out_name = os.path.splitext(uploaded_file.name)[0] + '.mp4'
+        processed_file = SimpleUploadedFile(
+            name=out_name,
+            content=processed_data,
+            content_type='video/mp4'
+        )
+        return processed_file, len(processed_data), duration
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"[VIDEO_TRIM] Processing exception: {e}", exc_info=True)
+        uploaded_file.seek(0)
+        return uploaded_file, uploaded_file.size, None
+    finally:
+        import os
+        if in_temp_path and os.path.exists(in_temp_path):
+            try:
+                os.remove(in_temp_path)
+            except Exception:
+                pass
+        if out_temp_path and os.path.exists(out_temp_path):
+            try:
+                os.remove(out_temp_path)
+            except Exception:
+                pass
 
 
 @api_view(['POST'])
@@ -891,54 +1022,176 @@ def batch_attachment_upload(request):
             attachment_metadata = {}
             if attachments_data and idx < len(attachments_data):
                 attachment_metadata = attachments_data[idx]
+
+            final_file = file
+            final_size = file.size
+            final_duration = None
+
+            if attachment_type == 'video':
+                trim_start = attachment_metadata.get('trim_start', 0)
+                trim_end = attachment_metadata.get('trim_end', 0)
+                is_trimmed = attachment_metadata.get('is_trimmed', False)
+                is_muted = attachment_metadata.get('is_muted', False)
+                rotation = attachment_metadata.get('rotation', 0)
+
+                final_file, final_size, final_duration = process_video_attachment(
+                    file,
+                    trim_start=trim_start,
+                    trim_end=trim_end,
+                    is_muted=is_muted,
+                    rotation=rotation,
+                    is_trimmed=is_trimmed
+                )
             
             validated_attachments.append({
-                'file': file,
+                'file': final_file,
                 'file_type': attachment_type,
                 'caption': attachment_metadata.get('caption', ''),
                 'order': attachment_metadata.get('order', idx),
-                'size': file.size
+                'size': final_size,
+                'duration': final_duration
             })
         
-        # Create message with media_group type
-        message = Message.objects.create(
-            conversation=conversation,
-            sender=request.user,
-            global_caption=global_caption,
-            message_type='media_group',
-            content=''  # Empty content for media group messages
-        )
-        
-        # Create all attachments
-        created_attachments = []
-        for attachment_data in validated_attachments:
-            attachment = MessageAttachment.objects.create(
-                message=message,
-                file=attachment_data['file'],
-                file_type=attachment_data['file_type'],
-                caption=attachment_data['caption'],
-                order=attachment_data['order'],
-                size=attachment_data['size']
+        # Partition validated attachments into:
+        # 1. Photos & Videos (Grouped Collage or Single Media)
+        # 2. Documents (Each document gets its OWN dedicated card / bubble)
+        # 3. Audio (Each audio track gets its OWN dedicated bubble)
+        media_group_attachments = [a for a in validated_attachments if a['file_type'] in ['image', 'video']]
+        document_attachments = [a for a in validated_attachments if a['file_type'] == 'document']
+        audio_attachments = [a for a in validated_attachments if a['file_type'] == 'audio']
+
+        created_messages = []
+
+        # 1. Handle Images & Videos
+        if media_group_attachments:
+            if len(media_group_attachments) == 1:
+                single_att = media_group_attachments[0]
+                caption_text = single_att['caption'] or global_caption or ''
+                media_msg = Message.objects.create(
+                    conversation=conversation,
+                    sender=request.user,
+                    attachment=single_att['file'],
+                    attachment_type=single_att['file_type'],
+                    message_type='media',
+                    content=caption_text,
+                    global_caption=caption_text
+                )
+                try:
+                    MessageAttachment.objects.create(
+                        message=media_msg,
+                        file=media_msg.attachment,
+                        file_type=single_att['file_type'],
+                        caption=caption_text,
+                        order=0,
+                        size=single_att['size'],
+                        duration=single_att.get('duration')
+                    )
+                except Exception as ma_err:
+                    logger.warning(f"Secondary MessageAttachment failed: {ma_err}")
+                created_messages.append(media_msg)
+            else:
+                group_msg = Message.objects.create(
+                    conversation=conversation,
+                    sender=request.user,
+                    global_caption=global_caption,
+                    message_type='media_group',
+                    content=global_caption or ''
+                )
+                for order_idx, att in enumerate(media_group_attachments):
+                    created_att = MessageAttachment.objects.create(
+                        message=group_msg,
+                        file=att['file'],
+                        file_type=att['file_type'],
+                        caption=att['caption'],
+                        order=order_idx,
+                        size=att['size'],
+                        duration=att.get('duration')
+                    )
+                    if order_idx == 0:
+                        group_msg.attachment = created_att.file
+                        group_msg.attachment_type = created_att.file_type
+                group_msg.save(update_fields=['attachment', 'attachment_type'])
+                created_messages.append(group_msg)
+
+        # 2. Handle Documents (Each document gets its OWN card / bubble)
+        for doc_att in document_attachments:
+            doc_msg = Message.objects.create(
+                conversation=conversation,
+                sender=request.user,
+                attachment=doc_att['file'],
+                attachment_type='document',
+                message_type='media',
+                content=doc_att['caption'] or doc_att['file'].name
             )
-            created_attachments.append(attachment)
-        
+            try:
+                MessageAttachment.objects.create(
+                    message=doc_msg,
+                    file=doc_msg.attachment,
+                    file_type='document',
+                    caption=doc_att['caption'],
+                    order=0,
+                    size=doc_att['size']
+                )
+            except Exception as ma_err:
+                logger.warning(f"Secondary MessageAttachment failed for document: {ma_err}")
+            created_messages.append(doc_msg)
+
+        # 3. Handle Audio (Each audio gets its OWN bubble)
+        for audio_att in audio_attachments:
+            is_vn = audio_att['file'].name.startswith('voice_')
+            audio_msg = Message.objects.create(
+                conversation=conversation,
+                sender=request.user,
+                attachment=audio_att['file'],
+                attachment_type='voice_note' if is_vn else 'audio',
+                message_type='voice_note' if is_vn else 'audio',
+                content=audio_att['caption'] or audio_att['file'].name
+            )
+            try:
+                MessageAttachment.objects.create(
+                    message=audio_msg,
+                    file=audio_msg.attachment,
+                    file_type='audio',
+                    caption=audio_att['caption'],
+                    order=0,
+                    size=audio_att['size'],
+                    duration=audio_att.get('duration')
+                )
+            except Exception as ma_err:
+                logger.warning(f"Secondary MessageAttachment failed for audio: {ma_err}")
+            created_messages.append(audio_msg)
+
         # Update conversation timestamp
         conversation.save()
-        
-        # Broadcast message via WebSocket
+
+        # Broadcast all created messages via WebSocket
         channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f"chat_{conversation.id}",
-            {
-                'type': 'chat_message',
-                'message': MessageSerializer(message).data
-            }
-        )
-        
-        return Response(
-            MessageSerializer(message).data,
-            status=status.HTTP_201_CREATED
-        )
+        for msg in created_messages:
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{conversation.id}",
+                {
+                    'type': 'chat_message',
+                    'message': MessageSerializer(msg).data
+                }
+            )
+
+        if not created_messages:
+            return Response(
+                {'error': 'No messages created', 'error_code': 'NO_MESSAGES'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Return single object if 1 message created, or array if multiple
+        if len(created_messages) == 1:
+            return Response(
+                MessageSerializer(created_messages[0]).data,
+                status=status.HTTP_201_CREATED
+            )
+        else:
+            return Response(
+                MessageSerializer(created_messages, many=True).data,
+                status=status.HTTP_201_CREATED
+            )
         
     except Exception as e:
         return Response(

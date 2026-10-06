@@ -96,6 +96,14 @@ export function escapeHtml(text) {
  * @returns {string} CSRF token
  */
 export function getCSRFToken() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  if (meta && meta.getAttribute('content')) {
+    return meta.getAttribute('content');
+  }
+  const input = document.querySelector('[name="csrfmiddlewaretoken"]');
+  if (input && input.value) {
+    return input.value;
+  }
   const cookies = document.cookie.split(';');
   for (const cookie of cookies) {
     const [name, value] = cookie.trim().split('=');
@@ -227,7 +235,7 @@ export function isVideoFile(filename) {
  * @returns {boolean} Is audio
  */
 export function isAudioFile(filename) {
-  const audioExtensions = ['mp3', 'wav', 'ogg', 'm4a', 'flac'];
+  const audioExtensions = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'weba', 'webm', 'aac'];
   const ext = getFileExtension(filename).toLowerCase();
   return audioExtensions.includes(ext);
 }

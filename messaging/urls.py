@@ -14,7 +14,6 @@ from .views import (
     fetch_link_metadata,
     unread_message_count
 )
-from pwaninet.messaging_gate import messaging_frozen
 
 router = DefaultRouter()
 router.register(r'conversations', ConversationViewSet, basename='conversation')

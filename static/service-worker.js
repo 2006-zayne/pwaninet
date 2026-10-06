@@ -5,9 +5,9 @@
  */
 
 'use strict';
-let CACHE_VERSION = '1.6.2';
-let CACHE_BUILD = '101';
-const SW_CACHE_REVISION = '2';
+let CACHE_VERSION = '1.6.3';
+let CACHE_BUILD = '102';
+const SW_CACHE_REVISION = '3';
 let CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
 let OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
 
@@ -262,20 +262,6 @@ self.addEventListener('fetch', (event) => {
 
 async function handleRequest(request) {
     const url = new URL(request.url);
-
-    // Do not serve cached inbox or group chat pages while messaging is frozen.
-    const isFrozenMessagingPath =
-        /^\/messaging(?:\/|$)/.test(url.pathname) ||
-        /^\/groups\/\d+\/chat\/?$/.test(url.pathname) ||
-        /^\/groups\/api\/groups\/\d+\/messages(?:\/|$)/.test(url.pathname) ||
-        /^\/groups\/api\/groups\/attachments\/(?:upload|batch-upload)\/?$/.test(url.pathname);
-    if (isFrozenMessagingPath) {
-        return new Response('Messaging is unavailable while the MVP feature is frozen.', {
-            status: 410,
-            statusText: 'Gone',
-            headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }
-        });
-    }
     
     try {
         // Handle virtual offline media stream with range support (HTTP 206)

@@ -10,10 +10,10 @@
 {% block mobile_bottom_nav %}{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}">
-<link rel="stylesheet" href="{% static 'css/chat_theme.css' %}">
-<link rel="stylesheet" href="{% static 'css/messaging/media-composer.css' %}">
-<link rel="stylesheet" href="{% static 'css/chat/telegram-media.css' %}">
+<link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}?v=21">
+<link rel="stylesheet" href="{% static 'css/chat_theme.css' %}?v=21">
+<link rel="stylesheet" href="{% static 'css/messaging/media-composer.css' %}?v=26">
+<link rel="stylesheet" href="{% static 'css/chat/telegram-media.css' %}?v=23">
 <script>
   document.documentElement.classList.add('in-conversation-active');
   document.body.classList.add('in-conversation-active');
@@ -170,7 +170,7 @@
       </div>
     </div>
 
-    <!-- COLLAPSED UTILITY STRIP (56px) -->
+    <!-- COLLAPSED UTILITY STRIP (68px) -->
     <div class="messaging-left-rail-collapsed" style="height: 100%;">
       <button type="button"
               class="messaging-rail-icon-btn"
@@ -200,7 +200,7 @@
       </a>
 
       <!-- Vertically stacked profile avatars of active chats only! -->
-      <div class="d-flex flex-column align-items-center gap-2 my-2 flex-grow-1 overflow-y-auto w-100" style="min-height: 0; padding: 4px 0;">
+      <div class="d-flex flex-column align-items-center gap-2 my-2 flex-grow-1 overflow-y-auto w-100 messaging-rail-avatars-scroll" style="min-height: 0; padding: 4px 0;">
         {% for item in conversation_data %}
         {% with conv=item.conversation %}
         <a href="{% url 'messaging:conversation_detail' conv.id %}"
@@ -226,7 +226,7 @@
             {% endfor %}
           {% endif %}
           {% if item.unread_count > 0 %}
-            <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle" style="transform: translate(-30%, -20%) !important;">
+            <span class="messaging-rail-unread-dot position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle" style="transform: translate(-35%, 15%) !important;">
               <span class="visually-hidden">unread</span>
             </span>
           {% endif %}
@@ -248,7 +248,7 @@
   </aside>
 
   <!-- 2. CENTER CHAT AREA -->
-  <div class="chat-container d-flex flex-column flex-grow-1" id="chatMainArea"
+  <div class="chat-container d-flex flex-column flex-grow-1 {% if not conversation %}chat-container-empty{% endif %}" id="chatMainArea"
        {% if conversation %}data-conversation-id="{{ conversation.id }}" data-user-id="{{ request.user.id }}" data-is-encrypted="false"{% endif %}>
     {% if conversation %}
     <!-- Floating Media Rail Reopen Button (Desktop) -->
@@ -433,6 +433,38 @@
         </div>
         <button type="button" class="btn-close btn-sm ms-2" id="cancelEditBtn" aria-label="Cancel edit" style="font-size: 0.7rem;"></button>
       </div>
+      <!-- Live Voice Capture & VN Preview Strip (PwaniMate layout) -->
+      <div class="pwanimate-voice-capture d-none" id="messagingVoiceCapture" role="region" aria-label="Voice recording">
+        <button type="button" class="pwanimate-voice-cancel" id="voiceCancelBtn" aria-label="Discard voice message" title="Discard">
+          <i class="bi bi-x-lg" aria-hidden="true"></i>
+        </button>
+
+        <div class="pwanimate-voice-waveform" id="voiceWaveform" aria-hidden="true">
+          {% for bar in "123456789012345678901234567890123456789012345678" %}
+            <span class="pwanimate-voice-waveform-bar" data-idx="{{ forloop.counter0 }}"></span>
+          {% endfor %}
+        </div>
+
+        <span class="messaging-voice-timer" id="voiceTimer">0:00</span>
+
+        <div class="messaging-voice-controls d-flex align-items-center gap-2">
+          <!-- Stop Button (Locked Recording State) -->
+          <button type="button" class="pwanimate-voice-stop d-none" id="voiceStopBtn" aria-label="Stop recording" title="Stop recording">
+            <i class="bi bi-stop-fill" aria-hidden="true"></i>
+          </button>
+
+          <!-- Play/Pause Button (VN Preview State - next to stop button) -->
+          <button type="button" class="pwanimate-voice-play d-none" id="voicePlayBtn" aria-label="Play recording preview" title="Play">
+            <i class="bi bi-play-fill" id="voicePlayIcon" aria-hidden="true"></i>
+          </button>
+
+          <!-- Send Button (In Preview State or Locked Recording State) -->
+          <button type="button" class="pwanimate-voice-send d-none" id="voiceSendBtn" aria-label="Send voice message" title="Send">
+            <i class="bi bi-arrow-up" aria-hidden="true"></i>
+            <span class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
 
       <div class="pwanimate-composer-standard" id="composerStandard">
         <!-- Input Row: Textarea -->
@@ -486,10 +518,15 @@
         </div>
       </div>
     </form>
+    <!-- Swipe up to lock badge -->
+    <div class="messaging-voice-lock-badge d-none" id="voiceLockBadge" aria-hidden="true">
+      <i class="bi bi-chevron-up bounce-chevron"></i>
+      <i class="bi bi-lock-fill"></i>
+    </div>
   </div>
   {% else %}
   <!-- Empty Selection State (When no conversation is selected on desktop) -->
-  <div class="d-flex flex-column align-items-center justify-content-center h-100 p-4 text-center my-auto">
+  <div class="d-flex flex-column align-items-center justify-content-center h-100 p-4 text-center my-auto messaging-empty-selection">
     <div class="pwanimate-empty-state messaging-empty-state">
       <div class="pwanimate-hero-avatar bg-primary text-white d-flex align-items-center justify-content-center rounded-circle shadow-sm mx-auto mb-3" style="width: 88px; height: 88px;">
         <i class="bi bi-chat-quote-fill" style="font-size: 2.75rem;"></i>
@@ -1621,69 +1658,171 @@
 {% endfor %}
 {% endif %}
 
-<!-- Media Composer Fullscreen Overlay -->
-<div id="mediaComposerOverlay" class="media-composer-overlay">
+<!-- Media Composer Fullscreen Overlay (Immersive Edge-to-Edge with Floating Circular Controls) -->
+<div id="mediaComposerOverlay" class="media-composer-overlay" role="dialog" aria-modal="true" aria-label="Media Editor">
   <div class="media-composer-container">
-    <!-- Header -->
-    <div class="media-composer-header" id="mediaComposerHeader">
-      <button class="media-composer-close" id="mediaComposerClose">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
-      <div class="media-composer-title">New Message</div>
-    </div>
+    <!-- Top Floating Scrim & Circular Controls -->
+    <header class="media-composer-header" id="mediaComposerHeader">
+      <!-- Floating Close Button & Size Badge (Top Left) -->
+      <div class="media-composer-header-left">
+        <button type="button" class="media-composer-btn media-composer-close" id="mediaComposerClose" title="Close" aria-label="Close">
+          <i class="bi bi-x-lg close-icon"></i>
+          <span class="spinner-border spinner-border-sm close-spinner d-none" aria-hidden="true"></span>
+          <span class="close-progress-label d-none">Closing…</span>
+        </button>
+        <span class="media-composer-size-badge d-none" id="mediaComposerSizeBadge">0 MB</span>
+      </div>
 
-    <!-- Main Content -->
-    <div class="media-composer-main" id="mediaComposerMain">
-      <!-- Preview Canvas -->
-      <div class="media-preview-container" id="mediaComposerPreview"></div>
+      <!-- Center Floating Item Counter (e.g. 1 / 3) -->
+      <div class="media-composer-center-counter d-none" id="mediaComposerCounterWrap">
+        <span class="media-composer-counter-badge" id="mediaComposerCounter">1 / 1</span>
+      </div>
 
-      <!-- Tool Rail -->
-      <div class="media-tools-rail" id="mediaComposerTools"></div>
-    </div>
-
-    <!-- Footer -->
-    <div class="media-composer-footer" id="mediaComposerFooter">
-      <!-- Thumbnail Strip -->
-      <div class="media-thumbnails" id="mediaComposerThumbnails"></div>
-
-      <!-- Caption Inputs -->
-      <div class="media-captions">
-        <div class="global-caption-container" id="mediaComposerGlobalCaption">
-          <textarea 
-            class="caption-input global-caption" 
-            placeholder="Add a caption for all media..."
-            rows="2"
-            maxlength="500"
-          ></textarea>
+      <!-- Floating Crop Actions Dock (Active during Image Crop Mode at Top Bar) -->
+      <div class="media-crop-actions-dock d-none" id="mediaCropActionsDock">
+        <button type="button" class="crop-dock-btn crop-dock-cancel" id="mediaCropCancelBtn" title="Cancel crop">
+          <i class="bi bi-x-lg me-1"></i>
+          <span>Cancel</span>
+        </button>
+        <div class="crop-dock-aspect-pills" id="mediaCropAspectPills">
+          <button type="button" class="crop-aspect-pill active" data-aspect="free">Free</button>
+          <button type="button" class="crop-aspect-pill" data-aspect="1:1">1:1</button>
+          <button type="button" class="crop-aspect-pill" data-aspect="4:5">4:5</button>
+          <button type="button" class="crop-aspect-pill" data-aspect="16:9">16:9</button>
         </div>
-        <div class="media-caption-container" id="mediaComposerMediaCaption" style="display: none;">
-          <textarea 
-            class="caption-input media-caption" 
-            placeholder="Add a caption for this media..."
-            rows="2"
-            maxlength="500"
-          ></textarea>
+        <button type="button" class="crop-dock-btn crop-dock-apply" id="mediaCropApplyBtn" title="Apply crop">
+          <i class="bi bi-check-lg me-1"></i>
+          <span>Done</span>
+        </button>
+      </div>
+
+      <!-- Floating Actions Suite (Top Right) -->
+      <div class="media-composer-header-actions" id="mediaComposerHeaderActions">
+        <!-- Rotate Button -->
+        <button type="button" class="media-composer-btn" id="mediaRotateBtn" title="Rotate 90°" aria-label="Rotate">
+          <i class="bi bi-arrow-clockwise"></i>
+        </button>
+
+        <!-- Crop Button & Anchored Aspect Dropdown -->
+        <div class="media-crop-btn-wrapper">
+          <button type="button" class="media-composer-btn" id="mediaCropBtn" title="Crop & Straighten" aria-label="Crop">
+            <i class="bi bi-crop"></i>
+          </button>
+
+          <!-- Floating Aspect Ratio Dropdown (Mobile & Desktop) -->
+          <div class="media-crop-dropdown d-none" id="mediaCropDropdown">
+            <div class="crop-dropdown-header">
+              <span>Aspect Ratio</span>
+            </div>
+            <div class="crop-dropdown-options">
+              <button type="button" class="crop-option-btn active" data-aspect="free">
+                <i class="bi bi-aspect-ratio me-2"></i>
+                <span class="flex-grow-1 text-start">Free (Default)</span>
+                <i class="bi bi-check2 check-icon"></i>
+              </button>
+              <button type="button" class="crop-option-btn" data-aspect="1:1">
+                <i class="bi bi-square me-2"></i>
+                <span class="flex-grow-1 text-start">1:1 Square</span>
+                <i class="bi bi-check2 check-icon d-none"></i>
+              </button>
+              <button type="button" class="crop-option-btn" data-aspect="4:5">
+                <i class="bi bi-phone me-2"></i>
+                <span class="flex-grow-1 text-start">4:5 Portrait</span>
+                <i class="bi bi-check2 check-icon d-none"></i>
+              </button>
+              <button type="button" class="crop-option-btn" data-aspect="16:9">
+                <i class="bi bi-display me-2"></i>
+                <span class="flex-grow-1 text-start">16:9 Landscape</span>
+                <i class="bi bi-check2 check-icon d-none"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reset / Clean All Edits Button -->
+        <button type="button" class="media-composer-btn d-none" id="mediaResetBtn" title="Undo & Clean all edits" aria-label="Clean edits">
+          <i class="bi bi-arrow-counterclockwise"></i>
+        </button>
+
+        <!-- Video Audio Mute Toggle (Videos only) -->
+        <button type="button" class="media-composer-btn d-none" id="mediaMuteBtn" title="Mute Video" aria-label="Mute Video">
+          <i class="bi bi-volume-up-fill" id="mediaMuteIcon"></i>
+        </button>
+
+        <!-- Delete / Discard Active Item -->
+        <button type="button" class="media-composer-btn text-danger-hover" id="mediaDeleteCurrentBtn" title="Discard this media" aria-label="Discard media">
+          <i class="bi bi-trash3"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Media Playground Area (Full Bleed Edge-to-Edge) -->
+    <main class="media-composer-main" id="mediaComposerMain">
+      <div class="media-preview-container" id="mediaComposerPreview"></div>
+    </main>
+
+    <!-- Floating Dock & Bottom Controls -->
+    <footer class="media-composer-footer" id="mediaComposerFooter">
+      <!-- Video Timeline Trimmer (Only visible for videos) -->
+      <div class="media-video-trimmer-bar d-none" id="mediaVideoTrimmerBar">
+        <div class="trimmer-timestamps">
+          <span class="trimmer-time-start" id="trimmerStartLabel">0:00</span>
+          <span class="trimmer-duration-badge" id="trimmerDurationLabel">0:00 selected</span>
+          <span class="trimmer-time-end" id="trimmerEndLabel">0:00</span>
+        </div>
+        <div class="trimmer-track" id="trimmerTrack">
+          <div class="trimmer-filmstrip" id="trimmerFilmstrip"></div>
+          <div class="trimmer-mask-left" id="trimmerMaskLeft"></div>
+          <div class="trimmer-mask-right" id="trimmerMaskRight"></div>
+          <div class="trimmer-selection-window" id="trimmerSelection">
+            <div class="trimmer-handle handle-left" id="trimmerHandleLeft" title="Drag to adjust start time"></div>
+            <div class="trimmer-playhead" id="trimmerPlayhead"></div>
+            <div class="trimmer-handle handle-right" id="trimmerHandleRight" title="Drag to adjust end time"></div>
+          </div>
         </div>
       </div>
 
-      <!-- Send Button -->
-      <button class="media-composer-send" id="mediaComposerSend">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="22" y1="2" x2="11" y2="13"></line>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </svg>
-        Send
-      </button>
-    </div>
+      <!-- Thumbnail Strip Navigation -->
+      <div class="media-thumbnails-wrap" id="mediaThumbnailsWrap">
+        <div class="media-thumbnails" id="mediaComposerThumbnails"></div>
+        <button type="button" class="media-thumbnail-add-btn" id="mediaComposerAddMore" title="Add more media" aria-label="Add more media">
+          <i class="bi bi-plus-lg"></i>
+          <span>Add</span>
+        </button>
+      </div>
+
+      <!-- Unified Floating Caption & Send Bar -->
+      <div class="media-composer-action-bar">
+        <div class="media-caption-pill" id="mediaComposerCaptionPill">
+          <button type="button" class="media-caption-emoji-btn" id="mediaCaptionEmojiBtn" title="Emoji" aria-label="Add emoji">
+            <i class="bi bi-emoji-smile"></i>
+          </button>
+          <textarea
+            class="media-caption-input"
+            id="mediaCaptionInput"
+            rows="1"
+            placeholder="Add a caption..."
+            aria-label="Caption"
+            maxlength="1000"
+          ></textarea>
+        </div>
+
+        <!-- Compatible hidden wrappers for legacy CaptionInput script references -->
+        <div id="mediaComposerGlobalCaption" style="display: none;"><textarea></textarea></div>
+        <div id="mediaComposerMediaCaption" style="display: none;"><textarea></textarea></div>
+
+        <button type="button" class="media-composer-send-btn" id="mediaComposerSend" title="Send media" aria-label="Send">
+          <i class="bi bi-arrow-up" aria-hidden="true"></i>
+          <span class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+        </button>
+      </div>
+    </footer>
   </div>
 </div>
 
 <script src="{% static 'js/encryption.js' %}"></script>
-<script type="module" src="{% static 'js/chat/bootstrap.js' %}?v=12"></script>
-<script src="{% static 'js/chat-theme-handler.js' %}"></script>
+<script type="module" src="{% static 'js/chat/bootstrap.js' %}?v=29"></script>
+<script src="{% static 'js/chat-theme-handler.js' %}?v=21"></script>
 
 <script>
   // Handle quick action and empty state greeting chip clicks

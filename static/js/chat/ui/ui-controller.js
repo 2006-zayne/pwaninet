@@ -175,58 +175,6 @@ export class UIController {
                 const isSendMode = voiceBtn.classList.contains('send-mode');
                 if (isSendMode) {
                     this._handleSendClick(messageInput);
-                } else {
-                    // Signal voice service - voice modal controller handles UI
-                    eventBus.emit(EVENTS.VOICE_START);
-                }
-            });
-
-            // Long press for recording (WhatsApp style, only in voice mode)
-            let longPressTimer;
-            voiceBtn.addEventListener('mousedown', () => {
-                const isSendMode = voiceBtn.classList.contains('send-mode');
-                if (!isSendMode) {
-                    longPressTimer = setTimeout(() => {
-                        eventBus.emit(EVENTS.VOICE_START);
-                    }, 500);
-                }
-            });
-
-            voiceBtn.addEventListener('mouseup', () => {
-                clearTimeout(longPressTimer);
-            });
-
-            // Touch events for mobile
-            voiceBtn.addEventListener('touchstart', (e) => {
-                const isSendMode = voiceBtn.classList.contains('send-mode');
-                if (!isSendMode) {
-                    e.preventDefault();
-                    const touch = e.touches[0];
-                    import('../features/voice/voice.service.js').then(({ voiceService }) => {
-                        voiceService.handleTouchStart(touch.clientY);
-                    });
-                    eventBus.emit(EVENTS.VOICE_START);
-                }
-            }, { passive: false });
-
-            voiceBtn.addEventListener('touchmove', (e) => {
-                const isSendMode = voiceBtn.classList.contains('send-mode');
-                if (!isSendMode) {
-                    const touch = e.touches[0];
-                    import('../features/voice/voice.service.js').then(({ voiceService }) => {
-                        voiceService.handleTouchMove(touch.clientY);
-                    });
-                }
-            }, { passive: true });
-
-            voiceBtn.addEventListener('touchend', (e) => {
-                const isSendMode = voiceBtn.classList.contains('send-mode');
-                if (!isSendMode) {
-                    import('../features/voice/voice.service.js').then(({ voiceService }) => {
-                        if (!voiceService.isLocked) {
-                            eventBus.emit(EVENTS.VOICE_STOP);
-                        }
-                    });
                 }
             });
         }

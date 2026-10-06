@@ -325,7 +325,8 @@ export class AttachmentUI {
     handleUploadError(error) {
         console.error('Upload error:', error);
         // Show error message to user
-        alert('Failed to upload file: ' + (error.message || 'Unknown error'));
+        const msg = error?.message || error?.error || error?.detail || (typeof error === 'string' ? error : 'Unknown error');
+        alert('Failed to upload file: ' + msg);
     }
 
     /**

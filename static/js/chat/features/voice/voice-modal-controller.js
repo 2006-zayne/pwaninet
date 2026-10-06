@@ -1,413 +1,734 @@
 /**
- * Voice Modal Controller
- * Simplified controller for the voice recording modal
- * Handles UI state transitions and user interactions
+ * Voice Modal Controller / Inline Voice Capture Controller
+ * Controls the inline PwaniMate-style voice capture strip (#messagingVoiceCapture),
+ * desktop single-click recording with stop button, mobile swipe-up-to-lock gestures,
+ * organic rolling wave animation, and VN preview playback before sending.
  */
 
 import { EVENTS } from '../../shared/constants.js';
 import { eventBus } from '../../core/event-bus.js';
+import { voiceService } from './voice.service.js';
 
 export class VoiceModalController {
-    constructor() {
-        this.modal = null;
-        this.overlay = null;
-        this.closeBtn = null;
-        
-        // State elements
-        this.recordingState = null;
-        this.previewState = null;
-        this.lockedState = null;
-        
-        // Timer elements
-        this.timer = null;
-        this.previewDuration = null;
-        this.lockedTimer = null;
-        
-        // Waveform elements
-        this.waveform = null;
-        this.staticWaveform = null;
-        this.lockedWaveform = null;
-        
-        // Control buttons
-        this.deleteBtn = null;
-        this.playPauseBtn = null;
-        this.sendBtn = null;
-        this.lockedDeleteBtn = null;
-        this.lockedStopBtn = null;
-        this.recordingDeleteBtn = null;
-        this.recordingStopBtn = null;
-        
-        // Animation frame for waveform
-        this.waveformAnimation = null;
-        
-        this.initialized = false;
+  constructor() {
+    this.composerForm = null;
+    this.composerStandard = null;
+    this.voiceCapture = null;
+    this.voiceBtn = null;
+    this.voiceLockBadge = null;
+
+    // Controls inside voiceCapture
+    this.voiceCancelBtn = null;
+    this.voiceStopBtn = null;
+    this.voicePlayBtn = null;
+    this.voicePlayIcon = null;
+    this.voiceSendBtn = null;
+    this.voiceTimer = null;
+    this.voiceWaveform = null;
+    this.bars = [];
+
+    // Animation & State
+    this.waveformAnimation = null;
+    this.waveformHistory = [];
+    this.recordedPeaks = [];
+    this.lastSampleTime = 0;
+    this.currentDuration = 0;
+    this.analyserData = null;
+
+    // Gesture / Mode State
+    this.isDesktopRecording = false;
+    this.isHolding = false;
+    this.isLocked = false;
+    this.holdStartTime = 0;
+    this.holdStartY = 0;
+    this.activePointerId = null;
+    this.ambientNoiseFloor = 0.025;
+
+    this.initialized = false;
+  }
+
+  /**
+   * Initialize voice capture controller
+   */
+  init() {
+    if (this.initialized) return;
+
+    this._initializeElements();
+    this._setupButtonListeners();
+    this._setupVoiceGestures();
+    this._setupServiceListeners();
+    this.resetToIdle();
+
+    this.initialized = true;
+    console.log('[VOICE_CONTROLLER] Inline voice capture controller initialized');
+  }
+
+  /**
+   * Initialize DOM elements
+   */
+  _initializeElements() {
+    this.composerForm = document.getElementById('messaging-composer-form');
+    this.composerStandard = document.getElementById('composerStandard');
+    this.voiceCapture = document.getElementById('messagingVoiceCapture');
+    this.voiceBtn = document.getElementById('voiceBtn');
+    this.voiceLockBadge = document.getElementById('voiceLockBadge');
+
+    this.voiceCancelBtn = document.getElementById('voiceCancelBtn');
+    this.voiceStopBtn = document.getElementById('voiceStopBtn');
+    this.voicePlayBtn = document.getElementById('voicePlayBtn');
+    this.voicePlayIcon = document.getElementById('voicePlayIcon');
+    this.voiceSendBtn = document.getElementById('voiceSendBtn');
+    this.voiceTimer = document.getElementById('voiceTimer');
+    this.voiceWaveform = document.getElementById('voiceWaveform');
+
+    if (this.voiceWaveform) {
+      this.bars = Array.from(this.voiceWaveform.querySelectorAll('.pwanimate-voice-waveform-bar'));
+      this.waveformHistory = new Array(this.bars.length).fill(0);
     }
-    
-    /**
-     * Initialize the voice modal controller
-     */
-    init() {
-        if (this.initialized) return;
-        
-        this._initializeElements();
-        this._setupEventListeners();
-        this._setupServiceListeners();
-        
-        this.initialized = true;
-        console.log('[VOICE_MODAL] Voice modal controller initialized');
+  }
+
+  /**
+   * Setup UI button click listeners
+   */
+  _setupButtonListeners() {
+    // Cancel / Discard (X)
+    if (this.voiceCancelBtn) {
+      this.voiceCancelBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        voiceService.discardRecording();
+        this.resetToIdle();
+      });
     }
-    
-    /**
-     * Initialize DOM elements
-     */
-    _initializeElements() {
-        this.modal = document.getElementById('voiceModal');
-        this.overlay = document.getElementById('voiceModalOverlay');
-        this.closeBtn = document.getElementById('voiceModalClose');
-        
-        // State elements
-        this.recordingState = document.getElementById('voiceRecordingState');
-        this.previewState = document.getElementById('voicePreviewState');
-        this.lockedState = document.getElementById('voiceLockedState');
-        
-        // Timer elements
-        this.timer = document.getElementById('voiceTimer');
-        this.previewDuration = document.getElementById('voicePreviewDuration');
-        this.lockedTimer = document.getElementById('voiceLockedTimer');
-        
-        // Waveform elements
-        this.waveform = document.getElementById('voiceWaveform');
-        this.staticWaveform = document.getElementById('voiceWaveformStatic');
-        this.lockedWaveform = document.getElementById('voiceLockedWaveform');
-        
-        // Control buttons
-        this.deleteBtn = document.getElementById('voiceDelete');
-        this.playPauseBtn = document.getElementById('voicePlayPause');
-        this.sendBtn = document.getElementById('voiceSend');
-        this.lockedDeleteBtn = document.getElementById('voiceLockedDelete');
-        this.lockedStopBtn = document.getElementById('voiceLockedStop');
-        this.recordingDeleteBtn = document.getElementById('voiceRecordingDelete');
-        this.recordingStopBtn = document.getElementById('voiceRecordingStop');
+
+    // Stop button (locked mode on mobile or desktop recording)
+    if (this.voiceStopBtn) {
+      this.voiceStopBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        voiceService.stopRecording();
+      });
     }
-    
-    /**
-     * Setup UI event listeners
-     */
-    _setupEventListeners() {
-        // Close button
-        if (this.closeBtn) {
-            this.closeBtn.addEventListener('click', () => {
-                eventBus.emit(EVENTS.VOICE_DISCARD);
-            });
-        }
-        
-        // Overlay click
-        if (this.overlay) {
-            this.overlay.addEventListener('click', () => this.closeModal());
-        }
-        
-        // Preview state controls
-        if (this.deleteBtn) {
-            this.deleteBtn.addEventListener('click', () => {
-                eventBus.emit(EVENTS.VOICE_DISCARD);
-            });
-        }
-        
-        if (this.playPauseBtn) {
-            this.playPauseBtn.addEventListener('click', () => {
-                eventBus.emit(EVENTS.VOICE_PLAY_PAUSE);
-            });
-        }
-        
-        if (this.sendBtn) {
-            this.sendBtn.addEventListener('click', () => {
-                eventBus.emit(EVENTS.VOICE_SEND);
-            });
-        }
-        
-        // Locked state controls
-        if (this.lockedDeleteBtn) {
-            this.lockedDeleteBtn.addEventListener('click', () => {
-                eventBus.emit(EVENTS.VOICE_DISCARD);
-            });
-        }
-        
-        if (this.lockedStopBtn) {
-            this.lockedStopBtn.addEventListener('click', () => {
-                eventBus.emit(EVENTS.VOICE_STOP);
-            });
-        }
-        
-        // Recording state controls
-        if (this.recordingDeleteBtn) {
-            this.recordingDeleteBtn.addEventListener('click', () => {
-                eventBus.emit(EVENTS.VOICE_DISCARD);
-            });
-        }
-        
-        if (this.recordingStopBtn) {
-            this.recordingStopBtn.addEventListener('click', () => {
-                eventBus.emit(EVENTS.VOICE_STOP);
-            });
-        }
+
+    // Play/Pause button (in preview mode)
+    if (this.voicePlayBtn) {
+      this.voicePlayBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        voiceService.togglePlayPause();
+      });
     }
-    
-    /**
-     * Setup service event listeners
-     */
-    _setupServiceListeners() {
-        eventBus.on(EVENTS.VOICE_START, () => {
-            this.showModal();
-            this.showRecordingState();
-            this.startWaveformAnimation();
+
+    // Send button
+    if (this.voiceSendBtn) {
+      this.voiceSendBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (this.voiceSendBtn.disabled) return;
+
+        this.voiceSendBtn.disabled = true;
+        this.voiceSendBtn.classList.add('is-loading');
+        const icon = this.voiceSendBtn.querySelector('i');
+        const spinner = this.voiceSendBtn.querySelector('.spinner-border');
+        if (icon) icon.classList.add('d-none');
+        if (spinner) spinner.classList.remove('d-none');
+
+        try {
+          await voiceService.sendRecording();
+        } catch (err) {
+          console.error('[VOICE_CONTROLLER] Send error:', err);
+        } finally {
+          this.resetToIdle();
+        }
+      });
+    }
+  }
+
+  /**
+   * Setup desktop single-click & mobile swipe-up-to-lock gestures
+   */
+  _setupVoiceGestures() {
+    if (!this.voiceBtn) return;
+
+    // Detect touch input vs desktop mouse input
+    const isTouchInput = (e) => {
+      return e.pointerType === 'touch' || e.pointerType === 'pen';
+    };
+
+    let touchStartTime = 0;
+    let touchStartY = 0;
+    let touchTimer = null;
+    let isTouchActive = false;
+
+    // Pointer down (captures mobile touches for hold gesture)
+    const onPointerDown = (e) => {
+      if (this.voiceBtn.classList.contains('send-mode')) return;
+      if (e.button !== undefined && e.button !== 0) return;
+
+      if (isTouchInput(e)) {
+        isTouchActive = true;
+        touchStartY = e.clientY;
+        touchStartTime = performance.now();
+        this.holdStartY = e.clientY;
+        this.holdStartTime = performance.now();
+        this.isHolding = false;
+        this.isLocked = false;
+        this.isDesktopRecording = false;
+        this.activePointerId = e.pointerId;
+
+        try {
+          if (this.voiceBtn.setPointerCapture && e.pointerId !== undefined) {
+            this.voiceBtn.setPointerCapture(e.pointerId);
+          }
+        } catch (_) {}
+
+        // Touch held past 200ms becomes a press-and-hold recording gesture
+        touchTimer = setTimeout(() => {
+          if (isTouchActive && !this.isLocked) {
+            this.isHolding = true;
+            voiceService.startRecording();
+            this.showHoldingState();
+          }
+        }, 200);
+      }
+    };
+
+    // Pointer move (for swipe up to lock while holding)
+    const onPointerMove = (e) => {
+      if (!isTouchActive || !isTouchInput(e)) return;
+
+      const currentY = e.clientY;
+      const deltaY = touchStartY - currentY; // Upward swipe is positive
+
+      // Swipe up >= 35px triggers lock
+      if (deltaY >= 35) {
+        if (!this.isLocked) {
+          this.isLocked = true;
+          this.isHolding = false;
+          if (touchTimer) clearTimeout(touchTimer);
+          if (!voiceService.isRecording) {
+            voiceService.startRecording();
+          }
+          voiceService.lockRecording();
+          this.showLockedState();
+        }
+      }
+    };
+
+    // Pointer up (for mobile hold release or quick tap)
+    const onPointerUp = (e) => {
+      if (!isTouchActive || !isTouchInput(e)) return;
+      isTouchActive = false;
+      if (touchTimer) clearTimeout(touchTimer);
+
+      try {
+        if (this.voiceBtn.releasePointerCapture && this.activePointerId !== null) {
+          this.voiceBtn.releasePointerCapture(this.activePointerId);
+        }
+      } catch (_) {}
+
+      this.activePointerId = null;
+
+      if (this.isLocked) {
+        // Was locked: release finger safely, recording continues hands-free
+        return;
+      }
+
+      const elapsed = (performance.now() - touchStartTime) / 1000;
+      if (this.isHolding && elapsed >= 0.2) {
+        // Was holding to record: releasing finger stops recording and enters preview
+        this.isHolding = false;
+        voiceService.stopRecording();
+      } else {
+        // Quick tap (< 200ms): start hands-free recording with Stop button!
+        this.isDesktopRecording = true;
+        this.isHolding = false;
+        this.isLocked = true;
+        voiceService.startRecording();
+        this.showDesktopRecordingState();
+      }
+    };
+
+    const onPointerCancel = (e) => {
+      if (!isTouchActive || !isTouchInput(e)) return;
+      isTouchActive = false;
+      if (touchTimer) clearTimeout(touchTimer);
+      this.isHolding = false;
+      if (!this.isLocked) {
+        voiceService.discardRecording();
+        this.resetToIdle();
+      }
+    };
+
+    // Desktop Click: Single click starts recording hands-free with Stop button
+    const onClick = (e) => {
+      if (this.voiceBtn.classList.contains('send-mode')) return;
+
+      // Handle desktop / mouse clicks (not touch input, which is handled above)
+      if (!isTouchInput(e) && e.pointerType !== 'touch') {
+        e.preventDefault();
+
+        if (voiceService.isRecording) {
+          // If already recording on desktop, clicking stops recording and enters preview
+          voiceService.stopRecording();
+        } else {
+          // Single desktop click starts recording hands-free with stop button!
+          this.isDesktopRecording = true;
+          this.isHolding = false;
+          this.isLocked = true;
+          voiceService.startRecording();
+          this.showDesktopRecordingState();
+        }
+      }
+    };
+
+    this.voiceBtn.addEventListener('pointerdown', onPointerDown);
+    this.voiceBtn.addEventListener('pointermove', onPointerMove);
+    this.voiceBtn.addEventListener('pointerup', onPointerUp);
+    this.voiceBtn.addEventListener('pointercancel', onPointerCancel);
+    this.voiceBtn.addEventListener('click', onClick);
+
+    this.voiceBtn.addEventListener('contextmenu', (e) => {
+      if (!this.voiceBtn.classList.contains('send-mode')) {
+        e.preventDefault();
+      }
+    });
+  }
+
+  /**
+   * Setup event bus listeners
+   */
+  _setupServiceListeners() {
+    eventBus.on(EVENTS.VOICE_START, () => {
+      if (this.isHolding) {
+        this.showHoldingState();
+      } else {
+        this.showDesktopRecordingState();
+      }
+    });
+
+    eventBus.on(EVENTS.VOICE_STOP, (data) => {
+      const duration = data?.duration || voiceService.duration || 0;
+      this.showPreviewState(duration);
+    });
+
+    eventBus.on(EVENTS.VOICE_LOCKED, () => {
+      this.showLockedState();
+    });
+
+    eventBus.on(EVENTS.VOICE_TIMER_UPDATE, (duration) => {
+      if (!voiceService.isPlaying && this.voiceTimer) {
+        this.voiceTimer.textContent = this._formatTime(duration);
+      }
+    });
+
+    eventBus.on(EVENTS.VOICE_PLAYING, () => {
+      if (this.voicePlayIcon) {
+        this.voicePlayIcon.className = 'bi bi-pause-fill';
+      }
+      this.startPlaybackWaveformAnimation(this.currentDuration);
+    });
+
+    eventBus.on(EVENTS.VOICE_PAUSED, () => {
+      if (this.voicePlayIcon) {
+        this.voicePlayIcon.className = 'bi bi-play-fill';
+      }
+      this.renderStaticWaveformProfile(this.currentDuration);
+    });
+
+    eventBus.on(EVENTS.VOICE_PLAYBACK_ENDED, () => {
+      if (this.voicePlayIcon) {
+        this.voicePlayIcon.className = 'bi bi-play-fill';
+      }
+      this.renderStaticWaveformProfile(this.currentDuration);
+    });
+
+    eventBus.on(EVENTS.VOICE_DISCARD, () => {
+      this.resetToIdle();
+    });
+
+    eventBus.on(EVENTS.VOICE_ERROR, (err) => {
+      console.warn('[VOICE_CONTROLLER] Voice error encountered:', err);
+      const msg = err?.message || 'Microphone access blocked or unavailable';
+      this.showHint(msg);
+      this.resetToIdle();
+    });
+  }
+
+  /**
+   * Display desktop single-click hands-free recording state with Stop button
+   */
+  showDesktopRecordingState() {
+    if (this.composerForm) this.composerForm.classList.add('is-voice-recording');
+    if (this.composerStandard) this.composerStandard.classList.add('d-none');
+    if (this.voiceCapture) this.voiceCapture.classList.remove('d-none');
+
+    // On desktop: lock badge not needed, stop button directly visible!
+    if (this.voiceLockBadge) this.voiceLockBadge.classList.add('d-none');
+    if (this.voiceCancelBtn) this.voiceCancelBtn.classList.remove('d-none');
+    if (this.voiceStopBtn) this.voiceStopBtn.classList.remove('d-none');
+    if (this.voicePlayBtn) this.voicePlayBtn.classList.add('d-none');
+    if (this.voiceSendBtn) this.voiceSendBtn.classList.add('d-none');
+
+    if (this.voiceTimer) this.voiceTimer.textContent = '0:00';
+
+    this.startLiveWaveformAnimation();
+  }
+
+  /**
+   * Display mobile holding-to-record state with lock badge
+   */
+  showHoldingState() {
+    if (this.composerForm) this.composerForm.classList.add('is-voice-recording');
+    if (this.composerStandard) this.composerStandard.classList.add('d-none');
+    if (this.voiceCapture) this.voiceCapture.classList.remove('d-none');
+    if (this.voiceLockBadge) this.voiceLockBadge.classList.remove('d-none');
+
+    if (this.voiceCancelBtn) this.voiceCancelBtn.classList.remove('d-none');
+    if (this.voiceStopBtn) this.voiceStopBtn.classList.add('d-none');
+    if (this.voicePlayBtn) this.voicePlayBtn.classList.add('d-none');
+    if (this.voiceSendBtn) this.voiceSendBtn.classList.add('d-none');
+
+    if (this.voiceTimer) this.voiceTimer.textContent = '0:00';
+
+    this.startLiveWaveformAnimation();
+  }
+
+  /**
+   * Display mobile swipe-up locked recording state
+   */
+  showLockedState() {
+    if (this.voiceLockBadge) this.voiceLockBadge.classList.add('d-none');
+    if (this.voiceStopBtn) this.voiceStopBtn.classList.remove('d-none');
+    if (this.voicePlayBtn) this.voicePlayBtn.classList.add('d-none');
+    if (this.voiceSendBtn) this.voiceSendBtn.classList.add('d-none');
+  }
+
+  /**
+   * Display recorded voice note preview state (VN preview)
+   * @param {number} duration - Recorded duration in seconds
+   */
+  showPreviewState(duration) {
+    this.stopWaveformAnimation();
+    this.isDesktopRecording = false;
+    this.currentDuration = Math.max(1, duration || 0);
+
+    if (this.composerForm) this.composerForm.classList.add('is-voice-recording');
+    if (this.composerStandard) this.composerStandard.classList.add('d-none');
+    if (this.voiceCapture) {
+      this.voiceCapture.classList.remove('d-none');
+      this.voiceCapture.classList.remove('is-speaking');
+    }
+    if (this.voiceLockBadge) this.voiceLockBadge.classList.add('d-none');
+
+    // Controls
+    if (this.voiceCancelBtn) this.voiceCancelBtn.classList.remove('d-none');
+    if (this.voiceStopBtn) this.voiceStopBtn.classList.add('d-none');
+    if (this.voicePlayBtn) this.voicePlayBtn.classList.remove('d-none');
+    if (this.voicePlayIcon) this.voicePlayIcon.className = 'bi bi-play-fill';
+    if (this.voiceSendBtn) {
+      this.voiceSendBtn.classList.remove('d-none', 'is-loading');
+      this.voiceSendBtn.removeAttribute('disabled');
+      const icon = this.voiceSendBtn.querySelector('i');
+      const spinner = this.voiceSendBtn.querySelector('.spinner-border');
+      if (icon) icon.classList.remove('d-none');
+      if (spinner) spinner.classList.add('d-none');
+    }
+
+    if (this.voiceTimer) {
+      this.voiceTimer.textContent = this._formatTime(this.currentDuration);
+    }
+
+    this.renderStaticWaveformProfile(this.currentDuration);
+  }
+
+  /**
+   * Reset composer to idle standard state
+   */
+  resetToIdle() {
+    this.stopWaveformAnimation();
+    this.isDesktopRecording = false;
+    this.isHolding = false;
+    this.isLocked = false;
+    this.activePointerId = null;
+    this.analyserData = null;
+
+    if (this.composerForm) {
+      this.composerForm.classList.remove('is-voice-recording', 'is-voice-active');
+    }
+    if (this.composerStandard) this.composerStandard.classList.remove('d-none');
+    if (this.voiceCapture) {
+      this.voiceCapture.classList.add('d-none');
+      this.voiceCapture.classList.remove('is-speaking');
+    }
+    if (this.voiceLockBadge) this.voiceLockBadge.classList.add('d-none');
+
+    if (this.voiceStopBtn) this.voiceStopBtn.classList.add('d-none');
+    if (this.voicePlayBtn) this.voicePlayBtn.classList.add('d-none');
+    if (this.voiceSendBtn) {
+      this.voiceSendBtn.classList.add('d-none');
+      this.voiceSendBtn.classList.remove('is-loading');
+      this.voiceSendBtn.removeAttribute('disabled');
+      const icon = this.voiceSendBtn.querySelector('i');
+      const spinner = this.voiceSendBtn.querySelector('.spinner-border');
+      if (icon) icon.classList.remove('d-none');
+      if (spinner) spinner.classList.add('d-none');
+    }
+
+    if (this.voiceTimer) this.voiceTimer.textContent = '0:00';
+
+    this.bars.forEach((bar) => {
+      bar.style.height = '3px';
+      bar.style.opacity = '0.5';
+    });
+  }
+
+  /**
+   * PwaniMate Organic Soundwave Animation
+   * Analyzes real microphone volume and continuously scrolls sound waves across the bars.
+   */
+  startLiveWaveformAnimation() {
+    this.stopWaveformAnimation();
+    if (!this.bars.length) return;
+
+    const numBars = this.bars.length;
+    this.waveformHistory = new Array(numBars).fill(0);
+    this.recordedPeaks = [];
+    this.lastSampleTime = performance.now();
+
+    const draw = () => {
+      const now = performance.now();
+      let liveRms = 0;
+
+      // Dynamically initialize and read byte time-domain data as soon as analyser is ready
+      if (voiceService.analyser) {
+        if (!this.analyserData || this.analyserData.length !== voiceService.analyser.fftSize) {
+          this.analyserData = new Uint8Array(voiceService.analyser.fftSize);
+        }
+        voiceService.analyser.getByteTimeDomainData(this.analyserData);
+        let sum = 0;
+        for (let i = 0; i < this.analyserData.length; i++) {
+          const amp = (this.analyserData[i] - 128) / 128;
+          sum += amp * amp;
+        }
+        liveRms = Math.sqrt(sum / this.analyserData.length);
+      }
+
+      // Track ambient baseline noise floor during quiet moments
+      if (liveRms > 0 && liveRms < 0.03) {
+        this.ambientNoiseFloor = this.ambientNoiseFloor * 0.95 + liveRms * 0.05;
+      }
+
+      let normalizedVolume = 0;
+      // Sensitive noise gate: adapts to room ambient noise, baseline 0.012
+      const gateThreshold = Math.max(0.012, (this.ambientNoiseFloor || 0.015) * 1.15);
+      if (liveRms > gateThreshold) {
+        // Dynamic volume curve: scales smoothly from 0.0 to 1.0 above the gate
+        normalizedVolume = Math.min(1.0, Math.pow((liveRms - gateThreshold) / 0.065, 0.72));
+      } else {
+        normalizedVolume = 0;
+      }
+
+      // Append sample at right edge every 50ms, scrolling trace leftward
+      if (now - this.lastSampleTime >= 50) {
+        this.waveformHistory.shift();
+        this.waveformHistory.push(normalizedVolume);
+        this.recordedPeaks.push(normalizedVolume);
+        this.lastSampleTime = now;
+
+        const isSpeaking = normalizedVolume > 0.02;
+        if (this.voiceCapture) {
+          this.voiceCapture.classList.toggle('is-speaking', isSpeaking);
+        }
+
+        // Render each bar height symmetrically with PwaniMate harmonic variation
+        this.bars.forEach((bar, index) => {
+          const sample = this.waveformHistory[index] || 0;
+          if (sample > 0.015) {
+            const variation = 0.75 + 0.25 * (0.5 + 0.5 * Math.sin((index + 1) * 2.37));
+            const height = Math.round(3 + Math.pow(sample, 0.74) * 31 * variation);
+            bar.style.height = `${Math.min(34, Math.max(3, height))}px`;
+            bar.style.opacity = '0.98';
+          } else {
+            bar.style.height = '3px';
+            bar.style.opacity = '0.45';
+          }
         });
-        
-        eventBus.on(EVENTS.VOICE_STOP, (data) => {
-            this.stopWaveformAnimation();
-            this.showPreviewState(data?.duration || 0);
-        });
-        
-        eventBus.on(EVENTS.VOICE_LOCK, () => {
-            this.showLockedState();
-        });
-        
-        eventBus.on(EVENTS.VOICE_LOCKED, () => {
-            this.showLockedState();
-        });
-        
-        eventBus.on(EVENTS.VOICE_TIMER_UPDATE, (duration) => {
-            this.updateTimer(duration);
-        });
-        
-        eventBus.on(EVENTS.VOICE_DISCARD, () => {
-            this.closeModal();
-            this.resetModal();
-        });
-        
-        eventBus.on(EVENTS.VOICE_SEND, () => {
-            this.closeModal();
-            this.resetModal();
-        });
-        
-        eventBus.on(EVENTS.VOICE_PLAYING, () => {
-            this.updatePlayPauseButton(true);
-        });
-        
-        eventBus.on(EVENTS.VOICE_PAUSED, () => {
-            this.updatePlayPauseButton(false);
-        });
-        
-        eventBus.on(EVENTS.VOICE_PLAYBACK_ENDED, () => {
-            this.updatePlayPauseButton(false);
-        });
-        
-        eventBus.on(EVENTS.VOICE_FREQUENCY_UPDATE, (data) => {
-            this.updateWaveformFromAudio(data);
-        });
-    }
-    
-    /**
-     * Show the modal
-     */
-    showModal() {
-        if (this.modal) {
-            this.modal.classList.add('show');
+      }
+
+      this.waveformAnimation = requestAnimationFrame(draw);
+    };
+
+    this.waveformAnimation = requestAnimationFrame(draw);
+  }
+
+  /**
+   * Preview Playback Animation in sync with real audio playback
+   * @param {number} duration - Total audio duration
+   */
+  startPlaybackWaveformAnimation(duration) {
+    this.stopWaveformAnimation();
+    if (!this.bars.length) return;
+
+    const numBars = this.bars.length;
+    const peaks = this.recordedPeaks.length > 0
+      ? this._resamplePeaks(this.recordedPeaks, numBars)
+      : this._generateRealisticProfile(numBars);
+
+    const draw = () => {
+      const audio = voiceService.audioElement;
+      if (!audio || !voiceService.isPlaying) return;
+
+      const currentTime = audio.currentTime || 0;
+      const totalDuration = audio.duration || duration || 1;
+      const progress = Math.min(1, Math.max(0, currentTime / totalDuration));
+      const activeBarIndex = Math.floor(progress * numBars);
+      const now = performance.now();
+
+      for (let i = 0; i < numBars; i++) {
+        const basePeak = peaks[i] || 0.15;
+        let height;
+
+        if (i <= activeBarIndex) {
+          // Passed/playing bars: animated with dynamic audio ripple
+          const ripple = 0.85 + 0.15 * Math.sin((i - activeBarIndex) * 0.75 + now * 0.012);
+          height = Math.round(3 + basePeak * 31 * ripple);
+          this.bars[i].style.opacity = '1';
+        } else {
+          // Upcoming bars: steady profile
+          height = Math.round(3 + basePeak * 26);
+          this.bars[i].style.opacity = '0.45';
         }
+        this.bars[i].style.height = `${Math.min(34, Math.max(3, height))}px`;
+      }
+
+      if (this.voiceTimer) {
+        this.voiceTimer.textContent = `${this._formatTime(currentTime)} / ${this._formatTime(totalDuration)}`;
+      }
+
+      this.waveformAnimation = requestAnimationFrame(draw);
+    };
+
+    this.waveformAnimation = requestAnimationFrame(draw);
+  }
+
+  /**
+   * Render static waveform profile for recorded audio
+   * @param {number} duration - Recorded duration
+   */
+  renderStaticWaveformProfile(duration) {
+    this.stopWaveformAnimation();
+    if (!this.bars.length) return;
+
+    const numBars = this.bars.length;
+    const peaks = this.recordedPeaks.length > 0
+      ? this._resamplePeaks(this.recordedPeaks, numBars)
+      : this._generateRealisticProfile(numBars);
+
+    for (let i = 0; i < numBars; i++) {
+      const basePeak = peaks[i] || 0.15;
+      const height = Math.round(3 + basePeak * 30);
+      this.bars[i].style.height = `${Math.min(34, Math.max(3, height))}px`;
+      this.bars[i].style.opacity = '0.85';
     }
-    
-    /**
-     * Close the modal
-     */
-    closeModal() {
-        if (this.modal) {
-            this.modal.classList.remove('show');
-        }
-        this.stopWaveformAnimation();
+
+    if (this.voiceTimer) {
+      this.voiceTimer.textContent = this._formatTime(duration);
     }
-    
-    /**
-     * Reset the modal to initial state
-     */
-    resetModal() {
-        this.stopWaveformAnimation();
-        
-        // Hide all states
-        if (this.recordingState) this.recordingState.style.display = 'none';
-        if (this.previewState) this.previewState.style.display = 'none';
-        if (this.lockedState) this.lockedState.style.display = 'none';
-        
-        // Reset timers
-        if (this.timer) this.timer.textContent = '0:00';
-        if (this.previewDuration) this.previewDuration.textContent = '0:00';
-        if (this.lockedTimer) this.lockedTimer.textContent = '0:00';
-        
-        // Reset play/pause button
-        this.updatePlayPauseButton(false);
-        
-        // Clear waveforms
-        if (this.waveform) this.waveform.innerHTML = '';
-        if (this.staticWaveform) this.staticWaveform.innerHTML = '';
-        if (this.lockedWaveform) this.lockedWaveform.innerHTML = '';
+  }
+
+  /**
+   * Stop active waveform animation
+   */
+  stopWaveformAnimation() {
+    if (this.waveformAnimation) {
+      cancelAnimationFrame(this.waveformAnimation);
+      this.waveformAnimation = null;
     }
-    
-    /**
-     * Show recording state
-     */
-    showRecordingState() {
-        this.hideAllStates();
-        if (this.recordingState) {
-            this.recordingState.style.display = 'flex';
-        }
-        this.generateWaveform(this.waveform);
+  }
+
+  /**
+   * Resample recorded peaks to match bar count
+   * @param {number[]} peaks
+   * @param {number} targetCount
+   * @returns {Float32Array}
+   */
+  _resamplePeaks(peaks, targetCount) {
+    if (!peaks.length) return new Float32Array(targetCount).fill(0.2);
+    const result = new Float32Array(targetCount);
+    const step = (peaks.length - 1) / (targetCount - 1 || 1);
+
+    for (let i = 0; i < targetCount; i++) {
+      const idx = i * step;
+      const low = Math.floor(idx);
+      const high = Math.min(peaks.length - 1, Math.ceil(idx));
+      const frac = idx - low;
+      const val = (peaks[low] * (1 - frac) + peaks[high] * frac);
+      result[i] = Math.min(1.0, Math.max(0.08, val));
     }
-    
-    /**
-     * Show preview state
-     */
-    showPreviewState(duration) {
-        this.hideAllStates();
-        if (this.previewState) {
-            this.previewState.style.display = 'flex';
-        }
-        if (this.previewDuration) {
-            this.previewDuration.textContent = this.formatTime(duration);
-        }
-        this.generateStaticWaveform();
+    return result;
+  }
+
+  /**
+   * Generate realistic organic waveform profile fallback
+   * @param {number} count
+   * @returns {Float32Array}
+   */
+  _generateRealisticProfile(count) {
+    const result = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      const norm = i / count;
+      const envelope = Math.sin(norm * Math.PI);
+      const variation = 0.4 + 0.6 * Math.abs(Math.sin(i * 2.37) * Math.cos(i * 1.5));
+      result[i] = Math.min(1.0, Math.max(0.1, envelope * variation));
     }
-    
-    /**
-     * Show locked state
-     */
-    showLockedState() {
-        this.hideAllStates();
-        if (this.lockedState) {
-            this.lockedState.style.display = 'flex';
-        }
-        this.generateWaveform(this.lockedWaveform);
-    }
-    
-    /**
-     * Hide all states
-     */
-    hideAllStates() {
-        if (this.recordingState) this.recordingState.style.display = 'none';
-        if (this.previewState) this.previewState.style.display = 'none';
-        if (this.lockedState) this.lockedState.style.display = 'none';
-    }
-    
-    /**
-     * Update timer display
-     */
-    updateTimer(duration) {
-        const formatted = this.formatTime(duration);
-        if (this.timer) this.timer.textContent = formatted;
-        if (this.lockedTimer) this.lockedTimer.textContent = formatted;
-    }
-    
-    /**
-     * Format time as MM:SS
-     */
-    formatTime(seconds) {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    }
-    
-    /**
-     * Generate waveform bars
-     */
-    generateWaveform(container) {
-        if (!container) return;
-        container.innerHTML = '';
-        
-        const barCount = 40;
-        for (let i = 0; i < barCount; i++) {
-            const bar = document.createElement('div');
-            bar.className = 'voice-waveform-bar';
-            bar.style.height = Math.random() * 60 + 20 + 'px';
-            container.appendChild(bar);
-        }
-    }
-    
-    /**
-     * Generate static waveform for preview
-     */
-    generateStaticWaveform() {
-        if (!this.staticWaveform) return;
-        this.staticWaveform.innerHTML = '';
-        
-        const barCount = 40;
-        for (let i = 0; i < barCount; i++) {
-            const bar = document.createElement('div');
-            bar.className = 'voice-waveform-bar';
-            bar.style.height = Math.random() * 50 + 15 + 'px';
-            this.staticWaveform.appendChild(bar);
-        }
-    }
-    
-    /**
-     * Start waveform animation
-     * Waveform is now driven by actual frequency data from voice service
-     */
-    startWaveformAnimation() {
-        // Waveform animation is now driven by VOICE_FREQUENCY_UPDATE events
-        // No need for random animation loop
-    }
-    
-    /**
-     * Stop waveform animation
-     */
-    stopWaveformAnimation() {
-        if (this.waveformAnimation) {
-            cancelAnimationFrame(this.waveformAnimation);
-            this.waveformAnimation = null;
-        }
-    }
-    
-    /**
-     * Update play/pause button icon
-     */
-    updatePlayPauseButton(isPlaying) {
-        if (!this.playPauseBtn) return;
-        
-        const icon = this.playPauseBtn.querySelector('i');
-        if (icon) {
-            if (isPlaying) {
-                icon.className = 'bi bi-pause-fill';
-            } else {
-                icon.className = 'bi bi-play-fill';
-            }
-        }
-    }
-    
-    /**
-     * Update waveform from actual audio frequency data
-     */
-    updateWaveformFromAudio(data) {
-        const bars = document.querySelectorAll('.voice-waveform .voice-waveform-bar');
-        if (!bars.length || !data.dataArray) return;
-        
-        const dataArray = data.dataArray;
-        const step = Math.floor(dataArray.length / bars.length);
-        
-        bars.forEach((bar, index) => {
-            const dataIndex = index * step;
-            const value = dataArray[dataIndex] || 0;
-            // Scale the value to a reasonable height (0-80px)
-            const height = Math.max(5, (value / 255) * 80);
-            bar.style.height = height + 'px';
-        });
-    }
-    
-    /**
-     * Destroy the controller
-     */
-    destroy() {
-        this.stopWaveformAnimation();
-        this.initialized = false;
-        console.log('[VOICE_MODAL] Voice modal controller destroyed');
-    }
+    return result;
+  }
+
+  /**
+   * Format seconds to M:SS
+   * @param {number} totalSeconds
+   * @returns {string}
+   */
+  _formatTime(totalSeconds) {
+    const s = Math.floor(totalSeconds || 0);
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  }
+
+  /**
+   * Show a temporary toast hint (e.g. "Hold to record or swipe up to lock")
+   * @param {string} msg
+   */
+  showHint(msg) {
+    const existing = document.querySelector('.messaging-voice-hint-toast');
+    if (existing) existing.remove();
+
+    const hint = document.createElement('div');
+    hint.className = 'messaging-voice-hint-toast';
+    hint.textContent = msg;
+    hint.style.cssText = [
+      'position: fixed',
+      'bottom: 92px',
+      'left: 50%',
+      'transform: translateX(-50%)',
+      'background: rgba(15, 23, 42, 0.92)',
+      'color: #ffffff',
+      'padding: 7px 18px',
+      'border-radius: 999px',
+      'font-size: 0.82rem',
+      'font-weight: 500',
+      'box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22)',
+      'z-index: 9999',
+      'pointer-events: none',
+      'transition: opacity 0.25s ease, transform 0.25s ease',
+    ].join(';');
+
+    document.body.appendChild(hint);
+    setTimeout(() => {
+      hint.style.opacity = '0';
+      hint.style.transform = 'translateX(-50%) translateY(4px)';
+      setTimeout(() => hint.remove(), 260);
+    }, 2400);
+  }
 }
 
-// Create and export singleton instance
+// Global singleton instance
 export const voiceModalController = new VoiceModalController();

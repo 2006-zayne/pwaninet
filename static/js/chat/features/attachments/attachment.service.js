@@ -68,7 +68,7 @@ export class AttachmentService {
    * @param {File} file - File to upload
    * @param {number} conversationId - Conversation ID
    */
-  async handleFileUpload(file, conversationId) {
+  async handleFileUpload(file, conversationId, options = {}) {
     // Validate file
     if (!this.validateFile(file)) {
       eventBus.emit(EVENTS.ATTACHMENT_ERROR, { message: 'Invalid file' });
@@ -84,30 +84,65 @@ export class AttachmentService {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('conversation_id', conversationId);
+    if (options.isVoiceNote || file.name.startsWith('voice_')) {
+      formData.append('is_voice_note', 'true');
+    }
+
+    const csrfToken = this.getCSRFToken();
+    if (csrfToken) {
+      formData.append('csrfmiddlewaretoken', csrfToken);
+    }
 
     try {
       // Emit upload start event (QUEUED state)
       eventBus.emit(EVENTS.ATTACHMENT_UPLOAD_START, { file, status: this.MESSAGE_STATES.QUEUED });
 
       // Upload file to messaging app endpoint
+      const headers = {};
+      if (csrfToken) {
+        headers['X-CSRFToken'] = csrfToken;
+      }
+
       const response = await fetch('/messaging/api/attachments/upload/', {
         method: 'POST',
         body: formData,
-        headers: {
-          'X-CSRFToken': this.getCSRFToken(),
-        },
+        headers,
       });
 
       if (response.ok) {
         const data = await response.json();
         eventBus.emit(EVENTS.ATTACHMENT_UPLOAD_SUCCESS, { ...data, status: this.MESSAGE_STATES.SENT });
+        // Emit MESSAGE_UPLOAD_SUCCESS so MessageService immediately resolves optimistic message and updates store
+        eventBus.emit(EVENTS.MESSAGE_UPLOAD_SUCCESS, {
+          tempId: options.tempId || `temp_upload_${data.id || Date.now()}`,
+          serverMessage: data
+        });
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
+        let errorData = null;
+        try {
+          errorData = await response.json();
+        } catch (_) {
+          errorData = { error: `Server returned HTTP ${response.status}` };
+        }
+        console.error('[ATTACHMENT_UPLOAD] Server error response:', response.status, errorData);
+        const errorMsg = (errorData && (errorData.error || errorData.detail || errorData.message)) ||
+                         (typeof errorData === 'string' ? errorData : `Upload failed (${response.status})`);
+        throw new Error(errorMsg);
       }
     } catch (error) {
       console.error('Attachment upload error:', error);
-      eventBus.emit(EVENTS.ATTACHMENT_ERROR, { ...error, status: this.MESSAGE_STATES.FAILED });
+      if (options.tempId) {
+        eventBus.emit(EVENTS.MESSAGE_UPLOAD_FAILED, {
+          tempId: options.tempId,
+          error: error.message || 'Upload failed'
+        });
+      }
+      eventBus.emit(EVENTS.ATTACHMENT_ERROR, {
+        message: error.message || 'Upload failed',
+        error,
+        status: this.MESSAGE_STATES.FAILED
+      });
+      throw error;
     }
   }
 
@@ -129,28 +164,13 @@ export class AttachmentService {
    * @returns {boolean} Is valid
    */
   validateFile(file) {
-    // Size limit: 50MB
-    const maxSize = 50 * 1024 * 1024;
+    if (!file) return false;
+    // Size limit: 100MB
+    const maxSize = 100 * 1024 * 1024;
     if (file.size > maxSize) {
       return false;
     }
-
-    // Allowed types
-    const allowedTypes = [
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'image/webp',
-      'video/mp4',
-      'video/webm',
-      'audio/mpeg',
-      'audio/wav',
-      'audio/webm',
-      'application/pdf',
-      'text/plain',
-    ];
-
-    return allowedTypes.includes(file.type);
+    return true;
   }
 
   /**
@@ -158,6 +178,14 @@ export class AttachmentService {
    * @returns {string} CSRF token
    */
   getCSRFToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta && meta.getAttribute('content')) {
+      return meta.getAttribute('content');
+    }
+    const input = document.querySelector('[name="csrfmiddlewaretoken"]');
+    if (input && input.value) {
+      return input.value;
+    }
     const cookies = document.cookie.split(';');
     for (const cookie of cookies) {
       const [name, value] = cookie.trim().split('=');

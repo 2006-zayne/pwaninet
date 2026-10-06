@@ -238,14 +238,18 @@ export class EmojiService {
    * Insert emoji into input
    */
   insertEmoji(emoji) {
-    const input = document.getElementById('messageInput');
+    const mcOverlay = document.getElementById('mediaComposerOverlay');
+    const isComposerOpen = mcOverlay && (mcOverlay.classList.contains('show') || mcOverlay.offsetParent !== null);
+    const input = (isComposerOpen ? document.getElementById('mediaCaptionInput') : null) || document.getElementById('messageInput');
     if (!input) return;
 
-    const pos = input.selectionStart;
+    const pos = input.selectionStart !== null && input.selectionStart !== undefined ? input.selectionStart : input.value.length;
     const val = input.value;
     input.value = val.slice(0, pos) + emoji + val.slice(pos);
-    input.setSelectionRange(pos + emoji.length, pos + emoji.length);
+    const nextPos = pos + emoji.length;
+    input.setSelectionRange(nextPos, nextPos);
     input.focus();
+    input.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
   /**

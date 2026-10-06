@@ -10,7 +10,16 @@ class ChatThemeHandler {
 
     init() {
         this.setupEventListeners();
-        this.loadCurrentTheme();
+        const conversationId = this.getConversationId();
+        if (conversationId) {
+            this.loadCurrentTheme();
+        } else {
+            const chatTarget = this.getChatTarget();
+            if (chatTarget) {
+                chatTarget.style.background = '';
+                chatTarget.style.backgroundImage = 'none';
+            }
+        }
     }
 
     setupEventListeners() {
@@ -202,9 +211,21 @@ class ChatThemeHandler {
         }
     }
 
+    getChatTarget() {
+        return document.getElementById('chatMainArea') || document.querySelector('.chat-container') || document.getElementById('messagesContainer');
+    }
+
     applyBackgroundTheme(themeName) {
+        const chatTarget = this.getChatTarget();
         const messagesArea = document.getElementById('messagesContainer');
-        if (!messagesArea) return;
+        if (!chatTarget) return;
+
+        // Ensure messagesArea remains transparent so wallpaper shows continuously behind messages and floating composer
+        if (messagesArea) {
+            messagesArea.style.background = 'transparent';
+            messagesArea.style.backgroundColor = 'transparent';
+            messagesArea.style.backgroundImage = 'none';
+        }
 
         // Remove active class from all options
         document.querySelectorAll('.theme-option').forEach(option => {
@@ -217,61 +238,79 @@ class ChatThemeHandler {
         // Apply theme
         const themeMap = {
             'light': () => {
-                messagesArea.style.background = '#f8fafc';
-                messagesArea.style.backgroundImage = 'none';
+                chatTarget.style.background = '#efeae2';
+                chatTarget.style.backgroundImage = 'none';
             },
             'dark': () => {
-                messagesArea.style.background = '#1f2937';
-                messagesArea.style.backgroundImage = 'none';
+                chatTarget.style.background = '#0b141a';
+                chatTarget.style.backgroundImage = 'none';
             },
             'wallpaper-1': () => {
-                messagesArea.style.backgroundImage = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                chatTarget.style.background = '';
+                chatTarget.style.backgroundImage = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
             },
             'wallpaper-2': () => {
-                messagesArea.style.backgroundImage = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+                chatTarget.style.background = '';
+                chatTarget.style.backgroundImage = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
             },
             'wallpaper-3': () => {
-                messagesArea.style.backgroundImage = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+                chatTarget.style.background = '';
+                chatTarget.style.backgroundImage = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
             },
             'wallpaper-4': () => {
-                messagesArea.style.backgroundImage = 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)';
+                chatTarget.style.background = '';
+                chatTarget.style.backgroundImage = 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)';
             },
             'wallpaper-5': () => {
-                messagesArea.style.backgroundImage = 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)';
+                chatTarget.style.background = '';
+                chatTarget.style.backgroundImage = 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)';
             },
             'wallpaper-6': () => {
-                messagesArea.style.backgroundImage = 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)';
+                chatTarget.style.background = '';
+                chatTarget.style.backgroundImage = 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)';
             }
         };
 
         if (themeMap[themeName]) {
             themeMap[themeName]();
             this.currentTheme = themeName;
+            chatTarget.style.backgroundSize = 'cover';
+            chatTarget.style.backgroundPosition = 'center';
+            chatTarget.style.backgroundRepeat = 'no-repeat';
         }
     }
 
     updateOverlay() {
-        const messagesArea = document.getElementById('messagesContainer');
-        if (!messagesArea) return;
+        const chatTarget = this.getChatTarget();
+        if (!chatTarget) return;
 
         const overlayEnabled = document.getElementById('overlayEnabled');
         const overlayOpacitySlider = document.getElementById('overlayOpacitySlider');
         const overlayColorPicker = document.getElementById('overlayColorPicker');
 
-        // Remove existing overlay
-        let overlay = messagesArea.querySelector('.chat-overlay');
-        if (overlay) {
-            overlay.remove();
+        // Clean up legacy inline overlays
+        const messagesArea = document.getElementById('messagesContainer');
+        if (messagesArea) {
+            const oldOverlay = messagesArea.querySelector('.chat-overlay');
+            if (oldOverlay) oldOverlay.remove();
+        }
+        let existingOverlay = chatTarget.querySelector(':scope > .chat-overlay');
+        if (existingOverlay) {
+            existingOverlay.remove();
         }
 
         // Only add overlay if enabled AND opacity > 0
         const isEnabled = overlayEnabled && overlayEnabled.checked;
         const opacity = overlayOpacitySlider ? overlayOpacitySlider.value / 100 : 0.3;
-        
+        const color = overlayColorPicker ? overlayColorPicker.value : '#ffffff';
+        const effectiveOpacity = isEnabled && opacity > 0 ? opacity : 0;
+
+        chatTarget.style.setProperty('--chat-overlay-color', color);
+        chatTarget.style.setProperty('--chat-overlay-opacity', effectiveOpacity);
+
         if (isEnabled && opacity > 0) {
-            overlay = document.createElement('div');
+            const overlay = document.createElement('div');
             overlay.className = 'chat-overlay';
-            const color = overlayColorPicker ? overlayColorPicker.value : '#ffffff';
             overlay.style.cssText = `
                 position: absolute;
                 top: 0;
@@ -280,19 +319,10 @@ class ChatThemeHandler {
                 bottom: 0;
                 background-color: ${color};
                 opacity: ${opacity};
-                pointer-events: none;
-                z-index: 1;
+                pointer-events: none !important;
+                z-index: 0 !important;
             `;
-            messagesArea.style.position = 'relative';
-            messagesArea.appendChild(overlay);
-        }
-
-        // Update CSS variables to match settings
-        if (messagesArea) {
-            const overlayColor = overlayColorPicker ? overlayColorPicker.value : '#ffffff';
-            const overlayOpacity = isEnabled && opacity > 0 ? opacity : 0;
-            messagesArea.style.setProperty('--chat-overlay-color', overlayColor);
-            messagesArea.style.setProperty('--chat-overlay-opacity', overlayOpacity);
+            chatTarget.prepend(overlay);
         }
     }
 
@@ -404,12 +434,19 @@ class ChatThemeHandler {
 
         const reader = new FileReader();
         reader.onload = (e) => {
+            const chatTarget = this.getChatTarget();
             const messagesArea = document.getElementById('messagesContainer');
-            if (messagesArea) {
-                messagesArea.style.backgroundImage = `url(${e.target.result})`;
-                messagesArea.style.backgroundSize = 'cover';
-                messagesArea.style.backgroundPosition = 'center';
-                messagesArea.style.backgroundRepeat = 'no-repeat';
+            if (chatTarget) {
+                if (messagesArea) {
+                    messagesArea.style.background = 'transparent';
+                    messagesArea.style.backgroundColor = 'transparent';
+                    messagesArea.style.backgroundImage = 'none';
+                }
+                chatTarget.style.background = '';
+                chatTarget.style.backgroundImage = `url(${e.target.result})`;
+                chatTarget.style.backgroundSize = 'cover';
+                chatTarget.style.backgroundPosition = 'center';
+                chatTarget.style.backgroundRepeat = 'no-repeat';
 
                 // Store as custom wallpaper
                 this.currentTheme = 'custom-wallpaper';
@@ -464,12 +501,19 @@ class ChatThemeHandler {
                     // Handle custom wallpaper restoration
                     if (themeData.background === 'custom-wallpaper' && themeData.customWallpaper) {
                         this.customWallpaperData = themeData.customWallpaper;
+                        const chatTarget = this.getChatTarget();
                         const messagesArea = document.getElementById('messagesContainer');
-                        if (messagesArea) {
-                            messagesArea.style.backgroundImage = `url(${themeData.customWallpaper})`;
-                            messagesArea.style.backgroundSize = 'cover';
-                            messagesArea.style.backgroundPosition = 'center';
-                            messagesArea.style.backgroundRepeat = 'no-repeat';
+                        if (chatTarget) {
+                            if (messagesArea) {
+                                messagesArea.style.background = 'transparent';
+                                messagesArea.style.backgroundColor = 'transparent';
+                                messagesArea.style.backgroundImage = 'none';
+                            }
+                            chatTarget.style.background = '';
+                            chatTarget.style.backgroundImage = `url(${themeData.customWallpaper})`;
+                            chatTarget.style.backgroundSize = 'cover';
+                            chatTarget.style.backgroundPosition = 'center';
+                            chatTarget.style.backgroundRepeat = 'no-repeat';
                         }
                     } else {
                         this.applyBackgroundTheme(themeData.background);

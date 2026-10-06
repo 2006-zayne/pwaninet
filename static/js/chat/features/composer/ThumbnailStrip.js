@@ -37,10 +37,6 @@ export class ThumbnailStrip {
             this.container.appendChild(thumbnail);
         });
         
-        // Add "add more" button
-        const addBtn = this._createAddButton();
-        this.container.appendChild(addBtn);
-        
         this._scrollToActive();
     }
     
@@ -58,23 +54,9 @@ export class ThumbnailStrip {
         const content = this._createThumbnailContent(item);
         thumbnail.appendChild(content);
         
-        // Remove button
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'thumbnail-remove';
-        removeBtn.innerHTML = `
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-        `;
-        removeBtn.onclick = (e) => {
-            e.stopPropagation();
-            this.composer.removeMediaItem(index);
-        };
-        thumbnail.appendChild(removeBtn);
-        
         // Click to activate
-        thumbnail.onclick = () => {
+        thumbnail.onclick = (e) => {
+            e.preventDefault();
             this.composer.setActiveMedia(index);
         };
         
@@ -206,13 +188,21 @@ export class ThumbnailStrip {
     }
     
     /**
-     * Destroy thumbnail strip
+     * Clear thumbnail strip
      */
-    destroy() {
+    clear() {
         if (this.container) {
             this.container.innerHTML = '';
         }
         this.mediaItems = [];
+        this.activeIndex = 0;
+    }
+
+    /**
+     * Destroy thumbnail strip
+     */
+    destroy() {
+        this.clear();
         this.initialized = false;
         console.log('[THUMBNAIL_STRIP] Thumbnail strip destroyed');
     }

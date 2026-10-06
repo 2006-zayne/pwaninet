@@ -107,6 +107,7 @@
   bottom: 0;
   background-color: var(--chat-overlay-color);
   opacity: var(--chat-overlay-opacity);
+  pointer-events: none !important;
   z-index: 1;
 }
 

@@ -85,6 +85,7 @@ export class MessageService {
             return;
         }
         
+        const msgType = message.message_type || message.type || (message.attachments?.length > 1 ? 'media_group' : 'media');
         const canonicalMessage = this._createCanonicalMessage({
             id: message.temp_id,
             conversationId: state.conversationId,
@@ -92,11 +93,18 @@ export class MessageService {
             timestamp: message.created_at,
             status: MESSAGE_STATE.UPLOADING,
             content: message.content || '',
-            type: message.message_type || message.type || 'media_group',
+            type: msgType,
             metadata: {
-                attachments: message.attachments,
-                global_caption: message.global_caption
+                ...(message.metadata || {}),
+                attachments: message.attachments || message.metadata?.attachments,
+                global_caption: message.global_caption || message.metadata?.global_caption,
+                url: message.metadata?.url || message.attachments?.[0]?.file_url || '',
+                type: message.metadata?.type || message.attachment_type || message.attachments?.[0]?.file_type || 'image',
+                size: message.metadata?.size || message.attachments?.[0]?.size || 0,
+                uploadProgress: message.metadata?.uploadProgress || 0
             },
+            attachments: message.attachments || message.metadata?.attachments || [],
+            global_caption: message.global_caption || message.metadata?.global_caption || '',
             isOptimistic: true,
             sortOrder: Date.now()
         });
@@ -132,10 +140,17 @@ export class MessageService {
         console.log('[MESSAGE_SERVICE] Removing optimistic message:', tempId);
         store.removeMessage(tempId);
         
-        // Add server message
-        console.log('[MESSAGE_SERVICE] Adding server message:', serverMessage);
-        const normalizedMessage = this.normalizeServerMessage(serverMessage);
-        store.addMessage(normalizedMessage);
+        // Add server message(s)
+        console.log('[MESSAGE_SERVICE] Adding server message(s):', serverMessage);
+        if (Array.isArray(serverMessage)) {
+            serverMessage.forEach(msg => {
+                const normalizedMessage = this.normalizeServerMessage(msg);
+                store.addMessage(normalizedMessage);
+            });
+        } else {
+            const normalizedMessage = this.normalizeServerMessage(serverMessage);
+            store.addMessage(normalizedMessage);
+        }
     }
 
     /**
@@ -208,6 +223,24 @@ export class MessageService {
         if (raw.attachment_url) {
             metadata.url = raw.attachment_url;
             metadata.type = raw.attachment_type || 'file';
+        } else if (raw.attachment && typeof raw.attachment === 'string') {
+            metadata.url = raw.attachment;
+            metadata.type = raw.attachment_type || 'file';
+        }
+        if (!metadata.url && raw.attachments && raw.attachments.length === 1) {
+            metadata.url = raw.attachments[0].file || raw.attachments[0].file_url || raw.attachments[0].url;
+            metadata.type = raw.attachments[0].file_type || raw.attachment_type || 'file';
+        }
+        if (raw.is_voice_note !== undefined) {
+            metadata.is_voice_note = raw.is_voice_note;
+        } else if (raw.attachment_type === 'voice_note' || raw.message_type === 'voice_note') {
+            metadata.is_voice_note = true;
+        }
+        if (raw.file_size) {
+            metadata.size = raw.file_size;
+        }
+        if (raw.file_name) {
+            metadata.file_name = raw.file_name;
         }
         
         // Add link metadata if present
@@ -224,6 +257,16 @@ export class MessageService {
         let messageType = this.mapType(raw.message_type || raw.type);
         if (raw.message_type === 'media_group') {
             messageType = 'media_group';
+        } else if (metadata.is_voice_note || raw.attachment_type === 'voice_note' || raw.message_type === 'voice_note') {
+            messageType = 'media';
+            metadata.type = 'voice_note';
+            metadata.is_voice_note = true;
+        } else if (raw.attachment_type === 'audio' || raw.message_type === 'audio') {
+            messageType = 'media';
+            metadata.type = 'audio';
+        } else if (raw.attachment_type === 'document' || raw.message_type === 'document') {
+            messageType = 'media';
+            metadata.type = 'document';
         } else if (raw.attachment_type) {
             messageType = 'media';
         } else if (raw.link_url) {
@@ -319,7 +362,10 @@ export class MessageService {
             console.error('[MESSAGE_SERVICE] Error stack:', error.stack);
             throw error;
         }
-        console.log('[MESSAGE_SERVICE] loadConversationHistory completed');
+        finally {
+            store.setInitialHistoryLoaded(true);
+            console.log('[MESSAGE_SERVICE] loadConversationHistory completed and marked loaded in store');
+        }
     }
 
 
@@ -877,6 +923,8 @@ export class MessageService {
             content: data.content,
             type: data.type,
             metadata: data.metadata || {},
+            attachments: data.attachments || data.metadata?.attachments || [],
+            global_caption: data.global_caption || data.metadata?.global_caption || '',
             isOptimistic: data.isOptimistic || false,
             sortOrder: data.sortOrder ?? Date.now()
         };
